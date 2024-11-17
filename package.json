@@ -1,0 +1,9 @@
+{
+  "name": "cap-contracts",
+  "version": "1.0.0",
+  "description": "Cap Labs Core Contracts",
+  "main": "index.js",
+  "author": "Cap Labs Inc.",
+  "license": "MIT",
+  "private": true
+}
