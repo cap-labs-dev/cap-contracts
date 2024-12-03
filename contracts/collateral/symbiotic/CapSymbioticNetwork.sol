@@ -4,8 +4,8 @@ pragma solidity ^0.8.28;
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import {INetworkRegistry} from "../../interfaces/symbiotic/INetworkRegistry.sol";
-import {INetworkMiddlewareService} from "../../interfaces/symbiotic/INetworkMiddlewareService.sol";
+import {INetworkRegistry} from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
+import {INetworkMiddlewareService} from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
 
 contract CapSymbioticNetwork is 
     OwnableUpgradeable, 
