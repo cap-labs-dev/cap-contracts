@@ -6,6 +6,9 @@
   "author": "Cap Labs Inc.",
   "license": "MIT",
   "private": true,
+  "engines": {
+    "node": "^20.18.0"
+  },
   "scripts": {
     "compile": "forge build"
   },
