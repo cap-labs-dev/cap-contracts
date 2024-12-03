@@ -5,5 +5,12 @@
   "main": "index.js",
   "author": "Cap Labs Inc.",
   "license": "MIT",
-  "private": true
+  "private": true,
+  "scripts": {
+    "compile": "forge build"
+  },
+  "devDependencies": {
+    "@openzeppelin/contracts": "npm:@openzeppelin/contracts",
+    "@openzeppelin/contracts-upgradeable": "npm:@openzeppelin/contracts-upgradeable"
+  }
 }

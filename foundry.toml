@@ -1,6 +1,18 @@
 [profile.default]
-src = "src"
+src = "contracts"
 out = "out"
-libs = ["lib"]
+test = "test"
+libs = ["node_modules", "lib"]
+script = "scripts"
+solc_version = "0.8.28"
+remappings = [
+    "@openzeppelin/=node_modules/@openzeppelin/"
+]
+
+[rpc_endpoints]
+mainnet = "${MAINNET_RPC}"
+
+[etherscan]
+mainnet = { key = "${MAINNET_API_KEY}" }
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
