@@ -7,10 +7,14 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {INetworkRegistry} from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
 import {INetworkMiddlewareService} from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
 
+/// @title Cap Symbiotic Network Contract
+/// @author Cap Labs
+/// @notice This contract manages the symbiotic collateral and slashing.
 contract CapSymbioticNetwork is 
     OwnableUpgradeable, 
     UUPSUpgradeable
 {
+
     function initialize(
         address _networkRegistry,
         address _networkMiddlewareService
