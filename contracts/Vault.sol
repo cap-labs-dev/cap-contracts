@@ -12,6 +12,7 @@ contract Vault is Initializable, AccessControlEnumerableUpgradeable {
     mapping(address => uint256) public totalSupplies;
     mapping(address => uint256) public totalBorrows;
     mapping(address => uint256) public utilizationIndex;
+    mapping(address => uint256) public lastUpdate;
 
     error TransferTaxNotSupported();
 
@@ -57,5 +58,9 @@ contract Vault is Initializable, AccessControlEnumerableUpgradeable {
 
     function utilization(address _asset) public view returns (uint256 ratio) {
         ratio = totalBorrows[_asset] * 1e27 / totalSupplies[_asset];
+    }
+
+    function currentUtilizationIndex(address _asset) external view returns (uint256 index) {
+        index = utilizationIndex[_asset] + ( utilization(_asset) * ( block.timestamp - lastUpdate[_asset] ) );
     }
 }
