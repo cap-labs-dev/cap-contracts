@@ -23,7 +23,14 @@ contract LendingPool is Initializable, AccessControlEnumerableUpgradeable {
         mapping(address => uint256) queue;
     }
 
+    struct BorrowRate {
+        uint256 variableSlope1;
+        uint256 variableSlope2;
+        uint256 optimalUsageRatio;
+    }
+
     mapping(address => Reserve) public reserve;
+    mapping(address => BorrowRate) public borrowRates;
 
     address[] public assets;
     address[] public borrowers;
@@ -125,8 +132,17 @@ contract LendingPool is Initializable, AccessControlEnumerableUpgradeable {
         reserve[_asset].lastUpdate = block.timestamp;
     }
 
-    function _getBorrowRate(address _asset) internal {
-
+    function _getBorrowRate(address _asset) internal returns (uint256 rate) {
+        uint256 borrowUsageRatio = reserve[_asset].totalBorrows / reserve[_asset].totalSupplies;
+        uint256 optimalUsageRatio = borrowRates[_asset].optimalUsageRatio;
+        uint256 slope1 = borrowRates[_asset].variableSlope1;
+        uint256 slope2 = borrowRates[_asset].variableSlope2;
+        if (borrowUsageRatio > optimalUsageRatio) {
+            uint256 excessBorrowUsageRatio = borrowUsageRatio - optimalUsageRatio;
+            rate = slope1 + ( slope2 * excessBorrowUsageRatio );
+        } else {
+            rate = slope1 * borrowUsageRatio / optimalUsageRatio;
+        }
     }
 
     function accruedInterest(
