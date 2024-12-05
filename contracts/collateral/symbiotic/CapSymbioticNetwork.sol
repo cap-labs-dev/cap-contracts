@@ -3,11 +3,11 @@ pragma solidity ^0.8.28;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {AccessControlEnumerableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 
 import {INetworkRegistry} from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
 import {INetworkMiddlewareService} from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
 import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
 import {IRegistry} from "@symbioticfi/core/src/interfaces/common/IRegistry.sol";
@@ -23,53 +23,36 @@ import {Subnetwork} from "@symbioticfi/core/src/contracts/libraries/Subnetwork.s
 
 import {SimpleKeyRegistry32} from "./SimpleKeyRegistry32.sol";
 import {MapWithTimeData} from "./libraries/MapWithTimeData.sol";
+import {Errors} from "./Errors.sol";
 
 /// @title Cap Symbiotic Network Contract
 /// @author Cap Labs
 /// @notice This contract manages the symbiotic collateral and slashing.
 contract CapSymbioticNetwork is 
     SimpleKeyRegistry32,
-    OwnableUpgradeable, 
+    Errors,
+    AccessControlEnumerableUpgradeable, 
     UUPSUpgradeable
 {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
     using MapWithTimeData for EnumerableMap.AddressToUintMap;
     using Subnetwork for address;
 
-    error NotOperator();
-    error NotVault();
-
-    error OperatorNotOptedIn();
-    error OperatorNotRegistred();
-    error OperarorGracePeriodNotPassed();
-    error OperatorAlreadyRegistred();
-
-    error VaultAlreadyRegistred();
-    error VaultEpochTooShort();
-    error VaultGracePeriodNotPassed();
-
-    error InvalidSubnetworksCnt();
-
-    error TooOldEpoch();
-    error InvalidEpoch();
-
-    error SlashingWindowTooShort();
-    error TooBigSlashAmount();
-    error UnknownSlasherType();
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
 
     struct ValidatorData {
         uint256 stake;
         bytes32 key;
     }
 
-    address public NETWORK;
-    address public OPERATOR_REGISTRY;
-    address public VAULT_REGISTRY;
-    address public OPERATOR_NET_OPTIN;
-    address public OWNER;
-    uint48 public EPOCH_DURATION;
-    uint48 public SLASHING_WINDOW;
-    uint48 public START_TIME;
+    address public network;
+    address public operatorRegistry;
+    address public vaultRegistry;
+    address public operatorNetOptIn;
+    uint48 public epochDuration;
+    uint48 public slashingWindow;
+    uint48 public startTime;
 
     uint48 private constant INSTANT_SLASHER_TYPE = 0;
     uint48 private constant VETO_SLASHER_TYPE = 1;
@@ -93,50 +76,52 @@ contract CapSymbioticNetwork is
         address _operatorRegistry,
         address _vaultRegistry,
         address _operatorNetOptin,
-        address _owner,
+        address _pauser,
         uint48 _epochDuration,
         uint48 _slashingWindow
     ) initializer external {
-        __Ownable_init(msg.sender);
+
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(OWNER_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, _pauser);
 
         if (_slashingWindow < _epochDuration) {
             revert SlashingWindowTooShort();
         }
         
-        START_TIME = Time.timestamp();
-        EPOCH_DURATION = _epochDuration;
-        NETWORK = _network;
-        OWNER = _owner;
-        OPERATOR_REGISTRY = _operatorRegistry;
-        VAULT_REGISTRY = _vaultRegistry;
-        OPERATOR_NET_OPTIN = _operatorNetOptin;
-        SLASHING_WINDOW = _slashingWindow;
+        startTime = Time.timestamp();
+        epochDuration = _epochDuration;
+        network = _network;
+        operatorRegistry = _operatorRegistry;
+        vaultRegistry = _vaultRegistry;
+        operatorNetOptIn = _operatorNetOptin;
+        slashingWindow = _slashingWindow;
 
         subnetworksCnt = 1;
     }
 
     function getEpochStartTs(uint48 epoch) public view returns (uint48 timestamp) {
-        return START_TIME + epoch * EPOCH_DURATION;
+        return startTime + epoch * epochDuration;
     }
 
     function getEpochAtTs(uint48 timestamp) public view returns (uint48 epoch) {
-        return (timestamp - START_TIME) / EPOCH_DURATION;
+        return (timestamp - startTime) / epochDuration;
     }
 
     function getCurrentEpoch() public view returns (uint48 epoch) {
         return getEpochAtTs(Time.timestamp());
     }
 
-    function registerOperator(address operator, bytes32 key) external onlyOwner {
+    function registerOperator(address operator, bytes32 key) external onlyRole(OWNER_ROLE) {
         if (operators.contains(operator)) {
             revert OperatorAlreadyRegistred();
         }
 
-        if (!IRegistry(OPERATOR_REGISTRY).isEntity(operator)) {
+        if (!IRegistry(operatorRegistry).isEntity(operator)) {
             revert NotOperator();
         }
 
-        if (!IOptInService(OPERATOR_NET_OPTIN).isOptedIn(operator, NETWORK)) {
+        if (!IOptInService(operatorNetOptIn).isOptedIn(operator, network)) {
             revert OperatorNotOptedIn();
         }
 
@@ -146,7 +131,7 @@ contract CapSymbioticNetwork is
         operators.enable(operator);
     }
 
-    function updateOperatorKey(address operator, bytes32 key) external onlyOwner {
+    function updateOperatorKey(address operator, bytes32 key) external onlyRole(OWNER_ROLE) {
         if (!operators.contains(operator)) {
             revert OperatorNotRegistred();
         }
@@ -154,30 +139,30 @@ contract CapSymbioticNetwork is
         updateKey(operator, key);
     }
 
-    function pauseOperator(address operator) external onlyOwner {
+    function pauseOperator(address operator) external onlyRole(PAUSER_ROLE) {
         operators.disable(operator);
     }
 
-    function unpauseOperator(address operator) external onlyOwner {
+    function unpauseOperator(address operator) external onlyRole(OWNER_ROLE) {
         operators.enable(operator);
     }
 
-    function unregisterOperator(address operator) external onlyOwner {
+    function unregisterOperator(address operator) external onlyRole(OWNER_ROLE) {
         (, uint48 disabledTime) = operators.getTimes(operator);
 
-        if (disabledTime == 0 || disabledTime + SLASHING_WINDOW > Time.timestamp()) {
+        if (disabledTime == 0 || disabledTime + slashingWindow > Time.timestamp()) {
             revert OperarorGracePeriodNotPassed();
         }
 
         operators.remove(operator);
     }
 
-    function registerVault(address vault) external onlyOwner {
+    function registerVault(address vault) external onlyRole(OWNER_ROLE) {
         if (vaults.contains(vault)) {
             revert VaultAlreadyRegistred();
         }
 
-        if (!IRegistry(VAULT_REGISTRY).isEntity(vault)) {
+        if (!IRegistry(vaultRegistry).isEntity(vault)) {
             revert NotVault();
         }
 
@@ -188,7 +173,7 @@ contract CapSymbioticNetwork is
             vaultEpoch -= IVetoSlasher(slasher).vetoDuration();
         }
 
-        if (vaultEpoch < SLASHING_WINDOW) {
+        if (vaultEpoch < slashingWindow) {
             revert VaultEpochTooShort();
         }
 
@@ -196,25 +181,25 @@ contract CapSymbioticNetwork is
         vaults.enable(vault);
     }
 
-    function pauseVault(address vault) external onlyOwner {
+    function pauseVault(address vault) external onlyRole(PAUSER_ROLE) {
         vaults.disable(vault);
     }
 
-    function unpauseVault(address vault) external onlyOwner {
+    function unpauseVault(address vault) external onlyRole(OWNER_ROLE) {
         vaults.enable(vault);
     }
 
-    function unregisterVault(address vault) external onlyOwner {
+    function unregisterVault(address vault) external onlyRole(OWNER_ROLE) {
         (, uint48 disabledTime) = vaults.getTimes(vault);
 
-        if (disabledTime == 0 || disabledTime + SLASHING_WINDOW > Time.timestamp()) {
+        if (disabledTime == 0 || disabledTime + slashingWindow > Time.timestamp()) {
             revert VaultGracePeriodNotPassed();
         }
 
         vaults.remove(vault);
     }
 
-    function setSubnetworksCnt(uint256 _subnetworksCnt) external onlyOwner {
+    function setSubnetworksCnt(uint256 _subnetworksCnt) external onlyRole(OWNER_ROLE) {
         if (subnetworksCnt >= _subnetworksCnt) {
             revert InvalidSubnetworksCnt();
         }
@@ -239,7 +224,7 @@ contract CapSymbioticNetwork is
 
             for (uint96 j = 0; j < subnetworksCnt; ++j) {
                 stake += IBaseDelegator(IVault(vault).delegator()).stakeAt(
-                    NETWORK.subnetwork(j), operator, epochStartTs, new bytes(0)
+                    network.subnetwork(j), operator, epochStartTs, new bytes(0)
                 );
             }
         }
@@ -292,10 +277,10 @@ contract CapSymbioticNetwork is
     }
 
     // just for example, our devnets don't support slashing
-    function slash(uint48 epoch, address operator, uint256 amount) public onlyOwner updateStakeCache(epoch) {
+    function slash(uint48 epoch, address operator, uint256 amount) public onlyRole(OWNER_ROLE) updateStakeCache(epoch) {
         uint48 epochStartTs = getEpochStartTs(epoch);
 
-        if (epochStartTs < Time.timestamp() - SLASHING_WINDOW) {
+        if (epochStartTs < Time.timestamp() - slashingWindow) {
             revert TooOldEpoch();
         }
 
@@ -315,7 +300,7 @@ contract CapSymbioticNetwork is
             }
 
             for (uint96 j = 0; j < subnetworksCnt; ++j) {
-                bytes32 subnetwork = NETWORK.subnetwork(j);
+                bytes32 subnetwork = network.subnetwork(j);
                 uint256 vaultStake =
                     IBaseDelegator(IVault(vault).delegator()).stakeAt(subnetwork, operator, epochStartTs, new bytes(0));
 
@@ -328,7 +313,7 @@ contract CapSymbioticNetwork is
         uint48 epochStartTs = getEpochStartTs(epoch);
 
         // for epoch older than SLASHING_WINDOW total stake can be invalidated (use cache)
-        if (epochStartTs < Time.timestamp() - SLASHING_WINDOW) {
+        if (epochStartTs < Time.timestamp() - slashingWindow) {
             revert TooOldEpoch();
         }
 
@@ -358,7 +343,7 @@ contract CapSymbioticNetwork is
         uint48 epochStartTs = getEpochStartTs(epoch);
 
         // for epoch older than SLASHING_WINDOW total stake can be invalidated (use cache)
-        if (epochStartTs < Time.timestamp() - SLASHING_WINDOW) {
+        if (epochStartTs < Time.timestamp() - slashingWindow) {
             revert TooOldEpoch();
         }
 
@@ -401,5 +386,5 @@ contract CapSymbioticNetwork is
         }
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address) internal override onlyRole(OWNER_ROLE) {}
 }
