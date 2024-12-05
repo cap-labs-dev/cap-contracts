@@ -25,10 +25,10 @@ import {SimpleKeyRegistry32} from "./SimpleKeyRegistry32.sol";
 import {MapWithTimeData} from "./libraries/MapWithTimeData.sol";
 import {Errors} from "./Errors.sol";
 
-/// @title Cap Symbiotic Network Contract
+/// @title Cap Symbiotic Network Middleware Contract
 /// @author Cap Labs
 /// @notice This contract manages the symbiotic collateral and slashing.
-contract CapSymbioticNetwork is 
+contract CapSymbioticNetworkMiddleware is 
     SimpleKeyRegistry32,
     Errors,
     AccessControlEnumerableUpgradeable, 
