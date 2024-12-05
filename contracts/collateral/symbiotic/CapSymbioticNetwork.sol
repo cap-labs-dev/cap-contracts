@@ -278,7 +278,7 @@ contract CapSymbioticNetwork is
 
     // just for example, our devnets don't support slashing
     function slash(uint48 epoch, address operator, uint256 amount) public onlyRole(OWNER_ROLE) updateStakeCache(epoch) {
-        uint48 epochStartTs = getEpochStartTs(epoch);
+       /* uint48 epochStartTs = getEpochStartTs(epoch);
 
         if (epochStartTs < Time.timestamp() - slashingWindow) {
             revert TooOldEpoch();
@@ -306,7 +306,7 @@ contract CapSymbioticNetwork is
 
                 _slashVault(epochStartTs, vault, subnetwork, operator, amount * vaultStake / totalOperatorStake);
             }
-        }
+        }*/
     }
 
     function calcAndCacheStakes(uint48 epoch) public returns (uint256 totalStake) {
@@ -375,7 +375,7 @@ contract CapSymbioticNetwork is
         address operator,
         uint256 amount
     ) private {
-        address slasher = IVault(vault).slasher();
+       /* address slasher = IVault(vault).slasher();
         uint256 slasherType = IEntity(slasher).TYPE();
         if (slasherType == INSTANT_SLASHER_TYPE) {
             ISlasher(slasher).slash(subnetwork, operator, amount, timestamp, new bytes(0));
@@ -383,7 +383,7 @@ contract CapSymbioticNetwork is
             IVetoSlasher(slasher).requestSlash(subnetwork, operator, amount, timestamp, new bytes(0));
         } else {
             revert UnknownSlasherType();
-        }
+        }*/
     }
 
     function _authorizeUpgrade(address) internal override onlyRole(OWNER_ROLE) {}
