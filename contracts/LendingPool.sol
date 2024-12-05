@@ -51,6 +51,7 @@ contract LendingPool is Initializable, AccessControlEnumerableUpgradeable {
         _validateAsset(_asset);
         _updateIndex(_asset);
         amountOut = _getMint(_asset, _amountIn);
+        if (amountOut < _minAmountOut) revert Slippage(amountOut, _minAmountOut);
         reserve[_asset].totalSupplies += _amountIn;
         capToken.mint(msg.sender, amountOut);
         IERC20(_asset).safeTransferFrom(msg.sender, address(this), _amountIn);
@@ -165,11 +166,11 @@ contract LendingPool is Initializable, AccessControlEnumerableUpgradeable {
 
     /* -------------------- MINT/BURN LOGIC -------------------- */
 
-    function _getMint(address _asset, uint256 _amount) internal {
-
+    function _getMint(address _asset, uint256 _amount) internal returns (uint256 amountOut) {
+        
     }
 
-    function _getBurn(address _asset, uint256 _amount) internal {
+    function _getBurn(address _asset, uint256 _amount) internal returns (uint256 amountOut) {
         
     }
 

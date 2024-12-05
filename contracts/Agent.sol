@@ -11,12 +11,10 @@ contract Agent is Initializable, AccessControlEnumerableUpgradeable {
         uint256 borrowIndex;
         uint256 utilizationIndex;
         uint256 lastUpdate;
-        uint256 withdrawReserve;
         uint256 ltv;
         mapping(address => uint256) borrowed;
         mapping(address => uint256) accrued;
         mapping(address => uint256) storedBorrowIndex;
-        mapping(address => uint256) queue;
     }
 
     struct BorrowRate {
@@ -37,16 +35,16 @@ contract Agent is Initializable, AccessControlEnumerableUpgradeable {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
-    function borrow(address _asset, uint256 _amount, address _receiver) external {
-        _validateAsset(_asset);
+    function borrow(address _vault, address _asset, uint256 _amount, address _receiver) external {
+        _validateAsset(_vault, _asset);
         _validateBorrow(msg.sender, _asset, _amount);
         _accrueInterest(_asset, msg.sender);
         reserve[_asset].borrowed[msg.sender] += _amount;
         vault.borrow(_asset, _amount, _receiver);
     }
 
-    function repay(address _asset, uint256 _amount, address _onBehalfOf) external {
-        _validateAsset(_asset);
+    function repay(address _vault, address _asset, uint256 _amount, address _onBehalfOf) external {
+        _validateAsset(_vault, _asset);
         _accrueInterest(_asset, _onBehalfOf);
         uint256 principal = borrowed[_asset][_onBehalfOf];
         uint256 interest = accrued[_asset][_onBehalfOf];
@@ -118,12 +116,12 @@ contract Agent is Initializable, AccessControlEnumerableUpgradeable {
 
     /* -------------------- VALIDATION -------------------- */
 
-    function _validateAsset(address _asset) internal {
-        if (!supportedAsset[_asset]) revert AssetNotSupported(_asset);
+    function _validateAsset(address _vault, address _asset) internal {
+        if (!registry.supportedAsset(_vault, _asset)) revert AssetNotSupported(_vault, _asset);
     }
 
     function _validateBorrow(address _borrower, address _asset, uint256 _amount) internal {
-        if (!supportedBorrower[_borrower]) revert NotValidBorrower(_borrower);
+        if (!registry.supportedBorrower(_vault, _asset)) revert BorrowerNotSupported(_borrower);
         if (_amount > availableBorrow(_asset)) 
             revert NotEnoughCash(_amount, availableBorrow(_asset));
 

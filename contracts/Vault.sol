@@ -9,18 +9,22 @@ contract Vault is Initializable, AccessControlEnumerableUpgradeable {
     bytes32 public constant SUPPLIER_ROLE = keccak256("SUPPLIER_ROLE");
     bytes32 public constant BORROWER_ROLE = keccak256("BORROWER_ROLE");
 
+    IRegistry public registry;
     mapping(address => uint256) public totalSupplies;
     mapping(address => uint256) public totalBorrows;
     mapping(address => uint256) public utilizationIndex;
     mapping(address => uint256) public lastUpdate;
 
     error TransferTaxNotSupported();
+    error AssetNotSupported(address asset);
 
-    function initialize() initializer external {
+    function initialize(address registry) initializer external {
+        registry = IRegistry(_registry);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
     function deposit(address _asset, uint256 _amount) external onlyRole(SUPPLIER_ROLE) {
+        _validate(_asset);
         _updateIndex(_asset);
         totalSupplies[_asset] += _amount;
         uint256 beforeBalance = IERC20(_asset).balanceOf(address(this));
@@ -30,26 +34,24 @@ contract Vault is Initializable, AccessControlEnumerableUpgradeable {
     }
 
     function withdraw(address _asset, uint256 _amount, address _receiver) external onlyRole(SUPPLIER_ROLE) {
+        _validate(_asset);
         _updateIndex(_asset);
         totalSupplies[_asset] -= _amount;
         IERC20(_asset).safeTransfer(_receiver, _amount);
     }
 
     function borrow(address _asset, uint256 _amount) external onlyRole(BORROWER_ROLE) {
+        _validate(_asset);
         _updateIndex(_asset);
         totalBorrows[_asset] += _amount;
         IERC20(_asset).safeTransfer(msg.sender, _amount);
     }
 
     function repay(address _asset, uint256 _amount) external onlyRole(BORROWER_ROLE) {
+        _validate(_asset);
         _updateIndex(_asset);
         totalBorrows[_asset] -= _amount;
         IERC20(_asset).safeTransferFrom(msg.sender, address(this), _amount);
-    }
-
-    function _updateIndex(address _asset) internal {
-        utilizationIndex[_asset] += utilization(_asset) * ( block.timestamp - lastUpdate[_asset] );
-        lastUpdate[_asset] = block.timestamp;
     }
 
     function availableBalance(address _asset) external view returns (uint256 amount) {
@@ -62,5 +64,14 @@ contract Vault is Initializable, AccessControlEnumerableUpgradeable {
 
     function currentUtilizationIndex(address _asset) external view returns (uint256 index) {
         index = utilizationIndex[_asset] + ( utilization(_asset) * ( block.timestamp - lastUpdate[_asset] ) );
+    }
+
+    function _updateIndex(address _asset) internal {
+        utilizationIndex[_asset] += utilization(_asset) * ( block.timestamp - lastUpdate[_asset] );
+        lastUpdate[_asset] = block.timestamp;
+    }
+
+    function _validate(address _asset) internal {
+        if (!registry.supportedAssets(address(this), _asset)) revert AssetNotSupported(_asset);
     }
 }
