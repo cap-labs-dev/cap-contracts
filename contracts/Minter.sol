@@ -4,28 +4,67 @@ pragma solidity ^0.8.28;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { AccessControlEnumerableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import { IRegistry } from "../interfaces/IRegistry.sol";
 
+/// @title Minter/burner for cTokens
+/// @author kexley, @capLabs
+/// @notice cTokens are minted or burned in exchange for collateral ratio of the backing tokens
+/// @dev Dynamic fees are applied according to the allocation of assets in the basket. Increasing
+/// the supply of a excessive asset or burning for an scarce asset will charge fees on a kinked 
+/// slope. Redeem can be used to avoid these fees by burning for the current ratio of assets.
 contract Minter is Initializable, AccessControlEnumerableUpgradeable {
 
-    struct Basket {
-        address[] assets;
-        uint256 baseFee;
-        mapping(address => bool) supportedAssets;
-        mapping(address => uint256) optimiumRatio;
-        mapping(address => uint256) lowerKinkRatio;
-        mapping(address => uint256) upperKinkRatio;
-    }
+    /// @notice Registry that controls fees, whitelisting assets and basket allocations
+    IRegistry public registry;
 
-    IVault public vault;
-    address[] public cTokens;
-    mapping(address => bool) public supportedCToken;
-    mapping(address => Basket) public basket;
+    /// @dev Pair of assets is not supported
+    error PairNotSupported(address asset0, address asset1);
 
-    function initialize(address _vault) initializer external {
-        vault = IVault(_vault);
+    /// @dev Assets is not supported
+    error AssetNotSupported(address asset);
+
+    /// @dev Amount out is below minimum
+    error Slippage(uint256 amount, uint256 minAmount);
+
+    /// @dev Redeemed amount out is below minimum for an asset
+    error RedeemSlippage(address asset, uint256 amount, uint256 minAmount);
+
+    /// @dev Swap made
+    event Swap(
+        address indexed sender,
+        address indexed to,
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 amountOut
+    );
+
+    /// @dev Redeem made
+    event Redeem(
+        address indexed sender,
+        address indexed to,
+        address tokenIn,
+        uint256 amountIn,
+        uint256[] amountOuts
+    );
+
+    /// @notice Initialize the registry address and default admin
+    /// @param _registry Registry address
+    function initialize(address _registry) initializer external {
+        registry = IRegistry(_registry);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
+    /// @notice Swap a backing asset for a cToken or vice versa, fees are charged based on asset
+    /// backing ratio
+    /// @dev Only whitelisted assets are allowed, this contract must be approved by the msg.sender 
+    /// to pull the asset
+    /// @param _amountIn Amount of tokenIn to be swapped
+    /// @param _minAmountOut Minimum amount of tokenOut to be received
+    /// @param _tokenIn Token to swap in
+    /// @param _tokenOut Token to swap out
+    /// @param _receiver Receiver of the swap
+    /// @param _deadline Deadline for the swap
     function swapExactTokenForTokens(
         uint256 _amountIn,
         uint256 _minAmountOut,
@@ -35,8 +74,7 @@ contract Minter is Initializable, AccessControlEnumerableUpgradeable {
         uint256 _deadline
     ) external returns (uint256 amountOut) {
         if (deadline != 0 && block.timestamp > deadline) revert PastDeadline();
-        _validateAssets(_tokenIn, _tokenOut);
-        bool mint = supportedCToken[_tokenOut];
+        bool mint = _validateAssets(_tokenIn, _tokenOut);
         if (mint) {
             (amountOut,) = MintBurnLogic.getMint(registry, _tokenIn, _tokenOut, _amountIn);
             IERC20(_tokenOut).mint(msg.sender, amountOut);
@@ -49,8 +87,16 @@ contract Minter is Initializable, AccessControlEnumerableUpgradeable {
             vault.withdraw(_asset, amountOut, _receiver);
         }
         if (amountOut < _minAmountOut) revert Slippage(amountOut, _minAmountOut);
+        emit Swap(msg.sender, _receiver, _tokenIn, _tokenOut, _amountIn, amountOut);
     }
 
+    /// @notice Redeem a cToken for a portion of all backing tokens
+    /// @dev Only a base fee is charged, no dynamic fees
+    /// @param _amountIn Amount of tokenIn to be swapped
+    /// @param _minAmountOuts Minimum amounts of backing tokens to be received
+    /// @param _tokenIn Token to swap in
+    /// @param _receiver Receiver of the swap
+    /// @param _deadline Deadline for the swap
     function redeem(
         uint256 _amountIn,
         uint256[] memory _minAmountOuts,
@@ -69,32 +115,48 @@ contract Minter is Initializable, AccessControlEnumerableUpgradeable {
             if (amount < minAmountOuts[i]) revert RedeemSlippage(asset, amount, minAmountOuts[i]);
             vault.withdraw(asset, amount, _receiver);
         }
+        emit Redeem(msg.sender, _receiver, _tokenIn, _amountIn, amountOuts);
     }
 
-    function getAmountOut(address _tokenIn, address _tokenOut, uint256 _amountIn) external view returns (uint256 amount) {
-        bool mint = registry.supportedAsset[_tokenOut];
+    /// @notice Get amount out from minting/burning a cToken
+    /// @param _tokenIn Token to swap in
+    /// @param _tokenOut Token to swap out
+    /// @param _amountIn Amount to swap in
+    /// @param amountOut Amount out
+    function getAmountOut(address _tokenIn, address _tokenOut, uint256 _amountIn) external view returns (uint256 amountOut) {
+        bool mint = _validateAssets(_tokenIn, _tokenOut);
         if (mint) {
-            (amount, fee) = getMint(_tokenIn, _tokenOut, _amount);
+            (amountOut,) = MintBurnLogic.getMint(registry, _tokenIn, _tokenOut, _amount);
         } else {
-            (amount, fee) = getBurn(_tokenIn, _tokenOut, _amount);
+            (amountOut,) = MintBurnLogic.getBurn(registry, _tokenIn, _tokenOut, _amount);
         }
     }
 
-    function getRedeemAmountOut(address _tokenIn, uint256 _amountIn) public view returns (uint256[] memory amounts, uint256[] memory fees) {
-        (amounts, fees) = MintBurnLogic.getRedeem(registry, _tokenIn, _amountIn);
+    /// @notice Get redeem amounts out from burning a cToken
+    /// @param _tokenIn Token to swap in
+    /// @param _amountIn Amount to swap in
+    /// @param amountOut Amounts out
+    function getRedeemAmountOut(address _tokenIn, uint256 _amountIn) public view returns (uint256[] memory amounts) {
+        (amounts,) = MintBurnLogic.getRedeem(registry, _tokenIn, _amountIn);
     }
 
     /* -------------------- VALIDATION -------------------- */
 
-    function _validateAssets(address _tokenIn, address _tokenOut) internal {
-        if (!(supportedCToken[_tokenIn] && basket[_tokenIn].supportedAssets[_tokenOut]) 
-            && !(supportedCToken[_tokenOut] && basket[_tokenOut].supportedAssets[_tokenIn])) 
-        {
+    /// @dev Validate assets are whitelisted and are in a linked basket
+    /// @param _tokenIn Token to swap in
+    /// @param _tokenOut Token to swap out
+    /// @return mint Whether the swap is a mint or a burn
+    function _validateAssets(address _tokenIn, address _tokenOut) internal view returns (bool mint) {
+        if (registry.supportedCToken[_tokenIn] && registry.basket[_tokenIn].supportedAssets[_tokenOut]) {
+            mint = true;
+        } else if (!(registry.supportedCToken[_tokenOut] && registry.basket[_tokenOut].supportedAssets[_tokenIn])) {
             revert PairNotValid(_tokenIn, _tokenOut);
         }
     }
 
+    /// @dev Validate if a single asset is a cToken
+    /// @param _cToken Token to redeem
     function _validateAsset(address _cToken) internal {
-        if (!supportedCToken[_cToken]) revert TokenNotSupported(_cToken);
+        if (!registry.supportedCToken[_cToken]) revert AssetNotSupported(_cToken);
     }
 }

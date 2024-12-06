@@ -111,7 +111,7 @@ contract Vault is Initializable, AccessControlEnumerableUpgradeable {
     }
 
     /// @notice Repay an asset
-    /// @dev Repay must come from borrower themselves
+    /// @dev Repay must come from borrower
     /// @param _asset Asset to repay
     /// @param _amount Amount of asset to repay
     function repay(address _asset, uint256 _amount) external onlyRole(BORROWER_ROLE) {
