@@ -6,9 +6,7 @@ import {Errors} from '../libraries/helpers/Errors.sol';
 import {ReserveConfiguration} from '../libraries/configuration/ReserveConfiguration.sol';
 import {PoolLogic} from '../libraries/logic/PoolLogic.sol';
 import {ReserveLogic} from '../libraries/logic/ReserveLogic.sol';
-import {EModeLogic} from '../libraries/logic/EModeLogic.sol';
 import {SupplyLogic} from '../libraries/logic/SupplyLogic.sol';
-import {FlashLoanLogic} from '../libraries/logic/FlashLoanLogic.sol';
 import {BorrowLogic} from '../libraries/logic/BorrowLogic.sol';
 import {LiquidationLogic} from '../libraries/logic/LiquidationLogic.sol';
 import {DataTypes} from '../libraries/types/DataTypes.sol';
@@ -19,92 +17,70 @@ import {IPool} from '../../interfaces/IPool.sol';
 import {IACLManager} from '../../interfaces/IACLManager.sol';
 import {PoolStorage} from './PoolStorage.sol';
 
-/**
- * @title Pool contract
- * @author Aave
- * @notice Main point of interaction with an Aave protocol's market
- * - Users can:
- *   # Supply
- *   # Withdraw
- *   # Borrow
- *   # Repay
- *   # Enable/disable their supplied assets as collateral
- *   # Liquidate positions
- *   # Execute Flash Loans
- * @dev To be covered by a proxy contract, owned by the PoolAddressesProvider of the specific market
- * @dev All admin functions are callable by the PoolConfigurator contract defined also in the
- *   PoolAddressesProvider
- */
-abstract contract Pool is VersionedInitializable, PoolStorage, IPool {
+/// @title Pool
+/// @author kexley, inspired by Aave
+/// @notice Lending pool for covered agents to borrow from
+contract Pool is PoolStorage {
     using ReserveLogic for DataTypes.ReserveData;
 
-    IPoolAddressesProvider public immutable ADDRESSES_PROVIDER;
-
-    /**
-    * @dev Only pool configurator can call functions marked by this modifier.
-    */
+    /// @dev Only pool configurator can call functions marked by this modifier
     modifier onlyPoolConfigurator() {
         _onlyPoolConfigurator();
         _;
     }
 
-    /**
-    * @dev Only pool admin can call functions marked by this modifier.
-    */
+    /// @dev Only pool admin can call functions marked by this modifier
     modifier onlyPoolAdmin() {
         _onlyPoolAdmin();
         _;
     }
 
-    function _onlyPoolConfigurator() internal view virtual {
+    /// @dev Check that the caller is the pool configurator
+    function _onlyPoolConfigurator() internal view {
         require(
             ADDRESSES_PROVIDER.getPoolConfigurator() == msg.sender,
             Errors.CALLER_NOT_POOL_CONFIGURATOR
         );
     }
 
-    function _onlyPoolAdmin() internal view virtual {
+    /// @dev Check that the caller is the pool admin
+    function _onlyPoolAdmin() internal view {
         require(
             IACLManager(ADDRESSES_PROVIDER.getACLManager()).isPoolAdmin(msg.sender),
             Errors.CALLER_NOT_POOL_ADMIN
         );
     }
 
-    /**
-    * @dev Constructor.
-    * @param provider The address of the PoolAddressesProvider contract
-    */
-    constructor(IPoolAddressesProvider provider) {
+    /// @dev Disable initializers on the implementation
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @notice Initialize the pool
+    /// @param provider The address of the PoolAddressesProvider contract
+    function initialize(IPoolAddressesProvider provider) external initializer {
         ADDRESSES_PROVIDER = provider;
     }
 
-    /**
-    * @notice Initializes the Pool.
-    * @dev Function is invoked by the proxy contract when the Pool contract is added to the
-    * PoolAddressesProvider of the market.
-    * @dev Caching the address of the PoolAddressesProvider in order to reduce gas consumption on subsequent operations
-    * @param provider The address of the PoolAddressesProvider
-    */
-    function initialize(IPoolAddressesProvider provider) external virtual;
-
-    /// @inheritdoc IPool
-    function supply(
-        address asset,
-        uint256 amount,
-        address onBehalfOf,
-        uint16 referralCode
-    ) public virtual override {
+    /// @notice Supply an asset to the pool
+    /// @param asset Asset to supply
+    /// @param amount Amount of an asset to supply
+    /// @param onBehalfOf User to receive the collateral tokens
+    function supply(address asset, uint256 amount, address onBehalfOf) public {
         SupplyLogic.executeSupply(
             _reserves,
-            DataTypes.ExecuteSupplyParams({
-                asset: asset,
-                amount: amount,
-                onBehalfOf: onBehalfOf
-            })
+            DataTypes.ExecuteSupplyParams({asset: asset, amount: amount, onBehalfOf: onBehalfOf})
         );
     }
 
-    /// @inheritdoc IPool
+    /// @notice Supply an asset to the pool using a permit
+    /// @param asset Asset to supply
+    /// @param amount Amount of an asset to supply
+    /// @param onBehalfOf User to receive the collateral tokens
+    /// @param deadline Deadline for the signature
+    /// @param permitV Part of a signature
+    /// @param permitR Part of a signature
+    /// @param permitS Part of a signature
     function supplyWithPermit(
         address asset,
         uint256 amount,
@@ -113,7 +89,7 @@ abstract contract Pool is VersionedInitializable, PoolStorage, IPool {
         uint8 permitV,
         bytes32 permitR,
         bytes32 permitS
-    ) public virtual override {
+    ) public {
         try IERC20WithPermit(asset).permit(
             msg.sender,
             address(this),
@@ -123,38 +99,30 @@ abstract contract Pool is VersionedInitializable, PoolStorage, IPool {
             permitR,
             permitS
         ) {} catch {}
+
         SupplyLogic.executeSupply(
             _reserves,
-            DataTypes.ExecuteSupplyParams({
-                asset: asset,
-                amount: amount,
-                onBehalfOf: onBehalfOf,
-            })
+            DataTypes.ExecuteSupplyParams({asset: asset, amount: amount, onBehalfOf: onBehalfOf})
         );
     }
 
-    /// @inheritdoc IPool
-    function withdraw(
-        address asset,
-        uint256 amount,
-        address to
-    ) public virtual override returns (uint256) {
-        return SupplyLogic.executeWithdraw(
+    /// @notice Withdraw an asset from the pool
+    /// @param asset Asset to withdraw
+    /// @param amount Amount to withdraw
+    /// @param to Address that will receive the withdrawn asset
+    /// @return withdrawAmount Actual amount withdrawn from the pool
+    function withdraw(address asset, uint256 amount, address to) public returns (uint256 withdrawAmount) {
+        withdrawAmount = SupplyLogic.executeWithdraw(
             _reserves,
-            DataTypes.ExecuteWithdrawParams({
-                asset: asset,
-                amount: amount,
-                to: to
-            })
+            DataTypes.ExecuteWithdrawParams({asset: asset, amount: amount, to: to})
         );
     }
 
-    /// @inheritdoc IPool
-    function borrow(
-        address asset,
-        uint256 amount,
-        address onBehalfOf
-    ) public virtual override {
+    /// @notice Borrow an asset from the pool
+    /// @param asset Asset to borrow
+    /// @param amount Amount to borrow
+    /// @param onBehalfOf User who will hold the debt
+    function borrow(address asset, uint256 amount, address onBehalfOf) public {
         BorrowLogic.executeBorrow(
             _reserves,
             _reservesList,
@@ -172,13 +140,13 @@ abstract contract Pool is VersionedInitializable, PoolStorage, IPool {
         );
     }
 
-    /// @inheritdoc IPool
-    function repay(
-        address asset,
-        uint256 amount,
-        address onBehalfOf
-    ) public virtual override returns (uint256) {
-        return BorrowLogic.executeRepay(
+    /// @notice Repay an asset to the pool
+    /// @param asset Asset to repay
+    /// @param amount Amount to repay
+    /// @param onBehalfOf Address of the user whose debt is being repaid
+    /// @param repaid Actual amount repaid
+    function repay(address asset, uint256 amount, address onBehalfOf) public returns (uint256 repaid) {
+        repaid = BorrowLogic.executeRepay(
             _reserves,
             _reservesList,
             _usersConfig[onBehalfOf],
@@ -190,7 +158,15 @@ abstract contract Pool is VersionedInitializable, PoolStorage, IPool {
         );
     }
 
-    /// @inheritdoc IPool
+    /// @notice Repay an asset to the pool using a permit
+    /// @param asset Asset to repay
+    /// @param amount Amount to repay
+    /// @param onBehalfOf Address of the user whose debt is being repaid
+    /// @param deadline Deadline for the signature
+    /// @param permitV Part of a signature
+    /// @param permitR Part of a signature
+    /// @param permitS Part of a signature
+    /// @param repaid Actual amount repaid
     function repayWithPermit(
         address asset,
         uint256 amount,
@@ -199,7 +175,7 @@ abstract contract Pool is VersionedInitializable, PoolStorage, IPool {
         uint8 permitV,
         bytes32 permitR,
         bytes32 permitS
-    ) public virtual override returns (uint256) {
+    ) public returns (uint256 repaid) {
         try IERC20WithPermit(asset).permit(
             msg.sender,
             address(this),
@@ -210,21 +186,23 @@ abstract contract Pool is VersionedInitializable, PoolStorage, IPool {
             permitS
         ) {} catch {}
 
-        DataTypes.ExecuteRepayParams memory params = DataTypes.ExecuteRepayParams({
-            asset: asset,
-            amount: amount,
-            onBehalfOf: onBehalfOf,
-        });
-
-        return BorrowLogic.executeRepay(_reserves, _reservesList, _usersConfig[onBehalfOf], params);
+        repaid = BorrowLogic.executeRepay(
+            _reserves,
+            _reservesList,
+            _usersConfig[onBehalfOf],
+            DataTypes.ExecuteRepayParams({
+                asset: asset,
+                amount: amount,
+                onBehalfOf: onBehalfOf,
+            })
+        );
     }
 
-    /// @inheritdoc IPool
-    function liquidationCall(
-        address debtAsset,
-        address user,
-        uint256 debtToCover
-    ) public virtual override {
+    /// @notice Liquidate a user
+    /// @param debtAsset Asset to repay
+    /// @param user User to liquidate
+    /// @param debtToCover Debt that will be repaid
+    function liquidationCall(address debtAsset, address user, uint256 debtToCover) public {
         LiquidationLogic.executeLiquidationCall(
             _reserves,
             _reservesList,
@@ -241,36 +219,44 @@ abstract contract Pool is VersionedInitializable, PoolStorage, IPool {
         );
     }
 
-    /// @inheritdoc IPool
-    function mintToTreasury(address[] calldata assets) external virtual override {
+    /// @notice Mint cTokens to the treasury address from the accrued debt
+    /// @param assets Addresses of underlying assets
+    function mintToTreasury(address[] calldata assets) external {
         PoolLogic.executeMintToTreasury(_reserves, assets, ADDRESSES_PROVIDER.treasury());
     }
 
-    /// @inheritdoc IPool
-    function getAccruedToTreasury(
-        address asset
-    ) external view returns (uint256) {
+    /// @notice Fetch amount of debt accrued to treasury
+    /// @param assets Address of underlying asset
+    /// @param amount Amount accrued to treasury
+    function getAccruedToTreasury(address asset) external view returns (uint128 amount) {
         return _reserves[asset].accruedToTreasury;
     }
 
-    /// @inheritdoc IPool
+    /// @notice Fetch reserve data
+    /// @param asset Address of underlying asset
+    /// @return reserveData Reserve data
     function getReserveData(
         address asset
-    ) external view returns (DataTypes.ReserveData memory) {
-        return _reserves[asset];
+    ) external view returns (DataTypes.ReserveData memory reserveData) {
+        reserve = _reserves[asset];
     }
 
-    /// @inheritdoc IPool
-    function getUnderlyingBalance(
-        address asset
-    ) external view virtual override returns (uint128) {
-        return _reserves[asset].underlyingBalance;
+    /// @notice Fetch supplied balance of the underlying asset in the pool
+    /// @param assets Address of underlying asset
+    /// @return amount Amount supplied
+    function getUnderlyingBalance(address asset) external view returns (uint128 amount) {
+        amount = _reserves[asset].underlyingBalance;
     }
 
-    /// @inheritdoc IPool
-    function getUserAccountData(
-        address user
-    ) external view virtual override returns (
+    /// @notice Fetch user account data
+    /// @param user Address of the user
+    /// @return totalCollateralBase Total collateral valued in base currency
+    /// @return totalDebtBase Total debt valued in base currency
+    /// @return availableBorrowsBase Available borrow power in base currency
+    /// @return currentLiquidationThreshold Health factor at which the user will be liquidated
+    /// @return ltv Loan-to-value of the user
+    /// @return healthFactor Health factor of the user (> 1 is healthy)
+    function getUserAccountData(address user) external view returns (
         uint256 totalCollateralBase,
         uint256 totalDebtBase,
         uint256 availableBorrowsBase,
@@ -291,29 +277,36 @@ abstract contract Pool is VersionedInitializable, PoolStorage, IPool {
         );
     }
 
-    /// @inheritdoc IPool
+    /// @notice Fetch configuration for a reserve
+    /// @param asset Address of underlying asset
+    /// @return configuration Reserve configuration
     function getConfiguration(
         address asset
-    ) external view virtual override returns (DataTypes.ReserveConfigurationMap memory) {
-        return _reserves[asset].configuration;
+    ) external view returns (DataTypes.ReserveConfigurationMap memory configuration) {
+        configuration = _reserves[asset].configuration;
     }
 
-    /// @inheritdoc IPool
+    /// @notice Fetch configuration for a user
+    /// @param user Address of user
+    /// @return configuration User configuration
     function getUserConfiguration(
         address user
-    ) external view virtual override returns (DataTypes.UserConfigurationMap memory) {
-        return _usersConfig[user];
+    ) external view returns (DataTypes.UserConfigurationMap memory configuration) {
+        configuration = _usersConfig[user];
     }
 
-    /// @inheritdoc IPool
+    /// @notice Fetch normalized debt for a reserve
+    /// @param asset Address of underlying asset
+    /// @return normalizedDebt Normalized debt of a reserve
     function getReserveNormalizedVariableDebt(
         address asset
-    ) external view virtual override returns (uint256) {
-        return _reserves[asset].getNormalizedDebt();
+    ) external view returns (uint256 normalizedDebt) {
+        normalizedDebt = _reserves[asset].getNormalizedDebt();
     }
 
-    /// @inheritdoc IPool
-    function getReservesList() external view virtual override returns (address[] memory) {
+    /// @notice Fetch all non-dropped reserves
+    /// @return reserves List of non-dropped reserve addresses
+    function getReservesList() external view returns (address[] memory reserves) {
         uint256 reservesListCount = _reservesCount;
         uint256 droppedReservesCount = 0;
         address[] memory reservesList = new address[](reservesListCount);
@@ -330,131 +323,152 @@ abstract contract Pool is VersionedInitializable, PoolStorage, IPool {
         assembly {
             mstore(reservesList, sub(reservesListCount, droppedReservesCount))
         }
-        return reservesList;
+        reserves = reservesList;
     }
 
-    /// @inheritdoc IPool
-    function getReservesCount() external view virtual override returns (uint256) {
-        return _reservesCount;
+    /// @notice Returns the number of initialized reserves, including dropped reserves
+    /// @return count Number of reserves
+    function getReservesCount() external view returns (uint256 count) {
+        count = _reservesCount;
     }
 
-    /// @inheritdoc IPool
-    function getReserveAddressById(uint16 id) external view returns (address) {
+    /// @notice Returns the address of the underlying asset of a reserve by the reserve id as stored in the DataTypes.ReserveData struct
+    /// @param id The id of the reserve as stored in the DataTypes.ReserveData struct
+    /// @return reserve The address of the reserve associated with id
+    function getReserveAddressById(uint16 id) external view returns (address reserve) {
         return _reservesList[id];
     }
 
-    /// @inheritdoc IPool
-    function MAX_NUMBER_RESERVES() public view virtual override returns (uint16) {
-        return ReserveConfiguration.MAX_RESERVES_COUNT;
+    /// @notice Maximum number of reserves that can be initialized
+    /// @return max Maximum number of initializable reserves
+    function MAX_NUMBER_RESERVES() public view virtual override returns (uint16 max) {
+        max = ReserveConfiguration.MAX_RESERVES_COUNT;
     }
 
-    /// @inheritdoc IPool
+    /// @notice Pool configurator calls this to initialize a reserve
+    /// @param asset Asset to be used as the underlying
+    /// @param cToken cToken address for the reserve
+    /// @param vToken vToken for the reserve
+    /// @param interestRateStrategy Interest rate strategy for the reserve
     function initReserve(
         address asset,
-        address aTokenAddress,
-        address variableDebtAddress,
-        address interestRateStrategyAddress
-    ) external virtual override onlyPoolConfigurator {
+        address cToken,
+        address vToken,
+        address interestRateStrategy
+    ) external onlyPoolConfigurator {
         if (
             PoolLogic.executeInitReserve(
                 _reserves,
                 _reservesList,
                 DataTypes.InitReserveParams({
                     asset: asset,
-                    aTokenAddress: aTokenAddress,
-                    variableDebtAddress: variableDebtAddress,
-                    interestRateStrategyAddress: interestRateStrategyAddress,
+                    cToken: cToken,
+                    vToken: vToken,
+                    interestRateStrategy: interestRateStrategy,
                     reservesCount: _reservesCount,
                     maxNumberReserves: MAX_NUMBER_RESERVES()
                 })
             )
         ) {
-        _reservesCount++;
+            _reservesCount++;
         }
     }
 
-    /// @inheritdoc IPool
+    /// @notice Pool configurator calls this to drop a reserve
+    /// @param asset Underlying asset of the dropped reserve
     function dropReserve(address asset) external virtual override onlyPoolConfigurator {
         PoolLogic.executeDropReserve(_reserves, _reservesList, asset);
     }
 
-    /// @inheritdoc IPool
-    function setReserveInterestRateStrategyAddress(
+    /// @notice Pool configurator calls this to set the interest rate strategy for a reserve
+    /// @param asset Underlying asset of the reserve
+    /// @param interestRateStrategy Address of the interest rate strategy
+    function setReserveInterestRateStrategy(
         address asset,
-        address rateStrategyAddress
-    ) external virtual override onlyPoolConfigurator {
+        address interestRateStrategy
+    ) external onlyPoolConfigurator {
         require(asset != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
         require(_reserves[asset].id != 0 || _reservesList[0] == asset, Errors.ASSET_NOT_LISTED);
 
-        _reserves[asset].interestRateStrategyAddress = rateStrategyAddress;
+        _reserves[asset].interestRateStrategy = interestRateStrategy;
     }
 
-    /// @inheritdoc IPool
-    function syncIndexesState(address asset) external virtual override onlyPoolConfigurator {
+    /// @notice Pool configurator calls this to update the debt index for a reserve
+    /// @dev Used by the configurator when needing to update the interest rate strategy data
+    /// @param asset Underlying asset of the reserve
+    function syncIndexesState(address asset) external onlyPoolConfigurator {
         DataTypes.ReserveData storage reserve = _reserves[asset];
         DataTypes.ReserveCache memory reserveCache = reserve.cache();
 
         reserve.updateState(reserveCache);
     }
 
-    /// @inheritdoc IPool
-    function syncRatesState(address asset) external virtual override onlyPoolConfigurator {
+    /// @notice Pool configurator calls this to update the interest rate
+    /// @dev Used by the configurator when needing to update the interest rate strategy data
+    /// @param asset Underlying asset of the reserve
+    function syncRatesState(address asset) external onlyPoolConfigurator {
         DataTypes.ReserveData storage reserve = _reserves[asset];
         DataTypes.ReserveCache memory reserveCache = reserve.cache();
 
         ReserveLogic.updateInterestRatesAndVirtualBalance(reserve, reserveCache, asset, 0, 0);
     }
 
-    /// @inheritdoc IPool
+    /// @notice Pool configurator calls this to set the configuration bitmap of a reserve
+    /// @param asset Underlying asset of the reserve
+    /// @param configuration New configuration bitmap
     function setConfiguration(
         address asset,
         DataTypes.ReserveConfigurationMap calldata configuration
-    ) external virtual override onlyPoolConfigurator {
+    ) external onlyPoolConfigurator {
         require(asset != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
         require(_reserves[asset].id != 0 || _reservesList[0] == asset, Errors.ASSET_NOT_LISTED);
         _reserves[asset].configuration = configuration;
     }
 
-    /// @inheritdoc IPool
-    function getLiquidationGracePeriod(address asset) external virtual override returns (uint40) {
-        return _reserves[asset].liquidationGracePeriodUntil;
+    /// @notice Fetch the grace period for liquidations of a reserve
+    /// @param asset Underlying asset of the reserve
+    /// @return gracePeriod Grace period for liquidations
+    function getLiquidationGracePeriod(address asset) external returns (uint40 period) {
+        period = _reserves[asset].liquidationGracePeriodUntil;
     }
 
-    /// @inheritdoc IPool
-    function setLiquidationGracePeriod(
-        address asset,
-        uint40 until
-    ) external virtual override onlyPoolConfigurator {
+    /// @notice Pool configurator calls this to set the grace period for liquidations of a reserve
+    /// @param asset Underlying asset of the reserve
+    /// @return until Grace period for liquidations
+    function setLiquidationGracePeriod(address asset, uint40 until) external onlyPoolConfigurator {
         require(_reserves[asset].id != 0 || _reservesList[0] == asset, Errors.ASSET_NOT_LISTED);
         PoolLogic.executeSetLiquidationGracePeriod(_reserves, asset, until);
     }
 
-    /// @inheritdoc IPool
-    function rescueTokens(
-        address token,
-        address to,
-        uint256 amount
-    ) external virtual override onlyPoolAdmin {
+    /// @notice Pool admin can rescue tokens sent to this contract
+    /// @param token Token to be rescued
+    /// @param to Receiver of the tokens
+    /// @param amount Amount to rescue
+    function rescueTokens(address token, address to, uint256 amount) external onlyPoolAdmin {
         PoolLogic.executeRescueTokens(token, to, amount);
     }
 
-    /// @inheritdoc IPool
-    function getBorrowLogic() external pure returns (address) {
-        return address(BorrowLogic);
+    /// @notice Fetch external library address of supply logic
+    /// @return supplyLogic External library address
+    function getSupplyLogic() external pure returns (address supplyLogic) {
+        supplyLogic = address(SupplyLogic);
     }
 
-    /// @inheritdoc IPool
-    function getLiquidationLogic() external pure returns (address) {
-        return address(LiquidationLogic);
+    /// @notice Fetch external library address of borrow logic
+    /// @return borrowLogic External library address
+    function getBorrowLogic() external pure returns (address borrowLogic) {
+        borrowLogic = address(BorrowLogic);
     }
 
-    /// @inheritdoc IPool
-    function getPoolLogic() external pure returns (address) {
-        return address(PoolLogic);
+    /// @notice Fetch external library address of liquidation logic
+    /// @return liquidationLogic External library address
+    function getLiquidationLogic() external pure returns (address liquidationLogic) {
+        liquidationLogic = address(LiquidationLogic);
     }
 
-    /// @inheritdoc IPool
-    function getSupplyLogic() external pure returns (address) {
-        return address(SupplyLogic);
+    /// @notice Fetch external library address of pool logic
+    /// @return poolLogic External library address
+    function getPoolLogic() external pure returns (address poolLogic) {
+        poolLogic = address(PoolLogic);
     }
 }

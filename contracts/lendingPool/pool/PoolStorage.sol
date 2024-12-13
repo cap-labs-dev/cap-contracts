@@ -5,6 +5,7 @@ import {UserConfiguration} from '../libraries/configuration/UserConfiguration.so
 import {ReserveConfiguration} from '../libraries/configuration/ReserveConfiguration.sol';
 import {ReserveLogic} from '../libraries/logic/ReserveLogic.sol';
 import {DataTypes} from '../libraries/types/DataTypes.sol';
+import {IPoolAddressesProvider} from '../../interfaces/IPoolAddressesProvider.sol';
 
 /**
  * @title PoolStorage
@@ -16,6 +17,8 @@ contract PoolStorage {
     using ReserveLogic for DataTypes.ReserveData;
     using ReserveConfiguration for DataTypes.ReserveConfigurationMap;
     using UserConfiguration for DataTypes.UserConfigurationMap;
+
+    IPoolAddressesProvider public ADDRESSES_PROVIDER;
 
     // Map of reserves and their data (underlyingAssetOfReserve => reserveData)
     mapping(address => DataTypes.ReserveData) internal _reserves;
