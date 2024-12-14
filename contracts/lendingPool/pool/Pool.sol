@@ -362,9 +362,9 @@ contract Pool is PoolStorage {
                 _reservesList,
                 DataTypes.InitReserveParams({
                     asset: asset,
-                    cToken: cToken,
-                    vToken: vToken,
-                    interestRateStrategy: interestRateStrategy,
+                    cTokenImplementation: ADDRESS_PROVIDER.getCTokenImplementation(),
+                    vTokenImplementation: ADDRESS_PROVIDER.getVTokenImplementation(),
+                    interestRateStrategy: ADDRESS_PROVIDER.getInterestRateStrategy(),
                     reservesCount: _reservesCount,
                     maxNumberReserves: MAX_NUMBER_RESERVES()
                 })

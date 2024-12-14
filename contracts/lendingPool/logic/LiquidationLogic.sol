@@ -100,9 +100,9 @@ library LiquidationLogic {
             DataTypes.CalculateUserAccountDataParams({
                 userConfig: userConfig,
                 reservesCount: params.reservesCount,
-                avsCount: params.avsCount,
                 user: params.user,
-                oracle: params.priceOracle
+                oracle: params.priceOracle,
+                avs: params.avs
             })
         );
 
@@ -120,7 +120,8 @@ library LiquidationLogic {
                 debtReserveCache: vars.debtReserveCache,
                 totalDebt: vars.userTotalDebt,
                 healthFactor: vars.healthFactor,
-                priceOracleSentinel: params.priceOracleSentinel
+                priceOracleSentinel: params.priceOracleSentinel,
+                avs: params.avs
             })
         );
 
@@ -160,12 +161,6 @@ library LiquidationLogic {
         IERC20(params.debtAsset).safeTransferFrom(
             msg.sender,
             vars.debtReserveCache.aTokenAddress,
-            vars.actualDebtToLiquidate
-        );
-
-        IAToken(vars.debtReserveCache.aTokenAddress).handleRepayment(
-            msg.sender,
-            params.user,
             vars.actualDebtToLiquidate
         );
 

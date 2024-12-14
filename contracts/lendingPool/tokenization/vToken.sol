@@ -94,8 +94,8 @@ contract vToken is ERC20Upgradeable {
         uint256 balanceIncrease = scaledBalance.rayMul(index) - scaledBalance.rayMul(_index[onBehalfOf]);
         _index[onBehalfOf] = index;
 
-        address rewarder = _pool.rewarder();
-        if (rewarder != address(0)) IRewarder(_pool.rewarder()).handleAction(
+        address rewarder = IPoolAddressProvider(_pool.ADDRESS_PROVIDER()).getRewarder();
+        if (rewarder != address(0)) IRewarder(rewarder).handleAction(
             address(0),
             onBehalfOf,
             amountScaled,
@@ -123,8 +123,8 @@ contract vToken is ERC20Upgradeable {
         uint256 balanceIncrease = scaledBalance.rayMul(index) - scaledBalance.rayMul(_index[from]);
         _index[from] = index;
 
-        address rewarder = _pool.rewarder();
-        if (rewarder != address(0)) IRewarder(_pool.rewarder()).handleAction(
+        address rewarder = IPoolAddressProvider(_pool.ADDRESS_PROVIDER()).getRewarder();
+        if (rewarder != address(0)) IRewarder(rewarder).handleAction(
             from,
             address(0),
             amountScaled,
@@ -154,6 +154,12 @@ contract vToken is ERC20Upgradeable {
     /// @return debt Total debt of the reserve
     function totalSupply() public view override returns (uint256 debt) {
         debt = _scaledTotalSupply.rayMul(_pool.getReserveNormalizedVariableDebt(_underlyingAsset));
+    }
+
+    /// @notice Total scaled debt
+    /// @return debt Total scaled debt of the reserve
+    function scaledTotalSupply() external view returns (uint256 scaledSupply) {
+        scaledSupply = _totalSupply;
     }
 
     /// @notice Lending pool address

@@ -12,6 +12,7 @@ import {DataTypes} from '../types/DataTypes.sol';
 import {ReserveLogic} from './ReserveLogic.sol';
 import {ValidationLogic} from './ValidationLogic.sol';
 import {GenericLogic} from './GenericLogic.sol';
+import {CloneLogic} from './CloneLogic.sol';
 
 /**
  * @title PoolLogic library
@@ -39,15 +40,36 @@ library PoolLogic {
         mapping(uint256 => address) storage reservesList,
         DataTypes.InitReserveParams memory params
     ) external returns (bool) {
+        require(params.asset != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
         require(Address.isContract(params.asset), Errors.NOT_CONTRACT);
-        reservesData[params.asset].init(
-            params.aTokenAddress,
-            params.variableDebtAddress,
-            params.interestRateStrategyAddress
+
+        address cToken = CloneLogic.clone(params.cTokenImplementation, address(this), params.asset);
+        address vToken = CloneLogic.clone(params.vTokenImplementation, address(this), params.asset);
+
+        ICToken(cToken).initialize(params.asset);
+        IVToken(vToken).initialize(params.asset);
+        IInterestRateStrategy(params.interestRateStrategy).setInterestRateParams(
+            params.asset,
+            params.optimalUsageRatio,
+            params.variableRateSlope1,
+            params.variableRateSlope2,
+            params.baseVariableBorrowRate
         );
 
+        DataTypes.ReserveConfigurationMap memory currentConfig = DataTypes.ReserveConfigurationMap(0);
+
+        currentConfig.setDecimals(IERC20(params.asset).decimals());
+        currentConfig.setActive(true);
+        currentConfig.setPaused(false);
+        currentConfig.setFrozen(false);
+
+        reservesData[params.asset].init(cToken, vToken);
+
+        require(_reserves[asset].id != 0 || _reservesList[0] == asset, Errors.ASSET_NOT_LISTED);
+        _reserves[asset].configuration = configuration;
+
         bool reserveAlreadyAdded = reservesData[params.asset].id != 0 ||
-        reservesList[0] == params.asset;
+            reservesList[0] == params.asset;
         require(!reserveAlreadyAdded, Errors.RESERVE_ALREADY_ADDED);
 
         for (uint16 i = 0; i < params.reservesCount; i++) {

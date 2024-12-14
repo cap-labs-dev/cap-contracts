@@ -108,8 +108,8 @@ contract cToken is ERC20PermitUpgradeable {
     /// @param to Receiver of the token transfer
     /// @param value Amount of tokens transferred
     function _update(address from, address to, uint256 value) internal override {
-        address rewarder = _pool.rewarder();
-        if (rewarder != address(0)) IRewarder(_pool.rewarder()).handleAction(
+        address rewarder = IPoolAddressProvider(_pool.ADDRESS_PROVIDER()).getRewarder();
+        if (rewarder != address(0)) IRewarder(rewarder).handleAction(
             from,
             to,
             value,

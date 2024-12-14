@@ -22,11 +22,9 @@ import {GenericLogic} from './GenericLogic.sol';
 import {SafeCast} from '../../../dependencies/openzeppelin/contracts/SafeCast.sol';
 import {IncentivizedERC20} from '../../tokenization/base/IncentivizedERC20.sol';
 
-/**
- * @title ReserveLogic library
- * @author Aave
- * @notice Implements functions to validate the different actions of the protocol
- */
+/// @title ValidationLogic library
+/// @author kexley, inspired by Aave
+/// @notice Implements functions to validate the different actions of the protocol
 library ValidationLogic {
     using ReserveLogic for DataTypes.ReserveData;
     using WadRayMath for uint256;
@@ -47,11 +45,11 @@ library ValidationLogic {
     */
     uint256 public constant HEALTH_FACTOR_LIQUIDATION_THRESHOLD = 1e18;
 
-    /**
-    * @notice Validates a supply action.
-    * @param reserveCache The cached data of the reserve
-    * @param amount The amount to be supplied
-    */
+    /// @notice Validates a supply action
+    /// @param reserveCache The cached data of the reserve
+    /// @param reserve The storage pointer of the reserve
+    /// @param amount The amount to be supplied
+    /// @param onBehalfOf Receiver of the cTokens
     function validateSupply(
         DataTypes.ReserveCache memory reserveCache,
         DataTypes.ReserveData storage reserve,
@@ -69,19 +67,17 @@ library ValidationLogic {
         uint256 supplyCap = reserveCache.reserveConfiguration.getSupplyCap();
         require(
             supplyCap == 0 ||
-                ((IAToken(reserveCache.aTokenAddress).totalSupply() +
+                ((IAToken(reserveCache.cToken).totalSupply() +
                     uint256(reserve.accruedToTreasury)) + amount) <=
                         supplyCap * (10 ** reserveCache.reserveConfiguration.getDecimals()),
             Errors.SUPPLY_CAP_EXCEEDED
         );
     }
 
-    /**
-    * @notice Validates a withdraw action.
-    * @param reserveCache The cached data of the reserve
-    * @param amount The amount to be withdrawn
-    * @param userBalance The balance of the user
-    */
+    /// @notice Validates a withdraw action
+    /// @param reserveCache The cached data of the reserve
+    /// @param amount The amount to be withdrawn
+    /// @param userBalance The balance of the user
     function validateWithdraw(
         DataTypes.ReserveCache memory reserveCache,
         uint256 amount,
@@ -114,12 +110,10 @@ library ValidationLogic {
         bool borrowingEnabled;
     }
 
-    /**
-    * @notice Validates a borrow action.
-    * @param reservesData The state of all the reserves
-    * @param reservesList The addresses of all the active reserves
-    * @param params Additional params needed for the validation
-    */
+    /// @notice Validates a borrow action
+    /// @param reservesData The state of all the reserves
+    /// @param reservesList The addresses of all the active reserves
+    /// @param params Additional params needed for the validation
     function validateBorrow(
         mapping(address => DataTypes.ReserveData) storage reservesData,
         mapping(uint256 => address) storage reservesList,
@@ -210,13 +204,11 @@ library ValidationLogic {
         );
     }
 
-    /**
-    * @notice Validates a repay action.
-    * @param reserveCache The cached data of the reserve
-    * @param amountSent The amount sent for the repayment. Can be an actual value or uint(-1)
-    * @param onBehalfOf The address of the user msg.sender is repaying for
-    * @param debt The borrow balance of the user
-    */
+    /// @notice Validates a repay action.
+    /// @param reserveCache The cached data of the reserve
+    /// @param amountSent The amount sent for the repayment. Can be an actual value or uint(-1)
+    /// @param onBehalfOf The address of the user msg.sender is repaying for
+    /// @param debt The borrow balance of the user
     function validateRepay(
         DataTypes.ReserveCache memory reserveCache,
         uint256 amountSent,
@@ -237,39 +229,28 @@ library ValidationLogic {
     }
 
     struct ValidateLiquidationCallLocalVars {
-        bool collateralReserveActive;
-        bool collateralReservePaused;
         bool principalReserveActive;
         bool principalReservePaused;
-        bool isCollateralEnabled;
     }
 
-    /**
-    * @notice Validates the liquidation action.
-    * @param userConfig The user configuration mapping
-    * @param collateralReserve The reserve data of the collateral
-    * @param debtReserve The reserve data of the debt
-    * @param params Additional parameters needed for the validation
-    */
+    /// @notice Validates the liquidation action
+    /// @param userConfig The user configuration mapping
+    /// @param debtReserve The reserve data of the debt
+    /// @param params Additional parameters needed for the validation
     function validateLiquidationCall(
         DataTypes.UserConfigurationMap storage userConfig,
-        DataTypes.AvsData storage currentAvs,
         DataTypes.ReserveData storage debtReserve,
         DataTypes.ValidateLiquidationCallParams memory params
     ) internal view {
         ValidateLiquidationCallLocalVars memory vars;
-
-        (vars.currentAvsActive, , , vars.currentAvsPaused) = currentAvs
-            .configuration
-            .getFlags();
 
         (vars.principalReserveActive, , , vars.principalReservePaused) = params
             .debtReserveCache
             .reserveConfiguration
             .getFlags();
 
-        require(vars.currentAvsActive && vars.principalReserveActive, Errors.RESERVE_INACTIVE);
-        require(!vars.currentAvsPaused && !vars.principalReservePaused, Errors.RESERVE_PAUSED);
+        require(vars.principalReserveActive, Errors.RESERVE_INACTIVE);
+        require(!vars.principalReservePaused, Errors.RESERVE_PAUSED);
 
         require(
             params.priceOracleSentinel == address(0)
@@ -279,8 +260,7 @@ library ValidationLogic {
         );
 
         require(
-            currentAvs.liquidationGracePeriodUntil < uint40(block.timestamp) 
-                && debtReserve.liquidationGracePeriodUntil < uint40(block.timestamp),
+            debtReserve.liquidationGracePeriodUntil < uint40(block.timestamp),
             Errors.LIQUIDATION_GRACE_SENTINEL_CHECK_FAILED
         );
 
@@ -290,20 +270,10 @@ library ValidationLogic {
         );
     }
 
-    /**
-    * @notice Validates a transfer action.
-    * @param reserve The reserve object
-    */
-    function validateTransfer(DataTypes.ReserveData storage reserve) internal view {
-        require(!reserve.configuration.getPaused(), Errors.RESERVE_PAUSED);
-    }
-
-    /**
-    * @notice Validates a drop reserve action.
-    * @param reservesList The addresses of all the active reserves
-    * @param reserve The reserve object
-    * @param asset The address of the reserve's underlying asset
-    */
+    /// @notice Validates a drop reserve action
+    /// @param reservesList The addresses of all the active reserves
+    /// @param reserve The reserve object
+    /// @param asset The address of the reserve's underlying asset
     function validateDropReserve(
         mapping(uint256 => address) storage reservesList,
         DataTypes.ReserveData storage reserve,
@@ -312,11 +282,11 @@ library ValidationLogic {
         require(asset != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
         require(reserve.id != 0 || reservesList[0] == asset, Errors.ASSET_NOT_LISTED);
         require(
-            IERC20(reserve.variableDebtTokenAddress).totalSupply() == 0,
+            IERC20(reserve.vToken).totalSupply() == 0,
             Errors.VARIABLE_DEBT_SUPPLY_NOT_ZERO
         );
         require(
-            IERC20(reserve.aTokenAddress).totalSupply() == 0 && reserve.accruedToTreasury == 0,
+            IERC20(reserve.cToken).totalSupply() == 0 && reserve.accruedToTreasury == 0,
             Errors.UNDERLYING_CLAIMABLE_RIGHTS_NOT_ZERO
         );
     }

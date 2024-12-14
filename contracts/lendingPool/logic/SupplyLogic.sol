@@ -11,8 +11,6 @@ library SupplyLogic {
     using ReserveLogic for DataTypes.ReserveCache;
     using ReserveLogic for DataTypes.ReserveData;
 
-    event ReserveUsedAsCollateralEnabled(address indexed reserve, address indexed user);
-    event ReserveUsedAsCollateralDisabled(address indexed reserve, address indexed user);
     event Withdraw(address indexed reserve, address indexed user, address indexed to, uint256 amount);
     event Supply(address indexed reserve, address user, address indexed onBehalfOf, uint256 amount);
 
@@ -31,7 +29,13 @@ library SupplyLogic {
 
         ValidationLogic.validateSupply(reserveCache, reserve, params.amount, params.onBehalfOf);
 
-        reserve.updateInterestRatesAndBalance(reserveCache, params.asset, params.amount, 0);
+        reserve.updateInterestRatesAndBalance(
+            reserveCache,
+            params.interestRateStrategy,
+            params.asset,
+            params.amount,
+            0
+        );
 
         IERC20(params.asset).safeTransferFrom(msg.sender, reserveCache.aTokenAddress, params.amount);
 
@@ -64,7 +68,13 @@ library SupplyLogic {
 
         ValidationLogic.validateWithdraw(reserveCache, amountToWithdraw, userBalance);
 
-        reserve.updateInterestRatesAndBalance(reserveCache, params.asset, 0, amountToWithdraw);
+        reserve.updateInterestRatesAndBalance(
+            reserveCache,
+            params.interestRateStrategy,
+            params.asset,
+            0,
+            amountToWithdraw
+        );
 
         IAToken(reserveCache.aTokenAddress).burn(
             msg.sender,

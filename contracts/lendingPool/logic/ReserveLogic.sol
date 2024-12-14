@@ -77,22 +77,19 @@ library ReserveLogic {
     /**
     * @notice Initializes a reserve.
     * @param reserve The reserve object
-    * @param aTokenAddress The address of the overlying atoken contract
-    * @param variableDebtTokenAddress The address of the overlying variable debt token contract
-    * @param interestRateStrategyAddress The address of the interest rate strategy contract
+    * @param cToken The address of the overlying atoken contract
+    * @param vToken The address of the overlying variable debt token contract
     */
     function init(
         DataTypes.ReserveData storage reserve,
-        address aTokenAddress,
-        address variableDebtTokenAddress,
-        address interestRateStrategyAddress
+        address cToken,
+        address vToken
     ) internal {
-        require(reserve.aTokenAddress == address(0), Errors.RESERVE_ALREADY_INITIALIZED);
+        require(reserve.cToken == address(0), Errors.RESERVE_ALREADY_INITIALIZED);
 
         reserve.variableBorrowIndex = uint128(WadRayMath.RAY);
-        reserve.aTokenAddress = aTokenAddress;
-        reserve.variableDebtTokenAddress = variableDebtTokenAddress;
-        reserve.interestRateStrategyAddress = interestRateStrategyAddress;
+        reserve.cToken = cToken;
+        reserve.vToken = vToken;
     }
 
     /**
@@ -106,6 +103,7 @@ library ReserveLogic {
     function updateInterestRatesAndBalance(
         DataTypes.ReserveData storage reserve,
         DataTypes.ReserveCache memory reserveCache,
+        address interestRateStrategy,
         address reserveAddress,
         uint256 liquidityAdded,
         uint256 liquidityTaken
@@ -115,7 +113,7 @@ library ReserveLogic {
         );
 
         (uint256 nextVariableRate) = IReserveInterestRateStrategy(
-            reserve.interestRateStrategyAddress
+            interestRateStrategyAddress
         ).calculateInterestRates(
             DataTypes.CalculateInterestRatesParams({
                 liquidityAdded: liquidityAdded,
@@ -211,13 +209,13 @@ library ReserveLogic {
         .variableBorrowIndex;
         reserveCache.currVariableBorrowRate = reserve.currentVariableBorrowRate;
 
-        reserveCache.aTokenAddress = reserve.aTokenAddress;
-        reserveCache.variableDebtTokenAddress = reserve.variableDebtTokenAddress;
+        reserveCache.cToken = reserve.aToken;
+        reserveCache.vToken = reserve.vToken;
 
         reserveCache.reserveLastUpdateTimestamp = reserve.lastUpdateTimestamp;
 
         reserveCache.currScaledVariableDebt = reserveCache.nextScaledVariableDebt = IVariableDebtToken(
-            reserveCache.variableDebtTokenAddress
+            reserveCache.vToken
         ).scaledTotalSupply();
     }
 }
