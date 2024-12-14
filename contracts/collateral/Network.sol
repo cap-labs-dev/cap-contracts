@@ -12,4 +12,6 @@ abstract contract Network {
     function _registerProvider(address _provider, bool _isRegistered) internal virtual {
         ICollateralHandler(collateralHandler).registerProvider(_provider, _isRegistered);
     }
+
+    function collateralByProvider(address) external view returns (uint256) {}
 }
