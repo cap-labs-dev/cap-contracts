@@ -12,22 +12,9 @@ import { IRegistry } from "../interfaces/IRegistry.sol";
 /// @dev Supplies, borrows and utilization rates are tracked. Interest rates should be computed and
 /// charged on the external contracts, only the principle amount is counted on this contract. Asset
 /// whitelisting is handled via the registry.
-contract Vault is Initializable, AccessControlEnumerableUpgradeable {
-
-    /// @notice Supplier only role
-    bytes32 public constant SUPPLIER_ROLE = keccak256("SUPPLIER_ROLE");
-
-    /// @notice Borrower only role
-    bytes32 public constant BORROWER_ROLE = keccak256("BORROWER_ROLE");
-
+contract Vault is Initializable, PausableUpgradeable {
     /// @notice Registry that controls whitelisting assets
     IRegistry public registry;
-
-    /// @notice Supply balance of an asset by a supplier
-    mapping(address => uint256) public supplied;
-
-    /// @notice Borrow balance of an asset by a borrower
-    mapping(address => uint256) public borrowed;
 
     /// @notice Total supply of an asset to this contract
     mapping(address => uint256) public totalSupplies;
@@ -63,6 +50,7 @@ contract Vault is Initializable, AccessControlEnumerableUpgradeable {
     /// @param _registry Registry address
     function initialize(address _registry) initializer external {
         registry = IRegistry(_registry);
+        __Pausable_init();
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
@@ -70,10 +58,9 @@ contract Vault is Initializable, AccessControlEnumerableUpgradeable {
     /// @dev This contract must have approval to move asset from msg.sender
     /// @param _asset Whitelisted asset to deposit
     /// @param _amount Amount of asset to deposit
-    function deposit(address _asset, uint256 _amount) external onlyRole(SUPPLIER_ROLE) {
+    function deposit(address _asset, uint256 _amount) external whenNotPaused onlyRole(SUPPLIER_ROLE) {
         _validate(_asset);
         _updateIndex(_asset);
-        supplied[_asset][msg.sender] += _amount;
         totalSupplies[_asset] += _amount;
         uint256 beforeBalance = IERC20(_asset).balanceOf(address(this));
         IERC20(_asset).safeTransferFrom(msg.sender, address(this), _amount);
@@ -90,7 +77,6 @@ contract Vault is Initializable, AccessControlEnumerableUpgradeable {
     function withdraw(address _asset, uint256 _amount, address _receiver) external onlyRole(SUPPLIER_ROLE) {
         _validate(_asset);
         _updateIndex(_asset);
-        supplied[_asset][msg.sender] -= _amount;
         totalSupplies[_asset] -= _amount;
         IERC20(_asset).safeTransfer(_receiver, _amount);
         emit Withdraw(msg.sender, _asset, _amount);
@@ -101,26 +87,41 @@ contract Vault is Initializable, AccessControlEnumerableUpgradeable {
     /// @param _asset Asset to borrow
     /// @param _amount Amount of asset to borrow
     /// @param _receiver Receiver of the borrow
-    function borrow(address _asset, uint256 _amount, address _receiver) external onlyRole(BORROWER_ROLE) {
+    function borrow(address _asset, uint256 _amount, address _receiver) external whenNotPaused onlyRole(BORROWER_ROLE) {
         _validate(_asset);
         _updateIndex(_asset);
-        borrowed[_asset][msg.sender] += _amount;
         totalBorrows[_asset] += _amount;
         IERC20(_asset).safeTransfer(_receiver, _amount);
         emit Borrow(msg.sender, _asset, _amount);
     }
 
     /// @notice Repay an asset
-    /// @dev Repay must come from borrower
     /// @param _asset Asset to repay
     /// @param _amount Amount of asset to repay
     function repay(address _asset, uint256 _amount) external onlyRole(BORROWER_ROLE) {
         _validate(_asset);
         _updateIndex(_asset);
-        borrowed[_asset][msg.sender] -= _amount;
         totalBorrows[_asset] -= _amount;
         IERC20(_asset).safeTransferFrom(msg.sender, address(this), _amount);
         emit Repay(msg.sender, _asset, _amount);
+    }
+
+    /// @notice Rescue an unsupported asset
+    /// @param _asset Asset to rescue
+    /// @param _receiver Receiver of the rescue
+    function rescueERC20(address _asset, address _receiver) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (registry.supportedAssets(_asset)) revert AssetNotRescuable(_asset);
+        IERC20(_asset).safeTransfer(_receiver, IERC20(_asset).balanceOf(address(this)));
+    }
+
+    /// @notice Pause vault
+    function pause() external onlyRole(PAUSER_ROLE) {
+        _pause();
+    }
+
+    /// @notice Unpause vault
+    function unpause() external onlyRole(PAUSER_ROLE) {
+        _unpause();
     }
 
     /// @notice Available balance to borrow
@@ -137,7 +138,7 @@ contract Vault is Initializable, AccessControlEnumerableUpgradeable {
     function utilization(address _asset) public view returns (uint256 ratio) {
         ratio = totalSupplies[_asset] != 0 
             ? totalBorrows[_asset] * 1e27 / totalSupplies[_asset]
-            :0;
+            : 0;
     }
 
     /// @notice Up to date cumulative utilization index of an asset
@@ -158,6 +159,6 @@ contract Vault is Initializable, AccessControlEnumerableUpgradeable {
     /// @dev Validate that an asset is whitelisted
     /// @param _asset Asset to check
     function _validate(address _asset) internal {
-        if (!registry.supportedAssets(address(this), _asset)) revert AssetNotSupported(_asset);
+        if (!registry.supportedAssets(_asset)) revert AssetNotSupported(_asset);
     }
 }
