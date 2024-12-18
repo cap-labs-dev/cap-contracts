@@ -8,37 +8,40 @@ interface INetwork {
 
 contract CollateralHandler {
 
-    address public lendingPool;
-    bytes32[] public availableTranches;
+    address public lender;
+    address[] public activeAgents;
 
-    struct Tranche {
+    struct Agent {
         uint maxCollateral;
         uint maxCollateralPerProvider;
-        uint availableCollateral;
         uint collateral;
+        uint ltv;
+        uint liquidationThreshold;
+        uint rate;
     }
 
-    mapping(bytes32 => Tranche) public tranche;
-    mapping(address => bytes32) public optIns;
+    mapping(address => Agent) public agents;
+    mapping(address => address) public optIns;
     mapping(address => bool) public network;
     mapping(address => bool) public providers;
-    mapping(address => mapping(bytes32 => uint256)) public providerTrancheCollateral;
+    mapping(address => mapping(address => uint256)) public providerAgentCollateral;
     mapping(address => address) public providerToNetwork;
-    mapping(bytes32 => address[]) public trancheProviders;
+    mapping(address => address[]) public agentProviders;
+    mapping(address => bool) public providerIsSlashed;
 
     error NotNetwork();
     error NotProvider();
-    error NotLendingPool();
+    error NotLender();
     error NotEnoughCollateral();
     error AlreadyOptedIn();
     error MaxCollateralExceeded();
     error MaxCollateralProviderExceeded();
     error NoNetwork();
+    error ProviderIsSlashed();
 
     event ProviderRegistered(address provider, bool isRegistered);
-    event CollateralUsed(bytes32 trancheId, uint256 amountUsed);
-    event OptIn(address provider, bytes32 trancheId, uint256 amount);
-    event OptOut(address povider, bytes32 trancheId, uint256 amount);
+    event OptIn(address provider, address agent, uint256 amount);
+    event OptOut(address provider, address bagent, uint256 amount);
     event SlashProvider(address provider, uint256 amount);
 
     function _onlyNetwork() private view {
@@ -49,116 +52,117 @@ contract CollateralHandler {
         if (providers[msg.sender]) revert NotProvider();
     }
 
-    function _onlyLendingPool() private view {
-        if (msg.sender != lendingPool) revert NotLendingPool();
+    function _onlyLender() private view {
+        if (msg.sender != lender) revert NotLender();
     }
 
     function globalCollateral() external view returns (uint256 _collateral) {
-        for (uint i; i < availableTranches.length; ++i) {
-            _collateral += tranche[availableTranches[i]].collateral;
+        for (uint i; i < activeAgents.length; ++i) {
+            _collateral += agents[activeAgents[i]].collateral;
         }
     }
 
     function collateralByNetwork(address) external view returns (uint256) {}
     function collateralByProvider(address) external view returns (uint256) {}
 
-    function trancheCollateral(bytes32 _trancheId) external view returns (uint256) {
-        return tranche[_trancheId].availableCollateral;
+    function coverage(address _agent) external view returns (uint256) {
+        return _convertToUsd(agents[_agent].collateral);
     }
 
-    function tranches() external view returns (bytes32[] memory _tranches) {
-        for (uint i; i < availableTranches.length; ++i) {
-            _tranches[i] = availableTranches[i];
+    function _convertToUsd(uint256 _amount) private pure returns (uint256) {
+        /// to do add oracle
+        return _amount;
+    }
+
+    function ltv(address _agent) external view returns (uint256 _ltv) {
+        return agents[_agent].ltv;
+    }
+
+    function liquidiationThreshold(address _agent) external view returns (uint256 _lt) {
+        return agents[_agent].liquidationThreshold;
+    }
+
+    function agentsList() external view returns (address[] memory _agents) {
+        for (uint i; i < activeAgents.length; ++i) {
+            _agents[i] = activeAgents[i];
         }
     }
 
-    function borrowAgainst(bytes32 _trancheId, uint _amount) external {
-        _onlyLendingPool();
-
-        uint available = tranche[_trancheId].availableCollateral;
-        if (_amount < available) revert NotEnoughCollateral();
-
-        tranche[_trancheId].availableCollateral = available - _amount;
-
-        emit CollateralUsed(_trancheId, _amount);
-    }
-
-
-    function slash(bytes32 _trancheId, uint _amount) external {
-        _onlyLendingPool();
+    function slash(address _agent, uint _amount) external {
+        _onlyLender();
         
-        Tranche memory _tranche = tranche[_trancheId];
+        Agent memory storedAgents = agents[_agent];
 
-        uint256 divisor = _amount  * 1e18 / _tranche.collateral;
+        uint256 divisor = _amount  * 1e18 / storedAgents.collateral;
 
-        _tranche.availableCollateral -= _amount;
-        _tranche.collateral -= _amount;
+        storedAgents.collateral -= _amount;
 
-        for (uint i; i < trancheProviders[_trancheId].length; ++i) {
-            address provider = trancheProviders[_trancheId][i];
-            uint256 amountCurrent = providerTrancheCollateral[provider][_trancheId];
+        for (uint i; i < agentProviders[_agent].length; ++i) {
+            address provider = agentProviders[_agent][i];
+            uint256 amountCurrent = providerAgentCollateral[provider][_agent];
             address _network = providerToNetwork[provider];
 
             uint256 slashAmount = amountCurrent * 1e18 / divisor;
             INetwork(_network).slashProvider(provider, slashAmount);
 
+            providerIsSlashed[provider] = true;
+
             emit SlashProvider(provider, slashAmount);
         }
     }
 
-    function optIn(bytes32[] calldata _trancheIds, uint[] calldata _amountsCollateral) external {
-        for (uint i; i < _trancheIds.length; ++i) {
-            optIn(_trancheIds[i], _amountsCollateral[i]);
+    function optIn(address[] calldata _agents, uint[] calldata _amountsCollateral) external {
+        for (uint i; i < _agents.length; ++i) {
+            optIn(_agents[i], _amountsCollateral[i]);
         }
     }
 
-    function optIn(bytes32 _trancheId, uint _amountCollateral) private {
+    function optIn(address _agent, uint _amountCollateral) private {
         _onlyProvider();
 
         address _network = providerToNetwork[msg.sender];
 
-        Tranche memory _tranche = tranche[_trancheId];
-        if (_tranche.collateral + _amountCollateral > _tranche.maxCollateral) revert MaxCollateralExceeded();
-        if (_amountCollateral > _tranche.maxCollateralPerProvider) revert MaxCollateralProviderExceeded();
+        Agent memory storedAgent = agents[_agent];
+        if (storedAgent.collateral + _amountCollateral > storedAgent.maxCollateral) revert MaxCollateralExceeded();
+        if (_amountCollateral > storedAgent.maxCollateralPerProvider) revert MaxCollateralProviderExceeded();
 
-        _tranche.availableCollateral += _amountCollateral;
-        _tranche.collateral += _amountCollateral;
+        storedAgent.collateral += _amountCollateral;
 
-        uint current = providerTrancheCollateral[msg.sender][_trancheId]; 
+        uint current = providerAgentCollateral[msg.sender][_agent]; 
         if (current + _amountCollateral > INetwork(_network).collateralByProvider(msg.sender)) revert NotEnoughCollateral();
         if (current > 0) revert AlreadyOptedIn();
-        providerTrancheCollateral[msg.sender][_trancheId] = _amountCollateral;
+        providerAgentCollateral[msg.sender][_agent] = _amountCollateral;
         
         // Need to work on this because opt out and back in is an issue.
-        trancheProviders[_trancheId].push(msg.sender);
+        agentProviders[_agent].push(msg.sender);
        
-        emit OptIn(msg.sender, _trancheId, _amountCollateral);
+        emit OptIn(msg.sender, _agent, _amountCollateral);
     }
 
-     function optOut(bytes32[] calldata _tranches) external {
-        for (uint i; i < _tranches.length; ++i) {
-            optOut(_tranches[i]);
+     function optOut(address[] calldata _agents) external {
+        for (uint i; i < _agents.length; ++i) {
+            optOut(_agents[i]);
         }
     }
 
-    function optOut(bytes32 _trancheId) public {
+    function optOut(address _agent) public {
         _onlyProvider();
 
-        Tranche memory _tranche = tranche[_trancheId];
+        if (providerIsSlashed[msg.sender]) revert ProviderIsSlashed();
 
-        uint256 amount = providerTrancheCollateral[msg.sender][_trancheId];
-        if (amount < _tranche.availableCollateral) revert NotEnoughCollateral();
+        Agent memory storedAgent = agents[_agent];
 
-        _tranche.availableCollateral -= amount;
-        _tranche.collateral -= amount;
+        uint256 amount = providerAgentCollateral[msg.sender][_agent];
 
-        providerTrancheCollateral[msg.sender][_trancheId] = 0;
+        storedAgent.collateral -= amount;
 
-        emit OptOut(msg.sender, _trancheId, amount);
+        providerAgentCollateral[msg.sender][_agent] = 0;
+
+        emit OptOut(msg.sender, _agent, amount);
     }
 
-    function configureTranche(bytes32 _trancheId, Tranche calldata _tranche) external {
-        tranche[_trancheId] = _tranche;
+    function modifyAgent(address _agent, Agent calldata _agentData) external {
+        agents[_agent] = _agentData;
     }
 
     function registerProvider(address _provider, bool _isRegistered) external {

@@ -24,11 +24,13 @@ import {Subnetwork} from "@symbioticfi/core/src/contracts/libraries/Subnetwork.s
 import {SimpleKeyRegistry32} from "./SimpleKeyRegistry32.sol";
 import {MapWithTimeData} from "./libraries/MapWithTimeData.sol";
 import {Errors} from "./Errors.sol";
+import {Network} from "../Network.sol";
 
 /// @title Cap Symbiotic Network Middleware Contract
 /// @author Cap Labs
 /// @notice This contract manages the symbiotic collateral and slashing.
 contract CapSymbioticNetworkMiddleware is 
+    Network,
     SimpleKeyRegistry32,
     Errors,
     AccessControlEnumerableUpgradeable, 
