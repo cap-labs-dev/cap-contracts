@@ -6,7 +6,7 @@ interface INetwork {
     function slashProvider(address _provider, uint256 _amount) external;
 }
 
-contract CollateralHandler {
+contract Collateral {
 
     address public lender;
     address[] public activeAgents;
