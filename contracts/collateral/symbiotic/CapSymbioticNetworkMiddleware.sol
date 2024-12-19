@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {AccessControlEnumerableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
-
 import {INetworkRegistry} from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
 import {INetworkMiddlewareService} from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
 import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
@@ -24,22 +20,19 @@ import {Subnetwork} from "@symbioticfi/core/src/contracts/libraries/Subnetwork.s
 import {SimpleKeyRegistry32} from "./SimpleKeyRegistry32.sol";
 import {MapWithTimeData} from "./libraries/MapWithTimeData.sol";
 import {Errors} from "./Errors.sol";
+import {Network} from "../Network.sol";
 
 /// @title Cap Symbiotic Network Middleware Contract
 /// @author Cap Labs
 /// @notice This contract manages the symbiotic collateral and slashing.
 contract CapSymbioticNetworkMiddleware is 
+    Network,
     SimpleKeyRegistry32,
-    Errors,
-    AccessControlEnumerableUpgradeable, 
-    UUPSUpgradeable
+    Errors
 {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
     using MapWithTimeData for EnumerableMap.AddressToUintMap;
     using Subnetwork for address;
-
-    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-    bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
 
     struct ValidatorData {
         uint256 stake;
@@ -385,6 +378,4 @@ contract CapSymbioticNetworkMiddleware is
             revert UnknownSlasherType();
         }*/
     }
-
-    function _authorizeUpgrade(address) internal override onlyRole(OWNER_ROLE) {}
 }
