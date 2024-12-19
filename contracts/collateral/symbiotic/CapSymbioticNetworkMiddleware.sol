@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {AccessControlEnumerableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
-
 import {INetworkRegistry} from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
 import {INetworkMiddlewareService} from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
 import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
@@ -31,16 +28,11 @@ import {Network} from "../Network.sol";
 contract CapSymbioticNetworkMiddleware is 
     Network,
     SimpleKeyRegistry32,
-    Errors,
-    AccessControlEnumerableUpgradeable, 
-    UUPSUpgradeable
+    Errors
 {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
     using MapWithTimeData for EnumerableMap.AddressToUintMap;
     using Subnetwork for address;
-
-    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-    bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
 
     struct ValidatorData {
         uint256 stake;
@@ -72,11 +64,6 @@ contract CapSymbioticNetworkMiddleware is
         _;
     }
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
- 
     function initialize(
         address _network,
         address _operatorRegistry,
@@ -391,6 +378,4 @@ contract CapSymbioticNetworkMiddleware is
             revert UnknownSlasherType();
         }*/
     }
-
-    function _authorizeUpgrade(address) internal override onlyRole(OWNER_ROLE) {}
 }
