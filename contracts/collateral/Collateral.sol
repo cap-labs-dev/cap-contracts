@@ -117,6 +117,12 @@ contract Collateral is
     function collateralByNetwork(address) external view returns (uint256) {}
     function collateralByProvider(address) external view returns (uint256) {}
 
+    function restakerRate(address) external pure returns (uint256 _rate) {
+        /// To do
+        uint256 rate = _rate;
+        return rate;
+    }
+
     /**
      * @notice How much collateral and agent has available to back their borrows
      * @param _agent The borrower from the lender
