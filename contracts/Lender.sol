@@ -14,18 +14,19 @@ import { IRegistry } from "../interfaces/IRegistry.sol";
 contract Lender is Initializable, AccessControlEnumerableUpgradeable {
 
     struct Reserve {
-        mapping(address => uint256) principal;
-        mapping(address => uint256) restaker;
-        mapping(address => uint256) interest;
-        mapping(address => uint256) storedBorrowIndex;
-        mapping(address => uint256) storedRestakerIndex;
+        uint256 id;
+        address vault;
         uint256 borrowIndex;
         uint256 lastUpdate;
-        address vault;
+        uint256 borrowed;
     }
 
     struct Agent {
-        uint256 rate;
+        mapping(uint256 => uint256) principal;
+        mapping(uint256 => uint256) restaker;
+        mapping(uint256 => uint256) interest;
+        mapping(uint256 => uint256) storedBorrowIndex;
+        mapping(uint256 => uint256) storedRestakerIndex;
         uint256 restakerIndex;
         uint256 lastUpdate;
     }
@@ -34,13 +35,63 @@ contract Lender is Initializable, AccessControlEnumerableUpgradeable {
     IRegistry public registry;
 
     mapping(address => Reserve) public reserve;
+    mapping(address => Agent) public agent;
     mapping(uint256 => address) internal reservesList;
     mapping(address => uint256) internal _agentConfig;
     uint16 internal _reservesCount;
 
+    event Borrow(address indexed asset, address indexed agent, uint256 amount);
+    event Repay(
+        address indexed asset,
+        address indexed agent,
+        uint256 principalPaid,
+        uint256 restakerPaid,
+        uint256 interestPaid
+    );
+    event Liquidate(address indexed asset, address indexed agent, uint256 amount, uint256 value);
+    event AccrueInterest(address indexed asset, address indexed agent, uint256 restakerInterest, uint256 interest);
+
+    /// @notice Initialize the lender
+    /// @param _registry Registry address
     function initialize(address _registry) initializer external {
         registry = IRegistry(_registry);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    }
+
+    function addAsset(address _asset, address _vault) external returns (bool filled) {
+        if (_asset == address(0) || _vault == address(0)) revert EmptyAddress(_asset, _vault);
+        if (reserve[_asset].vault != address(0)) revert AlreadyInitialized(_asset);
+        uint256 id = reserve[_asset].id;
+
+        for (uint256 i; i < reserveCount; ++i) {
+            // Fill empty space if available
+            if (reserveList[i] == address(0)) {
+                reserveList[i] = _asset;
+                filled = true;
+                break;
+            }
+        }
+
+        if (!filled) {
+            reserveList[reserveCount] = _asset;
+            ++reserveCount;
+        }
+
+        reserve[_asset] = Reserve({
+            vault: _vault,
+            borrowIndex = 1e27,
+            lastUpdate = block.timestamp
+        });
+    }
+
+    function removeAsset(address _asset) external {
+        uint256 id = reserve[_asset].id;
+
+        uint256 borrowedBalance = reserve[_asset].borrowed;
+        if (borrowedBalance > 0) revert BalanceStillBorrowed(borrowedBalance);
+
+        delete reserveList[id];
+        delete reserve[_asset];
     }
 
     /// @notice Borrow an asset
@@ -55,8 +106,10 @@ contract Lender is Initializable, AccessControlEnumerableUpgradeable {
         if (isFirstBorrow) _agentConfig[msg.sender].setBorrowing(id, true);
 
         _accrueInterest(id, msg.sender);
-        reserve[id].principal[msg.sender] += _amount;
+        agents[msg.sender].principal[id] += _amount;
+        reserve[_asset].borrowed += _amount;
         IVault(reserve[id].vault).borrow(_asset, _amount, _receiver);
+        emit Borrow(_asset, msg.sender, _amount);
     }
 
     /// @notice Repay an asset
@@ -83,8 +136,6 @@ contract Lender is Initializable, AccessControlEnumerableUpgradeable {
         address _asset,
         uint256 _debtToCover
     ) external returns (uint256 liquidatedValue) {
-        uint256 id = reserveId(_asset);
-
         (
             uint256 totalCollateral,
             ,
@@ -102,73 +153,79 @@ contract Lender is Initializable, AccessControlEnumerableUpgradeable {
         if (totalCollateral < liquidatedValue) liquidatedValue = totalCollateral;
 
         IAvs(avs).slash(_agent, msg.sender, liquidatedValue);
+        emit Liquidate(_agent, _asset, liquidated, liquidatedValue);
     }
 
     /// @dev Repay an asset
     /// @param _asset Asset to repay
     /// @param _amount Amount to repay
-    /// @param _onBehalfOf Repay on behalf of another borrower
+    /// @param _agent Repay on behalf of an agent
     /// @param _caller Address that will pay the debt
     /// @return repaid Actual amount repaid
     function _repay(
         address _asset,
         uint256 _amount,
-        address _onBehalfOf,
+        address _agent,
         address _caller
     ) internal returns (uint256 repaid) {
         uint256 id = reserveId(_asset);
         _accrueInterest(id, _onBehalfOf);
 
-        uint256 principal = reserve[id].principal[_onBehalfOf];
-        uint256 restaker = reserve[id].restaker[_onBehalfOf];
-        uint256 interest = reserve[id].interest[_onBehalfOf];
+        uint256 principal = agents[_agent].principal[id];
+        uint256 restaker = agents[_agent].restaker[id];
+        uint256 interest = agents[_agent].interest[id];
 
         uint256 principalPaid = _amount < principal ? _amount : principal;
         uint256 restakerPaid = _amount - principal < restaker ? _amount - principal : restaker;
         uint256 interestPaid = _amount - principal - restaker < interest ? _amount - principal - restaker : interest;
 
         repaid = principalPaid + restakerPaid + interestPaid;
-        if (repaid == principal + restaker + interest) _agentConfig[_onBehalfOf].setBorrowing(id, false);
+        if (repaid == principal + restaker + interest) {
+            _agentConfig[_agent].setBorrowing(id, false);
+            emit TotalRepayment(_asset, _agent);
+        }
 
         if (principalPaid > 0) {
-            reserve[id].principal[_onBehalfOf] -= principalPaid;
+            agents[_agent].principal[id] -= principalPaid;
+            reserve[_asset].borrowed -= principalPaid;
             IERC20(_asset).safeTransferFrom(_caller, address(this), principalPaid);
             IERC20(_asset).forceApprove(reserve[id].vault, principalPaid);
             IVault(reserve[id].vault).repay(_asset, principalPaid);
-            emit PrincipalRepaid(id, _onBehalfOf, principalPaid, principal - principalPaid);
         }
 
         if (restakerPaid > 0) {
-            reserve[id].restaker[_onBehalfOf] -= restakerPaid;
+            agents[_agent].restaker[id] -= restakerPaid;
             IERC20(_asset).safeTransferFrom(_caller, restakerRewarder, restakerPaid);
-            emit RestakerRepaid(id, _onBehalfOf, restakerPaid, restaker - restakerPaid);
         }
 
         if (interestPaid > 0) {
-            reserve[id].interest[_onBehalfOf] -= interestPaid;
+            agents[_agent].interest[id] -= interestPaid;
             IERC20(_asset).safeTransferFrom(_caller, rewarder, interestPaid);
-            emit InterestRepaid(id, _onBehalfOf, interestPaid, interest - interestPaid);
         }
+
+        emit Repay(_asset, _agent, principalPaid, restakerPaid, interestPaid);
     }
 
     /// @dev Accrue interest to a borrower's balance
     /// @param _id Reserve id of the reserve that has interest
-    /// @param _borrower Borrower of the asset
+    /// @param _agent Borrower of the asset
     function _accrueInterest(uint256 _id, address _agent) internal {
         _updateIndexes(_id, _agent);
 
-        reserve[_id].restaker[_agent] = accruedRestakerInterest(_id, _agent);
-        reserve[_id].storedRestakerIndex[_agent] = agent[_agent].restakerIndex;
+        agents[_agent].restaker[_id] = accruedRestakerInterest(_id, _agent);
+        agents[_agent].storedRestakerIndex[id] = agent[_agent].restakerIndex;
 
-        reserve[_id].interest[_agent] = accruedInterest(_id, _agent);
-        reserve[_id].storedBorrowIndex[_agent] = reserve[_id].borrowIndex;
+        agents[_agent].interest[id] = accruedInterest(_id, _agent);
+        agents[_agent].storedBorrowIndex[id] = reserve[_id].borrowIndex;
+
+        emit AccrueInterest(_asset, _agent, agents[_agent].restaker[_id], agents[_agent].interest[_id]);
     }
 
     /// @dev Update the borrow index of an asset
     /// @param _asset Asset that is borrowed
     function _updateIndexes(uint256 _id, address _agent) internal {
         agent[_agent].restakerIndex *= MathUtils.calculateLinearInterest(
-            agent[_agent].rate,
+            IAvs(avs).restakerRate(_agent),
             agent[_agent].lastUpdate
         );
 
@@ -188,11 +245,10 @@ contract Lender is Initializable, AccessControlEnumerableUpgradeable {
     /// @return rate Borrow rate scaled to 1e27
     function borrowRate(address _asset) public view returns (uint256 rate) {
         uint256 id = reserveId(_asset);
-        uint256 marketRate = IOracle(oracle).getMarketRate(asset, reserve[_id].lastUpdate);
-        rate = marketRate > reserve[_id].rate ? marketRate : reserve[_id].rate;
+        rate = IOracle(oracle).updateRate(_asset, reserve[id].lastUpdate);
     }
 
-    /// @notice Fetch the amount of interest a borrower has accrued
+    /// @notice Fetch the amount of restaker interest a borrower has accrued on an asset
     /// @param _id Reserve id
     /// @param _agent Agent that has interest accrued
     /// @return interest Amount of interest accrued
@@ -203,13 +259,13 @@ contract Lender is Initializable, AccessControlEnumerableUpgradeable {
         uint256 restakerIndex = agent[_agent].restakerIndex;
         if (agent[_agent].lastUpdate != block.timestamp) {
             restakerIndex *= MathUtils.calculateLinearInterest(
-                agent[_agent].rate,
+                IAvs(avs).restakerRate(_agent),
                 agent[_agent].lastUpdate
             );
         }
 
-        interest = reserve[_id].restaker[_agent] + (
-            (reserve[_id].principal[_agent] ) * ( restakerIndex - reserve[_id].storedRestakerIndex[_agent] )
+        interest = agents[_agent].restaker[_id] + (
+            (agents[_agent].principal[_id] ) * ( restakerIndex - agents[_agent].storedRestakerIndex[_id] )
         );
     }
 
@@ -229,8 +285,8 @@ contract Lender is Initializable, AccessControlEnumerableUpgradeable {
             );
         }
 
-        interest = reserve[_id].interest[_agent] + (
-            (reserve[_id].principal[_agent] + reserve[_id].interest[_agent] ) 
+        interest = agents[_agent].interest[_id] + (
+            (agents[_agent].principal[_id] + agents[_agent].interest[_id] ) 
             * ( borrowIndex - reserve[_id].storedBorrowIndex[_agent] )
         );
     }
@@ -244,7 +300,7 @@ contract Lender is Initializable, AccessControlEnumerableUpgradeable {
         address _agent
     ) external view returns (uint256 borrowed) {
         uint256 id = reserveId(_asset);
-        borrowed = reserve[id].principal[_agent] 
+        borrowed = agents[_agent].principal[id] 
             + accruedRestakerInterest(id, _agent)
             + accruedInterest(id, _agent);
     }
@@ -270,11 +326,11 @@ contract Lender is Initializable, AccessControlEnumerableUpgradeable {
 
         for (uint256 i; i < _reserveCount; ++i) {
             uint256 id = reserveList[i];
-            address asset = reserveAsset[id];
             if (!agentConfig.isBorrowing(id)) {
                 continue;
             }
 
+            address asset = reserveAsset[id];
             totalDebt += borrowed(id, _agent) * IOracle(oracle).price(asset);
         }
 
@@ -287,7 +343,7 @@ contract Lender is Initializable, AccessControlEnumerableUpgradeable {
     /// @notice Fetch the amount of asset that is available to borrow
     /// @param _asset Asset to borrow from vault
     function availableBorrow(address _asset) public view returns (uint256 available) {
-        available = IVault(reserveId[_asset].vault).balance(_asset);
+        available = IVault(reserves[_reserveId[_asset]].vault).balance(_asset);
     }
 
     /// @notice Reserve id for a given vault and asset
@@ -318,7 +374,7 @@ contract Lender is Initializable, AccessControlEnumerableUpgradeable {
 
         uint256 ltv = IAvs(avs).ltv(_agent);
         uint256 assetPrice = oracle.getPrice(asset);
-        uint256 newTotalDebt = _amount * assetPrice + totalDebt;
+        uint256 newTotalDebt = ( _amount * assetPrice ) + totalDebt;
         uint256 borrowCapacity = totalCollateral * ltv;
         
         if (newTotalDebt > borrowCapacity) 
