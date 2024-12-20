@@ -5,9 +5,9 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { AccessControlEnumerableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import { IRegistry } from "./interfaces/IRegistry.sol";
-import { IVault } from "./interfaces/IVault.sol";
-import { ICToken } from "./interfaces/ICToken.sol";
+import { IRegistry } from "../interfaces/IRegistry.sol";
+import { IVault } from "../interfaces/IVault.sol";
+import { ICToken } from "../interfaces/ICToken.sol";
 
 import { MintBurnLogic } from "./libraries/MintBurnLogic.sol";
 

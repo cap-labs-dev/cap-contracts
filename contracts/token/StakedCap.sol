@@ -10,8 +10,8 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { AccessControlEnumerableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import { IRegistry } from "./interfaces/IRegistry.sol";
-import { IMinter } from "./interfaces/IMinter.sol";
+import { IRegistry } from "../interfaces/IRegistry.sol";
+import { IMinter } from "../interfaces/IMinter.sol";
 
 contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
     using SafeERC20 for IERC20;

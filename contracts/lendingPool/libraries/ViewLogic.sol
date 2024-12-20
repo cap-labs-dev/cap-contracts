@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { IPToken } from "../interfaces/IPToken.sol";
-import { ICollateral } from "../interfaces/ICollateral.sol";
-import { IOracle } from "../interfaces/IOracle.sol";
+import { IPToken } from "../../interfaces/IPToken.sol";
+import { ICollateral } from "../../interfaces/ICollateral.sol";
+import { IOracle } from "../../interfaces/IOracle.sol";
 
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
 import { DataTypes } from "./types/DataTypes.sol";

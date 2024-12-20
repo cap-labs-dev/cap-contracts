@@ -5,10 +5,10 @@ import { ERC20Upgradeable, IERC20 } from "@openzeppelin/contracts-upgradeable/to
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import { Errors } from "./libraries/helpers/Errors.sol";
-import { MathUtils } from "./libraries/math/MathUtils.sol";
-import { ILender } from "./interfaces/ILender.sol";
-import { IOracle } from "./interfaces/IOracle.sol";
+import { Errors } from "../lendingPool/libraries/helpers/Errors.sol";
+import { MathUtils } from "../lendingPool/libraries/math/MathUtils.sol";
+import { ILender } from "../interfaces/ILender.sol";
+import { IOracle } from "../interfaces/IOracle.sol";
 
 contract pToken is ERC20Upgradeable {
 

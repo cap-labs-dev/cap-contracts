@@ -3,13 +3,13 @@ pragma solidity ^0.8.28;
 
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import { BorrowLogic } from "./libraries/BorrowLogic.sol";
-import { LiquidationLogic } from "./libraries/LiquidationLogic.sol";
-import { ReserveLogic } from "./libraries/ReserveLogic.sol";
-import { ViewLogic } from "./libraries/ViewLogic.sol";
-import { DataTypes } from "./libraries/types/DataTypes.sol";
-import { Errors } from "./libraries/helpers/Errors.sol";
-import { IRegistry } from "./interfaces/IRegistry.sol";
+import { BorrowLogic } from "../libraries/BorrowLogic.sol";
+import { LiquidationLogic } from "../libraries/LiquidationLogic.sol";
+import { ReserveLogic } from "../libraries/ReserveLogic.sol";
+import { ViewLogic } from "../libraries/ViewLogic.sol";
+import { DataTypes } from "../libraries/types/DataTypes.sol";
+import { Errors } from "../libraries/helpers/Errors.sol";
+import { IRegistry } from "../../interfaces/IRegistry.sol";
 import { LenderStorage } from "./LenderStorage.sol";
 
 /// @title Lender for covered agents

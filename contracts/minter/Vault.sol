@@ -7,7 +7,7 @@ import { AccessControlEnumerableUpgradeable } from "@openzeppelin/contracts-upgr
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-import { IRegistry } from "./interfaces/IRegistry.sol";
+import { IRegistry } from "../interfaces/IRegistry.sol";
 
 /// @title Vault for storing the backing for cTokens
 /// @author kexley, @capLabs

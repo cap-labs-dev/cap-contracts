@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { IPToken } from "../interfaces/IPToken.sol";
+import { IPToken } from "../../interfaces/IPToken.sol";
 
 import { Errors } from './helpers/Errors.sol';
 import { ValidationLogic } from "./ValidationLogic.sol";
