@@ -8,18 +8,26 @@ import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/I
 contract Registry is Initializable, AccessControlEnumerableUpgradeable {
 
     struct Basket {
+        string name;
         address[] assets;
         mapping(address => bool) supportedAssets;
-        mapping(address => uint256) optimiumRatio;
-        mapping(address => uint256) lowerKinkRatio;
-        mapping(address => uint256) upperKinkRatio;
+        mapping(address => uint256) slope0;
+        mapping(address => uint256) slope1;
+        mapping(address => uint256) mintKinkRatio;
+        mapping(address => uint256) burnKinkRatio;
+        mapping(address => uint256) optimalRatio;
         uint256 baseFee;
     }
 
-    ICapToken public capToken;
-    IVault public vault;
+    struct BorrowRate {
+        uint256 variableSlope1;
+        uint256 variableSlope2;
+        uint256 optimalUsageRatio;
+    }
 
-    Basket[] public baskets;
+    mapping(uint256 => Basket) public baskets;
+    mapping(address => bool) public supportedAsset;
+
     address[] public borrowers;
     mapping(address => bool) public supportedBorrower;
 
@@ -27,8 +35,8 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
-    function addAsset(address _asset) external onlyRole(MANAGER) {
-        assets.push(_asset);
+    function addAsset(uint256 _basket, address _asset) external onlyRole(MANAGER) {
+        baskets[_basket].assets.push(_asset);
         supportedAsset[_asset] = true;
     }
 
@@ -52,6 +60,10 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
 
     function setMinter(address _minter) external onlyRole(MANAGER) {
         minter = IMinter(_minter);
+    }
+
+    function supportedAssets(address _vault, address _asset) {
+        
     }
     
 }

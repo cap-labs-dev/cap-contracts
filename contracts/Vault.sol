@@ -2,9 +2,12 @@
 pragma solidity ^0.8.28;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { AccessControlEnumerableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import { IRegistry } from "../interfaces/IRegistry.sol";
+import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+
+import { IRegistry } from "./interfaces/IRegistry.sol";
 
 /// @title Vault for storing the backing for cTokens
 /// @author kexley, @capLabs
@@ -12,9 +15,20 @@ import { IRegistry } from "../interfaces/IRegistry.sol";
 /// @dev Supplies, borrows and utilization rates are tracked. Interest rates should be computed and
 /// charged on the external contracts, only the principle amount is counted on this contract. Asset
 /// whitelisting is handled via the registry.
-contract Vault is Initializable, PausableUpgradeable {
+contract Vault is Initializable, PausableUpgradeable, AccessControlEnumerableUpgradeable {
+    using SafeERC20 for IERC20;
+
     /// @notice Registry that controls whitelisting assets
     IRegistry public registry;
+
+    /// @notice Supplier role
+    bytes32 public constant SUPPLIER_ROLE = keccak256("SUPPLIER_ROLE");
+
+    /// @notice Borrower role
+    bytes32 public constant BORROWER_ROLE = keccak256("BORROWER_ROLE");
+
+    /// @notice Pauser role
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     /// @notice Total supply of an asset to this contract
     mapping(address => uint256) public totalSupplies;
@@ -33,6 +47,9 @@ contract Vault is Initializable, PausableUpgradeable {
 
     /// @dev Only whitelisted assets can be supplied or borrowed
     error AssetNotSupported(address asset);
+
+    /// @dev Only non-supported assets can be rescued
+    error AssetNotRescuable(address asset);
 
     /// @dev Deposit made
     event Deposit(address indexed depositor, address indexed asset, uint256 amount);
@@ -65,7 +82,7 @@ contract Vault is Initializable, PausableUpgradeable {
         uint256 beforeBalance = IERC20(_asset).balanceOf(address(this));
         IERC20(_asset).safeTransferFrom(msg.sender, address(this), _amount);
         uint256 afterBalance = IERC20(_asset).balanceOf(address(this));
-        if (afterBalance != beforeBalance + _amount) TransferTaxNotSupported();
+        if (afterBalance != beforeBalance + _amount) revert TransferTaxNotSupported();
         emit Deposit(msg.sender, _asset, _amount);
     }
 
@@ -110,7 +127,7 @@ contract Vault is Initializable, PausableUpgradeable {
     /// @param _asset Asset to rescue
     /// @param _receiver Receiver of the rescue
     function rescueERC20(address _asset, address _receiver) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (registry.supportedAssets(_asset)) revert AssetNotRescuable(_asset);
+        if (registry.vaultSupportsAsset(address(this), _asset)) revert AssetNotRescuable(_asset);
         IERC20(_asset).safeTransfer(_receiver, IERC20(_asset).balanceOf(address(this)));
     }
 
@@ -158,7 +175,7 @@ contract Vault is Initializable, PausableUpgradeable {
 
     /// @dev Validate that an asset is whitelisted
     /// @param _asset Asset to check
-    function _validate(address _asset) internal {
-        if (!registry.supportedAssets(_asset)) revert AssetNotSupported(_asset);
+    function _validate(address _asset) internal view {
+        if (!registry.vaultSupportsAsset(address(this), _asset)) revert AssetNotSupported(_asset);
     }
 }

@@ -2,28 +2,45 @@
 pragma solidity ^0.8.28;
 
 import { ERC4626Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import { ERC20PermitUpgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
+import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { AccessControlEnumerableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import { IRegistry } from "../interfaces/IRegistry.sol";
+
+import { IRegistry } from "./interfaces/IRegistry.sol";
+import { IMinter } from "./interfaces/IMinter.sol";
 
 contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
+    using SafeERC20 for IERC20;
+
     uint256 public lastNotify;
     uint256 public storedTotal;
     uint256 public totalLocked;
     uint256 public lockDuration;
+
+    address public registry;
 
     /// @dev Disable initializers on the implementation
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(address asset_) external initializer {
-        string memory name = "s" + IERC20(asset_).name();
-        string memory symbol = "s" + IERC20(asset_).symbol();
+    function initialize(address asset_, address _registry) external initializer {
+        string memory name = string.concat("s", IERC20Metadata(asset_).name());
+        string memory symbol = string.concat("s", IERC20Metadata(asset_).symbol());
 
+        __ERC4626_init(IERC20(asset_));
         __ERC20_init(name, symbol);
-        __ERC4626_init(asset_);
         __ERC20Permit_init(name);
+
+        registry = _registry;
+    }
+
+    function decimals() public view virtual override(ERC20Upgradeable, ERC4626Upgradeable) returns (uint8) {
+        return ERC4626Upgradeable.decimals();
     }
 
     function notify() external {
@@ -37,7 +54,8 @@ contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
     }
 
     function _swap() internal {
-        address[] memory assets = ICap(asset()).assets();
+        address[] memory assets = IRegistry(registry).basketAssets(asset());
+        address minter = IRegistry(registry).minter();
         for (uint i; i < assets.length; ++i) {
             uint256 balance = IERC20(assets[i]).balanceOf(address(this));
             if (balance > 0) {
@@ -55,7 +73,7 @@ contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
 
     function lockedProfit() public view returns (uint256 locked) {
         if (lockDuration == 0) return 0;
-        uint256 elapsed = block.timestamp - lastHarvest;
+        uint256 elapsed = block.timestamp - lastNotify;
         uint256 remaining = elapsed < lockDuration ? lockDuration - elapsed : 0;
         locked = totalLocked * remaining / lockDuration;
     }
@@ -65,7 +83,7 @@ contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
     }
 
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
-        SafeERC20.safeTransferFrom(asset(), caller, address(this), assets);
+        SafeERC20.safeTransferFrom(IERC20(asset()), caller, address(this), assets);
         _mint(receiver, shares);
         storedTotal += shares;
 
@@ -87,7 +105,7 @@ contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
         }
 
         _burn(owner, shares);
-        SafeERC20.safeTransfer(asset(), receiver, assets);
+        SafeERC20.safeTransfer(IERC20(asset()), receiver, assets);
         storedTotal -= shares;
 
         emit Withdraw(caller, receiver, owner, assets, shares);

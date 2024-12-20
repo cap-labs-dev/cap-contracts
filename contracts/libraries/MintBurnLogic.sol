@@ -8,82 +8,80 @@ import { IOracle } from "../interfaces/IOracle.sol";
 
 library MintBurnLogic {
     function getMint(
-        address _registry,
+        IRegistry _registry,
         address _tokenIn,
         address _tokenOut,
         uint256 _amount
     ) external view returns (uint256 amountOut, uint256 fee) {
-        IRegistry registry = IRegistry(_registry);
-        IVault vault = IVault(registry.basket[_tokenOut].vault);
-        IOracle oracle = IVault(registry.oracle());
+        IVault vault = IVault(_registry.basketVault(_tokenOut));
+        IOracle oracle = IOracle(_registry.oracle());
 
-        uint256 basketValue = _getBasketValue(registry, vault, oracle, _tokenOut);
+        uint256 basketValue = _getBasketValue(_registry, vault, oracle, _tokenOut);
         uint256 basketAssetValue = vault.totalSupplies(_tokenIn) * oracle.getPrice(_tokenIn);
         uint256 mintValue = _amount * oracle.getPrice(_tokenIn);
         uint256 newRatio = ( basketAssetValue + mintValue ) * 1e27 / ( basketValue + mintValue );
+
+        IRegistry.BasketFees memory basketFees = _registry.basketFees(_tokenOut, _tokenIn);
 
         amountOut = mintValue * IERC20(_tokenOut).totalSupply() / basketValue;
         (amountOut, fee) = _applyFeeSlopes(
             true,
             amountOut,
             newRatio,
-            registry.basket[_tokenOut].optimiumRatio[_tokenIn],
-            registry.basket[_tokenOut].mintKinkRatio[_tokenIn],
-            registry.basket[_tokenOut].baseFee[_tokenIn],
-            registry.basket[_tokenOut].slope0[_tokenIn],
-            registry.basket[_tokenOut].slope1[_tokenIn]
+            basketFees
         );
     }
 
     function getBurn(
-        address _registry,
+        IRegistry _registry,
         address _tokenIn,
         address _tokenOut,
         uint256 _amount
     ) external view returns (uint256 amountOut, uint256 fee) {
-        IRegistry registry = IRegistry(_registry);
-        IVault vault = IVault(registry.basket[_tokenIn].vault);
-        IOracle oracle = IVault(registry.oracle());
+        IVault vault = IVault(_registry.basketVault(_tokenIn));
+        IOracle oracle = IOracle(_registry.oracle());
 
-        uint256 basketValue = _getBasketValue(registry, vault, oracle, _tokenIn);
+        uint256 basketValue = _getBasketValue(_registry, vault, oracle, _tokenIn);
         uint256 basketAssetValue = vault.totalSupplies(_tokenOut) * oracle.getPrice(_tokenOut);
-        uint256 mintValue = _amount * basketValue / _tokenIn.totalSupply();
+        uint256 mintValue = _amount * basketValue / IERC20(_tokenIn).totalSupply();
         uint256 newRatio = ( basketAssetValue - mintValue ) * 1e27 / ( basketValue - mintValue );
+
+        IRegistry.BasketFees memory basketFees = _registry.basketFees(_tokenIn, _tokenOut);
 
         amountOut = mintValue / (oracle.getPrice(_tokenOut));
         (amountOut, fee) = _applyFeeSlopes(
             false,
             amountOut,
             newRatio,
-            registry.basket[_tokenIn].optimiumRatio[_tokenOut],
-            registry.basket[_tokenIn].burnKinkRatio[_tokenOut],
-            registry.basket[_tokenIn].baseFee[_tokenOut],
-            registry.basket[_tokenIn].slope0[_tokenOut],
-            registry.basket[_tokenIn].slope1[_tokenOut]
+            basketFees
         );
     }
 
     function getRedeem(
-        address _registry,
+        IRegistry _registry,
         address _tokenIn,
         uint256 _amountIn
     ) external view returns (uint256[] memory amounts, uint256[] memory fees) {
-        IRegistry registry = IRegistry(_registry);
-        IVault vault = IVault(registry.basket[_tokenIn].vault);
+        IVault vault = IVault(_registry.basketVault(_tokenIn));
 
         uint256 shares = _amountIn / IERC20(_tokenIn).totalSupply();
-        address[] memory assets = registry.basket[_tokenIn].assets;
+        address[] memory assets = _registry.basketAssets(_tokenIn);
         uint256 assetLength = assets.length;
         for (uint256 i; i < assetLength; ++i) {
             address asset = assets[i];
             uint256 withdrawAmount = vault.totalSupplies(asset) * shares;
-            fees[i] = withdrawAmount * registry.basket[_tokenIn].baseFee / 1e27;
+            fees[i] = withdrawAmount * _registry.basketBaseFee(_tokenIn) / 1e27;
             amounts[i] = withdrawAmount - fees[i];
         }
     }
 
-    function _getBasketValue(IRegistry _registry, IVault _vault, IOracle _oracle, address _cToken) internal view returns (uint256 totalValue) {
-        address[] memory assets = _registry.basket[_cToken].assets;
+    function _getBasketValue(
+        IRegistry _registry,
+        IVault _vault,
+        IOracle _oracle,
+        address _cToken
+    ) internal view returns (uint256 totalValue) {
+        address[] memory assets = _registry.basketAssets(_cToken);
         uint256 assetLength = assets.length;
         for (uint256 i; i < assetLength; ++i) {
             address asset = assets[i];
@@ -95,35 +93,32 @@ library MintBurnLogic {
     function _applyFeeSlopes(
         bool _mint,
         uint256 _amountOut,
-        uint256 _ratio0,
-        uint256 _ratio1,
-        uint256 _ratio2,
-        uint256 _rate,
-        uint256 _slope0,
-        uint256 _slope1
+        uint256 _newRatio,
+        IRegistry.BasketFees memory _basketFees
     ) internal pure returns (uint256 amountOut, uint256 fee) {
-        if (mint) {
-            if (_ratio0 > _ratio1) {
-                if (_ratio0 > _ratio2) {
-                    uint256 excessRatio = _ratio0 - _ratio2;
-                    _rate += _slope1 + ( _slope2 * excessRatio );
+        uint256 rate;
+        if (_mint) {
+            if (_newRatio > _basketFees.optimalRatio) {
+                if (_newRatio > _basketFees.mintKinkRatio) {
+                    uint256 excessRatio = _newRatio - _basketFees.mintKinkRatio;
+                    rate = _basketFees.slope0 + ( _basketFees.slope1 * excessRatio );
                 } else {
-                    _rate += _slope1 * _ratio0 / _ratio2;
+                    rate = _basketFees.slope0 * _newRatio / _basketFees.mintKinkRatio;
                 }
             }
         } else {
-            if (_ratio0 < _ratio1) {
-                if (_ratio0 < _ratio2) {
-                    uint256 excessRatio = _ratio2 - _ratio0;
-                    _rate += _slope0 + ( _slope1 * excessRatio );
+            if (_newRatio < _basketFees.optimalRatio) {
+                if (_newRatio < _basketFees.burnKinkRatio) {
+                    uint256 excessRatio = _basketFees.burnKinkRatio - _newRatio;
+                    rate = _basketFees.slope0 + ( _basketFees.slope1 * excessRatio );
                 } else {
-                    _rate += _slope0 * _ratio2 / _ratio0;
+                    rate = _basketFees.slope0 * _basketFees.burnKinkRatio / _newRatio;
                 }
             }
         }
 
-        if (_rate > 1e27) _rate = 1e27;
-        fee = _amountOut * _rate / 1e27;
+        if (rate > 1e27) rate = 1e27;
+        fee = _amountOut * rate / 1e27;
         amountOut = _amountOut - fee;
     }
 }
