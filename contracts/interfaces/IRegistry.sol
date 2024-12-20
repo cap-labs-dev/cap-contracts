@@ -3,9 +3,7 @@ pragma solidity ^0.8.28;
 
 interface IRegistry {
     struct Basket {
-        string name;
         address vault;
-        address[] assets;
         uint256 baseFee;
     }
 
