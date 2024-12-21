@@ -24,3 +24,7 @@ cache_forge
 
 # Remappings are in foundry.toml and this file is generated on postinstall
 remappings.txt
+
+# Coverage
+coverage
+lcov.info

@@ -32,7 +32,9 @@ contract GasOptMintTest is Test {
     address public user_admin;
     address public user_manager;
     address public user_agent;
-    address[10] public stablecoin_minters;
+
+    uint256 public constant stablecoin_minters_count = 50;
+    address[stablecoin_minters_count] public stablecoin_minters;
 
     function setUp() public {
         // Setup addresses with gas
@@ -42,7 +44,7 @@ contract GasOptMintTest is Test {
         user_agent = makeAddr("agent");
 
         // Setup 10 stablecoin minters
-        for (uint256 i = 0; i < 10; i++) {
+        for (uint256 i = 0; i < stablecoin_minters_count; i++) {
             string memory minterNum = vm.toString(i);
             stablecoin_minters[i] = makeAddr(string.concat("minter", minterNum));
             vm.deal(stablecoin_minters[i], 100 ether);
@@ -59,7 +61,7 @@ contract GasOptMintTest is Test {
         usdx = new MockERC20("USDx", "USDx");
 
         // Mint tokens to all minters
-        for (uint256 i = 0; i < 10; i++) {
+        for (uint256 i = 0; i < stablecoin_minters_count; i++) {
             usdt.mint(stablecoin_minters[i], 1000e18);
             usdc.mint(stablecoin_minters[i], 1000e18);
             usdx.mint(stablecoin_minters[i], 1000e18);
@@ -172,12 +174,12 @@ contract GasOptMintTest is Test {
     }
 
     function testParallelMinting() public {
-        uint256 amountIn = 100e18;
-        uint256 minAmountOut = 95e18;
+        uint256 amountIn = 1e18;
+        uint256 minAmountOut = 0.9e18;
         uint256 deadline = block.timestamp + 1 hours;
 
         // Have all minters approve and mint simultaneously
-        for (uint256 i = 0; i < 10; i++) {
+        for (uint256 i = 0; i < stablecoin_minters_count; i++) {
             vm.startPrank(stablecoin_minters[i]);
 
             // Approve USDT spending
@@ -198,7 +200,9 @@ contract GasOptMintTest is Test {
 
         // Assert total USDT in vault
         assertEq(
-            usdt.balanceOf(address(vault)), amountIn * 10, "Vault should have received total USDT from all minters"
+            usdt.balanceOf(address(vault)),
+            amountIn * stablecoin_minters_count,
+            "Vault should have received total USDT from all minters"
         );
     }
 }

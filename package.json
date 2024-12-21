@@ -13,8 +13,10 @@
     "compile": "forge build",
     "postinstall": "forge remappings > remappings.txt",
     "test": "forge test",
-    "gas:snapshot": "FOUNDRY_PROFILE=release forge snapshot",
-    "gas:report": "FOUNDRY_PROFILE=release forge test --gas-report --match-contract GasOpt*"
+    "gas:snapshot": "FOUNDRY_PROFILE=release forge snapshot --gas-report --match-contract GasOpt*",
+    "gas:report": "FOUNDRY_PROFILE=release forge test --gas-report --match-contract GasOpt*",
+    "coverage:forge": "forge coverage --report summary",
+    "coverage:forge:report": "forge coverage --report lcov && lcov --remove lcov.info \"*test/*\" \"*script/*\" \"*node_modules/*\" --output-file lcov.info --rc lcov_branch_coverage=1 --ignore-errors inconsistent --ignore-errors unused && genhtml lcov.info --branch-coverage --output-dir coverage --ignore-errors inconsistent --ignore-errors unused"
   },
   "devDependencies": {
     "@openzeppelin/contracts": "npm:@openzeppelin/contracts",
