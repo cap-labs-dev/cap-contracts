@@ -12,7 +12,7 @@ remappings = [
 ]
 
 [profile.release]
-gas_reports = ["MintGasOptTest"]
+gas_reports = ["*"]
 optimizer = true
 optimizer_runs = 20000
 via_ir = true

@@ -17,7 +17,7 @@ contract MockERC20 is ERC20 {
     }
 }
 
-contract MintGasOptTest is Test {
+contract GasOptMintTest is Test {
     Registry public registry;
     Minter public minter;
     Vault public vault;
@@ -126,9 +126,11 @@ contract MintGasOptTest is Test {
         uint256 minAmountOut = 95e18; // Accounting for potential fees
         uint256 deadline = block.timestamp + 1 hours;
 
+        vm.startSnapshotGas("testMintWithUSDT_snapshot_swapExactTokenForTokens_0");
         minter.swapExactTokenForTokens(
             amountIn, minAmountOut, address(usdt), address(cUSD), stablecoin_minters[0], deadline
         );
+        vm.stopSnapshotGas();
 
         // Assert the minting was successful
         assertGt(cUSD.balanceOf(stablecoin_minters[0]), 0, "Should have received cUSD tokens");
@@ -151,9 +153,11 @@ contract MintGasOptTest is Test {
         uint256 minAmountOut = 95e18;
         uint256 deadline = block.timestamp + 1 hours;
 
+        vm.startSnapshotGas("testMintWithDifferentPrices_snapshot_swapExactTokenForTokens_1");
         minter.swapExactTokenForTokens(
             amountIn, minAmountOut, address(usdt), address(cUSD), stablecoin_minters[0], deadline
         );
+        vm.stopSnapshotGas();
 
         // We should receive more cUSD since USDT is worth more
         uint256 expectedMin = (amountIn * 102) / 100; // rough calculation
@@ -180,9 +184,11 @@ contract MintGasOptTest is Test {
             usdt.approve(address(minter), amountIn);
 
             // Mint cUSD with USDT
+            vm.startSnapshotGas(string.concat("testParallelMinting_swapExactTokenForTokens_", vm.toString(i)));
             minter.swapExactTokenForTokens(
                 amountIn, minAmountOut, address(usdt), address(cUSD), stablecoin_minters[i], deadline
             );
+            vm.stopSnapshotGas();
 
             // Assert the minting was successful
             assertGt(cUSD.balanceOf(stablecoin_minters[i]), 0, "Should have received cUSD tokens");

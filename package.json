@@ -11,7 +11,10 @@
   },
   "scripts": {
     "compile": "forge build",
-    "postinstall": "forge remappings > remappings.txt"
+    "postinstall": "forge remappings > remappings.txt",
+    "test": "forge test",
+    "gas:snapshot": "FOUNDRY_PROFILE=release forge snapshot",
+    "gas:report": "FOUNDRY_PROFILE=release forge test --gas-report --match-contract GasOpt*"
   },
   "devDependencies": {
     "@openzeppelin/contracts": "npm:@openzeppelin/contracts",

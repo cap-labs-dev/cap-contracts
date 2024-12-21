@@ -1,0 +1,14 @@
+{
+  "testMintWithDifferentPrices_snapshot_swapExactTokenForTokens_1": "244419",
+  "testMintWithUSDT_snapshot_swapExactTokenForTokens_0": "244419",
+  "testParallelMinting_swapExactTokenForTokens_0": "244422",
+  "testParallelMinting_swapExactTokenForTokens_1": "240660",
+  "testParallelMinting_swapExactTokenForTokens_2": "240660",
+  "testParallelMinting_swapExactTokenForTokens_3": "240661",
+  "testParallelMinting_swapExactTokenForTokens_4": "240662",
+  "testParallelMinting_swapExactTokenForTokens_5": "240662",
+  "testParallelMinting_swapExactTokenForTokens_6": "240664",
+  "testParallelMinting_swapExactTokenForTokens_7": "240664",
+  "testParallelMinting_swapExactTokenForTokens_8": "240665",
+  "testParallelMinting_swapExactTokenForTokens_9": "240665"
+}
