@@ -7,6 +7,7 @@ import {AccessControlEnumerableUpgradeable} from
     "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IRegistry} from "../interfaces/IRegistry.sol";
+import {IOracle} from "../interfaces/IOracle.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {ICToken} from "../interfaces/ICToken.sol";
 
@@ -78,17 +79,19 @@ contract Minter is Initializable, AccessControlEnumerableUpgradeable {
         uint256 _deadline
     ) external returns (uint256 amountOut) {
         if (_deadline != 0 && block.timestamp > _deadline) revert PastDeadline();
-        bool mint = _validateAssets(_tokenIn, _tokenOut);
+        (address _oracle, bool mint, address _vault, IRegistry.BasketFees memory basketFees, address[] memory assets) =
+            registry.getMintBurnContext(_tokenIn, _tokenOut);
+
+        IVault vault = IVault(_vault);
+
         if (mint) {
-            IVault vault = IVault(registry.basketVault(_tokenOut));
-            (amountOut,) = MintBurnLogic.getMint(registry, vault, _tokenIn, _tokenOut, _amountIn);
+            (amountOut,) = MintBurnLogic.getMint(_oracle, _vault, assets, basketFees, _tokenIn, _tokenOut, _amountIn);
             ICToken(_tokenOut).mint(msg.sender, amountOut);
             IERC20(_tokenIn).safeTransferFrom(msg.sender, address(this), _amountIn);
             IERC20(_tokenIn).forceApprove(address(vault), _amountIn);
             vault.deposit(_tokenIn, _amountIn);
         } else {
-            IVault vault = IVault(registry.basketVault(_tokenIn));
-            (amountOut,) = MintBurnLogic.getBurn(registry, vault, _tokenIn, _tokenOut, _amountIn);
+            (amountOut,) = MintBurnLogic.getBurn(_oracle, _vault, assets, basketFees, _tokenIn, _tokenOut, _amountIn);
             ICToken(_tokenIn).burn(msg.sender, _amountIn);
             vault.withdraw(_tokenOut, amountOut, _receiver);
         }
@@ -115,9 +118,9 @@ contract Minter is Initializable, AccessControlEnumerableUpgradeable {
         ICToken(_tokenIn).burn(msg.sender, _amountIn);
 
         uint256[] memory fees = new uint256[](_minAmountOuts.length);
-        IVault vault = IVault(registry.basketVault(_tokenIn));
-        (amountOuts, fees) = MintBurnLogic.getRedeem(registry, vault, _tokenIn, _amountIn);
+        (amountOuts, fees) = MintBurnLogic.getRedeem(registry, _tokenIn, _amountIn);
         address[] memory assets = registry.basketAssets(_tokenIn);
+        IVault vault = IVault(registry.basketVault(_tokenIn));
 
         uint256 amountLength = amountOuts.length;
         for (uint256 i; i < amountLength; ++i) {
@@ -138,12 +141,13 @@ contract Minter is Initializable, AccessControlEnumerableUpgradeable {
         view
         returns (uint256 amountOut)
     {
-        bool mint = _validateAssets(_tokenIn, _tokenOut);
-        IVault vault = IVault(registry.basketVault(_tokenOut));
+        (address oracle, bool mint, address vault, IRegistry.BasketFees memory basketFees, address[] memory assets) =
+            registry.getMintBurnContext(_tokenIn, _tokenOut);
+
         if (mint) {
-            (amountOut,) = MintBurnLogic.getMint(registry, vault, _tokenIn, _tokenOut, _amountIn);
+            (amountOut,) = MintBurnLogic.getMint(oracle, vault, assets, basketFees, _tokenIn, _tokenOut, _amountIn);
         } else {
-            (amountOut,) = MintBurnLogic.getBurn(registry, vault, _tokenIn, _tokenOut, _amountIn);
+            (amountOut,) = MintBurnLogic.getBurn(oracle, vault, assets, basketFees, _tokenIn, _tokenOut, _amountIn);
         }
     }
 
@@ -152,25 +156,10 @@ contract Minter is Initializable, AccessControlEnumerableUpgradeable {
     /// @param _amountIn Amount to swap in
     /// @param amounts Amounts out
     function getRedeemAmountOut(address _tokenIn, uint256 _amountIn) external view returns (uint256[] memory amounts) {
-        IVault vault = IVault(registry.basketVault(_tokenIn));
-        (amounts,) = MintBurnLogic.getRedeem(registry, vault, _tokenIn, _amountIn);
+        (amounts,) = MintBurnLogic.getRedeem(registry, _tokenIn, _amountIn);
     }
 
     /* -------------------- VALIDATION -------------------- */
-
-    /// @dev Validate assets are whitelisted and are in a linked basket
-    /// @param _tokenIn Token to swap in
-    /// @param _tokenOut Token to swap out
-    /// @return mint Whether the swap is a mint or a burn
-    function _validateAssets(address _tokenIn, address _tokenOut) internal view returns (bool mint) {
-        if (registry.supportedCToken(_tokenIn) && registry.basketSupportsAsset(_tokenIn, _tokenOut)) {
-            mint = false;
-        } else if (registry.supportedCToken(_tokenOut) && registry.basketSupportsAsset(_tokenOut, _tokenIn)) {
-            mint = true;
-        } else {
-            revert PairNotSupported(_tokenIn, _tokenOut);
-        }
-    }
 
     /// @dev Validate if a single asset is a cToken
     /// @param _cToken Token to redeem

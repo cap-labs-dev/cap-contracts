@@ -19,11 +19,13 @@ contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeabl
     address public override minter;
     address public override assetManager;
 
-    mapping(address => Basket) public baskets; // cToken => Basket
-    mapping(address => mapping(address => BasketFees)) public basketFeesData; // cToken => asset => fees
-    mapping(address => EnumerableSet.AddressSet) private vaultAssetWhitelist; // vault => set(whitelisted asset)
-    mapping(address => address) public override restakerRewarder; // cToken => restakerRewarder
-    mapping(address => address) public override rewarder; // asset => rewarder
+    // Storage, optimized for read access
+    mapping(address => address) private _basketVault; // cToken => vault
+    mapping(address => uint256) private _basketBaseFee; // cToken => baseFee
+    mapping(address => mapping(address => BasketFees)) private _basketFees; // cToken => asset => fees
+    mapping(address => address) private _restakerRewarder; // cToken => restakerRewarder
+    mapping(address => EnumerableSet.AddressSet) private _vaultAssetWhitelist; // vault => set(whitelisted asset)
+    mapping(address => address) private _rewarder; // asset => rewarder
 
     event AssetAdded(address indexed cToken, address indexed asset);
     event AssetRemoved(address indexed cToken, address indexed asset);
@@ -34,42 +36,52 @@ contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeabl
     event AssetManagerUpdated(address indexed oldManager, address indexed newManager);
     event BasketSet(address indexed cToken, address indexed vault, uint256 baseFee);
 
+    error VaultNotFound();
+    error BasketNotFound();
+    error PairNotSupported(address tokenIn, address tokenOut);
+
     function initialize() external initializer {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MANAGER_ROLE, msg.sender);
     }
 
     function supportedCToken(address cToken) public view override returns (bool) {
-        return baskets[cToken].vault != address(0);
+        return _basketVault[cToken] != address(0);
     }
 
-    function _basketSupportsAsset(address _cToken, address _asset) internal view returns (bool) {
-        Basket storage basket = baskets[_cToken];
-        return vaultAssetWhitelist[basket.vault].contains(_asset);
-    }
-
-    function basketVault(address _cToken) external view override returns (address vault) {
-        return baskets[_cToken].vault;
+    function basketVault(address _cToken) public view override returns (address vault) {
+        vault = _basketVault[_cToken];
+        if (vault == address(0)) revert BasketNotFound();
     }
 
     function basketAssets(address _cToken) external view override returns (address[] memory) {
-        return vaultAssetWhitelist[baskets[_cToken].vault].values();
+        address vault = basketVault(_cToken);
+        return _vaultAssetWhitelist[vault].values();
     }
 
     function basketBaseFee(address _cToken) external view override returns (uint256) {
-        return baskets[_cToken].baseFee;
+        return _basketBaseFee[_cToken];
     }
 
     function basketFees(address _cToken, address _asset) external view override returns (BasketFees memory) {
-        return basketFeesData[_cToken][_asset];
+        return _basketFees[_cToken][_asset];
     }
 
-    function basketSupportsAsset(address _cToken, address _asset) external view override returns (bool) {
-        return _basketSupportsAsset(_cToken, _asset);
+    function restakerRewarder(address _cToken) external view returns (address) {
+        return _restakerRewarder[_cToken];
     }
 
-    function vaultSupportsAsset(address _vault, address _asset) external view override returns (bool) {
-        return vaultAssetWhitelist[_vault].contains(_asset);
+    function rewarder(address _asset) external view returns (address) {
+        return _rewarder[_asset];
+    }
+
+    function basketSupportsAsset(address _cToken, address _asset) public view override returns (bool) {
+        address vault = basketVault(_cToken);
+        return vaultSupportsAsset(vault, _asset);
+    }
+
+    function vaultSupportsAsset(address _vault, address _asset) public view override returns (bool) {
+        return _vaultAssetWhitelist[_vault].contains(_asset);
     }
 
     function setOracle(address _oracle) external onlyRole(MANAGER_ROLE) {
@@ -103,19 +115,48 @@ contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeabl
     }
 
     function addAsset(address _cToken, address _asset) external onlyRole(MANAGER_ROLE) {
-        require(!_basketSupportsAsset(_cToken, _asset), "Asset already supported");
-
-        vaultAssetWhitelist[baskets[_cToken].vault].add(_asset);
+        require(!basketSupportsAsset(_cToken, _asset), "Asset already supported");
+        _vaultAssetWhitelist[basketVault(_cToken)].add(_asset);
         emit AssetAdded(_cToken, _asset);
     }
 
     function removeAsset(address _cToken, address _asset) external onlyRole(MANAGER_ROLE) {
-        vaultAssetWhitelist[baskets[_cToken].vault].remove(_asset);
+        require(basketSupportsAsset(_cToken, _asset), "Asset not supported");
+        _vaultAssetWhitelist[basketVault(_cToken)].remove(_asset);
         emit AssetRemoved(_cToken, _asset);
     }
 
     function setBasket(address _cToken, address _vault, uint256 _baseFee) external onlyRole(MANAGER_ROLE) {
-        baskets[_cToken] = Basket({vault: _vault, baseFee: _baseFee});
+        _basketVault[_cToken] = _vault;
+        _basketBaseFee[_cToken] = _baseFee;
         emit BasketSet(_cToken, _vault, _baseFee);
+    }
+
+    function getMintBurnContext(address _tokenIn, address _tokenOut)
+        external
+        view
+        override
+        returns (address oracleOut, bool mint, address vault, BasketFees memory basketFeesOut, address[] memory assets)
+    {
+        address _cToken;
+        address _asset;
+        if (supportedCToken(_tokenIn)) {
+            mint = false;
+            _cToken = _tokenIn;
+            _asset = _tokenOut;
+        } else if (supportedCToken(_tokenOut)) {
+            mint = true;
+            _cToken = _tokenOut;
+            _asset = _tokenIn;
+        } else {
+            revert BasketNotFound();
+        }
+
+        if (!basketSupportsAsset(_cToken, _asset)) revert PairNotSupported(_tokenIn, _tokenOut);
+
+        vault = basketVault(_cToken);
+        oracleOut = oracle;
+        basketFeesOut = _basketFees[_cToken][_asset];
+        assets = _vaultAssetWhitelist[vault].values();
     }
 }

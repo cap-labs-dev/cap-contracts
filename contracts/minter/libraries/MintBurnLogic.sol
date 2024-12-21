@@ -7,15 +7,18 @@ import {IVault} from "../../interfaces/IVault.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
 
 library MintBurnLogic {
-    function getMint(IRegistry _registry, IVault vault, address _tokenIn, address _tokenOut, uint256 _amount)
-        external
-        view
-        returns (uint256 amountOut, uint256 fee)
-    {
-        // IVault vault = IVault(_registry.basketVault(_tokenOut));
-        IOracle oracle = IOracle(_registry.oracle());
-
-        uint256 basketValue = _getBasketValue(_registry, vault, oracle, _tokenOut);
+    function getMint(
+        address _oracle,
+        address _vault,
+        address[] memory _assets,
+        IRegistry.BasketFees memory _basketFees,
+        address _tokenIn,
+        address _tokenOut,
+        uint256 _amount
+    ) external view returns (uint256 amountOut, uint256 fee) {
+        IOracle oracle = IOracle(_oracle);
+        IVault vault = IVault(_vault);
+        uint256 basketValue = _getBasketValue(oracle, vault, _assets);
         uint256 tokenInPrice = oracle.getPrice(_tokenIn);
         uint256 mintValue = _amount * tokenInPrice;
 
@@ -26,21 +29,24 @@ library MintBurnLogic {
         } else {
             uint256 basketAssetValue = vault.totalSupplies(_tokenIn) * tokenInPrice;
             uint256 newRatio = (basketAssetValue + mintValue) * 1e27 / (basketValue + mintValue);
-            IRegistry.BasketFees memory basketFees = _registry.basketFees(_tokenOut, _tokenIn);
 
             amountOut = mintValue * IERC20(_tokenOut).totalSupply() / basketValue;
-            (amountOut, fee) = _applyFeeSlopes(true, amountOut, newRatio, basketFees);
+            (amountOut, fee) = _applyFeeSlopes(true, amountOut, newRatio, _basketFees);
         }
     }
 
-    function getBurn(IRegistry _registry, IVault vault, address _tokenIn, address _tokenOut, uint256 _amount)
-        external
-        view
-        returns (uint256 amountOut, uint256 fee)
-    {
-        IOracle oracle = IOracle(_registry.oracle());
-
-        uint256 basketValue = _getBasketValue(_registry, vault, oracle, _tokenIn);
+    function getBurn(
+        address _oracle,
+        address _vault,
+        address[] memory _assets,
+        IRegistry.BasketFees memory _basketFees,
+        address _tokenIn,
+        address _tokenOut,
+        uint256 _amount
+    ) external view returns (uint256 amountOut, uint256 fee) {
+        IOracle oracle = IOracle(_oracle);
+        IVault vault = IVault(_vault);
+        uint256 basketValue = _getBasketValue(oracle, vault, _assets);
         uint256 tokenOutPrice = oracle.getPrice(_tokenOut);
         uint256 burnValue = _amount * tokenOutPrice;
 
@@ -53,18 +59,17 @@ library MintBurnLogic {
             uint256 mintValue = _amount * basketValue / IERC20(_tokenIn).totalSupply();
             uint256 newRatio = (basketAssetValue - burnValue) * 1e27 / (basketValue - burnValue);
 
-            IRegistry.BasketFees memory basketFees = _registry.basketFees(_tokenIn, _tokenOut);
-
             amountOut = mintValue / tokenOutPrice;
-            (amountOut, fee) = _applyFeeSlopes(false, amountOut, newRatio, basketFees);
+            (amountOut, fee) = _applyFeeSlopes(false, amountOut, newRatio, _basketFees);
         }
     }
 
-    function getRedeem(IRegistry _registry, IVault vault, address _tokenIn, uint256 _amountIn)
+    function getRedeem(IRegistry _registry, address _tokenIn, uint256 _amountIn)
         external
         view
         returns (uint256[] memory amounts, uint256[] memory fees)
     {
+        IVault vault = IVault(_registry.basketVault(_tokenIn));
         uint256 shares = _amountIn / IERC20(_tokenIn).totalSupply();
         address[] memory assets = _registry.basketAssets(_tokenIn);
         uint256 assetLength = assets.length;
@@ -76,15 +81,14 @@ library MintBurnLogic {
         }
     }
 
-    function _getBasketValue(IRegistry _registry, IVault _vault, IOracle _oracle, address _cToken)
+    function _getBasketValue(IOracle _oracle, IVault _vault, address[] memory _assets)
         internal
         view
         returns (uint256 totalValue)
     {
-        address[] memory assets = _registry.basketAssets(_cToken);
-        uint256 assetLength = assets.length;
+        uint256 assetLength = _assets.length;
         for (uint256 i; i < assetLength; ++i) {
-            address asset = assets[i];
+            address asset = _assets[i];
             // Need to normalize decimals here
             totalValue += _vault.totalSupplies(asset) * _oracle.getPrice(asset);
         }
