@@ -15,9 +15,20 @@ remappings = [
 gas_reports = ["*"]
 gas_reports_ignore = ["MockERC20", "MockOracle"]
 optimizer = true
-optimizer_runs = 20000
+optimizer_runs = 200000
 via_ir = true
-
+use_literal_content = true
+[profile.release.optimizer_details]
+# # https://docs.soliditylang.org/en/v0.8.28/using-the-compiler.html#input-description
+peephole = true                               # default true
+jumpdestRemover = true                        # default true
+simpleCounterForLoopUncheckedIncrement = true # default true
+yul = true                                    # default true
+# inliner = true                                # default false
+# orderLiterals = true                          # default false
+# deduplicate = true                            # default false
+# cse = true                                    # default false
+# constantOptimizer = true                      # default false 
 
 [rpc_endpoints]
 mainnet = "${MAINNET_RPC}"

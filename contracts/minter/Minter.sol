@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { AccessControlEnumerableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
-import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import { IRegistry } from "../interfaces/IRegistry.sol";
-import { IVault } from "../interfaces/IVault.sol";
-import { ICToken } from "../interfaces/ICToken.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {AccessControlEnumerableUpgradeable} from
+    "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {IRegistry} from "../interfaces/IRegistry.sol";
+import {IVault} from "../interfaces/IVault.sol";
+import {ICToken} from "../interfaces/ICToken.sol";
 
-import { MintBurnLogic } from "./libraries/MintBurnLogic.sol";
+import {MintBurnLogic} from "./libraries/MintBurnLogic.sol";
 
 /// @title Minter/burner for cTokens
 /// @author kexley, @capLabs
 /// @notice cTokens are minted or burned in exchange for collateral ratio of the backing tokens
 /// @dev Dynamic fees are applied according to the allocation of assets in the basket. Increasing
-/// the supply of a excessive asset or burning for an scarce asset will charge fees on a kinked 
+/// the supply of a excessive asset or burning for an scarce asset will charge fees on a kinked
 /// slope. Redeem can be used to avoid these fees by burning for the current ratio of assets.
 contract Minter is Initializable, AccessControlEnumerableUpgradeable {
     using SafeERC20 for IERC20;
@@ -49,24 +50,18 @@ contract Minter is Initializable, AccessControlEnumerableUpgradeable {
     );
 
     /// @dev Redeem made
-    event Redeem(
-        address indexed sender,
-        address indexed to,
-        address tokenIn,
-        uint256 amountIn,
-        uint256[] amountOuts
-    );
+    event Redeem(address indexed sender, address indexed to, address tokenIn, uint256 amountIn, uint256[] amountOuts);
 
     /// @notice Initialize the registry address and default admin
     /// @param _registry Registry address
-    function initialize(address _registry) initializer external {
+    function initialize(address _registry) external initializer {
         registry = IRegistry(_registry);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
     /// @notice Swap a backing asset for a cToken or vice versa, fees are charged based on asset
     /// backing ratio
-    /// @dev Only whitelisted assets are allowed, this contract must be approved by the msg.sender 
+    /// @dev Only whitelisted assets are allowed, this contract must be approved by the msg.sender
     /// to pull the asset
     /// @param _amountIn Amount of tokenIn to be swapped
     /// @param _minAmountOut Minimum amount of tokenOut to be received
@@ -86,14 +81,14 @@ contract Minter is Initializable, AccessControlEnumerableUpgradeable {
         bool mint = _validateAssets(_tokenIn, _tokenOut);
         if (mint) {
             IVault vault = IVault(registry.basketVault(_tokenOut));
-            (amountOut,) = MintBurnLogic.getMint(registry, _tokenIn, _tokenOut, _amountIn);
+            (amountOut,) = MintBurnLogic.getMint(registry, vault, _tokenIn, _tokenOut, _amountIn);
             ICToken(_tokenOut).mint(msg.sender, amountOut);
             IERC20(_tokenIn).safeTransferFrom(msg.sender, address(this), _amountIn);
             IERC20(_tokenIn).forceApprove(address(vault), _amountIn);
             vault.deposit(_tokenIn, _amountIn);
         } else {
             IVault vault = IVault(registry.basketVault(_tokenIn));
-            (amountOut,) = MintBurnLogic.getBurn(registry, _tokenIn, _tokenOut, _amountIn);
+            (amountOut,) = MintBurnLogic.getBurn(registry, vault, _tokenIn, _tokenOut, _amountIn);
             ICToken(_tokenIn).burn(msg.sender, _amountIn);
             vault.withdraw(_tokenOut, amountOut, _receiver);
         }
@@ -120,9 +115,9 @@ contract Minter is Initializable, AccessControlEnumerableUpgradeable {
         ICToken(_tokenIn).burn(msg.sender, _amountIn);
 
         uint256[] memory fees = new uint256[](_minAmountOuts.length);
-        (amountOuts, fees) = MintBurnLogic.getRedeem(registry, _tokenIn, _amountIn);
-        address[] memory assets = registry.basketAssets(_tokenIn);
         IVault vault = IVault(registry.basketVault(_tokenIn));
+        (amountOuts, fees) = MintBurnLogic.getRedeem(registry, vault, _tokenIn, _amountIn);
+        address[] memory assets = registry.basketAssets(_tokenIn);
 
         uint256 amountLength = amountOuts.length;
         for (uint256 i; i < amountLength; ++i) {
@@ -138,16 +133,17 @@ contract Minter is Initializable, AccessControlEnumerableUpgradeable {
     /// @param _tokenOut Token to swap out
     /// @param _amountIn Amount to swap in
     /// @param amountOut Amount out
-    function getAmountOut(
-        address _tokenIn, 
-        address _tokenOut,
-        uint256 _amountIn
-    ) external view returns (uint256 amountOut) {
+    function getAmountOut(address _tokenIn, address _tokenOut, uint256 _amountIn)
+        external
+        view
+        returns (uint256 amountOut)
+    {
         bool mint = _validateAssets(_tokenIn, _tokenOut);
+        IVault vault = IVault(registry.basketVault(_tokenOut));
         if (mint) {
-            (amountOut,) = MintBurnLogic.getMint(registry, _tokenIn, _tokenOut, _amountIn);
+            (amountOut,) = MintBurnLogic.getMint(registry, vault, _tokenIn, _tokenOut, _amountIn);
         } else {
-            (amountOut,) = MintBurnLogic.getBurn(registry, _tokenIn, _tokenOut, _amountIn);
+            (amountOut,) = MintBurnLogic.getBurn(registry, vault, _tokenIn, _tokenOut, _amountIn);
         }
     }
 
@@ -155,11 +151,9 @@ contract Minter is Initializable, AccessControlEnumerableUpgradeable {
     /// @param _tokenIn Token to swap in
     /// @param _amountIn Amount to swap in
     /// @param amounts Amounts out
-    function getRedeemAmountOut(
-        address _tokenIn,
-        uint256 _amountIn
-    ) external view returns (uint256[] memory amounts) {
-        (amounts,) = MintBurnLogic.getRedeem(registry, _tokenIn, _amountIn);
+    function getRedeemAmountOut(address _tokenIn, uint256 _amountIn) external view returns (uint256[] memory amounts) {
+        IVault vault = IVault(registry.basketVault(_tokenIn));
+        (amounts,) = MintBurnLogic.getRedeem(registry, vault, _tokenIn, _amountIn);
     }
 
     /* -------------------- VALIDATION -------------------- */
