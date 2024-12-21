@@ -138,23 +138,19 @@ contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeabl
         override
         returns (address oracleOut, bool mint, address vault, BasketFees memory basketFeesOut, address[] memory assets)
     {
-        address _cToken;
-        address _asset;
-        if (supportedCToken(_tokenIn)) {
-            mint = false;
-            _cToken = _tokenIn;
-            _asset = _tokenOut;
-        } else if (supportedCToken(_tokenOut)) {
+        address _cToken = _tokenIn;
+        address _asset = _tokenOut;
+        vault = _basketVault[_tokenIn];
+        if (vault == address(0)) {
+            vault = _basketVault[_tokenOut];
             mint = true;
             _cToken = _tokenOut;
             _asset = _tokenIn;
-        } else {
-            revert BasketNotFound();
         }
+        if (vault == address(0)) revert BasketNotFound();
 
-        if (!basketSupportsAsset(_cToken, _asset)) revert PairNotSupported(_tokenIn, _tokenOut);
+        if (!_vaultAssetWhitelist[vault].contains(_asset)) revert PairNotSupported(_tokenIn, _tokenOut);
 
-        vault = basketVault(_cToken);
         oracleOut = oracle;
         basketFeesOut = _basketFees[_cToken][_asset];
         assets = _vaultAssetWhitelist[vault].values();

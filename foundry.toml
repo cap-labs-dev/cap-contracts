@@ -25,10 +25,10 @@ jumpdestRemover = true                        # default true
 simpleCounterForLoopUncheckedIncrement = true # default true
 yul = true                                    # default true
 # inliner = true                                # default false
-# orderLiterals = true                          # default false
-# deduplicate = true                            # default false
-# cse = true                                    # default false
-# constantOptimizer = true                      # default false 
+# orderLiterals = true # default false
+# deduplicate = true # default false
+# cse = true # default false
+# constantOptimizer = true # default false 
 
 [rpc_endpoints]
 mainnet = "${MAINNET_RPC}"
