@@ -17,19 +17,24 @@ library MintBurnLogic {
         IOracle oracle = IOracle(_registry.oracle());
 
         uint256 basketValue = _getBasketValue(_registry, vault, oracle, _tokenOut);
-        uint256 basketAssetValue = vault.totalSupplies(_tokenIn) * oracle.getPrice(_tokenIn);
         uint256 mintValue = _amount * oracle.getPrice(_tokenIn);
-        uint256 newRatio = ( basketAssetValue + mintValue ) * 1e27 / ( basketValue + mintValue );
 
-        IRegistry.BasketFees memory basketFees = _registry.basketFees(_tokenOut, _tokenIn);
-
-        amountOut = mintValue * IERC20(_tokenOut).totalSupply() / basketValue;
-        (amountOut, fee) = _applyFeeSlopes(
-            true,
-            amountOut,
-            newRatio,
-            basketFees
-        );
+        if (basketValue == 0) {  // TODO: should we force init vaults with some assets to avoid all this?
+            amountOut = mintValue;
+            fee = 0; // TODO: Definitely not ok
+        } else {
+            uint256 basketAssetValue = vault.totalSupplies(_tokenIn) * oracle.getPrice(_tokenIn);
+            uint256 newRatio = ( basketAssetValue + mintValue ) * 1e27 / ( basketValue + mintValue );
+            IRegistry.BasketFees memory basketFees = _registry.basketFees(_tokenOut, _tokenIn);
+            
+            amountOut = mintValue * IERC20(_tokenOut).totalSupply() / basketValue;
+            (amountOut, fee) = _applyFeeSlopes(
+                true,
+                amountOut,
+                newRatio,
+                basketFees
+            );
+        }
     }
 
     function getBurn(

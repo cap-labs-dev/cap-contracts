@@ -33,6 +33,7 @@ contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeabl
     event PTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
     event MinterUpdated(address indexed oldMinter, address indexed newMinter);
     event AssetManagerUpdated(address indexed oldManager, address indexed newManager);
+    event BasketSet(address indexed cToken, address indexed vault, uint256 baseFee);
 
     function initialize() initializer external {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -102,16 +103,24 @@ contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeabl
         emit AssetManagerUpdated(oldManager, _manager);
     }
 
-    function addAsset(address _basket, address _asset) external onlyRole(MANAGER_ROLE) {
-        require(!_basketSupportsAsset(_basket, _asset), "Asset already supported");
+    function addAsset(address _cToken, address _asset) external onlyRole(MANAGER_ROLE) {
+        require(!_basketSupportsAsset(_cToken, _asset), "Asset already supported");
         
-        vaultAssetWhitelist[_basket].add(_asset);
-        emit AssetAdded(_basket, _asset);
+        vaultAssetWhitelist[baskets[_cToken].vault].add(_asset);
+        emit AssetAdded(_cToken, _asset);
     }
 
-    function removeAsset(address _basket, address _asset) external onlyRole(MANAGER_ROLE) {
-        vaultAssetWhitelist[_basket].remove(_asset);
-        emit AssetRemoved(_basket, _asset);
+    function removeAsset(address _cToken, address _asset) external onlyRole(MANAGER_ROLE) {
+        vaultAssetWhitelist[baskets[_cToken].vault].remove(_asset);
+        emit AssetRemoved(_cToken, _asset);
+    }
+
+    function setBasket(address _cToken, address _vault, uint256 _baseFee) external onlyRole(MANAGER_ROLE) {
+        baskets[_cToken] = Basket({
+            vault: _vault,
+            baseFee: _baseFee
+        });
+        emit BasketSet(_cToken, _vault, _baseFee);
     }
 }
 

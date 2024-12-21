@@ -170,8 +170,10 @@ contract Minter is Initializable, AccessControlEnumerableUpgradeable {
     /// @return mint Whether the swap is a mint or a burn
     function _validateAssets(address _tokenIn, address _tokenOut) internal view returns (bool mint) {
         if (registry.supportedCToken(_tokenIn) && registry.basketSupportsAsset(_tokenIn, _tokenOut)) {
+            mint = false;
+        } else if (registry.supportedCToken(_tokenOut) && registry.basketSupportsAsset(_tokenOut, _tokenIn)) {
             mint = true;
-        } else if (!(registry.supportedCToken(_tokenOut) && registry.basketSupportsAsset(_tokenOut, _tokenIn))) {
+        } else {
             revert PairNotSupported(_tokenIn, _tokenOut);
         }
     }
