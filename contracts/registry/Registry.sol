@@ -131,28 +131,4 @@ contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeabl
         _basketBaseFee[_cToken] = _baseFee;
         emit BasketSet(_cToken, _vault, _baseFee);
     }
-
-    function getMintBurnContext(address _tokenIn, address _tokenOut)
-        external
-        view
-        override
-        returns (address oracleOut, bool mint, address vault, BasketFees memory basketFeesOut, address[] memory assets)
-    {
-        address _cToken = _tokenIn;
-        address _asset = _tokenOut;
-        vault = _basketVault[_tokenIn];
-        if (vault == address(0)) {
-            vault = _basketVault[_tokenOut];
-            mint = true;
-            _cToken = _tokenOut;
-            _asset = _tokenIn;
-        }
-        if (vault == address(0)) revert BasketNotFound();
-
-        if (!_vaultAssetWhitelist[vault].contains(_asset)) revert PairNotSupported(_tokenIn, _tokenOut);
-
-        oracleOut = oracle;
-        basketFeesOut = _basketFees[_cToken][_asset];
-        assets = _vaultAssetWhitelist[vault].values();
-    }
 }

@@ -2,13 +2,11 @@
 pragma solidity ^0.8.28;
 
 interface IRegistry {
-    struct MintBurnContext {
-        address oracle;
-        bool mint;
+    struct Basket {
+        string name;
         address vault;
-        uint256 baseFee;
-        BasketFees basketFees;
         address[] assets;
+        uint256 baseFee;
     }
 
     struct BasketFees {
@@ -26,10 +24,6 @@ interface IRegistry {
     function supportedCToken(address cToken) external view returns (bool supported);
     function basketSupportsAsset(address cToken, address asset) external view returns (bool supported);
     function vaultSupportsAsset(address vault, address asset) external view returns (bool supported);
-    function getMintBurnContext(address cToken, address asset)
-        external
-        view
-        returns (address oracle, bool mint, address vault, BasketFees memory basketFees, address[] memory assets);
 
     function oracle() external view returns (address oracle);
     function collateral() external view returns (address collateral);

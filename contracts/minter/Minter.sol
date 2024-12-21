@@ -7,7 +7,6 @@ import {AccessControlEnumerableUpgradeable} from
     "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IRegistry} from "../interfaces/IRegistry.sol";
-import {IOracle} from "../interfaces/IOracle.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {ICToken} from "../interfaces/ICToken.sol";
 
@@ -79,19 +78,17 @@ contract Minter is Initializable, AccessControlEnumerableUpgradeable {
         uint256 _deadline
     ) external returns (uint256 amountOut) {
         if (_deadline != 0 && block.timestamp > _deadline) revert PastDeadline();
-        (address _oracle, bool mint, address _vault, IRegistry.BasketFees memory basketFees, address[] memory assets) =
-            registry.getMintBurnContext(_tokenIn, _tokenOut);
-
-        IVault vault = IVault(_vault);
-
+        bool mint = _validateAssets(_tokenIn, _tokenOut);
         if (mint) {
-            (amountOut,) = MintBurnLogic.getMint(_oracle, _vault, assets, basketFees, _tokenIn, _tokenOut, _amountIn);
+            IVault vault = IVault(registry.basketVault(_tokenOut));
+            (amountOut,) = MintBurnLogic.getMint(registry, _tokenIn, _tokenOut, _amountIn);
             ICToken(_tokenOut).mint(msg.sender, amountOut);
             IERC20(_tokenIn).safeTransferFrom(msg.sender, address(this), _amountIn);
             IERC20(_tokenIn).forceApprove(address(vault), _amountIn);
             vault.deposit(_tokenIn, _amountIn);
         } else {
-            (amountOut,) = MintBurnLogic.getBurn(_oracle, _vault, assets, basketFees, _tokenIn, _tokenOut, _amountIn);
+            IVault vault = IVault(registry.basketVault(_tokenIn));
+            (amountOut,) = MintBurnLogic.getBurn(registry, _tokenIn, _tokenOut, _amountIn);
             ICToken(_tokenIn).burn(msg.sender, _amountIn);
             vault.withdraw(_tokenOut, amountOut, _receiver);
         }
@@ -141,13 +138,11 @@ contract Minter is Initializable, AccessControlEnumerableUpgradeable {
         view
         returns (uint256 amountOut)
     {
-        (address oracle, bool mint, address vault, IRegistry.BasketFees memory basketFees, address[] memory assets) =
-            registry.getMintBurnContext(_tokenIn, _tokenOut);
-
+        bool mint = _validateAssets(_tokenIn, _tokenOut);
         if (mint) {
-            (amountOut,) = MintBurnLogic.getMint(oracle, vault, assets, basketFees, _tokenIn, _tokenOut, _amountIn);
+            (amountOut,) = MintBurnLogic.getMint(registry, _tokenIn, _tokenOut, _amountIn);
         } else {
-            (amountOut,) = MintBurnLogic.getBurn(oracle, vault, assets, basketFees, _tokenIn, _tokenOut, _amountIn);
+            (amountOut,) = MintBurnLogic.getBurn(registry, _tokenIn, _tokenOut, _amountIn);
         }
     }
 
@@ -160,6 +155,20 @@ contract Minter is Initializable, AccessControlEnumerableUpgradeable {
     }
 
     /* -------------------- VALIDATION -------------------- */
+
+    /// @dev Validate assets are whitelisted and are in a linked basket
+    /// @param _tokenIn Token to swap in
+    /// @param _tokenOut Token to swap out
+    /// @return mint Whether the swap is a mint or a burn
+    function _validateAssets(address _tokenIn, address _tokenOut) internal view returns (bool mint) {
+        if (registry.supportedCToken(_tokenIn) && registry.basketSupportsAsset(_tokenIn, _tokenOut)) {
+            mint = false;
+        } else if (registry.supportedCToken(_tokenOut) && registry.basketSupportsAsset(_tokenOut, _tokenIn)) {
+            mint = true;
+        } else if (!(registry.supportedCToken(_tokenOut) && registry.basketSupportsAsset(_tokenOut, _tokenIn))) {
+            revert PairNotSupported(_tokenIn, _tokenOut);
+        }
+    }
 
     /// @dev Validate if a single asset is a cToken
     /// @param _cToken Token to redeem
