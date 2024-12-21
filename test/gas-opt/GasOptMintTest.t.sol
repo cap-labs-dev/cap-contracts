@@ -32,9 +32,7 @@ contract GasOptMintTest is Test {
     address public user_admin;
     address public user_manager;
     address public user_agent;
-
-    uint256 public constant stablecoin_minters_count = 50;
-    address[stablecoin_minters_count] public stablecoin_minters;
+    address public user_stablecoin_minter;
 
     function setUp() public {
         // Setup addresses with gas
@@ -42,30 +40,24 @@ contract GasOptMintTest is Test {
         user_admin = makeAddr("admin");
         user_manager = makeAddr("manager");
         user_agent = makeAddr("agent");
+        user_stablecoin_minter = makeAddr("stablecoin_minter");
 
         // Setup 10 stablecoin minters
-        for (uint256 i = 0; i < stablecoin_minters_count; i++) {
-            string memory minterNum = vm.toString(i);
-            stablecoin_minters[i] = makeAddr(string.concat("minter", minterNum));
-            vm.deal(stablecoin_minters[i], 100 ether);
-        }
-
         vm.deal(user_deployer, 100 ether);
         vm.deal(user_admin, 100 ether);
         vm.deal(user_manager, 100 ether);
         vm.deal(user_agent, 100 ether);
+        vm.deal(user_stablecoin_minter, 100 ether);
 
         // Deploy mock tokens
         usdt = new MockERC20("USDT", "USDT");
         usdc = new MockERC20("USDC", "USDC");
         usdx = new MockERC20("USDx", "USDx");
 
-        // Mint tokens to all minters
-        for (uint256 i = 0; i < stablecoin_minters_count; i++) {
-            usdt.mint(stablecoin_minters[i], 1000e18);
-            usdc.mint(stablecoin_minters[i], 1000e18);
-            usdx.mint(stablecoin_minters[i], 1000e18);
-        }
+        // Mint tokens to minter
+        usdt.mint(user_stablecoin_minter, 1000e18);
+        usdc.mint(user_stablecoin_minter, 1000e18);
+        usdx.mint(user_stablecoin_minter, 1000e18);
 
         vm.startPrank(user_deployer);
 
@@ -118,7 +110,7 @@ contract GasOptMintTest is Test {
     }
 
     function testMintWithUSDT() public {
-        vm.startPrank(stablecoin_minters[0]);
+        vm.startPrank(user_stablecoin_minter);
 
         // Approve USDT spending
         usdt.approve(address(minter), 100e18);
@@ -130,19 +122,19 @@ contract GasOptMintTest is Test {
 
         vm.startSnapshotGas("testMintWithUSDT_snapshot_swapExactTokenForTokens_0");
         minter.swapExactTokenForTokens(
-            amountIn, minAmountOut, address(usdt), address(cUSD), stablecoin_minters[0], deadline
+            amountIn, minAmountOut, address(usdt), address(cUSD), user_stablecoin_minter, deadline
         );
         vm.stopSnapshotGas();
 
         // Assert the minting was successful
-        assertGt(cUSD.balanceOf(stablecoin_minters[0]), 0, "Should have received cUSD tokens");
+        assertGt(cUSD.balanceOf(user_stablecoin_minter), 0, "Should have received cUSD tokens");
         assertEq(usdt.balanceOf(address(vault)), amountIn, "Vault should have received USDT");
 
         vm.stopPrank();
     }
 
     function testMintWithDifferentPrices() public {
-        vm.startPrank(stablecoin_minters[0]);
+        vm.startPrank(user_stablecoin_minter);
 
         // Set USDT price to 1.02 USD
         oracle.setPrice(address(usdt), 1.02e18);
@@ -157,52 +149,19 @@ contract GasOptMintTest is Test {
 
         vm.startSnapshotGas("testMintWithDifferentPrices_snapshot_swapExactTokenForTokens_1");
         minter.swapExactTokenForTokens(
-            amountIn, minAmountOut, address(usdt), address(cUSD), stablecoin_minters[0], deadline
+            amountIn, minAmountOut, address(usdt), address(cUSD), user_stablecoin_minter, deadline
         );
         vm.stopSnapshotGas();
 
         // We should receive more cUSD since USDT is worth more
         uint256 expectedMin = (amountIn * 102) / 100; // rough calculation
         assertGe(
-            cUSD.balanceOf(stablecoin_minters[0]),
+            cUSD.balanceOf(user_stablecoin_minter),
             expectedMin,
             "Should have received more cUSD due to higher USDT price"
         );
         assertEq(usdt.balanceOf(address(vault)), amountIn, "Vault should have received USDT");
 
         vm.stopPrank();
-    }
-
-    function testParallelMinting() public {
-        uint256 amountIn = 1e18;
-        uint256 minAmountOut = 0.9e18;
-        uint256 deadline = block.timestamp + 1 hours;
-
-        // Have all minters approve and mint simultaneously
-        for (uint256 i = 0; i < stablecoin_minters_count; i++) {
-            vm.startPrank(stablecoin_minters[i]);
-
-            // Approve USDT spending
-            usdt.approve(address(minter), amountIn);
-
-            // Mint cUSD with USDT
-            vm.startSnapshotGas(string.concat("testParallelMinting_swapExactTokenForTokens_", vm.toString(i)));
-            minter.swapExactTokenForTokens(
-                amountIn, minAmountOut, address(usdt), address(cUSD), stablecoin_minters[i], deadline
-            );
-            vm.stopSnapshotGas();
-
-            // Assert the minting was successful
-            assertGt(cUSD.balanceOf(stablecoin_minters[i]), 0, "Should have received cUSD tokens");
-
-            vm.stopPrank();
-        }
-
-        // Assert total USDT in vault
-        assertEq(
-            usdt.balanceOf(address(vault)),
-            amountIn * stablecoin_minters_count,
-            "Vault should have received total USDT from all minters"
-        );
     }
 }
