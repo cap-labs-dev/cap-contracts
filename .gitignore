@@ -17,7 +17,10 @@ artifacts
 out
 cache_forge
 
-.vscode
+# Keep .vscode/settings.json for consistent Solidity configuration
+!.vscode/
+.vscode/*
+!.vscode/settings.json
 
 # Remappings are in foundry.toml and this file is generated on postinstall
 remappings.txt
