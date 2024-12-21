@@ -36,7 +36,7 @@ $ forge fmt
 ### Gas Snapshots
 
 ```shell
-$ forge snapshot
+$ FOUNDRY_PROFILE=release forge snapshot
 ```
 
 ### Anvil

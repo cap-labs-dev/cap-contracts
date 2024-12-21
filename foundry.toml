@@ -11,6 +11,13 @@ remappings = [
     "forge-std/=lib/forge-std/src/"    
 ]
 
+[profile.release]
+gas_reports = ["MintGasOptTest"]
+optimizer = true
+optimizer_runs = 20000
+via_ir = true
+
+
 [rpc_endpoints]
 mainnet = "${MAINNET_RPC}"
 
