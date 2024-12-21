@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { AccessControlEnumerableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
-import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import { IRegistry } from "../interfaces/IRegistry.sol";
-
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {AccessControlEnumerableUpgradeable} from
+    "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {IRegistry} from "../interfaces/IRegistry.sol";
 
 contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeable {
-
     using EnumerableSet for EnumerableSet.AddressSet;
 
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
@@ -35,7 +34,7 @@ contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeabl
     event AssetManagerUpdated(address indexed oldManager, address indexed newManager);
     event BasketSet(address indexed cToken, address indexed vault, uint256 baseFee);
 
-    function initialize() initializer external {
+    function initialize() external initializer {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MANAGER_ROLE, msg.sender);
     }
@@ -46,7 +45,7 @@ contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeabl
 
     function _basketSupportsAsset(address _cToken, address _asset) internal view returns (bool) {
         Basket storage basket = baskets[_cToken];
-        return vaultAssetWhitelist[basket.vault].contains(_asset);   
+        return vaultAssetWhitelist[basket.vault].contains(_asset);
     }
 
     function basketVault(address _cToken) external view override returns (address vault) {
@@ -105,7 +104,7 @@ contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeabl
 
     function addAsset(address _cToken, address _asset) external onlyRole(MANAGER_ROLE) {
         require(!_basketSupportsAsset(_cToken, _asset), "Asset already supported");
-        
+
         vaultAssetWhitelist[baskets[_cToken].vault].add(_asset);
         emit AssetAdded(_cToken, _asset);
     }
@@ -116,11 +115,7 @@ contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeabl
     }
 
     function setBasket(address _cToken, address _vault, uint256 _baseFee) external onlyRole(MANAGER_ROLE) {
-        baskets[_cToken] = Basket({
-            vault: _vault,
-            baseFee: _baseFee
-        });
+        baskets[_cToken] = Basket({vault: _vault, baseFee: _baseFee});
         emit BasketSet(_cToken, _vault, _baseFee);
     }
 }
-

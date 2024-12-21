@@ -8,7 +8,7 @@ solc_version = "0.8.28"
 remappings = [
     "@openzeppelin/=node_modules/@openzeppelin/",
     "@symbioticfi/=node_modules/@symbioticfi/",
-    "forge-std/=lib/forge-std/src/"    
+    "forge-std/=lib/forge-std/src/",
 ]
 
 [profile.release]
