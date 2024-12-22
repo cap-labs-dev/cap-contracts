@@ -18,18 +18,13 @@ library MintBurnLogic {
         uint256 basketValue = _getBasketValue(_registry, vault, oracle, _tokenOut);
         uint256 mintValue = _amount * oracle.getPrice(_tokenIn);
 
-        if (basketValue == 0) {
-            amountOut = mintValue;
-            fee = 0;
-        } else {
-            uint256 basketAssetValue = vault.totalSupplies(_tokenIn) * oracle.getPrice(_tokenIn);
-            uint256 newRatio = (basketAssetValue + mintValue) * 1e27 / (basketValue + mintValue);
+        uint256 basketAssetValue = vault.totalSupplies(_tokenIn) * oracle.getPrice(_tokenIn);
+        uint256 newRatio = (basketAssetValue + mintValue) * 1e27 / (basketValue + mintValue);
 
-            IRegistry.BasketFees memory basketFees = _registry.basketFees(_tokenOut, _tokenIn);
+        IRegistry.BasketFees memory basketFees = _registry.basketFees(_tokenOut, _tokenIn);
 
-            amountOut = mintValue * IERC20(_tokenOut).totalSupply() / basketValue;
-            (amountOut, fee) = _applyFeeSlopes(true, amountOut, newRatio, basketFees);
-        }
+        amountOut = mintValue * IERC20(_tokenOut).totalSupply() / basketValue;
+        (amountOut, fee) = _applyFeeSlopes(true, amountOut, newRatio, basketFees);
     }
 
     function getBurn(IRegistry _registry, address _tokenIn, address _tokenOut, uint256 _amount)

@@ -1,2 +1,2 @@
-GasOptMintTest:testMintWithDifferentPrices() (gas: 297541)
-GasOptMintTest:testMintWithUSDT() (gas: 265584)
+GasOptMintTest:testMintWithDifferentPrices() (gas: 247090)
+GasOptMintTest:testMintWithUSDT() (gas: 215146)
