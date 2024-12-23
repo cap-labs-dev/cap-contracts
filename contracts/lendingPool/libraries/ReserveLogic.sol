@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { IPToken } from "../../interfaces/IPToken.sol";
+import { IDebtToken } from "../../interfaces/IDebtToken.sol";
 
 import { Errors } from './helpers/Errors.sol';
 import { ValidationLogic } from "./ValidationLogic.sol";
@@ -39,13 +39,13 @@ library ReserveLogic {
             reservesList[params.reserveCount] = params.asset;
         }
 
-        address pToken = CloneLogic.clone(params.pTokenInstance);
-        IPToken(pToken).initialize(params.asset);
+        address debtToken = CloneLogic.clone(params.debtTokenInstance);
+        IDebtToken(debtToken).initialize(params.asset);
 
         reservesData[params.asset] = DataTypes.ReserveData({
             id: id,
             vault: params.vault,
-            pToken: pToken,
+            debtToken: debtToken,
             paused: false
         });
     }

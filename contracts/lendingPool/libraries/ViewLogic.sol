@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { IPToken } from "../../interfaces/IPToken.sol";
+import { IDebtToken } from "../../interfaces/IDebtToken.sol";
 import { ICollateral } from "../../interfaces/ICollateral.sol";
 import { IOracle } from "../../interfaces/IOracle.sol";
 
@@ -43,7 +43,7 @@ library ViewLogic {
 
             address asset = reservesList[i];
 
-            totalDebt += IPToken(reservesData[asset].pToken).totalBalanceOf(params.agent)
+            totalDebt += IDebtToken(reservesData[asset].debtToken).totalBalanceOf(params.agent)
                 * IOracle(params.oracle).getPrice(asset);
         }
 

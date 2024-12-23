@@ -6,7 +6,7 @@ library DataTypes {
     struct ReserveData {
         uint256 id;
         address vault;
-        address pToken;
+        address debtToken;
         bool paused;
     }
 
@@ -19,7 +19,7 @@ library DataTypes {
         address agent;
         address asset;
         address vault;
-        address pToken;
+        address debtToken;
         uint256 amount;
         address receiver;
         address collateral;
@@ -32,7 +32,7 @@ library DataTypes {
         address agent;
         address asset;
         address vault;
-        address pToken;
+        address debtToken;
         uint256 amount;
         uint256 interest;
         address caller;
@@ -45,7 +45,7 @@ library DataTypes {
         address agent;
         address asset;
         address vault;
-        address pToken;
+        address debtToken;
         uint256 amount;
         uint256 interest;
         address caller;
@@ -67,7 +67,7 @@ library DataTypes {
         address asset;
         address vault;
         uint16 reserveCount;
-        address pTokenInstance;
+        address debtTokenInstance;
     }
 
     struct ValidateBorrowParams {

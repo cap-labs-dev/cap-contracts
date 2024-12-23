@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { ICollateral } from "../../interfaces/ICollateral.sol";
 import { IOracle } from "../../interfaces/IOracle.sol";
 import { IRegistry } from "../../interfaces/IRegistry.sol";
-import { IPToken } from "../../interfaces/IPToken.sol";
+import { IDebtToken } from "../../interfaces/IDebtToken.sol";
 
 import { Errors } from "./helpers/Errors.sol";
 import { ViewLogic } from "./ViewLogic.sol";
@@ -69,7 +69,7 @@ library ValidationLogic {
         address _asset
     ) external view {
         require(
-            IPToken(reservesData[_asset].pToken).totalSupply() == 0,
+            IDebtToken(reservesData[_asset].debtToken).totalSupply() == 0,
             Errors.VARIABLE_DEBT_SUPPLY_NOT_ZERO
         );
     }

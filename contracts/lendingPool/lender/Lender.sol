@@ -47,7 +47,7 @@ contract Lender is Initializable, LenderStorage {
                 agent: msg.sender,
                 asset: _asset,
                 vault: _reservesData[_asset].vault,
-                pToken: _reservesData[_asset].pToken,
+                debtToken: _reservesData[_asset].debtToken,
                 amount: _amount,
                 receiver: _receiver,
                 collateral: IRegistry(ADDRESS_PROVIDER).collateral(),
@@ -75,7 +75,7 @@ contract Lender is Initializable, LenderStorage {
                 agent: _agent,
                 asset: _asset,
                 vault: _reservesData[_asset].vault,
-                pToken: _reservesData[_asset].pToken,
+                debtToken: _reservesData[_asset].debtToken,
                 amount: _amount,
                 interest: _interest,
                 caller: msg.sender,
@@ -106,7 +106,7 @@ contract Lender is Initializable, LenderStorage {
                 agent: _agent,
                 asset: _asset,
                 vault: _reservesData[_asset].vault,
-                pToken: _reservesData[_asset].pToken,
+                debtToken: _reservesData[_asset].debtToken,
                 amount: _amount,
                 interest: _interest,
                 caller: msg.sender,
@@ -165,7 +165,7 @@ contract Lender is Initializable, LenderStorage {
                 asset: _asset,
                 vault: _vault,
                 reserveCount: _reservesCount,
-                pTokenInstance: IRegistry(ADDRESS_PROVIDER).pTokenInstance()
+                debtTokenInstance: IRegistry(ADDRESS_PROVIDER).debtTokenInstance()
             }))
         ) {
             ++_reservesCount;
