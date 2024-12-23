@@ -23,6 +23,7 @@ interface IRegistry {
     function basketFees(address cToken, address asset) external view returns (
         BasketFees memory basketFees
     );
+    function basketRedeemFee(address cToken) external view returns (uint256 fee);
     function supportedCToken(address cToken) external view returns (bool supported);
     function basketSupportsAsset(address cToken, address asset) external view returns (bool supported);
     function vaultSupportsAsset(address vault, address asset) external view returns (bool supported);

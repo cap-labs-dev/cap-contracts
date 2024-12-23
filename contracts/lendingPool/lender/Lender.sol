@@ -7,6 +7,7 @@ import { BorrowLogic } from "../libraries/BorrowLogic.sol";
 import { LiquidationLogic } from "../libraries/LiquidationLogic.sol";
 import { ReserveLogic } from "../libraries/ReserveLogic.sol";
 import { ViewLogic } from "../libraries/ViewLogic.sol";
+import { CloneLogic } from "../libraries/CloneLogic.sol";
 import { DataTypes } from "../libraries/types/DataTypes.sol";
 import { Errors } from "../libraries/helpers/Errors.sol";
 import { IRegistry } from "../../interfaces/IRegistry.sol";
@@ -182,11 +183,7 @@ contract Lender is Initializable, LenderStorage {
     /// @notice Remove asset from lending when there is no borrows
     /// @param _asset Asset address
     function removeAsset(address _asset) external onlyLenderAdmin {
-        ReserveLogic.removeAsset(
-            _reservesData,
-            _reservesList,
-            _asset
-        );
+        ReserveLogic.removeAsset(_reservesData, _reservesList, _asset);
     }
 
     /// @notice Pause an asset
@@ -194,5 +191,12 @@ contract Lender is Initializable, LenderStorage {
     /// @param _pause True if pausing or false if unpausing
     function pauseAsset(address _asset, bool _pause) external onlyLenderAdmin {
         ReserveLogic.pauseAsset(_reservesData, _asset, _pause);
+    }
+
+    /// @notice Upgrade an instance owned by the lender
+    /// @param _instance Instance of a contract owned by the lender
+    /// @param _implementation New implementation address
+    function upgradeInstance(address _instance, address _implementation) external onlyLenderAdmin {
+        CloneLogic.upgradeTo(_instance, _implementation);
     }
 }

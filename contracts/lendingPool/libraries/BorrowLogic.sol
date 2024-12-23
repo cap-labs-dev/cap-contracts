@@ -72,6 +72,7 @@ library BorrowLogic {
     }
 
     /// @notice Repay an asset, burning the debt token and/or paying down interest
+    /// @dev Only the amount owed or specified will be taken from the repayer, whichever is lower
     /// @param agentConfig Agent configuration for borrowing
     /// @param params Parameters to repay a debt
     /// @return repaid Actual amount repaid

@@ -2,123 +2,72 @@
 pragma solidity ^0.8.28;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { ICapToken } from "../../interfaces/ICapToken.sol";
 import { IRegistry } from "../../interfaces/IRegistry.sol";
 import { IVault } from "../../interfaces/IVault.sol";
-import { IOracle } from "../../interfaces/IOracle.sol";
 
+import { ValidationLogic } from "./ValidationLogic.sol";
+import { DataTypes } from "./types/DataTypes.sol";
+
+/// @title Mint Burn Logic
+/// @author kexley, @capLabs
+/// @notice Mint/Burn logic for exchanging underlying assets with cap tokens
 library MintBurnLogic {
-    function getMint(
-        IRegistry _registry,
-        address _tokenIn,
-        address _tokenOut,
-        uint256 _amount
-    ) external view returns (uint256 amountOut, uint256 fee) {
-        IVault vault = IVault(_registry.basketVault(_tokenOut));
-        IOracle oracle = IOracle(_registry.oracle());
+    using SafeERC20 for IERC20;
 
-        uint256 basketValue = _getBasketValue(_registry, vault, oracle, _tokenOut);
-        uint256 basketAssetValue = vault.totalSupplies(_tokenIn) * oracle.getPrice(_tokenIn);
-        uint256 mintValue = _amount * oracle.getPrice(_tokenIn);
-        uint256 newRatio = ( basketAssetValue + mintValue ) * 1e27 / ( basketValue + mintValue );
+    /// @dev Swap made
+    event Swap(
+        address indexed sender,
+        address indexed to,
+        address asset,
+        address capToken,
+        uint256 amountIn,
+        uint256 amountOut
+    );
 
-        IRegistry.BasketFees memory basketFees = _registry.basketFees(_tokenOut, _tokenIn);
+    /// @dev Redeem made
+    event Redeem(
+        address indexed sender,
+        address indexed to,
+        address tokenIn,
+        uint256 amountIn,
+        uint256[] amountOuts
+    );
 
-        amountOut = mintValue * IERC20(_tokenOut).totalSupply() / basketValue;
-        (amountOut, fee) = _applyFeeSlopes(
-            true,
-            amountOut,
-            newRatio,
-            basketFees
-        );
+    /// @notice Mint a cap token in exchange for an underlying asset
+    /// @param params Parameters for minting
+    function mint(DataTypes.MintBurnParams memory params) external {
+        ICapToken(params.capToken).mint(params.receiver, params.amountOut);
+
+        IERC20(params.asset).safeTransferFrom(msg.sender, address(this), params.amountIn);
+        IERC20(params.asset).forceApprove(params.vault, params.amountIn);
+        IVault(params.vault).deposit(params.asset, params.amountIn);
+
+        emit Swap(msg.sender, params.receiver, params.asset, params.capToken, params.amountIn, params.amountOut);
     }
 
-    function getBurn(
-        IRegistry _registry,
-        address _tokenIn,
-        address _tokenOut,
-        uint256 _amount
-    ) external view returns (uint256 amountOut, uint256 fee) {
-        IVault vault = IVault(_registry.basketVault(_tokenIn));
-        IOracle oracle = IOracle(_registry.oracle());
+    /// @notice Burn a cap token in exchange for an underlying asset
+    /// @param params Parameters for burning
+    function burn(DataTypes.MintBurnParams memory params) external {
+        ICapToken(params.capToken).burn(msg.sender, params.amountIn);
+        
+        IVault(params.vault).withdraw(params.asset, params.amountOut, params.receiver);
 
-        uint256 basketValue = _getBasketValue(_registry, vault, oracle, _tokenIn);
-        uint256 basketAssetValue = vault.totalSupplies(_tokenOut) * oracle.getPrice(_tokenOut);
-        uint256 mintValue = _amount * basketValue / IERC20(_tokenIn).totalSupply();
-        uint256 newRatio = ( basketAssetValue - mintValue ) * 1e27 / ( basketValue - mintValue );
-
-        IRegistry.BasketFees memory basketFees = _registry.basketFees(_tokenIn, _tokenOut);
-
-        amountOut = mintValue / (oracle.getPrice(_tokenOut));
-        (amountOut, fee) = _applyFeeSlopes(
-            false,
-            amountOut,
-            newRatio,
-            basketFees
-        );
+        emit Swap(msg.sender, params.receiver, params.asset, params.capToken, params.amountIn, params.amountOut);
     }
 
-    function getRedeem(
-        IRegistry _registry,
-        address _tokenIn,
-        uint256 _amountIn
-    ) external view returns (uint256[] memory amounts, uint256[] memory fees) {
-        IVault vault = IVault(_registry.basketVault(_tokenIn));
+    /// @notice Redeem a cap token in exchange for proportional weighting of underlying assets
+    /// @param params Parameters for redeeming
+    function redeem(DataTypes.RedeemParams memory params) external {
+        ICapToken(params.capToken).burn(msg.sender, params.amount);
 
-        uint256 shares = _amountIn / IERC20(_tokenIn).totalSupply();
-        address[] memory assets = _registry.basketAssets(_tokenIn);
-        uint256 assetLength = assets.length;
-        for (uint256 i; i < assetLength; ++i) {
-            address asset = assets[i];
-            uint256 withdrawAmount = vault.totalSupplies(asset) * shares;
-            fees[i] = withdrawAmount * _registry.basketBaseFee(_tokenIn) / 1e27;
-            amounts[i] = withdrawAmount - fees[i];
-        }
-    }
-
-    function _getBasketValue(
-        IRegistry _registry,
-        IVault _vault,
-        IOracle _oracle,
-        address _cToken
-    ) internal view returns (uint256 totalValue) {
-        address[] memory assets = _registry.basketAssets(_cToken);
-        uint256 assetLength = assets.length;
-        for (uint256 i; i < assetLength; ++i) {
-            address asset = assets[i];
-            // Need to normalize decimals here
-            totalValue += _vault.totalSupplies(asset) * _oracle.getPrice(asset);
-        }
-    }
-
-    function _applyFeeSlopes(
-        bool _mint,
-        uint256 _amountOut,
-        uint256 _newRatio,
-        IRegistry.BasketFees memory _basketFees
-    ) internal pure returns (uint256 amountOut, uint256 fee) {
-        uint256 rate;
-        if (_mint) {
-            if (_newRatio > _basketFees.optimalRatio) {
-                if (_newRatio > _basketFees.mintKinkRatio) {
-                    uint256 excessRatio = _newRatio - _basketFees.mintKinkRatio;
-                    rate = _basketFees.slope0 + ( _basketFees.slope1 * excessRatio );
-                } else {
-                    rate = _basketFees.slope0 * _newRatio / _basketFees.mintKinkRatio;
-                }
-            }
-        } else {
-            if (_newRatio < _basketFees.optimalRatio) {
-                if (_newRatio < _basketFees.burnKinkRatio) {
-                    uint256 excessRatio = _basketFees.burnKinkRatio - _newRatio;
-                    rate = _basketFees.slope0 + ( _basketFees.slope1 * excessRatio );
-                } else {
-                    rate = _basketFees.slope0 * _basketFees.burnKinkRatio / _newRatio;
-                }
-            }
+        uint256 amountLength = params.amountOuts.length;
+        for (uint256 i; i < amountLength; ++i) {
+            ValidationLogic.validateMinAmount(params.minAmountOuts[i], params.amountOuts[i]);
+            IVault(params.vault).withdraw(params.assets[i], params.amountOuts[i], params.receiver);
         }
 
-        if (rate > 1e27) rate = 1e27;
-        fee = _amountOut * rate / 1e27;
-        amountOut = _amountOut - fee;
+        emit Redeem(msg.sender, params.receiver, params.capToken, params.amount, params.amountOuts);
     }
 }
