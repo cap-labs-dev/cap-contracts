@@ -107,6 +107,7 @@ contract Lender is Initializable, LenderStorage {
                 asset: _asset,
                 vault: _reservesData[_asset].vault,
                 debtToken: _reservesData[_asset].debtToken,
+                bonus: _reservesData[_asset].bonus,
                 amount: _amount,
                 interest: _interest,
                 caller: msg.sender,
@@ -157,15 +158,21 @@ contract Lender is Initializable, LenderStorage {
     /// @notice Add asset to the possible lending
     /// @param _asset Asset address
     /// @param _vault Vault address
-    function addAsset(address _asset, address _vault) external onlyLenderAdmin {
+    /// @param _liquidationBonus Bonus percentage for liquidating a market to cover holding risk
+    function addAsset(
+        address _asset,
+        address _vault,
+        uint256 _liquidationBonus
+    ) external onlyLenderAdmin {
         if (ReserveLogic.addAsset(
             _reservesData,
             _reservesList,
             DataTypes.AddAssetParams({
                 asset: _asset,
                 vault: _vault,
-                reserveCount: _reservesCount,
-                debtTokenInstance: IRegistry(ADDRESS_PROVIDER).debtTokenInstance()
+                debtTokenInstance: IRegistry(ADDRESS_PROVIDER).debtTokenInstance(),
+                bonus: _liquidationBonus,
+                reserveCount: _reservesCount
             }))
         ) {
             ++_reservesCount;

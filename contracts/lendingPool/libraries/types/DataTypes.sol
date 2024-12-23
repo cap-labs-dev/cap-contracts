@@ -7,6 +7,7 @@ library DataTypes {
         uint256 id;
         address vault;
         address debtToken;
+        uint256 bonus;
         bool paused;
     }
 
@@ -46,6 +47,7 @@ library DataTypes {
         address asset;
         address vault;
         address debtToken;
+        uint256 bonus;
         uint256 amount;
         uint256 interest;
         address caller;
@@ -66,8 +68,9 @@ library DataTypes {
     struct AddAssetParams {
         address asset;
         address vault;
-        uint16 reserveCount;
         address debtTokenInstance;
+        uint256 bonus;
+        uint16 reserveCount;
     }
 
     struct ValidateBorrowParams {
