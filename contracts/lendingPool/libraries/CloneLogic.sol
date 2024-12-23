@@ -9,6 +9,7 @@ import { IUpgradeableBeacon } from "../../interfaces/IUpgradeableBeacon.sol";
 /// @author kexley
 /// @notice Implements the base logic for all the actions related to cloning
 library CloneLogic {
+
     /// @dev New instance has been created
     event InstanceCreated(address indexed implementation, address instance);
 

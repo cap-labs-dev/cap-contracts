@@ -8,6 +8,9 @@ import { IOracle } from "../../interfaces/IOracle.sol";
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
 import { DataTypes } from "./types/DataTypes.sol";
 
+/// @title View Logic
+/// @author kexley, @capLabs
+/// @notice View functions to see the state of an agent's health
 library ViewLogic {
     using AgentConfiguration for DataTypes.AgentConfigurationMap;
 

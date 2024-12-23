@@ -13,7 +13,7 @@ import { MintBurnLogic } from "./libraries/MintBurnLogic.sol";
 
 /// @title Minter/burner for cTokens
 /// @author kexley, @capLabs
-/// @notice cTokens are minted or burned in exchange for collateral ratio of the backing tokens
+/// @notice Cap tokens are minted or burned in exchange for collateral ratio of the backing tokens
 /// @dev Dynamic fees are applied according to the allocation of assets in the basket. Increasing
 /// the supply of a excessive asset or burning for an scarce asset will charge fees on a kinked 
 /// slope. Redeem can be used to avoid these fees by burning for the current ratio of assets.

@@ -8,8 +8,13 @@ import { ValidationLogic } from "./ValidationLogic.sol";
 import { CloneLogic } from "./CloneLogic.sol";
 import { DataTypes } from "./types/DataTypes.sol";
 
+/// @title Reserve Logic
+/// @author kexley, @capLabs
+/// @notice Add, remove or pause reserves on the Lender 
 library ReserveLogic {
+
     /// @notice Add asset to the possible lending
+    /// @dev The debt token will be deployed for this reserve
     /// @param reservesData Reserve mapping
     /// @param reservesList Mapping of all reserves
     /// @param params Parameters for adding an asset
@@ -46,11 +51,14 @@ library ReserveLogic {
             id: id,
             vault: params.vault,
             debtToken: debtToken,
+            bonus: params.bonus,
             paused: false
         });
     }
 
     /// @notice Remove asset from lending when there is no borrows
+    /// @param reservesData Reserve mapping
+    /// @param reservesList Mapping of all reserves
     /// @param _asset Asset address
     function removeAsset(
         mapping(address => DataTypes.ReserveData) storage reservesData,
@@ -63,7 +71,8 @@ library ReserveLogic {
         delete reservesData[_asset];
     }
 
-    /// @notice Pause an asset
+    /// @notice Pause an asset from being borrowed
+    /// @param reservesData Reserve mapping
     /// @param _asset Asset address
     /// @param _pause True if pausing or false if unpausing
     function pauseAsset(
