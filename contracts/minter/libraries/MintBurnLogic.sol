@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { ICapToken } from "../../interfaces/ICapToken.sol";
-import { IRegistry } from "../../interfaces/IRegistry.sol";
-import { IVault } from "../../interfaces/IVault.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ICapToken} from "../../interfaces/ICapToken.sol";
+import {IRegistry} from "../../interfaces/IRegistry.sol";
+import {IVault} from "../../interfaces/IVault.sol";
 
-import { ValidationLogic } from "./ValidationLogic.sol";
-import { DataTypes } from "./types/DataTypes.sol";
+import {ValidationLogic} from "./ValidationLogic.sol";
+import {DataTypes} from "./types/DataTypes.sol";
 
 /// @title Mint Burn Logic
 /// @author kexley, @capLabs
@@ -18,22 +18,11 @@ library MintBurnLogic {
 
     /// @dev Swap made
     event Swap(
-        address indexed sender,
-        address indexed to,
-        address asset,
-        address capToken,
-        uint256 amountIn,
-        uint256 amountOut
+        address indexed sender, address indexed to, address asset, address capToken, uint256 amountIn, uint256 amountOut
     );
 
     /// @dev Redeem made
-    event Redeem(
-        address indexed sender,
-        address indexed to,
-        address tokenIn,
-        uint256 amountIn,
-        uint256[] amountOuts
-    );
+    event Redeem(address indexed sender, address indexed to, address tokenIn, uint256 amountIn, uint256[] amountOuts);
 
     /// @notice Mint a cap token in exchange for an underlying asset
     /// @param params Parameters for minting
@@ -51,7 +40,7 @@ library MintBurnLogic {
     /// @param params Parameters for burning
     function burn(DataTypes.MintBurnParams memory params) external {
         ICapToken(params.capToken).burn(msg.sender, params.amountIn);
-        
+
         IVault(params.vault).withdraw(params.asset, params.amountOut, params.receiver);
 
         emit Swap(msg.sender, params.receiver, params.asset, params.capToken, params.amountIn, params.amountOut);

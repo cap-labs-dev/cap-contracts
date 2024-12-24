@@ -1,34 +1,33 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import { IRegistry } from "../interfaces/IRegistry.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {IRegistry} from "../interfaces/IRegistry.sol";
 
-import { ValidationLogic } from "./libraries/ValidationLogic.sol";
-import { AmountOutLogic } from "./libraries/AmountOutLogic.sol";
-import { MintBurnLogic } from "./libraries/MintBurnLogic.sol";
-import { DataTypes } from "./libraries/types/DataTypes.sol";
+import {ValidationLogic} from "./libraries/ValidationLogic.sol";
+import {AmountOutLogic} from "./libraries/AmountOutLogic.sol";
+import {MintBurnLogic} from "./libraries/MintBurnLogic.sol";
+import {DataTypes} from "./libraries/types/DataTypes.sol";
 
 /// @title Minter/burner for cap tokens
 /// @author kexley, @capLabs
 /// @notice Cap tokens are minted or burned in exchange for collateral ratio of the backing tokens
 /// @dev Dynamic fees are applied according to the allocation of assets in the basket. Increasing
-/// the supply of a excessive asset or burning for an scarce asset will charge fees on a kinked 
+/// the supply of a excessive asset or burning for an scarce asset will charge fees on a kinked
 /// slope. Redeem can be used to avoid these fees by burning for the current ratio of assets.
 contract Minter is Initializable {
-
     /// @notice Registry that controls fees, whitelisting assets and basket allocations
     address public registry;
 
     /// @notice Initialize the registry address and default admin
     /// @param _registry Registry address
-    function initialize(address _registry) initializer external {
+    function initialize(address _registry) external initializer {
         registry = _registry;
     }
 
     /// @notice Swap a backing asset for a cap token or vice versa, fees are charged based on asset
     /// backing ratio
-    /// @dev Only whitelisted assets are allowed, this contract must be approved by the msg.sender 
+    /// @dev Only whitelisted assets are allowed, this contract must be approved by the msg.sender
     /// to pull the asset
     /// @param _amountIn Amount of tokenIn to be swapped
     /// @param _minAmountOut Minimum amount of tokenOut to be received
@@ -138,11 +137,11 @@ contract Minter is Initializable {
     /// @param _tokenOut Token to swap out
     /// @param _amountIn Amount to swap in
     /// @param amountOut Amount out
-    function getAmountOut(
-        address _tokenIn, 
-        address _tokenOut,
-        uint256 _amountIn
-    ) external view returns (uint256 amountOut) {
+    function getAmountOut(address _tokenIn, address _tokenOut, uint256 _amountIn)
+        external
+        view
+        returns (uint256 amountOut)
+    {
         bool mint = ValidationLogic.validateSwap(
             DataTypes.ValidateSwapParams({
                 registry: address(registry),
@@ -181,10 +180,11 @@ contract Minter is Initializable {
     /// @param _tokenIn Token to swap in
     /// @param _amountIn Amount to swap in
     /// @param amountOuts Amounts out
-    function getRedeemAmountOut(
-        address _tokenIn,
-        uint256 _amountIn
-    ) external view returns (uint256[] memory amountOuts) {
+    function getRedeemAmountOut(address _tokenIn, uint256 _amountIn)
+        external
+        view
+        returns (uint256[] memory amountOuts)
+    {
         ValidationLogic.validateRedeem(registry, _tokenIn, block.timestamp);
         address vault = IRegistry(registry).basketVault(_tokenIn);
 
