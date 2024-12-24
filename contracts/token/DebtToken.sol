@@ -12,12 +12,12 @@ import { IOracle } from "../interfaces/IOracle.sol";
 
 /// @title Debt token for a market on the Lender
 /// @author kexley, @capLabs
-/// @notice pTokens are minted 1:1 with the principal loan amount
+/// @notice Debt tokens are minted 1:1 with the principal loan amount
 /// @dev Asset interest is calculated from the oracle returning both the market rate and the benchmark
 /// rate and taking the higher of the two. Interest is returned to a rewarder to be converted into
 /// cTokens and distributed via ERC4626. Restaker interest is calculated from the agent specific index
 /// in the oracle and sent to an agent specific rewarder.
-contract pToken is ERC20Upgradeable {
+contract DebtToken is ERC20Upgradeable {
 
     /// @notice Lender contract
     address public lender;
@@ -54,7 +54,7 @@ contract pToken is ERC20Upgradeable {
         _disableInitializers();
     }
 
-    /// @notice Initialize the pToken with the underlying asset
+    /// @notice Initialize the debt token with the underlying asset
     /// @param asset_ Asset address
     function initialize(address asset_) external initializer {
         string memory name = string.concat("p", IERC20Metadata(asset_).name());
@@ -72,7 +72,7 @@ contract pToken is ERC20Upgradeable {
         return _decimals;
     }
 
-    /// @notice Lender will mint pTokens to match the amount borrowed by an agent. Interest and
+    /// @notice Lender will mint debt tokens to match the amount borrowed by an agent. Interest and
     /// restaker interest is accrued to the agent.
     /// @param to Address to mint tokens to
     /// @param amount Amount of tokens to mint
@@ -82,7 +82,7 @@ contract pToken is ERC20Upgradeable {
         _mint(to, amount);
     }
 
-    /// @notice Lender will burn pTokens when the principal debt is repaid by an agent. Interest 
+    /// @notice Lender will burn debt tokens when the principal debt is repaid by an agent. Interest 
     /// can be repaid or not. Unpaid interest will accrue more interest.
     /// @param from Burn tokens from agent
     /// @param amount Amount to burn

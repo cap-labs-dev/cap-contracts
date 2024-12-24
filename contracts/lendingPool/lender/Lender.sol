@@ -7,6 +7,7 @@ import { BorrowLogic } from "../libraries/BorrowLogic.sol";
 import { LiquidationLogic } from "../libraries/LiquidationLogic.sol";
 import { ReserveLogic } from "../libraries/ReserveLogic.sol";
 import { ViewLogic } from "../libraries/ViewLogic.sol";
+import { CloneLogic } from "../libraries/CloneLogic.sol";
 import { DataTypes } from "../libraries/types/DataTypes.sol";
 import { Errors } from "../libraries/helpers/Errors.sol";
 import { IRegistry } from "../../interfaces/IRegistry.sol";
@@ -47,7 +48,7 @@ contract Lender is Initializable, LenderStorage {
                 agent: msg.sender,
                 asset: _asset,
                 vault: _reservesData[_asset].vault,
-                pToken: _reservesData[_asset].pToken,
+                debtToken: _reservesData[_asset].debtToken,
                 amount: _amount,
                 receiver: _receiver,
                 collateral: IRegistry(ADDRESS_PROVIDER).collateral(),
@@ -75,7 +76,7 @@ contract Lender is Initializable, LenderStorage {
                 agent: _agent,
                 asset: _asset,
                 vault: _reservesData[_asset].vault,
-                pToken: _reservesData[_asset].pToken,
+                debtToken: _reservesData[_asset].debtToken,
                 amount: _amount,
                 interest: _interest,
                 caller: msg.sender,
@@ -106,7 +107,8 @@ contract Lender is Initializable, LenderStorage {
                 agent: _agent,
                 asset: _asset,
                 vault: _reservesData[_asset].vault,
-                pToken: _reservesData[_asset].pToken,
+                debtToken: _reservesData[_asset].debtToken,
+                bonus: _reservesData[_asset].bonus,
                 amount: _amount,
                 interest: _interest,
                 caller: msg.sender,
@@ -157,15 +159,21 @@ contract Lender is Initializable, LenderStorage {
     /// @notice Add asset to the possible lending
     /// @param _asset Asset address
     /// @param _vault Vault address
-    function addAsset(address _asset, address _vault) external onlyLenderAdmin {
+    /// @param _liquidationBonus Bonus percentage for liquidating a market to cover holding risk
+    function addAsset(
+        address _asset,
+        address _vault,
+        uint256 _liquidationBonus
+    ) external onlyLenderAdmin {
         if (ReserveLogic.addAsset(
             _reservesData,
             _reservesList,
             DataTypes.AddAssetParams({
                 asset: _asset,
                 vault: _vault,
-                reserveCount: _reservesCount,
-                pTokenInstance: IRegistry(ADDRESS_PROVIDER).pTokenInstance()
+                debtTokenInstance: IRegistry(ADDRESS_PROVIDER).debtTokenInstance(),
+                bonus: _liquidationBonus,
+                reserveCount: _reservesCount
             }))
         ) {
             ++_reservesCount;
@@ -175,11 +183,7 @@ contract Lender is Initializable, LenderStorage {
     /// @notice Remove asset from lending when there is no borrows
     /// @param _asset Asset address
     function removeAsset(address _asset) external onlyLenderAdmin {
-        ReserveLogic.removeAsset(
-            _reservesData,
-            _reservesList,
-            _asset
-        );
+        ReserveLogic.removeAsset(_reservesData, _reservesList, _asset);
     }
 
     /// @notice Pause an asset
@@ -187,5 +191,12 @@ contract Lender is Initializable, LenderStorage {
     /// @param _pause True if pausing or false if unpausing
     function pauseAsset(address _asset, bool _pause) external onlyLenderAdmin {
         ReserveLogic.pauseAsset(_reservesData, _asset, _pause);
+    }
+
+    /// @notice Upgrade an instance owned by the lender
+    /// @param _instance Instance of a contract owned by the lender
+    /// @param _implementation New implementation address
+    function upgradeInstance(address _instance, address _implementation) external onlyLenderAdmin {
+        CloneLogic.upgradeTo(_instance, _implementation);
     }
 }

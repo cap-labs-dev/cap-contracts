@@ -9,11 +9,15 @@ import { ViewLogic } from "./ViewLogic.sol";
 import { BorrowLogic } from "./BorrowLogic.sol";
 import { DataTypes } from "./types/DataTypes.sol";
 
+/// @title Liquidation Logic
+/// @author kexley, @capLabs
+/// @notice Liquidate an agent that has an unhealthy ltv by slashing their collateral backing
 library LiquidationLogic {
 
+    /// @notice An agent has been liquidated
     event Liquidate(address indexed asset, address indexed agent, uint256 amount, uint256 value);
 
-    /// @notice Liquidate an agent when the health is below 1
+    /// @notice Liquidate an agent when their health is below 1
     /// @param reservesData Reserve mapping
     /// @param reservesList Mapping of all reserves
     /// @param agentConfig Agent configuration
@@ -49,14 +53,14 @@ library LiquidationLogic {
             uint256 principalLiquidated, 
             uint256 restakerInterestLiquidated,
             uint256 interestLiquidated
-        )= BorrowLogic.repay(
+        ) = BorrowLogic.repay(
             agentConfig,
             DataTypes.RepayParams({
                 id: params.id,
                 agent: params.agent,
                 asset: params.asset,
                 vault: params.vault,
-                pToken: params.pToken,
+                debtToken: params.debtToken,
                 amount: params.amount,
                 interest: params.interest,
                 caller: params.caller,
@@ -67,11 +71,14 @@ library LiquidationLogic {
 
         uint256 liquidated = principalLiquidated + restakerInterestLiquidated + interestLiquidated;
 
+        if (params.bonus > 0) liquidated += params.bonus * liquidated;
+
         uint256 assetPrice = IOracle(params.oracle).getPrice(params.asset);
         liquidatedValue = liquidated * assetPrice;
         if (totalCollateral < liquidatedValue) liquidatedValue = totalCollateral;
 
         ICollateral(params.collateral).slash(params.agent, params.caller, liquidatedValue);
+
         emit Liquidate(params.agent, params.asset, liquidated, liquidatedValue);
     }
 }

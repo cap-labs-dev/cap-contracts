@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-/**
-* @title Errors library
-* @author Aave
-* @notice Defines the error messages emitted by the different contracts of the Aave protocol
-*/
+/// @title Errors library
+/// @author Aave
+/// @notice Defines the error messages emitted by the different contracts of the Aave protocol
 library Errors {
+    /// TODO Prune errors
     string public constant CALLER_NOT_POOL_ADMIN = '1'; // 'The caller of the function is not a pool admin'
     string public constant CALLER_NOT_EMERGENCY_ADMIN = '2'; // 'The caller of the function is not an emergency admin'
     string public constant CALLER_NOT_POOL_OR_EMERGENCY_ADMIN = '3'; // 'The caller of the function is not a pool or emergency admin'

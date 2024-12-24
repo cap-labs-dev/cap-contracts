@@ -4,14 +4,23 @@ pragma solidity ^0.8.28;
 import { ICollateral } from "../../interfaces/ICollateral.sol";
 import { IOracle } from "../../interfaces/IOracle.sol";
 import { IRegistry } from "../../interfaces/IRegistry.sol";
-import { IPToken } from "../../interfaces/IPToken.sol";
+import { IDebtToken } from "../../interfaces/IDebtToken.sol";
 
 import { Errors } from "./helpers/Errors.sol";
 import { ViewLogic } from "./ViewLogic.sol";
 import { DataTypes } from "./types/DataTypes.sol";
 
+/// @title Validation Logic
+/// @author kexley, @capLabs
+/// @notice Validate actions before state is altered
 library ValidationLogic {
+
     /// @notice Validate the borrow of an agent
+    /// @dev Check the pause state of the reserve and the health of the agent before and after the 
+    /// borrow.
+    /// @param reservesData Reserve mapping that stores reserve data
+    /// @param reservesList List of all reserves
+    /// @param agentConfig Agent configuration for borrowing
     /// @param params Validation parameters
     function validateBorrow(
         mapping(address => DataTypes.ReserveData) storage reservesData,
@@ -39,7 +48,7 @@ library ValidationLogic {
             })
         );
 
-        require(health >= 1, Errors.HEALTH_FACTOR_LOWER_THAN_LIQUIDATION_THRESHOLD);
+        require(health >= 1e27, Errors.HEALTH_FACTOR_LOWER_THAN_LIQUIDATION_THRESHOLD);
 
         uint256 ltv = ICollateral(params.collateral).ltv(params.agent);
         uint256 assetPrice = IOracle(params.oracle).getPrice(params.asset);
@@ -50,11 +59,17 @@ library ValidationLogic {
     }
 
     /// @notice Validate the liquidation of an agent
+    /// @dev Health of above 1e27 is healthy, below is liquidatable
     /// @param health Health of an agent's position
     function validateLiquidation(uint256 health) external pure {
-        require(health >= 1, Errors.HEALTH_FACTOR_NOT_BELOW_THRESHOLD);
+        require(health >= 1e27, Errors.HEALTH_FACTOR_NOT_BELOW_THRESHOLD);
     }
 
+    /// TODO Check that the asset is borrowable from the vault
+    /// @notice Validate adding an asset as a reserve
+    /// @param reservesData Reserve mapping that stores reserve data
+    /// @param _asset Asset to add
+    /// @param _vault Vault to borrow asset from
     function validateAddAsset(
         mapping(address => DataTypes.ReserveData) storage reservesData,
         address _asset,
@@ -64,16 +79,23 @@ library ValidationLogic {
         require(reservesData[_asset].vault == address(0), Errors.RESERVE_ALREADY_INITIALIZED);
     }
 
+    /// @notice Validate dropping an asset as a reserve
+    /// @dev All principal borrows must be repaid, interest is ignored
+    /// @param reservesData Reserve mapping that stores reserve data
+    /// @param _asset Asset to remove
     function validateRemoveAsset(
         mapping(address => DataTypes.ReserveData) storage reservesData,
         address _asset
     ) external view {
         require(
-            IPToken(reservesData[_asset].pToken).totalSupply() == 0,
+            IDebtToken(reservesData[_asset].debtToken).totalSupply() == 0,
             Errors.VARIABLE_DEBT_SUPPLY_NOT_ZERO
         );
     }
 
+    /// @notice Validate pausing a reserve
+    /// @param reservesData Reserve mapping that stores reserve data
+    /// @param _asset Asset to pause
     function validatePauseAsset(
         mapping(address => DataTypes.ReserveData) storage reservesData,
         address _asset

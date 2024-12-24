@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { IERC20 } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
-interface IPToken is IERC20 {
+interface IDebtToken is IERC20 {
     function initialize(address asset) external;
     function mint(address to, uint256 amount) external;
     function burn(

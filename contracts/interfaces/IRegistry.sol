@@ -21,13 +21,14 @@ interface IRegistry {
     function basketAssets(address cToken) external view returns (address[] memory assets);
     function basketBaseFee(address cToken) external view returns (uint256 baseFee);
     function basketFees(address cToken, address asset) external view returns (BasketFees memory basketFees);
+    function basketRedeemFee(address cToken) external view returns (uint256 fee);
     function supportedCToken(address cToken) external view returns (bool supported);
     function basketSupportsAsset(address cToken, address asset) external view returns (bool supported);
     function vaultSupportsAsset(address vault, address asset) external view returns (bool supported);
 
     function oracle() external view returns (address oracle);
     function collateral() external view returns (address collateral);
-    function pTokenInstance() external view returns (address pTokenInstance);
+    function debtTokenInstance() external view returns (address debtTokenInstance);
     function minter() external view returns (address minter);
     function restakerRewarder(address agent) external view returns (address restakerRewarder);
     function rewarder(address asset) external view returns (address rewarder);

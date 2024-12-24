@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { IPToken } from "../../interfaces/IPToken.sol";
+import { IDebtToken } from "../../interfaces/IDebtToken.sol";
 import { ICollateral } from "../../interfaces/ICollateral.sol";
 import { IOracle } from "../../interfaces/IOracle.sol";
 
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
 import { DataTypes } from "./types/DataTypes.sol";
 
+/// @title View Logic
+/// @author kexley, @capLabs
+/// @notice View functions to see the state of an agent's health
 library ViewLogic {
     using AgentConfiguration for DataTypes.AgentConfigurationMap;
 
@@ -43,7 +46,7 @@ library ViewLogic {
 
             address asset = reservesList[i];
 
-            totalDebt += IPToken(reservesData[asset].pToken).totalBalanceOf(params.agent)
+            totalDebt += IDebtToken(reservesData[asset].debtToken).totalBalanceOf(params.agent)
                 * IOracle(params.oracle).getPrice(asset);
         }
 

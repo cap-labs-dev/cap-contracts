@@ -15,13 +15,14 @@ contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeabl
 
     address public override oracle;
     address public override collateral;
-    address public override pTokenInstance;
+    address public override debtTokenInstance;
     address public override minter;
     address public override assetManager;
 
     // Storage, optimized for read access
     mapping(address => address) private _basketVault; // cToken => vault
     mapping(address => uint256) private _basketBaseFee; // cToken => baseFee
+    mapping(address => uint256) private _basketRedeemFee; // cToken => redeemFee
     mapping(address => mapping(address => BasketFees)) private _basketFees; // cToken => asset => fees
     mapping(address => address) private _restakerRewarder; // cToken => restakerRewarder
     mapping(address => EnumerableSet.AddressSet) private _vaultAssetWhitelist; // vault => set(whitelisted asset)
@@ -31,7 +32,7 @@ contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeabl
     event AssetRemoved(address indexed cToken, address indexed asset);
     event OracleUpdated(address indexed oldOracle, address indexed newOracle);
     event CollateralUpdated(address indexed oldCollateral, address indexed newCollateral);
-    event PTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
+    event DebtTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
     event MinterUpdated(address indexed oldMinter, address indexed newMinter);
     event AssetManagerUpdated(address indexed oldManager, address indexed newManager);
     event BasketSet(address indexed cToken, address indexed vault, uint256 baseFee);
@@ -67,6 +68,10 @@ contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeabl
         return _basketFees[_cToken][_asset];
     }
 
+    function basketRedeemFee(address _cToken) external view override returns (uint256) {
+        return _basketRedeemFee[_cToken];
+    }
+
     function restakerRewarder(address _cToken) external view returns (address) {
         return _restakerRewarder[_cToken];
     }
@@ -96,10 +101,10 @@ contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeabl
         emit CollateralUpdated(oldCollateral, _collateral);
     }
 
-    function setPTokenInstance(address _pTokenInstance) external onlyRole(MANAGER_ROLE) {
-        address oldInstance = pTokenInstance;
-        pTokenInstance = _pTokenInstance;
-        emit PTokenInstanceUpdated(oldInstance, _pTokenInstance);
+    function setDebtTokenInstance(address _debtTokenInstance) external onlyRole(MANAGER_ROLE) {
+        address oldInstance = debtTokenInstance;
+        debtTokenInstance = _debtTokenInstance;
+        emit DebtTokenInstanceUpdated(oldInstance, _debtTokenInstance);
     }
 
     function setMinter(address _minter) external onlyRole(MANAGER_ROLE) {

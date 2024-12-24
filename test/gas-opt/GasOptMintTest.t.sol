@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {Registry} from "../../contracts/registry/Registry.sol";
 import {Minter} from "../../contracts/minter/Minter.sol";
-import {Vault} from "../../contracts/minter/Vault.sol";
+import {Vault} from "../../contracts/vault/Vault.sol";
 import {CapToken} from "../../contracts/token/CapToken.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {MockOracle} from "../mocks/MockOracle.sol";

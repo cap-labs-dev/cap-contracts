@@ -13,21 +13,38 @@ import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/I
 import { IRegistry } from "../interfaces/IRegistry.sol";
 import { IMinter } from "../interfaces/IMinter.sol";
 
+/// @title Staked Cap Token
+/// @author kexley, @capLabs
+/// @notice Slow releasing yield-bearing token that distributes the yield accrued from agents
+/// borrowing from the underlying assets.
+/// @dev Calling notify permissionlessly will swap the underlying assets to the cap token and start
+/// the linear unlock
 contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
     using SafeERC20 for IERC20;
 
-    uint256 public lastNotify;
-    uint256 public storedTotal;
-    uint256 public totalLocked;
-    uint256 public lockDuration;
-
+    /// @notice Registry for checking which underlying assets belong to the cap token basket
     address public registry;
+
+    /// @notice Stored total balance of cap tokens on this contract, including locked
+    uint256 public storedTotal;
+
+    /// @notice Total cap tokens locked in latest notification
+    uint256 public totalLocked;
+
+    /// @notice Timestamp of the last notification of yield
+    uint256 public lastNotify;
+
+    /// @notice Lock duration for the linear vesting period, in seconds
+    uint256 public lockDuration;
 
     /// @dev Disable initializers on the implementation
     constructor() {
         _disableInitializers();
     }
 
+    /// @notice Initialize the staked cap token by matching the name and symbol of the underlying
+    /// @param asset_ Address of the cap token
+    /// @param _registry Address of the registry
     function initialize(address asset_, address _registry) external initializer {
         string memory name = string.concat("s", IERC20Metadata(asset_).name());
         string memory symbol = string.concat("s", IERC20Metadata(asset_).symbol());
@@ -39,10 +56,13 @@ contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
         registry = _registry;
     }
 
-    function decimals() public view virtual override(ERC20Upgradeable, ERC4626Upgradeable) returns (uint8) {
-        return ERC4626Upgradeable.decimals();
+    /// @notice Override the decimals function to match underlying decimals
+    /// @return _decimals Decimals of the staked cap token
+    function decimals() public view virtual override(ERC20Upgradeable, ERC4626Upgradeable) returns (uint8 _decimals) {
+        _decimals = ERC4626Upgradeable.decimals();
     }
 
+    /// @notice Notify this contract that it has yield to convert and start vesting
     function notify() external {
         _swap();
         uint256 total = IERC20(asset()).balanceOf(address(this));
@@ -53,6 +73,7 @@ contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
         }
     }
 
+    /// @dev Swap yield using the minter into the cap token
     function _swap() internal {
         address[] memory assets = IRegistry(registry).basketAssets(asset());
         address minter = IRegistry(registry).minter();
@@ -71,6 +92,8 @@ contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
         }
     }
 
+    /// @notice Remaining locked profit after a notification
+    /// @return locked Amount remaining to be vested
     function lockedProfit() public view returns (uint256 locked) {
         if (lockDuration == 0) return 0;
         uint256 elapsed = block.timestamp - lastNotify;
@@ -78,36 +101,46 @@ contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
         locked = totalLocked * remaining / lockDuration;
     }
 
+    /// @notice Total vested cap tokens on this contract
+    /// @return total Total amount of vested cap tokens
     function totalAssets() public override view returns (uint256 total) {
         total = storedTotal - lockedProfit();
     }
 
-    function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
-        SafeERC20.safeTransferFrom(IERC20(asset()), caller, address(this), assets);
-        _mint(receiver, shares);
-        storedTotal += shares;
+    /// @dev Overriden to update the total assets including unvested tokens
+    /// @param _caller Caller of the deposit
+    /// @param _receiver Receiver of the staked cap tokens
+    /// @param _assets Amount of cap tokens to pull from the caller
+    /// @param _shares Amount of staked cap tokens to send to receiver
+    function _deposit(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal override {
+        SafeERC20.safeTransferFrom(IERC20(asset()), _caller, address(this), _assets);
+        _mint(_receiver, _shares);
+        storedTotal += _shares;
 
-        emit Deposit(caller, receiver, assets, shares);
+        emit Deposit(_caller, _receiver, _assets, _shares);
     }
 
-    /**
-     * @dev Withdraw/redeem common workflow.
-     */
+    /// @dev Overriden to reduce the total assts including unvested tokens
+    /// @param _caller Caller of the withdrawal
+    /// @param _receiver Receiver of the cap tokens
+    /// @param _owner Owner of the staked cap tokens being burnt
+    /// @param _assets Amount of cap tokens to send to the receiver
+    /// @param _shares Amount of staked cap tokens to burn from the owner
     function _withdraw(
-        address caller,
-        address receiver,
-        address owner,
-        uint256 assets,
-        uint256 shares
+        address _caller,
+        address _receiver,
+        address _owner,
+        uint256 _assets,
+        uint256 _shares
     ) internal override {
-        if (caller != owner) {
-            _spendAllowance(owner, caller, shares);
+        if (_caller != _owner) {
+            _spendAllowance(_owner, _caller, _shares);
         }
 
-        _burn(owner, shares);
-        SafeERC20.safeTransfer(IERC20(asset()), receiver, assets);
-        storedTotal -= shares;
+        _burn(_owner, _shares);
+        SafeERC20.safeTransfer(IERC20(asset()), _receiver, _assets);
+        storedTotal -= _shares;
 
-        emit Withdraw(caller, receiver, owner, assets, shares);
+        emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
     }
 }
