@@ -90,6 +90,7 @@ contract GasOptMintTest is Test {
         registry.grantRole(registry.DEFAULT_ADMIN_ROLE(), user_deployer);
         registry.grantRole(registry.MANAGER_ROLE(), user_manager);
         cUSD.grantRole(cUSD.MINTER_ROLE(), address(minter));
+        cUSD.grantRole(cUSD.BURNER_ROLE(), address(minter));
         vault.grantRole(vault.SUPPLIER_ROLE(), address(minter));
 
         vm.stopPrank();
@@ -180,6 +181,48 @@ contract GasOptMintTest is Test {
             "Should have received less cUSD due to higher USDT price"
         );
         assertEq(usdt.balanceOf(address(vault)), vaultBalanceBefore + amountIn, "Vault should have received USDT");
+
+        vm.stopPrank();
+    }
+
+    function testMintAndBurn() public {
+        vm.startPrank(user_stablecoin_minter);
+
+        // Initial balances
+        uint256 initialUsdtBalance = usdt.balanceOf(user_stablecoin_minter);
+        uint256 initialVaultBalance = usdt.balanceOf(address(vault));
+
+        // First mint cUSD with USDT
+        uint256 amountIn = 100e18;
+        uint256 minAmountOut = 95e18;
+        uint256 deadline = block.timestamp + 1 hours;
+
+        // Approve and mint
+        usdt.approve(address(minter), amountIn);
+        minter.swapExactTokenForTokens(
+            amountIn, minAmountOut, address(usdt), address(cUSD), user_stablecoin_minter, deadline
+        );
+
+        uint256 mintedAmount = cUSD.balanceOf(user_stablecoin_minter);
+        assertGt(mintedAmount, 0, "Should have received cUSD tokens");
+        assertEq(usdt.balanceOf(address(vault)), initialVaultBalance + amountIn, "Vault should have received USDT");
+
+        // Now burn the cUSD tokens
+        uint256 burnAmount = mintedAmount;
+        uint256 minOutputAmount = burnAmount * 95 / 100; // Expect at least 95% back accounting for potential fees
+
+        cUSD.approve(address(minter), burnAmount);
+        minter.swapExactTokenForTokens(
+            burnAmount, minOutputAmount, address(cUSD), address(usdt), user_stablecoin_minter, deadline
+        );
+
+        // Verify final balances
+        assertEq(cUSD.balanceOf(user_stablecoin_minter), 0, "Should have burned all cUSD tokens");
+        assertGt(
+            usdt.balanceOf(user_stablecoin_minter),
+            initialUsdtBalance - amountIn + minOutputAmount,
+            "Should have received USDT back"
+        );
 
         vm.stopPrank();
     }
