@@ -64,3 +64,26 @@ $ forge --help
 $ anvil --help
 $ cast --help
 ```
+
+### Testnet Deploy
+
+Prepare config in `~/.foundry/foundry.toml`
+```toml
+[rpc_endpoints]
+anvil = "http://127.0.0.1:8545"
+```
+
+Create anvil wallet
+```shell
+cast wallet import anvil --interactive
+```
+
+Start anvil
+```shell
+anvil -f $RPC_URL --accounts 3 --balance 300 --no-cors --block-time 5
+```
+
+Deploy
+```shell
+forge script --rpc-url anvil script/DeployTestnetVault.s.sol:DeployTestnetVault --account anvil --broadcast
+```

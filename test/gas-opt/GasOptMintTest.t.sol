@@ -8,14 +8,7 @@ import {Vault} from "../../contracts/minter/Vault.sol";
 import {CapToken} from "../../contracts/token/CapToken.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {MockOracle} from "../mocks/MockOracle.sol";
-
-contract MockERC20 is ERC20 {
-    constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
-
-    function mint(address to, uint256 amount) external {
-        _mint(to, amount);
-    }
-}
+import {MockERC20} from "../mocks/MockERC20.sol";
 
 contract GasOptMintTest is Test {
     Registry public registry;
