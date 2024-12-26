@@ -4,22 +4,32 @@ pragma solidity ^0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {Registry} from "../../contracts/registry/Registry.sol";
 import {Minter} from "../../contracts/minter/Minter.sol";
+import {Lender} from "../../contracts/lendingPool/lender/Lender.sol";
 import {Vault} from "../../contracts/vault/Vault.sol";
 import {CapToken} from "../../contracts/token/CapToken.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {DebtToken} from "../../contracts/token/DebtToken.sol";
+import {CloneLogic} from "../../contracts/lendingPool/libraries/CloneLogic.sol";
 import {MockOracle} from "../mocks/MockOracle.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
+import {MockCollateral} from "../mocks/MockCollateral.sol";
 
-contract GasOptMintTest is Test {
+contract GasOptTest is Test {
     Registry public registry;
     Minter public minter;
+    Lender public lender;
     Vault public vault;
     CapToken public cUSD;
+    DebtToken public debtTokenImplementation;
+    address public debtTokenInstance;
+
     MockOracle public oracle;
+    MockCollateral public collateral;
 
     MockERC20 public usdt;
     MockERC20 public usdc;
     MockERC20 public usdx;
+    MockERC20 public weth;
 
     address public user_deployer;
     address public user_admin;
@@ -46,6 +56,7 @@ contract GasOptMintTest is Test {
         usdt = new MockERC20("USDT", "USDT");
         usdc = new MockERC20("USDC", "USDC");
         usdx = new MockERC20("USDx", "USDx");
+        weth = new MockERC20("WETH", "WETH");
 
         // Mint tokens to minter
         usdt.mint(user_stablecoin_minter, 1000e18);
@@ -62,6 +73,10 @@ contract GasOptMintTest is Test {
         minter = new Minter();
         minter.initialize(address(registry));
 
+        // Deploy and initialize Lender with Registry
+        lender = new Lender();
+        lender.initialize(address(registry));
+
         // Deploy and initialize Vault with Registry
         vault = new Vault();
         vault.initialize(address(registry));
@@ -69,6 +84,11 @@ contract GasOptMintTest is Test {
         // Deploy and initialize cUSD token
         cUSD = new CapToken();
         cUSD.initialize("Capped USD", "cUSD");
+
+        // Deploy debt token
+        debtTokenImplementation = new DebtToken();
+        debtTokenInstance = CloneLogic.initializeBeacon(address(debtTokenImplementation));
+        registry.setDebtTokenInstance(address(debtTokenInstance));
 
         // Deploy and setup mock oracle
         oracle = new MockOracle();
@@ -79,12 +99,17 @@ contract GasOptMintTest is Test {
         oracle.setPrice(address(usdc), 1e18);
         oracle.setPrice(address(usdx), 1e18);
 
+        // Setup oracle config
+        collateral = new MockCollateral();
+        registry.setCollateral(address(collateral));
+
         // Setup roles
         registry.grantRole(registry.DEFAULT_ADMIN_ROLE(), user_deployer);
         registry.grantRole(registry.MANAGER_ROLE(), user_manager);
         cUSD.grantRole(cUSD.MINTER_ROLE(), address(minter));
         cUSD.grantRole(cUSD.BURNER_ROLE(), address(minter));
         vault.grantRole(vault.SUPPLIER_ROLE(), address(minter));
+        vault.grantRole(vault.BORROWER_ROLE(), address(lender));
 
         vm.stopPrank();
 
@@ -121,6 +146,18 @@ contract GasOptMintTest is Test {
         cUSD.revokeRole(cUSD.MINTER_ROLE(), address(user_deployer));
 
         vm.stopPrank();
+
+        // allow agents to borrow any assets
+        vm.startPrank(user_manager);
+        registry.setAssetManager(user_manager);
+        lender.addAsset(address(usdc), address(vault), 1e18);
+        lender.addAsset(address(usdt), address(vault), 1e18);
+        lender.addAsset(address(usdx), address(vault), 1e18);
+        vm.stopPrank();
+
+        // make the agent covered
+        collateral.setCoverage(user_agent, 100000e18);
+        collateral.setLtv(user_agent, 1e18);
     }
 
     function testMintWithUSDT() public {
@@ -216,6 +253,19 @@ contract GasOptMintTest is Test {
             initialUsdtBalance - amountIn + minOutputAmount,
             "Should have received USDT back"
         );
+
+        vm.stopPrank();
+    }
+
+    function testAgentBorrow() public {
+        vm.startPrank(user_agent);
+
+        address borrowAsset = address(usdc);
+        uint256 borrowAmount = 1e18; // mock usdc has 18 decimals
+        address receiver = user_agent;
+        lender.borrow(borrowAsset, borrowAmount, receiver);
+
+        assertEq(usdc.balanceOf(receiver), borrowAmount);
 
         vm.stopPrank();
     }

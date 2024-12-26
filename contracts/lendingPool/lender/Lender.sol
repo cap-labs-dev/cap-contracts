@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import { BorrowLogic } from "../libraries/BorrowLogic.sol";
-import { LiquidationLogic } from "../libraries/LiquidationLogic.sol";
-import { ReserveLogic } from "../libraries/ReserveLogic.sol";
-import { ViewLogic } from "../libraries/ViewLogic.sol";
-import { CloneLogic } from "../libraries/CloneLogic.sol";
-import { DataTypes } from "../libraries/types/DataTypes.sol";
-import { Errors } from "../libraries/helpers/Errors.sol";
-import { IRegistry } from "../../interfaces/IRegistry.sol";
-import { LenderStorage } from "./LenderStorage.sol";
+import {BorrowLogic} from "../libraries/BorrowLogic.sol";
+import {LiquidationLogic} from "../libraries/LiquidationLogic.sol";
+import {ReserveLogic} from "../libraries/ReserveLogic.sol";
+import {ViewLogic} from "../libraries/ViewLogic.sol";
+import {CloneLogic} from "../libraries/CloneLogic.sol";
+import {DataTypes} from "../libraries/types/DataTypes.sol";
+import {Errors} from "../libraries/helpers/Errors.sol";
+import {IRegistry} from "../../interfaces/IRegistry.sol";
+import {LenderStorage} from "./LenderStorage.sol";
 
 /// @title Lender for covered agents
 /// @author kexley, @capLabs
@@ -19,19 +19,20 @@ import { LenderStorage } from "./LenderStorage.sol";
 /// @dev Borrow interest rates are calculated from the underlying utilization rates of the assets
 /// in the vaults.
 contract Lender is Initializable, LenderStorage {
-
-    modifier onlyLenderAdmin {
-        require(
-            msg.sender == IRegistry(ADDRESS_PROVIDER).assetManager(),
-            Errors.CALLER_NOT_POOL_ADMIN
-        );
+    modifier onlyLenderAdmin() {
+        require(msg.sender == IRegistry(ADDRESS_PROVIDER).assetManager(), Errors.CALLER_NOT_POOL_ADMIN);
         _;
     }
 
     /// @notice Initialize the lender
     /// @param _addressProvider Registry address
-    function initialize(address _addressProvider) initializer external {
+    function initialize(address _addressProvider) external initializer {
         ADDRESS_PROVIDER = _addressProvider;
+    }
+
+    /// @notice Expose oracle to DebtToken contracts
+    function oracle() public returns (address) {
+        return IRegistry(ADDRESS_PROVIDER).oracle();
     }
 
     /// @notice Borrow an asset
@@ -54,7 +55,8 @@ contract Lender is Initializable, LenderStorage {
                 collateral: IRegistry(ADDRESS_PROVIDER).collateral(),
                 oracle: IRegistry(ADDRESS_PROVIDER).oracle(),
                 reserveCount: _reservesCount
-        }));
+            })
+        );
     }
 
     /// @notice Repay an asset
@@ -63,12 +65,10 @@ contract Lender is Initializable, LenderStorage {
     /// @param _interest Amount of interest to repay
     /// @param _agent Repay on behalf of another borrower
     /// @return repaid Actual amount repaid
-    function repay(
-        address _asset,
-        uint256 _amount,
-        uint256 _interest,
-        address _agent
-    ) external returns (uint256 repaid, uint256 restakerRepaid, uint256 interestRepaid) {
+    function repay(address _asset, uint256 _amount, uint256 _interest, address _agent)
+        external
+        returns (uint256 repaid, uint256 restakerRepaid, uint256 interestRepaid)
+    {
         (repaid, restakerRepaid, interestRepaid) = BorrowLogic.repay(
             _agentConfig[_agent],
             DataTypes.RepayParams({
@@ -92,12 +92,10 @@ contract Lender is Initializable, LenderStorage {
     /// @param _amount Amount of asset to repay on behalf of the agent
     /// @param _interest Amount of interest to repay on behalf of agent
     /// @param liquidatedValue Value of the liquidation returned to the liquidator
-    function liquidate(
-        address _agent,
-        address _asset,
-        uint256 _amount,
-        uint256 _interest
-    ) external returns (uint256 liquidatedValue) {
+    function liquidate(address _agent, address _asset, uint256 _amount, uint256 _interest)
+        external
+        returns (uint256 liquidatedValue)
+    {
         liquidatedValue = LiquidationLogic.liquidate(
             _reservesData,
             _reservesList,
@@ -128,22 +126,12 @@ contract Lender is Initializable, LenderStorage {
     /// @return ltv Loan to value ratio
     /// @return liquidationThreshold Liquidation ratio of an agent
     /// @return health Health status of an agent
-    function agent(
-        address _agent
-    ) external view returns (
-        uint256 totalCollateral,
-        uint256 totalDebt,
-        uint256 ltv,
-        uint256 liquidationThreshold,
-        uint256 health
-    ) {
-        (
-            totalCollateral,
-            totalDebt,
-            ltv,
-            liquidationThreshold,
-            health
-        ) = ViewLogic.agent(
+    function agent(address _agent)
+        external
+        view
+        returns (uint256 totalCollateral, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health)
+    {
+        (totalCollateral, totalDebt, ltv, liquidationThreshold, health) = ViewLogic.agent(
             _reservesData,
             _reservesList,
             _agentConfig[_agent],
@@ -160,21 +148,19 @@ contract Lender is Initializable, LenderStorage {
     /// @param _asset Asset address
     /// @param _vault Vault address
     /// @param _liquidationBonus Bonus percentage for liquidating a market to cover holding risk
-    function addAsset(
-        address _asset,
-        address _vault,
-        uint256 _liquidationBonus
-    ) external onlyLenderAdmin {
-        if (ReserveLogic.addAsset(
-            _reservesData,
-            _reservesList,
-            DataTypes.AddAssetParams({
-                asset: _asset,
-                vault: _vault,
-                debtTokenInstance: IRegistry(ADDRESS_PROVIDER).debtTokenInstance(),
-                bonus: _liquidationBonus,
-                reserveCount: _reservesCount
-            }))
+    function addAsset(address _asset, address _vault, uint256 _liquidationBonus) external onlyLenderAdmin {
+        if (
+            ReserveLogic.addAsset(
+                _reservesData,
+                _reservesList,
+                DataTypes.AddAssetParams({
+                    asset: _asset,
+                    vault: _vault,
+                    debtTokenInstance: IRegistry(ADDRESS_PROVIDER).debtTokenInstance(),
+                    bonus: _liquidationBonus,
+                    reserveCount: _reservesCount
+                })
+            )
         ) {
             ++_reservesCount;
         }
