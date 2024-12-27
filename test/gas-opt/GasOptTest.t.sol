@@ -263,9 +263,20 @@ contract GasOptTest is Test {
         address borrowAsset = address(usdc);
         uint256 borrowAmount = 1e18; // mock usdc has 18 decimals
         address receiver = user_agent;
-        lender.borrow(borrowAsset, borrowAmount, receiver);
 
+        uint256 vaultBalanceBefore = usdc.balanceOf(address(vault));
+
+        lender.borrow(borrowAsset, borrowAmount, receiver);
         assertEq(usdc.balanceOf(receiver), borrowAmount);
+
+        //simulate yield
+        usdc.mint(user_agent, 1000e18);
+
+        // repay the debt
+        uint256 interest = 10;
+        usdc.approve(address(lender), borrowAmount + interest);
+        lender.repay(borrowAsset, borrowAmount, interest, user_agent);
+        assertGe(usdc.balanceOf(address(vault)), vaultBalanceBefore);
 
         vm.stopPrank();
     }

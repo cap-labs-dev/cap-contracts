@@ -1,4 +1,4 @@
-GasOptTest:testAgentBorrow() (gas: 302856)
+GasOptTest:testAgentBorrow() (gas: 520019)
 GasOptTest:testMintAndBurn() (gas: 425229)
 GasOptTest:testMintWithDifferentPrices() (gas: 251595)
 GasOptTest:testMintWithUSDT() (gas: 219707)
