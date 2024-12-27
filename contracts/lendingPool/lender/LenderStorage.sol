@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { DataTypes } from "../libraries/types/DataTypes.sol";
+import {DataTypes} from "../libraries/types/DataTypes.sol";
 
 /// @title Lender Storage
 /// @author kexley, @capLabs
 /// @notice Storage for the Lender
 contract LenderStorage {
-
     /// @dev Address provider for all contracts
     address internal ADDRESS_PROVIDER;
 
