@@ -64,7 +64,7 @@ contract CapSymbioticNetworkMiddleware is Network, SimpleKeyRegistry32 {
     error InvalidSubnetworksCnt();
     error TooOldEpoch();
     error InvalidEpoch();
-    error SlashingWindowTooShortt();
+    error SlashingWindowTooShort();
     error TooBigSlashAmount();
     error UnknownSlasherType();
 
@@ -89,7 +89,7 @@ contract CapSymbioticNetworkMiddleware is Network, SimpleKeyRegistry32 {
         _grantRole(PAUSER_ROLE, _pauser);
 
         if (_slashingWindow < _epochDuration) {
-            revert SlashingWindowTooShortt();
+            revert SlashingWindowTooShort();
         }
 
         startTime = Time.timestamp();
