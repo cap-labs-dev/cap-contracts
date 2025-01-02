@@ -7,6 +7,7 @@ contract MockOracle is IOracle {
     mapping(address => uint256) public prices;
     mapping(address => uint256) public marketIndices;
     mapping(address => uint256) public agentIndices;
+    mapping(address => uint256) public agentRates;
 
     function setPrice(address asset, uint256 price) external {
         prices[asset] = price;
@@ -30,5 +31,9 @@ contract MockOracle is IOracle {
 
     function agentIndex(address agent) external view override returns (uint256) {
         return agentIndices[agent];
+    }
+
+    function agentRate(address agent) external view override returns (uint256) {
+        return agentRates[agent];
     }
 } 

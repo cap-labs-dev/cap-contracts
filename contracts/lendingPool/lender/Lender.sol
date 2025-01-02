@@ -31,7 +31,7 @@ contract Lender is Initializable, LenderStorage {
     }
 
     /// @notice Expose oracle to DebtToken contracts
-    function oracle() public returns (address) {
+    function oracle() external view returns (address) {
         return IRegistry(ADDRESS_PROVIDER).oracle();
     }
 
