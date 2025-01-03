@@ -8,7 +8,7 @@ import {Lender} from "../../contracts/lendingPool/lender/Lender.sol";
 import {Vault} from "../../contracts/vault/Vault.sol";
 import {CapToken} from "../../contracts/token/CapToken.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {DebtToken} from "../../contracts/token/DebtToken.sol";
+import {DebtToken} from "../../contracts/lendingPool/tokens/DebtToken.sol";
 import {CloneLogic} from "../../contracts/lendingPool/libraries/CloneLogic.sol";
 import {MockOracle} from "../mocks/MockOracle.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
@@ -275,7 +275,7 @@ contract GasOptTest is Test {
         // repay the debt
         uint256 interest = 10;
         usdc.approve(address(lender), borrowAmount + interest);
-        lender.repay(borrowAsset, borrowAmount, interest, user_agent);
+        lender.repay(borrowAsset, borrowAmount, user_agent);
         assertGe(usdc.balanceOf(address(vault)), vaultBalanceBefore);
 
         vm.stopPrank();

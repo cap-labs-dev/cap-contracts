@@ -7,6 +7,8 @@ library DataTypes {
         uint256 id;
         address vault;
         address debtToken;
+        address restakerToken;
+        address interestToken;
         uint256 bonus;
         bool paused;
     }
@@ -21,6 +23,8 @@ library DataTypes {
         address asset;
         address vault;
         address debtToken;
+        address restakerToken;
+        address interestToken;
         uint256 amount;
         address receiver;
         address collateral;
@@ -34,8 +38,9 @@ library DataTypes {
         address asset;
         address vault;
         address debtToken;
+        address restakerToken;
+        address interestToken;
         uint256 amount;
-        uint256 interest;
         address caller;
         address restakerRewarder;
         address rewarder;
@@ -47,9 +52,10 @@ library DataTypes {
         address asset;
         address vault;
         address debtToken;
+        address restakerToken;
+        address interestToken;
         uint256 bonus;
         uint256 amount;
-        uint256 interest;
         address caller;
         address collateral;
         address oracle;
@@ -69,8 +75,11 @@ library DataTypes {
         address asset;
         address vault;
         address debtTokenInstance;
+        address restakerTokenInstance;
+        address interestTokenInstance;
         uint256 bonus;
         uint16 reserveCount;
+        address addressProvider;
     }
 
     struct ValidateBorrowParams {

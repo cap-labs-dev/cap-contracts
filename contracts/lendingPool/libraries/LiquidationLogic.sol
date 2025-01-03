@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { ICollateral } from "../../interfaces/ICollateral.sol";
-import { IOracle } from "../../interfaces/IOracle.sol";
+import { IPriceOracle } from "../../interfaces/IPriceOracle.sol";
 
 import { ValidationLogic } from "./ValidationLogic.sol";
 import { ViewLogic } from "./ViewLogic.sol";
@@ -49,11 +49,7 @@ library LiquidationLogic {
 
         ValidationLogic.validateLiquidation(health);
 
-        (
-            uint256 principalLiquidated, 
-            uint256 restakerInterestLiquidated,
-            uint256 interestLiquidated
-        ) = BorrowLogic.repay(
+        (uint256 liquidated, , ) = BorrowLogic.repay(
             agentConfig,
             DataTypes.RepayParams({
                 id: params.id,
@@ -61,19 +57,18 @@ library LiquidationLogic {
                 asset: params.asset,
                 vault: params.vault,
                 debtToken: params.debtToken,
+                restakerToken: params.restakerToken,
+                interestToken: params.interestToken,
                 amount: params.amount,
-                interest: params.interest,
                 caller: params.caller,
                 restakerRewarder: params.restakerRewarder,
                 rewarder: params.rewarder
             })
         );
 
-        uint256 liquidated = principalLiquidated + restakerInterestLiquidated + interestLiquidated;
-
         if (params.bonus > 0) liquidated += params.bonus * liquidated;
 
-        uint256 assetPrice = IOracle(params.oracle).getPrice(params.asset);
+        uint256 assetPrice = IPriceOracle(params.oracle).getPrice(params.asset);
         liquidatedValue = liquidated * assetPrice;
         if (totalCollateral < liquidatedValue) liquidatedValue = totalCollateral;
 

@@ -5,23 +5,22 @@ import { ERC20Upgradeable, IERC20 } from "@openzeppelin/contracts-upgradeable/to
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import { Errors } from "../lendingPool/libraries/helpers/Errors.sol";
-import { WadRayMath } from "../lendingPool/libraries/math/WadRayMath.sol";
-import { ILender } from "../interfaces/ILender.sol";
-import { IOracle } from "../interfaces/IOracle.sol";
-import { IDebtToken } from "../interfaces/IDebtToken.sol";
+import { Errors } from "../libraries/helpers/Errors.sol";
+import { WadRayMath } from "../libraries/math/WadRayMath.sol";
+import { IRegistry } from "../../interfaces/IRegistry.sol";
+import { IRateOracle } from "../../interfaces/IRateOracle.sol";
 
-/// @title Agent debt token for a market on the Lender
+/// @title Restaker debt token for a market on the Lender
 /// @author kexley, @capLabs
-/// @notice Agent debt tokens accrue over time representing the debt in the underlying asset to be 
+/// @notice Restaker debt tokens accrue over time representing the debt in the underlying asset to be 
 /// paid to the restakers collateralizing an agent
 /// @dev Each agent can have a different rate so the weighted mean is used to calculate the total
 /// accrued debt. This means that the total supply may not be exact.
-contract AgentDebtToken is ERC20Upgradeable {
+contract RestakerDebtToken is ERC20Upgradeable {
     using WadRayMath for uint256;
 
-    /// @notice Lender contract
-    address public lender;
+    /// @notice Registry contract
+    address public registry;
 
     /// @notice Principal debt token
     address public debtToken;
@@ -49,7 +48,7 @@ contract AgentDebtToken is ERC20Upgradeable {
 
     /// @dev Only the lender can use these functions
     modifier onlyLender() {
-        require(msg.sender == lender, Errors.CALLER_NOT_POOL_OR_EMERGENCY_ADMIN);
+        require(msg.sender == IRegistry(registry).lender(), Errors.CALLER_NOT_POOL_OR_EMERGENCY_ADMIN);
         _;
     }
 
@@ -59,18 +58,19 @@ contract AgentDebtToken is ERC20Upgradeable {
     }
 
     /// @notice Initialize the debt token with the underlying asset
+    /// @param _registry Registry address
     /// @param _debtToken Principal debt token
     /// @param asset_ Asset address
-    function initialize(address _debtToken, address asset_) external initializer {
+    function initialize(address _registry, address _debtToken, address asset_) external initializer {
         debtToken = _debtToken;
         
-        string memory name = string.concat("a", IERC20Metadata(asset_).name());
-        string memory symbol = string.concat("a", IERC20Metadata(asset_).symbol());
+        string memory name = string.concat("restaker", IERC20Metadata(asset_).name());
+        string memory symbol = string.concat("restaker", IERC20Metadata(asset_).symbol());
         _decimals = IERC20Metadata(asset_).decimals();
         asset = asset_;
 
         __ERC20_init(name, symbol);
-        lender = msg.sender;
+        registry = _registry;
     }
 
     /// @notice Update the interest per second of the agent and the scaled total supply
@@ -79,9 +79,9 @@ contract AgentDebtToken is ERC20Upgradeable {
     function update(address _agent) external {
         _accrueInterest(_agent);
 
-        uint256 rate = IOracle(ILender(lender).oracle()).agentRate(_agent);
+        uint256 rate = IRateOracle(IRegistry(registry).rateOracle()).restakerRate(_agent);
         uint256 oldInterestPerSecond = interestPerSecond[_agent];
-        uint256 newInterestPerSecond = IDebtToken(debtToken).balanceOf(_agent) * rate;
+        uint256 newInterestPerSecond = IERC20(debtToken).balanceOf(_agent) * rate;
 
         interestPerSecond[_agent] = newInterestPerSecond;
         totalInterestPerSecond = totalInterestPerSecond + newInterestPerSecond - oldInterestPerSecond;
@@ -101,7 +101,7 @@ contract AgentDebtToken is ERC20Upgradeable {
 
         if (actualRepaid > 0) {
             _burn(_agent, actualRepaid);
-            
+
             if (actualRepaid < _totalSupply) {
                 _totalSupply -= actualRepaid;
             } else {
@@ -137,7 +137,7 @@ contract AgentDebtToken is ERC20Upgradeable {
     /// @notice Average rate of all restakers weighted by debt
     /// @param rate Average rate
     function averageRate() external view returns (uint256 rate) {
-        uint256 totalDebt = IDebtToken(debtToken).totalSupply();
+        uint256 totalDebt = IERC20(debtToken).totalSupply();
         rate = totalDebt > 0 ? totalInterestPerSecond.rayDiv(totalDebt) : 0;
     }
 

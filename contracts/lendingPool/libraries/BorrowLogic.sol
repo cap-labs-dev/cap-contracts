@@ -64,7 +64,9 @@ library BorrowLogic {
 
         if (!agentConfig.isBorrowing(params.id)) agentConfig.setBorrowing(params.id, true);
 
+        IDebtToken(params.interestToken).update(params.agent);
         IDebtToken(params.debtToken).mint(params.agent, params.amount);
+        IDebtToken(params.restakerToken).update(params.agent);
 
         IVault(params.vault).borrow(params.asset, params.amount, params.receiver);
 
@@ -75,24 +77,37 @@ library BorrowLogic {
     /// @dev Only the amount owed or specified will be taken from the repayer, whichever is lower
     /// @param agentConfig Agent configuration for borrowing
     /// @param params Parameters to repay a debt
-    /// @return repaid Actual amount repaid
+    /// @return principalRepaid Actual principal amount repaid
     /// @return restakerRepaid Actual restaker interest paid
     /// @return interestRepaid Actual market interest paid
     function repay(
         DataTypes.AgentConfigurationMap storage agentConfig,
         DataTypes.RepayParams memory params
-    ) external returns (uint256 repaid, uint256 restakerRepaid, uint256 interestRepaid) {
-        repaid = params.amount > IERC20(params.debtToken).balanceOf(params.agent)
-            ? params.amount 
-            :  IERC20(params.debtToken).balanceOf(params.agent);
+    ) external returns (uint256 principalRepaid, uint256 restakerRepaid, uint256 interestRepaid) {
+        uint256 principalDebt = IERC20(params.debtToken).balanceOf(params.agent);
+        uint256 restakerDebt = IERC20(params.restakerToken).balanceOf(params.agent);
+        uint256 interestDebt = IERC20(params.interestToken).balanceOf(params.agent);
 
-        (interestRepaid, restakerRepaid) 
-            = IDebtToken(params.debtToken).burn(params.agent, repaid, params.interest);
+        if (params.amount > principalDebt) {
+            principalRepaid = params.amount - principalDebt;
+            restakerRepaid = restakerDebt < params.amount - principalRepaid 
+                ? restakerDebt 
+                : params.amount - principalRepaid;
+            interestRepaid = interestDebt < params.amount - principalRepaid - restakerRepaid 
+                ? interestDebt 
+                : params.amount - principalRepaid - restakerRepaid;
+        } else {
+            principalRepaid = params.amount;
+        }
 
-        if (repaid > 0) {
-            IERC20(params.asset).safeTransferFrom(params.caller, address(this), repaid);
-            IERC20(params.asset).forceApprove(params.vault, repaid);
-            IVault(params.vault).repay(params.asset, repaid);
+        IDebtToken(params.interestToken).update(params.agent);
+        IDebtToken(params.debtToken).burn(params.agent, principalRepaid);
+        IDebtToken(params.restakerToken).update(params.agent);
+
+        if (principalRepaid > 0) {
+            IERC20(params.asset).safeTransferFrom(params.caller, address(this), principalRepaid);
+            IERC20(params.asset).forceApprove(params.vault, principalRepaid);
+            IVault(params.vault).repay(params.asset, principalRepaid);
         }
 
         if (restakerRepaid > 0) {
@@ -103,11 +118,14 @@ library BorrowLogic {
             IERC20(params.asset).safeTransferFrom(params.caller, params.rewarder, interestRepaid);
         }
 
-        if (IDebtToken(params.debtToken).totalBalanceOf(params.agent) == 0) {
+        if (IERC20(params.debtToken).balanceOf(params.agent) == 0
+            && IERC20(params.restakerToken).balanceOf(params.agent) == 0
+            && IERC20(params.interestToken).balanceOf(params.agent) == 0
+        ) {
             agentConfig.setBorrowing(params.id, false);
             emit TotalRepayment(params.agent, params.asset);
         }
 
-        emit Repay(params.agent, params.asset, repaid, restakerRepaid, interestRepaid);
+        emit Repay(params.agent, params.asset, principalRepaid, restakerRepaid, interestRepaid);
     }
 }

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { ICollateral } from "../../interfaces/ICollateral.sol";
-import { IOracle } from "../../interfaces/IOracle.sol";
+import { IPriceOracle } from "../../interfaces/IPriceOracle.sol";
 import { IRegistry } from "../../interfaces/IRegistry.sol";
 import { IDebtToken } from "../../interfaces/IDebtToken.sol";
 
@@ -51,7 +51,7 @@ library ValidationLogic {
         require(health >= 1e27, Errors.HEALTH_FACTOR_LOWER_THAN_LIQUIDATION_THRESHOLD);
 
         uint256 ltv = ICollateral(params.collateral).ltv(params.agent);
-        uint256 assetPrice = IOracle(params.oracle).getPrice(params.asset);
+        uint256 assetPrice = IPriceOracle(params.oracle).getPrice(params.asset);
         uint256 newTotalDebt = ( params.amount * assetPrice ) + totalDebt;
         uint256 borrowCapacity = totalCollateral * ltv;
         

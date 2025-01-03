@@ -6,18 +6,34 @@ import {AccessControlEnumerableUpgradeable} from
     "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {IRegistry} from "../interfaces/IRegistry.sol";
 
-contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeable {
+contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
+
+    struct Basket {
+        string name;
+        address vault;
+        address[] assets;
+        uint256 baseFee;
+    }
+
+    struct BasketFees {
+        uint256 slope0;
+        uint256 slope1;
+        uint256 mintKinkRatio;
+        uint256 burnKinkRatio;
+        uint256 optimalRatio;
+    }
 
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
-    address public override oracle;
-    address public override collateral;
-    address public override debtTokenInstance;
-    address public override minter;
-    address public override assetManager;
+    address public oracle;
+    address public collateral;
+    address public debtTokenInstance;
+    address public restakerTokenInstance;
+    address public interestTokenInstance;
+    address public minter;
+    address public assetManager;
 
     // Storage, optimized for read access
     mapping(address => address) private _basketVault; // cToken => vault
@@ -46,29 +62,29 @@ contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeabl
         _grantRole(MANAGER_ROLE, msg.sender);
     }
 
-    function supportedCToken(address cToken) public view override returns (bool) {
+    function supportedCToken(address cToken) public view returns (bool) {
         return _basketVault[cToken] != address(0);
     }
 
-    function basketVault(address _cToken) public view override returns (address vault) {
+    function basketVault(address _cToken) public view returns (address vault) {
         vault = _basketVault[_cToken];
         if (vault == address(0)) revert BasketNotFound();
     }
 
-    function basketAssets(address _cToken) external view override returns (address[] memory) {
+    function basketAssets(address _cToken) external view returns (address[] memory) {
         address vault = basketVault(_cToken);
         return _vaultAssetWhitelist[vault].values();
     }
 
-    function basketBaseFee(address _cToken) external view override returns (uint256) {
+    function basketBaseFee(address _cToken) external view returns (uint256) {
         return _basketBaseFee[_cToken];
     }
 
-    function basketFees(address _cToken, address _asset) external view override returns (BasketFees memory) {
+    function basketFees(address _cToken, address _asset) external view returns (BasketFees memory) {
         return _basketFees[_cToken][_asset];
     }
 
-    function basketRedeemFee(address _cToken) external view override returns (uint256) {
+    function basketRedeemFee(address _cToken) external view returns (uint256) {
         return _basketRedeemFee[_cToken];
     }
 
@@ -80,12 +96,12 @@ contract Registry is IRegistry, Initializable, AccessControlEnumerableUpgradeabl
         return _rewarder[_asset];
     }
 
-    function basketSupportsAsset(address _cToken, address _asset) public view override returns (bool) {
+    function basketSupportsAsset(address _cToken, address _asset) public view returns (bool) {
         address vault = basketVault(_cToken);
         return vaultSupportsAsset(vault, _asset);
     }
 
-    function vaultSupportsAsset(address _vault, address _asset) public view override returns (bool) {
+    function vaultSupportsAsset(address _vault, address _asset) public view returns (bool) {
         return _vaultAssetWhitelist[_vault].contains(_asset);
     }
 

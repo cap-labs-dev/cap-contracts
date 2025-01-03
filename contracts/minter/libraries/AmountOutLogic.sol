@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IVault } from "../../interfaces/IVault.sol";
-import { IOracle } from "../../interfaces/IOracle.sol";
+import { IPriceOracle } from "../../interfaces/IPriceOracle.sol";
 
 import { DataTypes } from "./types/DataTypes.sol";
 
@@ -64,7 +64,7 @@ library AmountOutLogic {
 
         for (uint256 i; i < assetLength; ++i) {
             address asset = params.assets[i];
-            uint256 price = IOracle(params.oracle).getPrice(asset);
+            uint256 price = IPriceOracle(params.oracle).getPrice(asset);
             uint256 value = IVault(params.vault).totalSupplies(asset) * price;
 
             if (asset == params.asset) {

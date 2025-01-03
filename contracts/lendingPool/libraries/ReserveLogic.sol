@@ -45,12 +45,20 @@ library ReserveLogic {
         }
 
         address debtToken = CloneLogic.clone(params.debtTokenInstance);
-        IDebtToken(debtToken).initialize(params.asset);
+        IDebtToken(debtToken).initialize(params.addressProvider, params.asset);
+
+        address restakerToken = CloneLogic.clone(params.restakerTokenInstance);
+        IDebtToken(restakerToken).initialize(params.addressProvider, debtToken, params.asset);
+
+        address interestToken = CloneLogic.clone(params.interestTokenInstance);
+        IDebtToken(interestToken).initialize(params.addressProvider, debtToken, params.asset);
 
         reservesData[params.asset] = DataTypes.ReserveData({
             id: id,
             vault: params.vault,
             debtToken: debtToken,
+            restakerToken: restakerToken,
+            interestToken: interestToken,
             bonus: params.bonus,
             paused: false
         });

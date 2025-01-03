@@ -30,11 +30,6 @@ contract Lender is Initializable, LenderStorage {
         ADDRESS_PROVIDER = _addressProvider;
     }
 
-    /// @notice Expose oracle to DebtToken contracts
-    function oracle() external view returns (address) {
-        return IRegistry(ADDRESS_PROVIDER).oracle();
-    }
-
     /// @notice Borrow an asset
     /// @param _asset Asset to borrow
     /// @param _amount Amount to borrow
@@ -50,10 +45,12 @@ contract Lender is Initializable, LenderStorage {
                 asset: _asset,
                 vault: _reservesData[_asset].vault,
                 debtToken: _reservesData[_asset].debtToken,
+                restakerToken: _reservesData[_asset].restakerToken,
+                interestToken: _reservesData[_asset].interestToken,
                 amount: _amount,
                 receiver: _receiver,
                 collateral: IRegistry(ADDRESS_PROVIDER).collateral(),
-                oracle: IRegistry(ADDRESS_PROVIDER).oracle(),
+                oracle: IRegistry(ADDRESS_PROVIDER).priceOracle(),
                 reserveCount: _reservesCount
             })
         );
@@ -61,15 +58,16 @@ contract Lender is Initializable, LenderStorage {
 
     /// @notice Repay an asset
     /// @param _asset Asset to repay
-    /// @param _amount Amount of principal to repay
-    /// @param _interest Amount of interest to repay
+    /// @param _amount Amount to repay
     /// @param _agent Repay on behalf of another borrower
-    /// @return repaid Actual amount repaid
-    function repay(address _asset, uint256 _amount, uint256 _interest, address _agent)
+    /// @return principalRepaid Actual amount repaid
+    /// @return restakerRepaid Actual restaker amount repaid
+    /// @return interestRepaid Actual interest amount repaid
+    function repay(address _asset, uint256 _amount, address _agent)
         external
-        returns (uint256 repaid, uint256 restakerRepaid, uint256 interestRepaid)
+        returns (uint256 principalRepaid, uint256 restakerRepaid, uint256 interestRepaid)
     {
-        (repaid, restakerRepaid, interestRepaid) = BorrowLogic.repay(
+        (principalRepaid, restakerRepaid, interestRepaid) = BorrowLogic.repay(
             _agentConfig[_agent],
             DataTypes.RepayParams({
                 id: _reservesData[_asset].id,
@@ -77,8 +75,9 @@ contract Lender is Initializable, LenderStorage {
                 asset: _asset,
                 vault: _reservesData[_asset].vault,
                 debtToken: _reservesData[_asset].debtToken,
+                restakerToken: _reservesData[_asset].restakerToken,
+                interestToken: _reservesData[_asset].interestToken,
                 amount: _amount,
-                interest: _interest,
                 caller: msg.sender,
                 restakerRewarder: IRegistry(ADDRESS_PROVIDER).restakerRewarder(_agent),
                 rewarder: IRegistry(ADDRESS_PROVIDER).rewarder(_asset)
@@ -90,9 +89,8 @@ contract Lender is Initializable, LenderStorage {
     /// @param _agent Agent address
     /// @param _asset Asset to repay
     /// @param _amount Amount of asset to repay on behalf of the agent
-    /// @param _interest Amount of interest to repay on behalf of agent
     /// @param liquidatedValue Value of the liquidation returned to the liquidator
-    function liquidate(address _agent, address _asset, uint256 _amount, uint256 _interest)
+    function liquidate(address _agent, address _asset, uint256 _amount)
         external
         returns (uint256 liquidatedValue)
     {
@@ -106,12 +104,13 @@ contract Lender is Initializable, LenderStorage {
                 asset: _asset,
                 vault: _reservesData[_asset].vault,
                 debtToken: _reservesData[_asset].debtToken,
+                restakerToken: _reservesData[_asset].restakerToken,
+                interestToken: _reservesData[_asset].interestToken,
                 bonus: _reservesData[_asset].bonus,
                 amount: _amount,
-                interest: _interest,
                 caller: msg.sender,
                 collateral: IRegistry(ADDRESS_PROVIDER).collateral(),
-                oracle: IRegistry(ADDRESS_PROVIDER).oracle(),
+                oracle: IRegistry(ADDRESS_PROVIDER).priceOracle(),
                 reserveCount: _reservesCount,
                 restakerRewarder: IRegistry(ADDRESS_PROVIDER).restakerRewarder(_agent),
                 rewarder: IRegistry(ADDRESS_PROVIDER).rewarder(_asset)
@@ -138,7 +137,7 @@ contract Lender is Initializable, LenderStorage {
             DataTypes.AgentParams({
                 agent: _agent,
                 collateral: IRegistry(ADDRESS_PROVIDER).collateral(),
-                oracle: IRegistry(ADDRESS_PROVIDER).oracle(),
+                oracle: IRegistry(ADDRESS_PROVIDER).priceOracle(),
                 reserveCount: _reservesCount
             })
         );
@@ -157,8 +156,11 @@ contract Lender is Initializable, LenderStorage {
                     asset: _asset,
                     vault: _vault,
                     debtTokenInstance: IRegistry(ADDRESS_PROVIDER).debtTokenInstance(),
+                    restakerTokenInstance: IRegistry(ADDRESS_PROVIDER).restakerTokenInstance(),
+                    interestTokenInstance: IRegistry(ADDRESS_PROVIDER).interestTokenInstance(),
                     bonus: _liquidationBonus,
-                    reserveCount: _reservesCount
+                    reserveCount: _reservesCount,
+                    addressProvider: ADDRESS_PROVIDER
                 })
             )
         ) {

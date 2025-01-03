@@ -26,11 +26,15 @@ interface IRegistry {
     function basketSupportsAsset(address cToken, address asset) external view returns (bool supported);
     function vaultSupportsAsset(address vault, address asset) external view returns (bool supported);
 
-    function oracle() external view returns (address oracle);
+    function rateOracle() external view returns (address oracle);
+    function priceOracle() external view returns (address oracle);
     function collateral() external view returns (address collateral);
     function debtTokenInstance() external view returns (address debtTokenInstance);
+    function restakerTokenInstance() external view returns (address restakerTokenInstance);
+    function interestTokenInstance() external view returns (address interestTokenInstance);
     function minter() external view returns (address minter);
     function restakerRewarder(address agent) external view returns (address restakerRewarder);
     function rewarder(address asset) external view returns (address rewarder);
     function assetManager() external view returns (address manager);
+    function lender() external view returns (address lender);
 }

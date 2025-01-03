@@ -64,7 +64,7 @@ contract Minter is Initializable {
                 amount: _amountIn,
                 capToken: capToken,
                 vault: vault,
-                oracle: IRegistry(registry).oracle(),
+                oracle: IRegistry(registry).priceOracle(),
                 assets: IRegistry(registry).basketAssets(capToken),
                 basketFees: DataTypes.BasketFees({
                     optimalRatio: basketFees.optimalRatio,
@@ -163,7 +163,7 @@ contract Minter is Initializable {
                 amount: _amountIn,
                 capToken: capToken,
                 vault: vault,
-                oracle: IRegistry(registry).oracle(),
+                oracle: IRegistry(registry).priceOracle(),
                 assets: IRegistry(registry).basketAssets(capToken),
                 basketFees: DataTypes.BasketFees({
                     optimalRatio: basketFees.optimalRatio,
