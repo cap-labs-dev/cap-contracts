@@ -208,10 +208,6 @@ contract DeployTestnetVault is Script {
             registry.setLender(address(lender));
         }
 
-        // we need the debt tokens to be initialized before adding a basket
-        // vm.stopBroadcast();
-        // vm.startBroadcast();
-
         // Setup vault assets
         {
             // update the registry with the new basket
@@ -241,7 +237,6 @@ contract DeployTestnetVault is Script {
 
         // Allow agents to borrow any assets
         {
-            
             lender.addAsset(address(usdc), address(vault), 1e18);
             lender.addAsset(address(usdt), address(vault), 1e18);
             lender.addAsset(address(usdx), address(vault), 1e18);
