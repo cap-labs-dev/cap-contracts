@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { ICollateral } from "../../interfaces/ICollateral.sol";
-import { IPriceOracle } from "../../interfaces/IPriceOracle.sol";
+import {ICollateral} from "../../interfaces/ICollateral.sol";
+import {IPriceOracle} from "../../interfaces/IPriceOracle.sol";
 
-import { ValidationLogic } from "./ValidationLogic.sol";
-import { ViewLogic } from "./ViewLogic.sol";
-import { BorrowLogic } from "./BorrowLogic.sol";
-import { DataTypes } from "./types/DataTypes.sol";
+import {ValidationLogic} from "./ValidationLogic.sol";
+import {ViewLogic} from "./ViewLogic.sol";
+import {BorrowLogic} from "./BorrowLogic.sol";
+import {DataTypes} from "./types/DataTypes.sol";
 
 /// @title Liquidation Logic
 /// @author kexley, @capLabs
 /// @notice Liquidate an agent that has an unhealthy ltv by slashing their collateral backing
 library LiquidationLogic {
-
     /// @notice An agent has been liquidated
     event Liquidate(address indexed asset, address indexed agent, uint256 amount, uint256 value);
 
@@ -29,13 +28,7 @@ library LiquidationLogic {
         DataTypes.AgentConfigurationMap storage agentConfig,
         DataTypes.LiquidateParams memory params
     ) external returns (uint256 liquidatedValue) {
-        (
-            uint256 totalCollateral,
-            ,
-            ,
-            ,
-            uint256 health
-        ) = ViewLogic.agent(
+        (uint256 totalCollateral,,,, uint256 health) = ViewLogic.agent(
             reservesData,
             reservesList,
             agentConfig,
@@ -49,7 +42,7 @@ library LiquidationLogic {
 
         ValidationLogic.validateLiquidation(health);
 
-        (uint256 liquidated, , ) = BorrowLogic.repay(
+        (uint256 liquidated,,) = BorrowLogic.repay(
             agentConfig,
             DataTypes.RepayParams({
                 id: params.id,
@@ -57,8 +50,8 @@ library LiquidationLogic {
                 asset: params.asset,
                 vault: params.vault,
                 debtToken: params.debtToken,
-                restakerToken: params.restakerToken,
-                interestToken: params.interestToken,
+                restakerDebtToken: params.restakerDebtToken,
+                interestDebtToken: params.interestDebtToken,
                 amount: params.amount,
                 caller: params.caller,
                 restakerRewarder: params.restakerRewarder,

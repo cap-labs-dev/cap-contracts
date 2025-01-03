@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IVault } from "../../interfaces/IVault.sol";
-import { IDebtToken } from "../../interfaces/IDebtToken.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IVault} from "../../interfaces/IVault.sol";
+import {IDebtToken} from "../../interfaces/IDebtToken.sol";
 
-import { ValidationLogic } from "./ValidationLogic.sol";
-import { AgentConfiguration } from './configuration/AgentConfiguration.sol';
-import { DataTypes } from "./types/DataTypes.sol";
+import {ValidationLogic} from "./ValidationLogic.sol";
+import {AgentConfiguration} from "./configuration/AgentConfiguration.sol";
+import {DataTypes} from "./types/DataTypes.sol";
 
 /// @title BorrowLogic
 /// @author kexley, @capLabs
 /// @notice Logic for borrowing and repaying assets from the Lender
 /// @dev Interest rates for borrowing are not based on utilization like other lending markets.
-/// Instead the rates are based on a benchmark rate per asset set by an admin or an alternative 
+/// Instead the rates are based on a benchmark rate per asset set by an admin or an alternative
 /// lending market rate, whichever is higher. Indexes representing the increase of interest over
 /// time are pulled from an oracle. A separate interest rate is set by admin per agent which is
 /// paid to the restakers that guarantee the agent.
@@ -27,11 +27,7 @@ library BorrowLogic {
 
     /// @dev An agent, or someone on behalf of an agent, has repaid
     event Repay(
-        address indexed asset,
-        address indexed agent,
-        uint256 principalPaid,
-        uint256 restakerPaid,
-        uint256 interestPaid
+        address indexed asset, address indexed agent, uint256 principalPaid, uint256 restakerPaid, uint256 interestPaid
     );
 
     /// @dev An agent has totally repaid their debt of an asset including all interests
@@ -64,9 +60,9 @@ library BorrowLogic {
 
         if (!agentConfig.isBorrowing(params.id)) agentConfig.setBorrowing(params.id, true);
 
-        IDebtToken(params.interestToken).update(params.agent);
+        IDebtToken(params.interestDebtToken).update(params.agent);
         IDebtToken(params.debtToken).mint(params.agent, params.amount);
-        IDebtToken(params.restakerToken).update(params.agent);
+        IDebtToken(params.restakerDebtToken).update(params.agent);
 
         IVault(params.vault).borrow(params.asset, params.amount, params.receiver);
 
@@ -80,29 +76,28 @@ library BorrowLogic {
     /// @return principalRepaid Actual principal amount repaid
     /// @return restakerRepaid Actual restaker interest paid
     /// @return interestRepaid Actual market interest paid
-    function repay(
-        DataTypes.AgentConfigurationMap storage agentConfig,
-        DataTypes.RepayParams memory params
-    ) external returns (uint256 principalRepaid, uint256 restakerRepaid, uint256 interestRepaid) {
+    function repay(DataTypes.AgentConfigurationMap storage agentConfig, DataTypes.RepayParams memory params)
+        external
+        returns (uint256 principalRepaid, uint256 restakerRepaid, uint256 interestRepaid)
+    {
         uint256 principalDebt = IERC20(params.debtToken).balanceOf(params.agent);
-        uint256 restakerDebt = IERC20(params.restakerToken).balanceOf(params.agent);
-        uint256 interestDebt = IERC20(params.interestToken).balanceOf(params.agent);
+        uint256 restakerDebt = IERC20(params.restakerDebtToken).balanceOf(params.agent);
+        uint256 interestDebt = IERC20(params.interestDebtToken).balanceOf(params.agent);
 
         if (params.amount > principalDebt) {
             principalRepaid = params.amount - principalDebt;
-            restakerRepaid = restakerDebt < params.amount - principalRepaid 
-                ? restakerDebt 
-                : params.amount - principalRepaid;
-            interestRepaid = interestDebt < params.amount - principalRepaid - restakerRepaid 
-                ? interestDebt 
+            restakerRepaid =
+                restakerDebt < params.amount - principalRepaid ? restakerDebt : params.amount - principalRepaid;
+            interestRepaid = interestDebt < params.amount - principalRepaid - restakerRepaid
+                ? interestDebt
                 : params.amount - principalRepaid - restakerRepaid;
         } else {
             principalRepaid = params.amount;
         }
 
-        IDebtToken(params.interestToken).update(params.agent);
+        IDebtToken(params.interestDebtToken).update(params.agent);
         IDebtToken(params.debtToken).burn(params.agent, principalRepaid);
-        IDebtToken(params.restakerToken).update(params.agent);
+        IDebtToken(params.restakerDebtToken).update(params.agent);
 
         if (principalRepaid > 0) {
             IERC20(params.asset).safeTransferFrom(params.caller, address(this), principalRepaid);
@@ -118,9 +113,10 @@ library BorrowLogic {
             IERC20(params.asset).safeTransferFrom(params.caller, params.rewarder, interestRepaid);
         }
 
-        if (IERC20(params.debtToken).balanceOf(params.agent) == 0
-            && IERC20(params.restakerToken).balanceOf(params.agent) == 0
-            && IERC20(params.interestToken).balanceOf(params.agent) == 0
+        if (
+            IERC20(params.debtToken).balanceOf(params.agent) == 0
+                && IERC20(params.restakerDebtToken).balanceOf(params.agent) == 0
+                && IERC20(params.interestDebtToken).balanceOf(params.agent) == 0
         ) {
             agentConfig.setBorrowing(params.id, false);
             emit TotalRepayment(params.agent, params.asset);

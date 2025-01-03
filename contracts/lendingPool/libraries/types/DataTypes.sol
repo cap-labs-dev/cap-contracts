@@ -2,13 +2,12 @@
 pragma solidity ^0.8.28;
 
 library DataTypes {
-
     struct ReserveData {
         uint256 id;
         address vault;
         address debtToken;
-        address restakerToken;
-        address interestToken;
+        address restakerDebtToken;
+        address interestDebtToken;
         uint256 bonus;
         bool paused;
     }
@@ -23,8 +22,8 @@ library DataTypes {
         address asset;
         address vault;
         address debtToken;
-        address restakerToken;
-        address interestToken;
+        address restakerDebtToken;
+        address interestDebtToken;
         uint256 amount;
         address receiver;
         address collateral;
@@ -38,8 +37,8 @@ library DataTypes {
         address asset;
         address vault;
         address debtToken;
-        address restakerToken;
-        address interestToken;
+        address restakerDebtToken;
+        address interestDebtToken;
         uint256 amount;
         address caller;
         address restakerRewarder;
@@ -52,8 +51,8 @@ library DataTypes {
         address asset;
         address vault;
         address debtToken;
-        address restakerToken;
-        address interestToken;
+        address restakerDebtToken;
+        address interestDebtToken;
         uint256 bonus;
         uint256 amount;
         address caller;
@@ -75,8 +74,8 @@ library DataTypes {
         address asset;
         address vault;
         address debtTokenInstance;
-        address restakerTokenInstance;
-        address interestTokenInstance;
+        address restakerDebtTokenInstance;
+        address interestDebtTokenInstance;
         uint256 bonus;
         uint16 reserveCount;
         address addressProvider;
