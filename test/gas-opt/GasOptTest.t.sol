@@ -47,7 +47,6 @@ contract GasOptTest is Test {
     MockERC20 public usdt;
     MockERC20 public usdc;
     MockERC20 public usdx;
-    MockERC20 public weth;
 
     address public user_deployer;
     address public user_admin;
@@ -82,7 +81,6 @@ contract GasOptTest is Test {
             usdt = new MockERC20("USDT", "USDT");
             usdc = new MockERC20("USDC", "USDC");
             usdx = new MockERC20("USDx", "USDx");
-            weth = new MockERC20("WETH", "WETH");
 
             // Mint tokens to minter
             usdt.mint(user_stablecoin_minter, 1000e18);
