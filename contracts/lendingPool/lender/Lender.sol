@@ -45,8 +45,8 @@ contract Lender is Initializable, LenderStorage {
                 asset: _asset,
                 vault: _reservesData[_asset].vault,
                 debtToken: _reservesData[_asset].debtToken,
-                restakerToken: _reservesData[_asset].restakerToken,
-                interestToken: _reservesData[_asset].interestToken,
+                restakerDebtToken: _reservesData[_asset].restakerDebtToken,
+                interestDebtToken: _reservesData[_asset].interestDebtToken,
                 amount: _amount,
                 receiver: _receiver,
                 collateral: IRegistry(ADDRESS_PROVIDER).collateral(),
@@ -75,8 +75,8 @@ contract Lender is Initializable, LenderStorage {
                 asset: _asset,
                 vault: _reservesData[_asset].vault,
                 debtToken: _reservesData[_asset].debtToken,
-                restakerToken: _reservesData[_asset].restakerToken,
-                interestToken: _reservesData[_asset].interestToken,
+                restakerDebtToken: _reservesData[_asset].restakerDebtToken,
+                interestDebtToken: _reservesData[_asset].interestDebtToken,
                 amount: _amount,
                 caller: msg.sender,
                 restakerRewarder: IRegistry(ADDRESS_PROVIDER).restakerRewarder(_agent),
@@ -90,10 +90,7 @@ contract Lender is Initializable, LenderStorage {
     /// @param _asset Asset to repay
     /// @param _amount Amount of asset to repay on behalf of the agent
     /// @param liquidatedValue Value of the liquidation returned to the liquidator
-    function liquidate(address _agent, address _asset, uint256 _amount)
-        external
-        returns (uint256 liquidatedValue)
-    {
+    function liquidate(address _agent, address _asset, uint256 _amount) external returns (uint256 liquidatedValue) {
         liquidatedValue = LiquidationLogic.liquidate(
             _reservesData,
             _reservesList,
@@ -104,8 +101,8 @@ contract Lender is Initializable, LenderStorage {
                 asset: _asset,
                 vault: _reservesData[_asset].vault,
                 debtToken: _reservesData[_asset].debtToken,
-                restakerToken: _reservesData[_asset].restakerToken,
-                interestToken: _reservesData[_asset].interestToken,
+                restakerDebtToken: _reservesData[_asset].restakerDebtToken,
+                interestDebtToken: _reservesData[_asset].interestDebtToken,
                 bonus: _reservesData[_asset].bonus,
                 amount: _amount,
                 caller: msg.sender,
@@ -156,8 +153,8 @@ contract Lender is Initializable, LenderStorage {
                     asset: _asset,
                     vault: _vault,
                     debtTokenInstance: IRegistry(ADDRESS_PROVIDER).debtTokenInstance(),
-                    restakerTokenInstance: IRegistry(ADDRESS_PROVIDER).restakerTokenInstance(),
-                    interestTokenInstance: IRegistry(ADDRESS_PROVIDER).interestTokenInstance(),
+                    restakerDebtTokenInstance: IRegistry(ADDRESS_PROVIDER).restakerDebtTokenInstance(),
+                    interestDebtTokenInstance: IRegistry(ADDRESS_PROVIDER).interestDebtTokenInstance(),
                     bonus: _liquidationBonus,
                     reserveCount: _reservesCount,
                     addressProvider: ADDRESS_PROVIDER

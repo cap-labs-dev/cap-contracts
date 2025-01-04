@@ -9,8 +9,15 @@ import {Vault} from "../../contracts/vault/Vault.sol";
 import {CapToken} from "../../contracts/token/CapToken.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {DebtToken} from "../../contracts/lendingPool/tokens/DebtToken.sol";
+import {InterestDebtToken} from "../../contracts/lendingPool/tokens/InterestDebtToken.sol";
+import {RestakerDebtToken} from "../../contracts/lendingPool/tokens/RestakerDebtToken.sol";
 import {CloneLogic} from "../../contracts/lendingPool/libraries/CloneLogic.sol";
-import {MockOracle} from "../mocks/MockOracle.sol";
+import {PriceOracle} from "../../contracts/oracle/PriceOracle.sol";
+import {RateOracle} from "../../contracts/oracle/RateOracle.sol";
+import {ChainlinkAdapter} from "../../contracts/oracle/libraries/ChainlinkAdapter.sol";
+import {AaveAdapter} from "../../contracts/oracle/libraries/AaveAdapter.sol";
+import {MockAaveDataProvider} from "../mocks/MockAaveDataProvider.sol";
+import {MockChainlink} from "../mocks/MockChainlink.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 import {MockCollateral} from "../mocks/MockCollateral.sol";
 
@@ -20,16 +27,26 @@ contract GasOptTest is Test {
     Lender public lender;
     Vault public vault;
     CapToken public cUSD;
+
     DebtToken public debtTokenImplementation;
     address public debtTokenInstance;
+    InterestDebtToken public interestDebtTokenImplementation;
+    address public interestDebtTokenInstance;
+    RestakerDebtToken public restakerDebtTokenImplementation;
+    address public restakerDebtTokenInstance;
 
-    MockOracle public oracle;
+    PriceOracle public priceOracle;
+    RateOracle public rateOracle;
+    address public aaveAdapter;
+    address public chainlinkAdapter;
+    MockAaveDataProvider public aaveDataProvider;
+    MockChainlink public chainlinkOracle;
+
     MockCollateral public collateral;
 
     MockERC20 public usdt;
     MockERC20 public usdc;
     MockERC20 public usdx;
-    MockERC20 public weth;
 
     address public user_deployer;
     address public user_admin;
@@ -39,125 +56,233 @@ contract GasOptTest is Test {
 
     function setUp() public {
         // Setup addresses with gas
-        user_deployer = makeAddr("deployer");
-        user_admin = makeAddr("admin");
-        user_manager = makeAddr("manager");
-        user_agent = makeAddr("agent");
-        user_stablecoin_minter = makeAddr("stablecoin_minter");
+        {
+            vm.startPrank(user_deployer);
+            user_deployer = makeAddr("deployer");
+            user_admin = makeAddr("admin");
+            user_manager = makeAddr("manager");
+            user_agent = makeAddr("agent");
+            user_stablecoin_minter = makeAddr("stablecoin_minter");
 
-        // Setup 10 stablecoin minters
-        vm.deal(user_deployer, 100 ether);
-        vm.deal(user_admin, 100 ether);
-        vm.deal(user_manager, 100 ether);
-        vm.deal(user_agent, 100 ether);
-        vm.deal(user_stablecoin_minter, 100 ether);
+            // Setup 10 stablecoin minters
+            vm.deal(user_deployer, 100 ether);
+            vm.deal(user_admin, 100 ether);
+            vm.deal(user_manager, 100 ether);
+            vm.deal(user_agent, 100 ether);
+            vm.deal(user_stablecoin_minter, 100 ether);
+
+            vm.stopPrank();
+        }
 
         // Deploy mock tokens
-        usdt = new MockERC20("USDT", "USDT");
-        usdc = new MockERC20("USDC", "USDC");
-        usdx = new MockERC20("USDx", "USDx");
-        weth = new MockERC20("WETH", "WETH");
+        {
+            vm.startPrank(user_deployer);
 
-        // Mint tokens to minter
-        usdt.mint(user_stablecoin_minter, 1000e18);
-        usdc.mint(user_stablecoin_minter, 1000e18);
-        usdx.mint(user_stablecoin_minter, 1000e18);
+            usdt = new MockERC20("USDT", "USDT");
+            usdc = new MockERC20("USDC", "USDC");
+            usdx = new MockERC20("USDx", "USDx");
 
-        vm.startPrank(user_deployer);
+            // Mint tokens to minter
+            usdt.mint(user_stablecoin_minter, 1000e18);
+            usdc.mint(user_stablecoin_minter, 1000e18);
+            usdx.mint(user_stablecoin_minter, 1000e18);
 
-        // Deploy and initialize Registry
-        registry = new Registry();
-        registry.initialize();
+            vm.stopPrank();
+        }
 
-        // Deploy and initialize Minter with Registry
-        minter = new Minter();
-        minter.initialize(address(registry));
+        // deploy infra contracts
+        {
+            vm.startPrank(user_deployer);
 
-        // Deploy and initialize Lender with Registry
-        lender = new Lender();
-        lender.initialize(address(registry));
+            // Deploy and initialize Registry
+            registry = new Registry();
+            registry.initialize();
 
-        // Deploy and initialize Vault with Registry
-        vault = new Vault();
-        vault.initialize(address(registry));
+            // Deploy and initialize Minter with Registry
+            minter = new Minter();
+            minter.initialize(address(registry));
 
-        // Deploy and initialize cUSD token
-        cUSD = new CapToken();
-        cUSD.initialize("Capped USD", "cUSD");
+            // Deploy and initialize Lender with Registry
+            lender = new Lender();
+            lender.initialize(address(registry));
 
-        // Deploy debt token
-        debtTokenImplementation = new DebtToken();
-        debtTokenInstance = CloneLogic.initializeBeacon(address(debtTokenImplementation));
-        registry.setDebtTokenInstance(address(debtTokenInstance));
+            // Deploy and initialize Vault with Registry
+            vault = new Vault();
+            vault.initialize(address(registry));
 
-        // Deploy and setup mock oracle
-        oracle = new MockOracle();
-        registry.setOracle(address(oracle));
+            // Deploy and initialize cUSD token
+            cUSD = new CapToken();
+            cUSD.initialize("Capped USD", "cUSD");
 
-        // Setup initial prices (1:1 for simplicity)
-        oracle.setPrice(address(usdt), 1e18);
-        oracle.setPrice(address(usdc), 1e18);
-        oracle.setPrice(address(usdx), 1e18);
+            // Deploy debt token
+            debtTokenImplementation = new DebtToken();
+            debtTokenInstance = CloneLogic.initializeBeacon(address(debtTokenImplementation));
+            registry.setDebtTokenInstance(address(debtTokenInstance));
 
-        // Setup oracle config
-        collateral = new MockCollateral();
-        registry.setCollateral(address(collateral));
+            // Deploy interest debt token
+            interestDebtTokenImplementation = new InterestDebtToken();
+            interestDebtTokenInstance = CloneLogic.initializeBeacon(address(interestDebtTokenImplementation));
+            registry.setInterestDebtTokenInstance(address(interestDebtTokenInstance));
+
+            // Deploy restaker debt token
+            restakerDebtTokenImplementation = new RestakerDebtToken();
+            restakerDebtTokenInstance = CloneLogic.initializeBeacon(address(restakerDebtTokenImplementation));
+            registry.setRestakerDebtTokenInstance(address(restakerDebtTokenInstance));
+
+            vm.stopPrank();
+        }
+
+        // Deploy oracles
+        {
+            vm.startPrank(user_deployer);
+
+            priceOracle = new PriceOracle();
+            priceOracle.initialize(address(registry));
+
+            rateOracle = new RateOracle();
+            rateOracle.initialize(address(registry));
+
+            // Deploy adapters libraries
+            aaveAdapter = address(AaveAdapter);
+            chainlinkAdapter = address(ChainlinkAdapter);
+
+            // Deploy mock data providers
+            aaveDataProvider = new MockAaveDataProvider();
+            chainlinkOracle = new MockChainlink();
+
+            // Set oracles in registry
+            registry.setPriceOracle(address(priceOracle));
+            registry.setRateOracle(address(rateOracle));
+
+            vm.stopPrank();
+        }
 
         // Setup roles
-        registry.grantRole(registry.DEFAULT_ADMIN_ROLE(), user_deployer);
-        registry.grantRole(registry.MANAGER_ROLE(), user_manager);
-        cUSD.grantRole(cUSD.MINTER_ROLE(), address(minter));
-        cUSD.grantRole(cUSD.BURNER_ROLE(), address(minter));
-        vault.grantRole(vault.SUPPLIER_ROLE(), address(minter));
-        vault.grantRole(vault.BORROWER_ROLE(), address(lender));
+        {
+            vm.startPrank(user_deployer);
 
-        vm.stopPrank();
+            registry.setAssetManager(user_manager);
+            registry.grantRole(registry.DEFAULT_ADMIN_ROLE(), user_deployer);
+            registry.grantRole(registry.MANAGER_ROLE(), user_manager);
+            cUSD.grantRole(cUSD.MINTER_ROLE(), address(minter));
+            cUSD.grantRole(cUSD.BURNER_ROLE(), address(minter));
+            vault.grantRole(vault.SUPPLIER_ROLE(), address(minter));
+            vault.grantRole(vault.BORROWER_ROLE(), address(lender));
 
-        // Setup Registry with manager role
-        vm.startPrank(user_manager);
+            vm.stopPrank();
+        }
 
-        // update the registry with the new basket
-        registry.setBasket(address(cUSD), address(vault), 0); // No base fee for testing
-        registry.addAsset(address(cUSD), address(usdt));
-        registry.addAsset(address(cUSD), address(usdc));
-        registry.addAsset(address(cUSD), address(usdx));
+        // Set initial oracles data
+        {
+            vm.startPrank(user_manager);
 
-        // Set minter in registry
-        registry.setMinter(address(minter));
+            chainlinkOracle.setDecimals(8);
+            chainlinkOracle.setLatestAnswer(100000000); // $1.00 with 8 decimals
 
-        vm.stopPrank();
+            // Set initial Aave data for USDT
+            aaveDataProvider.setReserveData(
+                address(usdt),
+                0, // unbacked
+                0, // accruedToTreasuryScaled
+                1000e18, // totalAToken
+                1000e18, // totalVariableDebt
+                50000000000000000, // liquidityRate (5% APY)
+                100000000000000000, // variableBorrowRate (10% APY)
+                1e27, // liquidityIndex
+                1e27, // variableBorrowIndex
+                uint40(block.timestamp)
+            );
 
-        vm.startPrank(user_deployer);
+            vm.stopPrank();
+        }
+
+        // Setup price sources and adapters
+        {
+            vm.startPrank(user_manager);
+
+            // Set Chainlink as price source for stablecoins
+            priceOracle.setAdapter(address(chainlinkOracle), address(chainlinkAdapter));
+            priceOracle.setSource(address(usdt), address(chainlinkOracle));
+            priceOracle.setSource(address(usdc), address(chainlinkOracle));
+            priceOracle.setSource(address(usdx), address(chainlinkOracle));
+
+            // Set Aave as rate source
+            rateOracle.setAdapter(address(aaveDataProvider), address(aaveAdapter));
+            rateOracle.setSource(address(usdt), address(aaveDataProvider));
+            rateOracle.setSource(address(usdc), address(aaveDataProvider));
+            rateOracle.setSource(address(usdx), address(aaveDataProvider));
+
+            // Set initial prices (1:1 for simplicity)
+            chainlinkOracle.setLatestAnswer(100000000); // $1.00 for all stablecoins
+
+            vm.stopPrank();
+        }
+
+        // Setup minter, lender and collateral
+        {
+            vm.startPrank(user_deployer);
+
+            collateral = new MockCollateral();
+            registry.setCollateral(address(collateral));
+
+            registry.setMinter(address(minter));
+
+            registry.setLender(address(lender));
+
+            vm.stopPrank();
+        }
+
+        // Setup vault assets
+        {
+            vm.startPrank(user_manager);
+
+            // update the registry with the new basket
+            registry.setBasket(address(cUSD), address(vault), 0); // No base fee for testing
+            registry.addAsset(address(cUSD), address(usdt));
+            registry.addAsset(address(cUSD), address(usdc));
+            registry.addAsset(address(cUSD), address(usdx));
+
+            vm.stopPrank();
+        }
 
         // have something in the vault already
-        vault.grantRole(vault.SUPPLIER_ROLE(), address(user_deployer));
-        usdt.mint(address(user_deployer), 1000e18);
-        usdc.mint(address(user_deployer), 1000e18);
-        usdx.mint(address(user_deployer), 1000e18);
-        usdt.approve(address(vault), 1000e18);
-        usdc.approve(address(vault), 1000e18);
-        usdx.approve(address(vault), 1000e18);
-        vault.deposit(address(usdt), 1000e18);
-        vault.deposit(address(usdc), 1000e18);
-        vault.deposit(address(usdx), 1000e18);
-        vault.revokeRole(vault.SUPPLIER_ROLE(), address(user_deployer));
-        cUSD.grantRole(cUSD.MINTER_ROLE(), address(user_deployer));
-        cUSD.mint(address(user_deployer), 3000e18);
-        cUSD.revokeRole(cUSD.MINTER_ROLE(), address(user_deployer));
+        {
+            vm.startPrank(user_deployer);
 
-        vm.stopPrank();
+            vault.grantRole(vault.SUPPLIER_ROLE(), address(user_deployer));
+            usdt.mint(address(user_deployer), 1000e18);
+            usdc.mint(address(user_deployer), 1000e18);
+            usdx.mint(address(user_deployer), 1000e18);
+            usdt.approve(address(vault), 1000e18);
+            usdc.approve(address(vault), 1000e18);
+            usdx.approve(address(vault), 1000e18);
+            vault.deposit(address(usdt), 1000e18);
+            vault.deposit(address(usdc), 1000e18);
+            vault.deposit(address(usdx), 1000e18);
+            vault.revokeRole(vault.SUPPLIER_ROLE(), address(user_deployer));
+            cUSD.grantRole(cUSD.MINTER_ROLE(), address(user_deployer));
+            cUSD.mint(address(user_deployer), 3000e18);
+            cUSD.revokeRole(cUSD.MINTER_ROLE(), address(user_deployer));
+
+            vm.stopPrank();
+        }
 
         // allow agents to borrow any assets
-        vm.startPrank(user_manager);
-        registry.setAssetManager(user_manager);
-        lender.addAsset(address(usdc), address(vault), 1e18);
-        lender.addAsset(address(usdt), address(vault), 1e18);
-        lender.addAsset(address(usdx), address(vault), 1e18);
-        vm.stopPrank();
+        {
+            vm.startPrank(user_manager);
+            lender.addAsset(address(usdc), address(vault), 1e18);
+            lender.addAsset(address(usdt), address(vault), 1e18);
+            lender.addAsset(address(usdx), address(vault), 1e18);
+            vm.stopPrank();
+        }
 
         // make the agent covered
-        collateral.setCoverage(user_agent, 100000e18);
-        collateral.setLtv(user_agent, 1e18);
+        {
+            vm.startPrank(user_manager);
+            collateral.setCoverage(user_agent, 100000e18);
+            collateral.setLtv(user_agent, 1e18);
+            vm.stopPrank();
+        }
     }
 
     function testMintWithUSDT() public {
@@ -190,7 +315,7 @@ contract GasOptTest is Test {
         uint256 vaultBalanceBefore = usdt.balanceOf(address(vault));
 
         // Set USDT price to 1.02 USD
-        oracle.setPrice(address(usdt), 1.02e18);
+        chainlinkOracle.setLatestAnswer(102e8);
 
         // Approve USDT spending
         usdt.approve(address(minter), 100e18);
@@ -279,5 +404,15 @@ contract GasOptTest is Test {
         assertGe(usdc.balanceOf(address(vault)), vaultBalanceBefore);
 
         vm.stopPrank();
+    }
+
+    function testPriceOracle() public view {
+        uint256 usdtPrice = priceOracle.getPrice(address(usdt));
+        assertEq(usdtPrice, 1e8, "USDT price should be $1");
+    }
+
+    function testRateOracle() public view {
+        uint256 usdtRate = rateOracle.marketRate(address(usdt));
+        assertEq(usdtRate, 1e17, "USDT borrow rate should be 10%, 1e18 being 100%");
     }
 }

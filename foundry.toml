@@ -13,7 +13,12 @@ remappings = [
 
 [profile.release]
 gas_reports = ["*"]
-gas_reports_ignore = ["MockERC20", "MockOracle"]
+gas_reports_ignore = [
+    "MockERC20",
+    "MockChainlink",
+    "MockAaveDataProvider",
+    "MockCollateral",
+]
 optimizer = true
 optimizer_runs = 200000
 via_ir = true

@@ -85,7 +85,9 @@ anvil -f $RPC_URL --accounts 3 --balance 300 --no-cors --block-time 5
 
 Deploy
 ```shell
-forge script --rpc-url anvil script/DeployTestnetVault.s.sol:DeployTestnetVault --account anvil --broadcast
+# skip simulation is needed to avoid the ERC1967InvalidBeacon error
+# this happens because the script is trying to simulate a clone on a beacon that is not deployed yet
+forge script --rpc-url anvil script/DeployTestnetVault.s.sol:DeployTestnetVault --account anvil --skip-simulation --broadcast
 ```
 
 Latest testnet deploy:

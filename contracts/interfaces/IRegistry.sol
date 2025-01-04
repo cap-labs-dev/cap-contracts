@@ -30,8 +30,8 @@ interface IRegistry {
     function priceOracle() external view returns (address oracle);
     function collateral() external view returns (address collateral);
     function debtTokenInstance() external view returns (address debtTokenInstance);
-    function restakerTokenInstance() external view returns (address restakerTokenInstance);
-    function interestTokenInstance() external view returns (address interestTokenInstance);
+    function restakerDebtTokenInstance() external view returns (address restakerDebtTokenInstance);
+    function interestDebtTokenInstance() external view returns (address interestDebtTokenInstance);
     function minter() external view returns (address minter);
     function restakerRewarder(address agent) external view returns (address restakerRewarder);
     function rewarder(address asset) external view returns (address rewarder);

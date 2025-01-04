@@ -1,18 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { IDebtToken } from "../../interfaces/IDebtToken.sol";
+import {IDebtToken} from "../../interfaces/IDebtToken.sol";
 
-import { Errors } from './helpers/Errors.sol';
-import { ValidationLogic } from "./ValidationLogic.sol";
-import { CloneLogic } from "./CloneLogic.sol";
-import { DataTypes } from "./types/DataTypes.sol";
+import {Errors} from "./helpers/Errors.sol";
+import {ValidationLogic} from "./ValidationLogic.sol";
+import {CloneLogic} from "./CloneLogic.sol";
+import {DataTypes} from "./types/DataTypes.sol";
 
 /// @title Reserve Logic
 /// @author kexley, @capLabs
-/// @notice Add, remove or pause reserves on the Lender 
+/// @notice Add, remove or pause reserves on the Lender
 library ReserveLogic {
-
     /// @notice Add asset to the possible lending
     /// @dev The debt token will be deployed for this reserve
     /// @param reservesData Reserve mapping
@@ -47,18 +46,18 @@ library ReserveLogic {
         address debtToken = CloneLogic.clone(params.debtTokenInstance);
         IDebtToken(debtToken).initialize(params.addressProvider, params.asset);
 
-        address restakerToken = CloneLogic.clone(params.restakerTokenInstance);
-        IDebtToken(restakerToken).initialize(params.addressProvider, debtToken, params.asset);
+        address restakerDebtToken = CloneLogic.clone(params.restakerDebtTokenInstance);
+        IDebtToken(restakerDebtToken).initialize(params.addressProvider, debtToken, params.asset);
 
-        address interestToken = CloneLogic.clone(params.interestTokenInstance);
-        IDebtToken(interestToken).initialize(params.addressProvider, debtToken, params.asset);
+        address interestDebtToken = CloneLogic.clone(params.interestDebtTokenInstance);
+        IDebtToken(interestDebtToken).initialize(params.addressProvider, debtToken, params.asset);
 
         reservesData[params.asset] = DataTypes.ReserveData({
             id: id,
             vault: params.vault,
             debtToken: debtToken,
-            restakerToken: restakerToken,
-            interestToken: interestToken,
+            restakerDebtToken: restakerDebtToken,
+            interestDebtToken: interestDebtToken,
             bonus: params.bonus,
             paused: false
         });
@@ -83,11 +82,9 @@ library ReserveLogic {
     /// @param reservesData Reserve mapping
     /// @param _asset Asset address
     /// @param _pause True if pausing or false if unpausing
-    function pauseAsset(
-        mapping(address => DataTypes.ReserveData) storage reservesData,
-        address _asset,
-        bool _pause
-    ) external {
+    function pauseAsset(mapping(address => DataTypes.ReserveData) storage reservesData, address _asset, bool _pause)
+        external
+    {
         ValidationLogic.validatePauseAsset(reservesData, _asset);
         reservesData[_asset].paused = _pause;
     }

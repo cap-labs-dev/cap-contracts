@@ -27,11 +27,13 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
 
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
-    address public oracle;
+    address public priceOracle;
+    address public rateOracle;
+    address public lender;
     address public collateral;
     address public debtTokenInstance;
-    address public restakerTokenInstance;
-    address public interestTokenInstance;
+    address public restakerDebtTokenInstance;
+    address public interestDebtTokenInstance;
     address public minter;
     address public assetManager;
 
@@ -46,9 +48,13 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
 
     event AssetAdded(address indexed cToken, address indexed asset);
     event AssetRemoved(address indexed cToken, address indexed asset);
-    event OracleUpdated(address indexed oldOracle, address indexed newOracle);
+    event PriceOracleUpdated(address indexed oldOracle, address indexed newOracle);
+    event RateOracleUpdated(address indexed oldOracle, address indexed newOracle);
+    event LenderUpdated(address indexed oldLender, address indexed newLender);
     event CollateralUpdated(address indexed oldCollateral, address indexed newCollateral);
     event DebtTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
+    event RestakerDebtTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
+    event InterestDebtTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
     event MinterUpdated(address indexed oldMinter, address indexed newMinter);
     event AssetManagerUpdated(address indexed oldManager, address indexed newManager);
     event BasketSet(address indexed cToken, address indexed vault, uint256 baseFee);
@@ -105,10 +111,22 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
         return _vaultAssetWhitelist[_vault].contains(_asset);
     }
 
-    function setOracle(address _oracle) external onlyRole(MANAGER_ROLE) {
-        address oldOracle = oracle;
-        oracle = _oracle;
-        emit OracleUpdated(oldOracle, _oracle);
+    function setPriceOracle(address _priceOracle) external onlyRole(MANAGER_ROLE) {
+        address oldPriceOracle = priceOracle;
+        priceOracle = _priceOracle;
+        emit PriceOracleUpdated(oldPriceOracle, _priceOracle);
+    }
+
+    function setRateOracle(address _rateOracle) external onlyRole(MANAGER_ROLE) {
+        address oldRateOracle = rateOracle;
+        rateOracle = _rateOracle;
+        emit RateOracleUpdated(oldRateOracle, _rateOracle);
+    }
+
+    function setLender(address _lender) external onlyRole(MANAGER_ROLE) {
+        address oldLender = lender;
+        lender = _lender;
+        emit LenderUpdated(oldLender, _lender);
     }
 
     function setCollateral(address _collateral) external onlyRole(MANAGER_ROLE) {
@@ -121,6 +139,18 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
         address oldInstance = debtTokenInstance;
         debtTokenInstance = _debtTokenInstance;
         emit DebtTokenInstanceUpdated(oldInstance, _debtTokenInstance);
+    }
+
+    function setRestakerDebtTokenInstance(address _restakerDebtTokenInstance) external onlyRole(MANAGER_ROLE) {
+        address oldInstance = restakerDebtTokenInstance;
+        restakerDebtTokenInstance = _restakerDebtTokenInstance;
+        emit RestakerDebtTokenInstanceUpdated(oldInstance, _restakerDebtTokenInstance);
+    }
+
+    function setInterestDebtTokenInstance(address _interestDebtTokenInstance) external onlyRole(MANAGER_ROLE) {
+        address oldInstance = interestDebtTokenInstance;
+        interestDebtTokenInstance = _interestDebtTokenInstance;
+        emit InterestDebtTokenInstanceUpdated(oldInstance, _interestDebtTokenInstance);
     }
 
     function setMinter(address _minter) external onlyRole(MANAGER_ROLE) {
