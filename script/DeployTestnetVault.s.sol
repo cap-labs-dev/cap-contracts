@@ -10,7 +10,7 @@ import {Minter} from "../contracts/minter/Minter.sol";
 import {Lender} from "../contracts/lendingPool/lender/Lender.sol";
 import {Vault} from "../contracts/vault/Vault.sol";
 import {CapToken} from "../contracts/token/CapToken.sol";
-import {DebtToken} from "../contracts/lendingPool/tokens/DebtToken.sol";
+import {PrincipalDebtToken} from "../contracts/lendingPool/tokens/PrincipalDebtToken.sol";
 import {InterestDebtToken} from "../contracts/lendingPool/tokens/InterestDebtToken.sol";
 import {RestakerDebtToken} from "../contracts/lendingPool/tokens/RestakerDebtToken.sol";
 import {PriceOracle} from "../contracts/oracle/PriceOracle.sol";
@@ -29,7 +29,7 @@ contract DeployTestnetVault is Script {
     CapToken public cUSD;
     StakedCap public scUSD;
 
-    DebtToken public debtTokenImplementation;
+    PrincipalDebtToken public principalDebtTokenImplementation;
     InterestDebtToken public interestDebtTokenImplementation;
     RestakerDebtToken public restakerDebtTokenImplementation;
 
@@ -104,9 +104,9 @@ contract DeployTestnetVault is Script {
             console.log("scUSD address:", address(scUSD));
 
             // Deploy debt tokens
-            debtTokenImplementation = new DebtToken();
-            registry.setDebtTokenImplementation(address(debtTokenImplementation));
-            console.log("Debt Token Implementation:", address(debtTokenImplementation));
+            principalDebtTokenImplementation = new PrincipalDebtToken();
+            registry.setPrincipalDebtTokenImplementation(address(principalDebtTokenImplementation));
+            console.log("Principal Debt Token Implementation:", address(principalDebtTokenImplementation));
 
             interestDebtTokenImplementation = new InterestDebtToken();
             registry.setInterestDebtTokenImplementation(address(interestDebtTokenImplementation));
