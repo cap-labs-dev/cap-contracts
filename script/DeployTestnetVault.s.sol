@@ -13,7 +13,6 @@ import {CapToken} from "../contracts/token/CapToken.sol";
 import {DebtToken} from "../contracts/lendingPool/tokens/DebtToken.sol";
 import {InterestDebtToken} from "../contracts/lendingPool/tokens/InterestDebtToken.sol";
 import {RestakerDebtToken} from "../contracts/lendingPool/tokens/RestakerDebtToken.sol";
-import {CloneLogic} from "../contracts/lendingPool/libraries/CloneLogic.sol";
 import {PriceOracle} from "../contracts/oracle/PriceOracle.sol";
 import {RateOracle} from "../contracts/oracle/RateOracle.sol";
 import {ChainlinkAdapter} from "../contracts/oracle/libraries/ChainlinkAdapter.sol";
@@ -31,11 +30,8 @@ contract DeployTestnetVault is Script {
     StakedCap public scUSD;
 
     DebtToken public debtTokenImplementation;
-    address public debtTokenInstance;
     InterestDebtToken public interestDebtTokenImplementation;
-    address public interestDebtTokenInstance;
     RestakerDebtToken public restakerDebtTokenImplementation;
-    address public restakerDebtTokenInstance;
 
     PriceOracle public priceOracle;
     RateOracle public rateOracle;
@@ -109,22 +105,16 @@ contract DeployTestnetVault is Script {
 
             // Deploy debt tokens
             debtTokenImplementation = new DebtToken();
-            debtTokenInstance = CloneLogic.initializeBeacon(address(debtTokenImplementation));
-            registry.setDebtTokenInstance(address(debtTokenInstance));
+            registry.setDebtTokenImplementation(address(debtTokenImplementation));
             console.log("Debt Token Implementation:", address(debtTokenImplementation));
-            console.log("Debt Token Instance:", debtTokenInstance);
 
             interestDebtTokenImplementation = new InterestDebtToken();
-            interestDebtTokenInstance = CloneLogic.initializeBeacon(address(interestDebtTokenImplementation));
-            registry.setInterestDebtTokenInstance(address(interestDebtTokenInstance));
+            registry.setInterestDebtTokenImplementation(address(interestDebtTokenImplementation));
             console.log("Interest Debt Token Implementation:", address(interestDebtTokenImplementation));
-            console.log("Interest Debt Token Instance:", interestDebtTokenInstance);
 
             restakerDebtTokenImplementation = new RestakerDebtToken();
-            restakerDebtTokenInstance = CloneLogic.initializeBeacon(address(restakerDebtTokenImplementation));
-            registry.setRestakerDebtTokenInstance(address(restakerDebtTokenInstance));
+            registry.setRestakerDebtTokenImplementation(address(restakerDebtTokenImplementation));
             console.log("Restaker Debt Token Implementation:", address(restakerDebtTokenImplementation));
-            console.log("Restaker Debt Token Instance:", restakerDebtTokenInstance);
         }
 
         // deploy oracles

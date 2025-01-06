@@ -7,6 +7,7 @@ import {AccessControlEnumerableUpgradeable} from
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+import {CloneLogic} from "../lendingPool/libraries/CloneLogic.sol";
 
 contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -33,11 +34,14 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     address public rateOracle;
     address public lender;
     address public collateral;
+    address public minter;
+    address public assetManager;
+
+    // TODO: these token addresses could be immutable as they are beacon proxies and
+    //       implementation can be updated without changing the address
     address public principalDebtTokenInstance;
     address public restakerDebtTokenInstance;
     address public interestDebtTokenInstance;
-    address public minter;
-    address public assetManager;
 
     // TODO: rework registry api and storage to minimize SLOAD calls on read ops
     mapping(address => address) private _basketVault; // cToken => vault
@@ -55,7 +59,7 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     event RateOracleUpdated(address indexed oldOracle, address indexed newOracle);
     event LenderUpdated(address indexed oldLender, address indexed newLender);
     event CollateralUpdated(address indexed oldCollateral, address indexed newCollateral);
-    event DebtTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
+    event PrincipalDebtTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
     event RestakerDebtTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
     event InterestDebtTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
     event MinterUpdated(address indexed oldMinter, address indexed newMinter);
@@ -142,22 +146,34 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
         emit CollateralUpdated(oldCollateral, _collateral);
     }
 
-    function setPrincipalDebtTokenInstance(address _principalDebtTokenInstance) external onlyRole(MANAGER_ROLE) {
+    function setPrincipalDebtTokenImplementation(address _principalDebtTokenImplementation)
+        external
+        onlyRole(MANAGER_ROLE)
+    {
+        address newInstance = CloneLogic.initializeBeacon(_principalDebtTokenImplementation);
         address oldInstance = principalDebtTokenInstance;
-        principalDebtTokenInstance = _principalDebtTokenInstance;
-        emit DebtTokenInstanceUpdated(oldInstance, _principalDebtTokenInstance);
+        principalDebtTokenInstance = newInstance;
+        emit PrincipalDebtTokenInstanceUpdated(oldInstance, newInstance);
     }
 
-    function setRestakerDebtTokenInstance(address _restakerDebtTokenInstance) external onlyRole(MANAGER_ROLE) {
+    function setRestakerDebtTokenImplementation(address _restakerDebtTokenImplementation)
+        external
+        onlyRole(MANAGER_ROLE)
+    {
+        address newInstance = CloneLogic.initializeBeacon(_restakerDebtTokenImplementation);
         address oldInstance = restakerDebtTokenInstance;
-        restakerDebtTokenInstance = _restakerDebtTokenInstance;
-        emit RestakerDebtTokenInstanceUpdated(oldInstance, _restakerDebtTokenInstance);
+        restakerDebtTokenInstance = newInstance;
+        emit RestakerDebtTokenInstanceUpdated(oldInstance, newInstance);
     }
 
-    function setInterestDebtTokenInstance(address _interestDebtTokenInstance) external onlyRole(MANAGER_ROLE) {
+    function setInterestDebtTokenImplementation(address _interestDebtTokenImplementation)
+        external
+        onlyRole(MANAGER_ROLE)
+    {
+        address newInstance = CloneLogic.initializeBeacon(_interestDebtTokenImplementation);
         address oldInstance = interestDebtTokenInstance;
-        interestDebtTokenInstance = _interestDebtTokenInstance;
-        emit InterestDebtTokenInstanceUpdated(oldInstance, _interestDebtTokenInstance);
+        interestDebtTokenInstance = newInstance;
+        emit InterestDebtTokenInstanceUpdated(oldInstance, newInstance);
     }
 
     function setMinter(address _minter) external onlyRole(MANAGER_ROLE) {

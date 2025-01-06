@@ -31,11 +31,8 @@ contract GasOptTest is Test {
     StakedCap public scUSD;
 
     PrincipalDebtToken public principalDebtTokenImplementation;
-    address public principalDebtTokenInstance;
     InterestDebtToken public interestDebtTokenImplementation;
-    address public interestDebtTokenInstance;
     RestakerDebtToken public restakerDebtTokenImplementation;
-    address public restakerDebtTokenInstance;
 
     PriceOracle public priceOracle;
     RateOracle public rateOracle;
@@ -121,18 +118,15 @@ contract GasOptTest is Test {
 
             // Deploy debt token
             principalDebtTokenImplementation = new PrincipalDebtToken();
-            principalDebtTokenInstance = CloneLogic.initializeBeacon(address(principalDebtTokenImplementation));
-            registry.setPrincipalDebtTokenInstance(address(principalDebtTokenInstance));
+            registry.setPrincipalDebtTokenImplementation(address(principalDebtTokenImplementation));
 
             // Deploy interest debt token
             interestDebtTokenImplementation = new InterestDebtToken();
-            interestDebtTokenInstance = CloneLogic.initializeBeacon(address(interestDebtTokenImplementation));
-            registry.setInterestDebtTokenInstance(address(interestDebtTokenInstance));
+            registry.setInterestDebtTokenImplementation(address(interestDebtTokenImplementation));
 
             // Deploy restaker debt token
             restakerDebtTokenImplementation = new RestakerDebtToken();
-            restakerDebtTokenInstance = CloneLogic.initializeBeacon(address(restakerDebtTokenImplementation));
-            registry.setRestakerDebtTokenInstance(address(restakerDebtTokenInstance));
+            registry.setRestakerDebtTokenImplementation(address(restakerDebtTokenImplementation));
 
             vm.stopPrank();
         }

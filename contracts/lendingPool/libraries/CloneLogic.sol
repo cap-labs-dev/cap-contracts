@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { BeaconProxy } from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
-import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
-import { IUpgradeableBeacon } from "../../interfaces/IUpgradeableBeacon.sol";
+import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import {IUpgradeableBeacon} from "../../interfaces/IUpgradeableBeacon.sol";
 
 /// @title CloneLogic library
 /// @author kexley
 /// @notice Implements the base logic for all the actions related to cloning
 library CloneLogic {
-
     /// @dev New instance has been created
     event InstanceCreated(address indexed implementation, address instance);
 
