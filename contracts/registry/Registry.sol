@@ -39,6 +39,7 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
 
     // Storage, optimized for read access
     mapping(address => address) private _basketVault; // cToken => vault
+    mapping(address => address) private _basketScToken; // cToken => scToken
     mapping(address => uint256) private _basketBaseFee; // cToken => baseFee
     mapping(address => uint256) private _basketRedeemFee; // cToken => redeemFee
     mapping(address => mapping(address => BasketFees)) private _basketFees; // cToken => asset => fees
@@ -57,7 +58,7 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     event InterestDebtTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
     event MinterUpdated(address indexed oldMinter, address indexed newMinter);
     event AssetManagerUpdated(address indexed oldManager, address indexed newManager);
-    event BasketSet(address indexed cToken, address indexed vault, uint256 baseFee);
+    event BasketSet(address indexed cToken, address indexed scToken, address indexed vault, uint256 baseFee);
 
     error VaultNotFound();
     error BasketNotFound();
@@ -177,9 +178,13 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
         emit AssetRemoved(_cToken, _asset);
     }
 
-    function setBasket(address _cToken, address _vault, uint256 _baseFee) external onlyRole(MANAGER_ROLE) {
+    function setBasket(address _cToken, address _scToken, address _vault, uint256 _baseFee)
+        external
+        onlyRole(MANAGER_ROLE)
+    {
         _basketVault[_cToken] = _vault;
+        _basketScToken[_cToken] = _scToken;
         _basketBaseFee[_cToken] = _baseFee;
-        emit BasketSet(_cToken, _vault, _baseFee);
+        emit BasketSet(_cToken, _scToken, _vault, _baseFee);
     }
 }

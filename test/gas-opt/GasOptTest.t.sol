@@ -7,6 +7,7 @@ import {Minter} from "../../contracts/minter/Minter.sol";
 import {Lender} from "../../contracts/lendingPool/lender/Lender.sol";
 import {Vault} from "../../contracts/vault/Vault.sol";
 import {CapToken} from "../../contracts/token/CapToken.sol";
+import {StakedCap} from "../../contracts/token/StakedCap.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {PrincipalDebtToken} from "../../contracts/lendingPool/tokens/PrincipalDebtToken.sol";
 import {InterestDebtToken} from "../../contracts/lendingPool/tokens/InterestDebtToken.sol";
@@ -27,6 +28,7 @@ contract GasOptTest is Test {
     Lender public lender;
     Vault public vault;
     CapToken public cUSD;
+    StakedCap public scUSD;
 
     PrincipalDebtToken public principalDebtTokenImplementation;
     address public principalDebtTokenInstance;
@@ -113,6 +115,9 @@ contract GasOptTest is Test {
             // Deploy and initialize cUSD token
             cUSD = new CapToken();
             cUSD.initialize("Capped USD", "cUSD");
+
+            scUSD = new StakedCap();
+            scUSD.initialize(address(cUSD), address(registry));
 
             // Deploy debt token
             principalDebtTokenImplementation = new PrincipalDebtToken();
@@ -237,7 +242,7 @@ contract GasOptTest is Test {
             vm.startPrank(user_manager);
 
             // update the registry with the new basket
-            registry.setBasket(address(cUSD), address(vault), 0); // No base fee for testing
+            registry.setBasket(address(cUSD), address(scUSD), address(vault), 0); // No base fee for testing
             registry.addAsset(address(cUSD), address(usdt));
             registry.addAsset(address(cUSD), address(usdc));
             registry.addAsset(address(cUSD), address(usdx));
@@ -361,6 +366,62 @@ contract GasOptTest is Test {
         uint256 mintedAmount = cUSD.balanceOf(user_stablecoin_minter);
         assertGt(mintedAmount, 0, "Should have received cUSD tokens");
         assertEq(usdt.balanceOf(address(vault)), initialVaultBalance + amountIn, "Vault should have received USDT");
+
+        // Now burn the cUSD tokens
+        uint256 burnAmount = mintedAmount;
+        uint256 minOutputAmount = burnAmount * 95 / 100; // Expect at least 95% back accounting for potential fees
+
+        cUSD.approve(address(minter), burnAmount);
+        minter.swapExactTokenForTokens(
+            burnAmount, minOutputAmount, address(cUSD), address(usdt), user_stablecoin_minter, deadline
+        );
+
+        // Verify final balances
+        assertEq(cUSD.balanceOf(user_stablecoin_minter), 0, "Should have burned all cUSD tokens");
+        assertGt(
+            usdt.balanceOf(user_stablecoin_minter),
+            initialUsdtBalance - amountIn + minOutputAmount,
+            "Should have received USDT back"
+        );
+
+        vm.stopPrank();
+    }
+
+    function testMintStakeUnstakeBurn() public {
+        vm.startPrank(user_stablecoin_minter);
+
+        // Initial balances
+        uint256 initialUsdtBalance = usdt.balanceOf(user_stablecoin_minter);
+        uint256 initialVaultBalance = usdt.balanceOf(address(vault));
+
+        // First mint cUSD with USDT
+        uint256 amountIn = 100e18;
+        uint256 minAmountOut = 95e18;
+        uint256 deadline = block.timestamp + 1 hours;
+
+        // Approve and mint
+        usdt.approve(address(minter), amountIn);
+        minter.swapExactTokenForTokens(
+            amountIn, minAmountOut, address(usdt), address(cUSD), user_stablecoin_minter, deadline
+        );
+
+        uint256 mintedAmount = cUSD.balanceOf(user_stablecoin_minter);
+        assertGt(mintedAmount, 0, "Should have received cUSD tokens");
+        assertEq(usdt.balanceOf(address(vault)), initialVaultBalance + amountIn, "Vault should have received USDT");
+
+        // Now stake the cUSD tokens
+        cUSD.approve(address(scUSD), mintedAmount);
+        scUSD.deposit(mintedAmount, user_stablecoin_minter);
+
+        uint256 stakedAmount = scUSD.balanceOf(user_stablecoin_minter);
+        assertGt(stakedAmount, 0, "Should have staked cUSD tokens");
+
+        // Now unstake the cUSD tokens
+        scUSD.withdraw(stakedAmount, user_stablecoin_minter, user_stablecoin_minter);
+
+        uint256 unstakedAmount = cUSD.balanceOf(user_stablecoin_minter);
+        assertGt(unstakedAmount, 0, "Should have unstaked cUSD tokens");
+        assertEq(scUSD.balanceOf(user_stablecoin_minter), 0, "Should have burned all staked cUSD tokens");
 
         // Now burn the cUSD tokens
         uint256 burnAmount = mintedAmount;
