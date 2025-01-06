@@ -27,8 +27,8 @@ contract DeployTestnetVault is Script {
     Lender public lender;
     Vault public vault;
     CapToken public cUSD;
-    StakedCap public scUSD;
 
+    StakedCap public stakedCapImplementation;
     PrincipalDebtToken public principalDebtTokenImplementation;
     InterestDebtToken public interestDebtTokenImplementation;
     RestakerDebtToken public restakerDebtTokenImplementation;
@@ -99,9 +99,9 @@ contract DeployTestnetVault is Script {
             console.log("cUSD address:", address(cUSD));
 
             // Deploy and initialize scUSD token
-            scUSD = new StakedCap();
-            scUSD.initialize(address(cUSD), address(registry));
-            console.log("scUSD address:", address(scUSD));
+            stakedCapImplementation = new StakedCap();
+            registry.setStakedCapImplementation(address(stakedCapImplementation));
+            console.log("Staked Cap Implementation address:", address(stakedCapImplementation));
 
             // Deploy debt tokens
             principalDebtTokenImplementation = new PrincipalDebtToken();
@@ -198,7 +198,7 @@ contract DeployTestnetVault is Script {
         // Setup vault assets
         {
             // update the registry with the new basket
-            registry.setBasket(address(cUSD), address(scUSD), address(vault), 0); // No base fee for testing
+            registry.setBasket(address(cUSD), address(vault), 0); // No base fee for testing
             registry.addAsset(address(cUSD), address(usdt));
             registry.addAsset(address(cUSD), address(usdc));
             registry.addAsset(address(cUSD), address(usdx));

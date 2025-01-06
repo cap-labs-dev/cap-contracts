@@ -8,7 +8,8 @@ import {Lender} from "../../contracts/lendingPool/lender/Lender.sol";
 import {Vault} from "../../contracts/vault/Vault.sol";
 import {CapToken} from "../../contracts/token/CapToken.sol";
 import {StakedCap} from "../../contracts/token/StakedCap.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IStakedCap} from "../../contracts/interfaces/IStakedCap.sol";
 import {PrincipalDebtToken} from "../../contracts/lendingPool/tokens/PrincipalDebtToken.sol";
 import {InterestDebtToken} from "../../contracts/lendingPool/tokens/InterestDebtToken.sol";
 import {RestakerDebtToken} from "../../contracts/lendingPool/tokens/RestakerDebtToken.sol";
@@ -27,8 +28,8 @@ contract GasOptTest is Test {
     Lender public lender;
     Vault public vault;
     CapToken public cUSD;
-    StakedCap public scUSD;
 
+    StakedCap public stakedCapImplementation;
     PrincipalDebtToken public principalDebtTokenImplementation;
     InterestDebtToken public interestDebtTokenImplementation;
     RestakerDebtToken public restakerDebtTokenImplementation;
@@ -120,8 +121,8 @@ contract GasOptTest is Test {
             cUSD = new CapToken();
             cUSD.initialize("Capped USD", "cUSD");
 
-            scUSD = new StakedCap();
-            scUSD.initialize(address(cUSD), address(registry));
+            stakedCapImplementation = new StakedCap();
+            registry.setStakedCapImplementation(address(stakedCapImplementation));
 
             // Deploy debt token
             principalDebtTokenImplementation = new PrincipalDebtToken();
@@ -229,7 +230,7 @@ contract GasOptTest is Test {
             vm.startPrank(user_manager);
 
             // update the registry with the new basket
-            registry.setBasket(address(cUSD), address(scUSD), address(vault), 0); // No base fee for testing
+            registry.setBasket(address(cUSD), address(vault), 0); // No base fee for testing
             registry.addAsset(address(cUSD), address(usdt));
             registry.addAsset(address(cUSD), address(usdc));
             registry.addAsset(address(cUSD), address(usdx));
@@ -397,6 +398,7 @@ contract GasOptTest is Test {
         assertEq(usdt.balanceOf(address(vault)), initialVaultBalance + amountIn, "Vault should have received USDT");
 
         // Now stake the cUSD tokens
+        IStakedCap scUSD = IStakedCap(registry.basketScToken(address(cUSD)));
         cUSD.approve(address(scUSD), mintedAmount);
         scUSD.deposit(mintedAmount, user_stablecoin_minter);
 

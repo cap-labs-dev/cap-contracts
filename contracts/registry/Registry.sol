@@ -8,6 +8,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {CloneLogic} from "../lendingPool/libraries/CloneLogic.sol";
+import {IStakedCap} from "../interfaces/IStakedCap.sol";
 
 contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -39,6 +40,7 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
 
     // TODO: these token addresses could be immutable as they are beacon proxies and
     //       implementation can be updated without changing the address
+    address public stakedCapInstance;
     address public principalDebtTokenInstance;
     address public restakerDebtTokenInstance;
     address public interestDebtTokenInstance;
@@ -59,6 +61,7 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     event RateOracleUpdated(address indexed oldOracle, address indexed newOracle);
     event LenderUpdated(address indexed oldLender, address indexed newLender);
     event CollateralUpdated(address indexed oldCollateral, address indexed newCollateral);
+    event StakedCapInstanceUpdated(address indexed oldInstance, address indexed newInstance);
     event PrincipalDebtTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
     event RestakerDebtTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
     event InterestDebtTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
@@ -69,6 +72,7 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     error VaultNotFound();
     error BasketNotFound();
     error PairNotSupported(address tokenIn, address tokenOut);
+    error ScTokenNotInitialized(address cToken);
 
     function initialize() external initializer {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -91,6 +95,11 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     function basketAssets(address _cToken) external view returns (address[] memory) {
         address vault = basketVault(_cToken);
         return _vaultAssetWhitelist[vault].values();
+    }
+
+    function basketScToken(address _cToken) external view returns (address scToken) {
+        scToken = EnumerableMap.get(_basketScToken, _cToken);
+        if (scToken == address(0)) revert ScTokenNotInitialized(_cToken);
     }
 
     function basketBaseFee(address _cToken) external view returns (uint256) {
@@ -144,6 +153,13 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
         address oldCollateral = collateral;
         collateral = _collateral;
         emit CollateralUpdated(oldCollateral, _collateral);
+    }
+
+    function setStakedCapImplementation(address _stakedCapImplementation) external onlyRole(MANAGER_ROLE) {
+        address newInstance = CloneLogic.initializeBeacon(_stakedCapImplementation);
+        address oldInstance = stakedCapInstance;
+        stakedCapInstance = newInstance;
+        emit StakedCapInstanceUpdated(oldInstance, newInstance);
     }
 
     function setPrincipalDebtTokenImplementation(address _principalDebtTokenImplementation)
@@ -200,13 +216,12 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
         emit AssetRemoved(_cToken, _asset);
     }
 
-    function setBasket(address _cToken, address _scToken, address _vault, uint256 _baseFee)
-        external
-        onlyRole(MANAGER_ROLE)
-    {
+    function setBasket(address _cToken, address _vault, uint256 _baseFee) external onlyRole(MANAGER_ROLE) {
+        address scToken = CloneLogic.clone(stakedCapInstance);
+        IStakedCap(scToken).initialize(_cToken, address(this));
         _basketVault[_cToken] = _vault;
-        EnumerableMap.set(_basketScToken, _cToken, _scToken);
+        _basketScToken.set(_cToken, scToken);
         _basketBaseFee[_cToken] = _baseFee;
-        emit BasketSet(_cToken, _scToken, _vault, _baseFee);
+        emit BasketSet(_cToken, scToken, _vault, _baseFee);
     }
 }
