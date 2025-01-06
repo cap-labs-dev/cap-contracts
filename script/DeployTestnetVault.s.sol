@@ -159,21 +159,10 @@ contract DeployTestnetVault is Script {
         {
             // Set initial oracles data
             chainlinkOracle.setDecimals(8);
-            chainlinkOracle.setLatestAnswer(100000000); // $1.00 with 8 decimals
+            chainlinkOracle.setLatestAnswer(1e8); // $1.00 with 8 decimals
 
             // Set initial Aave data for USDT
-            aaveDataProvider.setReserveData(
-                address(usdt),
-                0, // unbacked
-                0, // accruedToTreasuryScaled
-                1000e18, // totalAToken
-                1000e18, // totalVariableDebt
-                50000000000000000, // liquidityRate (5% APY)
-                100000000000000000, // variableBorrowRate (10% APY)
-                1e27, // liquidityIndex
-                1e27, // variableBorrowIndex
-                uint40(block.timestamp)
-            );
+            aaveDataProvider.setVariableBorrowRate(1e17); // 10% APY, 1e18 = 100%
         }
 
         // Setup price sources and adapters
