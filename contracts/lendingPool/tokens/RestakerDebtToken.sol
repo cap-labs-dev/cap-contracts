@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { ERC20Upgradeable, IERC20 } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {ERC20Upgradeable, IERC20} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import { Errors } from "../libraries/helpers/Errors.sol";
-import { WadRayMath } from "../libraries/math/WadRayMath.sol";
-import { IRegistry } from "../../interfaces/IRegistry.sol";
-import { IRateOracle } from "../../interfaces/IRateOracle.sol";
+import {Errors} from "../libraries/helpers/Errors.sol";
+import {WadRayMath} from "../libraries/math/WadRayMath.sol";
+import {IRegistry} from "../../interfaces/IRegistry.sol";
+import {IRateOracle} from "../../interfaces/IRateOracle.sol";
 
 /// @title Restaker debt token for a market on the Lender
 /// @author kexley, @capLabs
-/// @notice Restaker debt tokens accrue over time representing the debt in the underlying asset to be 
+/// @notice Restaker debt tokens accrue over time representing the debt in the underlying asset to be
 /// paid to the restakers collateralizing an agent
 /// @dev Each agent can have a different rate so the weighted mean is used to calculate the total
 /// accrued debt. This means that the total supply may not be exact.
@@ -33,7 +33,7 @@ contract RestakerDebtToken is ERC20Upgradeable {
 
     /// @dev Total supply
     uint256 private _totalSupply;
- 
+
     /// @notice Amount of interest an agent accrues per second
     mapping(address => uint256) public interestPerSecond;
 
@@ -63,13 +63,13 @@ contract RestakerDebtToken is ERC20Upgradeable {
     /// @param _asset Asset address
     function initialize(address _registry, address _debtToken, address _asset) external initializer {
         debtToken = _debtToken;
-        
-        string memory name = string.concat("restaker", IERC20Metadata(_asset).name());
-        string memory symbol = string.concat("restaker", IERC20Metadata(_asset).symbol());
+
+        string memory _name = string.concat("restaker", IERC20Metadata(_asset).name());
+        string memory _symbol = string.concat("restaker", IERC20Metadata(_asset).symbol());
         _decimals = IERC20Metadata(_asset).decimals();
         asset = _asset;
 
-        __ERC20_init(name, symbol);
+        __ERC20_init(_name, _symbol);
         registry = _registry;
     }
 
@@ -113,11 +113,10 @@ contract RestakerDebtToken is ERC20Upgradeable {
     /// @notice Interest accrued by an agent to be repaid to restakers
     /// @param _agent Agent address
     /// @return balance Interest amount
-    function balanceOf(address _agent) public override view returns (uint256 balance) {
+    function balanceOf(address _agent) public view override returns (uint256 balance) {
         uint256 timestamp = block.timestamp;
         if (timestamp > lastAgentUpdate[_agent]) {
-            balance = super.balanceOf(_agent) 
-                + interestPerSecond[_agent].rayMul(timestamp - lastAgentUpdate[_agent]);
+            balance = super.balanceOf(_agent) + interestPerSecond[_agent].rayMul(timestamp - lastAgentUpdate[_agent]);
         } else {
             balance = super.balanceOf(_agent);
         }
@@ -125,7 +124,7 @@ contract RestakerDebtToken is ERC20Upgradeable {
 
     /// @notice Total amount of interest accrued by agents
     /// @return supply Total amount of interest
-    function totalSupply() public override view returns (uint256 supply) {
+    function totalSupply() public view override returns (uint256 supply) {
         uint256 timestamp = block.timestamp;
         if (timestamp > lastUpdate) {
             supply = _totalSupply + totalInterestPerSecond.rayMul(timestamp - lastUpdate);
@@ -148,7 +147,7 @@ contract RestakerDebtToken is ERC20Upgradeable {
 
         if (timestamp > lastAgentUpdate[_agent]) {
             uint256 amount = interestPerSecond[_agent].rayMul(timestamp - lastAgentUpdate[_agent]);
-            
+
             if (amount > 0) _mint(_agent, amount);
 
             lastAgentUpdate[_agent] = timestamp;
@@ -163,7 +162,7 @@ contract RestakerDebtToken is ERC20Upgradeable {
 
     /// @notice Match decimals with underlying asset
     /// @return decimals
-    function decimals() public override view returns (uint8) {
+    function decimals() public view override returns (uint8) {
         return _decimals;
     }
 

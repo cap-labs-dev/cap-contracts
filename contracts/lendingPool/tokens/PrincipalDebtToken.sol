@@ -1,18 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { ERC20Upgradeable, IERC20 } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {ERC20Upgradeable, IERC20} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import { Errors } from "../libraries/helpers/Errors.sol";
-import { IRegistry } from "../../interfaces/IRegistry.sol";
+import {Errors} from "../libraries/helpers/Errors.sol";
+import {IRegistry} from "../../interfaces/IRegistry.sol";
 
 /// @title Principal debt token for a market on the Lender
 /// @author kexley, @capLabs
 /// @notice Principal debt tokens are minted 1:1 with the principal loan amount
 contract PrincipalDebtToken is ERC20Upgradeable {
-
     /// @notice Registry contract
     address public registry;
 
@@ -37,18 +36,18 @@ contract PrincipalDebtToken is ERC20Upgradeable {
     /// @param _registry Registry address
     /// @param _asset Asset address
     function initialize(address _registry, address _asset) external initializer {
-        string memory name = string.concat("debt", IERC20Metadata(_asset).name());
-        string memory symbol = string.concat("debt", IERC20Metadata(_asset).symbol());
+        string memory _name = string.concat("debt", IERC20Metadata(_asset).name());
+        string memory _symbol = string.concat("debt", IERC20Metadata(_asset).symbol());
         _decimals = IERC20Metadata(_asset).decimals();
         asset = _asset;
 
-        __ERC20_init(name, symbol);
+        __ERC20_init(_name, _symbol);
         registry = _registry;
     }
 
     /// @notice Match decimals with underlying asset
     /// @return decimals
-    function decimals() public override view returns (uint8) {
+    function decimals() public view override returns (uint8) {
         return _decimals;
     }
 

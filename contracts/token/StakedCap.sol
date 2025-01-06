@@ -39,10 +39,14 @@ contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
     /// @notice Lock duration for the linear vesting period, in seconds
     uint256 public lockDuration;
 
+    /// @dev Disable initializers on the implementation
+    constructor() {
+        _disableInitializers();
+    }
+
     /// @notice Initialize the staked cap token by matching the name and symbol of the underlying
     /// @param _asset Address of the cap token
     /// @param _registry Address of the registry
-
     function initialize(address _asset, address _registry) external initializer {
         string memory _name = string.concat("s", IERC20Metadata(_asset).name());
         string memory _symbol = string.concat("s", IERC20Metadata(_asset).symbol());
