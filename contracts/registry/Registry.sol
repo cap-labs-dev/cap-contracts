@@ -6,9 +6,12 @@ import {AccessControlEnumerableUpgradeable} from
     "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+import {CloneLogic} from "../lendingPool/libraries/CloneLogic.sol";
 
 contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableMap for EnumerableMap.AddressToAddressMap;
 
     struct Basket {
         string name;
@@ -31,14 +34,18 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     address public rateOracle;
     address public lender;
     address public collateral;
-    address public principalDebtTokenInstance;
-    address public restakerDebtTokenInstance;
-    address public interestDebtTokenInstance;
     address public minter;
     address public assetManager;
 
-    // Storage, optimized for read access
+    // TODO: these token addresses could be immutable as they are beacon proxies and
+    //       implementation can be updated without changing the address
+    address public principalDebtTokenInstance;
+    address public restakerDebtTokenInstance;
+    address public interestDebtTokenInstance;
+
+    // TODO: rework registry api and storage to minimize SLOAD calls on read ops
     mapping(address => address) private _basketVault; // cToken => vault
+    EnumerableMap.AddressToAddressMap private _basketScToken; // cToken => scToken
     mapping(address => uint256) private _basketBaseFee; // cToken => baseFee
     mapping(address => uint256) private _basketRedeemFee; // cToken => redeemFee
     mapping(address => mapping(address => BasketFees)) private _basketFees; // cToken => asset => fees
@@ -52,12 +59,12 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     event RateOracleUpdated(address indexed oldOracle, address indexed newOracle);
     event LenderUpdated(address indexed oldLender, address indexed newLender);
     event CollateralUpdated(address indexed oldCollateral, address indexed newCollateral);
-    event DebtTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
+    event PrincipalDebtTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
     event RestakerDebtTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
     event InterestDebtTokenInstanceUpdated(address indexed oldInstance, address indexed newInstance);
     event MinterUpdated(address indexed oldMinter, address indexed newMinter);
     event AssetManagerUpdated(address indexed oldManager, address indexed newManager);
-    event BasketSet(address indexed cToken, address indexed vault, uint256 baseFee);
+    event BasketSet(address indexed cToken, address indexed scToken, address indexed vault, uint256 baseFee);
 
     error VaultNotFound();
     error BasketNotFound();
@@ -66,6 +73,10 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     function initialize() external initializer {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MANAGER_ROLE, msg.sender);
+    }
+
+    function baskets() external view returns (address[] memory) {
+        return _basketScToken.keys();
     }
 
     function supportedCToken(address cToken) public view returns (bool) {
@@ -135,22 +146,34 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
         emit CollateralUpdated(oldCollateral, _collateral);
     }
 
-    function setPrincipalDebtTokenInstance(address _principalDebtTokenInstance) external onlyRole(MANAGER_ROLE) {
+    function setPrincipalDebtTokenImplementation(address _principalDebtTokenImplementation)
+        external
+        onlyRole(MANAGER_ROLE)
+    {
+        address newInstance = CloneLogic.initializeBeacon(_principalDebtTokenImplementation);
         address oldInstance = principalDebtTokenInstance;
-        principalDebtTokenInstance = _principalDebtTokenInstance;
-        emit DebtTokenInstanceUpdated(oldInstance, _principalDebtTokenInstance);
+        principalDebtTokenInstance = newInstance;
+        emit PrincipalDebtTokenInstanceUpdated(oldInstance, newInstance);
     }
 
-    function setRestakerDebtTokenInstance(address _restakerDebtTokenInstance) external onlyRole(MANAGER_ROLE) {
+    function setRestakerDebtTokenImplementation(address _restakerDebtTokenImplementation)
+        external
+        onlyRole(MANAGER_ROLE)
+    {
+        address newInstance = CloneLogic.initializeBeacon(_restakerDebtTokenImplementation);
         address oldInstance = restakerDebtTokenInstance;
-        restakerDebtTokenInstance = _restakerDebtTokenInstance;
-        emit RestakerDebtTokenInstanceUpdated(oldInstance, _restakerDebtTokenInstance);
+        restakerDebtTokenInstance = newInstance;
+        emit RestakerDebtTokenInstanceUpdated(oldInstance, newInstance);
     }
 
-    function setInterestDebtTokenInstance(address _interestDebtTokenInstance) external onlyRole(MANAGER_ROLE) {
+    function setInterestDebtTokenImplementation(address _interestDebtTokenImplementation)
+        external
+        onlyRole(MANAGER_ROLE)
+    {
+        address newInstance = CloneLogic.initializeBeacon(_interestDebtTokenImplementation);
         address oldInstance = interestDebtTokenInstance;
-        interestDebtTokenInstance = _interestDebtTokenInstance;
-        emit InterestDebtTokenInstanceUpdated(oldInstance, _interestDebtTokenInstance);
+        interestDebtTokenInstance = newInstance;
+        emit InterestDebtTokenInstanceUpdated(oldInstance, newInstance);
     }
 
     function setMinter(address _minter) external onlyRole(MANAGER_ROLE) {
@@ -177,9 +200,13 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
         emit AssetRemoved(_cToken, _asset);
     }
 
-    function setBasket(address _cToken, address _vault, uint256 _baseFee) external onlyRole(MANAGER_ROLE) {
+    function setBasket(address _cToken, address _scToken, address _vault, uint256 _baseFee)
+        external
+        onlyRole(MANAGER_ROLE)
+    {
         _basketVault[_cToken] = _vault;
+        EnumerableMap.set(_basketScToken, _cToken, _scToken);
         _basketBaseFee[_cToken] = _baseFee;
-        emit BasketSet(_cToken, _vault, _baseFee);
+        emit BasketSet(_cToken, _scToken, _vault, _baseFee);
     }
 }

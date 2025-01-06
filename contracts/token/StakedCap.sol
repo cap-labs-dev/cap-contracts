@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { ERC4626Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import { ERC20PermitUpgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
-import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { AccessControlEnumerableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
-import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {ERC4626Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {ERC20PermitUpgradeable} from
+    "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
+import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {AccessControlEnumerableUpgradeable} from
+    "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import { IRegistry } from "../interfaces/IRegistry.sol";
-import { IMinter } from "../interfaces/IMinter.sol";
+import {IRegistry} from "../interfaces/IRegistry.sol";
+import {IMinter} from "../interfaces/IMinter.sol";
 
 /// @title Staked Cap Token
 /// @author kexley, @capLabs
@@ -37,21 +39,17 @@ contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
     /// @notice Lock duration for the linear vesting period, in seconds
     uint256 public lockDuration;
 
-    /// @dev Disable initializers on the implementation
-    constructor() {
-        _disableInitializers();
-    }
-
     /// @notice Initialize the staked cap token by matching the name and symbol of the underlying
     /// @param _asset Address of the cap token
     /// @param _registry Address of the registry
+
     function initialize(address _asset, address _registry) external initializer {
-        string memory name = string.concat("s", IERC20Metadata(_asset).name());
-        string memory symbol = string.concat("s", IERC20Metadata(_asset).symbol());
+        string memory _name = string.concat("s", IERC20Metadata(_asset).name());
+        string memory _symbol = string.concat("s", IERC20Metadata(_asset).symbol());
 
         __ERC4626_init(IERC20(_asset));
-        __ERC20_init(name, symbol);
-        __ERC20Permit_init(name);
+        __ERC20_init(_name, _symbol);
+        __ERC20Permit_init(_name);
 
         registry = _registry;
     }
@@ -77,16 +75,11 @@ contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
     function _swap() internal {
         address[] memory assets = IRegistry(registry).basketAssets(asset());
         address minter = IRegistry(registry).minter();
-        for (uint i; i < assets.length; ++i) {
+        for (uint256 i; i < assets.length; ++i) {
             uint256 balance = IERC20(assets[i]).balanceOf(address(this));
             if (balance > 0) {
                 IMinter(minter).swapExactTokenForTokens(
-                    balance,
-                    0,
-                    assets[i],
-                    asset(),
-                    address(this),
-                    type(uint256).max
+                    balance, 0, assets[i], asset(), address(this), type(uint256).max
                 );
             }
         }
@@ -103,7 +96,7 @@ contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
 
     /// @notice Total vested cap tokens on this contract
     /// @return total Total amount of vested cap tokens
-    function totalAssets() public override view returns (uint256 total) {
+    function totalAssets() public view override returns (uint256 total) {
         total = storedTotal - lockedProfit();
     }
 
@@ -126,13 +119,10 @@ contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
     /// @param _owner Owner of the staked cap tokens being burnt
     /// @param _assets Amount of cap tokens to send to the receiver
     /// @param _shares Amount of staked cap tokens to burn from the owner
-    function _withdraw(
-        address _caller,
-        address _receiver,
-        address _owner,
-        uint256 _assets,
-        uint256 _shares
-    ) internal override {
+    function _withdraw(address _caller, address _receiver, address _owner, uint256 _assets, uint256 _shares)
+        internal
+        override
+    {
         if (_caller != _owner) {
             _spendAllowance(_owner, _caller, _shares);
         }

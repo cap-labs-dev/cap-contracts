@@ -7,11 +7,11 @@ import {Minter} from "../../contracts/minter/Minter.sol";
 import {Lender} from "../../contracts/lendingPool/lender/Lender.sol";
 import {Vault} from "../../contracts/vault/Vault.sol";
 import {CapToken} from "../../contracts/token/CapToken.sol";
+import {StakedCap} from "../../contracts/token/StakedCap.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {PrincipalDebtToken} from "../../contracts/lendingPool/tokens/PrincipalDebtToken.sol";
 import {InterestDebtToken} from "../../contracts/lendingPool/tokens/InterestDebtToken.sol";
 import {RestakerDebtToken} from "../../contracts/lendingPool/tokens/RestakerDebtToken.sol";
-import {CloneLogic} from "../../contracts/lendingPool/libraries/CloneLogic.sol";
 import {PriceOracle} from "../../contracts/oracle/PriceOracle.sol";
 import {RateOracle} from "../../contracts/oracle/RateOracle.sol";
 import {ChainlinkAdapter} from "../../contracts/oracle/libraries/ChainlinkAdapter.sol";
@@ -27,13 +27,11 @@ contract GasOptTest is Test {
     Lender public lender;
     Vault public vault;
     CapToken public cUSD;
+    StakedCap public scUSD;
 
     PrincipalDebtToken public principalDebtTokenImplementation;
-    address public principalDebtTokenInstance;
     InterestDebtToken public interestDebtTokenImplementation;
-    address public interestDebtTokenInstance;
     RestakerDebtToken public restakerDebtTokenImplementation;
-    address public restakerDebtTokenInstance;
 
     PriceOracle public priceOracle;
     RateOracle public rateOracle;
@@ -53,6 +51,7 @@ contract GasOptTest is Test {
     address public user_manager;
     address public user_agent;
     address public user_stablecoin_minter;
+    address public user_liquidator;
 
     function setUp() public {
         // Setup addresses with gas
@@ -63,13 +62,15 @@ contract GasOptTest is Test {
             user_manager = makeAddr("manager");
             user_agent = makeAddr("agent");
             user_stablecoin_minter = makeAddr("stablecoin_minter");
+            user_liquidator = makeAddr("liquidator");
 
-            // Setup 10 stablecoin minters
+            // Give gas to all users
             vm.deal(user_deployer, 100 ether);
             vm.deal(user_admin, 100 ether);
             vm.deal(user_manager, 100 ether);
             vm.deal(user_agent, 100 ether);
             vm.deal(user_stablecoin_minter, 100 ether);
+            vm.deal(user_liquidator, 100 ether);
 
             vm.stopPrank();
         }
@@ -86,6 +87,11 @@ contract GasOptTest is Test {
             usdt.mint(user_stablecoin_minter, 1000e18);
             usdc.mint(user_stablecoin_minter, 1000e18);
             usdx.mint(user_stablecoin_minter, 1000e18);
+
+            // mint some tokens to the liquidator for repayments
+            usdt.mint(user_liquidator, 1000e18);
+            usdc.mint(user_liquidator, 1000e18);
+            usdx.mint(user_liquidator, 1000e18);
 
             vm.stopPrank();
         }
@@ -114,20 +120,20 @@ contract GasOptTest is Test {
             cUSD = new CapToken();
             cUSD.initialize("Capped USD", "cUSD");
 
+            scUSD = new StakedCap();
+            scUSD.initialize(address(cUSD), address(registry));
+
             // Deploy debt token
             principalDebtTokenImplementation = new PrincipalDebtToken();
-            principalDebtTokenInstance = CloneLogic.initializeBeacon(address(principalDebtTokenImplementation));
-            registry.setPrincipalDebtTokenInstance(address(principalDebtTokenInstance));
+            registry.setPrincipalDebtTokenImplementation(address(principalDebtTokenImplementation));
 
             // Deploy interest debt token
             interestDebtTokenImplementation = new InterestDebtToken();
-            interestDebtTokenInstance = CloneLogic.initializeBeacon(address(interestDebtTokenImplementation));
-            registry.setInterestDebtTokenInstance(address(interestDebtTokenInstance));
+            registry.setInterestDebtTokenImplementation(address(interestDebtTokenImplementation));
 
             // Deploy restaker debt token
             restakerDebtTokenImplementation = new RestakerDebtToken();
-            restakerDebtTokenInstance = CloneLogic.initializeBeacon(address(restakerDebtTokenImplementation));
-            registry.setRestakerDebtTokenInstance(address(restakerDebtTokenInstance));
+            registry.setRestakerDebtTokenImplementation(address(restakerDebtTokenImplementation));
 
             vm.stopPrank();
         }
@@ -177,21 +183,10 @@ contract GasOptTest is Test {
             vm.startPrank(user_manager);
 
             chainlinkOracle.setDecimals(8);
-            chainlinkOracle.setLatestAnswer(100000000); // $1.00 with 8 decimals
+            chainlinkOracle.setLatestAnswer(1e8); // $1.00 with 8 decimals
 
             // Set initial Aave data for USDT
-            aaveDataProvider.setReserveData(
-                address(usdt),
-                0, // unbacked
-                0, // accruedToTreasuryScaled
-                1000e18, // totalAToken
-                1000e18, // totalVariableDebt
-                50000000000000000, // liquidityRate (5% APY)
-                100000000000000000, // variableBorrowRate (10% APY)
-                1e27, // liquidityIndex
-                1e27, // variableBorrowIndex
-                uint40(block.timestamp)
-            );
+            aaveDataProvider.setVariableBorrowRate(1e17); // 10% APY, 1e18 = 100%
 
             vm.stopPrank();
         }
@@ -211,9 +206,6 @@ contract GasOptTest is Test {
             rateOracle.setSource(address(usdt), address(aaveDataProvider));
             rateOracle.setSource(address(usdc), address(aaveDataProvider));
             rateOracle.setSource(address(usdx), address(aaveDataProvider));
-
-            // Set initial prices (1:1 for simplicity)
-            chainlinkOracle.setLatestAnswer(100000000); // $1.00 for all stablecoins
 
             vm.stopPrank();
         }
@@ -237,7 +229,7 @@ contract GasOptTest is Test {
             vm.startPrank(user_manager);
 
             // update the registry with the new basket
-            registry.setBasket(address(cUSD), address(vault), 0); // No base fee for testing
+            registry.setBasket(address(cUSD), address(scUSD), address(vault), 0); // No base fee for testing
             registry.addAsset(address(cUSD), address(usdt));
             registry.addAsset(address(cUSD), address(usdc));
             registry.addAsset(address(cUSD), address(usdx));
@@ -382,7 +374,63 @@ contract GasOptTest is Test {
         vm.stopPrank();
     }
 
-    function testAgentBorrow() public {
+    function testMintStakeUnstakeBurn() public {
+        vm.startPrank(user_stablecoin_minter);
+
+        // Initial balances
+        uint256 initialUsdtBalance = usdt.balanceOf(user_stablecoin_minter);
+        uint256 initialVaultBalance = usdt.balanceOf(address(vault));
+
+        // First mint cUSD with USDT
+        uint256 amountIn = 100e18;
+        uint256 minAmountOut = 95e18;
+        uint256 deadline = block.timestamp + 1 hours;
+
+        // Approve and mint
+        usdt.approve(address(minter), amountIn);
+        minter.swapExactTokenForTokens(
+            amountIn, minAmountOut, address(usdt), address(cUSD), user_stablecoin_minter, deadline
+        );
+
+        uint256 mintedAmount = cUSD.balanceOf(user_stablecoin_minter);
+        assertGt(mintedAmount, 0, "Should have received cUSD tokens");
+        assertEq(usdt.balanceOf(address(vault)), initialVaultBalance + amountIn, "Vault should have received USDT");
+
+        // Now stake the cUSD tokens
+        cUSD.approve(address(scUSD), mintedAmount);
+        scUSD.deposit(mintedAmount, user_stablecoin_minter);
+
+        uint256 stakedAmount = scUSD.balanceOf(user_stablecoin_minter);
+        assertGt(stakedAmount, 0, "Should have staked cUSD tokens");
+
+        // Now unstake the cUSD tokens
+        scUSD.withdraw(stakedAmount, user_stablecoin_minter, user_stablecoin_minter);
+
+        uint256 unstakedAmount = cUSD.balanceOf(user_stablecoin_minter);
+        assertGt(unstakedAmount, 0, "Should have unstaked cUSD tokens");
+        assertEq(scUSD.balanceOf(user_stablecoin_minter), 0, "Should have burned all staked cUSD tokens");
+
+        // Now burn the cUSD tokens
+        uint256 burnAmount = mintedAmount;
+        uint256 minOutputAmount = burnAmount * 95 / 100; // Expect at least 95% back accounting for potential fees
+
+        cUSD.approve(address(minter), burnAmount);
+        minter.swapExactTokenForTokens(
+            burnAmount, minOutputAmount, address(cUSD), address(usdt), user_stablecoin_minter, deadline
+        );
+
+        // Verify final balances
+        assertEq(cUSD.balanceOf(user_stablecoin_minter), 0, "Should have burned all cUSD tokens");
+        assertGt(
+            usdt.balanceOf(user_stablecoin_minter),
+            initialUsdtBalance - amountIn + minOutputAmount,
+            "Should have received USDT back"
+        );
+
+        vm.stopPrank();
+    }
+
+    function testAgentBorrowRepay() public {
         vm.startPrank(user_agent);
 
         address borrowAsset = address(usdc);
@@ -402,6 +450,39 @@ contract GasOptTest is Test {
         usdc.approve(address(lender), borrowAmount + interest);
         lender.repay(borrowAsset, borrowAmount, user_agent);
         assertGe(usdc.balanceOf(address(vault)), vaultBalanceBefore);
+
+        vm.stopPrank();
+    }
+
+    function testLiquidation() public {
+        address borrowAsset = address(usdc);
+        uint256 borrowAmount = 1e18; // mock usdc has 18 decimals
+        address receiver = user_agent;
+
+        // borrow some assets
+        {
+            vm.startPrank(user_agent);
+            lender.borrow(borrowAsset, borrowAmount, receiver);
+            assertEq(usdc.balanceOf(receiver), borrowAmount);
+            vm.stopPrank();
+        }
+
+        // simulate a price drop
+        {
+            vm.startPrank(user_manager);
+            chainlinkOracle.setLatestAnswer(90e8);
+            vm.stopPrank();
+        }
+
+        // anyone can liquidate the debt
+        {
+            vm.startPrank(user_liquidator);
+            // approve repay amount for liquidation
+            usdc.approve(address(lender), borrowAmount);
+            uint256 liquidatedAmount = lender.liquidate(user_agent, borrowAsset, borrowAmount);
+            assertEq(liquidatedAmount, 100000e18);
+            vm.stopPrank();
+        }
 
         vm.stopPrank();
     }

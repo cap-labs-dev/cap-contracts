@@ -1,17 +1,18 @@
-pragma solidity ^0.8.13;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {MockERC20} from "../test/mocks/MockERC20.sol";
+import {StakedCap} from "../contracts/token/StakedCap.sol";
 import {Registry} from "../contracts/registry/Registry.sol";
 import {Minter} from "../contracts/minter/Minter.sol";
 import {Lender} from "../contracts/lendingPool/lender/Lender.sol";
 import {Vault} from "../contracts/vault/Vault.sol";
 import {CapToken} from "../contracts/token/CapToken.sol";
-import {DebtToken} from "../contracts/lendingPool/tokens/DebtToken.sol";
+import {PrincipalDebtToken} from "../contracts/lendingPool/tokens/PrincipalDebtToken.sol";
 import {InterestDebtToken} from "../contracts/lendingPool/tokens/InterestDebtToken.sol";
 import {RestakerDebtToken} from "../contracts/lendingPool/tokens/RestakerDebtToken.sol";
-import {CloneLogic} from "../contracts/lendingPool/libraries/CloneLogic.sol";
 import {PriceOracle} from "../contracts/oracle/PriceOracle.sol";
 import {RateOracle} from "../contracts/oracle/RateOracle.sol";
 import {ChainlinkAdapter} from "../contracts/oracle/libraries/ChainlinkAdapter.sol";
@@ -26,13 +27,11 @@ contract DeployTestnetVault is Script {
     Lender public lender;
     Vault public vault;
     CapToken public cUSD;
+    StakedCap public scUSD;
 
-    DebtToken public debtTokenImplementation;
-    address public debtTokenInstance;
+    PrincipalDebtToken public principalDebtTokenImplementation;
     InterestDebtToken public interestDebtTokenImplementation;
-    address public interestDebtTokenInstance;
     RestakerDebtToken public restakerDebtTokenImplementation;
-    address public restakerDebtTokenInstance;
 
     PriceOracle public priceOracle;
     RateOracle public rateOracle;
@@ -99,24 +98,23 @@ contract DeployTestnetVault is Script {
             cUSD.initialize("Capped USD", "cUSD");
             console.log("cUSD address:", address(cUSD));
 
+            // Deploy and initialize scUSD token
+            scUSD = new StakedCap();
+            scUSD.initialize(address(cUSD), address(registry));
+            console.log("scUSD address:", address(scUSD));
+
             // Deploy debt tokens
-            debtTokenImplementation = new DebtToken();
-            debtTokenInstance = CloneLogic.initializeBeacon(address(debtTokenImplementation));
-            registry.setDebtTokenInstance(address(debtTokenInstance));
-            console.log("Debt Token Implementation:", address(debtTokenImplementation));
-            console.log("Debt Token Instance:", debtTokenInstance);
+            principalDebtTokenImplementation = new PrincipalDebtToken();
+            registry.setPrincipalDebtTokenImplementation(address(principalDebtTokenImplementation));
+            console.log("Principal Debt Token Implementation:", address(principalDebtTokenImplementation));
 
             interestDebtTokenImplementation = new InterestDebtToken();
-            interestDebtTokenInstance = CloneLogic.initializeBeacon(address(interestDebtTokenImplementation));
-            registry.setInterestDebtTokenInstance(address(interestDebtTokenInstance));
+            registry.setInterestDebtTokenImplementation(address(interestDebtTokenImplementation));
             console.log("Interest Debt Token Implementation:", address(interestDebtTokenImplementation));
-            console.log("Interest Debt Token Instance:", interestDebtTokenInstance);
 
             restakerDebtTokenImplementation = new RestakerDebtToken();
-            restakerDebtTokenInstance = CloneLogic.initializeBeacon(address(restakerDebtTokenImplementation));
-            registry.setRestakerDebtTokenInstance(address(restakerDebtTokenInstance));
+            registry.setRestakerDebtTokenImplementation(address(restakerDebtTokenImplementation));
             console.log("Restaker Debt Token Implementation:", address(restakerDebtTokenImplementation));
-            console.log("Restaker Debt Token Instance:", restakerDebtTokenInstance);
         }
 
         // deploy oracles
@@ -161,21 +159,10 @@ contract DeployTestnetVault is Script {
         {
             // Set initial oracles data
             chainlinkOracle.setDecimals(8);
-            chainlinkOracle.setLatestAnswer(100000000); // $1.00 with 8 decimals
+            chainlinkOracle.setLatestAnswer(1e8); // $1.00 with 8 decimals
 
             // Set initial Aave data for USDT
-            aaveDataProvider.setReserveData(
-                address(usdt),
-                0, // unbacked
-                0, // accruedToTreasuryScaled
-                1000e18, // totalAToken
-                1000e18, // totalVariableDebt
-                50000000000000000, // liquidityRate (5% APY)
-                100000000000000000, // variableBorrowRate (10% APY)
-                1e27, // liquidityIndex
-                1e27, // variableBorrowIndex
-                uint40(block.timestamp)
-            );
+            aaveDataProvider.setVariableBorrowRate(1e17); // 10% APY, 1e18 = 100%
         }
 
         // Setup price sources and adapters
@@ -211,7 +198,7 @@ contract DeployTestnetVault is Script {
         // Setup vault assets
         {
             // update the registry with the new basket
-            registry.setBasket(address(cUSD), address(vault), 0); // No base fee for testing
+            registry.setBasket(address(cUSD), address(scUSD), address(vault), 0); // No base fee for testing
             registry.addAsset(address(cUSD), address(usdt));
             registry.addAsset(address(cUSD), address(usdc));
             registry.addAsset(address(cUSD), address(usdx));
