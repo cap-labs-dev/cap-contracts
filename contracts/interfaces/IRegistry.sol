@@ -17,6 +17,8 @@ interface IRegistry {
         uint256 optimalRatio;
     }
 
+    function baskets() external view returns (address[] memory baskets);
+    function basketPool(address cToken) external view returns (address scToken);
     function basketVault(address cToken) external view returns (address vault);
     function basketAssets(address cToken) external view returns (address[] memory assets);
     function basketBaseFee(address cToken) external view returns (uint256 baseFee);

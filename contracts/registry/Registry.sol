@@ -6,9 +6,11 @@ import {AccessControlEnumerableUpgradeable} from
     "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
 contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableMap for EnumerableMap.AddressToAddressMap;
 
     struct Basket {
         string name;
@@ -37,9 +39,9 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     address public minter;
     address public assetManager;
 
-    // Storage, optimized for read access
+    // TODO: rework registry api and storage to minimize SLOAD calls on read ops
     mapping(address => address) private _basketVault; // cToken => vault
-    mapping(address => address) private _basketScToken; // cToken => scToken
+    EnumerableMap.AddressToAddressMap private _basketScToken; // cToken => scToken
     mapping(address => uint256) private _basketBaseFee; // cToken => baseFee
     mapping(address => uint256) private _basketRedeemFee; // cToken => redeemFee
     mapping(address => mapping(address => BasketFees)) private _basketFees; // cToken => asset => fees
@@ -67,6 +69,10 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     function initialize() external initializer {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MANAGER_ROLE, msg.sender);
+    }
+
+    function baskets() external view returns (address[] memory) {
+        return _basketScToken.keys();
     }
 
     function supportedCToken(address cToken) public view returns (bool) {
@@ -183,7 +189,7 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
         onlyRole(MANAGER_ROLE)
     {
         _basketVault[_cToken] = _vault;
-        _basketScToken[_cToken] = _scToken;
+        EnumerableMap.set(_basketScToken, _cToken, _scToken);
         _basketBaseFee[_cToken] = _baseFee;
         emit BasketSet(_cToken, _scToken, _vault, _baseFee);
     }
