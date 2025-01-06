@@ -43,13 +43,13 @@ contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
     }
 
     /// @notice Initialize the staked cap token by matching the name and symbol of the underlying
-    /// @param asset_ Address of the cap token
+    /// @param _asset Address of the cap token
     /// @param _registry Address of the registry
-    function initialize(address asset_, address _registry) external initializer {
-        string memory name = string.concat("s", IERC20Metadata(asset_).name());
-        string memory symbol = string.concat("s", IERC20Metadata(asset_).symbol());
+    function initialize(address _asset, address _registry) external initializer {
+        string memory name = string.concat("s", IERC20Metadata(_asset).name());
+        string memory symbol = string.concat("s", IERC20Metadata(_asset).symbol());
 
-        __ERC4626_init(IERC20(asset_));
+        __ERC4626_init(IERC20(_asset));
         __ERC20_init(name, symbol);
         __ERC20Permit_init(name);
 

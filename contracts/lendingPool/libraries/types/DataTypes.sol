@@ -5,7 +5,7 @@ library DataTypes {
     struct ReserveData {
         uint256 id;
         address vault;
-        address debtToken;
+        address principalDebtToken;
         address restakerDebtToken;
         address interestDebtToken;
         uint256 bonus;
@@ -21,7 +21,7 @@ library DataTypes {
         address agent;
         address asset;
         address vault;
-        address debtToken;
+        address principalDebtToken;
         address restakerDebtToken;
         address interestDebtToken;
         uint256 amount;
@@ -36,7 +36,7 @@ library DataTypes {
         address agent;
         address asset;
         address vault;
-        address debtToken;
+        address principalDebtToken;
         address restakerDebtToken;
         address interestDebtToken;
         uint256 amount;
@@ -50,7 +50,7 @@ library DataTypes {
         address agent;
         address asset;
         address vault;
-        address debtToken;
+        address principalDebtToken;
         address restakerDebtToken;
         address interestDebtToken;
         uint256 bonus;
@@ -73,7 +73,7 @@ library DataTypes {
     struct AddAssetParams {
         address asset;
         address vault;
-        address debtTokenInstance;
+        address principalDebtTokenInstance;
         address restakerDebtTokenInstance;
         address interestDebtTokenInstance;
         uint256 bonus;

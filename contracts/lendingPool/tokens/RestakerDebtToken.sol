@@ -60,14 +60,14 @@ contract RestakerDebtToken is ERC20Upgradeable {
     /// @notice Initialize the debt token with the underlying asset
     /// @param _registry Registry address
     /// @param _debtToken Principal debt token
-    /// @param asset_ Asset address
-    function initialize(address _registry, address _debtToken, address asset_) external initializer {
+    /// @param _asset Asset address
+    function initialize(address _registry, address _debtToken, address _asset) external initializer {
         debtToken = _debtToken;
         
-        string memory name = string.concat("restaker", IERC20Metadata(asset_).name());
-        string memory symbol = string.concat("restaker", IERC20Metadata(asset_).symbol());
-        _decimals = IERC20Metadata(asset_).decimals();
-        asset = asset_;
+        string memory name = string.concat("restaker", IERC20Metadata(_asset).name());
+        string memory symbol = string.concat("restaker", IERC20Metadata(_asset).symbol());
+        _decimals = IERC20Metadata(_asset).decimals();
+        asset = _asset;
 
         __ERC20_init(name, symbol);
         registry = _registry;
@@ -81,7 +81,7 @@ contract RestakerDebtToken is ERC20Upgradeable {
 
         uint256 rate = IRateOracle(IRegistry(registry).rateOracle()).restakerRate(_agent);
         uint256 oldInterestPerSecond = interestPerSecond[_agent];
-        uint256 newInterestPerSecond = IERC20(debtToken).balanceOf(_agent) * rate;
+        uint256 newInterestPerSecond = IERC20(debtToken).balanceOf(_agent).rayMul(rate);
 
         interestPerSecond[_agent] = newInterestPerSecond;
         totalInterestPerSecond = totalInterestPerSecond + newInterestPerSecond - oldInterestPerSecond;

@@ -31,7 +31,7 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     address public rateOracle;
     address public lender;
     address public collateral;
-    address public debtTokenInstance;
+    address public principalDebtTokenInstance;
     address public restakerDebtTokenInstance;
     address public interestDebtTokenInstance;
     address public minter;
@@ -135,10 +135,10 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
         emit CollateralUpdated(oldCollateral, _collateral);
     }
 
-    function setDebtTokenInstance(address _debtTokenInstance) external onlyRole(MANAGER_ROLE) {
-        address oldInstance = debtTokenInstance;
-        debtTokenInstance = _debtTokenInstance;
-        emit DebtTokenInstanceUpdated(oldInstance, _debtTokenInstance);
+    function setPrincipalDebtTokenInstance(address _principalDebtTokenInstance) external onlyRole(MANAGER_ROLE) {
+        address oldInstance = principalDebtTokenInstance;
+        principalDebtTokenInstance = _principalDebtTokenInstance;
+        emit DebtTokenInstanceUpdated(oldInstance, _principalDebtTokenInstance);
     }
 
     function setRestakerDebtTokenInstance(address _restakerDebtTokenInstance) external onlyRole(MANAGER_ROLE) {

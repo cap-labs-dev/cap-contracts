@@ -7,6 +7,7 @@ import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/I
 
 import { Errors } from "../libraries/helpers/Errors.sol";
 import { MathUtils } from "../libraries/math/MathUtils.sol";
+import { WadRayMath } from "../libraries/math/WadRayMath.sol";
 import { IRegistry } from "../../interfaces/IRegistry.sol";
 import { IRateOracle } from "../../interfaces/IRateOracle.sol";
 
@@ -16,6 +17,7 @@ import { IRateOracle } from "../../interfaces/IRateOracle.sol";
 /// @dev Total supply is calculated therefore an estimation rather than exact.
 contract InterestDebtToken is ERC20Upgradeable {
     using MathUtils for uint256;
+    using WadRayMath for uint256;
 
     /// @notice Registry contract
     address public registry;
@@ -35,11 +37,17 @@ contract InterestDebtToken is ERC20Upgradeable {
     /// @notice Interest rate
     uint256 public interestRate;
 
+    /// @notice Current index at time of last agent update
+    mapping(address => uint256) public storedIndex;
+
     /// @notice Last time the agent had interest accrued
     mapping(address => uint256) public lastAgentUpdate;
 
     /// @notice Last time the total supply was updated
     uint256 public lastUpdate;
+
+    /// @notice Interest rate index, 
+    uint256 public index;
 
     /// @dev Only the lender can use these functions
     modifier onlyLender() {
@@ -55,26 +63,38 @@ contract InterestDebtToken is ERC20Upgradeable {
     /// @notice Initialize the interest debt token with the underlying asset
     /// @param _registry Registry address
     /// @param _debtToken Principal debt token
-    /// @param asset_ Asset address
-    function initialize(address _registry, address _debtToken, address asset_) external initializer {
+    /// @param _asset Asset address
+    function initialize(address _registry, address _debtToken, address _asset) external initializer {
         debtToken = _debtToken;
         
-        string memory name = string.concat("interest", IERC20Metadata(asset_).name());
-        string memory symbol = string.concat("interest", IERC20Metadata(asset_).symbol());
-        _decimals = IERC20Metadata(asset_).decimals();
-        asset = asset_;
+        string memory name = string.concat("interest", IERC20Metadata(_asset).name());
+        string memory symbol = string.concat("interest", IERC20Metadata(_asset).symbol());
+        _decimals = IERC20Metadata(_asset).decimals();
+        asset = _asset;
 
         __ERC20_init(name, symbol);
         registry = _registry;
+        index = 1e27;
     }
 
     /// @notice Update the accrued interest and the interest rate
     /// @dev Left permissionless
     /// @param _agent Agent address to accrue interest for
     function update(address _agent) external {
-        _accrueInterest(_agent);
+        _update(_agent);
+    }
 
-        interestRate = nextInterestRate();
+    /// @notice Interest rate index representing the increase of debt per asset borrowed
+    /// @dev A value of 1e27 means there is no debt. As time passes, the debt is accrued. A value
+    /// of 2*1e27 means that for each unit of debt, one unit worth of interest has been accumulated
+    /// @return latestIndex Current interest rate index
+    function currentIndex() public view returns (uint256 latestIndex) {
+        uint256 timestamp = block.timestamp;
+        if (timestamp != lastUpdate) {
+            latestIndex = MathUtils.calculateCompoundedInterest(interestRate, lastUpdate).rayMul(index);
+        } else {
+            latestIndex = index;
+        }
     }
 
     /// @notice Burn the debt token, only callable by the lender
@@ -83,7 +103,7 @@ contract InterestDebtToken is ERC20Upgradeable {
     /// @param _amount Amount of underlying asset to repay to lender
     /// @return actualRepaid Actual amount repaid
     function burn(address _agent, uint256 _amount) external onlyLender returns (uint256 actualRepaid) {
-        _accrueInterest(_agent);
+        _update(_agent);
 
         uint256 agentBalance = super.balanceOf(_agent);
 
@@ -108,7 +128,7 @@ contract InterestDebtToken is ERC20Upgradeable {
         if (timestamp > lastAgentUpdate[_agent]) {
             balance = super.balanceOf(_agent) + 
                 (IERC20(debtToken).balanceOf(_agent) + super.balanceOf(_agent))
-                    .calculateCompoundedInterest(interestRate, lastAgentUpdate[_agent]);
+                    .rayMul(currentIndex() - storedIndex[_agent]);
         } else {
             balance = super.balanceOf(_agent);
         }
@@ -122,7 +142,7 @@ contract InterestDebtToken is ERC20Upgradeable {
         if (timestamp > lastUpdate) {
             supply = _totalSupply 
                 + (IERC20(debtToken).totalSupply() + _totalSupply)
-                    .calculateCompoundedInterest(interestRate, lastUpdate);
+                    .rayMul(currentIndex() - index);
         } else {
             supply = _totalSupply;
         }
@@ -140,24 +160,29 @@ contract InterestDebtToken is ERC20Upgradeable {
 
     /// @notice Accrue interest for a specific agent and the total supply
     /// @param _agent Agent address
-    function _accrueInterest(address _agent) internal {
+    function _update(address _agent) internal {
         uint256 timestamp = block.timestamp;
 
         if (timestamp > lastAgentUpdate[_agent]) {
             uint256 amount = (IERC20(debtToken).balanceOf(_agent) + super.balanceOf(_agent))
-                    .calculateCompoundedInterest(interestRate, lastAgentUpdate[_agent]);
+                .rayMul(currentIndex() - storedIndex[_agent]);
             
             if (amount > 0) _mint(_agent, amount);
 
+            storedIndex[_agent] = currentIndex();
             lastAgentUpdate[_agent] = timestamp;
         }
 
         if (timestamp > lastUpdate) {
             _totalSupply += (IERC20(debtToken).totalSupply() + _totalSupply)
-                .calculateCompoundedInterest(interestRate, lastUpdate);
+                .rayMul(currentIndex() - index);
+            
+            index = currentIndex();
 
             lastUpdate = timestamp;
         }
+
+        interestRate = nextInterestRate();
     }
 
     /// @notice Match decimals with underlying asset

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ICollateral } from "../../interfaces/ICollateral.sol";
 import { IPriceOracle } from "../../interfaces/IPriceOracle.sol";
 import { IRegistry } from "../../interfaces/IRegistry.sol";
-import { IDebtToken } from "../../interfaces/IDebtToken.sol";
 
 import { Errors } from "./helpers/Errors.sol";
 import { ViewLogic } from "./ViewLogic.sol";
@@ -88,7 +88,7 @@ library ValidationLogic {
         address _asset
     ) external view {
         require(
-            IDebtToken(reservesData[_asset].debtToken).totalSupply() == 0,
+            IERC20(reservesData[_asset].principalDebtToken).totalSupply() == 0,
             Errors.VARIABLE_DEBT_SUPPLY_NOT_ZERO
         );
     }

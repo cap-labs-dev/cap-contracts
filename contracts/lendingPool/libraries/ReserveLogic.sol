@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {IPrincipalDebtToken} from "../../interfaces/IPrincipalDebtToken.sol";
 import {IDebtToken} from "../../interfaces/IDebtToken.sol";
 
 import {Errors} from "./helpers/Errors.sol";
@@ -43,19 +44,19 @@ library ReserveLogic {
             reservesList[params.reserveCount] = params.asset;
         }
 
-        address debtToken = CloneLogic.clone(params.debtTokenInstance);
-        IDebtToken(debtToken).initialize(params.addressProvider, params.asset);
+        address principalDebtToken = CloneLogic.clone(params.principalDebtTokenInstance);
+        IPrincipalDebtToken(principalDebtToken).initialize(params.addressProvider, params.asset);
 
         address restakerDebtToken = CloneLogic.clone(params.restakerDebtTokenInstance);
-        IDebtToken(restakerDebtToken).initialize(params.addressProvider, debtToken, params.asset);
+        IDebtToken(restakerDebtToken).initialize(params.addressProvider, principalDebtToken, params.asset);
 
         address interestDebtToken = CloneLogic.clone(params.interestDebtTokenInstance);
-        IDebtToken(interestDebtToken).initialize(params.addressProvider, debtToken, params.asset);
+        IDebtToken(interestDebtToken).initialize(params.addressProvider, principalDebtToken, params.asset);
 
         reservesData[params.asset] = DataTypes.ReserveData({
             id: id,
             vault: params.vault,
-            debtToken: debtToken,
+            principalDebtToken: principalDebtToken,
             restakerDebtToken: restakerDebtToken,
             interestDebtToken: interestDebtToken,
             bonus: params.bonus,

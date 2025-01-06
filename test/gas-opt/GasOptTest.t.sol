@@ -8,7 +8,7 @@ import {Lender} from "../../contracts/lendingPool/lender/Lender.sol";
 import {Vault} from "../../contracts/vault/Vault.sol";
 import {CapToken} from "../../contracts/token/CapToken.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {DebtToken} from "../../contracts/lendingPool/tokens/DebtToken.sol";
+import {PrincipalDebtToken} from "../../contracts/lendingPool/tokens/PrincipalDebtToken.sol";
 import {InterestDebtToken} from "../../contracts/lendingPool/tokens/InterestDebtToken.sol";
 import {RestakerDebtToken} from "../../contracts/lendingPool/tokens/RestakerDebtToken.sol";
 import {CloneLogic} from "../../contracts/lendingPool/libraries/CloneLogic.sol";
@@ -28,8 +28,8 @@ contract GasOptTest is Test {
     Vault public vault;
     CapToken public cUSD;
 
-    DebtToken public debtTokenImplementation;
-    address public debtTokenInstance;
+    PrincipalDebtToken public principalDebtTokenImplementation;
+    address public principalDebtTokenInstance;
     InterestDebtToken public interestDebtTokenImplementation;
     address public interestDebtTokenInstance;
     RestakerDebtToken public restakerDebtTokenImplementation;
@@ -115,9 +115,9 @@ contract GasOptTest is Test {
             cUSD.initialize("Capped USD", "cUSD");
 
             // Deploy debt token
-            debtTokenImplementation = new DebtToken();
-            debtTokenInstance = CloneLogic.initializeBeacon(address(debtTokenImplementation));
-            registry.setDebtTokenInstance(address(debtTokenInstance));
+            principalDebtTokenImplementation = new PrincipalDebtToken();
+            principalDebtTokenInstance = CloneLogic.initializeBeacon(address(principalDebtTokenImplementation));
+            registry.setPrincipalDebtTokenInstance(address(principalDebtTokenInstance));
 
             // Deploy interest debt token
             interestDebtTokenImplementation = new InterestDebtToken();

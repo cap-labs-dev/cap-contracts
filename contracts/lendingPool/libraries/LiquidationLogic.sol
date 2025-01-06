@@ -49,7 +49,7 @@ library LiquidationLogic {
                 agent: params.agent,
                 asset: params.asset,
                 vault: params.vault,
-                debtToken: params.debtToken,
+                principalDebtToken: params.principalDebtToken,
                 restakerDebtToken: params.restakerDebtToken,
                 interestDebtToken: params.interestDebtToken,
                 amount: params.amount,

@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IVault} from "../../interfaces/IVault.sol";
+import {IPrincipalDebtToken} from "../../interfaces/IPrincipalDebtToken.sol";
 import {IDebtToken} from "../../interfaces/IDebtToken.sol";
 
 import {ValidationLogic} from "./ValidationLogic.sol";
@@ -34,6 +35,8 @@ library BorrowLogic {
     event TotalRepayment(address indexed agent, address indexed asset);
 
     /// @notice Borrow an asset from the Lender, minting a debt token which must be repaid
+    /// @dev Interest debt token is updated before borrow happens to bring index up to date. Restaker
+    /// debt token is updated after so the new principal debt can be used in calculations
     /// @param reservesData Reserve mapping that stores reserve data
     /// @param reservesList List of all reserves
     /// @param agentConfig Agent configuration for borrowing
@@ -61,7 +64,7 @@ library BorrowLogic {
         if (!agentConfig.isBorrowing(params.id)) agentConfig.setBorrowing(params.id, true);
 
         IDebtToken(params.interestDebtToken).update(params.agent);
-        IDebtToken(params.debtToken).mint(params.agent, params.amount);
+        IPrincipalDebtToken(params.principalDebtToken).mint(params.agent, params.amount);
         IDebtToken(params.restakerDebtToken).update(params.agent);
 
         IVault(params.vault).borrow(params.asset, params.amount, params.receiver);
@@ -70,7 +73,9 @@ library BorrowLogic {
     }
 
     /// @notice Repay an asset, burning the debt token and/or paying down interest
-    /// @dev Only the amount owed or specified will be taken from the repayer, whichever is lower
+    /// @dev Only the amount owed or specified will be taken from the repayer, whichever is lower.
+    /// Interest debt is paid first as the amount accrued is based on current principal debt, restaker
+    /// debt is paid last as the future rate is calculated based on the resulting principal debt
     /// @param agentConfig Agent configuration for borrowing
     /// @param params Parameters to repay a debt
     /// @return principalRepaid Actual principal amount repaid
@@ -80,10 +85,11 @@ library BorrowLogic {
         external
         returns (uint256 principalRepaid, uint256 restakerRepaid, uint256 interestRepaid)
     {
-        uint256 principalDebt = IERC20(params.debtToken).balanceOf(params.agent);
+        uint256 principalDebt = IERC20(params.principalDebtToken).balanceOf(params.agent);
         uint256 restakerDebt = IERC20(params.restakerDebtToken).balanceOf(params.agent);
         uint256 interestDebt = IERC20(params.interestDebtToken).balanceOf(params.agent);
 
+        /// Order of repayment is principal, restaker, then interest
         if (params.amount > principalDebt) {
             principalRepaid = params.amount - principalDebt;
             restakerRepaid =
@@ -95,26 +101,25 @@ library BorrowLogic {
             principalRepaid = params.amount;
         }
 
-        IDebtToken(params.interestDebtToken).update(params.agent);
-        IDebtToken(params.debtToken).burn(params.agent, principalRepaid);
-        IDebtToken(params.restakerDebtToken).update(params.agent);
+        if (interestRepaid > 0) {
+            interestRepaid = IDebtToken(params.interestDebtToken).burn(params.agent, interestRepaid);
+            IERC20(params.asset).safeTransferFrom(params.caller, params.rewarder, interestRepaid);
+        }
 
         if (principalRepaid > 0) {
+            IPrincipalDebtToken(params.principalDebtToken).burn(params.agent, principalRepaid);
             IERC20(params.asset).safeTransferFrom(params.caller, address(this), principalRepaid);
             IERC20(params.asset).forceApprove(params.vault, principalRepaid);
             IVault(params.vault).repay(params.asset, principalRepaid);
         }
 
         if (restakerRepaid > 0) {
+            restakerRepaid = IDebtToken(params.restakerDebtToken).burn(params.agent, restakerRepaid);
             IERC20(params.asset).safeTransferFrom(params.caller, params.restakerRewarder, restakerRepaid);
         }
 
-        if (interestRepaid > 0) {
-            IERC20(params.asset).safeTransferFrom(params.caller, params.rewarder, interestRepaid);
-        }
-
         if (
-            IERC20(params.debtToken).balanceOf(params.agent) == 0
+            IERC20(params.principalDebtToken).balanceOf(params.agent) == 0
                 && IERC20(params.restakerDebtToken).balanceOf(params.agent) == 0
                 && IERC20(params.interestDebtToken).balanceOf(params.agent) == 0
         ) {

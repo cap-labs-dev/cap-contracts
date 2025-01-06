@@ -29,7 +29,7 @@ interface IRegistry {
     function rateOracle() external view returns (address oracle);
     function priceOracle() external view returns (address oracle);
     function collateral() external view returns (address collateral);
-    function debtTokenInstance() external view returns (address debtTokenInstance);
+    function principalDebtTokenInstance() external view returns (address principalDebtTokenInstance);
     function restakerDebtTokenInstance() external view returns (address restakerDebtTokenInstance);
     function interestDebtTokenInstance() external view returns (address interestDebtTokenInstance);
     function minter() external view returns (address minter);

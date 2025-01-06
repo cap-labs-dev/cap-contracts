@@ -46,7 +46,7 @@ library ViewLogic {
 
             address asset = reservesList[i];
 
-            totalDebt += IERC20(reservesData[asset].debtToken).balanceOf(params.agent)
+            totalDebt += IERC20(reservesData[asset].principalDebtToken).balanceOf(params.agent)
                 * IPriceOracle(params.oracle).getPrice(asset);
         }
 

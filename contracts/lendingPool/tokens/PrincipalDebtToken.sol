@@ -8,10 +8,10 @@ import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/I
 import { Errors } from "../libraries/helpers/Errors.sol";
 import { IRegistry } from "../../interfaces/IRegistry.sol";
 
-/// @title Debt token for a market on the Lender
+/// @title Principal debt token for a market on the Lender
 /// @author kexley, @capLabs
-/// @notice Debt tokens are minted 1:1 with the principal loan amount
-contract DebtToken is ERC20Upgradeable {
+/// @notice Principal debt tokens are minted 1:1 with the principal loan amount
+contract PrincipalDebtToken is ERC20Upgradeable {
 
     /// @notice Registry contract
     address public registry;
@@ -35,12 +35,12 @@ contract DebtToken is ERC20Upgradeable {
 
     /// @notice Initialize the debt token with the underlying asset
     /// @param _registry Registry address
-    /// @param asset_ Asset address
-    function initialize(address _registry, address asset_) external initializer {
-        string memory name = string.concat("debt", IERC20Metadata(asset_).name());
-        string memory symbol = string.concat("debt", IERC20Metadata(asset_).symbol());
-        _decimals = IERC20Metadata(asset_).decimals();
-        asset = asset_;
+    /// @param _asset Asset address
+    function initialize(address _registry, address _asset) external initializer {
+        string memory name = string.concat("debt", IERC20Metadata(_asset).name());
+        string memory symbol = string.concat("debt", IERC20Metadata(_asset).symbol());
+        _decimals = IERC20Metadata(_asset).decimals();
+        asset = _asset;
 
         __ERC20_init(name, symbol);
         registry = _registry;
