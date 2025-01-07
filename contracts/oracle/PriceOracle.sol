@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import { IRegistry } from "../interfaces/IRegistry.sol";
 import { IOracleAdapter } from "../interfaces/IOracleAdapter.sol";
 
 /// @title Oracle for fetching prices
 /// @author kexley, @capLabs
-contract PriceOracle is Initializable {
+contract PriceOracle is UUPSUpgradeable {
 
     /// @notice Registry address
     address public registry;
@@ -32,6 +32,11 @@ contract PriceOracle is Initializable {
     modifier onlyAuth {
         if (msg.sender != IRegistry(registry).assetManager()) revert NotAuth();
         _;
+    }
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
     /// @notice Initialize the oracle with the registry address
@@ -80,4 +85,6 @@ contract PriceOracle is Initializable {
         if (_adapter == address(0)) revert NoAdapter();
         adapter[_source] = _adapter;
     }
+
+    function _authorizeUpgrade(address) internal override {}
 }

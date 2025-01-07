@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {IRegistry} from "../interfaces/IRegistry.sol";
 
 import {ValidationLogic} from "./libraries/ValidationLogic.sol";
@@ -15,9 +15,14 @@ import {DataTypes} from "./libraries/types/DataTypes.sol";
 /// @dev Dynamic fees are applied according to the allocation of assets in the basket. Increasing
 /// the supply of a excessive asset or burning for an scarce asset will charge fees on a kinked
 /// slope. Redeem can be used to avoid these fees by burning for the current ratio of assets.
-contract Minter is Initializable {
+contract Minter is UUPSUpgradeable {
     /// @notice Registry that controls fees, whitelisting assets and basket allocations
     address public registry;
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
     /// @notice Initialize the registry address and default admin
     /// @param _registry Registry address
@@ -198,4 +203,6 @@ contract Minter is Initializable {
             })
         );
     }
+
+    function _authorizeUpgrade(address) internal override {}
 }

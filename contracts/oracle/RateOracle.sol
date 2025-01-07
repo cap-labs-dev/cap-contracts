@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import { IRegistry } from "../interfaces/IRegistry.sol";
 import { IOracleAdapter } from "../interfaces/IOracleAdapter.sol";
@@ -9,7 +9,7 @@ import { IOracleAdapter } from "../interfaces/IOracleAdapter.sol";
 /// @title Oracle for fetching interest rates
 /// @author kexley, @capLabs
 /// @notice Admin can set the minimum interest rates and the restaker interest rates.
-contract RateOracle is Initializable {
+contract RateOracle is UUPSUpgradeable {
 
     /// @notice Registry address
     address public registry;
@@ -36,6 +36,11 @@ contract RateOracle is Initializable {
     modifier onlyAuth {
         if (msg.sender != IRegistry(registry).assetManager()) revert NotAuth();
         _;
+    }
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
     /// @notice Initialize the oracle with the registry address
@@ -83,4 +88,6 @@ contract RateOracle is Initializable {
     function setBenchmarkRate(address _asset, uint256 _rate) external onlyAuth {
         benchmarkRate[_asset] = _rate;
     }
+
+    function _authorizeUpgrade(address) internal override {}
 }

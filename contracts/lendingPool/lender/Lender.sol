@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import {BorrowLogic} from "../libraries/BorrowLogic.sol";
 import {LiquidationLogic} from "../libraries/LiquidationLogic.sol";
@@ -18,10 +18,15 @@ import {LenderStorage} from "./LenderStorage.sol";
 /// @notice Whitelisted tokens are borrowed and repaid from this contract by covered agents.
 /// @dev Borrow interest rates are calculated from the underlying utilization rates of the assets
 /// in the vaults.
-contract Lender is Initializable, LenderStorage {
+contract Lender is UUPSUpgradeable, LenderStorage {
     modifier onlyLenderAdmin() {
         require(msg.sender == IRegistry(ADDRESS_PROVIDER).assetManager(), Errors.CALLER_NOT_POOL_ADMIN);
         _;
+    }
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
     /// @notice Initialize the lender
@@ -184,4 +189,6 @@ contract Lender is Initializable, LenderStorage {
     function upgradeInstance(address _instance, address _implementation) external onlyLenderAdmin {
         CloneLogic.upgradeTo(_instance, _implementation);
     }
+
+    function _authorizeUpgrade(address) internal override {}
 }
