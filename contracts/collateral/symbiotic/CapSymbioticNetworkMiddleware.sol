@@ -19,17 +19,12 @@ import {Subnetwork} from "@symbioticfi/core/src/contracts/libraries/Subnetwork.s
 
 import {SimpleKeyRegistry32} from "./SimpleKeyRegistry32.sol";
 import {MapWithTimeData} from "./libraries/MapWithTimeData.sol";
-import {Errors} from "./Errors.sol";
 import {Network} from "../Network.sol";
 
 /// @title Cap Symbiotic Network Middleware Contract
 /// @author Cap Labs
 /// @notice This contract manages the symbiotic collateral and slashing.
-contract CapSymbioticNetworkMiddleware is 
-    Network,
-    SimpleKeyRegistry32,
-    Errors
-{
+contract CapSymbioticNetworkMiddleware is Network, SimpleKeyRegistry32 {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
     using MapWithTimeData for EnumerableMap.AddressToUintMap;
     using Subnetwork for address;
@@ -57,6 +52,22 @@ contract CapSymbioticNetworkMiddleware is
     EnumerableMap.AddressToUintMap private operators;
     EnumerableMap.AddressToUintMap private vaults;
 
+    error NotOperator();
+    error NotVault();
+    error OperatorNotOptedIn();
+    error OperatorNotRegistred();
+    error OperarorGracePeriodNotPassed();
+    error OperatorAlreadyRegistred();
+    error VaultAlreadyRegistred();
+    error VaultEpochTooShort();
+    error VaultGracePeriodNotPassed();
+    error InvalidSubnetworksCnt();
+    error TooOldEpoch();
+    error InvalidEpoch();
+    error SlashingWindowTooShort();
+    error TooBigSlashAmount();
+    error UnknownSlasherType();
+
     modifier updateStakeCache(uint48 epoch) {
         if (!totalStakeCached[epoch]) {
             calcAndCacheStakes(epoch);
@@ -72,8 +83,7 @@ contract CapSymbioticNetworkMiddleware is
         address _pauser,
         uint48 _epochDuration,
         uint48 _slashingWindow
-    ) initializer external {
-
+    ) external initializer {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(OWNER_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, _pauser);
@@ -81,7 +91,7 @@ contract CapSymbioticNetworkMiddleware is
         if (_slashingWindow < _epochDuration) {
             revert SlashingWindowTooShort();
         }
-        
+
         startTime = Time.timestamp();
         epochDuration = _epochDuration;
         network = _network;
@@ -270,8 +280,12 @@ contract CapSymbioticNetworkMiddleware is
     }
 
     // just for example, our devnets don't support slashing
-    function slash(uint48 epoch, address operator, uint256 amount) public onlyRole(OWNER_ROLE) updateStakeCache(epoch) {
-       /* uint48 epochStartTs = getEpochStartTs(epoch);
+    function slash(uint48 epoch, address operator, uint256 amount)
+        public
+        onlyRole(OWNER_ROLE)
+        updateStakeCache(epoch)
+    {
+        /* uint48 epochStartTs = getEpochStartTs(epoch);
 
         if (epochStartTs < Time.timestamp() - slashingWindow) {
             revert TooOldEpoch();
@@ -361,14 +375,10 @@ contract CapSymbioticNetworkMiddleware is
         return enabledTime != 0 && enabledTime <= timestamp && (disabledTime == 0 || disabledTime >= timestamp);
     }
 
-    function _slashVault(
-        uint48 timestamp,
-        address vault,
-        bytes32 subnetwork,
-        address operator,
-        uint256 amount
-    ) private {
-       /* address slasher = IVault(vault).slasher();
+    function _slashVault(uint48 timestamp, address vault, bytes32 subnetwork, address operator, uint256 amount)
+        private
+    {
+        /* address slasher = IVault(vault).slasher();
         uint256 slasherType = IEntity(slasher).TYPE();
         if (slasherType == INSTANT_SLASHER_TYPE) {
             ISlasher(slasher).slash(subnetwork, operator, amount, timestamp, new bytes(0));
