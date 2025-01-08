@@ -17,6 +17,8 @@ import {PriceOracle} from "../contracts/oracle/PriceOracle.sol";
 import {RateOracle} from "../contracts/oracle/RateOracle.sol";
 import {ChainlinkAdapter} from "../contracts/oracle/libraries/ChainlinkAdapter.sol";
 import {AaveAdapter} from "../contracts/oracle/libraries/AaveAdapter.sol";
+import {CapTokenAdapter} from "../contracts/oracle/libraries/CapTokenAdapter.sol";
+import {StakedCapAdapter} from "../contracts/oracle/libraries/StakedCapAdapter.sol";
 import {MockAaveDataProvider} from "../test/mocks/MockAaveDataProvider.sol";
 import {MockChainlink} from "../test/mocks/MockChainlink.sol";
 import {MockCollateral} from "../test/mocks/MockCollateral.sol";
@@ -27,6 +29,7 @@ contract DeployTestnetVault is Script {
     Lender public lender;
     Vault public vault;
     CapToken public cUSD;
+    StakedCap public scUSD;
 
     StakedCap public stakedCapImplementation;
     PrincipalDebtToken public principalDebtTokenImplementation;
@@ -37,6 +40,8 @@ contract DeployTestnetVault is Script {
     RateOracle public rateOracle;
     address public aaveAdapter;
     address public chainlinkAdapter;
+    address public capTokenAdapter;
+    address public stakedCapAdapter;
     MockAaveDataProvider public aaveDataProvider;
     MockChainlink public chainlinkOracle;
 
@@ -130,8 +135,12 @@ contract DeployTestnetVault is Script {
 
             aaveAdapter = address(AaveAdapter);
             chainlinkAdapter = address(ChainlinkAdapter);
+            capTokenAdapter = address(new CapTokenAdapter(address(registry)));
+            stakedCapAdapter = address(new StakedCapAdapter(address(registry)));
             console.log("Aave Adapter address:", aaveAdapter);
             console.log("Chainlink Adapter address:", chainlinkAdapter);
+            console.log("Cap Token Adapter address:", capTokenAdapter);
+            console.log("Staked Cap Adapter address:", stakedCapAdapter);
 
             // Deploy mock data providers
             aaveDataProvider = new MockAaveDataProvider();
@@ -202,6 +211,17 @@ contract DeployTestnetVault is Script {
             registry.addAsset(address(cUSD), address(usdt));
             registry.addAsset(address(cUSD), address(usdc));
             registry.addAsset(address(cUSD), address(usdx));
+
+            scUSD = StakedCap(registry.basketScToken(address(cUSD)));
+            console.log("scUSD address:", address(scUSD));
+
+            // Set CapTokenAdapter as price source for cUSD
+            priceOracle.setAdapter(address(capTokenAdapter), address(capTokenAdapter));
+            priceOracle.setSource(address(cUSD), address(capTokenAdapter));
+
+            // Set StakedCapAdapter as price source for scUSD
+            priceOracle.setAdapter(address(stakedCapAdapter), address(stakedCapAdapter));
+            priceOracle.setSource(address(scUSD), address(stakedCapAdapter));
         }
 
         // have something in the vault already
