@@ -99,6 +99,7 @@ Latest testnet deploy:
 - Lender address: 0x443775362DD8DA58d98D87a77923507EDEA5EAF0
 - Vault address: 0xeBc792641e73cFa9BC93a1Ae884BFe82cc2c23c4
 - cUSD address: 0x992bAAd7EE067E980939013ffa597925210Ec0d9
+- scUSD address: 0xDE2E58B286cDa4e728A8af388CB1b50D8744985D
 - Staked Cap Implementation address: 0x6e8eD0B3d92723d2D638cf0de16de59b8e933611
 - Principal Debt Token Implementation: 0xCC5572a04C4BA9C2F9fCE0eA7fBdc8EBF36e9570
 - Interest Debt Token Implementation: 0x9560708Aad7b32Baf4F0E2990c7299B929C12475
@@ -110,6 +111,9 @@ Latest testnet deploy:
 - Aave Data Provider address: 0x9F267EAbe1Ec5a7cFf777083a7c2e2792505Dde3
 - Chainlink Oracle address: 0xD889830d042ACf44b9a941857Ae502d6a9c0A1B4
 - Collateral address: 0xDEf61c5c6EF283Ae7BF5f7ee91F74C47eB33ae8F
+- Cap Token Adapter address: 0xA10ceFc89397DeeB910A144F695D545F639b3f71
+- Staked Cap Adapter address: 0xA12BCC3e4f794a232172143D6b49b4FE1CC140fe
+
 
 Latest testnet zap deploy:
 - Zap Router: 0xC35a456138dE0634357eb47Ba5E74AFE9faE9a98
