@@ -12,7 +12,7 @@ contract MockAaveDataProvider {
         return variableBorrowRate;
     }
 
-    function getReserveData(address _asset)
+    function getReserveData(address)
         external
         view
         returns (

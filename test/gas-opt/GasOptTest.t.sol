@@ -17,6 +17,8 @@ import {PriceOracle} from "../../contracts/oracle/PriceOracle.sol";
 import {RateOracle} from "../../contracts/oracle/RateOracle.sol";
 import {ChainlinkAdapter} from "../../contracts/oracle/libraries/ChainlinkAdapter.sol";
 import {AaveAdapter} from "../../contracts/oracle/libraries/AaveAdapter.sol";
+import {CapTokenAdapter} from "../../contracts/oracle/libraries/CapTokenAdapter.sol";
+import {StakedCapAdapter} from "../../contracts/oracle/libraries/StakedCapAdapter.sol";
 import {MockAaveDataProvider} from "../mocks/MockAaveDataProvider.sol";
 import {MockChainlink} from "../mocks/MockChainlink.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
@@ -28,6 +30,7 @@ contract GasOptTest is Test {
     Lender public lender;
     Vault public vault;
     CapToken public cUSD;
+    StakedCap public scUSD;
 
     StakedCap public stakedCapImplementation;
     PrincipalDebtToken public principalDebtTokenImplementation;
@@ -38,6 +41,8 @@ contract GasOptTest is Test {
     RateOracle public rateOracle;
     address public aaveAdapter;
     address public chainlinkAdapter;
+    address public capTokenAdapter;
+    address public stakedCapAdapter;
     MockAaveDataProvider public aaveDataProvider;
     MockChainlink public chainlinkOracle;
 
@@ -152,6 +157,8 @@ contract GasOptTest is Test {
             // Deploy adapters libraries
             aaveAdapter = address(AaveAdapter);
             chainlinkAdapter = address(ChainlinkAdapter);
+            capTokenAdapter = address(new CapTokenAdapter(address(registry)));
+            stakedCapAdapter = address(new StakedCapAdapter(address(registry)));
 
             // Deploy mock data providers
             aaveDataProvider = new MockAaveDataProvider();
@@ -234,6 +241,16 @@ contract GasOptTest is Test {
             registry.addAsset(address(cUSD), address(usdt));
             registry.addAsset(address(cUSD), address(usdc));
             registry.addAsset(address(cUSD), address(usdx));
+
+            scUSD = StakedCap(registry.basketScToken(address(cUSD)));
+
+            // Set CapTokenAdapter as price source for cUSD
+            priceOracle.setAdapter(address(capTokenAdapter), address(capTokenAdapter));
+            priceOracle.setSource(address(cUSD), address(capTokenAdapter));
+
+            // Set StakedCapAdapter as price source for scUSD
+            priceOracle.setAdapter(address(stakedCapAdapter), address(stakedCapAdapter));
+            priceOracle.setSource(address(scUSD), address(stakedCapAdapter));
 
             vm.stopPrank();
         }
@@ -398,7 +415,6 @@ contract GasOptTest is Test {
         assertEq(usdt.balanceOf(address(vault)), initialVaultBalance + amountIn, "Vault should have received USDT");
 
         // Now stake the cUSD tokens
-        IStakedCap scUSD = IStakedCap(registry.basketScToken(address(cUSD)));
         cUSD.approve(address(scUSD), mintedAmount);
         scUSD.deposit(mintedAmount, user_stablecoin_minter);
 
@@ -497,5 +513,12 @@ contract GasOptTest is Test {
     function testRateOracle() public view {
         uint256 usdtRate = rateOracle.marketRate(address(usdt));
         assertEq(usdtRate, 1e17, "USDT borrow rate should be 10%, 1e18 being 100%");
+    }
+
+    function testCapAdapters() public view {
+        uint256 cUSDPrice = priceOracle.getPrice(address(cUSD));
+        uint256 scUSDPrice = priceOracle.getPrice(address(scUSD));
+        assertApproxEqAbs(cUSDPrice, 1e8, 10, "cUSD price should be $1");
+        assertApproxEqAbs(scUSDPrice, 1e8, 10, "scUSD price should be $1");
     }
 }
