@@ -2,7 +2,8 @@
 pragma solidity ^0.8.28;
 
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {IRegistry} from "../interfaces/IRegistry.sol";
+import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
+import {IVaultDataProvider} from "../interfaces/IVaultDataProvider.sol";
 
 import {ValidationLogic} from "./libraries/ValidationLogic.sol";
 import {AmountOutLogic} from "./libraries/AmountOutLogic.sol";
@@ -16,18 +17,27 @@ import {DataTypes} from "./libraries/types/DataTypes.sol";
 /// the supply of a excessive asset or burning for an scarce asset will charge fees on a kinked
 /// slope. Redeem can be used to avoid these fees by burning for the current ratio of assets.
 contract Minter is UUPSUpgradeable {
-    /// @notice Registry that controls fees, whitelisting assets and basket allocations
-    address public registry;
+    /// @notice Minter admin role
+    bytes32 public constant MINTER_ADMIN = keccak256("MINTER_ADMIN");
+
+    /// @notice Address provider
+    IAddressProvider public addressProvider;
+
+    /// @dev Only authorized addresses can call these functions
+    modifier onlyAdmin {
+        addressProvider.checkRole(MINTER_ADMIN, msg.sender);
+        _;
+    }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    /// @notice Initialize the registry address and default admin
-    /// @param _registry Registry address
-    function initialize(address _registry) external initializer {
-        registry = _registry;
+    /// @notice Initialize the address provider
+    /// @param _addressProvider Address provider
+    function initialize(address _addressProvider) external initializer {
+        addressProvider = IAddressProvider(_addressProvider);
     }
 
     /// @notice Swap a backing asset for a cap token or vice versa, fees are charged based on asset
@@ -50,7 +60,7 @@ contract Minter is UUPSUpgradeable {
     ) external returns (uint256 amountOut) {
         bool mint = ValidationLogic.validateSwap(
             DataTypes.ValidateSwapParams({
-                registry: registry,
+                vaultDataProvider: addressProvider.vaultDataProvider(),
                 tokenIn: _tokenIn,
                 tokenOut: _tokenOut,
                 deadline: _deadline
@@ -59,8 +69,9 @@ contract Minter is UUPSUpgradeable {
 
         address capToken = mint ? _tokenOut : _tokenIn;
         address asset = mint ? _tokenIn : _tokenOut;
-        address vault = IRegistry(registry).basketVault(capToken);
-        IRegistry.BasketFees memory basketFees = IRegistry(registry).basketFees(vault, asset);
+        address vault = IVaultDataProvider(addressProvider.vaultDataProvider()).vault(capToken);
+        IVaultDataProvider.AllocationData memory allocationData = 
+            IVaultDataProvider(addressProvider.vaultDataProvider()).allocationData(vault);
 
         (amountOut,) = AmountOutLogic.amountOut(
             DataTypes.AmountOutParams({
@@ -69,15 +80,12 @@ contract Minter is UUPSUpgradeable {
                 amount: _amountIn,
                 capToken: capToken,
                 vault: vault,
-                oracle: IRegistry(registry).priceOracle(),
-                assets: IRegistry(registry).basketAssets(capToken),
-                basketFees: DataTypes.BasketFees({
-                    optimalRatio: basketFees.optimalRatio,
-                    mintKinkRatio: basketFees.mintKinkRatio,
-                    burnKinkRatio: basketFees.burnKinkRatio,
-                    slope0: basketFees.slope0,
-                    slope1: basketFees.slope1
-                })
+                oracle: addressProvider.priceOracle(),
+                slope0: allocationData.slope0,
+                slope1: allocationData.slope0,
+                mintKinkRatio: allocationData.mintKinkRatio,
+                burnKinkRatio: allocationData.burnKinkRatio,
+                optimalRatio: allocationData.optimalRatio
             })
         );
 
@@ -109,18 +117,20 @@ contract Minter is UUPSUpgradeable {
         address _receiver,
         uint256 _deadline
     ) external returns (uint256[] memory amountOuts) {
-        ValidationLogic.validateRedeem(registry, _tokenIn, _deadline);
+        address vaultDataProvider = addressProvider.vaultDataProvider();
+        address vault = IVaultDataProvider(vaultDataProvider).vault(_tokenIn);
 
-        address vault = IRegistry(registry).basketVault(_tokenIn);
-        address[] memory assets = IRegistry(registry).basketAssets(_tokenIn);
+        ValidationLogic.validateRedeem(vault, _deadline);
+
+        IVaultDataProvider.VaultData memory vaultData = IVaultDataProvider(vaultDataProvider).vaultData(vault);
 
         (amountOuts,) = AmountOutLogic.redeemAmountOut(
             DataTypes.RedeemAmountOutParams({
                 capToken: _tokenIn,
                 amount: _amountIn,
                 vault: vault,
-                assets: assets,
-                redeemFee: IRegistry(registry).basketRedeemFee(_tokenIn)
+                assets: vaultData.assets,
+                redeemFee: vaultData.redeemFee
             })
         );
 
@@ -129,7 +139,7 @@ contract Minter is UUPSUpgradeable {
                 capToken: _tokenIn,
                 amount: _amountIn,
                 vault: vault,
-                assets: assets,
+                assets: vaultData.assets,
                 amountOuts: amountOuts,
                 minAmountOuts: _minAmountOuts,
                 receiver: _receiver
@@ -149,7 +159,7 @@ contract Minter is UUPSUpgradeable {
     {
         bool mint = ValidationLogic.validateSwap(
             DataTypes.ValidateSwapParams({
-                registry: address(registry),
+                vaultDataProvider: addressProvider.vaultDataProvider(),
                 tokenIn: _tokenIn,
                 tokenOut: _tokenOut,
                 deadline: block.timestamp
@@ -158,8 +168,9 @@ contract Minter is UUPSUpgradeable {
 
         address capToken = mint ? _tokenOut : _tokenIn;
         address asset = mint ? _tokenIn : _tokenOut;
-        address vault = IRegistry(registry).basketVault(capToken);
-        IRegistry.BasketFees memory basketFees = IRegistry(registry).basketFees(vault, asset);
+        address vault = IVaultDataProvider(addressProvider.vaultDataProvider()).vault(capToken);
+        IVaultDataProvider.AllocationData memory allocationData 
+            = IVaultDataProvider(addressProvider.vaultDataProvider()).allocationData(vault);
 
         (amountOut,) = AmountOutLogic.amountOut(
             DataTypes.AmountOutParams({
@@ -168,15 +179,12 @@ contract Minter is UUPSUpgradeable {
                 amount: _amountIn,
                 capToken: capToken,
                 vault: vault,
-                oracle: IRegistry(registry).priceOracle(),
-                assets: IRegistry(registry).basketAssets(capToken),
-                basketFees: DataTypes.BasketFees({
-                    optimalRatio: basketFees.optimalRatio,
-                    mintKinkRatio: basketFees.mintKinkRatio,
-                    burnKinkRatio: basketFees.burnKinkRatio,
-                    slope0: basketFees.slope0,
-                    slope1: basketFees.slope1
-                })
+                oracle: addressProvider.priceOracle(),
+                slope0: allocationData.slope0,
+                slope1: allocationData.slope0,
+                mintKinkRatio: allocationData.mintKinkRatio,
+                burnKinkRatio: allocationData.burnKinkRatio,
+                optimalRatio: allocationData.optimalRatio
             })
         );
     }
@@ -190,19 +198,23 @@ contract Minter is UUPSUpgradeable {
         view
         returns (uint256[] memory amountOuts)
     {
-        ValidationLogic.validateRedeem(registry, _tokenIn, block.timestamp);
-        address vault = IRegistry(registry).basketVault(_tokenIn);
+        address vaultDataProvider = addressProvider.vaultDataProvider();
+        address vault = IVaultDataProvider(vaultDataProvider).vault(_tokenIn);
+
+        ValidationLogic.validateRedeem(vault, block.timestamp);
+
+        IVaultDataProvider.VaultData memory vaultData = IVaultDataProvider(vaultDataProvider).vaultData(vault);
 
         (amountOuts,) = AmountOutLogic.redeemAmountOut(
             DataTypes.RedeemAmountOutParams({
                 capToken: _tokenIn,
                 amount: _amountIn,
                 vault: vault,
-                assets: IRegistry(registry).basketAssets(_tokenIn),
-                redeemFee: IRegistry(registry).basketRedeemFee(_tokenIn)
+                assets: vaultData.assets,
+                redeemFee: vaultData.redeemFee
             })
         );
     }
 
-    function _authorizeUpgrade(address) internal override {}
+    function _authorizeUpgrade(address) internal override onlyAdmin {}
 }

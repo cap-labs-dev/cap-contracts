@@ -41,8 +41,8 @@ library DataTypes {
         address interestDebtToken;
         uint256 amount;
         address caller;
-        address restakerRewarder;
-        address rewarder;
+        address restakerInterestReceiver;
+        address interestReceiver;
     }
 
     struct LiquidateParams {
@@ -59,8 +59,8 @@ library DataTypes {
         address collateral;
         address oracle;
         uint16 reserveCount;
-        address restakerRewarder;
-        address rewarder;
+        address restakerInterestReceiver;
+        address interestReceiver;
     }
 
     struct AgentParams {

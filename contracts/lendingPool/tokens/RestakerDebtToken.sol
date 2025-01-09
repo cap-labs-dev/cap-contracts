@@ -7,7 +7,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 
 import {Errors} from "../libraries/helpers/Errors.sol";
 import {WadRayMath} from "../libraries/math/WadRayMath.sol";
-import {IRegistry} from "../../interfaces/IRegistry.sol";
+import {IAddressProvider} from "../../interfaces/IAddressProvider.sol";
 import {IRateOracle} from "../../interfaces/IRateOracle.sol";
 
 /// @title Restaker debt token for a market on the Lender
@@ -19,8 +19,8 @@ import {IRateOracle} from "../../interfaces/IRateOracle.sol";
 contract RestakerDebtToken is ERC20Upgradeable {
     using WadRayMath for uint256;
 
-    /// @notice Registry contract
-    address public registry;
+    /// @notice Address provider
+    IAddressProvider public addressProvider;
 
     /// @notice Principal debt token
     address public debtToken;
@@ -48,7 +48,7 @@ contract RestakerDebtToken is ERC20Upgradeable {
 
     /// @dev Only the lender can use these functions
     modifier onlyLender() {
-        require(msg.sender == IRegistry(registry).lender(), Errors.CALLER_NOT_POOL_OR_EMERGENCY_ADMIN);
+        require(msg.sender == addressProvider.lender(), Errors.CALLER_NOT_POOL_OR_EMERGENCY_ADMIN);
         _;
     }
 
@@ -58,10 +58,11 @@ contract RestakerDebtToken is ERC20Upgradeable {
     }
 
     /// @notice Initialize the debt token with the underlying asset
-    /// @param _registry Registry address
+    /// @param _addressProvider Address provider
     /// @param _debtToken Principal debt token
     /// @param _asset Asset address
-    function initialize(address _registry, address _debtToken, address _asset) external initializer {
+    function initialize(address _addressProvider, address _debtToken, address _asset) external initializer {
+        addressProvider = IAddressProvider(_addressProvider);
         debtToken = _debtToken;
 
         string memory _name = string.concat("restaker", IERC20Metadata(_asset).name());
@@ -70,7 +71,6 @@ contract RestakerDebtToken is ERC20Upgradeable {
         asset = _asset;
 
         __ERC20_init(_name, _symbol);
-        registry = _registry;
     }
 
     /// @notice Update the interest per second of the agent and the scaled total supply
@@ -79,7 +79,7 @@ contract RestakerDebtToken is ERC20Upgradeable {
     function update(address _agent) external {
         _accrueInterest(_agent);
 
-        uint256 rate = IRateOracle(IRegistry(registry).rateOracle()).restakerRate(_agent);
+        uint256 rate = IRateOracle(addressProvider.rateOracle()).restakerRate(_agent);
         uint256 oldInterestPerSecond = interestPerSecond[_agent];
         uint256 newInterestPerSecond = IERC20(debtToken).balanceOf(_agent).rayMul(rate);
 

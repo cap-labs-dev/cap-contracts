@@ -3,35 +3,51 @@ pragma solidity ^0.8.28;
 
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import { IRegistry } from "../interfaces/IRegistry.sol";
+import { IAddressProvider } from "../interfaces/IAddressProvider.sol";
 import { IOracleAdapter } from "../interfaces/IOracleAdapter.sol";
 
 /// @title Oracle for fetching prices
 /// @author kexley, @capLabs
+/// @dev Payloads are stored on this contract and calculation logic is hosted on external libraries
 contract PriceOracle is UUPSUpgradeable {
+    /// @notice Price oracle admin role
+    bytes32 public constant PRICE_ORACLE_ADMIN = keccak256("PRICE_ORACLE_ADMIN");
 
-    /// @notice Registry address
-    address public registry;
+    /// @dev Oracle data for fetching prices
+    /// @param adapter Adapter address containing logic
+    /// @param payload Encoded data for calculating prices
+    struct OracleData {
+        address adapter;
+        bytes payload;
+    }
 
-    /// @notice Source of an asset's price
-    mapping(address => address) public source;
+    /// @notice Address provider
+    IAddressProvider public addressProvider;
 
-    /// @notice Backup source of an asset's price
-    mapping(address => address) public backupSource;
+    /// @notice Data used to calculate an asset's price
+    mapping(address => OracleData) public oracleData;
 
-    /// @notice Adapter for calculating price
-    mapping(address => address) public adapter;
-
-    /// @dev Not authorized to call
-    error NotAuth();
+    /// @notice Backup data used to calculate an asset's price
+    mapping(address => OracleData) public backupOracleData;
 
     /// @dev No adapter will result in failed calculations
     error NoAdapter();
 
+    /// @dev Set oracle data
+    event SetOracleData(address asset, OracleData data);
+
+    /// @dev Set backup oracle data
+    event SetBackupOracleData(address asset, OracleData data);
+
     /// @dev Only authorized addresses can call these functions
-    modifier onlyAuth {
-        if (msg.sender != IRegistry(registry).assetManager()) revert NotAuth();
+    modifier onlyAdmin {
+        _onlyAdmin();
         _;
+    }
+
+    /// @dev Reverts if the caller is not admin
+    function _onlyAdmin() private view {
+        addressProvider.checkRole(PRICE_ORACLE_ADMIN, msg.sender);
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -39,52 +55,53 @@ contract PriceOracle is UUPSUpgradeable {
         _disableInitializers();
     }
 
-    /// @notice Initialize the oracle with the registry address
-    /// @param _registry Registry address
-    function initialize(address _registry) external initializer {
-        registry = _registry;
+    /// @notice Initialize the oracle with the address provider
+    /// @param _addressProvider Address provider
+    function initialize(address _addressProvider) external initializer {
+        addressProvider = IAddressProvider(_addressProvider);
     }
 
     /// @notice Fetch the price for an asset
+    /// @dev If initial price fetch fails then a backup source is used, never reverts
     /// @param _asset Asset address
     /// @return price Price of the asset
-    function getPrice(address _asset) external view returns (uint256 price) {
-        address sourceAddress = source[_asset];
-        address adapterAddress = adapter[sourceAddress];
+    function getPrice(address _asset) external returns (uint256 price) {
+        OracleData memory data = oracleData[_asset];
 
-        price = IOracleAdapter(adapterAddress).price(sourceAddress, _asset);
-
+        price = _getPrice(data.adapter, data.payload);
+        
         if (price == 0) {
-            sourceAddress = backupSource[_asset];
-            adapterAddress = adapter[sourceAddress];
-
-            price = IOracleAdapter(adapterAddress).price(sourceAddress, _asset);
+            data = backupOracleData[_asset];
+            price = _getPrice(data.adapter, data.payload);
         }
     }
 
     /// @notice Set a price source for an asset
     /// @param _asset Asset address
-    /// @param _source Source of an asset price
-    function setSource(address _asset, address _source) external onlyAuth {
-        if (adapter[_source] == address(0)) revert NoAdapter();
-        source[_asset] = _source;
+    /// @param _oracleData Oracle data
+    function setOracleData(address _asset, OracleData calldata _oracleData) external onlyAdmin {
+        if (_oracleData.adapter == address(0)) revert NoAdapter();
+        oracleData[_asset] = _oracleData;
+        emit SetOracleData(_asset, _oracleData);
     }
 
     /// @notice Set a backup price source for an asset
     /// @param _asset Asset address
-    /// @param _source Backup source of an asset price
-    function setBackupSource(address _asset, address _source) external onlyAuth {
-        if (adapter[_source] == address(0)) revert NoAdapter();
-        backupSource[_asset] = _source;
+    /// @param _oracleData Oracle data
+    function setBackupOracleData(address _asset, OracleData calldata _oracleData) external onlyAdmin {
+        if (_oracleData.adapter == address(0)) revert NoAdapter();
+        backupOracleData[_asset] = _oracleData;
+        emit SetBackupOracleData(_asset, _oracleData);
     }
 
-    /// @notice Set an adapter for a price source
-    /// @param _source Source of an asset price
-    /// @param _adapter Adapter for calculating the price
-    function setAdapter(address _source, address _adapter) external onlyAuth {
-        if (_adapter == address(0)) revert NoAdapter();
-        adapter[_source] = _adapter;
+    /// @dev Calculate price using an adapter and payload but do not revert on errors
+    /// @param _adapter Adapter for calculation logic
+    /// @param _payload Encoded call to adapter with all required data
+    /// @return price Calculated price
+    function _getPrice(address _adapter, bytes memory _payload) private returns (uint256 price) {
+        (bool success, bytes memory returnedData) = _adapter.call(_payload);
+        if (success) price = abi.decode(returnedData, (uint256));
     }
 
-    function _authorizeUpgrade(address) internal override {}
+    function _authorizeUpgrade(address) internal override onlyAdmin {}
 }

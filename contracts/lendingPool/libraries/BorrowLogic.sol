@@ -103,7 +103,7 @@ library BorrowLogic {
 
         if (interestRepaid > 0) {
             interestRepaid = IDebtToken(params.interestDebtToken).burn(params.agent, interestRepaid);
-            IERC20(params.asset).safeTransferFrom(params.caller, params.rewarder, interestRepaid);
+            IERC20(params.asset).safeTransferFrom(params.caller, params.interestReceiver, interestRepaid);
         }
 
         if (principalRepaid > 0) {
@@ -115,7 +115,7 @@ library BorrowLogic {
 
         if (restakerRepaid > 0) {
             restakerRepaid = IDebtToken(params.restakerDebtToken).burn(params.agent, restakerRepaid);
-            IERC20(params.asset).safeTransferFrom(params.caller, params.restakerRewarder, restakerRepaid);
+            IERC20(params.asset).safeTransferFrom(params.caller, params.restakerInterestReceiver, restakerRepaid);
         }
 
         if (

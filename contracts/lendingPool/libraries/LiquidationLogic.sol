@@ -54,8 +54,8 @@ library LiquidationLogic {
                 interestDebtToken: params.interestDebtToken,
                 amount: params.amount,
                 caller: params.caller,
-                restakerRewarder: params.restakerRewarder,
-                rewarder: params.rewarder
+                restakerInterestReceiver: params.restakerInterestReceiver,
+                interestReceiver: params.interestReceiver
             })
         );
 

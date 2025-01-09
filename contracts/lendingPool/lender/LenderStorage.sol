@@ -8,7 +8,7 @@ import {DataTypes} from "../libraries/types/DataTypes.sol";
 /// @notice Storage for the Lender
 contract LenderStorage {
     /// @dev Address provider for all contracts
-    address internal ADDRESS_PROVIDER;
+    address internal addressProvider;
 
     /// @dev Data mapping for each reserve
     mapping(address => DataTypes.ReserveData) internal _reservesData;

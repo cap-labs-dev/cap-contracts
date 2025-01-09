@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { IRegistry } from "../../interfaces/IRegistry.sol";
+import { IVaultDataProvider } from "../../interfaces/IVaultDataProvider.sol";
 
 import { Errors } from "./helpers/Errors.sol";
 import { DataTypes } from "./types/DataTypes.sol";
@@ -10,12 +10,11 @@ import { DataTypes } from "./types/DataTypes.sol";
 /// @author kexley, @capLabs
 /// @notice Validation logic for cap token minting/burning
 library ValidationLogic {
-
     /// @notice Validate if a cap token can be redeemed
-    /// @param _capToken Token to redeem
+    /// @param _vault Vault of a cap token
     /// @param _deadline Deadline for redeem to take place
-    function validateRedeem(address registry, address _capToken, uint256 _deadline) external view {
-        require(IRegistry(registry).supportedCToken(_capToken), Errors.ASSET_NOT_LISTED);
+    function validateRedeem(address _vault, uint256 _deadline) external view {
+        require(_vault != address(0), Errors.ASSET_NOT_LISTED);
         require(_deadline >= block.timestamp, Errors.PAST_DEADLINE);
     }
 
@@ -23,14 +22,36 @@ library ValidationLogic {
     /// @param params Parameters to check
     /// @return mint True if mint action or false if burning
     function validateSwap(DataTypes.ValidateSwapParams memory params) external view returns (bool mint) {
-        IRegistry registry = IRegistry(params.registry);
-        mint = registry.supportedCToken(params.tokenOut) 
-            && registry.basketSupportsAsset(params.tokenOut, params.tokenIn);
+        address vaultOut = IVaultDataProvider(params.vaultDataProvider).vault(params.tokenOut);
+
+        if (vaultOut != address(0)) {
+            IVaultDataProvider.VaultData memory tokenOutVaultData 
+                = IVaultDataProvider(params.vaultDataProvider).vaultData(vaultOut);
+
+            uint256 length = tokenOutVaultData.assets.length;
+            for (uint256 i; i < length; ++i) {
+                if (tokenOutVaultData.assets[i] == params.tokenIn) {
+                    mint = true;
+                    break;
+                }
+            }
+        }
 
         bool burn;
         if (!mint) {
-            burn = registry.supportedCToken(params.tokenIn) 
-                && registry.basketSupportsAsset(params.tokenIn, params.tokenOut);
+            address vaultIn = IVaultDataProvider(params.vaultDataProvider).vault(params.tokenIn);
+            if (vaultIn != address(0)) {
+                IVaultDataProvider.VaultData memory tokenInVaultData 
+                    = IVaultDataProvider(params.vaultDataProvider).vaultData(vaultIn);
+
+                uint256 length = tokenInVaultData.assets.length;
+                for (uint256 i; i < length; ++i) {
+                    if (tokenInVaultData.assets[i] == params.tokenOut) {
+                        burn = true;
+                        break;
+                    }
+                }
+            }
         }
 
         require(mint || burn, Errors.PAIR_NOT_SUPPORTED);

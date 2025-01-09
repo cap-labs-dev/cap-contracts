@@ -8,11 +8,9 @@ import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {AccessControlEnumerableUpgradeable} from
-    "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-
-import {IRegistry} from "../interfaces/IRegistry.sol";
+import {IVaultDataProvider} from "../interfaces/IVaultDataProvider.sol";
+import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
 import {IMinter} from "../interfaces/IMinter.sol";
 
 /// @title Staked Cap Token
@@ -24,8 +22,8 @@ import {IMinter} from "../interfaces/IMinter.sol";
 contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
     using SafeERC20 for IERC20;
 
-    /// @notice Registry for checking which underlying assets belong to the cap token basket
-    address public registry;
+    /// @notice Address provider
+    IAddressProvider public addressProvider;
 
     /// @notice Stored total balance of cap tokens on this contract, including locked
     uint256 public storedTotal;
@@ -45,17 +43,16 @@ contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
     }
 
     /// @notice Initialize the staked cap token by matching the name and symbol of the underlying
+    /// @param _addressProvider Address of the address provider
     /// @param _asset Address of the cap token
-    /// @param _registry Address of the registry
-    function initialize(address _asset, address _registry) external initializer {
+    function initialize(address _addressProvider, address _asset) external initializer {
+        addressProvider = IAddressProvider(_addressProvider);
         string memory _name = string.concat("s", IERC20Metadata(_asset).name());
         string memory _symbol = string.concat("s", IERC20Metadata(_asset).symbol());
 
         __ERC4626_init(IERC20(_asset));
         __ERC20_init(_name, _symbol);
         __ERC20Permit_init(_name);
-
-        registry = _registry;
     }
 
     /// @notice Override the decimals function to match underlying decimals
@@ -77,8 +74,10 @@ contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
 
     /// @dev Swap yield using the minter into the cap token
     function _swap() internal {
-        address[] memory assets = IRegistry(registry).basketAssets(asset());
-        address minter = IRegistry(registry).minter();
+        IVaultDataProvider vaultDataProvider = IVaultDataProvider(addressProvider.vaultDataProvider());
+        address vault = vaultDataProvider.vault(asset());
+        address[] memory assets = vaultDataProvider.vaultData(vault).assets;
+        address minter = addressProvider.minter();
         for (uint256 i; i < assets.length; ++i) {
             uint256 balance = IERC20(assets[i]).balanceOf(address(this));
             if (balance > 0) {

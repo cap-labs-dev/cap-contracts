@@ -10,7 +10,7 @@ import {ViewLogic} from "../libraries/ViewLogic.sol";
 import {CloneLogic} from "../libraries/CloneLogic.sol";
 import {DataTypes} from "../libraries/types/DataTypes.sol";
 import {Errors} from "../libraries/helpers/Errors.sol";
-import {IRegistry} from "../../interfaces/IRegistry.sol";
+import {IAddressProvider} from "../../interfaces/IAddressProvider.sol";
 import {LenderStorage} from "./LenderStorage.sol";
 
 /// @title Lender for covered agents
@@ -19,8 +19,12 @@ import {LenderStorage} from "./LenderStorage.sol";
 /// @dev Borrow interest rates are calculated from the underlying utilization rates of the assets
 /// in the vaults.
 contract Lender is UUPSUpgradeable, LenderStorage {
-    modifier onlyLenderAdmin() {
-        require(msg.sender == IRegistry(ADDRESS_PROVIDER).assetManager(), Errors.CALLER_NOT_POOL_ADMIN);
+    /// @notice Lender admin role
+    bytes32 public constant LENDER_ADMIN = keccak256("LENDER_ADMIN");
+
+    /// @dev Only admin are allowed to call certain functions
+    modifier onlyAdmin() {
+        IAddressProvider(addressProvider).checkRole(LENDER_ADMIN, msg.sender);
         _;
     }
 
@@ -30,9 +34,9 @@ contract Lender is UUPSUpgradeable, LenderStorage {
     }
 
     /// @notice Initialize the lender
-    /// @param _addressProvider Registry address
+    /// @param _addressProvider Address provider
     function initialize(address _addressProvider) external initializer {
-        ADDRESS_PROVIDER = _addressProvider;
+        addressProvider = _addressProvider;
     }
 
     /// @notice Borrow an asset
@@ -54,8 +58,8 @@ contract Lender is UUPSUpgradeable, LenderStorage {
                 interestDebtToken: _reservesData[_asset].interestDebtToken,
                 amount: _amount,
                 receiver: _receiver,
-                collateral: IRegistry(ADDRESS_PROVIDER).collateral(),
-                oracle: IRegistry(ADDRESS_PROVIDER).priceOracle(),
+                collateral: IAddressProvider(addressProvider).collateral(),
+                oracle: IAddressProvider(addressProvider).priceOracle(),
                 reserveCount: _reservesCount
             })
         );
@@ -84,8 +88,8 @@ contract Lender is UUPSUpgradeable, LenderStorage {
                 interestDebtToken: _reservesData[_asset].interestDebtToken,
                 amount: _amount,
                 caller: msg.sender,
-                restakerRewarder: IRegistry(ADDRESS_PROVIDER).restakerRewarder(_agent),
-                rewarder: IRegistry(ADDRESS_PROVIDER).rewarder(_asset)
+                restakerInterestReceiver: IAddressProvider(addressProvider).restakerInterestReceiver(_agent),
+                interestReceiver: IAddressProvider(addressProvider).interestReceiver(_asset)
             })
         );
     }
@@ -111,11 +115,11 @@ contract Lender is UUPSUpgradeable, LenderStorage {
                 bonus: _reservesData[_asset].bonus,
                 amount: _amount,
                 caller: msg.sender,
-                collateral: IRegistry(ADDRESS_PROVIDER).collateral(),
-                oracle: IRegistry(ADDRESS_PROVIDER).priceOracle(),
+                collateral: IAddressProvider(addressProvider).collateral(),
+                oracle: IAddressProvider(addressProvider).priceOracle(),
                 reserveCount: _reservesCount,
-                restakerRewarder: IRegistry(ADDRESS_PROVIDER).restakerRewarder(_agent),
-                rewarder: IRegistry(ADDRESS_PROVIDER).rewarder(_asset)
+                restakerInterestReceiver: IAddressProvider(addressProvider).restakerInterestReceiver(_agent),
+                interestReceiver: IAddressProvider(addressProvider).interestReceiver(_asset)
             })
         );
     }
@@ -138,8 +142,8 @@ contract Lender is UUPSUpgradeable, LenderStorage {
             _agentConfig[_agent],
             DataTypes.AgentParams({
                 agent: _agent,
-                collateral: IRegistry(ADDRESS_PROVIDER).collateral(),
-                oracle: IRegistry(ADDRESS_PROVIDER).priceOracle(),
+                collateral: IAddressProvider(addressProvider).collateral(),
+                oracle: IAddressProvider(addressProvider).priceOracle(),
                 reserveCount: _reservesCount
             })
         );
@@ -149,7 +153,7 @@ contract Lender is UUPSUpgradeable, LenderStorage {
     /// @param _asset Asset address
     /// @param _vault Vault address
     /// @param _liquidationBonus Bonus percentage for liquidating a market to cover holding risk
-    function addAsset(address _asset, address _vault, uint256 _liquidationBonus) external onlyLenderAdmin {
+    function addAsset(address _asset, address _vault, uint256 _liquidationBonus) external onlyAdmin {
         if (
             ReserveLogic.addAsset(
                 _reservesData,
@@ -157,12 +161,12 @@ contract Lender is UUPSUpgradeable, LenderStorage {
                 DataTypes.AddAssetParams({
                     asset: _asset,
                     vault: _vault,
-                    principalDebtTokenInstance: IRegistry(ADDRESS_PROVIDER).principalDebtTokenInstance(),
-                    restakerDebtTokenInstance: IRegistry(ADDRESS_PROVIDER).restakerDebtTokenInstance(),
-                    interestDebtTokenInstance: IRegistry(ADDRESS_PROVIDER).interestDebtTokenInstance(),
+                    principalDebtTokenInstance: IAddressProvider(addressProvider).principalDebtTokenInstance(),
+                    restakerDebtTokenInstance: IAddressProvider(addressProvider).restakerDebtTokenInstance(),
+                    interestDebtTokenInstance: IAddressProvider(addressProvider).interestDebtTokenInstance(),
                     bonus: _liquidationBonus,
                     reserveCount: _reservesCount,
-                    addressProvider: ADDRESS_PROVIDER
+                    addressProvider: addressProvider
                 })
             )
         ) {
@@ -172,23 +176,23 @@ contract Lender is UUPSUpgradeable, LenderStorage {
 
     /// @notice Remove asset from lending when there is no borrows
     /// @param _asset Asset address
-    function removeAsset(address _asset) external onlyLenderAdmin {
+    function removeAsset(address _asset) external onlyAdmin {
         ReserveLogic.removeAsset(_reservesData, _reservesList, _asset);
     }
 
-    /// @notice Pause an asset
+    /// @notice Pause an asset from being borrowed
     /// @param _asset Asset address
     /// @param _pause True if pausing or false if unpausing
-    function pauseAsset(address _asset, bool _pause) external onlyLenderAdmin {
+    function pauseAsset(address _asset, bool _pause) external onlyAdmin {
         ReserveLogic.pauseAsset(_reservesData, _asset, _pause);
     }
 
     /// @notice Upgrade an instance owned by the lender
     /// @param _instance Instance of a contract owned by the lender
     /// @param _implementation New implementation address
-    function upgradeInstance(address _instance, address _implementation) external onlyLenderAdmin {
+    function upgradeImplementation(address _instance, address _implementation) external onlyAdmin {
         CloneLogic.upgradeTo(_instance, _implementation);
     }
 
-    function _authorizeUpgrade(address) internal override {}
+    function _authorizeUpgrade(address) internal override onlyAdmin {}
 }

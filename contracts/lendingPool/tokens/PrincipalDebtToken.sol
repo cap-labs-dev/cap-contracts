@@ -6,14 +6,14 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import {Errors} from "../libraries/helpers/Errors.sol";
-import {IRegistry} from "../../interfaces/IRegistry.sol";
+import {IAddressProvider} from "../../interfaces/IAddressProvider.sol";
 
 /// @title Principal debt token for a market on the Lender
 /// @author kexley, @capLabs
 /// @notice Principal debt tokens are minted 1:1 with the principal loan amount
 contract PrincipalDebtToken is ERC20Upgradeable {
-    /// @notice Registry contract
-    address public registry;
+    /// @notice Address provider
+    IAddressProvider public addressProvider;
 
     /// @notice asset Underlying asset
     address public asset;
@@ -23,7 +23,7 @@ contract PrincipalDebtToken is ERC20Upgradeable {
 
     /// @dev Only the lender can use these functions
     modifier onlyLender() {
-        require(msg.sender == IRegistry(registry).lender(), Errors.CALLER_NOT_POOL_OR_EMERGENCY_ADMIN);
+        require(msg.sender == addressProvider.lender(), Errors.CALLER_NOT_POOL_OR_EMERGENCY_ADMIN);
         _;
     }
 
@@ -33,16 +33,16 @@ contract PrincipalDebtToken is ERC20Upgradeable {
     }
 
     /// @notice Initialize the debt token with the underlying asset
-    /// @param _registry Registry address
+    /// @param _addressProvider Address provider
     /// @param _asset Asset address
-    function initialize(address _registry, address _asset) external initializer {
+    function initialize(address _addressProvider, address _asset) external initializer {
+        addressProvider = IAddressProvider(_addressProvider);
         string memory _name = string.concat("debt", IERC20Metadata(_asset).name());
         string memory _symbol = string.concat("debt", IERC20Metadata(_asset).symbol());
         _decimals = IERC20Metadata(_asset).decimals();
         asset = _asset;
 
         __ERC20_init(_name, _symbol);
-        registry = _registry;
     }
 
     /// @notice Match decimals with underlying asset

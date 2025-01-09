@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {IVaultDataProvider} from "../../../interfaces/IVaultDataProvider.sol";
+
 library DataTypes {
 
     struct MintBurnParams {
@@ -19,23 +21,22 @@ library DataTypes {
         address capToken;
         address vault;
         address oracle;
-        address[] assets;
-        BasketFees basketFees;
+        uint256 slope0;
+        uint256 slope1;
+        uint256 mintKinkRatio;
+        uint256 burnKinkRatio;
+        uint256 optimalRatio;
     }
 
     struct FeeSlopeParams {
         bool mint;
         uint256 amount;
         uint256 ratio;
-        BasketFees basketFees;
-    }
-
-    struct BasketFees {
-        uint256 optimalRatio;
-        uint256 mintKinkRatio;
-        uint256 burnKinkRatio;
         uint256 slope0;
         uint256 slope1;
+        uint256 mintKinkRatio;
+        uint256 burnKinkRatio;
+        uint256 optimalRatio;
     }
 
     struct RedeemParams {
@@ -57,7 +58,7 @@ library DataTypes {
     }
 
     struct ValidateSwapParams {
-        address registry;
+        address vaultDataProvider;
         address tokenIn;
         address tokenOut;
         uint256 deadline;

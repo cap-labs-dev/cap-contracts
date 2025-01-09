@@ -8,7 +8,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {Errors} from "../libraries/helpers/Errors.sol";
 import {MathUtils} from "../libraries/math/MathUtils.sol";
 import {WadRayMath} from "../libraries/math/WadRayMath.sol";
-import {IRegistry} from "../../interfaces/IRegistry.sol";
+import {IAddressProvider} from "../../interfaces/IAddressProvider.sol";
 import {IRateOracle} from "../../interfaces/IRateOracle.sol";
 
 /// @title Interest debt token for a market on the Lender
@@ -19,8 +19,8 @@ contract InterestDebtToken is ERC20Upgradeable {
     using MathUtils for uint256;
     using WadRayMath for uint256;
 
-    /// @notice Registry contract
-    address public registry;
+    /// @notice Address provider
+    IAddressProvider public addressProvider;
 
     /// @notice Principal debt token
     address public debtToken;
@@ -51,7 +51,7 @@ contract InterestDebtToken is ERC20Upgradeable {
 
     /// @dev Only the lender can use these functions
     modifier onlyLender() {
-        require(msg.sender == IRegistry(registry).lender(), Errors.CALLER_NOT_POOL_OR_EMERGENCY_ADMIN);
+        require(msg.sender == addressProvider.lender(), Errors.CALLER_NOT_POOL_OR_EMERGENCY_ADMIN);
         _;
     }
 
@@ -61,10 +61,11 @@ contract InterestDebtToken is ERC20Upgradeable {
     }
 
     /// @notice Initialize the interest debt token with the underlying asset
-    /// @param _registry Registry address
+    /// @param _addressProvider Address provider
     /// @param _debtToken Principal debt token
     /// @param _asset Asset address
-    function initialize(address _registry, address _debtToken, address _asset) external initializer {
+    function initialize(address _addressProvider, address _debtToken, address _asset) external initializer {
+        addressProvider = IAddressProvider(_addressProvider);
         debtToken = _debtToken;
 
         string memory _name = string.concat("interest", IERC20Metadata(_asset).name());
@@ -73,7 +74,6 @@ contract InterestDebtToken is ERC20Upgradeable {
         asset = _asset;
 
         __ERC20_init(_name, _symbol);
-        registry = _registry;
         index = 1e27;
     }
 
@@ -150,7 +150,7 @@ contract InterestDebtToken is ERC20Upgradeable {
     /// @notice Next interest rate on update
     /// @param rate Interest rate
     function nextInterestRate() public view returns (uint256 rate) {
-        address oracle = IRegistry(registry).rateOracle();
+        address oracle = addressProvider.rateOracle();
         uint256 marketRate = IRateOracle(oracle).marketRate(asset);
         uint256 benchmarkRate = IRateOracle(oracle).benchmarkRate(asset);
 

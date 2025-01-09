@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IVault } from "../../interfaces/IVault.sol";
 import { IPriceOracle } from "../../interfaces/IPriceOracle.sol";
 
@@ -11,7 +12,6 @@ import { DataTypes } from "./types/DataTypes.sol";
 /// @author kexley, @capLabs
 /// @notice Amount out logic for exchanging underlying assets with cap tokens
 library AmountOutLogic {
-
     /// @notice Calculate the output amounts for redeeming a cap token for a proportional weighting
     /// @param params Parameters for redeeming
     /// @return amounts Amount of underlying assets withdrawn
@@ -44,7 +44,11 @@ library AmountOutLogic {
                 mint: params.mint,
                 amount: amountOutBeforeFee,
                 ratio: newRatio,
-                basketFees: params.basketFees
+                slope0: params.slope0,
+                slope1: params.slope0,
+                mintKinkRatio: params.mintKinkRatio,
+                burnKinkRatio: params.burnKinkRatio,
+                optimalRatio: params.optimalRatio
             })
         );
     }
@@ -56,33 +60,25 @@ library AmountOutLogic {
     function _amountOutBeforeFee(
         DataTypes.AmountOutParams memory params
     ) internal view returns (uint256 amount, uint256 newRatio) {
-        uint256 basketValue;
-        uint256 mintValue;
-        uint256 basketAssetValue;
-        uint256 assetPrice;
-        uint256 assetLength = params.assets.length;
+        uint256 assetPrice = IPriceOracle(params.oracle).getPrice(params.asset);
+        uint256 capPrice = IPriceOracle(params.oracle).getPrice(params.capToken);
 
-        for (uint256 i; i < assetLength; ++i) {
-            address asset = params.assets[i];
-            uint256 price = IPriceOracle(params.oracle).getPrice(asset);
-            uint256 value = IVault(params.vault).totalSupplies(asset) * price;
+        uint8 assetDecimals = IERC20Metadata(params.asset).decimals();
+        uint8 capDecimals = IERC20Metadata(params.capToken).decimals();
 
-            if (asset == params.asset) {
-                basketAssetValue = value;
-                assetPrice = price;
-                if (params.mint) mintValue = params.amount * price;
-            }
+        uint256 capValue = IERC20(params.capToken).totalSupply() * capPrice / capDecimals;
+        uint256 allocationValue = IVault(params.vault).totalSupplies(params.asset) 
+            * assetPrice / assetDecimals;
 
-            basketValue += value;
-        }
-
+        uint256 assetValue;
         if (params.mint) {
-            newRatio = ( basketAssetValue + mintValue ) * 1e27 / ( basketValue + mintValue );
-            amount = mintValue * IERC20(params.capToken).totalSupply() / basketValue;
+            assetValue = params.amount * assetPrice / assetDecimals;
+            newRatio = ( allocationValue + assetValue ) * 1e27 / ( capValue + assetValue );
+            amount = assetValue * capDecimals / capPrice;
         } else {
-            mintValue = params.amount * basketValue / IERC20(params.capToken).totalSupply();
-            newRatio = ( basketAssetValue - mintValue ) * 1e27 / ( basketValue - mintValue );
-            amount = mintValue / assetPrice;
+            assetValue = params.amount * capPrice / capDecimals;
+            newRatio = ( allocationValue - assetValue ) * 1e27 / ( capValue - assetValue );
+            amount = assetValue * assetDecimals / assetPrice;
         }
     }
 
@@ -96,21 +92,21 @@ library AmountOutLogic {
     ) internal pure returns (uint256 amount, uint256 fee) {
         uint256 rate;
         if (params.mint) {
-            if (params.ratio > params.basketFees.optimalRatio) {
-                if (params.ratio > params.basketFees.mintKinkRatio) {
-                    uint256 excessRatio = params.ratio - params.basketFees.mintKinkRatio;
-                    rate = params.basketFees.slope0 + ( params.basketFees.slope1 * excessRatio );
+            if (params.ratio > params.optimalRatio) {
+                if (params.ratio > params.mintKinkRatio) {
+                    uint256 excessRatio = params.ratio - params.mintKinkRatio;
+                    rate = params.slope0 + ( params.slope1 * excessRatio );
                 } else {
-                    rate = params.basketFees.slope0 * params.ratio / params.basketFees.mintKinkRatio;
+                    rate = params.slope0 * params.ratio / params.mintKinkRatio;
                 }
             }
         } else {
-            if (params.ratio < params.basketFees.optimalRatio) {
-                if (params.ratio < params.basketFees.burnKinkRatio) {
-                    uint256 excessRatio = params.basketFees.burnKinkRatio - params.ratio;
-                    rate = params.basketFees.slope0 + ( params.basketFees.slope1 * excessRatio );
+            if (params.ratio < params.optimalRatio) {
+                if (params.ratio < params.burnKinkRatio) {
+                    uint256 excessRatio = params.burnKinkRatio - params.ratio;
+                    rate = params.slope0 + ( params.slope1 * excessRatio );
                 } else {
-                    rate = params.basketFees.slope0 * params.basketFees.burnKinkRatio / params.ratio;
+                    rate = params.slope0 * params.burnKinkRatio / params.ratio;
                 }
             }
         }

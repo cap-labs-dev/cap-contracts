@@ -3,32 +3,31 @@ pragma solidity ^0.8.28;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { AccessControlEnumerableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-import { IRegistry } from "../interfaces/IRegistry.sol";
+import { IAddressProvider } from "../interfaces/IAddressProvider.sol";
+import { IVaultDataProvider } from "../interfaces/IVaultDataProvider.sol";
 
 /// @title Vault for storing the backing for cTokens
 /// @author kexley, @capLabs
 /// @notice Tokens are supplied by cToken minters and borrowed by covered agents
 /// @dev Supplies, borrows and utilization rates are tracked. Interest rates should be computed and
 /// charged on the external contracts, only the principle amount is counted on this contract. Asset
-/// whitelisting is handled via the registry.
-contract Vault is UUPSUpgradeable, PausableUpgradeable, AccessControlEnumerableUpgradeable {
+/// whitelisting is handled via the vault data provider.
+contract Vault is UUPSUpgradeable {
     using SafeERC20 for IERC20;
 
-    /// @notice Registry that controls whitelisting assets
-    IRegistry public registry;
+    /// @notice Vault admin role
+    bytes32 public constant VAULT_ADMIN = keccak256("VAULT_ADMIN");
 
     /// @notice Supplier role
-    bytes32 public constant SUPPLIER_ROLE = keccak256("SUPPLIER_ROLE");
+    bytes32 public constant VAULT_SUPPLIER = keccak256("VAULT_SUPPLIER");
 
     /// @notice Borrower role
-    bytes32 public constant BORROWER_ROLE = keccak256("BORROWER_ROLE");
+    bytes32 public constant VAULT_BORROWER = keccak256("VAULT_BORROWER");
 
-    /// @notice Pauser role
-    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    /// @notice Address provider
+    IAddressProvider public addressProvider;
 
     /// @notice Total supply of an asset to this contract
     mapping(address => uint256) public totalSupplies;
@@ -51,6 +50,9 @@ contract Vault is UUPSUpgradeable, PausableUpgradeable, AccessControlEnumerableU
     /// @dev Only non-supported assets can be rescued
     error AssetNotRescuable(address asset);
 
+    /// @dev Supplies and borrows are paused
+    error Paused();
+
     /// @dev Deposit made
     event Deposit(address indexed depositor, address indexed asset, uint256 amount);
 
@@ -63,24 +65,67 @@ contract Vault is UUPSUpgradeable, PausableUpgradeable, AccessControlEnumerableU
     /// @dev Repayment made
     event Repay(address indexed repayer, address indexed asset, uint256 amount);
 
+    /// @dev Only admin are allowed to call functions
+    modifier onlyAdmin {
+        _onlyAdmin();
+        _;
+    }
+
+    /// @dev Only suppliers are allowed to call functions
+    modifier onlySupplier {
+        _onlySupplier();
+        _;
+    }
+
+    /// @dev Only borrowers are allowed to call functions
+    modifier onlyBorrower {
+        _onlyBorrower();
+        _;
+    }
+
+    /// @dev Only allowed when not paused
+    modifier whenNotPaused {
+        _whenNotPaused();
+        _;
+    }
+
+    /// @dev Reverts if the caller is not admin
+    function _onlyAdmin() private view {
+        addressProvider.checkRole(VAULT_ADMIN, msg.sender);
+    }
+
+    /// @dev Reverts if the caller is not supplier
+    function _onlySupplier() private view {
+        addressProvider.checkRole(VAULT_SUPPLIER, msg.sender);
+    }
+
+    /// @dev Reverts if the caller is not borrower
+    function _onlyBorrower() private view {
+        addressProvider.checkRole(VAULT_BORROWER, msg.sender);
+    }
+
+    /// @dev Reverts if the vault is not paused
+    function _whenNotPaused() private view {
+        IVaultDataProvider vaultDataProvider = IVaultDataProvider(addressProvider.vaultDataProvider());
+        if (!vaultDataProvider.paused(address(this))) revert Paused();
+    }
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    /// @notice Initialize the registry address and default admin
-    /// @param _registry Registry address
-    function initialize(address _registry) initializer external {
-        registry = IRegistry(_registry);
-        __Pausable_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    /// @notice Initialize the address provider address
+    /// @param _addressProvider Address provider address
+    function initialize(address _addressProvider) initializer external {
+        addressProvider = IAddressProvider(_addressProvider);
     }
 
     /// @notice Deposit an asset
     /// @dev This contract must have approval to move asset from msg.sender
     /// @param _asset Whitelisted asset to deposit
     /// @param _amount Amount of asset to deposit
-    function deposit(address _asset, uint256 _amount) external whenNotPaused onlyRole(SUPPLIER_ROLE) {
+    function deposit(address _asset, uint256 _amount) external whenNotPaused onlySupplier {
         _validate(_asset);
         _updateIndex(_asset);
         totalSupplies[_asset] += _amount;
@@ -96,7 +141,7 @@ contract Vault is UUPSUpgradeable, PausableUpgradeable, AccessControlEnumerableU
     /// @param _asset Asset to withdraw
     /// @param _amount Amount of asset to withdraw
     /// @param _receiver Receiver of the withdrawal
-    function withdraw(address _asset, uint256 _amount, address _receiver) external onlyRole(SUPPLIER_ROLE) {
+    function withdraw(address _asset, uint256 _amount, address _receiver) external onlySupplier {
         _validate(_asset);
         _updateIndex(_asset);
         totalSupplies[_asset] -= _amount;
@@ -105,11 +150,11 @@ contract Vault is UUPSUpgradeable, PausableUpgradeable, AccessControlEnumerableU
     }
 
     /// @notice Borrow an asset
-    /// @dev Whitelisted agents can borrow any amount, LTV is handled directly by Agent contracts
+    /// @dev Whitelisted agents can borrow any amount, LTV is handled by Agent contracts
     /// @param _asset Asset to borrow
     /// @param _amount Amount of asset to borrow
     /// @param _receiver Receiver of the borrow
-    function borrow(address _asset, uint256 _amount, address _receiver) external whenNotPaused onlyRole(BORROWER_ROLE) {
+    function borrow(address _asset, uint256 _amount, address _receiver) external whenNotPaused onlyBorrower {
         _validate(_asset);
         _updateIndex(_asset);
         totalBorrows[_asset] += _amount;
@@ -120,7 +165,7 @@ contract Vault is UUPSUpgradeable, PausableUpgradeable, AccessControlEnumerableU
     /// @notice Repay an asset
     /// @param _asset Asset to repay
     /// @param _amount Amount of asset to repay
-    function repay(address _asset, uint256 _amount) external onlyRole(BORROWER_ROLE) {
+    function repay(address _asset, uint256 _amount) external onlyBorrower {
         _validate(_asset);
         _updateIndex(_asset);
         totalBorrows[_asset] -= _amount;
@@ -131,19 +176,11 @@ contract Vault is UUPSUpgradeable, PausableUpgradeable, AccessControlEnumerableU
     /// @notice Rescue an unsupported asset
     /// @param _asset Asset to rescue
     /// @param _receiver Receiver of the rescue
-    function rescueERC20(address _asset, address _receiver) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (registry.vaultSupportsAsset(address(this), _asset)) revert AssetNotRescuable(_asset);
+    function rescueERC20(address _asset, address _receiver) external onlyAdmin {
+        IVaultDataProvider vaultDataProvider = IVaultDataProvider(addressProvider.vaultDataProvider());
+        if (vaultDataProvider.assetSupported(address(this), _asset)) revert AssetNotRescuable(_asset);
+
         IERC20(_asset).safeTransfer(_receiver, IERC20(_asset).balanceOf(address(this)));
-    }
-
-    /// @notice Pause vault
-    function pause() external onlyRole(PAUSER_ROLE) {
-        _pause();
-    }
-
-    /// @notice Unpause vault
-    function unpause() external onlyRole(PAUSER_ROLE) {
-        _unpause();
     }
 
     /// @notice Available balance to borrow
@@ -181,8 +218,9 @@ contract Vault is UUPSUpgradeable, PausableUpgradeable, AccessControlEnumerableU
     /// @dev Validate that an asset is whitelisted
     /// @param _asset Asset to check
     function _validate(address _asset) internal view {
-        if (!registry.vaultSupportsAsset(address(this), _asset)) revert AssetNotSupported(_asset);
+        IVaultDataProvider vaultDataProvider = IVaultDataProvider(addressProvider.vaultDataProvider());
+        if (!vaultDataProvider.assetSupported(address(this), _asset)) revert AssetNotSupported(_asset);
     }
 
-    function _authorizeUpgrade(address) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
+    function _authorizeUpgrade(address) internal override onlyAdmin {}
 }
