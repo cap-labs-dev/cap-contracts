@@ -6,10 +6,11 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {CloneLogic} from "../lendingPool/libraries/CloneLogic.sol";
 import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
 import {IVault} from "../interfaces/IVault.sol";
+import {IVaultDataProvider} from "../interfaces/IVaultDataProvider.sol";
 
 /// @title VaultDataProvider
 /// @notice Data provider for Cap token vaults
-contract VaultDataProvider is UUPSUpgradeable {
+contract VaultDataProvider is IVaultDataProvider, UUPSUpgradeable {
     /// @notice Vault data admin role
     bytes32 public constant VAULT_DATA_ADMIN = keccak256("VAULT_DATA_ADMIN");
 
@@ -19,23 +20,9 @@ contract VaultDataProvider is UUPSUpgradeable {
     /// @notice Address provider
     IAddressProvider public addressProvider;
 
-    struct VaultData {
-        address[] assets;
-        uint256 redeemFee;
-        bool paused;
-    }
-
-    struct AllocationData {
-        uint256 slope0;
-        uint256 slope1;
-        uint256 mintKinkRatio;
-        uint256 burnKinkRatio;
-        uint256 optimalRatio;
-    }
-
-    mapping(address => address) public vault;
-    mapping(address => VaultData) public vaultData;
-    mapping(address => mapping(address => AllocationData)) public allocationData;
+    mapping(address => address) public vaultByCapToken;
+    mapping(address => VaultData) public vaultDataByVault;
+    mapping(address => mapping(address => AllocationData)) public allocationDataByVaultAndAsset;
 
     error VaultAlreadyExists();
     error AssetAlreadyListed();
@@ -43,12 +30,12 @@ contract VaultDataProvider is UUPSUpgradeable {
     event CreateVault(address capToken, address vault, VaultData vaultData);
     event AddAssetToVault(address vault, address asset);
     event RemoveAssetFromVault(address vault, address asset);
-    event SetAllocationData(address vault, address asset, AllocationData allocationData);
+    event SetAllocationData(address vault, address asset, AllocationData allocationDataByVaultAndAsset);
     event SetPause(address vault, bool paused);
     event SetRedeemFee(address vault, uint256 redeemFee);
 
     /// @dev Only admin are allowed to call functions
-    modifier onlyAdmin {
+    modifier onlyAdmin() {
         _onlyAdmin();
         _;
     }
@@ -59,7 +46,7 @@ contract VaultDataProvider is UUPSUpgradeable {
     }
 
     /// @dev Only keeper are allowed to call functions
-    modifier onlyKeeper {
+    modifier onlyKeeper() {
         _onlyKeeper();
         _;
     }
@@ -75,27 +62,72 @@ contract VaultDataProvider is UUPSUpgradeable {
         addressProvider = IAddressProvider(_addressProvider);
     }
 
+    /// @notice Get vault address for a cap token
+    /// @param _capToken Cap token address
+    /// @return vault Vault address
+    function vault(address _capToken) external view returns (address) {
+        return vaultByCapToken[_capToken];
+    }
+
+    /// @notice Get vault data for a vault
+    /// @param _vault Vault address
+    /// @return VaultData struct containing assets, redeem fee and pause state
+    function vaultData(address _vault) external view returns (VaultData memory) {
+        return vaultDataByVault[_vault];
+    }
+
+    /// @notice Get allocation data for a vault and asset
+    /// @param _vault Vault address
+    /// @param _asset Asset address
+    /// @return AllocationData struct containing slopes and ratios
+    function allocationData(address _vault, address _asset) external view returns (AllocationData memory) {
+        return allocationDataByVaultAndAsset[_vault][_asset];
+    }
+
+    /// @notice Check if an asset is supported by a vault
+    /// @param _vault Vault address
+    /// @param _asset Asset address
+    /// @return supported True if asset is supported
+    function assetSupported(address _vault, address _asset) external view returns (bool supported) {
+        VaultData memory data = vaultDataByVault[_vault];
+        uint256 length = data.assets.length;
+        for (uint256 i; i < length; ++i) {
+            if (data.assets[i] == _asset) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// @notice Check if a vault is paused
+    /// @param _vault Vault address
+    /// @return pause True if vault is paused
+    function paused(address _vault) external view returns (bool) {
+        return vaultDataByVault[_vault].paused;
+    }
+
     /// @notice Create a vault for a Cap token
     /// @param _capToken Cap token address
     /// @param _vaultData Initial assets, redeem fee and pause state for the vault
     /// @param _allocationData Allocation slopes and ratios
     /// @return newVault Created vault
-    function createVault(
-        address _capToken,
-        VaultData calldata _vaultData,
-        AllocationData[] memory _allocationData
-    ) external onlyAdmin returns (address newVault) {
-        if (vault[_capToken] != address(0)) revert VaultAlreadyExists();
+    function createVault(address _capToken, VaultData calldata _vaultData, AllocationData[] memory _allocationData)
+        external
+        onlyAdmin
+        returns (address newVault)
+    {
+        if (vaultByCapToken[_capToken] != address(0)) revert VaultAlreadyExists();
 
         newVault = CloneLogic.clone(addressProvider.vaultInstance());
         IVault(newVault).initialize(address(addressProvider));
 
-        vaultData[newVault] = _vaultData;
+        vaultByCapToken[_capToken] = newVault;
+        vaultDataByVault[newVault] = _vaultData;
 
         uint256 length = _vaultData.assets.length;
         for (uint256 i; i < length; ++i) {
             address asset = _vaultData.assets[i];
-            allocationData[newVault][asset] = _allocationData[i];
+            allocationDataByVaultAndAsset[newVault][asset] = _allocationData[i];
         }
 
         emit CreateVault(_capToken, newVault, _vaultData);
@@ -105,12 +137,11 @@ contract VaultDataProvider is UUPSUpgradeable {
     /// @param _vault Vault address
     /// @param _asset Asset address
     /// @param _allocationData Allocation slopes and ratios for the asset
-    function addAssetToVault(
-        address _vault,
-        address _asset,
-        AllocationData calldata _allocationData
-    ) external onlyAdmin {
-        VaultData storage data = vaultData[_vault];
+    function addAssetToVault(address _vault, address _asset, AllocationData calldata _allocationData)
+        external
+        onlyAdmin
+    {
+        VaultData storage data = vaultDataByVault[_vault];
 
         uint256 length = data.assets.length;
         for (uint256 i; i < length; ++i) {
@@ -120,7 +151,7 @@ contract VaultDataProvider is UUPSUpgradeable {
         data.assets.push(_asset);
         emit AddAssetToVault(_vault, _asset);
 
-        allocationData[_vault][_asset] = _allocationData;
+        allocationDataByVaultAndAsset[_vault][_asset] = _allocationData;
         emit SetAllocationData(_vault, _asset, _allocationData);
     }
 
@@ -129,7 +160,7 @@ contract VaultDataProvider is UUPSUpgradeable {
     /// @param _vault Vault address
     /// @param _asset Asset address
     function removeAssetFromVault(address _vault, address _asset) external onlyAdmin {
-        VaultData storage data = vaultData[_vault];
+        VaultData storage data = vaultDataByVault[_vault];
 
         uint256 length = data.assets.length;
         for (uint256 i; i < length; ++i) {
@@ -139,8 +170,8 @@ contract VaultDataProvider is UUPSUpgradeable {
                 data.assets.pop();
                 emit RemoveAssetFromVault(_vault, _asset);
 
-                delete allocationData[_vault][_asset];
-                emit SetAllocationData(_vault, _asset, allocationData[_vault][_asset]);
+                delete allocationDataByVaultAndAsset[_vault][_asset];
+                emit SetAllocationData(_vault, _asset, allocationDataByVaultAndAsset[_vault][_asset]);
                 break;
             }
         }
@@ -150,12 +181,11 @@ contract VaultDataProvider is UUPSUpgradeable {
     /// @param _vault Vault address
     /// @param _asset Asset address
     /// @param _allocationData Allocation slopes and ratios for the asset in the vault
-    function setAllocationData(
-        address _vault,
-        address _asset,
-        AllocationData calldata _allocationData
-    ) external onlyKeeper {
-        allocationData[_vault][_asset] = _allocationData;
+    function setAllocationData(address _vault, address _asset, AllocationData calldata _allocationData)
+        external
+        onlyKeeper
+    {
+        allocationDataByVaultAndAsset[_vault][_asset] = _allocationData;
         emit SetAllocationData(_vault, _asset, _allocationData);
     }
 
@@ -163,7 +193,7 @@ contract VaultDataProvider is UUPSUpgradeable {
     /// @param _vault Vault address
     /// @param _pause Toggle pause state
     function setPause(address _vault, bool _pause) external onlyKeeper {
-        vaultData[_vault].paused = _pause;
+        vaultDataByVault[_vault].paused = _pause;
         emit SetPause(_vault, _pause);
     }
 
@@ -171,31 +201,8 @@ contract VaultDataProvider is UUPSUpgradeable {
     /// @param _vault Vault address
     /// @param _redeemFee Redeem fee in 27 decimals
     function setRedeemFee(address _vault, uint256 _redeemFee) external onlyKeeper {
-        vaultData[_vault].redeemFee = _redeemFee;
+        vaultDataByVault[_vault].redeemFee = _redeemFee;
         emit SetRedeemFee(_vault, _redeemFee);
-    }
-
-    /// @notice Check if an asset is supported by a vault
-    /// @param _vault Vault address
-    /// @param _asset Asset address
-    /// @return supported Asset is supported by a vault or not
-    function assetSupported(address _vault, address _asset) external view returns (bool supported) {
-        VaultData memory data = vaultData[_vault];
-
-        uint256 length = data.assets.length;
-        for (uint256 i; i < length; ++i) {
-            if (data.assets[i] == _asset) {
-                supported = true;
-                break;
-            }
-        }
-    }
-
-    /// @notice Check if a vault is paused
-    /// @param _vault Vault address
-    /// @return pause Vault is paused or not
-    function paused(address _vault) external view returns (bool pause) {
-        pause = vaultData[_vault].paused;
     }
 
     /// @dev Only admin can upgrade the contract

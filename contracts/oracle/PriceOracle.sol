@@ -3,8 +3,8 @@ pragma solidity ^0.8.28;
 
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import { IAddressProvider } from "../interfaces/IAddressProvider.sol";
-import { IOracleAdapter } from "../interfaces/IOracleAdapter.sol";
+import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
+import {IOracleAdapter} from "../interfaces/IOracleAdapter.sol";
 
 /// @title Oracle for fetching prices
 /// @author kexley, @capLabs
@@ -33,6 +33,9 @@ contract PriceOracle is UUPSUpgradeable {
     /// @dev No adapter will result in failed calculations
     error NoAdapter();
 
+    /// @dev No backup adapter will result in failed calculations
+    error NoBackupAdapter();
+
     /// @dev Set oracle data
     event SetOracleData(address asset, OracleData data);
 
@@ -40,7 +43,7 @@ contract PriceOracle is UUPSUpgradeable {
     event SetBackupOracleData(address asset, OracleData data);
 
     /// @dev Only authorized addresses can call these functions
-    modifier onlyAdmin {
+    modifier onlyAdmin() {
         _onlyAdmin();
         _;
     }
@@ -69,9 +72,10 @@ contract PriceOracle is UUPSUpgradeable {
         OracleData memory data = oracleData[_asset];
 
         price = _getPrice(data.adapter, data.payload);
-        
+
         if (price == 0) {
             data = backupOracleData[_asset];
+            if (data.adapter == address(0)) revert NoBackupAdapter();
             price = _getPrice(data.adapter, data.payload);
         }
     }

@@ -5,11 +5,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AccessControlEnumerableUpgradeable} from
     "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {IAccessControl} from "../interfaces/IAccessControl.sol";
 
 /// @title AccessControl
 /// @author kexley, @capLabs
 /// @notice Basic access control contract
-contract AccessControl is UUPSUpgradeable, AccessControlEnumerableUpgradeable {
+contract AccessControl is IAccessControl, UUPSUpgradeable, AccessControlEnumerableUpgradeable {
     /// @notice Initialize the default admin
     /// @param _admin Default admin address
     function initialize(address _admin) external initializer {

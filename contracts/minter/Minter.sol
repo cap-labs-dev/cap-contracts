@@ -24,7 +24,7 @@ contract Minter is UUPSUpgradeable {
     IAddressProvider public addressProvider;
 
     /// @dev Only authorized addresses can call these functions
-    modifier onlyAdmin {
+    modifier onlyAdmin() {
         addressProvider.checkRole(MINTER_ADMIN, msg.sender);
         _;
     }
@@ -70,8 +70,8 @@ contract Minter is UUPSUpgradeable {
         address capToken = mint ? _tokenOut : _tokenIn;
         address asset = mint ? _tokenIn : _tokenOut;
         address vault = IVaultDataProvider(addressProvider.vaultDataProvider()).vault(capToken);
-        IVaultDataProvider.AllocationData memory allocationData = 
-            IVaultDataProvider(addressProvider.vaultDataProvider()).allocationData(vault);
+        IVaultDataProvider.AllocationData memory allocationData =
+            IVaultDataProvider(addressProvider.vaultDataProvider()).allocationData(vault, asset);
 
         (amountOut,) = AmountOutLogic.amountOut(
             DataTypes.AmountOutParams({
@@ -117,12 +117,13 @@ contract Minter is UUPSUpgradeable {
         address _receiver,
         uint256 _deadline
     ) external returns (uint256[] memory amountOuts) {
-        address vaultDataProvider = addressProvider.vaultDataProvider();
-        address vault = IVaultDataProvider(vaultDataProvider).vault(_tokenIn);
+        IVaultDataProvider vaultDataProvider = IVaultDataProvider(addressProvider.vaultDataProvider());
+
+        address vault = vaultDataProvider.vault(_tokenIn);
 
         ValidationLogic.validateRedeem(vault, _deadline);
 
-        IVaultDataProvider.VaultData memory vaultData = IVaultDataProvider(vaultDataProvider).vaultData(vault);
+        IVaultDataProvider.VaultData memory vaultData = vaultDataProvider.vaultData(vault);
 
         (amountOuts,) = AmountOutLogic.redeemAmountOut(
             DataTypes.RedeemAmountOutParams({
@@ -157,9 +158,11 @@ contract Minter is UUPSUpgradeable {
         view
         returns (uint256 amountOut)
     {
+        address vaultDataProvider = addressProvider.vaultDataProvider();
+
         bool mint = ValidationLogic.validateSwap(
             DataTypes.ValidateSwapParams({
-                vaultDataProvider: addressProvider.vaultDataProvider(),
+                vaultDataProvider: vaultDataProvider,
                 tokenIn: _tokenIn,
                 tokenOut: _tokenOut,
                 deadline: block.timestamp
@@ -168,9 +171,9 @@ contract Minter is UUPSUpgradeable {
 
         address capToken = mint ? _tokenOut : _tokenIn;
         address asset = mint ? _tokenIn : _tokenOut;
-        address vault = IVaultDataProvider(addressProvider.vaultDataProvider()).vault(capToken);
-        IVaultDataProvider.AllocationData memory allocationData 
-            = IVaultDataProvider(addressProvider.vaultDataProvider()).allocationData(vault);
+        address vault = IVaultDataProvider(vaultDataProvider).vault(capToken);
+        IVaultDataProvider.AllocationData memory allocationData =
+            IVaultDataProvider(vaultDataProvider).allocationData(vault, asset);
 
         (amountOut,) = AmountOutLogic.amountOut(
             DataTypes.AmountOutParams({

@@ -16,17 +16,9 @@ interface IVaultDataProvider {
         uint256 optimalRatio;
     }
 
-    function VAULT_DATA_ADMIN() external view returns (bytes32);
-
     function vault(address capToken) external view returns (address);
     function vaultData(address vault) external view returns (VaultData memory);
-    function allocationData(address vault) external view returns (AllocationData memory);
-    function initialize(address _addressProvider) external;
-    function createVault(
-        address _capToken,
-        VaultData calldata _vaultData,
-        AllocationData[] calldata _allocationData
-    ) external;
+    function allocationData(address vault, address asset) external view returns (AllocationData memory);
     function addAssetToVault(address _vault, address _asset, AllocationData calldata _allocationData) external;
     function removeAssetFromVault(address _vault, address _asset) external;
     function setAllocationData(address _vault, address _asset, AllocationData calldata _allocationData) external;

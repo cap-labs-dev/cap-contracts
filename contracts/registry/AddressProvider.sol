@@ -4,11 +4,12 @@ pragma solidity ^0.8.28;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {IAccessControl} from "../interfaces/IAccessControl.sol";
+import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
 
 /// @title AddressProvider
 /// @author kexley, @capLabs
 /// @notice Addresses are stored here as a central repository
-contract AddressProvider is UUPSUpgradeable {
+contract AddressProvider is IAddressProvider, UUPSUpgradeable {
     /// @dev Address provider admin role
     bytes32 public constant ADDRESS_PROVIDER_ADMIN = keccak256("ADDRESS_PROVIDER_ADMIN");
 
@@ -33,6 +34,12 @@ contract AddressProvider is UUPSUpgradeable {
     /// @notice Minter
     address public minter;
 
+    /// @notice Cap token instance
+    address public capTokenInstance;
+
+    /// @notice Staked cap instance
+    address public stakedCapInstance;
+
     /// @notice Vault instance
     address public vaultInstance;
 
@@ -46,10 +53,10 @@ contract AddressProvider is UUPSUpgradeable {
     address public interestDebtTokenInstance;
 
     /// @notice Interest receiver for an asset
-    mapping(address => address) interestReceiver;
+    mapping(address => address) interestReceiverByAsset;
 
     /// @notice Receiver of restaker interest for an asset
-    mapping(address => address) restakerInterestReceiver;
+    mapping(address => address) restakerInterestReceiverByAgent;
 
     event SetAccessControl(address accessControl);
 
@@ -65,6 +72,10 @@ contract AddressProvider is UUPSUpgradeable {
 
     event SetMinter(address minter);
 
+    event SetCapTokenInstance(address capTokenInstance);
+
+    event SetStakedCapInstance(address stakedCapInstance);
+
     event SetVaultInstance(address vaultInstance);
 
     event SetPrincipalDebtTokenInstance(address principalDebtTokenInstance);
@@ -78,7 +89,7 @@ contract AddressProvider is UUPSUpgradeable {
     event SetRestakerInterestReceiver(address agent, address restakerInterestReceiver);
 
     /// @dev Only admin are allowed to call functions
-    modifier onlyAdmin {
+    modifier onlyAdmin() {
         _onlyAdmin();
         _;
     }
@@ -105,6 +116,14 @@ contract AddressProvider is UUPSUpgradeable {
     /// @param _account Caller address
     function checkRole(bytes32 _role, address _account) external view {
         IAccessControl(accessControl).checkRole(_role, _account);
+    }
+
+    function restakerInterestReceiver(address _agent) external view returns (address) {
+        return restakerInterestReceiverByAgent[_agent];
+    }
+
+    function interestReceiver(address _asset) external view returns (address) {
+        return interestReceiverByAsset[_asset];
     }
 
     /// @notice Set the access control address
@@ -144,42 +163,43 @@ contract AddressProvider is UUPSUpgradeable {
         emit SetMinter(_minter);
     }
 
+    function setCapTokenInstance(address _capTokenInstance) external onlyAdmin {
+        capTokenInstance = _capTokenInstance;
+        emit SetCapTokenInstance(_capTokenInstance);
+    }
+
+    function setStakedCapInstance(address _stakedCapInstance) external onlyAdmin {
+        stakedCapInstance = _stakedCapInstance;
+        emit SetStakedCapInstance(_stakedCapInstance);
+    }
+
     function setVaultInstance(address _vaultInstance) external onlyAdmin {
         vaultInstance = _vaultInstance;
         emit SetVaultInstance(_vaultInstance);
     }
 
-    function setPrincipalDebtTokenInstance(address _principalDebtTokenInstance)
-        external
-        onlyAdmin
-    {
+    function setPrincipalDebtTokenInstance(address _principalDebtTokenInstance) external onlyAdmin {
         principalDebtTokenInstance = _principalDebtTokenInstance;
         emit SetPrincipalDebtTokenInstance(_principalDebtTokenInstance);
     }
 
-    function setRestakerDebtTokenInstance(address _restakerDebtTokenInstance)
-        external
-        onlyAdmin
-    {
+    function setRestakerDebtTokenInstance(address _restakerDebtTokenInstance) external onlyAdmin {
         restakerDebtTokenInstance = _restakerDebtTokenInstance;
         emit SetRestakerDebtTokenInstance(_restakerDebtTokenInstance);
     }
 
-    function setInterestDebtTokenInstance(address _interestDebtTokenInstance)
-        external
-        onlyAdmin
-    {
+    function setInterestDebtTokenInstance(address _interestDebtTokenInstance) external onlyAdmin {
         interestDebtTokenInstance = _interestDebtTokenInstance;
         emit SetInterestDebtTokenInstance(_interestDebtTokenInstance);
     }
 
     function setInterestReceiver(address _asset, address _receiver) external onlyAdmin {
-        interestReceiver[_asset] = _receiver;
+        interestReceiverByAsset[_asset] = _receiver;
         emit SetInterestReceiver(_asset, _receiver);
     }
 
     function setRestakerInterestReceiver(address _agent, address _receiver) external onlyAdmin {
-        restakerInterestReceiver[_agent] = _receiver;
+        restakerInterestReceiverByAgent[_agent] = _receiver;
         emit SetRestakerInterestReceiver(_agent, _receiver);
     }
 
