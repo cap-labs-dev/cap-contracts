@@ -476,6 +476,10 @@ contract GasOptTest is Test {
         }
     }
 
+    function testEmpty() public {
+        // empty test to know how much gas is used by the setup() function
+    }
+
     function testMintWithUSDT() public {
         vm.startPrank(user_stablecoin_minter);
 
