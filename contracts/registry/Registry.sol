@@ -4,13 +4,13 @@ pragma solidity ^0.8.28;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AccessControlEnumerableUpgradeable} from
     "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {CloneLogic} from "../lendingPool/libraries/CloneLogic.sol";
 import {IStakedCap} from "../interfaces/IStakedCap.sol";
 
-contract Registry is Initializable, AccessControlEnumerableUpgradeable {
+contract Registry is UUPSUpgradeable, AccessControlEnumerableUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableMap for EnumerableMap.AddressToAddressMap;
 
@@ -73,6 +73,11 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
     error BasketNotFound();
     error PairNotSupported(address tokenIn, address tokenOut);
     error ScTokenNotInitialized(address cToken);
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize() external initializer {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -224,4 +229,6 @@ contract Registry is Initializable, AccessControlEnumerableUpgradeable {
         _basketBaseFee[_cToken] = _baseFee;
         emit BasketSet(_cToken, scToken, _vault, _baseFee);
     }
+
+    function _authorizeUpgrade(address) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }

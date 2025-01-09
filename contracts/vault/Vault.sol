@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { AccessControlEnumerableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
-import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import { IRegistry } from "../interfaces/IRegistry.sol";
@@ -15,7 +15,7 @@ import { IRegistry } from "../interfaces/IRegistry.sol";
 /// @dev Supplies, borrows and utilization rates are tracked. Interest rates should be computed and
 /// charged on the external contracts, only the principle amount is counted on this contract. Asset
 /// whitelisting is handled via the registry.
-contract Vault is Initializable, PausableUpgradeable, AccessControlEnumerableUpgradeable {
+contract Vault is UUPSUpgradeable, PausableUpgradeable, AccessControlEnumerableUpgradeable {
     using SafeERC20 for IERC20;
 
     /// @notice Registry that controls whitelisting assets
@@ -62,6 +62,11 @@ contract Vault is Initializable, PausableUpgradeable, AccessControlEnumerableUpg
 
     /// @dev Repayment made
     event Repay(address indexed repayer, address indexed asset, uint256 amount);
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
     /// @notice Initialize the registry address and default admin
     /// @param _registry Registry address
@@ -178,4 +183,6 @@ contract Vault is Initializable, PausableUpgradeable, AccessControlEnumerableUpg
     function _validate(address _asset) internal view {
         if (!registry.vaultSupportsAsset(address(this), _asset)) revert AssetNotSupported(_asset);
     }
+
+    function _authorizeUpgrade(address) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }
