@@ -8,7 +8,8 @@ import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
 import {IVaultDataProvider} from "../interfaces/IVaultDataProvider.sol";
 import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
 import {IMinter} from "../interfaces/IMinter.sol";
@@ -19,8 +20,11 @@ import {IMinter} from "../interfaces/IMinter.sol";
 /// borrowing from the underlying assets.
 /// @dev Calling notify permissionlessly will swap the underlying assets to the cap token and start
 /// the linear unlock
-contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
+contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeable {
     using SafeERC20 for IERC20;
+
+    /// @notice Staked cap token admin role id
+    bytes32 public constant STAKED_CAP_ADMIN = keccak256("STAKED_CAP_ADMIN");
 
     /// @notice Address provider
     IAddressProvider public addressProvider;
@@ -135,5 +139,10 @@ contract StakedCap is ERC4626Upgradeable, ERC20PermitUpgradeable {
         storedTotal -= _shares;
 
         emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
+    }
+
+    /// @dev Only admin can upgrade
+    function _authorizeUpgrade(address) internal override view {
+        addressProvider.checkRole(STAKED_CAP_ADMIN, msg.sender);
     }
 }
