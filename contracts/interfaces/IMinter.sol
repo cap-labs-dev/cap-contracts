@@ -19,14 +19,10 @@ interface IMinter {
         uint256 _deadline
     ) external returns (uint256[] memory amountOuts);
 
-    function getAmountOut(
-        address _tokenIn,
-        address _tokenOut,
-        uint256 _amountIn
-    ) external view returns (uint256 amountOut);
+    function getAmountOut(address _tokenIn, address _tokenOut, uint256 _amountIn)
+        external
+        view
+        returns (uint256 amountOut);
 
-    function getRedeemAmountOut(
-        address _tokenIn,
-        uint256 _amountIn
-    ) external view returns (uint256[] memory amounts);
+    function getRedeemAmountOut(address _tokenIn, uint256 _amountIn) external view returns (uint256[] memory amounts);
 }

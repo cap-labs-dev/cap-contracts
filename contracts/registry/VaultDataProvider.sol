@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {CloneLogic} from "../lendingPool/libraries/CloneLogic.sol";
-import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
-import {IVault} from "../interfaces/IVault.sol";
-import {IVaultDataProvider} from "../interfaces/IVaultDataProvider.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { CloneLogic } from "../lendingPool/libraries/CloneLogic.sol";
+import { IAddressProvider } from "../interfaces/IAddressProvider.sol";
+import { IVault } from "../interfaces/IVault.sol";
+import { IVaultDataProvider } from "../interfaces/IVaultDataProvider.sol";
 
 /// @title VaultDataProvider
 /// @notice Data provider for Cap token vaults
@@ -206,5 +206,5 @@ contract VaultDataProvider is IVaultDataProvider, UUPSUpgradeable {
     }
 
     /// @dev Only admin can upgrade the contract
-    function _authorizeUpgrade(address) internal override onlyAdmin {}
+    function _authorizeUpgrade(address) internal override onlyAdmin { }
 }

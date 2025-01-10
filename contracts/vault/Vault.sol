@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
-import {IVaultDataProvider} from "../interfaces/IVaultDataProvider.sol";
+import { IAddressProvider } from "../interfaces/IAddressProvider.sol";
+import { IVaultDataProvider } from "../interfaces/IVaultDataProvider.sol";
 
 /// @title Vault for storing the backing for cTokens
 /// @author kexley, @capLabs
@@ -220,5 +220,5 @@ contract Vault is UUPSUpgradeable {
         if (!vaultDataProvider.assetSupported(address(this), _asset)) revert AssetNotSupported(_asset);
     }
 
-    function _authorizeUpgrade(address) internal override onlyAdmin {}
+    function _authorizeUpgrade(address) internal override onlyAdmin { }
 }

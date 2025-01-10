@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IVaultDataProvider} from "../../../interfaces/IVaultDataProvider.sol";
+import { IVaultDataProvider } from "../../../interfaces/IVaultDataProvider.sol";
 
 library DataTypes {
-
     struct MintBurnParams {
         address capToken;
         uint256 amountOut;

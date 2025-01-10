@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC20Upgradeable, IERC20} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import { ERC20Upgradeable, IERC20 } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import {Errors} from "../libraries/helpers/Errors.sol";
-import {MathUtils} from "../libraries/math/MathUtils.sol";
-import {WadRayMath} from "../libraries/math/WadRayMath.sol";
-import {IAddressProvider} from "../../interfaces/IAddressProvider.sol";
-import {IRateOracle} from "../../interfaces/IRateOracle.sol";
+import { Errors } from "../libraries/helpers/Errors.sol";
+import { MathUtils } from "../libraries/math/MathUtils.sol";
+import { WadRayMath } from "../libraries/math/WadRayMath.sol";
+import { IAddressProvider } from "../../interfaces/IAddressProvider.sol";
+import { IRateOracle } from "../../interfaces/IRateOracle.sol";
 
 /// @title Interest debt token for a market on the Lender
 /// @author kexley, @capLabs

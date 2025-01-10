@@ -25,8 +25,8 @@ library ValidationLogic {
         address vaultOut = IVaultDataProvider(params.vaultDataProvider).vault(params.tokenOut);
 
         if (vaultOut != address(0)) {
-            IVaultDataProvider.VaultData memory tokenOutVaultData 
-                = IVaultDataProvider(params.vaultDataProvider).vaultData(vaultOut);
+            IVaultDataProvider.VaultData memory tokenOutVaultData =
+                IVaultDataProvider(params.vaultDataProvider).vaultData(vaultOut);
 
             uint256 length = tokenOutVaultData.assets.length;
             for (uint256 i; i < length; ++i) {
@@ -41,8 +41,8 @@ library ValidationLogic {
         if (!mint) {
             address vaultIn = IVaultDataProvider(params.vaultDataProvider).vault(params.tokenIn);
             if (vaultIn != address(0)) {
-                IVaultDataProvider.VaultData memory tokenInVaultData 
-                    = IVaultDataProvider(params.vaultDataProvider).vaultData(vaultIn);
+                IVaultDataProvider.VaultData memory tokenInVaultData =
+                    IVaultDataProvider(params.vaultDataProvider).vaultData(vaultIn);
 
                 uint256 length = tokenInVaultData.assets.length;
                 for (uint256 i; i < length; ++i) {

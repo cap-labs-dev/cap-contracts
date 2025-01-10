@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ICollateral } from "../../interfaces/ICollateral.sol";
 import { IPriceOracle } from "../../interfaces/IPriceOracle.sol";
 
@@ -13,9 +13,8 @@ import { DataTypes } from "./types/DataTypes.sol";
 /// @author kexley, @capLabs
 /// @notice Validate actions before state is altered
 library ValidationLogic {
-
     /// @notice Validate the borrow of an agent
-    /// @dev Check the pause state of the reserve and the health of the agent before and after the 
+    /// @dev Check the pause state of the reserve and the health of the agent before and after the
     /// borrow.
     /// @param reservesData Reserve mapping that stores reserve data
     /// @param reservesList List of all reserves
@@ -29,13 +28,7 @@ library ValidationLogic {
     ) external view {
         require(!reservesData[params.asset].paused, Errors.RESERVE_PAUSED);
 
-        (
-            uint256 totalCollateral,
-            uint256 totalDebt,
-            ,
-            ,
-            uint256 health
-        ) = ViewLogic.agent(
+        (uint256 totalCollateral, uint256 totalDebt,,, uint256 health) = ViewLogic.agent(
             reservesData,
             reservesList,
             agentConfig,
@@ -51,9 +44,9 @@ library ValidationLogic {
 
         uint256 ltv = ICollateral(params.collateral).ltv(params.agent);
         uint256 assetPrice = IPriceOracle(params.oracle).getPrice(params.asset);
-        uint256 newTotalDebt = ( params.amount * assetPrice ) + totalDebt;
+        uint256 newTotalDebt = (params.amount * assetPrice) + totalDebt;
         uint256 borrowCapacity = totalCollateral * ltv;
-        
+
         require(newTotalDebt <= borrowCapacity, Errors.COLLATERAL_CANNOT_COVER_NEW_BORROW);
     }
 
@@ -82,23 +75,22 @@ library ValidationLogic {
     /// @dev All principal borrows must be repaid, interest is ignored
     /// @param reservesData Reserve mapping that stores reserve data
     /// @param _asset Asset to remove
-    function validateRemoveAsset(
-        mapping(address => DataTypes.ReserveData) storage reservesData,
-        address _asset
-    ) external view {
+    function validateRemoveAsset(mapping(address => DataTypes.ReserveData) storage reservesData, address _asset)
+        external
+        view
+    {
         require(
-            IERC20(reservesData[_asset].principalDebtToken).totalSupply() == 0,
-            Errors.VARIABLE_DEBT_SUPPLY_NOT_ZERO
+            IERC20(reservesData[_asset].principalDebtToken).totalSupply() == 0, Errors.VARIABLE_DEBT_SUPPLY_NOT_ZERO
         );
     }
 
     /// @notice Validate pausing a reserve
     /// @param reservesData Reserve mapping that stores reserve data
     /// @param _asset Asset to pause
-    function validatePauseAsset(
-        mapping(address => DataTypes.ReserveData) storage reservesData,
-        address _asset
-    ) external view {
+    function validatePauseAsset(mapping(address => DataTypes.ReserveData) storage reservesData, address _asset)
+        external
+        view
+    {
         require(reservesData[_asset].vault != address(0), Errors.ASSET_NOT_LISTED);
     }
 }

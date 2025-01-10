@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {AccessControlEnumerableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { AccessControlEnumerableUpgradeable } from
+    "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 
-import {ICollateralHandler} from "./interfaces/ICollateralHandler.sol";
+import { ICollateralHandler } from "./interfaces/ICollateralHandler.sol";
 
-contract Network is 
-    AccessControlEnumerableUpgradeable,
-    UUPSUpgradeable
-{
-
+contract Network is AccessControlEnumerableUpgradeable, UUPSUpgradeable {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
 
@@ -25,11 +22,11 @@ contract Network is
         ICollateralHandler(collateralHandler).registerProvider(_provider, _isRegistered);
     }
 
-    function collateralByProvider(address) external view returns (uint256) {}
+    function collateralByProvider(address) external view returns (uint256) { }
 
-    function slashProvider(address _provider, uint256 _amount) external {}
+    function slashProvider(address _provider, uint256 _amount) external { }
 
-    function _authorizeUpgrade(address) internal override onlyRole(OWNER_ROLE) {}
+    function _authorizeUpgrade(address) internal override onlyRole(OWNER_ROLE) { }
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new

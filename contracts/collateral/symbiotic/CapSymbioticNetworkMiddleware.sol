@@ -1,25 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {INetworkRegistry} from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
-import {INetworkMiddlewareService} from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
-import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
-import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+import { INetworkRegistry } from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
+import { INetworkMiddlewareService } from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
+import { Time } from "@openzeppelin/contracts/utils/types/Time.sol";
+import { EnumerableMap } from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
-import {IRegistry} from "@symbioticfi/core/src/interfaces/common/IRegistry.sol";
-import {IEntity} from "@symbioticfi/core/src/interfaces/common/IEntity.sol";
-import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
-import {IBaseDelegator} from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
-import {IBaseSlasher} from "@symbioticfi/core/src/interfaces/slasher/IBaseSlasher.sol";
-import {IOptInService} from "@symbioticfi/core/src/interfaces/service/IOptInService.sol";
-import {IEntity} from "@symbioticfi/core/src/interfaces/common/IEntity.sol";
-import {ISlasher} from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
-import {IVetoSlasher} from "@symbioticfi/core/src/interfaces/slasher/IVetoSlasher.sol";
-import {Subnetwork} from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
+import { IRegistry } from "@symbioticfi/core/src/interfaces/common/IRegistry.sol";
+import { IEntity } from "@symbioticfi/core/src/interfaces/common/IEntity.sol";
+import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
+import { IBaseDelegator } from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
+import { IBaseSlasher } from "@symbioticfi/core/src/interfaces/slasher/IBaseSlasher.sol";
+import { IOptInService } from "@symbioticfi/core/src/interfaces/service/IOptInService.sol";
+import { IEntity } from "@symbioticfi/core/src/interfaces/common/IEntity.sol";
+import { ISlasher } from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
+import { IVetoSlasher } from "@symbioticfi/core/src/interfaces/slasher/IVetoSlasher.sol";
+import { Subnetwork } from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
 
-import {SimpleKeyRegistry32} from "./SimpleKeyRegistry32.sol";
-import {MapWithTimeData} from "./libraries/MapWithTimeData.sol";
-import {Network} from "../Network.sol";
+import { SimpleKeyRegistry32 } from "./SimpleKeyRegistry32.sol";
+import { MapWithTimeData } from "./libraries/MapWithTimeData.sol";
+import { Network } from "../Network.sol";
 
 /// @title Cap Symbiotic Network Middleware Contract
 /// @author Cap Labs

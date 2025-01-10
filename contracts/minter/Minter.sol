@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
-import {IVaultDataProvider} from "../interfaces/IVaultDataProvider.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { IAddressProvider } from "../interfaces/IAddressProvider.sol";
+import { IVaultDataProvider } from "../interfaces/IVaultDataProvider.sol";
 
-import {ValidationLogic} from "./libraries/ValidationLogic.sol";
-import {AmountOutLogic} from "./libraries/AmountOutLogic.sol";
-import {MintBurnLogic} from "./libraries/MintBurnLogic.sol";
-import {DataTypes} from "./libraries/types/DataTypes.sol";
+import { ValidationLogic } from "./libraries/ValidationLogic.sol";
+import { AmountOutLogic } from "./libraries/AmountOutLogic.sol";
+import { MintBurnLogic } from "./libraries/MintBurnLogic.sol";
+import { DataTypes } from "./libraries/types/DataTypes.sol";
 
 /// @title Minter/burner for cap tokens
 /// @author kexley, @capLabs
@@ -219,5 +219,5 @@ contract Minter is UUPSUpgradeable {
         );
     }
 
-    function _authorizeUpgrade(address) internal override onlyAdmin {}
+    function _authorizeUpgrade(address) internal override onlyAdmin { }
 }

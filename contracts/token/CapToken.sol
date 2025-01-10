@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC20PermitUpgradeable} from
+import { ERC20PermitUpgradeable } from
     "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { IAddressProvider } from "../interfaces/IAddressProvider.sol";
 
 /// @title Cap Token
 /// @author kexley, @capLabs
@@ -31,11 +31,7 @@ contract CapToken is UUPSUpgradeable, ERC20PermitUpgradeable {
     /// @param _addressProvider Address provider
     /// @param _name Name of the cap token
     /// @param _symbol Symbol of the cap token
-    function initialize(
-        address _addressProvider,
-        string memory _name,
-        string memory _symbol
-    ) external initializer {
+    function initialize(address _addressProvider, string memory _name, string memory _symbol) external initializer {
         addressProvider = IAddressProvider(_addressProvider);
         __ERC20_init(_name, _symbol);
         __ERC20Permit_init(_name);
@@ -58,7 +54,7 @@ contract CapToken is UUPSUpgradeable, ERC20PermitUpgradeable {
     }
 
     /// @dev Only admin can upgrade
-    function _authorizeUpgrade(address) internal override view {
+    function _authorizeUpgrade(address) internal view override {
         addressProvider.checkRole(CAP_ADMIN, msg.sender);
     }
 }

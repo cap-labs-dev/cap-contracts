@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IVault} from "../../interfaces/IVault.sol";
-import {IPrincipalDebtToken} from "../../interfaces/IPrincipalDebtToken.sol";
-import {IDebtToken} from "../../interfaces/IDebtToken.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IVault } from "../../interfaces/IVault.sol";
+import { IPrincipalDebtToken } from "../../interfaces/IPrincipalDebtToken.sol";
+import { IDebtToken } from "../../interfaces/IDebtToken.sol";
 
-import {ValidationLogic} from "./ValidationLogic.sol";
-import {AgentConfiguration} from "./configuration/AgentConfiguration.sol";
-import {DataTypes} from "./types/DataTypes.sol";
+import { ValidationLogic } from "./ValidationLogic.sol";
+import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
+import { DataTypes } from "./types/DataTypes.sol";
 
 /// @title BorrowLogic
 /// @author kexley, @capLabs

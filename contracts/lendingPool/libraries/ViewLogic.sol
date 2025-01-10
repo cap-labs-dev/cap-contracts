@@ -29,13 +29,11 @@ library ViewLogic {
         mapping(uint256 => address) storage reservesList,
         DataTypes.AgentConfigurationMap storage agentConfig,
         DataTypes.AgentParams memory params
-    ) external view returns (
-        uint256 totalCollateral,
-        uint256 totalDebt,
-        uint256 ltv,
-        uint256 liquidationThreshold,
-        uint256 health
-    ) {
+    )
+        external
+        view
+        returns (uint256 totalCollateral, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health)
+    {
         totalCollateral = ICollateral(params.collateral).coverage(params.agent);
         liquidationThreshold = ICollateral(params.collateral).liquidationThreshold(params.agent);
 
@@ -51,8 +49,6 @@ library ViewLogic {
         }
 
         ltv = totalDebt / totalCollateral;
-        health = totalDebt == 0 
-            ? type(uint256).max 
-            : totalCollateral * liquidationThreshold / totalDebt;
+        health = totalDebt == 0 ? type(uint256).max : totalCollateral * liquidationThreshold / totalDebt;
     }
 }

@@ -12,10 +12,7 @@ contract L2Token is OFTPermit {
     /// @param _symbol Symbol of the token
     /// @param _lzEndpoint Layerzero endpoint
     /// @param _delegate Delegate capable of making OApp changes
-    constructor(
-        string memory _name,
-        string memory _symbol,
-        address _lzEndpoint,
-        address _delegate
-    ) OFTPermit(_name, _symbol, _lzEndpoint, _delegate) {}
+    constructor(string memory _name, string memory _symbol, address _lzEndpoint, address _delegate)
+        OFTPermit(_name, _symbol, _lzEndpoint, _delegate)
+    { }
 }

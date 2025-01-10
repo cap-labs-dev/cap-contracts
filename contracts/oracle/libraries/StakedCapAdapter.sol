@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import {IPriceOracle} from "../../interfaces/IPriceOracle.sol";
-import {IAddressProvider} from "../../interfaces/IAddressProvider.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import { IPriceOracle } from "../../interfaces/IPriceOracle.sol";
+import { IAddressProvider } from "../../interfaces/IAddressProvider.sol";
 
 /// @title Staked Cap Token Adapter
 /// @notice Prices are calculated based on the underlying cap token price and accrued yield

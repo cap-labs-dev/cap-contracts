@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import {BorrowLogic} from "../libraries/BorrowLogic.sol";
-import {LiquidationLogic} from "../libraries/LiquidationLogic.sol";
-import {ReserveLogic} from "../libraries/ReserveLogic.sol";
-import {ViewLogic} from "../libraries/ViewLogic.sol";
-import {CloneLogic} from "../libraries/CloneLogic.sol";
-import {DataTypes} from "../libraries/types/DataTypes.sol";
-import {Errors} from "../libraries/helpers/Errors.sol";
-import {IAddressProvider} from "../../interfaces/IAddressProvider.sol";
-import {LenderStorage} from "./LenderStorage.sol";
+import { BorrowLogic } from "../libraries/BorrowLogic.sol";
+import { LiquidationLogic } from "../libraries/LiquidationLogic.sol";
+import { ReserveLogic } from "../libraries/ReserveLogic.sol";
+import { ViewLogic } from "../libraries/ViewLogic.sol";
+import { CloneLogic } from "../libraries/CloneLogic.sol";
+import { DataTypes } from "../libraries/types/DataTypes.sol";
+import { Errors } from "../libraries/helpers/Errors.sol";
+import { IAddressProvider } from "../../interfaces/IAddressProvider.sol";
+import { LenderStorage } from "./LenderStorage.sol";
 
 /// @title Lender for covered agents
 /// @author kexley, @capLabs
@@ -194,5 +194,5 @@ contract Lender is UUPSUpgradeable, LenderStorage {
         CloneLogic.upgradeTo(_instance, _implementation);
     }
 
-    function _authorizeUpgrade(address) internal override onlyAdmin {}
+    function _authorizeUpgrade(address) internal override onlyAdmin { }
 }

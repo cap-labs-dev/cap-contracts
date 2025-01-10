@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IChainlink} from "../../interfaces/IChainlink.sol";
+import { IChainlink } from "../../interfaces/IChainlink.sol";
 
 /// @title Chainlink Adapter
 /// @author kexley, @capLabs

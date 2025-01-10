@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
-import {IOracleAdapter} from "../interfaces/IOracleAdapter.sol";
+import { IAddressProvider } from "../interfaces/IAddressProvider.sol";
+import { IOracleAdapter } from "../interfaces/IOracleAdapter.sol";
 
 /// @title Oracle for fetching interest rates
 /// @author kexley, @capLabs
@@ -109,5 +109,5 @@ contract RateOracle is UUPSUpgradeable {
         if (success) rate = abi.decode(returnedData, (uint256));
     }
 
-    function _authorizeUpgrade(address) internal override onlyAdmin {}
+    function _authorizeUpgrade(address) internal override onlyAdmin { }
 }

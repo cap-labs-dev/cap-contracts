@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IAaveDataProvider} from "../../interfaces/IAaveDataProvider.sol";
+import { IAaveDataProvider } from "../../interfaces/IAaveDataProvider.sol";
 
 /// @title Aave Adapter
 /// @author kexley, @capLabs

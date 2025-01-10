@@ -1,36 +1,36 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Test} from "forge-std/Test.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {CloneLogic} from "../../contracts/lendingPool/libraries/CloneLogic.sol";
-import {AccessControl} from "../../contracts/registry/AccessControl.sol";
-import {AddressProvider} from "../../contracts/registry/AddressProvider.sol";
-import {VaultDataProvider} from "../../contracts/registry/VaultDataProvider.sol";
-import {IVaultDataProvider} from "../../contracts/interfaces/IVaultDataProvider.sol";
-import {Minter} from "../../contracts/minter/Minter.sol";
-import {Lender} from "../../contracts/lendingPool/lender/Lender.sol";
-import {Vault} from "../../contracts/vault/Vault.sol";
-import {CapToken} from "../../contracts/token/CapToken.sol";
-import {StakedCap} from "../../contracts/token/StakedCap.sol";
-import {IStakedCap} from "../../contracts/interfaces/IStakedCap.sol";
-import {PrincipalDebtToken} from "../../contracts/lendingPool/tokens/PrincipalDebtToken.sol";
-import {InterestDebtToken} from "../../contracts/lendingPool/tokens/InterestDebtToken.sol";
-import {RestakerDebtToken} from "../../contracts/lendingPool/tokens/RestakerDebtToken.sol";
-import {PriceOracle} from "../../contracts/oracle/PriceOracle.sol";
-import {RateOracle} from "../../contracts/oracle/RateOracle.sol";
-import {IAddressProvider} from "../../contracts/interfaces/IAddressProvider.sol";
-import {IPriceOracle} from "../../contracts/interfaces/IPriceOracle.sol";
-import {IRateOracle} from "../../contracts/interfaces/IRateOracle.sol";
-import {ChainlinkAdapter} from "../../contracts/oracle/libraries/ChainlinkAdapter.sol";
-import {AaveAdapter} from "../../contracts/oracle/libraries/AaveAdapter.sol";
-import {CapTokenAdapter} from "../../contracts/oracle/libraries/CapTokenAdapter.sol";
-import {StakedCapAdapter} from "../../contracts/oracle/libraries/StakedCapAdapter.sol";
-import {MockAaveDataProvider} from "../mocks/MockAaveDataProvider.sol";
-import {MockChainlinkPriceFeed} from "../mocks/MockChainlinkPriceFeed.sol";
-import {MockERC20} from "../mocks/MockERC20.sol";
-import {MockCollateral} from "../mocks/MockCollateral.sol";
+import { Test } from "forge-std/Test.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { CloneLogic } from "../../contracts/lendingPool/libraries/CloneLogic.sol";
+import { AccessControl } from "../../contracts/registry/AccessControl.sol";
+import { AddressProvider } from "../../contracts/registry/AddressProvider.sol";
+import { VaultDataProvider } from "../../contracts/registry/VaultDataProvider.sol";
+import { IVaultDataProvider } from "../../contracts/interfaces/IVaultDataProvider.sol";
+import { Minter } from "../../contracts/minter/Minter.sol";
+import { Lender } from "../../contracts/lendingPool/lender/Lender.sol";
+import { Vault } from "../../contracts/vault/Vault.sol";
+import { CapToken } from "../../contracts/token/CapToken.sol";
+import { StakedCap } from "../../contracts/token/StakedCap.sol";
+import { IStakedCap } from "../../contracts/interfaces/IStakedCap.sol";
+import { PrincipalDebtToken } from "../../contracts/lendingPool/tokens/PrincipalDebtToken.sol";
+import { InterestDebtToken } from "../../contracts/lendingPool/tokens/InterestDebtToken.sol";
+import { RestakerDebtToken } from "../../contracts/lendingPool/tokens/RestakerDebtToken.sol";
+import { PriceOracle } from "../../contracts/oracle/PriceOracle.sol";
+import { RateOracle } from "../../contracts/oracle/RateOracle.sol";
+import { IAddressProvider } from "../../contracts/interfaces/IAddressProvider.sol";
+import { IPriceOracle } from "../../contracts/interfaces/IPriceOracle.sol";
+import { IRateOracle } from "../../contracts/interfaces/IRateOracle.sol";
+import { ChainlinkAdapter } from "../../contracts/oracle/libraries/ChainlinkAdapter.sol";
+import { AaveAdapter } from "../../contracts/oracle/libraries/AaveAdapter.sol";
+import { CapTokenAdapter } from "../../contracts/oracle/libraries/CapTokenAdapter.sol";
+import { StakedCapAdapter } from "../../contracts/oracle/libraries/StakedCapAdapter.sol";
+import { MockAaveDataProvider } from "../mocks/MockAaveDataProvider.sol";
+import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
+import { MockERC20 } from "../mocks/MockERC20.sol";
+import { MockCollateral } from "../mocks/MockCollateral.sol";
 
 contract GasOptTest is Test {
     AccessControl public accessControlProviderImplementation;
@@ -401,7 +401,7 @@ contract GasOptTest is Test {
             cUSDVault = Vault(
                 vaultDataProvider.createVault(
                     address(cUSD),
-                    IVaultDataProvider.VaultData({assets: assets, redeemFee: 0, paused: false}),
+                    IVaultDataProvider.VaultData({ assets: assets, redeemFee: 0, paused: false }),
                     allocations
                 )
             );

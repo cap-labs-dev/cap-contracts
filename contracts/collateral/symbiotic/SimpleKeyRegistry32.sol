@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Checkpoints} from "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
-import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
+import { Checkpoints } from "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
+import { Time } from "@openzeppelin/contracts/utils/types/Time.sol";
 
-import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
+import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 
 abstract contract SimpleKeyRegistry32 {
     using Checkpoints for Checkpoints.Trace208;

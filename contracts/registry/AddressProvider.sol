@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {IAccessControl} from "../interfaces/IAccessControl.sol";
-import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { IAccessControl } from "../interfaces/IAccessControl.sol";
+import { IAddressProvider } from "../interfaces/IAddressProvider.sol";
 
 /// @title AddressProvider
 /// @author kexley, @capLabs
@@ -203,5 +203,5 @@ contract AddressProvider is IAddressProvider, UUPSUpgradeable {
         emit SetRestakerInterestReceiver(_agent, _receiver);
     }
 
-    function _authorizeUpgrade(address) internal override onlyAdmin {}
+    function _authorizeUpgrade(address) internal override onlyAdmin { }
 }
