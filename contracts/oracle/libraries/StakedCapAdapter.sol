@@ -10,10 +10,10 @@ import {IAddressProvider} from "../../interfaces/IAddressProvider.sol";
 /// @notice Prices are calculated based on the underlying cap token price and accrued yield
 library StakedCapAdapter {
     /// @notice Fetch price for a staked cap token
-    /// @param _asset Staked cap token address
     /// @param _addressProvider Address provider
+    /// @param _asset Staked cap token address
     /// @return latestAnswer Price of the staked cap token fixed to 8 decimals
-    function price(address _asset, address _addressProvider) external view returns (uint256 latestAnswer) {
+    function price(address _addressProvider, address _asset) external view returns (uint256 latestAnswer) {
         address priceOracle = IAddressProvider(_addressProvider).priceOracle();
         address capToken = IERC4626(_asset).asset();
         uint256 capTokenPrice = IPriceOracle(priceOracle).getPrice(capToken);

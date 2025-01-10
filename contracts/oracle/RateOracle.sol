@@ -3,8 +3,8 @@ pragma solidity ^0.8.28;
 
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import { IAddressProvider } from "../interfaces/IAddressProvider.sol";
-import { IOracleAdapter } from "../interfaces/IOracleAdapter.sol";
+import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
+import {IOracleAdapter} from "../interfaces/IOracleAdapter.sol";
 
 /// @title Oracle for fetching interest rates
 /// @author kexley, @capLabs
@@ -46,7 +46,7 @@ contract RateOracle is UUPSUpgradeable {
     event SetRestakerRate(address agent, uint256 rate);
 
     /// @dev Only authorized addresses can call these functions
-    modifier onlyAdmin {
+    modifier onlyAdmin() {
         _onlyAdmin();
         _;
     }

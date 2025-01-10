@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-contract MockChainlink {
+contract MockChainlinkPriceFeed {
     uint8 private _decimals;
     int256 private _latestAnswer;
 

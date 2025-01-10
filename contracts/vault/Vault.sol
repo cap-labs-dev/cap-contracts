@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import { IAddressProvider } from "../interfaces/IAddressProvider.sol";
-import { IVaultDataProvider } from "../interfaces/IVaultDataProvider.sol";
+import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
+import {IVaultDataProvider} from "../interfaces/IVaultDataProvider.sol";
 
 /// @title Vault for storing the backing for cTokens
 /// @author kexley, @capLabs
@@ -66,25 +66,25 @@ contract Vault is UUPSUpgradeable {
     event Repay(address indexed repayer, address indexed asset, uint256 amount);
 
     /// @dev Only admin are allowed to call functions
-    modifier onlyAdmin {
+    modifier onlyAdmin() {
         _onlyAdmin();
         _;
     }
 
     /// @dev Only suppliers are allowed to call functions
-    modifier onlySupplier {
+    modifier onlySupplier() {
         _onlySupplier();
         _;
     }
 
     /// @dev Only borrowers are allowed to call functions
-    modifier onlyBorrower {
+    modifier onlyBorrower() {
         _onlyBorrower();
         _;
     }
 
     /// @dev Only allowed when not paused
-    modifier whenNotPaused {
+    modifier whenNotPaused() {
         _whenNotPaused();
         _;
     }
@@ -107,7 +107,7 @@ contract Vault is UUPSUpgradeable {
     /// @dev Reverts if the vault is not paused
     function _whenNotPaused() private view {
         IVaultDataProvider vaultDataProvider = IVaultDataProvider(addressProvider.vaultDataProvider());
-        if (!vaultDataProvider.paused(address(this))) revert Paused();
+        if (vaultDataProvider.paused(address(this))) revert Paused();
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -117,7 +117,7 @@ contract Vault is UUPSUpgradeable {
 
     /// @notice Initialize the address provider address
     /// @param _addressProvider Address provider address
-    function initialize(address _addressProvider) initializer external {
+    function initialize(address _addressProvider) external initializer {
         addressProvider = IAddressProvider(_addressProvider);
     }
 
@@ -195,9 +195,7 @@ contract Vault is UUPSUpgradeable {
     /// @param _asset Utilized asset
     /// @return ratio Utilization ratio
     function utilization(address _asset) public view returns (uint256 ratio) {
-        ratio = totalSupplies[_asset] != 0 
-            ? totalBorrows[_asset] * 1e27 / totalSupplies[_asset]
-            : 0;
+        ratio = totalSupplies[_asset] != 0 ? totalBorrows[_asset] * 1e27 / totalSupplies[_asset] : 0;
     }
 
     /// @notice Up to date cumulative utilization index of an asset
@@ -205,13 +203,13 @@ contract Vault is UUPSUpgradeable {
     /// @param _asset Utilized asset
     /// @return index Utilization ratio index
     function currentUtilizationIndex(address _asset) external view returns (uint256 index) {
-        index = utilizationIndex[_asset] + ( utilization(_asset) * ( block.timestamp - lastUpdate[_asset] ) );
+        index = utilizationIndex[_asset] + (utilization(_asset) * (block.timestamp - lastUpdate[_asset]));
     }
 
     /// @dev Update the cumulative utilization index of an asset
     /// @param _asset Utilized asset
     function _updateIndex(address _asset) internal {
-        utilizationIndex[_asset] += utilization(_asset) * ( block.timestamp - lastUpdate[_asset] );
+        utilizationIndex[_asset] += utilization(_asset) * (block.timestamp - lastUpdate[_asset]);
         lastUpdate[_asset] = block.timestamp;
     }
 
