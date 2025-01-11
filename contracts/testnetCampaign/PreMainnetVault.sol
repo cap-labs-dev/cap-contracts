@@ -74,28 +74,14 @@ contract PreMainnetVault is ERC20, Ownable {
         emit WithdrawEnabled();
     }
 
+    /// @dev override decimals to return decimals of deposit token
     function decimals() public view virtual override returns (uint8) {
         return _decimals;
     }
 
-    /// @notice Token is soulbound until transfer is enabled
-    function transfer(address to, uint256 value) public virtual override returns (bool) {
-        if (!withdrawEnabled) revert TransferNotEnabled();
-        address owner = _msgSender();
-        _transfer(owner, to, value);
-        return true;
-    }
-
-    /// @notice Token is soulbound until transfer is enabled
-    function transferFrom(address from, address to, uint256 value) public virtual override returns (bool) {
-        if (!withdrawEnabled) revert TransferNotEnabled();
-        address spender = _msgSender();
-        _spendAllowance(from, spender, value);
-        _transfer(from, to, value);
-        return true;
-    }
-
-    function tvl() external view returns (uint256) {
-        return depositToken.balanceOf(address(this));
+    /// @dev override _update to disable transfer before campaign ends
+    function _update(address from, address to, uint256 value) internal virtual override {
+        if (!withdrawEnabled && from != address(0)) revert TransferNotEnabled();
+        super._update(from, to, value);
     }
 }
