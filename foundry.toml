@@ -13,6 +13,12 @@ remappings = [
     '@layerzerolabs/oapp-evm/=lib/devtools/packages/oapp-evm/',
     '@layerzerolabs/lz-evm-protocol-v2/=lib/layerzero-v2/packages/layerzero-v2/evm/protocol',
 ]
+[fmt]
+bracket_spacing = true
+int_types = "preserve"
+sort_imports = true
+single_line_statement_blocks = "preserve"
+contract_new_lines = false
 
 [profile.release]
 gas_reports = ["*"]

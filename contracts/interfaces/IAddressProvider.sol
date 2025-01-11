@@ -11,5 +11,4 @@ interface IAddressProvider {
     function minter() external view returns (address);
     function interestReceiver(address asset) external view returns (address);
     function restakerInterestReceiver(address agent) external view returns (address);
-    function checkRole(bytes32 role, address account) external view;
 }

@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {AccessUpgradeable} from "./AccessUpgradeable.sol";
+import { IAddressProvider } from "../interfaces/IAddressProvider.sol";
+import { AccessUpgradeable } from "./AccessUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title AddressProvider
 /// @author kexley, @capLabs
 /// @notice Addresses are stored here as a central repository
-contract AddressProvider is UUPSUpgradeable, AccessUpgradeable {
+contract AddressProvider is IAddressProvider, UUPSUpgradeable, AccessUpgradeable {
+    /// @notice AccessControl
+    address public accessControl;
+
     /// @notice Lender for assets
     address public lender;
 
@@ -28,10 +32,10 @@ contract AddressProvider is UUPSUpgradeable, AccessUpgradeable {
     mapping(address => address) public vault;
 
     /// @notice Interest receiver for an asset
-    mapping(address => address) interestReceiver;
+    mapping(address => address) public interestReceiver;
 
     /// @notice Receiver of restaker interest for an agent
-    mapping(address => address) restakerInterestReceiver;
+    mapping(address => address) public restakerInterestReceiver;
 
     /// @dev Vault cannot be set more than once for a cap token
     error VaultAlreadySet(address capToken);
@@ -54,7 +58,7 @@ contract AddressProvider is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Initialize the address provider with the access control
     /// @param _accessControl Access control address
     function initialize(
-        address _accessControl, 
+        address _accessControl,
         address _lender,
         address _collateral,
         address _priceOracle,
@@ -73,7 +77,7 @@ contract AddressProvider is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Set a vault address for a cap token
     /// @param _capToken Cap token address
     /// @param _vault Vault token address
-    function setVault(address _capToken, address _vault) external checkRole(this.setVault.selector) {
+    function setVault(address _capToken, address _vault) external checkAccess(this.setVault.selector) {
         if (vault[_capToken] != address(0)) revert VaultAlreadySet(_capToken);
         vault[_capToken] = _vault;
         emit SetVault(_capToken, _vault);
@@ -82,10 +86,10 @@ contract AddressProvider is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Set a interest receiver for an asset
     /// @param _asset Asset address
     /// @param _receiver Receiver address
-    function setInterestReceiver(
-        address _asset,
-        address _receiver
-    ) external checkRole(this.setInterestReceiver.selector) {
+    function setInterestReceiver(address _asset, address _receiver)
+        external
+        checkAccess(this.setInterestReceiver.selector)
+    {
         interestReceiver[_asset] = _receiver;
         emit SetInterestReceiver(_asset, _receiver);
     }
@@ -93,13 +97,13 @@ contract AddressProvider is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Set a restaker interest receiver for an agent
     /// @param _agent Agent address
     /// @param _receiver Receiver address
-    function setRestakerInterestReceiver(
-        address _agent,
-        address _receiver
-    ) external checkRole(this.setRestakerInterestReceiver.selector) {
+    function setRestakerInterestReceiver(address _agent, address _receiver)
+        external
+        checkAccess(this.setRestakerInterestReceiver.selector)
+    {
         interestReceiver[_agent] = _receiver;
         emit SetRestakerInterestReceiver(_agent, _receiver);
     }
 
-    function _authorizeUpgrade(address) internal override checkRole(bytes4(0)) {}
+    function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }
 }

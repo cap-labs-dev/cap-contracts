@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {IAccessControl} from "../interfaces/IAccessControl.sol";
+import { IAccessControl } from "../interfaces/IAccessControl.sol";
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 /// @title AccessUpgradeable
 /// @author kexley, @capLabs
@@ -34,15 +34,15 @@ contract AccessUpgradeable is Initializable {
 
     /// @dev Check caller has permissions for a function
     /// @param _selector Function selector
-    modifier checkRole(bytes4 _selector) {
-        _checkRole(_selector);
+    modifier checkAccess(bytes4 _selector) {
+        _checkAccess(_selector);
         _;
     }
 
-    /// @dev Check role is held by the caller, revert overwise
+    /// @dev Check caller has access to a function, revert overwise
     /// @param _selector Function selector
-    function _checkRole(bytes4 _selector) internal view {
+    function _checkAccess(bytes4 _selector) internal view {
         AccessStorage storage $ = _getAccessStorage();
-        IAccessControl($.accessControl).checkRole(_selector, address(this), msg.sender);
+        IAccessControl($.accessControl).checkAccess(_selector, address(this), msg.sender);
     }
 }

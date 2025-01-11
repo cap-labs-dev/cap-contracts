@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import {AccessUpgradeable} from "../registry/AccessUpgradeable.sol";
-import {IOracleAdapter} from "../interfaces/IOracleAdapter.sol";
+import { IOracleAdapter } from "../interfaces/IOracleAdapter.sol";
+import { AccessUpgradeable } from "../registry/AccessUpgradeable.sol";
 
 /// @title Oracle for fetching interest rates
 /// @author kexley, @capLabs
@@ -61,7 +61,10 @@ contract RateOracle is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Set a rate source for an asset
     /// @param _asset Asset address
     /// @param _oracleData Oracle data
-    function setOracleData(address _asset, OracleData calldata _oracleData) external checkRole(this.setOracleData.selector) {
+    function setOracleData(address _asset, OracleData calldata _oracleData)
+        external
+        checkAccess(this.setOracleData.selector)
+    {
         if (_oracleData.adapter == address(0)) revert NoAdapter();
         oracleData[_asset] = _oracleData;
         emit SetOracleData(_asset, _oracleData);
@@ -70,7 +73,7 @@ contract RateOracle is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Update the minimum interest rate for an asset
     /// @param _asset Asset address
     /// @param _rate New interest rate
-    function setBenchmarkRate(address _asset, uint256 _rate) external checkRole(this.setBenchmarkRate.selector) {
+    function setBenchmarkRate(address _asset, uint256 _rate) external checkAccess(this.setBenchmarkRate.selector) {
         benchmarkRate[_asset] = _rate;
         emit SetBenchmarkRate(_asset, _rate);
     }
@@ -78,7 +81,7 @@ contract RateOracle is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Update the rate at which an agent accrues interest explicitly to pay restakers
     /// @param _agent Agent address
     /// @param _rate New interest rate
-    function setRestakerRate(address _agent, uint256 _rate) external checkRole(this.setRestakerRate.selector) {
+    function setRestakerRate(address _agent, uint256 _rate) external checkAccess(this.setRestakerRate.selector) {
         restakerRate[_agent] = _rate;
         emit SetRestakerRate(_agent, _rate);
     }
@@ -92,5 +95,5 @@ contract RateOracle is UUPSUpgradeable, AccessUpgradeable {
         if (success) rate = abi.decode(returnedData, (uint256));
     }
 
-    function _authorizeUpgrade(address) internal override view checkRole(bytes4(0)) {}
+    function _authorizeUpgrade(address) internal view override checkAccess(bytes4(0)) { }
 }
