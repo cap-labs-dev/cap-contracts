@@ -20,7 +20,17 @@ sort_imports = true
 single_line_statement_blocks = "preserve"
 contract_new_lines = false
 
+[rpc_endpoints]
+mainnet = "${MAINNET_RPC}"
+
+[etherscan]
+mainnet = { key = "${MAINNET_API_KEY}" }
+sepolia = { key = "${MAINNET_API_KEY}" }
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
 [profile.release]
+inherits = "default"
 gas_reports = ["*"]
 gas_reports_ignore = [
     "MockERC20",
@@ -44,11 +54,6 @@ yul = true                                    # default true
 # cse = true # default false
 # constantOptimizer = true # default false 
 
-[rpc_endpoints]
-mainnet = "${MAINNET_RPC}"
-
-[etherscan]
-mainnet = { key = "${MAINNET_API_KEY}" }
-sepolia = { key = "${MAINNET_API_KEY}" }
-
-# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+[profile.slither]
+inherit = "default"
+via_ir = true

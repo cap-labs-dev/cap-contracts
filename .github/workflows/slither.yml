@@ -8,6 +8,8 @@ on:
 jobs:
   analyze:
     runs-on: ubuntu-latest
+    env:
+      FOUNDRY_PROFILE: slither
     steps:
       - uses: actions/checkout@v4
       
