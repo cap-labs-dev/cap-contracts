@@ -28,7 +28,7 @@ contract PreMainnetVault is ERC20, Ownable {
     event Withdraw(address indexed user, uint256 amount);
     event WithdrawEnabled();
 
-    constructor(address _depositToken) ERC20("Pre Mainnet Vault Token", "capPMV") Ownable(msg.sender) {
+    constructor(address _depositToken) ERC20("CAP Pre Mainnet Vault Token", "capPMV") Ownable(msg.sender) {
         depositToken = IERC20(_depositToken);
 
         _decimals = IERC20Metadata(_depositToken).decimals();
