@@ -2,5 +2,5 @@
 pragma solidity ^0.8.28;
 
 interface IAccessControl {
-    function checkRole(bytes32 _role, address _account) external view;
+    function checkRole(bytes4 _selector, address _contract, address _caller) external view;
 }

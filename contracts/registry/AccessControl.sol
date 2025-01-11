@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AccessControlEnumerableUpgradeable} from
     "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {IAccessControl} from "../interfaces/IAccessControl.sol";
 
 /// @title AccessControl
 /// @author kexley, @capLabs
-/// @notice Basic access control contract
-contract AccessControl is IAccessControl, UUPSUpgradeable, AccessControlEnumerableUpgradeable {
+/// @notice Granular access control for each function on each contract
+contract AccessControl is UUPSUpgradeable, AccessControlEnumerableUpgradeable {
     /// @notice Initialize the default admin
     /// @param _admin Default admin address
     function initialize(address _admin) external initializer {
@@ -18,10 +16,19 @@ contract AccessControl is IAccessControl, UUPSUpgradeable, AccessControlEnumerab
     }
 
     /// @notice Check role is held by the account, revert overwise
-    /// @param _role Role id
-    /// @param _account Address to check role for
-    function checkRole(bytes32 _role, address _account) external view {
-        _checkRole(_role, _account);
+    /// @param _selector Function selector
+    /// @param _contract Contract being called
+    /// @param _caller Address to check role for
+    function checkRole(bytes4 _selector, address _contract, address _caller) external view {
+        _checkRole(role(_selector, _contract), _caller);
+    }
+
+    /// @notice Fetch role id for a function selector on a contract
+    /// @param _selector Function selector
+    /// @param _contract Contract being called
+    /// @return roleId Role id
+    function role(bytes4 _selector, address _contract) public pure returns (bytes32 roleId) {
+        roleId = keccak256(abi.encodePacked(_selector, _contract));
     }
 
     /// @dev Only admin can upgrade

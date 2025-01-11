@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { IVaultDataProvider } from "../../interfaces/IVaultDataProvider.sol";
+import { IAddressProvider } from "../../interfaces/IAddressProvider.sol";
+import { IVault } from "../../interfaces/IVault.sol";
 
 import { Errors } from "./helpers/Errors.sol";
 import { DataTypes } from "./types/DataTypes.sol";
@@ -22,15 +23,14 @@ library ValidationLogic {
     /// @param params Parameters to check
     /// @return mint True if mint action or false if burning
     function validateSwap(DataTypes.ValidateSwapParams memory params) external view returns (bool mint) {
-        address vaultOut = IVaultDataProvider(params.vaultDataProvider).vault(params.tokenOut);
+        address vaultOut = IAddressProvider(params.addressProvider).vault(params.tokenOut);
 
         if (vaultOut != address(0)) {
-            IVaultDataProvider.VaultData memory tokenOutVaultData 
-                = IVaultDataProvider(params.vaultDataProvider).vaultData(vaultOut);
+            address[] memory assets = IVault(vaultOut).assets();
 
-            uint256 length = tokenOutVaultData.assets.length;
+            uint256 length = assets.length;
             for (uint256 i; i < length; ++i) {
-                if (tokenOutVaultData.assets[i] == params.tokenIn) {
+                if (assets[i] == params.tokenIn) {
                     mint = true;
                     break;
                 }
@@ -39,14 +39,13 @@ library ValidationLogic {
 
         bool burn;
         if (!mint) {
-            address vaultIn = IVaultDataProvider(params.vaultDataProvider).vault(params.tokenIn);
+            address vaultIn = IAddressProvider(params.addressProvider).vault(params.tokenIn);
             if (vaultIn != address(0)) {
-                IVaultDataProvider.VaultData memory tokenInVaultData 
-                    = IVaultDataProvider(params.vaultDataProvider).vaultData(vaultIn);
+                address[] memory assets = IVault(vaultIn).assets();
 
-                uint256 length = tokenInVaultData.assets.length;
+                uint256 length = assets.length;
                 for (uint256 i; i < length; ++i) {
-                    if (tokenInVaultData.assets[i] == params.tokenOut) {
+                    if (assets[i] == params.tokenOut) {
                         burn = true;
                         break;
                     }

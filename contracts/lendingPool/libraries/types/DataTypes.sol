@@ -73,9 +73,9 @@ library DataTypes {
     struct AddAssetParams {
         address asset;
         address vault;
-        address principalDebtTokenInstance;
-        address restakerDebtTokenInstance;
-        address interestDebtTokenInstance;
+        address principalDebtToken;
+        address restakerDebtToken;
+        address interestDebtToken;
         uint256 bonus;
         uint16 reserveCount;
         address addressProvider;

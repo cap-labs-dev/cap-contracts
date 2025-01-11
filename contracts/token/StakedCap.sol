@@ -10,7 +10,8 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import {IVaultDataProvider} from "../interfaces/IVaultDataProvider.sol";
+import {AccessUpgradeable} from "../registry/AccessUpgradeable.sol";
+import {IVault} from "../interfaces/IVault.sol";
 import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
 import {IMinter} from "../interfaces/IMinter.sol";
 
@@ -20,11 +21,8 @@ import {IMinter} from "../interfaces/IMinter.sol";
 /// borrowing from the underlying assets.
 /// @dev Calling notify permissionlessly will swap the underlying assets to the cap token and start
 /// the linear unlock
-contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeable {
+contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeable, AccessUpgradeable {
     using SafeERC20 for IERC20;
-
-    /// @notice Staked cap token admin role id
-    bytes32 public constant STAKED_CAP_ADMIN = keccak256("STAKED_CAP_ADMIN");
 
     /// @notice Address provider
     IAddressProvider public addressProvider;
@@ -57,6 +55,7 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
         __ERC4626_init(IERC20(_asset));
         __ERC20_init(_name, _symbol);
         __ERC20Permit_init(_name);
+        __Access_init(addressProvider.accessControl());
     }
 
     /// @notice Override the decimals function to match underlying decimals
@@ -78,9 +77,8 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
 
     /// @dev Swap yield using the minter into the cap token
     function _swap() internal {
-        IVaultDataProvider vaultDataProvider = IVaultDataProvider(addressProvider.vaultDataProvider());
-        address vault = vaultDataProvider.vault(asset());
-        address[] memory assets = vaultDataProvider.vaultData(vault).assets;
+        address vault = addressProvider.vault(asset());
+        address[] memory assets = IVault(vault).assets();
         address minter = addressProvider.minter();
         for (uint256 i; i < assets.length; ++i) {
             uint256 balance = IERC20(assets[i]).balanceOf(address(this));
@@ -142,7 +140,5 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
     }
 
     /// @dev Only admin can upgrade
-    function _authorizeUpgrade(address) internal override view {
-        addressProvider.checkRole(STAKED_CAP_ADMIN, msg.sender);
-    }
+    function _authorizeUpgrade(address) internal override view checkRole(bytes4(0)) {}
 }

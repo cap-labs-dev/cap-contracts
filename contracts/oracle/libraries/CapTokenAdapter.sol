@@ -18,10 +18,8 @@ library CapTokenAdapter {
         uint256 capTokenSupply = IERC20Metadata(_asset).totalSupply();
         if (capTokenSupply == 0) return 1; // price of 0 triggers the backup adapter
 
-        IVaultDataProvider vaultDataProvider =
-            IVaultDataProvider(IAddressProvider(_addressProvider).vaultDataProvider());
-        address vault = vaultDataProvider.vault(_asset);
-        address[] memory assets = vaultDataProvider.vaultData(vault).assets;
+        address vault = IAddressProvider(_addressProvider).vault(_asset);
+        address[] memory assets = IVault(vault).assets();
         address priceOracle = IAddressProvider(_addressProvider).priceOracle();
 
         uint256 totalUsdValue;

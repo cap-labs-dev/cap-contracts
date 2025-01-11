@@ -3,16 +3,13 @@ pragma solidity ^0.8.28;
 
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
+import {AccessUpgradeable} from "../registry/AccessUpgradeable.sol";
 import {IOracleAdapter} from "../interfaces/IOracleAdapter.sol";
 
 /// @title Oracle for fetching prices
 /// @author kexley, @capLabs
 /// @dev Payloads are stored on this contract and calculation logic is hosted on external libraries
-contract PriceOracle is UUPSUpgradeable {
-    /// @notice Price oracle admin role
-    bytes32 public constant PRICE_ORACLE_ADMIN = keccak256("PRICE_ORACLE_ADMIN");
-
+contract PriceOracle is UUPSUpgradeable, AccessUpgradeable {
     /// @dev Oracle data for fetching prices
     /// @param adapter Adapter address containing logic
     /// @param payload Encoded data for calculating prices
@@ -20,9 +17,6 @@ contract PriceOracle is UUPSUpgradeable {
         address adapter;
         bytes payload;
     }
-
-    /// @notice Address provider
-    IAddressProvider public addressProvider;
 
     /// @notice Data used to calculate an asset's price
     mapping(address => OracleData) public oracleData;
@@ -42,26 +36,15 @@ contract PriceOracle is UUPSUpgradeable {
     /// @dev Set backup oracle data
     event SetBackupOracleData(address asset, OracleData data);
 
-    /// @dev Only authorized addresses can call these functions
-    modifier onlyAdmin() {
-        _onlyAdmin();
-        _;
-    }
-
-    /// @dev Reverts if the caller is not admin
-    function _onlyAdmin() private view {
-        addressProvider.checkRole(PRICE_ORACLE_ADMIN, msg.sender);
-    }
-
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    /// @notice Initialize the oracle with the address provider
-    /// @param _addressProvider Address provider
-    function initialize(address _addressProvider) external initializer {
-        addressProvider = IAddressProvider(_addressProvider);
+    /// @notice Initialize the oracle with the access control
+    /// @param _accessControl Access control
+    function initialize(address _accessControl) external initializer {
+        __Access_init(_accessControl);
     }
 
     /// @notice Fetch the price for an asset
@@ -83,7 +66,10 @@ contract PriceOracle is UUPSUpgradeable {
     /// @notice Set a price source for an asset
     /// @param _asset Asset address
     /// @param _oracleData Oracle data
-    function setOracleData(address _asset, OracleData calldata _oracleData) external onlyAdmin {
+    function setOracleData(
+        address _asset,
+        OracleData calldata _oracleData
+    ) external checkRole(this.setOracleData.selector) {
         if (_oracleData.adapter == address(0)) revert NoAdapter();
         oracleData[_asset] = _oracleData;
         emit SetOracleData(_asset, _oracleData);
@@ -92,7 +78,10 @@ contract PriceOracle is UUPSUpgradeable {
     /// @notice Set a backup price source for an asset
     /// @param _asset Asset address
     /// @param _oracleData Oracle data
-    function setBackupOracleData(address _asset, OracleData calldata _oracleData) external onlyAdmin {
+    function setBackupOracleData(
+        address _asset,
+        OracleData calldata _oracleData
+    ) external checkRole(this.setBackupOracleData.selector) {
         if (_oracleData.adapter == address(0)) revert NoAdapter();
         backupOracleData[_asset] = _oracleData;
         emit SetBackupOracleData(_asset, _oracleData);
@@ -107,5 +96,5 @@ contract PriceOracle is UUPSUpgradeable {
         if (success) price = abi.decode(returnedData, (uint256));
     }
 
-    function _authorizeUpgrade(address) internal override onlyAdmin {}
+    function _authorizeUpgrade(address) internal override view checkRole(bytes4(0)) {}
 }

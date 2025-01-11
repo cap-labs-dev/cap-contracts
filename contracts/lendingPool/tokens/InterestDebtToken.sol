@@ -5,6 +5,7 @@ import {ERC20Upgradeable, IERC20} from "@openzeppelin/contracts-upgradeable/toke
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
+import {AccessUpgradeable} from "../../registry/AccessUpgradeable.sol";
 import {Errors} from "../libraries/helpers/Errors.sol";
 import {MathUtils} from "../libraries/math/MathUtils.sol";
 import {WadRayMath} from "../libraries/math/WadRayMath.sol";
@@ -15,7 +16,7 @@ import {IRateOracle} from "../../interfaces/IRateOracle.sol";
 /// @author kexley, @capLabs
 /// @notice Compound interest accrues for agents borrowing an asset.
 /// @dev Total supply is calculated therefore an estimation rather than exact.
-contract InterestDebtToken is ERC20Upgradeable {
+contract InterestDebtToken is ERC20Upgradeable, AccessUpgradeable {
     using MathUtils for uint256;
     using WadRayMath for uint256;
 
@@ -49,12 +50,6 @@ contract InterestDebtToken is ERC20Upgradeable {
     /// @notice Interest rate index,
     uint256 public index;
 
-    /// @dev Only the lender can use these functions
-    modifier onlyLender() {
-        require(msg.sender == addressProvider.lender(), Errors.CALLER_NOT_POOL_OR_EMERGENCY_ADMIN);
-        _;
-    }
-
     /// @dev Disable initializers on the implementation
     constructor() {
         _disableInitializers();
@@ -64,7 +59,11 @@ contract InterestDebtToken is ERC20Upgradeable {
     /// @param _addressProvider Address provider
     /// @param _debtToken Principal debt token
     /// @param _asset Asset address
-    function initialize(address _addressProvider, address _debtToken, address _asset) external initializer {
+    function initialize(
+        address _addressProvider,
+        address _debtToken,
+        address _asset
+    ) external initializer {
         addressProvider = IAddressProvider(_addressProvider);
         debtToken = _debtToken;
 
@@ -72,9 +71,10 @@ contract InterestDebtToken is ERC20Upgradeable {
         string memory _symbol = string.concat("interest", IERC20Metadata(_asset).symbol());
         _decimals = IERC20Metadata(_asset).decimals();
         asset = _asset;
+        index = 1e27;
 
         __ERC20_init(_name, _symbol);
-        index = 1e27;
+        __Access_init(addressProvider.accessControl());
     }
 
     /// @notice Update the accrued interest and the interest rate
@@ -102,7 +102,10 @@ contract InterestDebtToken is ERC20Upgradeable {
     /// @param _agent Agent address that will have it's debt repaid
     /// @param _amount Amount of underlying asset to repay to lender
     /// @return actualRepaid Actual amount repaid
-    function burn(address _agent, uint256 _amount) external onlyLender returns (uint256 actualRepaid) {
+    function burn(
+        address _agent,
+        uint256 _amount
+    ) external checkRole(this.burn.selector) returns (uint256 actualRepaid) {
         _update(_agent);
 
         uint256 agentBalance = super.balanceOf(_agent);

@@ -3,8 +3,9 @@ pragma solidity ^0.8.28;
 
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
-import {IVaultDataProvider} from "../interfaces/IVaultDataProvider.sol";
+import {IVault} from "../interfaces/IVault.sol";
 
+import {AccessUpgradeable} from "../registry/AccessUpgradeable.sol";
 import {ValidationLogic} from "./libraries/ValidationLogic.sol";
 import {AmountOutLogic} from "./libraries/AmountOutLogic.sol";
 import {MintBurnLogic} from "./libraries/MintBurnLogic.sol";
@@ -16,18 +17,30 @@ import {DataTypes} from "./libraries/types/DataTypes.sol";
 /// @dev Dynamic fees are applied according to the allocation of assets in the basket. Increasing
 /// the supply of a excessive asset or burning for an scarce asset will charge fees on a kinked
 /// slope. Redeem can be used to avoid these fees by burning for the current ratio of assets.
-contract Minter is UUPSUpgradeable {
-    /// @notice Minter admin role
-    bytes32 public constant MINTER_ADMIN = keccak256("MINTER_ADMIN");
+contract Minter is UUPSUpgradeable, AccessUpgradeable {
+    /// @dev Fee data for minting and burning
+    struct FeeData {
+        uint256 slope0;
+        uint256 slope1;
+        uint256 mintKinkRatio;
+        uint256 burnKinkRatio;
+        uint256 optimalRatio;
+    }
 
     /// @notice Address provider
     IAddressProvider public addressProvider;
 
-    /// @dev Only authorized addresses can call these functions
-    modifier onlyAdmin() {
-        addressProvider.checkRole(MINTER_ADMIN, msg.sender);
-        _;
-    }
+    /// @notice Fee data for each asset in a vault
+    mapping(address => mapping(address => FeeData)) public feeData;
+
+    /// @notice Redeem fee for a vault
+    mapping(address => uint256) public redeemFee;
+
+    /// @dev Fee data set for an asset in a vault
+    event SetFeeData(address vault, address asset, FeeData feeData);
+
+    /// @dev Redeem fee set
+    event SetRedeemFee(address vault, uint256 redeemFee);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -38,6 +51,7 @@ contract Minter is UUPSUpgradeable {
     /// @param _addressProvider Address provider
     function initialize(address _addressProvider) external initializer {
         addressProvider = IAddressProvider(_addressProvider);
+        __Access_init(addressProvider.accessControl());
     }
 
     /// @notice Swap a backing asset for a cap token or vice versa, fees are charged based on asset
@@ -60,7 +74,7 @@ contract Minter is UUPSUpgradeable {
     ) external returns (uint256 amountOut) {
         bool mint = ValidationLogic.validateSwap(
             DataTypes.ValidateSwapParams({
-                vaultDataProvider: addressProvider.vaultDataProvider(),
+                addressProvider: address(addressProvider),
                 tokenIn: _tokenIn,
                 tokenOut: _tokenOut,
                 deadline: _deadline
@@ -69,9 +83,8 @@ contract Minter is UUPSUpgradeable {
 
         address capToken = mint ? _tokenOut : _tokenIn;
         address asset = mint ? _tokenIn : _tokenOut;
-        address vault = IVaultDataProvider(addressProvider.vaultDataProvider()).vault(capToken);
-        IVaultDataProvider.AllocationData memory allocationData =
-            IVaultDataProvider(addressProvider.vaultDataProvider()).allocationData(vault, asset);
+        address vault = addressProvider.vault(capToken);
+        FeeData memory fees = feeData[vault][asset];
 
         (amountOut,) = AmountOutLogic.amountOut(
             DataTypes.AmountOutParams({
@@ -81,11 +94,11 @@ contract Minter is UUPSUpgradeable {
                 capToken: capToken,
                 vault: vault,
                 oracle: addressProvider.priceOracle(),
-                slope0: allocationData.slope0,
-                slope1: allocationData.slope0,
-                mintKinkRatio: allocationData.mintKinkRatio,
-                burnKinkRatio: allocationData.burnKinkRatio,
-                optimalRatio: allocationData.optimalRatio
+                slope0: fees.slope0,
+                slope1: fees.slope0,
+                mintKinkRatio: fees.mintKinkRatio,
+                burnKinkRatio: fees.burnKinkRatio,
+                optimalRatio: fees.optimalRatio
             })
         );
 
@@ -117,21 +130,19 @@ contract Minter is UUPSUpgradeable {
         address _receiver,
         uint256 _deadline
     ) external returns (uint256[] memory amountOuts) {
-        IVaultDataProvider vaultDataProvider = IVaultDataProvider(addressProvider.vaultDataProvider());
-
-        address vault = vaultDataProvider.vault(_tokenIn);
+        address vault = addressProvider.vault(_tokenIn);
 
         ValidationLogic.validateRedeem(vault, _deadline);
 
-        IVaultDataProvider.VaultData memory vaultData = vaultDataProvider.vaultData(vault);
+        address[] memory assets = IVault(vault).assets();
 
         (amountOuts,) = AmountOutLogic.redeemAmountOut(
             DataTypes.RedeemAmountOutParams({
                 capToken: _tokenIn,
                 amount: _amountIn,
                 vault: vault,
-                assets: vaultData.assets,
-                redeemFee: vaultData.redeemFee
+                assets: assets,
+                redeemFee: redeemFee[vault]
             })
         );
 
@@ -140,7 +151,7 @@ contract Minter is UUPSUpgradeable {
                 capToken: _tokenIn,
                 amount: _amountIn,
                 vault: vault,
-                assets: vaultData.assets,
+                assets: assets,
                 amountOuts: amountOuts,
                 minAmountOuts: _minAmountOuts,
                 receiver: _receiver
@@ -158,11 +169,9 @@ contract Minter is UUPSUpgradeable {
         view
         returns (uint256 amountOut)
     {
-        address vaultDataProvider = addressProvider.vaultDataProvider();
-
         bool mint = ValidationLogic.validateSwap(
             DataTypes.ValidateSwapParams({
-                vaultDataProvider: vaultDataProvider,
+                addressProvider: address(addressProvider),
                 tokenIn: _tokenIn,
                 tokenOut: _tokenOut,
                 deadline: block.timestamp
@@ -171,9 +180,8 @@ contract Minter is UUPSUpgradeable {
 
         address capToken = mint ? _tokenOut : _tokenIn;
         address asset = mint ? _tokenIn : _tokenOut;
-        address vault = IVaultDataProvider(vaultDataProvider).vault(capToken);
-        IVaultDataProvider.AllocationData memory allocationData =
-            IVaultDataProvider(vaultDataProvider).allocationData(vault, asset);
+        address vault = addressProvider.vault(capToken);
+        FeeData memory fees = feeData[vault][asset];
 
         (amountOut,) = AmountOutLogic.amountOut(
             DataTypes.AmountOutParams({
@@ -183,11 +191,11 @@ contract Minter is UUPSUpgradeable {
                 capToken: capToken,
                 vault: vault,
                 oracle: addressProvider.priceOracle(),
-                slope0: allocationData.slope0,
-                slope1: allocationData.slope0,
-                mintKinkRatio: allocationData.mintKinkRatio,
-                burnKinkRatio: allocationData.burnKinkRatio,
-                optimalRatio: allocationData.optimalRatio
+                slope0: fees.slope0,
+                slope1: fees.slope0,
+                mintKinkRatio: fees.mintKinkRatio,
+                burnKinkRatio: fees.burnKinkRatio,
+                optimalRatio: fees.optimalRatio
             })
         );
     }
@@ -201,23 +209,46 @@ contract Minter is UUPSUpgradeable {
         view
         returns (uint256[] memory amountOuts)
     {
-        address vaultDataProvider = addressProvider.vaultDataProvider();
-        address vault = IVaultDataProvider(vaultDataProvider).vault(_tokenIn);
+        address vault = addressProvider.vault(_tokenIn);
 
         ValidationLogic.validateRedeem(vault, block.timestamp);
 
-        IVaultDataProvider.VaultData memory vaultData = IVaultDataProvider(vaultDataProvider).vaultData(vault);
+        address[] memory assets = IVault(vault).assets();
 
         (amountOuts,) = AmountOutLogic.redeemAmountOut(
             DataTypes.RedeemAmountOutParams({
                 capToken: _tokenIn,
                 amount: _amountIn,
                 vault: vault,
-                assets: vaultData.assets,
-                redeemFee: vaultData.redeemFee
+                assets: assets,
+                redeemFee: redeemFee[vault]
             })
         );
     }
 
-    function _authorizeUpgrade(address) internal override onlyAdmin {}
+    /// @notice Set the allocation slopes and ratios for an asset in a vault
+    /// @param _vault Vault address
+    /// @param _asset Asset address
+    /// @param _feeData Fee slopes and ratios for the asset in the vault
+    function setFeeData(
+        address _vault,
+        address _asset,
+        FeeData calldata _feeData
+    ) external checkRole(this.setFeeData.selector) {
+        feeData[_vault][_asset] = _feeData;
+        emit SetFeeData(_vault, _asset, _feeData);
+    }
+
+    /// @notice Set the redeem fee for a vault
+    /// @param _vault Vault address
+    /// @param _redeemFee Redeem fee amount
+    function setRedeemFee(
+        address _vault,
+        uint256 _redeemFee
+    ) external checkRole(this.setFeeData.selector) {
+        redeemFee[_vault] = _redeemFee;
+        emit SetRedeemFee(_vault, _redeemFee);
+    }
+
+    function _authorizeUpgrade(address) internal override checkRole(bytes4(0)) {}
 }

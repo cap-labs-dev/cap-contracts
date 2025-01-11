@@ -14,5 +14,6 @@ interface IVault {
     function currentUtilizationIndex(address asset) external view returns (uint256 index);
     function totalSupplies(address asset) external view returns (uint256 totalSupplies);
     function totalBorrows(address asset) external view returns (uint256 totalBorrows);
-    function initialize(address addressProvider) external;
+    function assets() external view returns (address[] memory assets);
+    function initialize(address accessControl) external;
 }

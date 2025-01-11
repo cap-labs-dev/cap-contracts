@@ -5,6 +5,7 @@ import {ERC20Upgradeable, IERC20} from "@openzeppelin/contracts-upgradeable/toke
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
+import {AccessUpgradeable} from "../../registry/AccessUpgradeable.sol";
 import {Errors} from "../libraries/helpers/Errors.sol";
 import {WadRayMath} from "../libraries/math/WadRayMath.sol";
 import {IAddressProvider} from "../../interfaces/IAddressProvider.sol";
@@ -16,7 +17,7 @@ import {IRateOracle} from "../../interfaces/IRateOracle.sol";
 /// paid to the restakers collateralizing an agent
 /// @dev Each agent can have a different rate so the weighted mean is used to calculate the total
 /// accrued debt. This means that the total supply may not be exact.
-contract RestakerDebtToken is ERC20Upgradeable {
+contract RestakerDebtToken is ERC20Upgradeable, AccessUpgradeable {
     using WadRayMath for uint256;
 
     /// @notice Address provider
@@ -46,12 +47,6 @@ contract RestakerDebtToken is ERC20Upgradeable {
     /// @notice Last time the total supply was updated
     uint256 public lastUpdate;
 
-    /// @dev Only the lender can use these functions
-    modifier onlyLender() {
-        require(msg.sender == addressProvider.lender(), Errors.CALLER_NOT_POOL_OR_EMERGENCY_ADMIN);
-        _;
-    }
-
     /// @dev Disable initializers on the implementation
     constructor() {
         _disableInitializers();
@@ -61,7 +56,11 @@ contract RestakerDebtToken is ERC20Upgradeable {
     /// @param _addressProvider Address provider
     /// @param _debtToken Principal debt token
     /// @param _asset Asset address
-    function initialize(address _addressProvider, address _debtToken, address _asset) external initializer {
+    function initialize(
+        address _addressProvider,
+        address _debtToken,
+        address _asset
+    ) external initializer {
         addressProvider = IAddressProvider(_addressProvider);
         debtToken = _debtToken;
 
@@ -71,6 +70,7 @@ contract RestakerDebtToken is ERC20Upgradeable {
         asset = _asset;
 
         __ERC20_init(_name, _symbol);
+        __Access_init(addressProvider.accessControl());
     }
 
     /// @notice Update the interest per second of the agent and the scaled total supply
@@ -92,7 +92,10 @@ contract RestakerDebtToken is ERC20Upgradeable {
     /// @param _agent Agent address that will have it's debt repaid
     /// @param _amount Amount of underlying asset to repay to lender
     /// @return actualRepaid Actual amount repaid
-    function burn(address _agent, uint256 _amount) external onlyLender returns (uint256 actualRepaid) {
+    function burn(
+        address _agent,
+        uint256 _amount
+    ) external checkRole(this.burn.selector) returns (uint256 actualRepaid) {
         _accrueInterest(_agent);
 
         uint256 agentBalance = super.balanceOf(_agent);

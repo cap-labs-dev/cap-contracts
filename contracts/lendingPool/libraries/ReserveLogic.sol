@@ -6,7 +6,6 @@ import {IDebtToken} from "../../interfaces/IDebtToken.sol";
 
 import {Errors} from "./helpers/Errors.sol";
 import {ValidationLogic} from "./ValidationLogic.sol";
-import {CloneLogic} from "./CloneLogic.sol";
 import {DataTypes} from "./types/DataTypes.sol";
 
 /// @title Reserve Logic
@@ -44,21 +43,12 @@ library ReserveLogic {
             reservesList[params.reserveCount] = params.asset;
         }
 
-        address principalDebtToken = CloneLogic.clone(params.principalDebtTokenInstance);
-        IPrincipalDebtToken(principalDebtToken).initialize(params.addressProvider, params.asset);
-
-        address restakerDebtToken = CloneLogic.clone(params.restakerDebtTokenInstance);
-        IDebtToken(restakerDebtToken).initialize(params.addressProvider, principalDebtToken, params.asset);
-
-        address interestDebtToken = CloneLogic.clone(params.interestDebtTokenInstance);
-        IDebtToken(interestDebtToken).initialize(params.addressProvider, principalDebtToken, params.asset);
-
         reservesData[params.asset] = DataTypes.ReserveData({
             id: id,
             vault: params.vault,
-            principalDebtToken: principalDebtToken,
-            restakerDebtToken: restakerDebtToken,
-            interestDebtToken: interestDebtToken,
+            principalDebtToken: params.principalDebtToken,
+            restakerDebtToken: params.restakerDebtToken,
+            interestDebtToken: params.interestDebtToken,
             bonus: params.bonus,
             paused: false
         });

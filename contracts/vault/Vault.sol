@@ -5,29 +5,18 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
-import {IVaultDataProvider} from "../interfaces/IVaultDataProvider.sol";
+import {AccessUpgradeable} from "../registry/AccessUpgradeable.sol";
 
 /// @title Vault for storing the backing for cTokens
 /// @author kexley, @capLabs
 /// @notice Tokens are supplied by cToken minters and borrowed by covered agents
 /// @dev Supplies, borrows and utilization rates are tracked. Interest rates should be computed and
-/// charged on the external contracts, only the principle amount is counted on this contract. Asset
-/// whitelisting is handled via the vault data provider.
-contract Vault is UUPSUpgradeable {
+/// charged on the external contracts, only the principle amount is counted on this contract.
+contract Vault is UUPSUpgradeable, AccessUpgradeable {
     using SafeERC20 for IERC20;
 
-    /// @notice Vault admin role
-    bytes32 public constant VAULT_ADMIN = keccak256("VAULT_ADMIN");
-
-    /// @notice Supplier role
-    bytes32 public constant VAULT_SUPPLIER = keccak256("VAULT_SUPPLIER");
-
-    /// @notice Borrower role
-    bytes32 public constant VAULT_BORROWER = keccak256("VAULT_BORROWER");
-
-    /// @notice Address provider
-    IAddressProvider public addressProvider;
+    /// @notice Assets supported by the vault
+    address[] public assets;
 
     /// @notice Total supply of an asset to this contract
     mapping(address => uint256) public totalSupplies;
@@ -41,17 +30,23 @@ contract Vault is UUPSUpgradeable {
     /// @notice Timestamp of the last update to the utilization index
     mapping(address => uint256) public lastUpdate;
 
+    /// @notice Asset pause state
+    mapping(address => bool) public paused;
+
     /// @dev No transfer tokens allowed
     error TransferTaxNotSupported();
+
+    /// @dev Paused assets cannot be supplied or borrowed
+    error AssetPaused(address asset);
 
     /// @dev Only whitelisted assets can be supplied or borrowed
     error AssetNotSupported(address asset);
 
+    /// @dev Asset is already listed
+    error AssetAlreadySupported(address asset);
+
     /// @dev Only non-supported assets can be rescued
     error AssetNotRescuable(address asset);
-
-    /// @dev Supplies and borrows are paused
-    error Paused();
 
     /// @dev Deposit made
     event Deposit(address indexed depositor, address indexed asset, uint256 amount);
@@ -65,49 +60,17 @@ contract Vault is UUPSUpgradeable {
     /// @dev Repayment made
     event Repay(address indexed repayer, address indexed asset, uint256 amount);
 
-    /// @dev Only admin are allowed to call functions
-    modifier onlyAdmin() {
-        _onlyAdmin();
+    /// @dev Asset paused
+    event PauseAsset(address asset);
+
+    /// @dev Asset unpaused
+    event UnpauseAsset(address asset);
+
+    /// @dev Only allow supplies and borrows when not paused
+    /// @param _asset Asset address
+    modifier whenNotPaused(address _asset) {
+        if (paused[_asset]) revert AssetPaused(_asset);
         _;
-    }
-
-    /// @dev Only suppliers are allowed to call functions
-    modifier onlySupplier() {
-        _onlySupplier();
-        _;
-    }
-
-    /// @dev Only borrowers are allowed to call functions
-    modifier onlyBorrower() {
-        _onlyBorrower();
-        _;
-    }
-
-    /// @dev Only allowed when not paused
-    modifier whenNotPaused() {
-        _whenNotPaused();
-        _;
-    }
-
-    /// @dev Reverts if the caller is not admin
-    function _onlyAdmin() private view {
-        addressProvider.checkRole(VAULT_ADMIN, msg.sender);
-    }
-
-    /// @dev Reverts if the caller is not supplier
-    function _onlySupplier() private view {
-        addressProvider.checkRole(VAULT_SUPPLIER, msg.sender);
-    }
-
-    /// @dev Reverts if the caller is not borrower
-    function _onlyBorrower() private view {
-        addressProvider.checkRole(VAULT_BORROWER, msg.sender);
-    }
-
-    /// @dev Reverts if the vault is not paused
-    function _whenNotPaused() private view {
-        IVaultDataProvider vaultDataProvider = IVaultDataProvider(addressProvider.vaultDataProvider());
-        if (vaultDataProvider.paused(address(this))) revert Paused();
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -115,24 +78,29 @@ contract Vault is UUPSUpgradeable {
         _disableInitializers();
     }
 
-    /// @notice Initialize the address provider address
-    /// @param _addressProvider Address provider address
-    function initialize(address _addressProvider) external initializer {
-        addressProvider = IAddressProvider(_addressProvider);
+    /// @notice Initialize the vault with the access control
+    /// @param _accessControl Access control address
+    function initialize(address _accessControl) external initializer {
+        __Access_init(_accessControl);
     }
 
     /// @notice Deposit an asset
     /// @dev This contract must have approval to move asset from msg.sender
     /// @param _asset Whitelisted asset to deposit
     /// @param _amount Amount of asset to deposit
-    function deposit(address _asset, uint256 _amount) external whenNotPaused onlySupplier {
-        _validate(_asset);
+    function deposit(
+        address _asset,
+        uint256 _amount
+    ) external whenNotPaused(_asset) checkRole(this.deposit.selector) {
+        if (!listed(_asset)) revert AssetNotSupported(_asset);
         _updateIndex(_asset);
+
         totalSupplies[_asset] += _amount;
         uint256 beforeBalance = IERC20(_asset).balanceOf(address(this));
         IERC20(_asset).safeTransferFrom(msg.sender, address(this), _amount);
         uint256 afterBalance = IERC20(_asset).balanceOf(address(this));
         if (afterBalance != beforeBalance + _amount) revert TransferTaxNotSupported();
+
         emit Deposit(msg.sender, _asset, _amount);
     }
 
@@ -141,11 +109,17 @@ contract Vault is UUPSUpgradeable {
     /// @param _asset Asset to withdraw
     /// @param _amount Amount of asset to withdraw
     /// @param _receiver Receiver of the withdrawal
-    function withdraw(address _asset, uint256 _amount, address _receiver) external onlySupplier {
-        _validate(_asset);
+    function withdraw(
+        address _asset,
+        uint256 _amount,
+        address _receiver
+    ) external checkRole(this.withdraw.selector) {
+        if (!listed(_asset)) revert AssetNotSupported(_asset);
         _updateIndex(_asset);
+
         totalSupplies[_asset] -= _amount;
         IERC20(_asset).safeTransfer(_receiver, _amount);
+
         emit Withdraw(msg.sender, _asset, _amount);
     }
 
@@ -154,33 +128,95 @@ contract Vault is UUPSUpgradeable {
     /// @param _asset Asset to borrow
     /// @param _amount Amount of asset to borrow
     /// @param _receiver Receiver of the borrow
-    function borrow(address _asset, uint256 _amount, address _receiver) external whenNotPaused onlyBorrower {
-        _validate(_asset);
+    function borrow(
+        address _asset,
+        uint256 _amount,
+        address _receiver
+    ) external whenNotPaused(_asset) checkRole(this.borrow.selector) {
+        if (!listed(_asset)) revert AssetNotSupported(_asset);
         _updateIndex(_asset);
+
         totalBorrows[_asset] += _amount;
         IERC20(_asset).safeTransfer(_receiver, _amount);
+
         emit Borrow(msg.sender, _asset, _amount);
     }
 
     /// @notice Repay an asset
     /// @param _asset Asset to repay
     /// @param _amount Amount of asset to repay
-    function repay(address _asset, uint256 _amount) external onlyBorrower {
-        _validate(_asset);
+    function repay(address _asset, uint256 _amount) external checkRole(this.repay.selector) {
+        if (!listed(_asset)) revert AssetNotSupported(_asset);
         _updateIndex(_asset);
+
         totalBorrows[_asset] -= _amount;
         IERC20(_asset).safeTransferFrom(msg.sender, address(this), _amount);
+
         emit Repay(msg.sender, _asset, _amount);
+    }
+
+    /// @notice Add an asset to the vault list
+    /// @param _asset Asset address
+    function addAsset(address _asset) external checkRole(this.addAsset.selector) {
+        if (listed(_asset)) revert AssetAlreadySupported(_asset);
+        assets.push(_asset);
+    }
+
+    /// @notice Remove an asset from the vault list
+    /// @param _asset Asset address
+    function removeAsset(address _asset) external checkRole(this.removeAsset.selector) {
+        address[] memory cachedAssets = assets;
+        uint256 length = cachedAssets.length;
+        bool removed;
+        for (uint256 i; i < length; ++i) {
+            if (_asset == cachedAssets[i]) {
+                assets[i] = cachedAssets[length - 1];
+                assets.pop();
+                removed = true;
+                break;
+            }
+        }
+
+        if (!removed) revert AssetNotSupported(_asset);
+    }
+
+    /// @notice Pause an asset
+    /// @param _asset Asset address
+    function pause(address _asset) external checkRole(this.pause.selector) {
+        paused[_asset] = true;
+        emit PauseAsset(_asset);
+    }
+
+    /// @notice Unpause an asset
+    /// @param _asset Asset address
+    function unpause(address _asset) external checkRole(this.unpause.selector) {
+        paused[_asset] = false;
+        emit UnpauseAsset(_asset);
     }
 
     /// @notice Rescue an unsupported asset
     /// @param _asset Asset to rescue
     /// @param _receiver Receiver of the rescue
-    function rescueERC20(address _asset, address _receiver) external onlyAdmin {
-        IVaultDataProvider vaultDataProvider = IVaultDataProvider(addressProvider.vaultDataProvider());
-        if (vaultDataProvider.assetSupported(address(this), _asset)) revert AssetNotRescuable(_asset);
-
+    function rescueERC20(
+        address _asset,
+        address _receiver
+    ) external checkRole(this.rescueERC20.selector) {
+        if (listed(_asset)) revert AssetNotRescuable(_asset);
         IERC20(_asset).safeTransfer(_receiver, IERC20(_asset).balanceOf(address(this)));
+    }
+
+    /// @dev Validate that an asset is listed
+    /// @param _asset Asset to check
+    /// @return isListed Asset is listed or not
+    function listed(address _asset) public view returns (bool isListed) {
+        address[] memory cachedAssets = assets;
+        uint256 length = assets.length;
+        for (uint256 i; i < length; ++i) {
+            if (_asset == cachedAssets[i]) {
+                isListed = true;
+                break;
+            }
+        }
     }
 
     /// @notice Available balance to borrow
@@ -213,12 +249,5 @@ contract Vault is UUPSUpgradeable {
         lastUpdate[_asset] = block.timestamp;
     }
 
-    /// @dev Validate that an asset is whitelisted
-    /// @param _asset Asset to check
-    function _validate(address _asset) internal view {
-        IVaultDataProvider vaultDataProvider = IVaultDataProvider(addressProvider.vaultDataProvider());
-        if (!vaultDataProvider.assetSupported(address(this), _asset)) revert AssetNotSupported(_asset);
-    }
-
-    function _authorizeUpgrade(address) internal override onlyAdmin {}
+    function _authorizeUpgrade(address) internal override checkRole(bytes4(0)) {}
 }

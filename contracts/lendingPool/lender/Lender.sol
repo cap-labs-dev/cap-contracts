@@ -3,11 +3,11 @@ pragma solidity ^0.8.28;
 
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
+import {AccessUpgradeable} from "../../registry/AccessUpgradeable.sol";
 import {BorrowLogic} from "../libraries/BorrowLogic.sol";
 import {LiquidationLogic} from "../libraries/LiquidationLogic.sol";
 import {ReserveLogic} from "../libraries/ReserveLogic.sol";
 import {ViewLogic} from "../libraries/ViewLogic.sol";
-import {CloneLogic} from "../libraries/CloneLogic.sol";
 import {DataTypes} from "../libraries/types/DataTypes.sol";
 import {Errors} from "../libraries/helpers/Errors.sol";
 import {IAddressProvider} from "../../interfaces/IAddressProvider.sol";
@@ -18,16 +18,7 @@ import {LenderStorage} from "./LenderStorage.sol";
 /// @notice Whitelisted tokens are borrowed and repaid from this contract by covered agents.
 /// @dev Borrow interest rates are calculated from the underlying utilization rates of the assets
 /// in the vaults.
-contract Lender is UUPSUpgradeable, LenderStorage {
-    /// @notice Lender admin role
-    bytes32 public constant LENDER_ADMIN = keccak256("LENDER_ADMIN");
-
-    /// @dev Only admin are allowed to call certain functions
-    modifier onlyAdmin() {
-        IAddressProvider(addressProvider).checkRole(LENDER_ADMIN, msg.sender);
-        _;
-    }
-
+contract Lender is UUPSUpgradeable, LenderStorage, AccessUpgradeable {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -37,6 +28,7 @@ contract Lender is UUPSUpgradeable, LenderStorage {
     /// @param _addressProvider Address provider
     function initialize(address _addressProvider) external initializer {
         addressProvider = _addressProvider;
+        __Access_init(IAddressProvider(addressProvider).accessControl());
     }
 
     /// @notice Borrow an asset
@@ -152,8 +144,18 @@ contract Lender is UUPSUpgradeable, LenderStorage {
     /// @notice Add asset to the possible lending
     /// @param _asset Asset address
     /// @param _vault Vault address
+    /// @param _principalDebtToken Principal debt address
+    /// @param _restakerDebtToken Restaker debt address
+    /// @param _interestDebtToken Interest debt address
     /// @param _liquidationBonus Bonus percentage for liquidating a market to cover holding risk
-    function addAsset(address _asset, address _vault, uint256 _liquidationBonus) external onlyAdmin {
+    function addAsset(
+        address _asset,
+        address _vault,
+        address _principalDebtToken,
+        address _restakerDebtToken,
+        address _interestDebtToken,
+        uint256 _liquidationBonus
+    ) external checkRole(this.addAsset.selector) {
         if (
             ReserveLogic.addAsset(
                 _reservesData,
@@ -161,9 +163,9 @@ contract Lender is UUPSUpgradeable, LenderStorage {
                 DataTypes.AddAssetParams({
                     asset: _asset,
                     vault: _vault,
-                    principalDebtTokenInstance: IAddressProvider(addressProvider).principalDebtTokenInstance(),
-                    restakerDebtTokenInstance: IAddressProvider(addressProvider).restakerDebtTokenInstance(),
-                    interestDebtTokenInstance: IAddressProvider(addressProvider).interestDebtTokenInstance(),
+                    principalDebtToken: _principalDebtToken,
+                    restakerDebtToken: _restakerDebtToken,
+                    interestDebtToken: _interestDebtToken,
                     bonus: _liquidationBonus,
                     reserveCount: _reservesCount,
                     addressProvider: addressProvider
@@ -176,23 +178,16 @@ contract Lender is UUPSUpgradeable, LenderStorage {
 
     /// @notice Remove asset from lending when there is no borrows
     /// @param _asset Asset address
-    function removeAsset(address _asset) external onlyAdmin {
+    function removeAsset(address _asset) external checkRole(this.removeAsset.selector) {
         ReserveLogic.removeAsset(_reservesData, _reservesList, _asset);
     }
 
     /// @notice Pause an asset from being borrowed
     /// @param _asset Asset address
     /// @param _pause True if pausing or false if unpausing
-    function pauseAsset(address _asset, bool _pause) external onlyAdmin {
+    function pauseAsset(address _asset, bool _pause) external checkRole(this.pauseAsset.selector) {
         ReserveLogic.pauseAsset(_reservesData, _asset, _pause);
     }
 
-    /// @notice Upgrade an instance owned by the lender
-    /// @param _instance Instance of a contract owned by the lender
-    /// @param _implementation New implementation address
-    function upgradeImplementation(address _instance, address _implementation) external onlyAdmin {
-        CloneLogic.upgradeTo(_instance, _implementation);
-    }
-
-    function _authorizeUpgrade(address) internal override onlyAdmin {}
+    function _authorizeUpgrade(address) internal override checkRole(bytes4(0)) {}
 }

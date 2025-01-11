@@ -3,16 +3,13 @@ pragma solidity ^0.8.28;
 
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
+import {AccessUpgradeable} from "../registry/AccessUpgradeable.sol";
 import {IOracleAdapter} from "../interfaces/IOracleAdapter.sol";
 
 /// @title Oracle for fetching interest rates
 /// @author kexley, @capLabs
 /// @notice Admin can set the minimum interest rates and the restaker interest rates.
-contract RateOracle is UUPSUpgradeable {
-    /// @notice Rate oracle admin role
-    bytes32 public constant RATE_ORACLE_ADMIN = keccak256("RATE_ORACLE_ADMIN");
-
+contract RateOracle is UUPSUpgradeable, AccessUpgradeable {
     /// @dev Rate data for fetching rate
     /// @param adapter Adapter address containing logic
     /// @param payload Encoded data for calculating rates
@@ -20,9 +17,6 @@ contract RateOracle is UUPSUpgradeable {
         address adapter;
         bytes payload;
     }
-
-    /// @notice Address provider
-    IAddressProvider public addressProvider;
 
     /// @notice Data used to calculate an asset's rate
     mapping(address => OracleData) public oracleData;
@@ -45,26 +39,15 @@ contract RateOracle is UUPSUpgradeable {
     /// @dev Set restaker rate
     event SetRestakerRate(address agent, uint256 rate);
 
-    /// @dev Only authorized addresses can call these functions
-    modifier onlyAdmin() {
-        _onlyAdmin();
-        _;
-    }
-
-    /// @dev Reverts if the caller is not admin
-    function _onlyAdmin() private view {
-        addressProvider.checkRole(RATE_ORACLE_ADMIN, msg.sender);
-    }
-
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    /// @notice Initialize the oracle with the address provider
-    /// @param _addressProvider Address provider
-    function initialize(address _addressProvider) external initializer {
-        addressProvider = IAddressProvider(_addressProvider);
+    /// @notice Initialize the oracle with the access control
+    /// @param _accessControl Access control
+    function initialize(address _accessControl) external initializer {
+        __Access_init(_accessControl);
     }
 
     /// @notice Fetch the market rate for an asset being borrowed
@@ -78,7 +61,7 @@ contract RateOracle is UUPSUpgradeable {
     /// @notice Set a rate source for an asset
     /// @param _asset Asset address
     /// @param _oracleData Oracle data
-    function setOracleData(address _asset, OracleData calldata _oracleData) external onlyAdmin {
+    function setOracleData(address _asset, OracleData calldata _oracleData) external checkRole(this.setOracleData.selector) {
         if (_oracleData.adapter == address(0)) revert NoAdapter();
         oracleData[_asset] = _oracleData;
         emit SetOracleData(_asset, _oracleData);
@@ -87,7 +70,7 @@ contract RateOracle is UUPSUpgradeable {
     /// @notice Update the minimum interest rate for an asset
     /// @param _asset Asset address
     /// @param _rate New interest rate
-    function setBenchmarkRate(address _asset, uint256 _rate) external onlyAdmin {
+    function setBenchmarkRate(address _asset, uint256 _rate) external checkRole(this.setBenchmarkRate.selector) {
         benchmarkRate[_asset] = _rate;
         emit SetBenchmarkRate(_asset, _rate);
     }
@@ -95,7 +78,7 @@ contract RateOracle is UUPSUpgradeable {
     /// @notice Update the rate at which an agent accrues interest explicitly to pay restakers
     /// @param _agent Agent address
     /// @param _rate New interest rate
-    function setRestakerRate(address _agent, uint256 _rate) external onlyAdmin {
+    function setRestakerRate(address _agent, uint256 _rate) external checkRole(this.setRestakerRate.selector) {
         restakerRate[_agent] = _rate;
         emit SetRestakerRate(_agent, _rate);
     }
@@ -109,5 +92,5 @@ contract RateOracle is UUPSUpgradeable {
         if (success) rate = abi.decode(returnedData, (uint256));
     }
 
-    function _authorizeUpgrade(address) internal override onlyAdmin {}
+    function _authorizeUpgrade(address) internal override view checkRole(bytes4(0)) {}
 }

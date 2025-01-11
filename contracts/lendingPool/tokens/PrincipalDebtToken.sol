@@ -5,27 +5,19 @@ import {ERC20Upgradeable, IERC20} from "@openzeppelin/contracts-upgradeable/toke
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
+import {AccessUpgradeable} from "../../registry/AccessUpgradeable.sol";
 import {Errors} from "../libraries/helpers/Errors.sol";
 import {IAddressProvider} from "../../interfaces/IAddressProvider.sol";
 
 /// @title Principal debt token for a market on the Lender
 /// @author kexley, @capLabs
 /// @notice Principal debt tokens are minted 1:1 with the principal loan amount
-contract PrincipalDebtToken is ERC20Upgradeable {
-    /// @notice Address provider
-    IAddressProvider public addressProvider;
-
+contract PrincipalDebtToken is ERC20Upgradeable, AccessUpgradeable {
     /// @notice asset Underlying asset
     address public asset;
 
     /// @dev Decimals of the underlying asset
     uint8 private _decimals;
-
-    /// @dev Only the lender can use these functions
-    modifier onlyLender() {
-        require(msg.sender == addressProvider.lender(), Errors.CALLER_NOT_POOL_OR_EMERGENCY_ADMIN);
-        _;
-    }
 
     /// @dev Disable initializers on the implementation
     constructor() {
@@ -33,16 +25,16 @@ contract PrincipalDebtToken is ERC20Upgradeable {
     }
 
     /// @notice Initialize the debt token with the underlying asset
-    /// @param _addressProvider Address provider
+    /// @param _accessControl Access control
     /// @param _asset Asset address
-    function initialize(address _addressProvider, address _asset) external initializer {
-        addressProvider = IAddressProvider(_addressProvider);
+    function initialize(address _accessControl, address _asset) external initializer {
         string memory _name = string.concat("debt", IERC20Metadata(_asset).name());
         string memory _symbol = string.concat("debt", IERC20Metadata(_asset).symbol());
         _decimals = IERC20Metadata(_asset).decimals();
         asset = _asset;
 
         __ERC20_init(_name, _symbol);
+        __Access_init(_accessControl);
     }
 
     /// @notice Match decimals with underlying asset
@@ -55,14 +47,14 @@ contract PrincipalDebtToken is ERC20Upgradeable {
     /// restaker interest is accrued to the agent.
     /// @param to Address to mint tokens to
     /// @param amount Amount of tokens to mint
-    function mint(address to, uint256 amount) external onlyLender {
+    function mint(address to, uint256 amount) external checkRole(this.mint.selector) {
         _mint(to, amount);
     }
 
     /// @notice Lender will burn debt tokens when the principal debt is repaid by an agent
     /// @param from Burn tokens from agent
     /// @param amount Amount to burn
-    function burn(address from, uint256 amount) external onlyLender {
+    function burn(address from, uint256 amount) external checkRole(this.burn.selector) {
         _burn(from, amount);
     }
 

@@ -58,7 +58,7 @@ library DataTypes {
     }
 
     struct ValidateSwapParams {
-        address vaultDataProvider;
+        address addressProvider;
         address tokenIn;
         address tokenOut;
         uint256 deadline;
