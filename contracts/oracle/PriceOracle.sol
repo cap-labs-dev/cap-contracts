@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import {AccessUpgradeable} from "../registry/AccessUpgradeable.sol";
-import {IOracleAdapter} from "../interfaces/IOracleAdapter.sol";
+import { IOracleAdapter } from "../interfaces/IOracleAdapter.sol";
+import { AccessUpgradeable } from "../registry/AccessUpgradeable.sol";
 
 /// @title Oracle for fetching prices
 /// @author kexley, @capLabs
@@ -66,10 +66,10 @@ contract PriceOracle is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Set a price source for an asset
     /// @param _asset Asset address
     /// @param _oracleData Oracle data
-    function setOracleData(
-        address _asset,
-        OracleData calldata _oracleData
-    ) external checkRole(this.setOracleData.selector) {
+    function setOracleData(address _asset, OracleData calldata _oracleData)
+        external
+        checkAccess(this.setOracleData.selector)
+    {
         if (_oracleData.adapter == address(0)) revert NoAdapter();
         oracleData[_asset] = _oracleData;
         emit SetOracleData(_asset, _oracleData);
@@ -78,10 +78,10 @@ contract PriceOracle is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Set a backup price source for an asset
     /// @param _asset Asset address
     /// @param _oracleData Oracle data
-    function setBackupOracleData(
-        address _asset,
-        OracleData calldata _oracleData
-    ) external checkRole(this.setBackupOracleData.selector) {
+    function setBackupOracleData(address _asset, OracleData calldata _oracleData)
+        external
+        checkAccess(this.setBackupOracleData.selector)
+    {
         if (_oracleData.adapter == address(0)) revert NoAdapter();
         backupOracleData[_asset] = _oracleData;
         emit SetBackupOracleData(_asset, _oracleData);
@@ -96,5 +96,5 @@ contract PriceOracle is UUPSUpgradeable, AccessUpgradeable {
         if (success) price = abi.decode(returnedData, (uint256));
     }
 
-    function _authorizeUpgrade(address) internal override view checkRole(bytes4(0)) {}
+    function _authorizeUpgrade(address) internal view override checkAccess(bytes4(0)) { }
 }

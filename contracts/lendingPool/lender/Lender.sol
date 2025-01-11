@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import {AccessUpgradeable} from "../../registry/AccessUpgradeable.sol";
-import {BorrowLogic} from "../libraries/BorrowLogic.sol";
-import {LiquidationLogic} from "../libraries/LiquidationLogic.sol";
-import {ReserveLogic} from "../libraries/ReserveLogic.sol";
-import {ViewLogic} from "../libraries/ViewLogic.sol";
-import {DataTypes} from "../libraries/types/DataTypes.sol";
-import {Errors} from "../libraries/helpers/Errors.sol";
-import {IAddressProvider} from "../../interfaces/IAddressProvider.sol";
-import {LenderStorage} from "./LenderStorage.sol";
+import { IAddressProvider } from "../../interfaces/IAddressProvider.sol";
+import { AccessUpgradeable } from "../../registry/AccessUpgradeable.sol";
+import { BorrowLogic } from "../libraries/BorrowLogic.sol";
+import { LiquidationLogic } from "../libraries/LiquidationLogic.sol";
+import { ReserveLogic } from "../libraries/ReserveLogic.sol";
+import { ViewLogic } from "../libraries/ViewLogic.sol";
+import { Errors } from "../libraries/helpers/Errors.sol";
+import { DataTypes } from "../libraries/types/DataTypes.sol";
+
+import { LenderStorage } from "./LenderStorage.sol";
 
 /// @title Lender for covered agents
 /// @author kexley, @capLabs
@@ -26,9 +27,9 @@ contract Lender is UUPSUpgradeable, LenderStorage, AccessUpgradeable {
 
     /// @notice Initialize the lender
     /// @param _addressProvider Address provider
-    function initialize(address _addressProvider) external initializer {
+    function initialize(address _addressProvider, address _accessControl) external initializer {
         addressProvider = _addressProvider;
-        __Access_init(IAddressProvider(addressProvider).accessControl());
+        __Access_init(_accessControl);
     }
 
     /// @notice Borrow an asset
@@ -155,7 +156,7 @@ contract Lender is UUPSUpgradeable, LenderStorage, AccessUpgradeable {
         address _restakerDebtToken,
         address _interestDebtToken,
         uint256 _liquidationBonus
-    ) external checkRole(this.addAsset.selector) {
+    ) external checkAccess(this.addAsset.selector) {
         if (
             ReserveLogic.addAsset(
                 _reservesData,
@@ -178,16 +179,16 @@ contract Lender is UUPSUpgradeable, LenderStorage, AccessUpgradeable {
 
     /// @notice Remove asset from lending when there is no borrows
     /// @param _asset Asset address
-    function removeAsset(address _asset) external checkRole(this.removeAsset.selector) {
+    function removeAsset(address _asset) external checkAccess(this.removeAsset.selector) {
         ReserveLogic.removeAsset(_reservesData, _reservesList, _asset);
     }
 
     /// @notice Pause an asset from being borrowed
     /// @param _asset Asset address
     /// @param _pause True if pausing or false if unpausing
-    function pauseAsset(address _asset, bool _pause) external checkRole(this.pauseAsset.selector) {
+    function pauseAsset(address _asset, bool _pause) external checkAccess(this.pauseAsset.selector) {
         ReserveLogic.pauseAsset(_reservesData, _asset, _pause);
     }
 
-    function _authorizeUpgrade(address) internal override checkRole(bytes4(0)) {}
+    function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }
 }

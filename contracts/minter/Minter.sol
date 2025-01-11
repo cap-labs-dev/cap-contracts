@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {IAddressProvider} from "../interfaces/IAddressProvider.sol";
-import {IVault} from "../interfaces/IVault.sol";
+import { IAddressProvider } from "../interfaces/IAddressProvider.sol";
+import { IVault } from "../interfaces/IVault.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import {AccessUpgradeable} from "../registry/AccessUpgradeable.sol";
-import {ValidationLogic} from "./libraries/ValidationLogic.sol";
-import {AmountOutLogic} from "./libraries/AmountOutLogic.sol";
-import {MintBurnLogic} from "./libraries/MintBurnLogic.sol";
-import {DataTypes} from "./libraries/types/DataTypes.sol";
+import { AccessUpgradeable } from "../registry/AccessUpgradeable.sol";
+
+import { AmountOutLogic } from "./libraries/AmountOutLogic.sol";
+import { MintBurnLogic } from "./libraries/MintBurnLogic.sol";
+import { ValidationLogic } from "./libraries/ValidationLogic.sol";
+import { DataTypes } from "./libraries/types/DataTypes.sol";
 
 /// @title Minter/burner for cap tokens
 /// @author kexley, @capLabs
@@ -49,9 +50,9 @@ contract Minter is UUPSUpgradeable, AccessUpgradeable {
 
     /// @notice Initialize the address provider
     /// @param _addressProvider Address provider
-    function initialize(address _addressProvider) external initializer {
+    function initialize(address _addressProvider, address _accessControl) external initializer {
         addressProvider = IAddressProvider(_addressProvider);
-        __Access_init(addressProvider.accessControl());
+        __Access_init(_accessControl);
     }
 
     /// @notice Swap a backing asset for a cap token or vice versa, fees are charged based on asset
@@ -230,11 +231,10 @@ contract Minter is UUPSUpgradeable, AccessUpgradeable {
     /// @param _vault Vault address
     /// @param _asset Asset address
     /// @param _feeData Fee slopes and ratios for the asset in the vault
-    function setFeeData(
-        address _vault,
-        address _asset,
-        FeeData calldata _feeData
-    ) external checkRole(this.setFeeData.selector) {
+    function setFeeData(address _vault, address _asset, FeeData calldata _feeData)
+        external
+        checkAccess(this.setFeeData.selector)
+    {
         feeData[_vault][_asset] = _feeData;
         emit SetFeeData(_vault, _asset, _feeData);
     }
@@ -242,13 +242,10 @@ contract Minter is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Set the redeem fee for a vault
     /// @param _vault Vault address
     /// @param _redeemFee Redeem fee amount
-    function setRedeemFee(
-        address _vault,
-        uint256 _redeemFee
-    ) external checkRole(this.setFeeData.selector) {
+    function setRedeemFee(address _vault, uint256 _redeemFee) external checkAccess(this.setFeeData.selector) {
         redeemFee[_vault] = _redeemFee;
         emit SetRedeemFee(_vault, _redeemFee);
     }
 
-    function _authorizeUpgrade(address) internal override checkRole(bytes4(0)) {}
+    function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }
 }
