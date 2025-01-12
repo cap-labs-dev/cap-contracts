@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {IAddressProvider} from "../../interfaces/IAddressProvider.sol";
-import {IVaultDataProvider} from "../../interfaces/IVaultDataProvider.sol";
-import {IVault} from "../../interfaces/IVault.sol";
-import {IPriceOracle} from "../../interfaces/IPriceOracle.sol";
+import { IAddressProvider } from "../../interfaces/IAddressProvider.sol";
+import { IPriceOracle } from "../../interfaces/IPriceOracle.sol";
+import { IVault } from "../../interfaces/IVault.sol";
+import { IVaultDataProvider } from "../../interfaces/IVaultDataProvider.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /// @title Cap Token Adapter
 /// @notice Prices are calculated based on the weighted average of underlying assets
@@ -16,7 +16,7 @@ library CapTokenAdapter {
     /// @return latestAnswer Price of the cap token fixed to 8 decimals
     function price(address _addressProvider, address _asset) external view returns (uint256 latestAnswer) {
         uint256 capTokenSupply = IERC20Metadata(_asset).totalSupply();
-        if (capTokenSupply == 0) return 1; // price of 0 triggers the backup adapter
+        if (capTokenSupply == 0) return 0;
 
         address vault = IAddressProvider(_addressProvider).vault(_asset);
         address[] memory assets = IVault(vault).assets();
