@@ -145,9 +145,9 @@ contract GasOptTest is Test {
             usdx = new MockERC20("USDx", "USDx");
 
             // Mint tokens to minter
-            usdt.mint(user_stablecoin_minter, 1000e18);
-            usdc.mint(user_stablecoin_minter, 1000e18);
-            usdx.mint(user_stablecoin_minter, 1000e18);
+            usdt.mint(user_stablecoin_minter, 1_000_000e18);
+            usdc.mint(user_stablecoin_minter, 1_000_000e18);
+            usdx.mint(user_stablecoin_minter, 1_000_000e18);
 
             // mint some tokens to the liquidator for repayments
             usdt.mint(user_liquidator, 1000e18);
@@ -300,27 +300,24 @@ contract GasOptTest is Test {
             }
 
             // Set Chainlink as price source for stablecoins
-            priceOracle.setOracleData(
-                address(usdt),
-                PriceOracle.OracleData({
-                    adapter: address(chainlinkAdapter),
-                    payload: abi.encodeWithSelector(ChainlinkAdapter.price.selector, address(usdtChainlinkPriceFeed))
-                })
-            );
-            priceOracle.setOracleData(
-                address(usdc),
-                PriceOracle.OracleData({
-                    adapter: address(chainlinkAdapter),
-                    payload: abi.encodeWithSelector(ChainlinkAdapter.price.selector, address(usdcChainlinkPriceFeed))
-                })
-            );
-            priceOracle.setOracleData(
-                address(usdx),
-                PriceOracle.OracleData({
-                    adapter: address(chainlinkAdapter),
-                    payload: abi.encodeWithSelector(ChainlinkAdapter.price.selector, address(usdxChainlinkPriceFeed))
-                })
-            );
+            PriceOracle.OracleData memory usdtOracleData = PriceOracle.OracleData({
+                adapter: address(chainlinkAdapter),
+                payload: abi.encodeWithSelector(ChainlinkAdapter.price.selector, address(usdtChainlinkPriceFeed))
+            });
+            PriceOracle.OracleData memory usdcOracleData = PriceOracle.OracleData({
+                adapter: address(chainlinkAdapter),
+                payload: abi.encodeWithSelector(ChainlinkAdapter.price.selector, address(usdcChainlinkPriceFeed))
+            });
+            PriceOracle.OracleData memory usdxOracleData = PriceOracle.OracleData({
+                adapter: address(chainlinkAdapter),
+                payload: abi.encodeWithSelector(ChainlinkAdapter.price.selector, address(usdxChainlinkPriceFeed))
+            });
+            priceOracle.setOracleData(address(usdt), usdtOracleData);
+            priceOracle.setOracleData(address(usdc), usdcOracleData);
+            priceOracle.setOracleData(address(usdx), usdxOracleData);
+            priceOracle.setBackupOracleData(address(usdt), usdtOracleData);
+            priceOracle.setBackupOracleData(address(usdc), usdcOracleData);
+            priceOracle.setBackupOracleData(address(usdx), usdxOracleData);
 
             vm.stopPrank();
         }
@@ -329,27 +326,21 @@ contract GasOptTest is Test {
         {
             vm.startPrank(user_rate_oracle_admin);
 
-            rateOracle.setOracleData(
-                address(usdt),
-                RateOracle.OracleData({
-                    adapter: address(aaveAdapter),
-                    payload: abi.encodeWithSelector(AaveAdapter.rate.selector, address(usdtAaveDataProvider), address(usdt))
-                })
-            );
-            rateOracle.setOracleData(
-                address(usdc),
-                RateOracle.OracleData({
-                    adapter: address(aaveAdapter),
-                    payload: abi.encodeWithSelector(AaveAdapter.rate.selector, address(usdcAaveDataProvider), address(usdc))
-                })
-            );
-            rateOracle.setOracleData(
-                address(usdx),
-                RateOracle.OracleData({
-                    adapter: address(aaveAdapter),
-                    payload: abi.encodeWithSelector(AaveAdapter.rate.selector, address(usdxAaveDataProvider), address(usdx))
-                })
-            );
+            RateOracle.OracleData memory usdtRateData = RateOracle.OracleData({
+                adapter: address(aaveAdapter),
+                payload: abi.encodeWithSelector(AaveAdapter.rate.selector, address(usdtAaveDataProvider), address(usdt))
+            });
+            RateOracle.OracleData memory usdcRateData = RateOracle.OracleData({
+                adapter: address(aaveAdapter),
+                payload: abi.encodeWithSelector(AaveAdapter.rate.selector, address(usdcAaveDataProvider), address(usdc))
+            });
+            RateOracle.OracleData memory usdxRateData = RateOracle.OracleData({
+                adapter: address(aaveAdapter),
+                payload: abi.encodeWithSelector(AaveAdapter.rate.selector, address(usdxAaveDataProvider), address(usdx))
+            });
+            rateOracle.setOracleData(address(usdt), usdtRateData);
+            rateOracle.setOracleData(address(usdc), usdcRateData);
+            rateOracle.setOracleData(address(usdx), usdxRateData);
 
             vm.stopPrank();
         }
@@ -426,25 +417,18 @@ contract GasOptTest is Test {
         {
             vm.startPrank(user_price_oracle_admin);
 
-            // Set CapTokenAdapter as price source for cUSD
-            priceOracle.setOracleData(
-                address(cUSD),
-                PriceOracle.OracleData({
-                    adapter: address(capTokenAdapter),
-                    payload: abi.encodeWithSelector(CapTokenAdapter.price.selector, address(addressProvider), address(cUSD))
-                })
-            );
-
-            // Set StakedCapAdapter as price source for scUSD
-            priceOracle.setOracleData(
-                address(scUSD),
-                PriceOracle.OracleData({
-                    adapter: address(stakedCapAdapter),
-                    payload: abi.encodeWithSelector(
-                        StakedCapAdapter.price.selector, address(addressProvider), address(scUSD)
-                    )
-                })
-            );
+            PriceOracle.OracleData memory cUSDOracleData = PriceOracle.OracleData({
+                adapter: address(capTokenAdapter),
+                payload: abi.encodeWithSelector(CapTokenAdapter.price.selector, address(addressProvider), address(cUSD))
+            });
+            PriceOracle.OracleData memory scUSDOracleData = PriceOracle.OracleData({
+                adapter: address(stakedCapAdapter),
+                payload: abi.encodeWithSelector(StakedCapAdapter.price.selector, address(addressProvider), address(scUSD))
+            });
+            priceOracle.setOracleData(address(cUSD), cUSDOracleData);
+            priceOracle.setOracleData(address(scUSD), scUSDOracleData);
+            priceOracle.setBackupOracleData(address(cUSD), cUSDOracleData);
+            priceOracle.setBackupOracleData(address(scUSD), scUSDOracleData);
 
             vm.stopPrank();
         }
@@ -575,21 +559,24 @@ contract GasOptTest is Test {
             vm.stopPrank();
         }
 
-        // bypass error on first deposit by having something in the vault
+        // init the vault with some assets
         {
-            vm.startPrank(address(minter));
+            vm.startPrank(user_stablecoin_minter);
+            usdc.approve(address(minter), 4000e18);
+            minter.swapExactTokenForTokens(
+                4000e18, 0, address(usdc), address(cUSD), user_stablecoin_minter, block.timestamp + 1 hours
+            );
+            usdt.approve(address(minter), 4000e18);
+            minter.swapExactTokenForTokens(
+                4000e18, 0, address(usdt), address(cUSD), user_stablecoin_minter, block.timestamp + 1 hours
+            );
+            usdx.approve(address(minter), 4000e18);
+            minter.swapExactTokenForTokens(
+                4000e18, 0, address(usdx), address(cUSD), user_stablecoin_minter, block.timestamp + 1 hours
+            );
 
-            usdt.mint(address(minter), 1000e18);
-            usdc.mint(address(minter), 1000e18);
-            usdx.mint(address(minter), 1000e18);
-            usdt.approve(address(cUSDVault), 1000e18);
-            usdc.approve(address(cUSDVault), 1000e18);
-            usdx.approve(address(cUSDVault), 1000e18);
-            cUSDVault.deposit(address(usdt), 1000e18);
-            cUSDVault.deposit(address(usdc), 1000e18);
-            cUSDVault.deposit(address(usdx), 1000e18);
-            cUSD.mint(address(minter), 3000e18);
-
+            console.log("cUSD balance", cUSD.balanceOf(user_stablecoin_minter));
+            cUSD.transfer(address(0xDead), cUSD.balanceOf(user_stablecoin_minter));
             vm.stopPrank();
         }
     }
@@ -677,7 +664,7 @@ contract GasOptTest is Test {
 
         // Now burn the cUSD tokens
         uint256 burnAmount = mintedAmount;
-        uint256 minOutputAmount = burnAmount * 95 / 100; // Expect at least 95% back accounting for potential fees
+        uint256 minOutputAmount = burnAmount * 95e18 / 100e18; // Expect at least 95% back accounting for potential fees
 
         cUSD.approve(address(minter), burnAmount);
         minter.swapExactTokenForTokens(
