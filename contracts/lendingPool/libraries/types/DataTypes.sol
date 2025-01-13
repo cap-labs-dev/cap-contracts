@@ -10,6 +10,7 @@ library DataTypes {
         address interestDebtToken;
         uint256 bonus;
         bool paused;
+        uint256 realizedInterest;
     }
 
     struct AgentConfigurationMap {
@@ -41,8 +42,18 @@ library DataTypes {
         address interestDebtToken;
         uint256 amount;
         address caller;
+        uint256 realizedInterest;
         address restakerInterestReceiver;
         address interestReceiver;
+    }
+
+    struct RealizeInterestParams {
+        address asset;
+        address vault;
+        address interestDebtToken;
+        address interestReceiver;
+        uint256 amount;
+        uint256 realizedInterest;
     }
 
     struct LiquidateParams {
@@ -56,6 +67,7 @@ library DataTypes {
         uint256 bonus;
         uint256 amount;
         address caller;
+        uint256 realizedInterest;
         address collateral;
         address oracle;
         uint16 reserveCount;

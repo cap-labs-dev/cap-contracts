@@ -43,6 +43,7 @@ library LiquidationLogic {
         ValidationLogic.validateLiquidation(health);
 
         (uint256 liquidated,,) = BorrowLogic.repay(
+            reservesData,
             agentConfig,
             DataTypes.RepayParams({
                 id: params.id,
@@ -54,6 +55,7 @@ library LiquidationLogic {
                 interestDebtToken: params.interestDebtToken,
                 amount: params.amount,
                 caller: params.caller,
+                realizedInterest: params.realizedInterest,
                 restakerInterestReceiver: params.restakerInterestReceiver,
                 interestReceiver: params.interestReceiver
             })

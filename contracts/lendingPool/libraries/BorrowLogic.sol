@@ -34,6 +34,9 @@ library BorrowLogic {
     /// @dev An agent has totally repaid their debt of an asset including all interests
     event TotalRepayment(address indexed agent, address indexed asset);
 
+    /// @dev Realize interest before it is repaid by agents
+    event RealizeInterest(address indexed asset, uint256 realizedInterest, address interestReceiver);
+
     /// @notice Borrow an asset from the Lender, minting a debt token which must be repaid
     /// @dev Interest debt token is updated before borrow happens to bring index up to date. Restaker
     /// debt token is updated after so the new principal debt can be used in calculations
@@ -75,13 +78,18 @@ library BorrowLogic {
     /// @notice Repay an asset, burning the debt token and/or paying down interest
     /// @dev Only the amount owed or specified will be taken from the repayer, whichever is lower.
     /// Interest debt is paid first as the amount accrued is based on current principal debt, restaker
-    /// debt is paid last as the future rate is calculated based on the resulting principal debt
+    /// debt is paid last as the future rate is calculated based on the resulting principal debt.
+    /// @param reservesData Reserve mapping that stores reserve data
     /// @param agentConfig Agent configuration for borrowing
     /// @param params Parameters to repay a debt
     /// @return principalRepaid Actual principal amount repaid
     /// @return restakerRepaid Actual restaker interest paid
     /// @return interestRepaid Actual market interest paid
-    function repay(DataTypes.AgentConfigurationMap storage agentConfig, DataTypes.RepayParams memory params)
+    function repay(
+        mapping(address => DataTypes.ReserveData) storage reservesData,
+        DataTypes.AgentConfigurationMap storage agentConfig,
+        DataTypes.RepayParams memory params
+    )
         external
         returns (uint256 principalRepaid, uint256 restakerRepaid, uint256 interestRepaid)
     {
@@ -89,7 +97,7 @@ library BorrowLogic {
         uint256 restakerDebt = IERC20(params.restakerDebtToken).balanceOf(params.agent);
         uint256 interestDebt = IERC20(params.interestDebtToken).balanceOf(params.agent);
 
-        /// Order of repayment is principal, restaker, then interest
+        /// Maturity order of repayment is principal, restaker, then interest
         if (params.amount > principalDebt) {
             principalRepaid = params.amount - principalDebt;
             restakerRepaid =
@@ -102,8 +110,24 @@ library BorrowLogic {
         }
 
         if (interestRepaid > 0) {
+            uint256 realizedInterestRepaid;
+            if (params.realizedInterest > 0) {
+                realizedInterestRepaid = interestRepaid < params.realizedInterest 
+                    ? interestRepaid 
+                    : params.realizedInterest;
+                
+                reservesData[params.asset].realizedInterest -= realizedInterestRepaid;
+                IERC20(params.asset).safeTransferFrom(params.caller, address(this), realizedInterestRepaid);
+                IERC20(params.asset).forceApprove(params.vault, realizedInterestRepaid);
+                IVault(params.vault).repay(params.asset, realizedInterestRepaid);
+            }
+
             interestRepaid = IDebtToken(params.interestDebtToken).burn(params.agent, interestRepaid);
-            IERC20(params.asset).safeTransferFrom(params.caller, params.interestReceiver, interestRepaid);
+            if (interestRepaid > realizedInterestRepaid) {
+                IERC20(params.asset).safeTransferFrom(
+                    params.caller, params.interestReceiver, interestRepaid - realizedInterestRepaid
+                );
+            }
         }
 
         if (principalRepaid > 0) {
@@ -128,5 +152,22 @@ library BorrowLogic {
         }
 
         emit Repay(params.agent, params.asset, principalRepaid, restakerRepaid, interestRepaid);
+    }
+
+    /// @notice Realize the interest before it is repaid by borrowing from the vault
+    /// @param reservesData Reserve mapping that stores reserve data
+    /// @param params Parameters for realizing interest
+    /// @return realizedInterest Actual realized interest
+    function realizeInterest(
+        mapping(address => DataTypes.ReserveData) storage reservesData,
+        DataTypes.RealizeInterestParams memory params
+    ) external returns (uint256 realizedInterest) {
+        uint256 totalInterest = IERC20(params.interestDebtToken).totalSupply();
+        uint256 maxRealization = totalInterest > params.realizedInterest ? totalInterest - params.realizedInterest : 0;
+        realizedInterest = params.amount > maxRealization ? maxRealization : params.amount;
+
+        reservesData[params.asset].realizedInterest += realizedInterest;
+        IVault(params.vault).borrow(params.asset, realizedInterest, params.interestReceiver);
+        emit RealizeInterest(params.asset, realizedInterest, params.interestReceiver);
     }
 }

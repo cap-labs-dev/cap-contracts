@@ -70,6 +70,7 @@ contract Lender is UUPSUpgradeable, LenderStorage, AccessUpgradeable {
         returns (uint256 principalRepaid, uint256 restakerRepaid, uint256 interestRepaid)
     {
         (principalRepaid, restakerRepaid, interestRepaid) = BorrowLogic.repay(
+            _reservesData,
             _agentConfig[_agent],
             DataTypes.RepayParams({
                 id: _reservesData[_asset].id,
@@ -81,8 +82,27 @@ contract Lender is UUPSUpgradeable, LenderStorage, AccessUpgradeable {
                 interestDebtToken: _reservesData[_asset].interestDebtToken,
                 amount: _amount,
                 caller: msg.sender,
+                realizedInterest: _reservesData[_asset].realizedInterest,
                 restakerInterestReceiver: IAddressProvider(addressProvider).restakerInterestReceiver(_agent),
                 interestReceiver: IAddressProvider(addressProvider).interestReceiver(_asset)
+            })
+        );
+    }
+
+    /// @notice Realize interest for an asset
+    /// @param _asset Asset to realize interest for
+    /// @param _amount Amount of interest to realize (type(uint).max for all available interest)
+    /// @return actualRealized Actual amount realized
+    function realizeInterest(address _asset, uint256 _amount) external returns (uint256 actualRealized) {
+        actualRealized = BorrowLogic.realizeInterest(
+            _reservesData,
+            DataTypes.RealizeInterestParams({
+                asset: _asset,
+                vault: _reservesData[_asset].vault,
+                interestDebtToken: _reservesData[_asset].interestDebtToken,
+                interestReceiver: IAddressProvider(addressProvider).interestReceiver(_asset),
+                amount: _amount,
+                realizedInterest: _reservesData[_asset].realizedInterest
             })
         );
     }
@@ -108,6 +128,7 @@ contract Lender is UUPSUpgradeable, LenderStorage, AccessUpgradeable {
                 bonus: _reservesData[_asset].bonus,
                 amount: _amount,
                 caller: msg.sender,
+                realizedInterest: _reservesData[_asset].realizedInterest,
                 collateral: IAddressProvider(addressProvider).collateral(),
                 oracle: IAddressProvider(addressProvider).priceOracle(),
                 reserveCount: _reservesCount,
