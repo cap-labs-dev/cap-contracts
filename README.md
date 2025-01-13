@@ -113,6 +113,8 @@ Latest testnet deploy:
 - Collateral address: 0xDEf61c5c6EF283Ae7BF5f7ee91F74C47eB33ae8F
 - Cap Token Adapter address: 0xA10ceFc89397DeeB910A144F695D545F639b3f71
 - Staked Cap Adapter address: 0xA12BCC3e4f794a232172143D6b49b4FE1CC140fe
+- scUSD Lockbox 0x43C16846322A4647908d16715a86C85cb7500574
+- cUSD Lockbox 0x99E7fCd4D8EFEAa8Ec5Beb097F66853d69209fb1
 
 
 Latest testnet zap deploy:
