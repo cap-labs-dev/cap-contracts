@@ -10,6 +10,13 @@
   "solidity.remappings": [
     "@openzeppelin/=node_modules/@openzeppelin/",
     "@symbioticfi/=node_modules/@symbioticfi/",
-    "forge-std/=lib/forge-std/src/"
+    "forge-std/=lib/forge-std/src/",
+    "@layerzerolabs/oft-evm/=lib/devtools/packages/oft-evm/",
+    "@layerzerolabs/oapp-evm/=lib/devtools/packages/oapp-evm/",
+    "@layerzerolabs/lz-evm-protocol-v2/=lib/layerzero-v2/packages/layerzero-v2/evm/protocol/",
+    "@layerzerolabs/interfaces/=lib/layerzero-v2/packages/layerzero-v2/evm/protocol/contracts/interfaces/",
+    "devtools/=lib/devtools/packages/toolbox-foundry/src/",
+    "ds-test/=lib/layerzero-v2/lib/forge-std/lib/ds-test/src/",
+    "layerzero-v2/=lib/layerzero-v2/",
   ]
 }

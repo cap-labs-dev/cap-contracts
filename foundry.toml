@@ -12,6 +12,7 @@ remappings = [
     '@layerzerolabs/oft-evm/=lib/devtools/packages/oft-evm/',
     '@layerzerolabs/oapp-evm/=lib/devtools/packages/oapp-evm/',
     '@layerzerolabs/lz-evm-protocol-v2/=lib/layerzero-v2/packages/layerzero-v2/evm/protocol',
+    '@layerzerolabs/interfaces/=lib/layerzero-v2/packages/layerzero-v2/evm/protocol/contracts/interfaces',
 ]
 fs_permissions = [
     { access = "read", path = "./script/config/layerzero-v2-deployments.json" },
@@ -23,15 +24,6 @@ int_types = "preserve"
 sort_imports = true
 single_line_statement_blocks = "preserve"
 contract_new_lines = false
-
-[rpc_endpoints]
-mainnet = "${MAINNET_RPC}"
-
-[etherscan]
-mainnet = { key = "${MAINNET_API_KEY}" }
-sepolia = { key = "${MAINNET_API_KEY}" }
-
-# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
 [profile.release]
 inherits = "default"

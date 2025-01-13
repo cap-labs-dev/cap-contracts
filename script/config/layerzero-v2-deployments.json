@@ -1,25 +1,6 @@
 {
-    "Arbitrum-Mainnet": {
-        "nativeChainId": 42161,
-        "eid": "30110",
-        "executor": "0x31CAe3B7fB82d847621859fb1585353c5720660D",
-        "endpointV2": "0x1a44076050125825900e736c501f859c50fE728c",
-        "sendUln301": "0x5cDc927876031B4Ef910735225c425A7Fc8efed9",
-        "sendUln302": "0x975bcD720be66659e3EB3C0e4F1866a3020E493A",
-        "receiveUln301": "0xe4DD168822767C4342e54e6241f0b91DE0d3c241",
-        "receiveUln302": "0x7B9E184e07a6EE1aC23eAe0fe8D6Be2f663f05e6"
-    },
-    "Arbitrum-Nova-Mainnet": {
-        "nativeChainId": 42170,
-        "eid": "30175",
-        "executor": "0x8Ee02736F8a0c28164a20c25f3d199a74DF7F24B",
-        "endpointV2": "0x1a44076050125825900e736c501f859c50fE728c",
-        "sendUln301": "0x2b3eBE6662Ad402317EE7Ef4e6B25c79a0f91015",
-        "sendUln302": "0xef32f931ac53808e695B7eF3D1b6C5016024a68f",
-        "receiveUln301": "0x00e7306e591c04E72867644dF141e250aCAF175B",
-        "receiveUln302": "0xB81F326b95e79eaC4aba800Ae545efb4C602973D"
-    },
-    "Arbitrum-Sepolia-Testnet": {
+    "421614": {
+        "chainName": "Arbitrum Sepolia",
         "nativeChainId": 421614,
         "eid": "40231",
         "executor": "0x5Df3a1cEbBD9c8BA7F8dF51Fd632A9aef8308897",
@@ -29,27 +10,8 @@
         "receiveUln301": "0xa673a180fB2BF0E315b4f832b7d5b9ACB7162273",
         "receiveUln302": "0x75Db67CDab2824970131D5aa9CECfC9F69c69636"
     },
-    "Ethereum-Holesky-Testnet": {
-        "nativeChainId": 17000,
-        "eid": "40217",
-        "executor": "0xBc0C24E6f24eC2F1fd7E859B8322A1277F80aaD5",
-        "endpointV2": "0x6EDCE65403992e310A62460808c4b910D972f10f",
-        "sendUln301": "0xDD066F8c7592bf7235F314028E5e01a66F9835F0",
-        "sendUln302": "0x21F33EcF7F65D61f77e554B4B4380829908cD076",
-        "receiveUln301": "0x8d00218390E52B30d755882E09B2418eD08dCa7d",
-        "receiveUln302": "0xbAe52D605770aD2f0D17533ce56D146c7C964A0d"
-    },
-    "Ethereum-Mainnet": {
-        "nativeChainId": 1,
-        "eid": "30101",
-        "executor": "0x173272739Bd7Aa6e4e214714048a9fE699453059",
-        "endpointV2": "0x1a44076050125825900e736c501f859c50fE728c",
-        "sendUln301": "0xD231084BfB234C107D3eE2b22F97F3346fDAF705",
-        "sendUln302": "0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1",
-        "receiveUln301": "0x245B6e8FFE9ea5Fc301e32d16F66bD4C2123eEfC",
-        "receiveUln302": "0xc02Ab410f0734EFa3F14628780e6e695156024C2"
-    },
-    "Ethereum-Sepolia-Testnet": {
+    "11155111": {
+        "chainName": "Ethereum Sepolia",
         "nativeChainId": 11155111,
         "eid": "40161",
         "executor": "0x718B92b5CB0a5552039B593faF724D182A881eDA",
