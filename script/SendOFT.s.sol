@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import { Script, console } from "forge-std/Script.sol";
-
+import { LzUtils } from "./util/LzUtils.sol";
+import { WalletUtils } from "./util/WalletUtils.sol";
 import { MessagingFee } from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import { IOAppCore } from "@layerzerolabs/oapp-evm/contracts/oapp/interfaces/IOAppCore.sol";
 import { OptionsBuilder } from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 import { IOFT } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import { OFTReceipt, SendParam } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Script, console } from "forge-std/Script.sol";
 
-contract SendOFT is Script, LzUtils {
+contract SendOFT is Script, WalletUtils, LzUtils {
     using OptionsBuilder for bytes;
 
     /**
@@ -26,20 +28,22 @@ contract SendOFT is Script, LzUtils {
         address oftAddress = vm.envAddress("OFT_ADDRESS");
         uint toChainId = vm.envUint("TO_CHAIN_ID");
         LzConfig memory toConfig = getLzConfig(vm, toChainId);
-        address toAddress = vm.envAddress("TO_ADDRESS");
-
-        uint256 _tokensToSend = vm.envUint("TOKENS_TO_SEND");
+        uint256 _amount = vm.envUint("AMOUNT");
 
         vm.startBroadcast();
 
+        address toAddress = getWalletAddress();
+        console.log("Sending to address: ", toAddress);
+
         IOFT sourceOFT = IOFT(oftAddress);
+        IERC20 token = IERC20(sourceOFT.token());
 
         bytes memory _extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
         SendParam memory sendParam = SendParam(
             toConfig.eid, // You can also make this dynamic if needed
             addressToBytes32(toAddress),
-            _tokensToSend,
-            _tokensToSend * 9 / 10,
+            _amount,
+            _amount * 9 / 10,
             _extraOptions,
             "",
             ""
@@ -49,7 +53,9 @@ contract SendOFT is Script, LzUtils {
 
         console.log("Fee amount: ", fee.nativeFee);
 
-        sourceOFT.send{ value: fee.nativeFee }(sendParam, fee, msg.sender);
+        // allow the OFT to send the tokens
+        token.approve(address(sourceOFT), _amount);
+        sourceOFT.send{ value: fee.nativeFee }(sendParam, fee, getWalletAddress());
 
         // Stop broadcasting
         vm.stopBroadcast();

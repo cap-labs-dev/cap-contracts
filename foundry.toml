@@ -14,6 +14,7 @@ remappings = [
     '@layerzerolabs/lz-evm-protocol-v2/=lib/layerzero-v2/packages/layerzero-v2/evm/protocol',
     '@layerzerolabs/interfaces/=lib/layerzero-v2/packages/layerzero-v2/evm/protocol/contracts/interfaces',
     '@layerzerolabs/lz-evm-messagelib-v2=lib/layerzero-v2/packages/layerzero-v2/evm/messagelib',
+    'solidity-bytes-utils/=lib/solidity-bytes-utils',
 ]
 fs_permissions = [
     { access = "read", path = "./script/config/layerzero-v2-deployments.json" },

@@ -4,7 +4,9 @@ pragma solidity ^0.8.28;
 import { CapToken } from "../contracts/token/CapToken.sol";
 import { OFTLockbox } from "../contracts/token/OFTLockbox.sol";
 import { StakedCap } from "../contracts/token/StakedCap.sol";
+
 import { LzUtils } from "./util/LzUtils.sol";
+import { WalletUtils } from "./util/WalletUtils.sol";
 import { ILayerZeroEndpointV2 } from "@layerzerolabs/interfaces/ILayerZeroEndpointV2.sol";
 import { Script } from "forge-std/Script.sol";
 import { console } from "forge-std/console.sol";
@@ -15,7 +17,7 @@ import { console } from "forge-std/console.sol";
  * Usage:
  *   SC_TOKEN=0x... forge script --chain sepolia --fork-url sepolia --account cap-dev --sender 0x... --verifier etherscan --verify script/DeployLockbox.s.sol:DeployLockbox
  */
-contract DeployLockbox is Script, LzUtils {
+contract DeployLockbox is Script, WalletUtils, LzUtils {
     function run() public {
         ILayerZeroEndpointV2 lzEndpoint = getLzConfig(vm, block.chainid).endpointV2;
         StakedCap scToken = StakedCap(vm.envAddress("SC_TOKEN"));
@@ -23,7 +25,7 @@ contract DeployLockbox is Script, LzUtils {
 
         vm.startBroadcast();
 
-        address owner = tx.origin;
+        address owner = getWalletAddress();
         console.log("owner", owner);
 
         OFTLockbox scLockbox = new OFTLockbox(address(scToken), address(lzEndpoint), owner);

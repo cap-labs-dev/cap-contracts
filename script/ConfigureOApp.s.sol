@@ -5,6 +5,7 @@ import { CapToken } from "../contracts/token/CapToken.sol";
 import { OFTLockbox } from "../contracts/token/OFTLockbox.sol";
 import { StakedCap } from "../contracts/token/StakedCap.sol";
 import { LzUtils } from "./util/LzUtils.sol";
+import { WalletUtils } from "./util/WalletUtils.sol";
 import { ILayerZeroEndpointV2 } from "@layerzerolabs/interfaces/ILayerZeroEndpointV2.sol";
 import { SetConfigParam } from "@layerzerolabs/interfaces/IMessageLibManager.sol";
 import { Script } from "forge-std/Script.sol";
@@ -25,7 +26,7 @@ import { console } from "forge-std/console.sol";
  * Usage:
  *   forge script --chain sepolia --fork-url sepolia --account cap-dev --sender 0x... --verifier etherscan --verify script/ConfigureOApp.s.sol:ConfigureOApp
  */
-contract ConfigureOApp is Script, LzUtils {
+contract ConfigureOApp is Script, WalletUtils, LzUtils {
     function run() public {
         address oapp = vm.envAddress("OAPP");
         uint256 targetId = vm.envUint("TARGET_CHAIN_ID");
@@ -36,7 +37,7 @@ contract ConfigureOApp is Script, LzUtils {
 
         vm.startBroadcast();
 
-        address owner = tx.origin;
+        address owner = getWalletAddress();
         console.log("owner", owner);
 
         uint256 gracePeriod = 1;
