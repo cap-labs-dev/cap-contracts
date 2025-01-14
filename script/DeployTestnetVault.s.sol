@@ -1,29 +1,31 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Script} from "forge-std/Script.sol";
-import {console} from "forge-std/console.sol";
-import {MockERC20} from "../test/mocks/MockERC20.sol";
-import {StakedCap} from "../contracts/token/StakedCap.sol";
-import {Registry} from "../contracts/registry/Registry.sol";
-import {Minter} from "../contracts/minter/Minter.sol";
-import {Lender} from "../contracts/lendingPool/lender/Lender.sol";
-import {Vault} from "../contracts/vault/Vault.sol";
-import {CapToken} from "../contracts/token/CapToken.sol";
-import {PrincipalDebtToken} from "../contracts/lendingPool/tokens/PrincipalDebtToken.sol";
-import {InterestDebtToken} from "../contracts/lendingPool/tokens/InterestDebtToken.sol";
-import {RestakerDebtToken} from "../contracts/lendingPool/tokens/RestakerDebtToken.sol";
-import {PriceOracle} from "../contracts/oracle/PriceOracle.sol";
-import {RateOracle} from "../contracts/oracle/RateOracle.sol";
-import {ChainlinkAdapter} from "../contracts/oracle/libraries/ChainlinkAdapter.sol";
-import {AaveAdapter} from "../contracts/oracle/libraries/AaveAdapter.sol";
-import {CapTokenAdapter} from "../contracts/oracle/libraries/CapTokenAdapter.sol";
-import {StakedCapAdapter} from "../contracts/oracle/libraries/StakedCapAdapter.sol";
-import {MockAaveDataProvider} from "../test/mocks/MockAaveDataProvider.sol";
-import {MockChainlink} from "../test/mocks/MockChainlink.sol";
-import {MockCollateral} from "../test/mocks/MockCollateral.sol";
+import { Lender } from "../contracts/lendingPool/lender/Lender.sol";
 
-contract DeployTestnetVault is Script {
+import { InterestDebtToken } from "../contracts/lendingPool/tokens/InterestDebtToken.sol";
+import { PrincipalDebtToken } from "../contracts/lendingPool/tokens/PrincipalDebtToken.sol";
+import { RestakerDebtToken } from "../contracts/lendingPool/tokens/RestakerDebtToken.sol";
+import { Minter } from "../contracts/minter/Minter.sol";
+import { PriceOracle } from "../contracts/oracle/PriceOracle.sol";
+import { RateOracle } from "../contracts/oracle/RateOracle.sol";
+import { AaveAdapter } from "../contracts/oracle/libraries/AaveAdapter.sol";
+import { CapTokenAdapter } from "../contracts/oracle/libraries/CapTokenAdapter.sol";
+import { ChainlinkAdapter } from "../contracts/oracle/libraries/ChainlinkAdapter.sol";
+import { StakedCapAdapter } from "../contracts/oracle/libraries/StakedCapAdapter.sol";
+import { Registry } from "../contracts/registry/Registry.sol";
+import { CapToken } from "../contracts/token/CapToken.sol";
+import { StakedCap } from "../contracts/token/StakedCap.sol";
+import { Vault } from "../contracts/vault/Vault.sol";
+import { MockAaveDataProvider } from "../test/mocks/MockAaveDataProvider.sol";
+import { MockChainlink } from "../test/mocks/MockChainlink.sol";
+import { MockCollateral } from "../test/mocks/MockCollateral.sol";
+import { MockERC20 } from "../test/mocks/MockERC20.sol";
+import { WalletUtils } from "./util/WalletUtils.sol";
+import { Script } from "forge-std/Script.sol";
+import { console } from "forge-std/console.sol";
+
+contract DeployTestnetVault is Script, WalletUtils {
     Registry public registry;
     Minter public minter;
     Lender public lender;
@@ -56,8 +58,8 @@ contract DeployTestnetVault is Script {
         vm.startBroadcast();
 
         // Get the broadcast address (deployer's address)
-        address user_deployer = msg.sender;
-        address user_agent = msg.sender;
+        address user_deployer = getWalletAddress();
+        address user_agent = getWalletAddress();
 
         // Deploy mock tokens
         {

@@ -90,6 +90,11 @@ Deploy
 forge script --rpc-url anvil script/DeployTestnetVault.s.sol:DeployTestnetVault --account anvil --skip-simulation --broadcast
 ```
 
+Latest testnet zap deploy:
+- Zap Router: 0xC35a456138dE0634357eb47Ba5E74AFE9faE9a98
+- Token Manager: 0x34D25ed76876993BdbF1d73507b5C0cd5495A34e
+- Permit 2: 0x31c2F6fcFf4F8759b3Bd5Bf0e1084A055615c768
+
 Latest testnet deploy:
 - Mock USDT address: 0x8bcc54D087CdB40491722F33dEF6C7f3abF290cF
 - Mock USDC address: 0xbDb6B30d716b7a864e0E482C9D703057b46BF218
@@ -113,9 +118,9 @@ Latest testnet deploy:
 - Collateral address: 0xDEf61c5c6EF283Ae7BF5f7ee91F74C47eB33ae8F
 - Cap Token Adapter address: 0xA10ceFc89397DeeB910A144F695D545F639b3f71
 - Staked Cap Adapter address: 0xA12BCC3e4f794a232172143D6b49b4FE1CC140fe
+- scUSD Lockbox 0xE2be24Ea84ff4935561910682a6D598a3B8Ea520
+- cUSD Lockbox 0x8c170da3f52cB59b4b51FA1cadBE0d4a6bFf996e
 
-
-Latest testnet zap deploy:
-- Zap Router: 0xC35a456138dE0634357eb47Ba5E74AFE9faE9a98
-- Token Manager: 0x34D25ed76876993BdbF1d73507b5C0cd5495A34e
-- Permit 2: 0x31c2F6fcFf4F8759b3Bd5Bf0e1084A055615c768
+Arbitrum Sepolia:
+- Bridged scUSD 0x939Ee9Df270aa428149eBE2277B024aE096759fC
+- Bridged cUSD 0x3E47E3003338023C96286f524AD4bB84FA82a3C4
