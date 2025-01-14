@@ -13,18 +13,6 @@ import { console } from "forge-std/console.sol";
 
 /**
  * Deploy the lockboxes for the cap token and staked cap token
- *
- * # EndpointV2.setSendLibrary(oapp, targetEid, newLib)
- * # EndpointV2.setReceiveLibrary(oapp, targetEid, newLib, gracePeriod)
- * # EndpointV2.setReceiveLibraryTimeout(oapp, targetEid, lib, gracePeriod)
- * # EndpointV2.setConfig(oapp, sendLibrary, sendConfig)
- * # EndpointV2.setConfig(oapp, receiveLibrary, receiveConfig)
- * # EndpointV2.setDelegate(delegate)
- *
- * # cast send --rpc-url $TARGET_CHAIN
- *
- * Usage:
- *   forge script --chain sepolia --fork-url sepolia --account cap-dev --sender 0x... --verifier etherscan --verify script/ConfigureOApp.s.sol:ConfigureOApp
  */
 contract ConfigureOApp is Script, WalletUtils, LzUtils {
     function run() public {

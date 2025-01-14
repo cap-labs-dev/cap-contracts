@@ -9,9 +9,6 @@ import { console } from "forge-std/console.sol";
 
 /**
  * Deploy an L2 token contract
- *
- * Usage:
- *   SALT=0x... forge script --chain arbitrum-sepolia --account cap-dev --sender 0x... --verifier etherscan --verify script/DeployL2Token.s.sol:DeployL2Token
  */
 contract DeployL2Token is Script, WalletUtils, LzUtils {
     function run() public {

@@ -11,6 +11,9 @@ import { OFTReceipt, SendParam } from "@layerzerolabs/oft-evm/contracts/interfac
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Script, console } from "forge-std/Script.sol";
 
+/**
+ * Send an OFT token to a target chain
+ */
 contract SendOFT is Script, WalletUtils, LzUtils {
     using OptionsBuilder for bytes;
 

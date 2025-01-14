@@ -13,9 +13,6 @@ import { console } from "forge-std/console.sol";
 
 /**
  * Deploy the lockboxes for the cap token and staked cap token
- *
- * Usage:
- *   SC_TOKEN=0x... forge script --chain sepolia --fork-url sepolia --account cap-dev --sender 0x... --verifier etherscan --verify script/DeployLockbox.s.sol:DeployLockbox
  */
 contract DeployLockbox is Script, WalletUtils, LzUtils {
     function run() public {
