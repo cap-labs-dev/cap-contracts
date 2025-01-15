@@ -46,8 +46,13 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
 
     /// @notice Initialize the lender
     /// @param _accessControl Access control address
-    function initialize(address _accessControl) external initializer {
+    function initialize(address _accessControl, address _delegation, address _oracle) external initializer {
         __Access_init(_accessControl);
+
+        // TODO: remove this
+        LenderStorage storage $ = _getLenderStorage();
+        $.delegation = _delegation;
+        $.oracle = _oracle;
     }
 
     /// @notice Borrow an asset

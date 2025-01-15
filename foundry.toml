@@ -31,10 +31,11 @@ contract_new_lines = false
 inherits = "default"
 gas_reports = ["*"]
 gas_reports_ignore = [
-    "MockERC20",
-    "MockChainlink",
     "MockAaveDataProvider",
-    "MockCollateral",
+    "MockChainlinkPriceFeed",
+    "MockDelegation",
+    "MockERC20",
+    "MockOFT",
 ]
 optimizer = true
 optimizer_runs = 200000
