@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import { IBeefyZapRouter } from "../contracts/interfaces/IBeefyZapRouter.sol";
-import { ZapOFTComposerMessageCodec } from "../contracts/zap/ZapOFTComposerMessageCodec.sol";
+import { IZapOFTComposer } from "../interfaces/IZapOFTComposer.sol";
 import { LzUtils } from "./util/LzUtils.sol";
 import { WalletUtils } from "./util/WalletUtils.sol";
 import { MessagingFee } from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
@@ -70,8 +70,8 @@ contract SendOFTWithZapCompose is Script, WalletUtils, LzUtils {
             tokens: new IBeefyZapRouter.StepToken[](0)
         });
 
-        ZapOFTComposerMessageCodec.ZapMessage memory zapMessage =
-            ZapOFTComposerMessageCodec.ZapMessage({ fallbackRecipient: toAddress, order: order, route: route });
+        IZapOFTComposer.ZapMessage memory zapMessage =
+            IZapOFTComposer.ZapMessage({ fallbackRecipient: toAddress, order: order, route: route });
 
         uint128 dstZapGasEstimate = 700000;
         uint128 srcZapGasEstimate = dstZapGasEstimate * 3; // src gas is 3x cheaper than dst gas

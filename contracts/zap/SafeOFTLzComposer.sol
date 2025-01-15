@@ -17,6 +17,10 @@ abstract contract SafeOFTLzComposer is ILayerZeroComposer {
     address public immutable oApp;
     address public immutable endpoint;
 
+    error SafeOFTLzComposer_InvalidOApp();
+    error SafeOFTLzComposer_InvalidEndpoint();
+    error SafeOFTLzComposer_Unauthorized();
+
     constructor(address _oApp, address _endpoint) {
         oApp = _oApp;
         endpoint = _endpoint;
@@ -30,8 +34,8 @@ abstract contract SafeOFTLzComposer is ILayerZeroComposer {
         bytes calldata _extraData
     ) external payable override {
         // Perform checks to make sure composed message comes from correct OApp.
-        require(_oApp == oApp, "!oApp");
-        require(msg.sender == endpoint, "!endpoint");
+        if (_oApp != oApp) revert SafeOFTLzComposer_InvalidOApp();
+        if (msg.sender != endpoint) revert SafeOFTLzComposer_InvalidEndpoint();
 
         // execute the handler and send back the oft asset to the recipient if the handler fails
         try SafeOFTLzComposer(address(this)).safeLzCompose(_oApp, _guid, _message, _executor, _extraData) { }
@@ -54,7 +58,7 @@ abstract contract SafeOFTLzComposer is ILayerZeroComposer {
         address _executor,
         bytes calldata _extraData
     ) external {
-        require(msg.sender == address(this), "!this");
+        if (msg.sender != address(this)) revert SafeOFTLzComposer_Unauthorized();
         _lzCompose(_oApp, _guid, _message, _executor, _extraData);
     }
 

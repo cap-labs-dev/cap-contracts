@@ -2,8 +2,9 @@
 pragma solidity ^0.8.22;
 
 import { IBeefyZapRouter } from "../interfaces/IBeefyZapRouter.sol";
+
+import { IZapOFTComposer } from "../interfaces/IZapOFTComposer.sol";
 import { SafeOFTLzComposer } from "./SafeOFTLzComposer.sol";
-import { ZapOFTComposerMessageCodec } from "./ZapOFTComposerMessageCodec.sol";
 import { IOAppCore } from "@layerzerolabs/oapp-evm/contracts/oapp/interfaces/IOAppCore.sol";
 import { IOFT } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import { OFTComposeMsgCodec } from "@layerzerolabs/oft-evm/contracts/libs/OFTComposeMsgCodec.sol";
@@ -35,50 +36,25 @@ contract ZapOFTComposer is SafeOFTLzComposer {
     }
 
     /// @notice Handles incoming composed messages from LayerZero OFTs and executes the zap order it represents.
-    /// @dev This compose function does not try to decode the message payload at all and just passes it to the ZapRouter.
-    /// @param /*_oApp*/ The address of the originating OApp.
-    /// @param /*_guid*/ The globally unique identifier of the message.
-    /// @param _message The encoded message content.
     function _lzCompose(address, /*_oApp*/ bytes32, /*_guid*/ bytes calldata _message, address, bytes calldata)
         internal
         override
     {
         // Decode the payload to get the message
-        ZapOFTComposerMessageCodec.ZapMessage memory zapMessage = ZapOFTComposerMessageCodec.decodeCompose(_message);
+        bytes memory payload = OFTComposeMsgCodec.composeMsg(_message);
+        IZapOFTComposer.ZapMessage memory zapMessage = abi.decode(payload, (IZapOFTComposer.ZapMessage));
 
         // approve all inputs to the zapTokenManager
         IBeefyZapRouter.Input[] memory inputs = zapMessage.order.inputs;
         uint256 inputLength = inputs.length;
         for (uint256 i = 0; i < inputLength; i++) {
             IBeefyZapRouter.Input memory input = inputs[i];
-            uint256 balance = IERC20(input.token).balanceOf(address(this));
-            if (balance > 0) {
-                IERC20(input.token).approve(zapTokenManager, balance);
+            if (input.amount > 0) {
+                IERC20(input.token).approve(zapTokenManager, input.amount);
             }
         }
 
-        // execute a zap order
+        // execute the zap order
         IBeefyZapRouter(zapRouter).executeOrder(zapMessage.order, zapMessage.route);
-
-        // send the remaining tokens to the recipient
-        address fallbackRecipient = zapMessage.order.recipient;
-        for (uint256 i = 0; i < inputLength; i++) {
-            IBeefyZapRouter.Input memory input = inputs[i];
-            uint256 balance = IERC20(input.token).balanceOf(address(this));
-            if (balance > 0) {
-                IERC20(input.token).safeTransfer(fallbackRecipient, balance);
-            }
-        }
-
-        // send the remaining output tokens to the recipient
-        IBeefyZapRouter.Output[] memory outputs = zapMessage.order.outputs;
-        uint256 outputLength = outputs.length;
-        for (uint256 i = 0; i < outputLength; i++) {
-            IBeefyZapRouter.Output memory output = outputs[i];
-            uint256 balance = IERC20(output.token).balanceOf(address(this));
-            if (balance > 0) {
-                IERC20(output.token).safeTransfer(fallbackRecipient, balance);
-            }
-        }
     }
 }
