@@ -7,15 +7,13 @@ import { ERC20PermitUpgradeable } from
 import { ERC4626Upgradeable, ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import { SafeERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { IVaultUpgradeable } from "../interfaces/IVaultUpgradeable.sol";
 import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
 
 /// @title Staked Cap Token
 /// @author kexley, @capLabs
 /// @notice Slow releasing yield-bearing token that distributes the yield accrued from agents
 /// borrowing from the underlying assets.
-/// @dev Calling notify permissionlessly will swap the underlying assets to the cap token and start
-/// the linear unlock
+/// @dev Calling notify permissionlessly will start the linear unlock
 contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeable, AccessUpgradeable {
     using SafeERC20 for IERC20;
 
@@ -46,6 +44,7 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
     /// @notice Initialize the staked cap token by matching the name and symbol of the underlying
     /// @param _accessControl Address of the access control
     /// @param _asset Address of the cap token
+    /// @param _lockDuration Duration in seconds for profit locking
     function initialize(address _accessControl, address _asset, uint256 _lockDuration) external initializer {
         string memory _name = string.concat("s", IERC20Metadata(_asset).name());
         string memory _symbol = string.concat("s", IERC20Metadata(_asset).symbol());
@@ -65,28 +64,14 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
         _decimals = ERC4626Upgradeable.decimals();
     }
 
-    /// @notice Notify this contract that it has yield to convert and start vesting
+    /// @notice Notify the yield to start vesting
     function notify() external {
-        _swap();
         uint256 total = IERC20(asset()).balanceOf(address(this));
         StakedCapStorage storage $ = _getStakedCapStorage();
         if (total > $.storedTotal) {
             $.totalLocked = lockedProfit() + total - $.storedTotal;
             $.storedTotal = total;
             $.lastNotify = block.timestamp;
-        }
-    }
-
-    /// @dev Swap yield using the minter into the cap token
-    function _swap() internal {
-        address[] memory assets = IVaultUpgradeable(asset()).assets();
-        for (uint256 i; i < assets.length; ++i) {
-            uint256 balance = IERC20(assets[i]).balanceOf(address(this));
-            if (balance > 0) {
-                IVaultUpgradeable(asset()).mint(
-                    assets[i], balance, 0, address(this), type(uint256).max
-                );
-            }
         }
     }
 
