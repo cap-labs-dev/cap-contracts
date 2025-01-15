@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { ERC20Upgradeable, IERC20 } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import { IAddressProvider } from "../../interfaces/IAddressProvider.sol";
 import { IOracle } from "../../interfaces/IOracle.sol";
 import { AccessUpgradeable } from "../../registry/AccessUpgradeable.sol";
 import { Errors } from "../libraries/helpers/Errors.sol";
@@ -16,39 +15,34 @@ import { WadRayMath } from "../libraries/math/WadRayMath.sol";
 /// @author kexley, @capLabs
 /// @notice Compound interest accrues for agents borrowing an asset.
 /// @dev Total supply is calculated therefore an estimation rather than exact.
-contract InterestDebtToken is ERC20Upgradeable, AccessUpgradeable {
+contract InterestDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeable {
     using MathUtils for uint256;
     using WadRayMath for uint256;
 
-    /// @notice Address provider
-    IAddressProvider public addressProvider;
+    /// @custom:storage-location erc7201:cap.storage.InterestDebt
+    struct InterestDebtStorage {
+        address oracle;
+        address debtToken;
+        address asset;
+        uint8 decimals;
+        uint256 totalSupply;
+        uint256 interestRate;
+        uint256 index;
+        mapping(address => uint256) storedIndex;
+        mapping(address => uint256) lastAgentUpdate;
+        uint256 lastUpdate;
+    }
 
-    /// @notice Principal debt token
-    address public debtToken;
+    /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.InterestDebt")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant InterestDebtStorageLocation = 0x162fe0b309d5cb2212ec304072bcf3222b3d6f4b4391048e3b69d42273fdd600;
 
-    /// @notice asset Underlying asset
-    address public asset;
-
-    /// @dev Decimals of the underlying asset
-    uint8 private _decimals;
-
-    /// @dev Total supply
-    uint256 private _totalSupply;
-
-    /// @notice Interest rate
-    uint256 public interestRate;
-
-    /// @notice Current index at time of last agent update
-    mapping(address => uint256) public storedIndex;
-
-    /// @notice Last time the agent had interest accrued
-    mapping(address => uint256) public lastAgentUpdate;
-
-    /// @notice Last time the total supply was updated
-    uint256 public lastUpdate;
-
-    /// @notice Interest rate index,
-    uint256 public index;
+    /// @dev Get this contract storage pointer
+    /// @return $ Storage pointer
+    function _getInterestDebtStorage() private pure returns (InterestDebtStorage storage $) {
+        assembly {
+            $.slot := InterestDebtStorageLocation
+        }
+    }
 
     /// @dev Disable initializers on the implementation
     constructor() {
@@ -56,21 +50,29 @@ contract InterestDebtToken is ERC20Upgradeable, AccessUpgradeable {
     }
 
     /// @notice Initialize the interest debt token with the underlying asset
-    /// @param _addressProvider Address provider
+    /// @param _accessControl Access control address
+    /// @param _oracle Oracle address
     /// @param _debtToken Principal debt token
     /// @param _asset Asset address
-    function initialize(address _addressProvider, address _debtToken, address _asset) external initializer {
-        addressProvider = IAddressProvider(_addressProvider);
-        debtToken = _debtToken;
+    function initialize(
+        address _accessControl,
+        address _oracle,
+        address _debtToken,
+        address _asset
+    ) external initializer {
+        InterestDebtStorage storage $ = _getInterestDebtStorage();
+        $.oracle = _oracle;
+        $.debtToken = _debtToken;
+        $.asset = _asset;
+        $.decimals = IERC20Metadata(_asset).decimals();
+        $.index = 1e27;
+        $.lastUpdate = block.timestamp;
 
         string memory _name = string.concat("interest", IERC20Metadata(_asset).name());
         string memory _symbol = string.concat("interest", IERC20Metadata(_asset).symbol());
-        _decimals = IERC20Metadata(_asset).decimals();
-        asset = _asset;
-        index = 1e27;
 
         __ERC20_init(_name, _symbol);
-        __Access_init(addressProvider.accessControl());
+        __Access_init(_accessControl);
     }
 
     /// @notice Update the accrued interest and the interest rate
@@ -85,11 +87,12 @@ contract InterestDebtToken is ERC20Upgradeable, AccessUpgradeable {
     /// of 2*1e27 means that for each unit of debt, one unit worth of interest has been accumulated
     /// @return latestIndex Current interest rate index
     function currentIndex() public view returns (uint256 latestIndex) {
+        InterestDebtStorage storage $ = _getInterestDebtStorage();
         uint256 timestamp = block.timestamp;
-        if (timestamp != lastUpdate) {
-            latestIndex = MathUtils.calculateCompoundedInterest(interestRate, lastUpdate).rayMul(index);
+        if (timestamp != $.lastUpdate) {
+            latestIndex = MathUtils.calculateCompoundedInterest($.interestRate, $.lastUpdate).rayMul($.index);
         } else {
-            latestIndex = index;
+            latestIndex = $.index;
         }
     }
 
@@ -112,23 +115,25 @@ contract InterestDebtToken is ERC20Upgradeable, AccessUpgradeable {
         if (actualRepaid > 0) {
             _burn(_agent, actualRepaid);
 
-            if (actualRepaid < _totalSupply) {
-                _totalSupply -= actualRepaid;
+            InterestDebtStorage storage $ = _getInterestDebtStorage();
+            if (actualRepaid < $.totalSupply) {
+                $.totalSupply -= actualRepaid;
             } else {
-                _totalSupply = 0;
+                $.totalSupply = 0;
             }
         }
     }
 
-    /// @notice Interest accrued by an agent to be repaid to restakers
+    /// @notice Interest accrued by an agent
     /// @param _agent Agent address
     /// @return balance Interest amount
     function balanceOf(address _agent) public view override returns (uint256 balance) {
+        InterestDebtStorage storage $ = _getInterestDebtStorage();
         uint256 timestamp = block.timestamp;
-        if (timestamp > lastAgentUpdate[_agent]) {
+        if (timestamp > $.lastAgentUpdate[_agent]) {
             balance = super.balanceOf(_agent)
-                + (IERC20(debtToken).balanceOf(_agent) + super.balanceOf(_agent)).rayMul(
-                    currentIndex() - storedIndex[_agent]
+                + (IERC20($.debtToken).balanceOf(_agent) + super.balanceOf(_agent)).rayMul(
+                    currentIndex() - $.storedIndex[_agent]
                 );
         } else {
             balance = super.balanceOf(_agent);
@@ -138,21 +143,22 @@ contract InterestDebtToken is ERC20Upgradeable, AccessUpgradeable {
     /// @notice Total amount of interest accrued by agents
     /// @return supply Total amount of interest
     function totalSupply() public view override returns (uint256 supply) {
+        InterestDebtStorage storage $ = _getInterestDebtStorage();
         uint256 timestamp = block.timestamp;
-
-        if (timestamp > lastUpdate) {
-            supply = _totalSupply + (IERC20(debtToken).totalSupply() + _totalSupply).rayMul(currentIndex() - index);
+        if (timestamp > $.lastUpdate) {
+            supply = $.totalSupply + (IERC20($.debtToken).totalSupply() + $.totalSupply).rayMul(currentIndex() - $.index);
         } else {
-            supply = _totalSupply;
+            supply = $.totalSupply;
         }
     }
 
     /// @notice Next interest rate on update
     /// @param rate Interest rate
     function nextInterestRate() public returns (uint256 rate) {
-        address oracle = addressProvider.oracle();
-        uint256 marketRate = IOracle(oracle).marketRate(asset);
-        uint256 benchmarkRate = IOracle(oracle).benchmarkRate(asset);
+        InterestDebtStorage storage $ = _getInterestDebtStorage();
+        address oracle = $.oracle;
+        uint256 marketRate = IOracle(oracle).marketRate($.asset);
+        uint256 benchmarkRate = IOracle(oracle).benchmarkRate($.asset);
 
         rate = marketRate > benchmarkRate ? marketRate : benchmarkRate;
     }
@@ -160,34 +166,36 @@ contract InterestDebtToken is ERC20Upgradeable, AccessUpgradeable {
     /// @notice Accrue interest for a specific agent and the total supply
     /// @param _agent Agent address
     function _update(address _agent) internal {
+        InterestDebtStorage storage $ = _getInterestDebtStorage();
         uint256 timestamp = block.timestamp;
 
-        if (timestamp > lastAgentUpdate[_agent]) {
-            uint256 amount = (IERC20(debtToken).balanceOf(_agent) + super.balanceOf(_agent)).rayMul(
-                currentIndex() - storedIndex[_agent]
+        if (timestamp > $.lastAgentUpdate[_agent]) {
+            uint256 amount = (IERC20($.debtToken).balanceOf(_agent) + super.balanceOf(_agent)).rayMul(
+                currentIndex() - $.storedIndex[_agent]
             );
 
             if (amount > 0) _mint(_agent, amount);
 
-            storedIndex[_agent] = currentIndex();
-            lastAgentUpdate[_agent] = timestamp;
+            $.storedIndex[_agent] = currentIndex();
+            $.lastAgentUpdate[_agent] = timestamp;
         }
 
-        if (timestamp > lastUpdate) {
-            _totalSupply += (IERC20(debtToken).totalSupply() + _totalSupply).rayMul(currentIndex() - index);
+        if (timestamp > $.lastUpdate) {
+            $.totalSupply += (IERC20($.debtToken).totalSupply() + $.totalSupply).rayMul(currentIndex() - $.index);
 
-            index = currentIndex();
+            $.index = currentIndex();
 
-            lastUpdate = timestamp;
+            $.lastUpdate = timestamp;
         }
 
-        interestRate = nextInterestRate();
+        $.interestRate = nextInterestRate();
     }
 
     /// @notice Match decimals with underlying asset
     /// @return decimals
     function decimals() public view override returns (uint8) {
-        return _decimals;
+        InterestDebtStorage storage $ = _getInterestDebtStorage();
+        return $.decimals;
     }
 
     /// @notice Disabled due to this being a non-transferrable token
@@ -209,4 +217,6 @@ contract InterestDebtToken is ERC20Upgradeable, AccessUpgradeable {
     function transferFrom(address, address, uint256) public pure override returns (bool) {
         revert(Errors.OPERATION_NOT_SUPPORTED);
     }
+
+    function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }
 }
