@@ -4,163 +4,67 @@ pragma solidity ^0.8.28;
 import {INetworkRegistry} from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
 import {INetworkMiddlewareService} from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
 import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
-import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IRegistry} from "@symbioticfi/core/src/interfaces/common/IRegistry.sol";
-import {IEntity} from "@symbioticfi/core/src/interfaces/common/IEntity.sol";
-import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
-import {IBaseDelegator} from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
-import {IBaseSlasher} from "@symbioticfi/core/src/interfaces/slasher/IBaseSlasher.sol";
-import {IOptInService} from "@symbioticfi/core/src/interfaces/service/IOptInService.sol";
-import {IEntity} from "@symbioticfi/core/src/interfaces/common/IEntity.sol";
 import {ISlasher} from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
-import {IVetoSlasher} from "@symbioticfi/core/src/interfaces/slasher/IVetoSlasher.sol";
+import {IEntity} from "@symbioticfi/core/src/interfaces/common/IEntity.sol";
+import {IBaseDelegator} from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
+import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
+import {IRegistry} from "@symbioticfi/core/src/interfaces/common/IRegistry.sol";
 import {Subnetwork} from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
 
-import {SimpleKeyRegistry32} from "./SimpleKeyRegistry32.sol";
-import {MapWithTimeData} from "./libraries/MapWithTimeData.sol";
 import {Network} from "../Network.sol";
+import {IStakerRewards} from "./interfaces/IStakerRewards.sol";
 
 /// @title Cap Symbiotic Network Middleware Contract
 /// @author Cap Labs
 /// @notice This contract manages the symbiotic collateral and slashing.
-contract CapSymbioticNetworkMiddleware is Network, SimpleKeyRegistry32 {
-    using EnumerableMap for EnumerableMap.AddressToUintMap;
-    using MapWithTimeData for EnumerableMap.AddressToUintMap;
+contract CapSymbioticNetworkMiddleware is Network {
+    using SafeERC20 for IERC20;
     using Subnetwork for address;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
-    struct ValidatorData {
-        uint256 stake;
-        bytes32 key;
-    }
+    address private network; 
 
-    address public network;
-    address public operatorRegistry;
     address public vaultRegistry;
-    address public operatorNetOptIn;
-    uint48 public epochDuration;
-    uint48 public slashingWindow;
-    uint48 public startTime;
+    uint48 public requiredEpochDuration;
 
     uint48 private constant INSTANT_SLASHER_TYPE = 0;
-    uint48 private constant VETO_SLASHER_TYPE = 1;
 
-    uint256 public subnetworksCnt;
-    mapping(uint48 => uint256) public totalStakeCache;
-    mapping(uint48 => bool) public totalStakeCached;
-    mapping(uint48 => mapping(address => uint256)) public operatorStakeCache;
-    EnumerableMap.AddressToUintMap private operators;
-    EnumerableMap.AddressToUintMap private vaults;
+    EnumerableSet.AddressSet private vaults;
 
-    error NotOperator();
-    error NotVault();
-    error OperatorNotOptedIn();
-    error OperatorNotRegistred();
-    error OperarorGracePeriodNotPassed();
-    error OperatorAlreadyRegistred();
     error VaultAlreadyRegistred();
-    error VaultEpochTooShort();
-    error VaultGracePeriodNotPassed();
-    error InvalidSubnetworksCnt();
-    error TooOldEpoch();
-    error InvalidEpoch();
-    error SlashingWindowTooShort();
+    error NotVault();
+    error InvalidDuration();
+    error InvalidSlasher();
+    error InvalidBurner();
     error TooBigSlashAmount();
-    error UnknownSlasherType();
-
-    modifier updateStakeCache(uint48 epoch) {
-        if (!totalStakeCached[epoch]) {
-            calcAndCacheStakes(epoch);
-        }
-        _;
-    }
 
     function initialize(
-        address _network,
-        address _operatorRegistry,
         address _vaultRegistry,
-        address _operatorNetOptin,
-        address _pauser,
-        uint48 _epochDuration,
-        uint48 _slashingWindow
+        address _networkRegistry, 
+        uint48 _requiredEpochDuration,
+        address _collateral
     ) external initializer {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(OWNER_ROLE, msg.sender);
-        _grantRole(PAUSER_ROLE, _pauser);
+        _grantRole(PAUSER_ROLE, msg.sender);
 
-        if (_slashingWindow < _epochDuration) {
-            revert SlashingWindowTooShort();
-        }
+        INetworkRegistry(_networkRegistry).registerNetwork();
 
-        startTime = Time.timestamp();
-        epochDuration = _epochDuration;
-        network = _network;
-        operatorRegistry = _operatorRegistry;
+        requiredEpochDuration = _requiredEpochDuration;
         vaultRegistry = _vaultRegistry;
-        operatorNetOptIn = _operatorNetOptin;
-        slashingWindow = _slashingWindow;
 
-        subnetworksCnt = 1;
+        network = address(this);
+
+        collateral = _collateral;
     }
 
-    function getEpochStartTs(uint48 epoch) public view returns (uint48 timestamp) {
-        return startTime + epoch * epochDuration;
+    function subnetwork() public view returns (bytes32) {
+        return network.subnetwork(0);
     }
 
-    function getEpochAtTs(uint48 timestamp) public view returns (uint48 epoch) {
-        return (timestamp - startTime) / epochDuration;
-    }
-
-    function getCurrentEpoch() public view returns (uint48 epoch) {
-        return getEpochAtTs(Time.timestamp());
-    }
-
-    function registerOperator(address operator, bytes32 key) external onlyRole(OWNER_ROLE) {
-        if (operators.contains(operator)) {
-            revert OperatorAlreadyRegistred();
-        }
-
-        if (!IRegistry(operatorRegistry).isEntity(operator)) {
-            revert NotOperator();
-        }
-
-        if (!IOptInService(operatorNetOptIn).isOptedIn(operator, network)) {
-            revert OperatorNotOptedIn();
-        }
-
-        updateKey(operator, key);
-
-        operators.add(operator);
-        operators.enable(operator);
-    }
-
-    function updateOperatorKey(address operator, bytes32 key) external onlyRole(OWNER_ROLE) {
-        if (!operators.contains(operator)) {
-            revert OperatorNotRegistred();
-        }
-
-        updateKey(operator, key);
-    }
-
-    function pauseOperator(address operator) external onlyRole(PAUSER_ROLE) {
-        operators.disable(operator);
-    }
-
-    function unpauseOperator(address operator) external onlyRole(OWNER_ROLE) {
-        operators.enable(operator);
-    }
-
-    function unregisterOperator(address operator) external onlyRole(OWNER_ROLE) {
-        (, uint48 disabledTime) = operators.getTimes(operator);
-
-        if (disabledTime == 0 || disabledTime + slashingWindow > Time.timestamp()) {
-            revert OperarorGracePeriodNotPassed();
-        }
-
-        operators.remove(operator);
-    }
-
-    function registerVault(address vault) external onlyRole(OWNER_ROLE) {
+    function registerVault(address vault, address rewards) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (vaults.contains(vault)) {
             revert VaultAlreadyRegistred();
         }
@@ -169,223 +73,59 @@ contract CapSymbioticNetworkMiddleware is Network, SimpleKeyRegistry32 {
             revert NotVault();
         }
 
+        if (IVault(vault).burner() != address(this)) revert InvalidBurner();
+
         uint48 vaultEpoch = IVault(vault).epochDuration();
 
-        address slasher = IVault(vault).slasher();
-        if (slasher != address(0) && IEntity(slasher).TYPE() == VETO_SLASHER_TYPE) {
-            vaultEpoch -= IVetoSlasher(slasher).vetoDuration();
-        }
+        if (vaultEpoch < requiredEpochDuration) revert InvalidDuration();
 
-        if (vaultEpoch < slashingWindow) {
-            revert VaultEpochTooShort();
-        }
+        address slasher = IVault(vault).slasher();
+        if (slasher == address(0) || IEntity(slasher).TYPE() != INSTANT_SLASHER_TYPE) revert InvalidSlasher();
 
         vaults.add(vault);
-        vaults.enable(vault);
+
+        _registerProvider(vault, IVault(vault).collateral(), rewards);
     }
 
-    function pauseVault(address vault) external onlyRole(PAUSER_ROLE) {
-        vaults.disable(vault);
-    }
-
-    function unpauseVault(address vault) external onlyRole(OWNER_ROLE) {
-        vaults.enable(vault);
-    }
-
-    function unregisterVault(address vault) external onlyRole(OWNER_ROLE) {
-        (, uint48 disabledTime) = vaults.getTimes(vault);
-
-        if (disabledTime == 0 || disabledTime + slashingWindow > Time.timestamp()) {
-            revert VaultGracePeriodNotPassed();
-        }
-
+    function unregisterVault(address vault) external onlyRole(DEFAULT_ADMIN_ROLE) {
         vaults.remove(vault);
     }
 
-    function setSubnetworksCnt(uint256 _subnetworksCnt) external onlyRole(OWNER_ROLE) {
-        if (subnetworksCnt >= _subnetworksCnt) {
-            revert InvalidSubnetworksCnt();
-        }
-
-        subnetworksCnt = _subnetworksCnt;
+    function collateralByProvider(address _operator, address _provider) external virtual override view returns (uint256) {
+        return IBaseDelegator(IVault(_provider).delegator()).stake(subnetwork(), _operator);
     }
 
-    function getOperatorStake(address operator, uint48 epoch) public view returns (uint256 stake) {
-        if (totalStakeCached[epoch]) {
-            return operatorStakeCache[epoch][operator];
-        }
-
-        uint48 epochStartTs = getEpochStartTs(epoch);
-
-        for (uint256 i; i < vaults.length(); ++i) {
-            (address vault, uint48 enabledTime, uint48 disabledTime) = vaults.atWithTimes(i);
-
-            // just skip the vault if it was enabled after the target epoch or not enabled
-            if (!_wasActiveAt(enabledTime, disabledTime, epochStartTs)) {
-                continue;
-            }
-
-            for (uint96 j = 0; j < subnetworksCnt; ++j) {
-                stake += IBaseDelegator(IVault(vault).delegator()).stakeAt(
-                    network.subnetwork(j), operator, epochStartTs, new bytes(0)
-                );
-            }
-        }
-
-        return stake;
-    }
-
-    function getTotalStake(uint48 epoch) public view returns (uint256) {
-        if (totalStakeCached[epoch]) {
-            return totalStakeCache[epoch];
-        }
-        return _calcTotalStake(epoch);
-    }
-
-    function getValidatorSet(uint48 epoch) public view returns (ValidatorData[] memory validatorsData) {
-        uint48 epochStartTs = getEpochStartTs(epoch);
-
-        validatorsData = new ValidatorData[](operators.length());
-        uint256 valIdx = 0;
-
-        for (uint256 i; i < operators.length(); ++i) {
-            (address operator, uint48 enabledTime, uint48 disabledTime) = operators.atWithTimes(i);
-
-            // just skip operator if it was added after the target epoch or paused
-            if (!_wasActiveAt(enabledTime, disabledTime, epochStartTs)) {
-                continue;
-            }
-
-            bytes32 key = getOperatorKeyAt(operator, epochStartTs);
-            if (key == bytes32(0)) {
-                continue;
-            }
-
-            uint256 stake = getOperatorStake(operator, epoch);
-
-            validatorsData[valIdx++] = ValidatorData(stake, key);
-        }
-
-        // shrink array to skip unused slots
-        /// @solidity memory-safe-assembly
-        assembly {
-            mstore(validatorsData, valIdx)
-        }
-    }
-
-    function submission(bytes memory payload, bytes32[] memory signatures) public updateStakeCache(getCurrentEpoch()) {
-        // validate signatures
-        // validate payload
-        // process payload
-    }
-
-    // just for example, our devnets don't support slashing
-    function slash(uint48 epoch, address operator, uint256 amount)
-        public
-        onlyRole(OWNER_ROLE)
-        updateStakeCache(epoch)
+    function slash(address _provider, address _operator, address _liquidator, uint256 _amount)
+        external virtual override
+        onlyRole(COLLATERAL_ROLE)
     {
-        /* uint48 epochStartTs = getEpochStartTs(epoch);
 
-        if (epochStartTs < Time.timestamp() - slashingWindow) {
-            revert TooOldEpoch();
-        }
+        bytes32 _subnetwork = subnetwork();
+        
+        uint256 totalOperatorStake = IBaseDelegator(IVault(_provider).delegator()).stake(_subnetwork, _operator);
 
-        uint256 totalOperatorStake = getOperatorStake(operator, epoch);
-
-        if (totalOperatorStake < amount) {
+        if (totalOperatorStake < _amount) {
             revert TooBigSlashAmount();
         }
 
-        // simple pro-rata slasher
-        for (uint256 i; i < vaults.length(); ++i) {
-            (address vault, uint48 enabledTime, uint48 disabledTime) = operators.atWithTimes(i);
-
-            // just skip the vault if it was enabled after the target epoch or not enabled
-            if (!_wasActiveAt(enabledTime, disabledTime, epochStartTs)) {
-                continue;
-            }
-
-            for (uint96 j = 0; j < subnetworksCnt; ++j) {
-                bytes32 subnetwork = network.subnetwork(j);
-                uint256 vaultStake =
-                    IBaseDelegator(IVault(vault).delegator()).stakeAt(subnetwork, operator, epochStartTs, new bytes(0));
-
-                _slashVault(epochStartTs, vault, subnetwork, operator, amount * vaultStake / totalOperatorStake);
-            }
-        }*/
+        _slashVault(_provider, _operator, _liquidator, _amount);
     }
 
-    function calcAndCacheStakes(uint48 epoch) public returns (uint256 totalStake) {
-        uint48 epochStartTs = getEpochStartTs(epoch);
-
-        // for epoch older than SLASHING_WINDOW total stake can be invalidated (use cache)
-        if (epochStartTs < Time.timestamp() - slashingWindow) {
-            revert TooOldEpoch();
-        }
-
-        if (epochStartTs > Time.timestamp()) {
-            revert InvalidEpoch();
-        }
-
-        for (uint256 i; i < operators.length(); ++i) {
-            (address operator, uint48 enabledTime, uint48 disabledTime) = operators.atWithTimes(i);
-
-            // just skip operator if it was added after the target epoch or paused
-            if (!_wasActiveAt(enabledTime, disabledTime, epochStartTs)) {
-                continue;
-            }
-
-            uint256 operatorStake = getOperatorStake(operator, epoch);
-            operatorStakeCache[epoch][operator] = operatorStake;
-
-            totalStake += operatorStake;
-        }
-
-        totalStakeCached[epoch] = true;
-        totalStakeCache[epoch] = totalStake;
-    }
-
-    function _calcTotalStake(uint48 epoch) private view returns (uint256 totalStake) {
-        uint48 epochStartTs = getEpochStartTs(epoch);
-
-        // for epoch older than SLASHING_WINDOW total stake can be invalidated (use cache)
-        if (epochStartTs < Time.timestamp() - slashingWindow) {
-            revert TooOldEpoch();
-        }
-
-        if (epochStartTs > Time.timestamp()) {
-            revert InvalidEpoch();
-        }
-
-        for (uint256 i; i < operators.length(); ++i) {
-            (address operator, uint48 enabledTime, uint48 disabledTime) = operators.atWithTimes(i);
-
-            // just skip operator if it was added after the target epoch or paused
-            if (!_wasActiveAt(enabledTime, disabledTime, epochStartTs)) {
-                continue;
-            }
-
-            uint256 operatorStake = getOperatorStake(operator, epoch);
-            totalStake += operatorStake;
-        }
-    }
-
-    function _wasActiveAt(uint48 enabledTime, uint48 disabledTime, uint48 timestamp) private pure returns (bool) {
-        return enabledTime != 0 && enabledTime <= timestamp && (disabledTime == 0 || disabledTime >= timestamp);
-    }
-
-    function _slashVault(uint48 timestamp, address vault, bytes32 subnetwork, address operator, uint256 amount)
+    function _slashVault(address vault, address operator, address liquidator, uint256 amount)
         private
     {
-        /* address slasher = IVault(vault).slasher();
-        uint256 slasherType = IEntity(slasher).TYPE();
-        if (slasherType == INSTANT_SLASHER_TYPE) {
-            ISlasher(slasher).slash(subnetwork, operator, amount, timestamp, new bytes(0));
-        } else if (slasherType == VETO_SLASHER_TYPE) {
-            IVetoSlasher(slasher).requestSlash(subnetwork, operator, amount, timestamp, new bytes(0));
-        } else {
-            revert UnknownSlasherType();
-        }*/
+        address slasher = IVault(vault).slasher();
+        ISlasher(slasher).slash(subnetwork(), operator, amount, Time.timestamp(), new bytes(0));
+
+        IERC20(IVault(vault).collateral()).safeTransferFrom(address(this), liquidator, amount);
+    }
+
+    function rewardStakers(
+        address stakerRewards,
+        address token,
+        uint256 amount
+    ) external onlyRole(COLLATERAL_ROLE) {
+        IERC20(token).forceApprove(stakerRewards, amount);
+        IStakerRewards(stakerRewards).distributeRewards(address(this), token, amount, bytes(""));
     }
 }

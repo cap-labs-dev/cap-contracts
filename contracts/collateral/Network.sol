@@ -12,24 +12,24 @@ contract Network is
 {
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-    bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
+    bytes32 public constant COLLATERAL_ROLE = keccak256("COLLATERAL_ROLE");
 
-    address public collateralHandler;
+    address public collateral;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function _registerProvider(address _provider, bool _isRegistered) internal virtual {
-        ICollateralHandler(collateralHandler).registerProvider(_provider, _isRegistered);
+    function _registerProvider(address _provider, address _asset, address _rewards) internal virtual {
+        ICollateralHandler(collateral).registerProvider(_provider, _asset, _rewards);
     }
 
-    function collateralByProvider(address) external view returns (uint256) {}
+    function collateralByProvider(address, address) external virtual view returns (uint256) {}
 
-    function slashProvider(address _provider, uint256 _amount) external {}
+    function slash(address _provider, address _operator, address _liquidator, uint256 _amount) external virtual {}
 
-    function _authorizeUpgrade(address) internal override onlyRole(OWNER_ROLE) {}
+    function _authorizeUpgrade(address) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
