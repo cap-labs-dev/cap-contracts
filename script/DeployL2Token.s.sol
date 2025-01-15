@@ -22,12 +22,12 @@ contract DeployL2Token is Script, WalletUtils, LzUtils {
         string memory name = "Cap USD";
         string memory symbol = "cUSD";
 
-        L2Token cToken = new L2Token(name, symbol, config.endpointV2, owner);
+        L2Token cToken = new L2Token(name, symbol, address(config.endpointV2), owner);
         console.log(string.concat("Bridged ", name, " ", symbol), address(cToken));
 
         name = string.concat("Staked ", name);
         symbol = string.concat("s", symbol);
-        L2Token scToken = new L2Token(name, symbol, config.endpointV2, owner);
+        L2Token scToken = new L2Token(name, symbol, address(config.endpointV2), owner);
         console.log(string.concat("Bridged ", name, " ", symbol), address(scToken));
 
         vm.stopBroadcast();

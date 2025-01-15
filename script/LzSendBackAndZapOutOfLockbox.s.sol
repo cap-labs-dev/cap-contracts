@@ -14,13 +14,13 @@ import { Script, console } from "forge-std/Script.sol";
 /**
  * Send an OFT token to a target chain
  */
-contract SendOFT is Script, WalletUtils, LzUtils {
+contract LzSendBackAndZapOutOfLockbox is Script, WalletUtils, LzUtils {
     using OptionsBuilder for bytes;
 
     function run() public {
         // Fetching environment variables
         address oftAddress = vm.envAddress("OFT_ADDRESS");
-        uint toChainId = vm.envUint("TO_CHAIN_ID");
+        uint256 toChainId = vm.envUint("TO_CHAIN_ID");
         LzConfig memory toConfig = getLzConfig(vm, toChainId);
         uint256 _amount = vm.envUint("AMOUNT");
 
@@ -32,7 +32,8 @@ contract SendOFT is Script, WalletUtils, LzUtils {
         IOFT sourceOFT = IOFT(oftAddress);
         IERC20 token = IERC20(sourceOFT.token());
 
-        bytes memory _extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0);
+        bytes memory _extraOptions =
+            OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0).addExecutorLzComposeOption(0, 65000, 0);
         SendParam memory sendParam = SendParam(
             toConfig.eid, // You can also make this dynamic if needed
             addressToBytes32(toAddress),
