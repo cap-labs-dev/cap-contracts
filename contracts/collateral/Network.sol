@@ -21,13 +21,13 @@ contract Network is
         _disableInitializers();
     }
 
-    function _registerProvider(address _provider, address _asset) internal virtual {
-        ICollateralHandler(collateral).registerProvider(_provider, _asset);
+    function _registerProvider(address _provider, address _asset, address _rewards) internal virtual {
+        ICollateralHandler(collateral).registerProvider(_provider, _asset, _rewards);
     }
 
     function collateralByProvider(address, address) external virtual view returns (uint256) {}
 
-    function slashProvider(address _provider, address _operator, uint256 _amount) external virtual {}
+    function slash(address _provider, address _operator, address _liquidator, uint256 _amount) external virtual {}
 
     function _authorizeUpgrade(address) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 

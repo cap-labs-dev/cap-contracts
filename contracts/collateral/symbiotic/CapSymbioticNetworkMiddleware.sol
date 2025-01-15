@@ -5,6 +5,7 @@ import {INetworkRegistry} from "@symbioticfi/core/src/interfaces/INetworkRegistr
 import {INetworkMiddlewareService} from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
 import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {ISlasher} from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
 import {IEntity} from "@symbioticfi/core/src/interfaces/common/IEntity.sol";
@@ -14,11 +15,13 @@ import {IRegistry} from "@symbioticfi/core/src/interfaces/common/IRegistry.sol";
 import {Subnetwork} from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
 
 import {Network} from "../Network.sol";
+import {IStakerRewards} from "./interfaces/IStakerRewards.sol";
 
 /// @title Cap Symbiotic Network Middleware Contract
 /// @author Cap Labs
 /// @notice This contract manages the symbiotic collateral and slashing.
 contract CapSymbioticNetworkMiddleware is Network {
+    using SafeERC20 for IERC20;
     using Subnetwork for address;
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -35,6 +38,7 @@ contract CapSymbioticNetworkMiddleware is Network {
     error NotVault();
     error InvalidDuration();
     error InvalidSlasher();
+    error InvalidBurner();
     error TooBigSlashAmount();
 
     function initialize(
@@ -60,7 +64,7 @@ contract CapSymbioticNetworkMiddleware is Network {
         return network.subnetwork(0);
     }
 
-    function registerVault(address vault) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function registerVault(address vault, address rewards) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (vaults.contains(vault)) {
             revert VaultAlreadyRegistred();
         }
@@ -68,6 +72,8 @@ contract CapSymbioticNetworkMiddleware is Network {
         if (!IRegistry(vaultRegistry).isEntity(vault)) {
             revert NotVault();
         }
+
+        if (IVault(vault).burner() != address(this)) revert InvalidBurner();
 
         uint48 vaultEpoch = IVault(vault).epochDuration();
 
@@ -78,7 +84,7 @@ contract CapSymbioticNetworkMiddleware is Network {
 
         vaults.add(vault);
 
-        _registerProvider(vault, IVault(vault).collateral());
+        _registerProvider(vault, IVault(vault).collateral(), rewards);
     }
 
     function unregisterVault(address vault) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -89,8 +95,7 @@ contract CapSymbioticNetworkMiddleware is Network {
         return IBaseDelegator(IVault(_provider).delegator()).stake(subnetwork(), _operator);
     }
 
-    // just for example, our devnets don't support slashing
-    function slashProvider(address _provider, address _operator, uint256 _amount)
+    function slash(address _provider, address _operator, address _liquidator, uint256 _amount)
         external virtual override
         onlyRole(COLLATERAL_ROLE)
     {
@@ -103,13 +108,24 @@ contract CapSymbioticNetworkMiddleware is Network {
             revert TooBigSlashAmount();
         }
 
-        _slashVault(_provider, _operator, _amount);
+        _slashVault(_provider, _operator, _liquidator, _amount);
     }
 
-    function _slashVault(address vault, address operator, uint256 amount)
+    function _slashVault(address vault, address operator, address liquidator, uint256 amount)
         private
     {
         address slasher = IVault(vault).slasher();
         ISlasher(slasher).slash(subnetwork(), operator, amount, Time.timestamp(), new bytes(0));
+
+        IERC20(IVault(vault).collateral()).safeTransferFrom(address(this), liquidator, amount);
+    }
+
+    function rewardStakers(
+        address stakerRewards,
+        address token,
+        uint256 amount
+    ) external onlyRole(COLLATERAL_ROLE) {
+        IERC20(token).forceApprove(stakerRewards, amount);
+        IStakerRewards(stakerRewards).distributeRewards(address(this), token, amount, bytes(""));
     }
 }
