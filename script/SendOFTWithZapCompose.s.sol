@@ -2,8 +2,7 @@
 pragma solidity ^0.8.13;
 
 import { IBeefyZapRouter } from "../contracts/interfaces/IBeefyZapRouter.sol";
-import { OFTZapMessage } from "../contracts/interfaces/IZapOFTComposer.sol";
-import { OFTZapMessage } from "../contracts/interfaces/IZapOFTComposer.sol";
+import { ZapOFTComposerMessageCodec } from "../contracts/zap/ZapOFTComposerMessageCodec.sol";
 import { LzUtils } from "./util/LzUtils.sol";
 import { WalletUtils } from "./util/WalletUtils.sol";
 import { MessagingFee } from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
@@ -71,30 +70,67 @@ contract SendOFTWithZapCompose is Script, WalletUtils, LzUtils {
             tokens: new IBeefyZapRouter.StepToken[](0)
         });
 
-        OFTZapMessage memory zapMessage = OFTZapMessage({ value: 0, order: order, route: route });
-        uint256 zapGasEstimate = 7e15;
+        ZapOFTComposerMessageCodec.ZapMessage memory zapMessage =
+            ZapOFTComposerMessageCodec.ZapMessage({ fallbackRecipient: toAddress, order: order, route: route });
 
-        bytes memory _extraOptions =
-            OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0).addExecutorLzComposeOption(0, 65000, 0);
-        SendParam memory sendParam = SendParam(
-            toConfig.eid,
-            addressToBytes32(dstComposerAddress),
-            srcAmount,
-            srcAmount * 9 / 10,
-            _extraOptions,
-            abi.encode(zapMessage),
-            ""
-        );
+        uint128 dstZapGasEstimate = 700000;
+        uint128 srcZapGasEstimate = dstZapGasEstimate * 3; // src gas is 3x cheaper than dst gas
 
-        // ------------------------------- quoteSend
+        // ------------------------------- send a properly formatted zap message
+        {
+            console.log("Sending correct zap");
+            bytes memory _extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0)
+                .addExecutorLzComposeOption(0, dstZapGasEstimate, 0);
+            bytes memory encodedZapMessage = ZapOFTComposerMessageCodec.encodeForSend(zapMessage);
 
-        MessagingFee memory fee = sourceOFT.quoteSend(sendParam, false);
-        fee.nativeFee += zapGasEstimate;
+            SendParam memory sendParam = SendParam(
+                toConfig.eid,
+                addressToBytes32(dstComposerAddress),
+                srcAmount,
+                srcAmount * 9 / 10,
+                _extraOptions,
+                encodedZapMessage,
+                ""
+            );
 
-        console.log("Fee amount: ", fee.nativeFee);
+            MessagingFee memory fee = sourceOFT.quoteSend(sendParam, false);
+            fee.nativeFee += srcZapGasEstimate;
 
-        token.approve(address(sourceOFT), srcAmount);
-        sourceOFT.send{ value: fee.nativeFee }(sendParam, fee, getWalletAddress());
+            console.log("Fee amount: ", fee.nativeFee);
+
+            token.approve(address(sourceOFT), srcAmount);
+            sourceOFT.send{ value: fee.nativeFee }(sendParam, fee, getWalletAddress());
+        }
+
+        // ------------------------------- send an incorrect zap
+        {
+            console.log("Sending incorrect zap");
+            // modify the zap message to make the zap fail
+            // removing the input will make the token manager empty and the zap will fail
+            zapMessage.order.inputs = new IBeefyZapRouter.Input[](0);
+
+            bytes memory _extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0)
+                .addExecutorLzComposeOption(0, dstZapGasEstimate, 0);
+
+            bytes memory encodedZapMessage = ZapOFTComposerMessageCodec.encodeForSend(zapMessage);
+
+            SendParam memory sendParam = SendParam(
+                toConfig.eid,
+                addressToBytes32(dstComposerAddress),
+                srcAmount,
+                srcAmount * 9 / 10,
+                _extraOptions,
+                encodedZapMessage,
+                ""
+            );
+
+            MessagingFee memory fee = sourceOFT.quoteSend(sendParam, false);
+            fee.nativeFee += srcZapGasEstimate;
+
+            console.log("Fee amount: ", fee.nativeFee);
+
+            sourceOFT.send{ value: fee.nativeFee }(sendParam, fee, getWalletAddress());
+        }
 
         // Stop broadcasting
         vm.stopBroadcast();
