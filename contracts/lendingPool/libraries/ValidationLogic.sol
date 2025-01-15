@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ICollateral } from "../../interfaces/ICollateral.sol";
-import { IPriceOracle } from "../../interfaces/IPriceOracle.sol";
+import { IOracle } from "../../interfaces/IOracle.sol";
 
 import { Errors } from "./helpers/Errors.sol";
 import { ViewLogic } from "./ViewLogic.sol";
@@ -50,7 +50,7 @@ library ValidationLogic {
         require(health >= 1e27, Errors.HEALTH_FACTOR_LOWER_THAN_LIQUIDATION_THRESHOLD);
 
         uint256 ltv = ICollateral(params.collateral).ltv(params.agent);
-        uint256 assetPrice = IPriceOracle(params.oracle).getPrice(params.asset);
+        uint256 assetPrice = IOracle(params.oracle).getPrice(params.asset);
         uint256 newTotalDebt = ( params.amount * assetPrice ) + totalDebt;
         uint256 borrowCapacity = totalCollateral * ltv;
         

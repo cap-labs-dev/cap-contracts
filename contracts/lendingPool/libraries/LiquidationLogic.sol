@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {ICollateral} from "../../interfaces/ICollateral.sol";
-import {IPriceOracle} from "../../interfaces/IPriceOracle.sol";
+import {IOracle} from "../../interfaces/IOracle.sol";
 
 import {ValidationLogic} from "./ValidationLogic.sol";
 import {ViewLogic} from "./ViewLogic.sol";
@@ -63,7 +63,7 @@ library LiquidationLogic {
 
         if (params.bonus > 0) liquidated += params.bonus * liquidated;
 
-        uint256 assetPrice = IPriceOracle(params.oracle).getPrice(params.asset);
+        uint256 assetPrice = IOracle(params.oracle).getPrice(params.asset);
         liquidatedValue = liquidated * assetPrice;
         if (totalCollateral < liquidatedValue) liquidatedValue = totalCollateral;
 

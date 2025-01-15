@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ICollateral } from "../../interfaces/ICollateral.sol";
-import { IPriceOracle } from "../../interfaces/IPriceOracle.sol";
+import { IOracle } from "../../interfaces/IOracle.sol";
 
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
 import { DataTypes } from "./types/DataTypes.sol";
@@ -47,7 +47,7 @@ library ViewLogic {
             address asset = reservesList[i];
 
             totalDebt += IERC20(reservesData[asset].principalDebtToken).balanceOf(params.agent)
-                * IPriceOracle(params.oracle).getPrice(asset);
+                * IOracle(params.oracle).getPrice(asset);
         }
 
         ltv = totalDebt / totalCollateral;

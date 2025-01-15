@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IVaultDataProvider} from "../../../interfaces/IVaultDataProvider.sol";
-
 library DataTypes {
     struct FeeData {
         uint256 slope0;

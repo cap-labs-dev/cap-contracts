@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { DataTypes } from "./types/DataTypes.sol";
-import { IPriceOracle } from "../../interfaces/IPriceOracle.sol";
+import { IOracle } from "../../interfaces/IOracle.sol";
 import { IVaultUpgradeable } from "../../interfaces/IVaultUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -59,8 +59,8 @@ library AmountOutLogic {
         view
         returns (uint256 amount, uint256 newRatio)
     {
-        uint256 assetPrice = IPriceOracle(params.oracle).getPrice(params.asset);
-        uint256 capPrice = IPriceOracle(params.oracle).getPrice(address(this));
+        uint256 assetPrice = IOracle(params.oracle).getPrice(params.asset);
+        uint256 capPrice = IOracle(params.oracle).getPrice(address(this));
 
         uint8 assetDecimals = IERC20Metadata(params.asset).decimals();
         uint8 capDecimals = IERC20Metadata(address(this)).decimals();

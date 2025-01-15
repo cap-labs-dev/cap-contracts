@@ -1,90 +1,100 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-
-import { IOracleAdapter } from "../interfaces/IOracleAdapter.sol";
+import { IOracle } from "../interfaces/IOracle.sol";
 import { AccessUpgradeable } from "../registry/AccessUpgradeable.sol";
 
 /// @title Oracle for fetching prices
 /// @author kexley, @capLabs
 /// @dev Payloads are stored on this contract and calculation logic is hosted on external libraries
-contract PriceOracle is UUPSUpgradeable, AccessUpgradeable {
-    /// @dev Oracle data for fetching prices
-    /// @param adapter Adapter address containing logic
-    /// @param payload Encoded data for calculating prices
-    struct OracleData {
-        address adapter;
-        bytes payload;
+contract PriceOracle is AccessUpgradeable {
+    /// @custom:storage-location erc7201:cap.storage.PriceOracle
+    struct PriceOracleStorage {
+        mapping(address => IOracle.OracleData) oracleData;
+        mapping(address => IOracle.OracleData) backupOracleData;
     }
 
-    /// @notice Data used to calculate an asset's price
-    mapping(address => OracleData) public oracleData;
+    /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.PriceOracle")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant PriceOracleStorageLocation = 0x02a142d837c166bd77dc34adb0a38ff11e81f2f3e8008e975ef32f5fb877ac00;
 
-    /// @notice Backup data used to calculate an asset's price
-    mapping(address => OracleData) public backupOracleData;
-
-    /// @dev No adapter will result in failed calculations
-    error NoAdapter();
-
-    /// @dev No backup adapter will result in failed calculations
-    error NoBackupAdapter();
+    /// @dev Get this contract storage pointer
+    /// @return $ Storage pointer
+    function _getPriceOracleStorage() private pure returns (PriceOracleStorage storage $) {
+        assembly {
+            $.slot := PriceOracleStorageLocation
+        }
+    }
 
     /// @dev Set oracle data
-    event SetOracleData(address asset, OracleData data);
+    event SetPriceOracleData(address asset, IOracle.OracleData data);
 
     /// @dev Set backup oracle data
-    event SetBackupOracleData(address asset, OracleData data);
+    event SetPriceBackupOracleData(address asset, IOracle.OracleData data);
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
-
-    /// @notice Initialize the oracle with the access control
-    /// @param _accessControl Access control
-    function initialize(address _accessControl) external initializer {
+    /// @dev Initialize the price oracle
+    /// @param _accessControl Access control address
+    function __PriceOracle_init(address _accessControl) internal onlyInitializing {
         __Access_init(_accessControl);
+        __PriceOracle_init_unchained();
     }
+
+    /// @dev Initialize unchained
+    function __PriceOracle_init_unchained() internal onlyInitializing {}
 
     /// @notice Fetch the price for an asset
     /// @dev If initial price fetch fails then a backup source is used, never reverts
     /// @param _asset Asset address
     /// @return price Price of the asset
     function getPrice(address _asset) external returns (uint256 price) {
-        OracleData memory data = oracleData[_asset];
+        PriceOracleStorage storage $ = _getPriceOracleStorage();
+        IOracle.OracleData memory data = $.oracleData[_asset];
 
         price = _getPrice(data.adapter, data.payload);
 
         if (price == 0) {
-            data = backupOracleData[_asset];
-            if (data.adapter == address(0)) revert NoBackupAdapter();
+            data = $.backupOracleData[_asset];
             price = _getPrice(data.adapter, data.payload);
         }
+    }
+
+    /// @notice View the oracle data for an asset
+    /// @param _asset Asset address
+    /// @return data Oracle data for an asset
+    function priceOracleData(address _asset) external view returns (IOracle.OracleData memory data) {
+        PriceOracleStorage storage $ = _getPriceOracleStorage();
+        data = $.oracleData[_asset];
+    }
+
+    /// @notice View the backup oracle data for an asset
+    /// @param _asset Asset address
+    /// @return data Backup oracle data for an asset
+    function priceBackupOracleData(address _asset) external view returns (IOracle.OracleData memory data) {
+        PriceOracleStorage storage $ = _getPriceOracleStorage();
+        data = $.backupOracleData[_asset];
     }
 
     /// @notice Set a price source for an asset
     /// @param _asset Asset address
     /// @param _oracleData Oracle data
-    function setOracleData(address _asset, OracleData calldata _oracleData)
+    function setPriceOracleData(address _asset, IOracle.OracleData calldata _oracleData)
         external
-        checkAccess(this.setOracleData.selector)
+        checkAccess(this.setPriceOracleData.selector)
     {
-        if (_oracleData.adapter == address(0)) revert NoAdapter();
-        oracleData[_asset] = _oracleData;
-        emit SetOracleData(_asset, _oracleData);
+        PriceOracleStorage storage $ = _getPriceOracleStorage();
+        $.oracleData[_asset] = _oracleData;
+        emit SetPriceOracleData(_asset, _oracleData);
     }
 
     /// @notice Set a backup price source for an asset
     /// @param _asset Asset address
     /// @param _oracleData Oracle data
-    function setBackupOracleData(address _asset, OracleData calldata _oracleData)
+    function setPriceBackupOracleData(address _asset, IOracle.OracleData calldata _oracleData)
         external
-        checkAccess(this.setBackupOracleData.selector)
+        checkAccess(this.setPriceBackupOracleData.selector)
     {
-        if (_oracleData.adapter == address(0)) revert NoAdapter();
-        backupOracleData[_asset] = _oracleData;
-        emit SetBackupOracleData(_asset, _oracleData);
+        PriceOracleStorage storage $ = _getPriceOracleStorage();
+        $.backupOracleData[_asset] = _oracleData;
+        emit SetPriceBackupOracleData(_asset, _oracleData);
     }
 
     /// @dev Calculate price using an adapter and payload but do not revert on errors
@@ -95,7 +105,4 @@ contract PriceOracle is UUPSUpgradeable, AccessUpgradeable {
         (bool success, bytes memory returnedData) = _adapter.call(_payload);
         if (success) price = abi.decode(returnedData, (uint256));
     }
-
-    /// @dev Only admin is allowed to upgrade implementation
-    function _authorizeUpgrade(address) internal view override checkAccess(bytes4(0)) { }
 }

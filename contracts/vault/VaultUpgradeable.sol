@@ -42,19 +42,19 @@ contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUp
     /// @param _name Name of the cap token
     /// @param _symbol Symbol of the cap token
     /// @param _accessControl Access control address
-    /// @param _priceOracle Price oracle address
+    /// @param _oracle Oracle address
     /// @param _assets Asset addresses
     function __Vault_init(
         string memory _name,
         string memory _symbol,
         address _accessControl,
-        address _priceOracle,
+        address _oracle,
         address[] calldata _assets
     ) internal onlyInitializing {
         __ERC20_init(_name, _symbol);
         __ERC20Permit_init(_name);
         __Access_init(_accessControl);
-        __Minter_init_unchained(_priceOracle);
+        __Minter_init_unchained(_oracle);
         __Vault_init_unchained(_assets);
     }
 
