@@ -2,8 +2,8 @@
 pragma solidity ^0.8.28;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { ICollateral } from "../../interfaces/ICollateral.sol";
-import { IPriceOracle } from "../../interfaces/IPriceOracle.sol";
+import { IDelegation } from "../../interfaces/IDelegation.sol";
+import { IOracle } from "../../interfaces/IOracle.sol";
 
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
 import { DataTypes } from "./types/DataTypes.sol";
@@ -19,7 +19,7 @@ library ViewLogic {
     /// @param reservesList Mapping of all reserves
     /// @param agentConfig Agent configuration
     /// @param params Parameters for calculating an agent's data
-    /// @return totalCollateral Total collateral of an agent
+    /// @return totalDelegation Total delegation of an agent
     /// @return totalDebt Total debt of an agent
     /// @return ltv Loan to value ratio
     /// @return liquidationThreshold Liquidation ratio of an agent
@@ -30,14 +30,14 @@ library ViewLogic {
         DataTypes.AgentConfigurationMap storage agentConfig,
         DataTypes.AgentParams memory params
     ) external view returns (
-        uint256 totalCollateral,
+        uint256 totalDelegation,
         uint256 totalDebt,
         uint256 ltv,
         uint256 liquidationThreshold,
         uint256 health
     ) {
-        totalCollateral = ICollateral(params.collateral).coverage(params.agent);
-        liquidationThreshold = ICollateral(params.collateral).liquidationThreshold(params.agent);
+        totalDelegation = IDelegation(params.delegation).coverage(params.agent);
+        liquidationThreshold = IDelegation(params.delegation).liquidationThreshold(params.agent);
 
         for (uint256 i; i < params.reserveCount; ++i) {
             if (!agentConfig.isBorrowing(i)) {
@@ -47,12 +47,12 @@ library ViewLogic {
             address asset = reservesList[i];
 
             totalDebt += IERC20(reservesData[asset].principalDebtToken).balanceOf(params.agent)
-                * IPriceOracle(params.oracle).getPrice(asset);
+                * IOracle(params.oracle).getPrice(asset);
         }
 
-        ltv = totalDebt / totalCollateral;
+        ltv = totalDebt / totalDelegation;
         health = totalDebt == 0 
             ? type(uint256).max 
-            : totalCollateral * liquidationThreshold / totalDebt;
+            : totalDelegation * liquidationThreshold / totalDebt;
     }
 }

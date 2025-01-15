@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-interface ICollateral {
+interface IDelegation {
     function coverage(address agent) external view returns (uint256 coverage);
     function slash(address agent, address receiver, uint256 liquidatedValue) external;
     function ltv(address agent) external view returns (uint256 ltv);

@@ -2,8 +2,8 @@
 pragma solidity ^0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { ICollateral } from "../../interfaces/ICollateral.sol";
-import { IPriceOracle } from "../../interfaces/IPriceOracle.sol";
+import { IDelegation } from "../../interfaces/IDelegation.sol";
+import { IOracle } from "../../interfaces/IOracle.sol";
 
 import { Errors } from "./helpers/Errors.sol";
 import { ViewLogic } from "./ViewLogic.sol";
@@ -30,7 +30,7 @@ library ValidationLogic {
         require(!reservesData[params.asset].paused, Errors.RESERVE_PAUSED);
 
         (
-            uint256 totalCollateral,
+            uint256 totalDelegation,
             uint256 totalDebt,
             ,
             ,
@@ -41,7 +41,7 @@ library ValidationLogic {
             agentConfig,
             DataTypes.AgentParams({
                 agent: params.agent,
-                collateral: params.collateral,
+                delegation: params.delegation,
                 oracle: params.oracle,
                 reserveCount: params.reserveCount
             })
@@ -49,10 +49,10 @@ library ValidationLogic {
 
         require(health >= 1e27, Errors.HEALTH_FACTOR_LOWER_THAN_LIQUIDATION_THRESHOLD);
 
-        uint256 ltv = ICollateral(params.collateral).ltv(params.agent);
-        uint256 assetPrice = IPriceOracle(params.oracle).getPrice(params.asset);
+        uint256 ltv = IDelegation(params.delegation).ltv(params.agent);
+        uint256 assetPrice = IOracle(params.oracle).getPrice(params.asset);
         uint256 newTotalDebt = ( params.amount * assetPrice ) + totalDebt;
-        uint256 borrowCapacity = totalCollateral * ltv;
+        uint256 borrowCapacity = totalDelegation * ltv;
         
         require(newTotalDebt <= borrowCapacity, Errors.COLLATERAL_CANNOT_COVER_NEW_BORROW);
     }

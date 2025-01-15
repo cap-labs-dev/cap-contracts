@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../../contracts/interfaces/ICollateral.sol";
+import "../../contracts/interfaces/IDelegation.sol";
 
-contract MockCollateral is ICollateral {
+contract MockDelegation is IDelegation {
     mapping(address => uint256) private _coverage;
     mapping(address => uint256) private _ltv;
     mapping(address => uint256) private _liquidationThreshold;

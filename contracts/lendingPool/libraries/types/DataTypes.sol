@@ -8,6 +8,7 @@ library DataTypes {
         address principalDebtToken;
         address restakerDebtToken;
         address interestDebtToken;
+        address interestReceiver;
         uint256 bonus;
         bool paused;
         uint256 realizedInterest;
@@ -27,7 +28,7 @@ library DataTypes {
         address interestDebtToken;
         uint256 amount;
         address receiver;
-        address collateral;
+        address delegation;
         address oracle;
         uint16 reserveCount;
     }
@@ -68,7 +69,7 @@ library DataTypes {
         uint256 amount;
         address caller;
         uint256 realizedInterest;
-        address collateral;
+        address delegation;
         address oracle;
         uint16 reserveCount;
         address restakerInterestReceiver;
@@ -77,7 +78,7 @@ library DataTypes {
 
     struct AgentParams {
         address agent;
-        address collateral;
+        address delegation;
         address oracle;
         uint16 reserveCount;
     }
@@ -88,16 +89,16 @@ library DataTypes {
         address principalDebtToken;
         address restakerDebtToken;
         address interestDebtToken;
+        address interestReceiver;
         uint256 bonus;
         uint16 reserveCount;
-        address addressProvider;
     }
 
     struct ValidateBorrowParams {
         address agent;
         address asset;
         uint256 amount;
-        address collateral;
+        address delegation;
         address oracle;
         uint16 reserveCount;
     }
