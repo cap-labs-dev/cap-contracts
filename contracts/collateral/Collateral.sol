@@ -32,7 +32,6 @@ contract Collateral is
     struct Provider {
         address asset;
         address network;
-        uint256 collateral; 
         bool isSlashed;
     }
 
@@ -298,7 +297,6 @@ contract Collateral is
         Provider memory newProvider = Provider({
             asset: _asset,
             network: msg.sender,
-            collateral: 0,
             isSlashed: false
         });
 
