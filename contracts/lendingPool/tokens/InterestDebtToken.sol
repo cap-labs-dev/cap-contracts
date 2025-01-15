@@ -6,7 +6,7 @@ import { ERC20Upgradeable, IERC20 } from "@openzeppelin/contracts-upgradeable/to
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import { IOracle } from "../../interfaces/IOracle.sol";
-import { AccessUpgradeable } from "../../registry/AccessUpgradeable.sol";
+import { AccessUpgradeable } from "../../access/AccessUpgradeable.sol";
 import { Errors } from "../libraries/helpers/Errors.sol";
 import { MathUtils } from "../libraries/math/MathUtils.sol";
 import { WadRayMath } from "../libraries/math/WadRayMath.sol";

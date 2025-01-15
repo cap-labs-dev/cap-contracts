@@ -5,7 +5,7 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 import { ERC20Upgradeable, IERC20 } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import { AccessUpgradeable } from "../../registry/AccessUpgradeable.sol";
+import { AccessUpgradeable } from "../../access/AccessUpgradeable.sol";
 import { Errors } from "../libraries/helpers/Errors.sol";
 
 /// @title Principal debt token for a market on the Lender

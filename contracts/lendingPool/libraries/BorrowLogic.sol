@@ -58,7 +58,7 @@ library BorrowLogic {
                 agent: params.agent,
                 asset: params.asset,
                 amount: params.amount,
-                collateral: params.collateral,
+                delegation: params.delegation,
                 oracle: params.oracle,
                 reserveCount: params.reserveCount
             })

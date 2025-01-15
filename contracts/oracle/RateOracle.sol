@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { IOracle } from "../interfaces/IOracle.sol";
-import { AccessUpgradeable } from "../registry/AccessUpgradeable.sol";
+import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
 
 /// @title Oracle for fetching interest rates
 /// @author kexley, @capLabs

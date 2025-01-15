@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { AccessUpgradeable } from "../registry/AccessUpgradeable.sol";
+import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
 import { AmountOutLogic } from "./libraries/AmountOutLogic.sol";
 import { DataTypes } from "./libraries/types/DataTypes.sol";
 

@@ -3,8 +3,7 @@ pragma solidity ^0.8.28;
 
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import { IAddressProvider } from "../interfaces/IAddressProvider.sol";
-import { AccessUpgradeable } from "../registry/AccessUpgradeable.sol";
+import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
 import { BorrowLogic } from "./libraries/BorrowLogic.sol";
 import { LiquidationLogic } from "./libraries/LiquidationLogic.sol";
 import { ReserveLogic } from "./libraries/ReserveLogic.sol";
@@ -20,11 +19,13 @@ import { DataTypes } from "./libraries/types/DataTypes.sol";
 contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @custom:storage-location erc7201:cap.storage.Lender
     struct LenderStorage {
-        address addressProvider;
         mapping(address => DataTypes.ReserveData) reservesData;
         mapping(uint256 => address) reservesList;
         mapping(address => DataTypes.AgentConfigurationMap) agentConfig;
         uint16 reservesCount;
+        address delegation;
+        address oracle;
+        mapping(address => address) restakerInterestReceiver;
     }
 
     /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.Lender")) - 1)) & ~bytes32(uint256(0xff))
@@ -44,10 +45,8 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     }
 
     /// @notice Initialize the lender
-    /// @param _addressProvider Address provider
-    function initialize(address _addressProvider, address _accessControl) external initializer {
-        LenderStorage storage $ = _getLenderStorage();
-        $.addressProvider = _addressProvider;
+    /// @param _accessControl Access control address
+    function initialize(address _accessControl) external initializer {
         __Access_init(_accessControl);
     }
 
@@ -71,8 +70,8 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
                 interestDebtToken: $.reservesData[_asset].interestDebtToken,
                 amount: _amount,
                 receiver: _receiver,
-                collateral: IAddressProvider($.addressProvider).collateral(),
-                oracle: IAddressProvider($.addressProvider).oracle(),
+                delegation: $.delegation,
+                oracle: $.oracle,
                 reserveCount: $.reservesCount
             })
         );
@@ -104,8 +103,8 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
                 amount: _amount,
                 caller: msg.sender,
                 realizedInterest: $.reservesData[_asset].realizedInterest,
-                restakerInterestReceiver: IAddressProvider($.addressProvider).restakerInterestReceiver(_agent),
-                interestReceiver: IAddressProvider($.addressProvider).interestReceiver(_asset)
+                restakerInterestReceiver: $.restakerInterestReceiver[_agent],
+                interestReceiver: $.reservesData[_asset].interestReceiver
             })
         );
     }
@@ -122,7 +121,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
                 asset: _asset,
                 vault: $.reservesData[_asset].vault,
                 interestDebtToken: $.reservesData[_asset].interestDebtToken,
-                interestReceiver: IAddressProvider($.addressProvider).interestReceiver(_asset),
+                interestReceiver: $.reservesData[_asset].interestReceiver,
                 amount: _amount,
                 realizedInterest: $.reservesData[_asset].realizedInterest
             })
@@ -152,18 +151,18 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
                 amount: _amount,
                 caller: msg.sender,
                 realizedInterest: $.reservesData[_asset].realizedInterest,
-                collateral: IAddressProvider($.addressProvider).collateral(),
-                oracle: IAddressProvider($.addressProvider).oracle(),
+                delegation: $.delegation,
+                oracle: $.oracle,
                 reserveCount: $.reservesCount,
-                restakerInterestReceiver: IAddressProvider($.addressProvider).restakerInterestReceiver(_agent),
-                interestReceiver: IAddressProvider($.addressProvider).interestReceiver(_asset)
+                restakerInterestReceiver: $.restakerInterestReceiver[_agent],
+                interestReceiver: $.reservesData[_asset].interestReceiver
             })
         );
     }
 
     /// @notice Calculate the agent data
     /// @param _agent Address of agent
-    /// @return totalCollateral Total collateral of an agent
+    /// @return totalDelegation Total delegation of an agent
     /// @return totalDebt Total debt of an agent
     /// @return ltv Loan to value ratio
     /// @return liquidationThreshold Liquidation ratio of an agent
@@ -171,17 +170,17 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     function agent(address _agent)
         external
         view
-        returns (uint256 totalCollateral, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health)
+        returns (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health)
     {
         LenderStorage storage $ = _getLenderStorage();
-        (totalCollateral, totalDebt, ltv, liquidationThreshold, health) = ViewLogic.agent(
+        (totalDelegation, totalDebt, ltv, liquidationThreshold, health) = ViewLogic.agent(
             $.reservesData,
             $.reservesList,
             $.agentConfig[_agent],
             DataTypes.AgentParams({
                 agent: _agent,
-                collateral: IAddressProvider($.addressProvider).collateral(),
-                oracle: IAddressProvider($.addressProvider).oracle(),
+                delegation: $.delegation,
+                oracle: $.oracle,
                 reserveCount: $.reservesCount
             })
         );
@@ -193,6 +192,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @param _principalDebtToken Principal debt address
     /// @param _restakerDebtToken Restaker debt address
     /// @param _interestDebtToken Interest debt address
+    /// @param _interestReceiver Interest receiver
     /// @param _liquidationBonus Bonus percentage for liquidating a market to cover holding risk
     function addAsset(
         address _asset,
@@ -200,6 +200,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         address _principalDebtToken,
         address _restakerDebtToken,
         address _interestDebtToken,
+        address _interestReceiver,
         uint256 _liquidationBonus
     ) external checkAccess(this.addAsset.selector) {
         LenderStorage storage $ = _getLenderStorage();
@@ -213,9 +214,9 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
                     principalDebtToken: _principalDebtToken,
                     restakerDebtToken: _restakerDebtToken,
                     interestDebtToken: _interestDebtToken,
+                    interestReceiver: _interestReceiver,
                     bonus: _liquidationBonus,
-                    reserveCount: $.reservesCount,
-                    addressProvider: $.addressProvider
+                    reserveCount: $.reservesCount
                 })
             )
         ) {

@@ -49,6 +49,7 @@ library ReserveLogic {
             principalDebtToken: params.principalDebtToken,
             restakerDebtToken: params.restakerDebtToken,
             interestDebtToken: params.interestDebtToken,
+            interestReceiver: params.interestReceiver,
             bonus: params.bonus,
             paused: false,
             realizedInterest: 0

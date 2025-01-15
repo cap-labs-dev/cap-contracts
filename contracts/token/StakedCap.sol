@@ -8,7 +8,7 @@ import { ERC4626Upgradeable, ERC20Upgradeable } from "@openzeppelin/contracts-up
 import { SafeERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IVaultUpgradeable } from "../interfaces/IVaultUpgradeable.sol";
-import { AccessUpgradeable } from "../registry/AccessUpgradeable.sol";
+import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
 
 /// @title Staked Cap Token
 /// @author kexley, @capLabs

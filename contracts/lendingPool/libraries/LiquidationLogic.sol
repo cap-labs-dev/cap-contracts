@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ICollateral} from "../../interfaces/ICollateral.sol";
+import {IDelegation} from "../../interfaces/IDelegation.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
 
 import {ValidationLogic} from "./ValidationLogic.sol";
@@ -11,7 +11,7 @@ import {DataTypes} from "./types/DataTypes.sol";
 
 /// @title Liquidation Logic
 /// @author kexley, @capLabs
-/// @notice Liquidate an agent that has an unhealthy ltv by slashing their collateral backing
+/// @notice Liquidate an agent that has an unhealthy ltv by slashing their delegation backing
 library LiquidationLogic {
     /// @notice An agent has been liquidated
     event Liquidate(address indexed asset, address indexed agent, uint256 amount, uint256 value);
@@ -28,13 +28,13 @@ library LiquidationLogic {
         DataTypes.AgentConfigurationMap storage agentConfig,
         DataTypes.LiquidateParams memory params
     ) external returns (uint256 liquidatedValue) {
-        (uint256 totalCollateral,,,, uint256 health) = ViewLogic.agent(
+        (uint256 totalDelegation,,,, uint256 health) = ViewLogic.agent(
             reservesData,
             reservesList,
             agentConfig,
             DataTypes.AgentParams({
                 agent: params.agent,
-                collateral: params.collateral,
+                delegation: params.delegation,
                 oracle: params.oracle,
                 reserveCount: params.reserveCount
             })
@@ -65,9 +65,9 @@ library LiquidationLogic {
 
         uint256 assetPrice = IOracle(params.oracle).getPrice(params.asset);
         liquidatedValue = liquidated * assetPrice;
-        if (totalCollateral < liquidatedValue) liquidatedValue = totalCollateral;
+        if (totalDelegation < liquidatedValue) liquidatedValue = totalDelegation;
 
-        ICollateral(params.collateral).slash(params.agent, params.caller, liquidatedValue);
+        IDelegation(params.delegation).slash(params.agent, params.caller, liquidatedValue);
 
         emit Liquidate(params.agent, params.asset, liquidated, liquidatedValue);
     }
