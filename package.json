@@ -25,7 +25,9 @@
     "@openzeppelin/contracts-upgradeable": "npm:@openzeppelin/contracts-upgradeable"
   },
   "dependencies": {
-    "@symbioticfi/core": "^1.0.0-devnet.8"
+    "@symbioticfi/core": "^1.0.0-devnet.8",
+    "eigenlayer": "^2.1.5",
+    "eigenlayer-contracts": "^1.0.4"
   },
   "resolutions": {
     "@openzeppelin/contracts": "^5.0.1"
