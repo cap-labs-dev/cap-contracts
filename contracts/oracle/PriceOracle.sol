@@ -96,5 +96,6 @@ contract PriceOracle is UUPSUpgradeable, AccessUpgradeable {
         if (success) price = abi.decode(returnedData, (uint256));
     }
 
+    /// @dev Only admin is allowed to upgrade implementation
     function _authorizeUpgrade(address) internal view override checkAccess(bytes4(0)) { }
 }

@@ -25,23 +25,11 @@ contract AddressProvider is IAddressProvider, UUPSUpgradeable, AccessUpgradeable
     /// @notice Rate oracle for interest rates
     address public rateOracle;
 
-    /// @notice Minter stored for Staked Cap Token's reference
-    address public minter;
-
-    /// @notice Vault for a cap token
-    mapping(address => address) public vault;
-
     /// @notice Interest receiver for an asset
     mapping(address => address) public interestReceiver;
 
     /// @notice Receiver of restaker interest for an agent
     mapping(address => address) public restakerInterestReceiver;
-
-    /// @dev Vault cannot be set more than once for a cap token
-    error VaultAlreadySet(address capToken);
-
-    /// @dev Set vault for a cap token
-    event SetVault(address capToken, address vault);
 
     /// @dev Set an interest receiver for an asset
     event SetInterestReceiver(address asset, address receiver);
@@ -62,8 +50,7 @@ contract AddressProvider is IAddressProvider, UUPSUpgradeable, AccessUpgradeable
         address _lender,
         address _collateral,
         address _priceOracle,
-        address _rateOracle,
-        address _minter
+        address _rateOracle
     ) external initializer {
         __Access_init(_accessControl);
 
@@ -71,16 +58,6 @@ contract AddressProvider is IAddressProvider, UUPSUpgradeable, AccessUpgradeable
         collateral = _collateral;
         priceOracle = _priceOracle;
         rateOracle = _rateOracle;
-        minter = _minter;
-    }
-
-    /// @notice Set a vault address for a cap token
-    /// @param _capToken Cap token address
-    /// @param _vault Vault token address
-    function setVault(address _capToken, address _vault) external checkAccess(this.setVault.selector) {
-        if (vault[_capToken] != address(0)) revert VaultAlreadySet(_capToken);
-        vault[_capToken] = _vault;
-        emit SetVault(_capToken, _vault);
     }
 
     /// @notice Set a interest receiver for an asset

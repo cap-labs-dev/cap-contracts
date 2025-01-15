@@ -3,8 +3,7 @@ pragma solidity ^0.8.28;
 
 import { IAddressProvider } from "../../interfaces/IAddressProvider.sol";
 import { IPriceOracle } from "../../interfaces/IPriceOracle.sol";
-import { IVault } from "../../interfaces/IVault.sol";
-import { IVaultDataProvider } from "../../interfaces/IVaultDataProvider.sol";
+import { IVaultUpgradeable } from "../../interfaces/IVaultUpgradeable.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /// @title Cap Token Adapter
@@ -18,14 +17,13 @@ library CapTokenAdapter {
         uint256 capTokenSupply = IERC20Metadata(_asset).totalSupply();
         if (capTokenSupply == 0) return 0;
 
-        address vault = IAddressProvider(_addressProvider).vault(_asset);
-        address[] memory assets = IVault(vault).assets();
+        address[] memory assets = IVaultUpgradeable(_asset).assets();
         address priceOracle = IAddressProvider(_addressProvider).priceOracle();
 
         uint256 totalUsdValue;
         for (uint256 i; i < assets.length; ++i) {
             address asset = assets[i];
-            uint256 supply = IVault(vault).totalSupplies(asset);
+            uint256 supply = IVaultUpgradeable(_asset).totalSupplies(asset);
             uint8 supplyDecimals = IERC20Metadata(asset).decimals();
             uint256 assetPrice = IPriceOracle(priceOracle).getPrice(asset);
 

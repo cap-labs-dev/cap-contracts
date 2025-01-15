@@ -2,18 +2,12 @@
 pragma solidity ^0.8.28;
 
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import { ERC20PermitUpgradeable } from
     "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
-import { ERC4626Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { ERC4626Upgradeable, ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import { SafeERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-
-import { IAddressProvider } from "../interfaces/IAddressProvider.sol";
-import { IMinter } from "../interfaces/IMinter.sol";
-import { IVault } from "../interfaces/IVault.sol";
+import { IVaultUpgradeable } from "../interfaces/IVaultUpgradeable.sol";
 import { AccessUpgradeable } from "../registry/AccessUpgradeable.sol";
 
 /// @title Staked Cap Token
@@ -24,9 +18,6 @@ import { AccessUpgradeable } from "../registry/AccessUpgradeable.sol";
 /// the linear unlock
 contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeable, AccessUpgradeable {
     using SafeERC20 for IERC20;
-
-    /// @notice Address provider
-    IAddressProvider public addressProvider;
 
     /// @notice Stored total balance of cap tokens on this contract, including locked
     uint256 public storedTotal;
@@ -46,22 +37,21 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
     }
 
     /// @notice Initialize the staked cap token by matching the name and symbol of the underlying
-    /// @param _addressProvider Address of the address provider
+    /// @param _accessControl Address of the access control
     /// @param _asset Address of the cap token
-    function initialize(address _addressProvider, address _asset) external initializer {
-        addressProvider = IAddressProvider(_addressProvider);
+    function initialize(address _accessControl, address _asset) external initializer {
         string memory _name = string.concat("s", IERC20Metadata(_asset).name());
         string memory _symbol = string.concat("s", IERC20Metadata(_asset).symbol());
 
         __ERC4626_init(IERC20(_asset));
         __ERC20_init(_name, _symbol);
         __ERC20Permit_init(_name);
-        __Access_init(addressProvider.accessControl());
+        __Access_init(_accessControl);
     }
 
     /// @notice Override the decimals function to match underlying decimals
     /// @return _decimals Decimals of the staked cap token
-    function decimals() public view virtual override(ERC20Upgradeable, ERC4626Upgradeable) returns (uint8 _decimals) {
+    function decimals() public view override(ERC20Upgradeable, ERC4626Upgradeable) returns (uint8 _decimals) {
         _decimals = ERC4626Upgradeable.decimals();
     }
 
@@ -78,14 +68,12 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
 
     /// @dev Swap yield using the minter into the cap token
     function _swap() internal {
-        address vault = addressProvider.vault(asset());
-        address[] memory assets = IVault(vault).assets();
-        address minter = addressProvider.minter();
+        address[] memory assets = IVaultUpgradeable(asset()).assets();
         for (uint256 i; i < assets.length; ++i) {
             uint256 balance = IERC20(assets[i]).balanceOf(address(this));
             if (balance > 0) {
-                IMinter(minter).swapExactTokenForTokens(
-                    balance, 0, assets[i], asset(), address(this), type(uint256).max
+                IVaultUpgradeable(asset()).mint(
+                    assets[i], balance, 0, address(this), type(uint256).max
                 );
             }
         }
@@ -140,6 +128,6 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
         emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
     }
 
-    /// @dev Only admin can upgrade
+    /// @dev Only admin can upgrade implementation
     function _authorizeUpgrade(address) internal view override checkAccess(bytes4(0)) { }
 }

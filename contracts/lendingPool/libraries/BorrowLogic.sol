@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IVault} from "../../interfaces/IVault.sol";
+import {IVaultUpgradeable} from "../../interfaces/IVaultUpgradeable.sol";
 import {IPrincipalDebtToken} from "../../interfaces/IPrincipalDebtToken.sol";
 import {IDebtToken} from "../../interfaces/IDebtToken.sol";
 
@@ -70,7 +70,7 @@ library BorrowLogic {
         IPrincipalDebtToken(params.principalDebtToken).mint(params.agent, params.amount);
         IDebtToken(params.restakerDebtToken).update(params.agent);
 
-        IVault(params.vault).borrow(params.asset, params.amount, params.receiver);
+        IVaultUpgradeable(params.vault).borrow(params.asset, params.amount, params.receiver);
 
         emit Borrow(params.agent, params.asset, params.amount);
     }
@@ -119,7 +119,7 @@ library BorrowLogic {
                 reservesData[params.asset].realizedInterest -= realizedInterestRepaid;
                 IERC20(params.asset).safeTransferFrom(params.caller, address(this), realizedInterestRepaid);
                 IERC20(params.asset).forceApprove(params.vault, realizedInterestRepaid);
-                IVault(params.vault).repay(params.asset, realizedInterestRepaid);
+                IVaultUpgradeable(params.vault).repay(params.asset, realizedInterestRepaid);
             }
 
             interestRepaid = IDebtToken(params.interestDebtToken).burn(params.agent, interestRepaid);
@@ -134,7 +134,7 @@ library BorrowLogic {
             IPrincipalDebtToken(params.principalDebtToken).burn(params.agent, principalRepaid);
             IERC20(params.asset).safeTransferFrom(params.caller, address(this), principalRepaid);
             IERC20(params.asset).forceApprove(params.vault, principalRepaid);
-            IVault(params.vault).repay(params.asset, principalRepaid);
+            IVaultUpgradeable(params.vault).repay(params.asset, principalRepaid);
         }
 
         if (restakerRepaid > 0) {
@@ -167,7 +167,7 @@ library BorrowLogic {
         realizedInterest = params.amount > maxRealization ? maxRealization : params.amount;
 
         reservesData[params.asset].realizedInterest += realizedInterest;
-        IVault(params.vault).borrow(params.asset, realizedInterest, params.interestReceiver);
+        IVaultUpgradeable(params.vault).borrow(params.asset, realizedInterest, params.interestReceiver);
         emit RealizeInterest(params.asset, realizedInterest, params.interestReceiver);
     }
 }
