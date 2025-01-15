@@ -17,15 +17,6 @@ import { Script, console } from "forge-std/Script.sol";
 contract SendOFT is Script, WalletUtils, LzUtils {
     using OptionsBuilder for bytes;
 
-    /**
-     * @dev Converts an address to bytes32.
-     * @param _addr The address to convert.
-     * @return The bytes32 representation of the address.
-     */
-    function addressToBytes32(address _addr) internal pure returns (bytes32) {
-        return bytes32(uint256(uint160(_addr)));
-    }
-
     function run() public {
         // Fetching environment variables
         address oftAddress = vm.envAddress("OFT_ADDRESS");
