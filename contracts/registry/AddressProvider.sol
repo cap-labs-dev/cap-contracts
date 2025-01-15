@@ -19,11 +19,8 @@ contract AddressProvider is IAddressProvider, UUPSUpgradeable, AccessUpgradeable
     /// @notice Collateral controller for collateralizing agents
     address public collateral;
 
-    /// @notice Price oracle
-    address public priceOracle;
-
-    /// @notice Rate oracle for interest rates
-    address public rateOracle;
+    /// @notice Oracle for prices and rate
+    address public oracle;
 
     /// @notice Interest receiver for an asset
     mapping(address => address) public interestReceiver;
@@ -49,15 +46,13 @@ contract AddressProvider is IAddressProvider, UUPSUpgradeable, AccessUpgradeable
         address _accessControl,
         address _lender,
         address _collateral,
-        address _priceOracle,
-        address _rateOracle
+        address _oracle
     ) external initializer {
         __Access_init(_accessControl);
 
         lender = _lender;
         collateral = _collateral;
-        priceOracle = _priceOracle;
-        rateOracle = _rateOracle;
+        oracle = _oracle;
     }
 
     /// @notice Set a interest receiver for an asset

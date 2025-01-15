@@ -6,7 +6,7 @@ import { ERC20Upgradeable, IERC20 } from "@openzeppelin/contracts-upgradeable/to
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import { IAddressProvider } from "../../interfaces/IAddressProvider.sol";
-import { IRateOracle } from "../../interfaces/IRateOracle.sol";
+import { IOracle } from "../../interfaces/IOracle.sol";
 import { AccessUpgradeable } from "../../registry/AccessUpgradeable.sol";
 import { Errors } from "../libraries/helpers/Errors.sol";
 import { WadRayMath } from "../libraries/math/WadRayMath.sol";
@@ -75,7 +75,7 @@ contract RestakerDebtToken is ERC20Upgradeable, AccessUpgradeable {
     function update(address _agent) external {
         _accrueInterest(_agent);
 
-        uint256 rate = IRateOracle(addressProvider.rateOracle()).restakerRate(_agent);
+        uint256 rate = IOracle(addressProvider.oracle()).restakerRate(_agent);
         uint256 oldInterestPerSecond = interestPerSecond[_agent];
         uint256 newInterestPerSecond = IERC20(debtToken).balanceOf(_agent).rayMul(rate);
 

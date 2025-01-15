@@ -72,7 +72,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
                 amount: _amount,
                 receiver: _receiver,
                 collateral: IAddressProvider($.addressProvider).collateral(),
-                oracle: IAddressProvider($.addressProvider).priceOracle(),
+                oracle: IAddressProvider($.addressProvider).oracle(),
                 reserveCount: $.reservesCount
             })
         );
@@ -153,7 +153,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
                 caller: msg.sender,
                 realizedInterest: $.reservesData[_asset].realizedInterest,
                 collateral: IAddressProvider($.addressProvider).collateral(),
-                oracle: IAddressProvider($.addressProvider).priceOracle(),
+                oracle: IAddressProvider($.addressProvider).oracle(),
                 reserveCount: $.reservesCount,
                 restakerInterestReceiver: IAddressProvider($.addressProvider).restakerInterestReceiver(_agent),
                 interestReceiver: IAddressProvider($.addressProvider).interestReceiver(_asset)
@@ -181,7 +181,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
             DataTypes.AgentParams({
                 agent: _agent,
                 collateral: IAddressProvider($.addressProvider).collateral(),
-                oracle: IAddressProvider($.addressProvider).priceOracle(),
+                oracle: IAddressProvider($.addressProvider).oracle(),
                 reserveCount: $.reservesCount
             })
         );

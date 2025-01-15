@@ -6,7 +6,7 @@ import { ERC20Upgradeable, IERC20 } from "@openzeppelin/contracts-upgradeable/to
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import { IAddressProvider } from "../../interfaces/IAddressProvider.sol";
-import { IRateOracle } from "../../interfaces/IRateOracle.sol";
+import { IOracle } from "../../interfaces/IOracle.sol";
 import { AccessUpgradeable } from "../../registry/AccessUpgradeable.sol";
 import { Errors } from "../libraries/helpers/Errors.sol";
 import { MathUtils } from "../libraries/math/MathUtils.sol";
@@ -149,10 +149,10 @@ contract InterestDebtToken is ERC20Upgradeable, AccessUpgradeable {
 
     /// @notice Next interest rate on update
     /// @param rate Interest rate
-    function nextInterestRate() public view returns (uint256 rate) {
-        address oracle = addressProvider.rateOracle();
-        uint256 marketRate = IRateOracle(oracle).marketRate(asset);
-        uint256 benchmarkRate = IRateOracle(oracle).benchmarkRate(asset);
+    function nextInterestRate() public returns (uint256 rate) {
+        address oracle = addressProvider.oracle();
+        uint256 marketRate = IOracle(oracle).marketRate(asset);
+        uint256 benchmarkRate = IOracle(oracle).benchmarkRate(asset);
 
         rate = marketRate > benchmarkRate ? marketRate : benchmarkRate;
     }
