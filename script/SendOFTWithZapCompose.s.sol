@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import { IBeefyZapRouter } from "../contracts/interfaces/IBeefyZapRouter.sol";
-import { IZapOFTComposer } from "../interfaces/IZapOFTComposer.sol";
+import { IZapOFTComposer } from "../contracts/interfaces/IZapOFTComposer.sol";
 import { LzUtils } from "./util/LzUtils.sol";
 import { WalletUtils } from "./util/WalletUtils.sol";
 import { MessagingFee } from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
@@ -70,8 +70,7 @@ contract SendOFTWithZapCompose is Script, WalletUtils, LzUtils {
             tokens: new IBeefyZapRouter.StepToken[](0)
         });
 
-        IZapOFTComposer.ZapMessage memory zapMessage =
-            IZapOFTComposer.ZapMessage({ fallbackRecipient: toAddress, order: order, route: route });
+        IZapOFTComposer.ZapMessage memory zapMessage = IZapOFTComposer.ZapMessage({ order: order, route: route });
 
         uint128 dstZapGasEstimate = 700000;
         uint128 srcZapGasEstimate = dstZapGasEstimate * 3; // src gas is 3x cheaper than dst gas
@@ -81,7 +80,7 @@ contract SendOFTWithZapCompose is Script, WalletUtils, LzUtils {
             console.log("Sending correct zap");
             bytes memory _extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0)
                 .addExecutorLzComposeOption(0, dstZapGasEstimate, 0);
-            bytes memory encodedZapMessage = ZapOFTComposerMessageCodec.encodeForSend(zapMessage);
+            bytes memory encodedZapMessage = abi.encode(zapMessage);
 
             SendParam memory sendParam = SendParam(
                 toConfig.eid,
@@ -112,7 +111,7 @@ contract SendOFTWithZapCompose is Script, WalletUtils, LzUtils {
             bytes memory _extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0)
                 .addExecutorLzComposeOption(0, dstZapGasEstimate, 0);
 
-            bytes memory encodedZapMessage = ZapOFTComposerMessageCodec.encodeForSend(zapMessage);
+            bytes memory encodedZapMessage = abi.encode(zapMessage);
 
             SendParam memory sendParam = SendParam(
                 toConfig.eid,

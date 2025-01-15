@@ -120,7 +120,7 @@ Latest testnet deploy:
 - Staked Cap Price Adapter address: 0xA12BCC3e4f794a232172143D6b49b4FE1CC140fe
 - scUSD Lockbox 0xE2be24Ea84ff4935561910682a6D598a3B8Ea520
 - cUSD Lockbox 0x8c170da3f52cB59b4b51FA1cadBE0d4a6bFf996e
-- scUSD OFT Composer address: 0x8bdE27AB57aBa2f30cA4Abfa405c395b51f47e22
+- scUSD OFT Composer address: 0xb1E38954c4917410Ba6c791a8495851Cd4b8ab43
 - cUSD OFT Composer address: TODO
 
 Arbitrum Sepolia:
