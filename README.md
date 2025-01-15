@@ -116,10 +116,11 @@ Latest testnet deploy:
 - Aave Data Provider address: 0x9F267EAbe1Ec5a7cFf777083a7c2e2792505Dde3
 - Chainlink Oracle address: 0xD889830d042ACf44b9a941857Ae502d6a9c0A1B4
 - Collateral address: 0xDEf61c5c6EF283Ae7BF5f7ee91F74C47eB33ae8F
-- Cap Token Adapter address: 0xA10ceFc89397DeeB910A144F695D545F639b3f71
-- Staked Cap Adapter address: 0xA12BCC3e4f794a232172143D6b49b4FE1CC140fe
+- Cap Token Price Adapter address: 0xA10ceFc89397DeeB910A144F695D545F639b3f71
+- Staked Cap Price Adapter address: 0xA12BCC3e4f794a232172143D6b49b4FE1CC140fe
 - scUSD Lockbox 0xE2be24Ea84ff4935561910682a6D598a3B8Ea520
 - cUSD Lockbox 0x8c170da3f52cB59b4b51FA1cadBE0d4a6bFf996e
+- scUSD OFT Composer address: 0x454fc983d37db65a6dfa3467760b1f92c0ca2c20
 
 Arbitrum Sepolia:
 - Bridged scUSD 0x939Ee9Df270aa428149eBE2277B024aE096759fC

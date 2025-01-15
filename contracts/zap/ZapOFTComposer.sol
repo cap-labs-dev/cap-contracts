@@ -11,6 +11,8 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 /// @title ZapOFTComposer
 /// @author @capLabs
 /// @notice Compose an OFT with Zap capabilities
+/// @dev This contract is used to compose an OFT message with Zap capabilities.
+///      It handles ERC20 approvals, zap execution, and refunds the remaining tokens to the zap recipient.
 contract ZapOFTComposer is ILayerZeroComposer {
     using SafeERC20 for IERC20;
 
@@ -70,6 +72,22 @@ contract ZapOFTComposer is ILayerZeroComposer {
             if (balance > 0) {
                 IERC20(input.token).safeTransfer(fallbackRecipient, balance);
             }
+        }
+
+        // send the remaining output tokens to the recipient
+        IBeefyZapRouter.Output[] memory outputs = zapMessage.order.outputs;
+        uint256 outputLength = outputs.length;
+        for (uint256 i = 0; i < outputLength; i++) {
+            IBeefyZapRouter.Output memory output = outputs[i];
+            uint256 balance = IERC20(output.token).balanceOf(address(this));
+            if (balance > 0) {
+                IERC20(output.token).safeTransfer(fallbackRecipient, balance);
+            }
+        }
+
+        // send the remaining gas to the recipient
+        if (msg.value > 0) {
+            payable(fallbackRecipient).transfer(msg.value);
         }
     }
 }
