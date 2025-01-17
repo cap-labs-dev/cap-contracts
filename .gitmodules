@@ -10,18 +10,6 @@
 [submodule "lib/solidity-bytes-utils"]
 	path = lib/solidity-bytes-utils
 	url = https://github.com/GNSPS/solidity-bytes-utils
-[submodule "lib/symbioticfi-core"]
-	path = lib/symbioticfi-core
-	url = https://github.com/symbioticfi/core
 [submodule "lib/symbioticfi-middleware-sdk"]
 	path = lib/symbioticfi-middleware-sdk
 	url = https://github.com/symbioticfi/middleware-sdk
-[submodule "lib/symbioticfi-burners"]
-	path = lib/symbioticfi-burners
-	url = https://github.com/symbioticfi/burners
-[submodule "lib/symbioticfi-hooks"]
-	path = lib/symbioticfi-hooks
-	url = https://github.com/symbioticfi/hooks
-[submodule "lib/symbioticfi-rewards"]
-	path = lib/symbioticfi-rewards
-	url = https://github.com/symbioticfi/rewards

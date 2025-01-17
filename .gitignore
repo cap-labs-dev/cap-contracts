@@ -23,9 +23,6 @@ cache_forge
 .vscode/*
 !.vscode/settings.json
 
-# Remappings are in foundry.toml and this file is generated on postinstall
-remappings.txt
-
 # Coverage
 coverage
 lcov.info

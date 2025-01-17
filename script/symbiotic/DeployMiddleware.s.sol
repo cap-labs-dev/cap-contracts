@@ -13,6 +13,11 @@ import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 import { IBurnerRouterFactory } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouterFactory.sol";
+
+import { IOperatorRegistry } from "@symbioticfi/core/src/interfaces/IOperatorRegistry.sol";
+import { IOptInService } from "@symbioticfi/core/src/interfaces/service/IOptInService.sol";
+
+import { INetworkRegistry } from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
 import { IVaultConfigurator } from "@symbioticfi/core/src/interfaces/IVaultConfigurator.sol";
 import { IDelegatorHook } from "@symbioticfi/core/src/interfaces/delegator/IDelegatorHook.sol";
 
@@ -40,6 +45,7 @@ contract DeployMiddleware is Script, WalletUtils, SymbioticUtils {
     SymbioticConfig public symbioticConfig;
     CapSymbioticNetworkMiddleware public middlewareImplementation;
 
+    address public network;
     MockERC20 public collateral;
     IBurnerRouter public burnerRouter;
     uint48 public burnerRouterDelay = 0;
@@ -182,29 +188,55 @@ contract DeployMiddleware is Script, WalletUtils, SymbioticUtils {
 
         // setup network
         {
+            network = getWalletAddress();
+
+            INetworkRegistry(symbioticConfig.networkRegistry).registerNetwork();
+            INetworkMiddlewareService(symbioticConfig.networkMiddlewareService).setMiddleware(address(middleware));
+
             middleware.initialize(
+                network,
                 symbioticConfig.vaultRegistry,
-                symbioticConfig.networkRegistry,
-                symbioticConfig.networkMiddlewareService,
+                symbioticConfig.operatorRegistry,
+                symbioticConfig.networkOptInService,
+                admin,
                 1 hours,
-                address(collateral)
+                address(burnerRouter)
             );
 
             console.log("middleware", address(middleware));
+
+            // register the vault in the network
+            middleware.registerVault(address(vault));
         }
 
-        // deposit collateral into vault
         {
-            MockERC20(collateral).mint(getWalletAddress(), 1e18);
-            IERC20(collateral).approve(address(vault), type(uint256).max);
+            address user_agent = getWalletAddress();
+            address user_restaker = getWalletAddress();
 
-            vault.deposit(getWalletAddress(), 1e18);
-            console.log("activeBalanceOf", vault.activeBalanceOf(getWalletAddress()));
-            vault.withdraw(getWalletAddress(), 1e18);
+            // deposit collateral into vault
+            MockERC20(collateral).mint(user_restaker, 10_000_000e18);
+            IERC20(collateral).approve(address(vault), 1000e18);
+            vault.deposit(user_restaker, 1000e18);
 
-            vault.deposit(getWalletAddress(), 1000e18);
+            // allow the stakers to delegate to the agent
+            networkRestakeDelegator.setMaxNetworkLimit(
+                middleware.getSubnetworkIdentifier(user_agent), type(uint256).max
+            );
+            networkRestakeDelegator.setNetworkLimit(middleware.getSubnetwork(user_agent), 1000e18);
 
-            // immediateSlasher.slash(getWalletAddress(), 1000e18, 1000e18, 1000e18, "");
+            // make the agent opt-in to the vault
+            IOperatorRegistry(symbioticConfig.operatorRegistry).registerOperator();
+            IOptInService(symbioticConfig.networkOptInService).optIn(network);
+            IOptInService(symbioticConfig.vaultOptInService).optIn(address(vault));
+
+            // actually delegate to the agent
+            networkRestakeDelegator.setOperatorNetworkShares(
+                middleware.getSubnetwork(user_agent), user_agent, type(uint256).max
+            );
+
+            // slash the operator
+            vm.warp(block.timestamp + 1 days);
+            middleware.slash(getWalletAddress(), 10e18);
         }
 
         vm.stopBroadcast();

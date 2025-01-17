@@ -1,26 +1,28 @@
 {
-  "solidity.packageDefaultDependenciesContractsDirectory": "src",
-  "solidity.packageDefaultDependenciesDirectory": "lib",
   "editor.formatOnSave": true,
   "[solidity]": {
     "editor.defaultFormatter": "JuanBlanco.solidity"
   },
   "solidity.formatter": "forge",
   "solidity.compileUsingRemoteVersion": "v0.8.28",
+  "solidity.defaultCompiler": "remote",
+  "solidity.packageDefaultDependenciesContractsDirectory": "src",
+  "solidity.packageDefaultDependenciesDirectory": "lib",
   "solidity.remappings": [
-    "@openzeppelin/=node_modules/@openzeppelin/",
-    "forge-std/=lib/forge-std/src/",
+    "@symbioticfi/core/=node_modules/@symbioticfi/core/",
+    "@symbioticfi/burners/=node_modules/@symbioticfi/burners/",
+    "@symbioticfi/hooks/=node_modules/@symbioticfi/hooks/",
+    "@symbioticfi/rewards/=node_modules/@symbioticfi/rewards/",
+    "@symbioticfi/middleware-sdk/=lib/symbioticfi-middleware-sdk/",
     "@layerzerolabs/oft-evm/=lib/devtools/packages/oft-evm/",
     "@layerzerolabs/oapp-evm/=lib/devtools/packages/oapp-evm/",
     "@layerzerolabs/lz-evm-protocol-v2/=lib/layerzero-v2/packages/layerzero-v2/evm/protocol/",
     "@layerzerolabs/interfaces/=lib/layerzero-v2/packages/layerzero-v2/evm/protocol/contracts/interfaces/",
-    "devtools/=lib/devtools/packages/toolbox-foundry/src/",
+    "@layerzerolabs/lz-evm-messagelib-v2=lib/layerzero-v2/packages/layerzero-v2/evm/messagelib/",
+    "solidity-bytes-utils/contracts/=lib/solidity-bytes-utils/contracts/",
     "ds-test/=lib/layerzero-v2/lib/forge-std/lib/ds-test/src/",
-    "layerzero-v2/=lib/layerzero-v2/",
-    "@symbioticfi/burners/=lib/symbioticfi-burners",
-    "@symbioticfi/core/=lib/symbioticfi-core",
-    "@symbioticfi/middleware-sdk/=lib/symbioticfi-middleware-sdk",
-    "@symbioticfi/hooks/=lib/symbioticfi-hooks",
-    "@symbioticfi/rewards/=lib/symbioticfi-rewards"
-  ]
+    "devtools/=lib/devtools/packages/toolbox-foundry/src/",
+    "forge-std/=lib/forge-std/src/",
+    "@openzeppelin/=node_modules/@openzeppelin/",
+  ],
 }
