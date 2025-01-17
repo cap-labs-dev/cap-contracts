@@ -308,7 +308,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
 
             assertEq(IERC20(collateral).balanceOf(address(middleware)), 0);
 
-            middleware.slashAgent(user_agent, 10e18);
+            middleware.slashAgent(user_agent, address(collateral), 10e18);
 
             assertEq(IERC20(collateral).balanceOf(address(middleware)), 10e18);
 

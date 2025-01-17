@@ -50,6 +50,7 @@ contract CapSymbioticNetworkMiddleware is
     error InvalidSlasher();
     error InvalidBurner();
     error TooBigSlashAmount();
+    error DidNotReceiveCollateralImmediatly();
 
     // TODO: use eip712
     uint48 public requiredEpochDuration;
@@ -101,29 +102,40 @@ contract CapSymbioticNetworkMiddleware is
         _registerSharedVault(vault);
     }
 
-    function slashAgent(address _agent, uint256 _amount) external {
+    function slashAgent(address _agent, address _collateral, uint256 _amount) external {
         bytes32 _subnetwork = getSubnetwork(_agent);
         uint48 _timestamp = getCaptureTimestamp();
         address[] memory _vaults = _activeVaultsAt(_timestamp);
 
-        uint256 amountToSlash = _amount;
+        uint256 restToSlash = _amount;
+        uint256 collateralBalanceBefore = IERC20(_collateral).balanceOf(address(this));
 
         for (uint256 i = 0; i < _vaults.length; i++) {
-            uint256 totalOperatorStake =
-                _getOperatorPowerAt(_timestamp, _agent, _vaults[i], getSubnetworkIdentifier(_agent));
-            uint256 amountToSlashFromVault = amountToSlash > totalOperatorStake ? totalOperatorStake : amountToSlash;
-            amountToSlash -= amountToSlashFromVault;
-
-            if (amountToSlashFromVault > 0) {
-                _slashVault(_timestamp, _vaults[i], _subnetwork, _agent, amountToSlashFromVault, new bytes(0));
-
-                // TODO: the burner could be a non routing burner
-                address burner = IVault(_vaults[i]).burner();
-                IBurnerRouter(burner).triggerTransfer(address(this));
+            if (IVault(_vaults[i]).collateral() != _collateral) {
+                continue;
             }
+
+            uint256 vaultStake = _getOperatorPowerAt(_timestamp, _agent, _vaults[i], getSubnetworkIdentifier(_agent));
+            uint256 slashFromVault = restToSlash > vaultStake ? vaultStake : restToSlash;
+            if (slashFromVault == 0) {
+                continue;
+            }
+            _slashVault(_timestamp, _vaults[i], _subnetwork, _agent, slashFromVault, new bytes(0));
+            restToSlash -= slashFromVault;
+
+            // TODO: the burner could be a non routing burner, could add hooks
+            address burner = IVault(_vaults[i]).burner();
+            IBurnerRouter(burner).triggerTransfer(address(this));
+
+            // expect the amount to be sent to the middleware
+            uint256 collateralBalanceAfter = IERC20(_collateral).balanceOf(address(this));
+            if (collateralBalanceAfter - collateralBalanceBefore != slashFromVault) {
+                revert DidNotReceiveCollateralImmediatly();
+            }
+            collateralBalanceBefore = collateralBalanceAfter;
         }
 
-        if (amountToSlash > 0) {
+        if (restToSlash > 0) {
             revert TooBigSlashAmount();
         }
     }
