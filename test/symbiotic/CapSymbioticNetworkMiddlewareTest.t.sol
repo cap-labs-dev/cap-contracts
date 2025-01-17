@@ -301,7 +301,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
         vm.warp(block.timestamp + 1 days);
     }
 
-    function test_slash() public {
+    function test_slash_sends_funds_to_middleware() public {
         // it is slashable
         {
             vm.startPrank(user_cap_admin);
@@ -311,6 +311,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             middleware.slashAgent(user_agent, 10e18);
 
             assertEq(IERC20(collateral).balanceOf(address(middleware)), 10e18);
+
             vm.stopPrank();
         }
     }
