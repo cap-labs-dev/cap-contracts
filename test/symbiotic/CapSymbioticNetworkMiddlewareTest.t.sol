@@ -4,9 +4,9 @@ pragma solidity ^0.8.0;
 import { CapSymbioticNetworkMiddleware } from "../../contracts/collateral/symbiotic/CapSymbioticNetworkMiddleware.sol";
 import { Test } from "forge-std/Test.sol";
 
-import { OperatorSpecificDecreaseHook } from "../../contracts/collateral/symbiotic/OperatorSpecificDecreaseHook.sol";
 import { SymbioticUtils } from "../../script/util/SymbioticUtils.sol";
 import { MockERC20 } from "../../test/mocks/MockERC20.sol";
+import { NetworkRestakeDecreaseHook } from "./NetworkRestakeDecreaseHook.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
@@ -98,7 +98,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             // hook setup
             // https://docs.symbiotic.fi/guides/vault-deployment/#hook
             // https://docs.symbiotic.fi/modules/extensions/hooks/
-            hook = new OperatorSpecificDecreaseHook();
+            hook = new NetworkRestakeDecreaseHook();
 
             // vault setup
             // https://docs.symbiotic.fi/guides/vault-deployment/#vault
@@ -202,6 +202,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             vm.startPrank(user_vault_admin);
 
             burnerRouter.setNetworkReceiver(cap_network_address, address(middleware));
+            burnerRouter.acceptNetworkReceiver(cap_network_address);
 
             vm.stopPrank();
         }

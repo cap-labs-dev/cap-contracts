@@ -7,27 +7,25 @@ import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/Saf
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { Time } from "@openzeppelin/contracts/utils/types/Time.sol";
 
-import { Subnetwork } from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
-import { EqualStakePower } from "@symbioticfi/middleware-sdk/src/extensions/managers/stake-powers/EqualStakePower.sol";
-import { console } from "forge-std/console.sol";
-
-import { INetworkRegistry } from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
-
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+
+import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
+import { Subnetwork } from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
+import { INetworkRegistry } from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
 import { IEntity } from "@symbioticfi/core/src/interfaces/common/IEntity.sol";
 import { IRegistry } from "@symbioticfi/core/src/interfaces/common/IRegistry.sol";
 import { IBaseDelegator } from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
 import { INetworkMiddlewareService } from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
 import { ISlasher } from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
 import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
-
 import { Subnetworks } from "@symbioticfi/middleware-sdk/src/extensions/Subnetworks.sol";
 import { OwnableAccessManager } from
     "@symbioticfi/middleware-sdk/src/extensions/managers/access/OwnableAccessManager.sol";
 import { TimestampCapture } from
     "@symbioticfi/middleware-sdk/src/extensions/managers/capture-timestamps/TimestampCapture.sol";
 import { KeyManagerAddress } from "@symbioticfi/middleware-sdk/src/extensions/managers/keys/KeyManagerAddress.sol";
+import { EqualStakePower } from "@symbioticfi/middleware-sdk/src/extensions/managers/stake-powers/EqualStakePower.sol";
 
 import { EqualStakePower } from "@symbioticfi/middleware-sdk/src/extensions/managers/stake-powers/EqualStakePower.sol";
 import { Operators } from "@symbioticfi/middleware-sdk/src/extensions/operators/Operators.sol";
@@ -109,19 +107,19 @@ contract CapSymbioticNetworkMiddleware is
         address[] memory _vaults = _activeVaultsAt(_timestamp);
 
         uint256 amountToSlash = _amount;
-        console.log("amountToSlash", amountToSlash);
-
-        console.log("activeVaults.length", _activeVaultsAt(_timestamp).length);
 
         for (uint256 i = 0; i < _vaults.length; i++) {
             uint256 totalOperatorStake =
                 _getOperatorPowerAt(_timestamp, _agent, _vaults[i], getSubnetworkIdentifier(_agent));
-            console.log("totalOperatorStake", totalOperatorStake);
             uint256 amountToSlashFromVault = amountToSlash > totalOperatorStake ? totalOperatorStake : amountToSlash;
             amountToSlash -= amountToSlashFromVault;
 
             if (amountToSlashFromVault > 0) {
                 _slashVault(_timestamp, _vaults[i], _subnetwork, _agent, amountToSlashFromVault, new bytes(0));
+
+                // TODO: the burner could be a non routing burner
+                address burner = IVault(_vaults[i]).burner();
+                IBurnerRouter(burner).triggerTransfer(address(this));
             }
         }
 
