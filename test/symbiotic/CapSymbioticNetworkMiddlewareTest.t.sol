@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
-
-import { LzUtils } from "../util/LzUtils.sol";
+pragma solidity ^0.8.0;
 
 import { CapSymbioticNetworkMiddleware } from "../../contracts/collateral/symbiotic/CapSymbioticNetworkMiddleware.sol";
-import { OperatorSpecificDecreaseHook } from "../../contracts/collateral/symbiotic/OperatorSpecificDecreaseHook.sol";
+import { Test } from "forge-std/Test.sol";
 
+import { OperatorSpecificDecreaseHook } from "../../contracts/collateral/symbiotic/OperatorSpecificDecreaseHook.sol";
+import { SymbioticUtils } from "../../script/util/SymbioticUtils.sol";
 import { MockERC20 } from "../../test/mocks/MockERC20.sol";
-import { SymbioticUtils } from "../util/SymbioticUtils.sol";
-import { WalletUtils } from "../util/WalletUtils.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
@@ -33,19 +31,13 @@ import { IBaseSlasher } from "@symbioticfi/core/src/interfaces/slasher/IBaseSlas
 import { ISlasher } from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
 import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 
-import { Script } from "forge-std/Script.sol";
 import { console } from "forge-std/console.sol";
 
-/**
- * Deploy the lockboxes for the cap token and staked cap token
- */
-contract DeployMiddleware is Script, WalletUtils, SymbioticUtils {
+contract CapSymbioticMiddlewareTest is Test, SymbioticUtils {
     address public constant CAP_NETWORK_ADDRESS = 0x58D347334A5E6bDE7279696abE59a11873294FA4;
 
     SymbioticConfig public symbioticConfig;
     CapSymbioticNetworkMiddleware public middlewareImplementation;
-
-    address public network;
     MockERC20 public collateral;
     IBurnerRouter public burnerRouter;
     uint48 public burnerRouterDelay = 0;
@@ -57,41 +49,61 @@ contract DeployMiddleware is Script, WalletUtils, SymbioticUtils {
     ISlasher public immediateSlasher;
     IDefaultStakerRewards public defaultStakerRewards;
 
+    address public user_deployer;
+    address public user_agent;
+    address public user_restaker;
+    address public user_cap_admin;
+    address public cap_network_address;
+
     function _proxy(address _implementation) internal returns (address) {
         bytes memory _empty = "";
         return address(new ERC1967Proxy(address(_implementation), _empty));
     }
 
-    function run() public {
-        // pull config
-        collateral = MockERC20(0xbDb6B30d716b7a864e0E482C9D703057b46BF218); // mock USDC
-        address admin = getWalletAddress();
-        address capNetwork = getWalletAddress();
-        symbioticConfig = getConfig();
-
-        console.log("collateral", address(collateral));
-        console.log("admin", admin);
-        console.log("capNetwork", capNetwork);
-
-        vm.startBroadcast();
-
-        middlewareImplementation = new CapSymbioticNetworkMiddleware();
-        middleware = CapSymbioticNetworkMiddleware(_proxy(address(middlewareImplementation)));
-
-        console.log("middlewareImplementation", address(middlewareImplementation));
-        console.log("middleware", address(middleware));
-
-        // setup vault
+    function setUp() public {
         {
+            vm.createSelectFork("https://sepolia.gateway.tenderly.co", 7512723);
+        }
+
+        {
+            user_deployer = makeAddr("deployer");
+            user_agent = makeAddr("agent");
+            user_restaker = makeAddr("restaker");
+            user_cap_admin = makeAddr("cap_admin");
+            cap_network_address = makeAddr("cap_network_address");
+
+            collateral = new MockERC20("Mock USDC", "USDC");
+            MockERC20(collateral).mint(user_restaker, 10_000_000e18);
+
+            symbioticConfig = getConfig();
+        }
+
+        // setup network
+        {
+            vm.startPrank(cap_network_address);
+
+            INetworkRegistry(symbioticConfig.networkRegistry).registerNetwork();
+
+            vm.stopPrank();
+        }
+
+        // deploy a vault
+        {
+            vm.startPrank(user_deployer);
+
+            middlewareImplementation = new CapSymbioticNetworkMiddleware();
+            middleware = CapSymbioticNetworkMiddleware(_proxy(address(middlewareImplementation)));
+
             // burner router setup
             // https://docs.symbiotic.fi/guides/vault-deployment/#1-burner-router
             // https://docs.symbiotic.fi/guides/vault-deployment#network-specific-burners
             IBurnerRouter.NetworkReceiver[] memory networkReceivers = new IBurnerRouter.NetworkReceiver[](1);
-            networkReceivers[0] = IBurnerRouter.NetworkReceiver({ network: capNetwork, receiver: address(middleware) });
+            networkReceivers[0] =
+                IBurnerRouter.NetworkReceiver({ network: cap_network_address, receiver: address(middleware) });
             burnerRouter = IBurnerRouter(
                 IBurnerRouterFactory(symbioticConfig.burnerRouterFactory).create(
                     IBurnerRouter.InitParams({
-                        owner: admin, // address of the router’s owner
+                        owner: user_cap_admin, // address of the router’s owner
                         collateral: address(collateral), // address of the collateral - wstETH (MUST be the same as for the Vault to connect)
                         delay: burnerRouterDelay, // duration of the receivers’ update delay (= 21 days)
                         globalReceiver: 0x58D347334A5E6bDE7279696abE59a11873294FA4, // address of the pure burner corresponding to the collateral - wstETH_Burner (some collaterals are covered by us; see Deployments page)
@@ -109,11 +121,11 @@ contract DeployMiddleware is Script, WalletUtils, SymbioticUtils {
             // vault setup
             // https://docs.symbiotic.fi/guides/vault-deployment/#vault
             address[] memory networkLimitSetRoleHolders = new address[](2);
-            networkLimitSetRoleHolders[0] = admin;
+            networkLimitSetRoleHolders[0] = user_cap_admin;
             networkLimitSetRoleHolders[1] = address(hook);
 
             address[] memory operatorNetworkSharesSetRoleHolders = new address[](2);
-            operatorNetworkSharesSetRoleHolders[0] = admin;
+            operatorNetworkSharesSetRoleHolders[0] = user_cap_admin;
             operatorNetworkSharesSetRoleHolders[1] = address(hook);
 
             (address _vault, address _networkRestakeDelegator, address _immediateSlasher) = IVaultConfigurator(
@@ -121,7 +133,7 @@ contract DeployMiddleware is Script, WalletUtils, SymbioticUtils {
             ).create(
                 IVaultConfigurator.InitParams({
                     version: 1, // Vault’s version (= common one)
-                    owner: admin, // address of the Vault’s owner (can migrate the Vault to new versions in the future)
+                    owner: user_cap_admin, // address of the Vault’s owner (can migrate the Vault to new versions in the future)
                     vaultParams: abi.encode(
                         IVault.InitParams({
                             collateral: address(collateral), // address of the collateral - wstETH
@@ -130,20 +142,20 @@ contract DeployMiddleware is Script, WalletUtils, SymbioticUtils {
                             depositWhitelist: false, // if enable deposit whitelisting
                             isDepositLimit: false, // if enable deposit limit
                             depositLimit: 0, // deposit limit
-                            defaultAdminRoleHolder: admin, // address of the Vault’s admin (can manage all roles)
-                            depositWhitelistSetRoleHolder: admin, // address of the enabler/disabler of the deposit whitelisting
-                            depositorWhitelistRoleHolder: admin, // address of the depositors whitelister
-                            isDepositLimitSetRoleHolder: admin, // address of the enabler/disabler of the deposit limit
-                            depositLimitSetRoleHolder: admin // address of the deposit limit setter
+                            defaultAdminRoleHolder: user_cap_admin, // address of the Vault’s admin (can manage all roles)
+                            depositWhitelistSetRoleHolder: user_cap_admin, // address of the enabler/disabler of the deposit whitelisting
+                            depositorWhitelistRoleHolder: user_cap_admin, // address of the depositors whitelister
+                            isDepositLimitSetRoleHolder: user_cap_admin, // address of the enabler/disabler of the deposit limit
+                            depositLimitSetRoleHolder: user_cap_admin // address of the deposit limit setter
                          })
                     ),
                     delegatorIndex: 0, // Delegator’s type (= NetworkRestakeDelegator)
                     delegatorParams: abi.encode(
                         INetworkRestakeDelegator.InitParams({
                             baseParams: IBaseDelegator.BaseParams({
-                                defaultAdminRoleHolder: admin, // address of the Delegator’s admin (can manage all roles)
+                                defaultAdminRoleHolder: user_cap_admin, // address of the Delegator’s admin (can manage all roles)
                                 hook: address(hook), // address of the hook (if not zero, receives onSlash() call on each slashing)
-                                hookSetRoleHolder: admin // address of the hook setter
+                                hookSetRoleHolder: user_cap_admin // address of the hook setter
                              }),
                             networkLimitSetRoleHolders: networkLimitSetRoleHolders, // array of addresses of the network limit setters
                             operatorNetworkSharesSetRoleHolders: operatorNetworkSharesSetRoleHolders // array of addresses of the operator-network shares setters
@@ -171,74 +183,103 @@ contract DeployMiddleware is Script, WalletUtils, SymbioticUtils {
                     IDefaultStakerRewards.InitParams({
                         vault: address(vault), // address of the deployed Vault
                         adminFee: 1000, // admin fee percent to get from all the rewards distributions (10% = 1_000 | 100% = 10_000)
-                        defaultAdminRoleHolder: admin, // address of the main admin (can manage all roles)
-                        adminFeeClaimRoleHolder: admin, // address of the admin fee claimer
-                        adminFeeSetRoleHolder: admin // address of the admin fee setter
+                        defaultAdminRoleHolder: user_cap_admin, // address of the main admin (can manage all roles)
+                        adminFeeClaimRoleHolder: user_cap_admin, // address of the admin fee claimer
+                        adminFeeSetRoleHolder: user_cap_admin // address of the admin fee setter
                      })
                 )
             );
 
-            console.log("burnerRouter", address(burnerRouter));
-            console.log("hook", address(hook));
-            console.log("vault", address(vault));
-            console.log("networkRestakeDelegator", address(networkRestakeDelegator));
-            console.log("immediateSlasher", address(immediateSlasher));
-            console.log("defaultStakerRewards", address(defaultStakerRewards));
+            vm.stopPrank();
         }
 
-        // setup network
         {
-            network = getWalletAddress();
-
-            INetworkRegistry(symbioticConfig.networkRegistry).registerNetwork();
+            vm.startPrank(cap_network_address);
             INetworkMiddlewareService(symbioticConfig.networkMiddlewareService).setMiddleware(address(middleware));
+            vm.stopPrank();
+        }
+        //
+        {
+            vm.startPrank(user_deployer);
 
             middleware.initialize(
-                network,
+                cap_network_address,
                 symbioticConfig.vaultRegistry,
                 symbioticConfig.operatorRegistry,
                 symbioticConfig.networkOptInService,
-                admin,
+                user_cap_admin,
                 1 hours,
                 address(burnerRouter)
             );
 
-            console.log("middleware", address(middleware));
-
-            // register the vault in the network
-            middleware.registerVault(address(vault));
+            vm.stopPrank();
         }
 
         {
-            address user_agent = getWalletAddress();
-            address user_restaker = getWalletAddress();
+            vm.startPrank(user_cap_admin);
 
-            // deposit collateral into vault
-            MockERC20(collateral).mint(user_restaker, 10_000_000e18);
+            // register the vault in the network
+            middleware.registerVault(address(vault));
+
+            vm.stopPrank();
+        }
+
+        // deposit collateral into vault
+        {
+            vm.startPrank(user_restaker);
+
             IERC20(collateral).approve(address(vault), 1000e18);
             vault.deposit(user_restaker, 1000e18);
 
-            // allow the stakers to delegate to the agent
+            vm.stopPrank();
+        }
+
+        // allow the stakers to delegate to the agent
+        {
+            vm.startPrank(cap_network_address);
+
             networkRestakeDelegator.setMaxNetworkLimit(
                 middleware.getSubnetworkIdentifier(user_agent), type(uint256).max
             );
+
+            vm.stopPrank();
+        }
+
+        {
+            vm.startPrank(user_cap_admin);
+
             networkRestakeDelegator.setNetworkLimit(middleware.getSubnetwork(user_agent), 1000e18);
 
-            // make the agent opt-in to the vault
+            vm.stopPrank();
+        }
+
+        // make the agent opt-in to the vault
+        {
+            vm.startPrank(user_agent);
             IOperatorRegistry(symbioticConfig.operatorRegistry).registerOperator();
-            IOptInService(symbioticConfig.networkOptInService).optIn(network);
+            IOptInService(symbioticConfig.networkOptInService).optIn(cap_network_address);
             IOptInService(symbioticConfig.vaultOptInService).optIn(address(vault));
+        }
+
+        {
+            vm.startPrank(user_restaker);
 
             // actually delegate to the agent
             networkRestakeDelegator.setOperatorNetworkShares(
                 middleware.getSubnetwork(user_agent), user_agent, type(uint256).max
             );
 
-            // slash the operator
-            vm.warp(block.timestamp + 1 days);
-            middleware.slash(getWalletAddress(), 10e18);
+            vm.stopPrank();
         }
 
-        vm.stopBroadcast();
+        vm.warp(block.timestamp + 1 days);
+    }
+
+    function test_slash() public {
+        vm.startPrank(user_cap_admin);
+
+        middleware.slashAgent(user_agent, 10e18);
+
+        vm.stopPrank();
     }
 }

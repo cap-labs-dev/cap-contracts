@@ -107,7 +107,7 @@ contract CapSymbioticNetworkMiddleware is
         _registerSharedVault(vault);
     }
 
-    function slash(address _agent, uint256 _amount) external {
+    function slashAgent(address _agent, uint256 _amount) external {
         bytes32 _subnetwork = getSubnetwork(_agent);
         uint48 _timestamp = getCaptureTimestamp();
         address[] memory _vaults = _activeVaultsAt(_timestamp);
