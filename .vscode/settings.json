@@ -20,6 +20,7 @@
     "@symbioticfi/burners/=lib/symbioticfi-burners",
     "@symbioticfi/core/=lib/symbioticfi-core",
     "@symbioticfi/middleware-sdk/=lib/symbioticfi-middleware-sdk",
-    "@symbioticfi/hooks/=lib/symbioticfi-hooks"
+    "@symbioticfi/hooks/=lib/symbioticfi-hooks",
+    "@symbioticfi/rewards/=lib/symbioticfi-rewards"
   ]
 }

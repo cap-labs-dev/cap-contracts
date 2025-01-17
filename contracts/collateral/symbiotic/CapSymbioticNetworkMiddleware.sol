@@ -44,6 +44,7 @@ contract CapSymbioticNetworkMiddleware is Network {
     function initialize(
         address _vaultRegistry,
         address _networkRegistry,
+        address _networkMiddlewareService,
         uint48 _requiredEpochDuration,
         address _collateral
     ) external initializer {
@@ -51,6 +52,7 @@ contract CapSymbioticNetworkMiddleware is Network {
         _grantRole(PAUSER_ROLE, msg.sender);
 
         INetworkRegistry(_networkRegistry).registerNetwork();
+        INetworkMiddlewareService(_networkMiddlewareService).setMiddleware(address(this));
 
         requiredEpochDuration = _requiredEpochDuration;
         vaultRegistry = _vaultRegistry;
