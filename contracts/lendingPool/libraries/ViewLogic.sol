@@ -15,42 +15,35 @@ library ViewLogic {
     using AgentConfiguration for DataTypes.AgentConfigurationMap;
 
     /// @notice Calculate the agent data
-    /// @param reservesData Reserve mapping
-    /// @param reservesList Mapping of all reserves
-    /// @param agentConfig Agent configuration
-    /// @param params Parameters for calculating an agent's data
+    /// @param $ Lender storage
+    /// @param _agent Agent address
     /// @return totalDelegation Total delegation of an agent
     /// @return totalDebt Total debt of an agent
     /// @return ltv Loan to value ratio
     /// @return liquidationThreshold Liquidation ratio of an agent
     /// @return health Health status of an agent
-    function agent(
-        mapping(address => DataTypes.ReserveData) storage reservesData,
-        mapping(uint256 => address) storage reservesList,
-        DataTypes.AgentConfigurationMap storage agentConfig,
-        DataTypes.AgentParams memory params
-    ) external view returns (
+    function agent(DataTypes.LenderStorage storage $, address _agent) external view returns (
         uint256 totalDelegation,
         uint256 totalDebt,
         uint256 ltv,
         uint256 liquidationThreshold,
         uint256 health
     ) {
-        totalDelegation = IDelegation(params.delegation).coverage(params.agent);
-        liquidationThreshold = IDelegation(params.delegation).liquidationThreshold(params.agent);
+        totalDelegation = IDelegation($.delegation).coverage(_agent);
+        liquidationThreshold = IDelegation($.delegation).liquidationThreshold(_agent);
 
-        for (uint256 i; i < params.reserveCount; ++i) {
-            if (!agentConfig.isBorrowing(i)) {
+        for (uint256 i; i < $.reservesCount; ++i) {
+            if (!$.agentConfig[_agent].isBorrowing(i)) {
                 continue;
             }
 
-            address asset = reservesList[i];
+            address asset = $.reservesList[i];
 
             totalDebt += (
-                IERC20(reservesData[asset].principalDebtToken).balanceOf(params.agent)
-                + IERC20(reservesData[asset].interestDebtToken).balanceOf(params.agent)
-                + IERC20(reservesData[asset].restakerDebtToken).balanceOf(params.agent)
-            ) * IOracle(params.oracle).getPrice(asset) / reservesData[asset].decimals;
+                IERC20($.reservesData[asset].principalDebtToken).balanceOf(_agent)
+                + IERC20($.reservesData[asset].interestDebtToken).balanceOf(_agent)
+                + IERC20($.reservesData[asset].restakerDebtToken).balanceOf(_agent)
+            ) * IOracle($.oracle).getPrice(asset) / $.reservesData[asset].decimals;
         }
 
         ltv = totalDebt / totalDelegation;

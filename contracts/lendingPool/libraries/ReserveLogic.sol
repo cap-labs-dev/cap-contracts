@@ -12,25 +12,22 @@ import {DataTypes} from "./types/DataTypes.sol";
 /// @author kexley, @capLabs
 /// @notice Add, remove or pause reserves on the Lender
 library ReserveLogic {
-    /// @notice Add asset to the possible lending
-    /// @dev The debt token will be deployed for this reserve
-    /// @param reservesData Reserve mapping
-    /// @param reservesList Mapping of all reserves
+    /// @notice Add asset to the lender
+    /// @param $ Lender storage
     /// @param params Parameters for adding an asset
     /// @return filled True if filling in empty space or false if appended
     function addAsset(
-        mapping(address => DataTypes.ReserveData) storage reservesData,
-        mapping(uint256 => address) storage reservesList,
+        DataTypes.LenderStorage storage $,
         DataTypes.AddAssetParams memory params
     ) external returns (bool filled) {
-        ValidationLogic.validateAddAsset(reservesData, params.asset, params.vault);
+        ValidationLogic.validateAddAsset($, params.asset, params.vault);
 
         uint256 id;
 
-        for (uint256 i; i < params.reserveCount; ++i) {
+        for (uint256 i; i < $.reservesCount; ++i) {
             // Fill empty space if available
-            if (reservesList[i] == address(0)) {
-                reservesList[i] = params.asset;
+            if ($.reservesList[i] == address(0)) {
+                $.reservesList[i] = params.asset;
                 id = i;
                 filled = true;
                 break;
@@ -38,12 +35,12 @@ library ReserveLogic {
         }
 
         if (!filled) {
-            require(params.reserveCount + 1 < 256, Errors.NO_MORE_RESERVES_ALLOWED);
-            id = params.reserveCount;
-            reservesList[params.reserveCount] = params.asset;
+            require($.reservesCount + 1 < 256, Errors.NO_MORE_RESERVES_ALLOWED);
+            id = $.reservesCount;
+            $.reservesList[$.reservesCount] = params.asset;
         }
 
-        reservesData[params.asset] = DataTypes.ReserveData({
+        $.reservesData[params.asset] = DataTypes.ReserveData({
             id: id,
             vault: params.vault,
             principalDebtToken: params.principalDebtToken,
@@ -51,35 +48,29 @@ library ReserveLogic {
             interestDebtToken: params.interestDebtToken,
             interestReceiver: params.interestReceiver,
             decimals: params.decimals,
-            bonusCap: params.bonusCap,
-            paused: false,
+            paused: true,
             realizedInterest: 0
         });
     }
 
     /// @notice Remove asset from lending when there is no borrows
-    /// @param reservesData Reserve mapping
-    /// @param reservesList Mapping of all reserves
+    /// @param $ Lender storage
     /// @param _asset Asset address
-    function removeAsset(
-        mapping(address => DataTypes.ReserveData) storage reservesData,
-        mapping(uint256 => address) storage reservesList,
-        address _asset
-    ) external {
-        ValidationLogic.validateRemoveAsset(reservesData, _asset);
+    function removeAsset(DataTypes.LenderStorage storage $, address _asset) external {
+        ValidationLogic.validateRemoveAsset($, _asset);
 
-        reservesList[reservesData[_asset].id] = address(0);
-        delete reservesData[_asset];
+        $.reservesList[$.reservesData[_asset].id] = address(0);
+        delete $.reservesData[_asset];
     }
 
     /// @notice Pause an asset from being borrowed
-    /// @param reservesData Reserve mapping
+    /// @param $ Lender storage
     /// @param _asset Asset address
     /// @param _pause True if pausing or false if unpausing
-    function pauseAsset(mapping(address => DataTypes.ReserveData) storage reservesData, address _asset, bool _pause)
+    function pauseAsset(DataTypes.LenderStorage storage $, address _asset, bool _pause)
         external
     {
-        ValidationLogic.validatePauseAsset(reservesData, _asset);
-        reservesData[_asset].paused = _pause;
+        ValidationLogic.validatePauseAsset($, _asset);
+        $.reservesData[_asset].paused = _pause;
     }
 }

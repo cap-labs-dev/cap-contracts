@@ -16,41 +16,21 @@ library ValidationLogic {
     /// @notice Validate the borrow of an agent
     /// @dev Check the pause state of the reserve and the health of the agent before and after the 
     /// borrow.
-    /// @param reservesData Reserve mapping that stores reserve data
-    /// @param reservesList List of all reserves
-    /// @param agentConfig Agent configuration for borrowing
+    /// @param $ Lender storage
     /// @param params Validation parameters
     function validateBorrow(
-        mapping(address => DataTypes.ReserveData) storage reservesData,
-        mapping(uint256 => address) storage reservesList,
-        DataTypes.AgentConfigurationMap storage agentConfig,
-        DataTypes.ValidateBorrowParams memory params
+        DataTypes.LenderStorage storage $,
+        DataTypes.BorrowParams memory params
     ) external view {
-        require(!reservesData[params.asset].paused, Errors.RESERVE_PAUSED);
+        require(!$.reservesData[params.asset].paused, Errors.RESERVE_PAUSED);
 
-        (
-            uint256 totalDelegation,
-            uint256 totalDebt,
-            ,
-            ,
-            uint256 health
-        ) = ViewLogic.agent(
-            reservesData,
-            reservesList,
-            agentConfig,
-            DataTypes.AgentParams({
-                agent: params.agent,
-                delegation: params.delegation,
-                oracle: params.oracle,
-                reserveCount: params.reserveCount
-            })
-        );
+        (uint256 totalDelegation, uint256 totalDebt,,, uint256 health) = ViewLogic.agent($, params.agent);
 
         require(health >= 1e27, Errors.HEALTH_FACTOR_LOWER_THAN_LIQUIDATION_THRESHOLD);
 
-        uint256 ltv = IDelegation(params.delegation).ltv(params.agent);
-        uint256 assetPrice = IOracle(params.oracle).getPrice(params.asset);
-        uint256 newTotalDebt = ( params.amount * assetPrice / params.decimals ) + totalDebt;
+        uint256 ltv = IDelegation($.delegation).ltv(params.agent);
+        uint256 assetPrice = IOracle($.oracle).getPrice(params.asset);
+        uint256 newTotalDebt = ( params.amount * assetPrice / $.reservesData[params.asset].decimals ) + totalDebt;
         uint256 borrowCapacity = totalDelegation * ltv;
         
         require(newTotalDebt <= borrowCapacity, Errors.COLLATERAL_CANNOT_COVER_NEW_BORROW);
@@ -92,39 +72,39 @@ library ValidationLogic {
 
     /// TODO Check that the asset is borrowable from the vault
     /// @notice Validate adding an asset as a reserve
-    /// @param reservesData Reserve mapping that stores reserve data
+    /// @param $ Lender storage
     /// @param _asset Asset to add
     /// @param _vault Vault to borrow asset from
     function validateAddAsset(
-        mapping(address => DataTypes.ReserveData) storage reservesData,
+        DataTypes.LenderStorage storage $,
         address _asset,
         address _vault
     ) external view {
         require(_asset != address(0) && _vault != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
-        require(reservesData[_asset].vault == address(0), Errors.RESERVE_ALREADY_INITIALIZED);
+        require($.reservesData[_asset].vault == address(0), Errors.RESERVE_ALREADY_INITIALIZED);
     }
 
     /// @notice Validate dropping an asset as a reserve
     /// @dev All principal borrows must be repaid, interest is ignored
-    /// @param reservesData Reserve mapping that stores reserve data
+    /// @param $ Lender storage
     /// @param _asset Asset to remove
     function validateRemoveAsset(
-        mapping(address => DataTypes.ReserveData) storage reservesData,
+        DataTypes.LenderStorage storage $,
         address _asset
     ) external view {
         require(
-            IERC20(reservesData[_asset].principalDebtToken).totalSupply() == 0,
+            IERC20($.reservesData[_asset].principalDebtToken).totalSupply() == 0,
             Errors.VARIABLE_DEBT_SUPPLY_NOT_ZERO
         );
     }
 
     /// @notice Validate pausing a reserve
-    /// @param reservesData Reserve mapping that stores reserve data
+    /// @param $ Lender storage
     /// @param _asset Asset to pause
     function validatePauseAsset(
-        mapping(address => DataTypes.ReserveData) storage reservesData,
+        DataTypes.LenderStorage storage $,
         address _asset
     ) external view {
-        require(reservesData[_asset].vault != address(0), Errors.ASSET_NOT_LISTED);
+        require($.reservesData[_asset].vault != address(0), Errors.ASSET_NOT_LISTED);
     }
 }

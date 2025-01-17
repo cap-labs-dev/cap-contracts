@@ -10,6 +10,7 @@ import { ReserveLogic } from "./libraries/ReserveLogic.sol";
 import { ViewLogic } from "./libraries/ViewLogic.sol";
 import { Errors } from "./libraries/helpers/Errors.sol";
 import { DataTypes } from "./libraries/types/DataTypes.sol";
+import { LenderStorage } from "./libraries/LenderStorage.sol";
 
 /// @title Lender for covered agents
 /// @author kexley, @capLabs
@@ -17,32 +18,6 @@ import { DataTypes } from "./libraries/types/DataTypes.sol";
 /// @dev Borrow interest rates are calculated from the underlying utilization rates of the assets
 /// in the vaults.
 contract Lender is UUPSUpgradeable, AccessUpgradeable {
-    /// @custom:storage-location erc7201:cap.storage.Lender
-    struct LenderStorage {
-        mapping(address => DataTypes.ReserveData) reservesData;
-        mapping(uint256 => address) reservesList;
-        mapping(address => DataTypes.AgentConfigurationMap) agentConfig;
-        uint16 reservesCount;
-        address delegation;
-        address oracle;
-        mapping(address => address) restakerInterestReceiver;
-        mapping(address => uint256) liquidationStart;
-        uint256 targetHealth;
-        uint256 grace;
-        uint256 expiry;
-    }
-
-    /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.Lender")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant LenderStorageLocation = 0xd6af1ec8a1789f5ada2b972bd1569f7c83af2e268be17cd65efe8474ebf08800;
-
-    /// @dev Get this contract storage pointer
-    /// @return $ Storage pointer
-    function _getLenderStorage() private pure returns (LenderStorage storage $) {
-        assembly {
-            $.slot := LenderStorageLocation
-        }
-    }
-
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -61,17 +36,19 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         address _oracle,
         uint256 _targetHealth,
         uint256 _grace,
-        uint256 _expiry
+        uint256 _expiry,
+        uint256 _bonusCap
     ) external initializer {
         __Access_init(_accessControl);
 
         // TODO: remove this
-        LenderStorage storage $ = _getLenderStorage();
+        DataTypes.LenderStorage storage $ = LenderStorage.get();
         $.delegation = _delegation;
         $.oracle = _oracle;
         $.targetHealth = _targetHealth;
         $.grace = _grace;
         $.expiry = _expiry;
+        $.bonusCap = _bonusCap;
     }
 
     /// @notice Borrow an asset
@@ -79,25 +56,13 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @param _amount Amount to borrow
     /// @param _receiver Receiver of the borrowed asset
     function borrow(address _asset, uint256 _amount, address _receiver) external {
-        LenderStorage storage $ = _getLenderStorage();
         BorrowLogic.borrow(
-            $.reservesData,
-            $.reservesList,
-            $.agentConfig[msg.sender],
+            LenderStorage.get(),
             DataTypes.BorrowParams({
-                id: $.reservesData[_asset].id,
                 agent: msg.sender,
                 asset: _asset,
-                decimals: $.reservesData[_asset].decimals,
-                vault: $.reservesData[_asset].vault,
-                principalDebtToken: $.reservesData[_asset].principalDebtToken,
-                restakerDebtToken: $.reservesData[_asset].restakerDebtToken,
-                interestDebtToken: $.reservesData[_asset].interestDebtToken,
                 amount: _amount,
-                receiver: _receiver,
-                delegation: $.delegation,
-                oracle: $.oracle,
-                reserveCount: $.reservesCount
+                receiver: _receiver
             })
         );
     }
@@ -106,30 +71,18 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @param _asset Asset to repay
     /// @param _amount Amount to repay
     /// @param _agent Repay on behalf of another borrower
-    /// @return principalRepaid Actual amount repaid
-    /// @return restakerRepaid Actual restaker amount repaid
-    /// @return interestRepaid Actual interest amount repaid
+    /// @return repaid Actual amount repaid
     function repay(address _asset, uint256 _amount, address _agent)
         external
-        returns (uint256 principalRepaid, uint256 restakerRepaid, uint256 interestRepaid)
+        returns (uint256 repaid)
     {
-        LenderStorage storage $ = _getLenderStorage();
-        (principalRepaid, restakerRepaid, interestRepaid) = BorrowLogic.repay(
-            $.reservesData,
-            $.agentConfig[_agent],
+        repaid = BorrowLogic.repay(
+            LenderStorage.get(),
             DataTypes.RepayParams({
-                id: $.reservesData[_asset].id,
                 agent: _agent,
                 asset: _asset,
-                vault: $.reservesData[_asset].vault,
-                principalDebtToken: $.reservesData[_asset].principalDebtToken,
-                restakerDebtToken: $.reservesData[_asset].restakerDebtToken,
-                interestDebtToken: $.reservesData[_asset].interestDebtToken,
                 amount: _amount,
-                caller: msg.sender,
-                realizedInterest: $.reservesData[_asset].realizedInterest,
-                restakerInterestReceiver: $.restakerInterestReceiver[_agent],
-                interestReceiver: $.reservesData[_asset].interestReceiver
+                caller: msg.sender
             })
         );
     }
@@ -139,16 +92,11 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @param _amount Amount of interest to realize (type(uint).max for all available interest)
     /// @return actualRealized Actual amount realized
     function realizeInterest(address _asset, uint256 _amount) external returns (uint256 actualRealized) {
-        LenderStorage storage $ = _getLenderStorage();
         actualRealized = BorrowLogic.realizeInterest(
-            $.reservesData,
+            LenderStorage.get(),
             DataTypes.RealizeInterestParams({
                 asset: _asset,
-                vault: $.reservesData[_asset].vault,
-                interestDebtToken: $.reservesData[_asset].interestDebtToken,
-                interestReceiver: $.reservesData[_asset].interestReceiver,
-                amount: _amount,
-                realizedInterest: $.reservesData[_asset].realizedInterest
+                amount: _amount
             })
         );
     }
@@ -156,38 +104,13 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Initiate liquidation of an agent when the health is below 1
     /// @param _agent Agent address
     function initiateLiquidation(address _agent) external {
-        LenderStorage storage $ = _getLenderStorage();
-        LiquidationLogic.initiateLiquidation(
-            $.reservesData,
-            $.reservesList,
-            $.agentConfig[_agent],
-            $.liquidationStart,
-            DataTypes.InitiateLiquidationParams({
-                agent: _agent,
-                delegation: $.delegation,
-                oracle: $.oracle,
-                reserveCount: $.reservesCount,
-                expiry: $.expiry
-            })
-        );
+        LiquidationLogic.initiateLiquidation(LenderStorage.get(), _agent);
     }
 
     /// @notice Cancel liquidation of an agent when the health is above 1
     /// @param _agent Agent address
     function cancelLiquidation(address _agent) external {
-        LenderStorage storage $ = _getLenderStorage();
-        LiquidationLogic.cancelLiquidation(
-            $.reservesData,
-            $.reservesList,
-            $.agentConfig[_agent],
-            $.liquidationStart,
-            DataTypes.AgentParams({
-                agent: _agent,
-                delegation: $.delegation,
-                oracle: $.oracle,
-                reserveCount: $.reservesCount
-            })
-        );
+        LiquidationLogic.cancelLiquidation(LenderStorage.get(), _agent);
     }
 
     /// @notice Liquidate an agent when the health is below 1
@@ -196,33 +119,13 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @param _amount Amount of asset to repay on behalf of the agent
     /// @param liquidatedValue Value of the liquidation returned to the liquidator
     function liquidate(address _agent, address _asset, uint256 _amount) external returns (uint256 liquidatedValue) {
-        LenderStorage storage $ = _getLenderStorage();
         liquidatedValue = LiquidationLogic.liquidate(
-            $.reservesData,
-            $.reservesList,
-            $.agentConfig[_agent],
-            DataTypes.LiquidateParams({
-                id: $.reservesData[_asset].id,
+            LenderStorage.get(),
+            DataTypes.RepayParams({
                 agent: _agent,
                 asset: _asset,
-                vault: $.reservesData[_asset].vault,
-                principalDebtToken: $.reservesData[_asset].principalDebtToken,
-                restakerDebtToken: $.reservesData[_asset].restakerDebtToken,
-                interestDebtToken: $.reservesData[_asset].interestDebtToken,
                 amount: _amount,
-                decimals: $.reservesData[_asset].decimals,
-                caller: msg.sender,
-                realizedInterest: $.reservesData[_asset].realizedInterest,
-                delegation: $.delegation,
-                oracle: $.oracle,
-                reserveCount: $.reservesCount,
-                restakerInterestReceiver: $.restakerInterestReceiver[_agent],
-                interestReceiver: $.reservesData[_asset].interestReceiver,
-                bonusCap: $.reservesData[_asset].bonusCap,
-                targetHealth: $.targetHealth,
-                start: $.liquidationStart[_agent],
-                grace: $.grace,
-                expiry: $.expiry
+                caller: msg.sender
             })
         );
     }
@@ -239,18 +142,8 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         view
         returns (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health)
     {
-        LenderStorage storage $ = _getLenderStorage();
-        (totalDelegation, totalDebt, ltv, liquidationThreshold, health) = ViewLogic.agent(
-            $.reservesData,
-            $.reservesList,
-            $.agentConfig[_agent],
-            DataTypes.AgentParams({
-                agent: _agent,
-                delegation: $.delegation,
-                oracle: $.oracle,
-                reserveCount: $.reservesCount
-            })
-        );
+        (totalDelegation, totalDebt, ltv, liquidationThreshold, health) 
+            = ViewLogic.agent(LenderStorage.get(), _agent);
     }
 
     /// @notice Add asset to the possible lending
@@ -272,11 +165,10 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         uint8 _decimals,
         uint256 _bonusCap
     ) external checkAccess(this.addAsset.selector) {
-        LenderStorage storage $ = _getLenderStorage();
+        DataTypes.LenderStorage storage $ = LenderStorage.get();
         if (
             ReserveLogic.addAsset(
-                $.reservesData,
-                $.reservesList,
+                $,
                 DataTypes.AddAssetParams({
                     asset: _asset,
                     vault: _vault,
@@ -285,8 +177,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
                     interestDebtToken: _interestDebtToken,
                     interestReceiver: _interestReceiver,
                     decimals: _decimals,
-                    bonusCap: _bonusCap,
-                    reserveCount: $.reservesCount
+                    bonusCap: _bonusCap
                 })
             )
         ) {
@@ -297,16 +188,14 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Remove asset from lending when there is no borrows
     /// @param _asset Asset address
     function removeAsset(address _asset) external checkAccess(this.removeAsset.selector) {
-        LenderStorage storage $ = _getLenderStorage();
-        ReserveLogic.removeAsset($.reservesData, $.reservesList, _asset);
+        ReserveLogic.removeAsset(LenderStorage.get(), _asset);
     }
 
     /// @notice Pause an asset from being borrowed
     /// @param _asset Asset address
     /// @param _pause True if pausing or false if unpausing
     function pauseAsset(address _asset, bool _pause) external checkAccess(this.pauseAsset.selector) {
-        LenderStorage storage $ = _getLenderStorage();
-        ReserveLogic.pauseAsset($.reservesData, _asset, _pause);
+        ReserveLogic.pauseAsset(LenderStorage.get(), _asset, _pause);
     }
 
     function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }
