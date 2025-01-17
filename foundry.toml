@@ -7,7 +7,6 @@ script = "scripts"
 solc_version = "0.8.28"
 remappings = [
     "@openzeppelin/=node_modules/@openzeppelin/",
-    "@symbioticfi/=node_modules/@symbioticfi/",
     "forge-std/=lib/forge-std/src/",
     '@layerzerolabs/oft-evm/=lib/devtools/packages/oft-evm/',
     '@layerzerolabs/oapp-evm/=lib/devtools/packages/oapp-evm/',
@@ -15,6 +14,9 @@ remappings = [
     '@layerzerolabs/interfaces/=lib/layerzero-v2/packages/layerzero-v2/evm/protocol/contracts/interfaces',
     '@layerzerolabs/lz-evm-messagelib-v2=lib/layerzero-v2/packages/layerzero-v2/evm/messagelib',
     'solidity-bytes-utils/contracts/=lib/solidity-bytes-utils/contracts',
+    '@symbioticfi/burners/=lib/symbioticfi-burners',
+    '@symbioticfi/core/=lib/symbioticfi-core',
+    '@symbioticfi/middleware-sdk/=lib/symbioticfi-middleware-sdk',
 ]
 fs_permissions = [
     { access = "read", path = "./script/config/layerzero-v2-deployments.json" },

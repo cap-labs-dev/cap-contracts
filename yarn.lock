@@ -2,17 +2,12 @@
 # yarn lockfile v1
 
 
-"@openzeppelin/contracts-upgradeable@5.0.2":
-  version "5.0.2"
-  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts-upgradeable/-/contracts-upgradeable-5.0.2.tgz#3e5321a2ecdd0b206064356798c21225b6ec7105"
-  integrity sha512-0MmkHSHiW2NRFiT9/r5Lu4eJq5UJ4/tzlOgYXNAIj/ONkQTVnz22pLxDvp4C4uZ9he7ZFvGn3Driptn1/iU7tQ==
-
 "@openzeppelin/contracts-upgradeable@npm:@openzeppelin/contracts-upgradeable":
   version "5.1.0"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts-upgradeable/-/contracts-upgradeable-5.1.0.tgz#4d37648b7402929c53e2ff6e45749ecff91eb2b6"
   integrity sha512-AIElwP5Ck+cslNE+Hkemf5SxjJoF4wBvvjxc27Rp+9jaPs/CLIaUBMYe1FNzhdiN0cYuwGRmYaRHmmntuiju4Q==
 
-"@openzeppelin/contracts@5.0.2", "@openzeppelin/contracts@^5.0.1":
+"@openzeppelin/contracts@^5.0.1":
   version "5.2.0"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-5.2.0.tgz#bd020694218202b811b0ea3eec07277814c658da"
   integrity sha512-bxjNie5z89W1Ea0NZLZluFh8PrFNn9DH8DQlujEok2yjsOlraUPKID5p1Wk3qdNbf6XkQ1Os2RvfiHrrXLHWKA==
@@ -21,11 +16,3 @@
   version "5.1.0"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-5.1.0.tgz#4e61162f2a2bf414c4e10c45eca98ce5f1aadbd4"
   integrity sha512-p1ULhl7BXzjjbha5aqst+QMLY+4/LCWADXOCsmLHRM77AqiPjnd9vvUN9sosUfhL9JGKpZ0TjEGxgvnizmWGSA==
-
-"@symbioticfi/core@^1.0.0-devnet.8":
-  version "1.0.0-devnet.8"
-  resolved "https://registry.yarnpkg.com/@symbioticfi/core/-/core-1.0.0-devnet.8.tgz#7ecd0790347540f5468b6d434ca077520a581e65"
-  integrity sha512-G5LglJmOHUz+R6toYb4/VJzZuAsZJHws5nGMMXu+fo3HWlJ/zWsHLWry+0qH1IatIG7fD8Wmpr4yKZrKclQDeQ==
-  dependencies:
-    "@openzeppelin/contracts" "5.0.2"
-    "@openzeppelin/contracts-upgradeable" "5.0.2"
