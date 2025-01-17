@@ -289,11 +289,11 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
         {
             vm.startPrank(user_cap_admin);
 
-            assertEq(IERC20(collateral).balanceOf(address(middleware)), 0);
+            address recipient = makeAddr("recipient");
 
-            middleware.slashAgent(user_agent, address(collateral), 10e18);
+            middleware.slashAgent(user_agent, address(collateral), 10e18, recipient);
 
-            assertEq(IERC20(collateral).balanceOf(address(middleware)), 10e18);
+            assertEq(IERC20(collateral).balanceOf(recipient), 10e18);
 
             vm.stopPrank();
         }

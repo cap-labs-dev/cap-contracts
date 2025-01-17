@@ -30,20 +30,19 @@ contract CapSymbioticNetworkMiddleware is Initializable {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
+    event VaultRegistered(address vault, address collateral);
     event InstantSlash(address vault, bytes32 subnetwork, uint256 amount);
 
     error VaultAlreadyRegistred();
-    error InvalidDuration();
     error InvalidSlasher();
-    error InvalidBurner();
     error InvalidDelegator();
     error NotVault();
     error NoSlasher();
     error NoBurner();
     error VaultNotInitialized();
-    error TooBigSlashAmount();
-    error DidNotReceiveCollateralImmediatly();
-    error InvalidEpochDuration();
+    error TooBigSlashAmount(uint256 restToSlash);
+    error DidNotReceiveCollateralImmediatly(address vault, address agent);
+    error InvalidEpochDuration(uint48 required, uint48 actual);
 
     enum SlasherType {
         INSTANT,
@@ -87,7 +86,7 @@ contract CapSymbioticNetworkMiddleware is Initializable {
         if (vaultsByCollateral[collateral].contains(vault)) revert VaultAlreadyRegistred();
 
         uint48 vaultEpoch = IVault(vault).epochDuration();
-        if (vaultEpoch != requiredEpochDuration) revert InvalidEpochDuration();
+        if (vaultEpoch != requiredEpochDuration) revert InvalidEpochDuration(requiredEpochDuration, vaultEpoch);
 
         address slasher = IVault(vault).slasher();
         uint64 slasherType = IEntity(slasher).TYPE();
@@ -105,9 +104,10 @@ contract CapSymbioticNetworkMiddleware is Initializable {
     function registerVault(address vault) external {
         _verifyVault(vault);
         vaultsByCollateral[IVault(vault).collateral()].add(vault);
+        emit VaultRegistered(vault, IVault(vault).collateral());
     }
 
-    function slashAgent(address _agent, address _collateral, uint256 _amount) external {
+    function slashAgent(address _agent, address _collateral, uint256 _amount, address _recipient) external {
         uint48 _timestamp = Time.timestamp() - 1;
         address[] memory _vaults = vaultsByCollateral[_collateral].values();
 
@@ -130,14 +130,16 @@ contract CapSymbioticNetworkMiddleware is Initializable {
 
             uint256 balanceAfter = IERC20(_collateral).balanceOf(address(this));
             if (balanceAfter - balanceBefore != _amount) {
-                revert DidNotReceiveCollateralImmediatly();
+                revert DidNotReceiveCollateralImmediatly(address(vault), _agent);
             }
 
             restToSlash -= toSlash;
         }
 
         if (restToSlash > 0) {
-            revert TooBigSlashAmount();
+            revert TooBigSlashAmount(restToSlash);
         }
+
+        IERC20(_collateral).safeTransfer(_recipient, _amount);
     }
 }
