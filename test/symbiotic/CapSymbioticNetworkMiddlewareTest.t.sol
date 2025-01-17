@@ -262,7 +262,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils {
         }
 
         {
-            vm.startPrank(user_restaker);
+            vm.startPrank(user_cap_admin);
 
             // actually delegate to the agent
             networkRestakeDelegator.setOperatorNetworkShares(
