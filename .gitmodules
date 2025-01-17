@@ -13,3 +13,6 @@
 [submodule "lib/symbioticfi-core"]
 	path = lib/symbioticfi-core
 	url = https://github.com/symbioticfi/core
+[submodule "lib/symbioticfi-middleware-sdk"]
+	path = lib/symbioticfi-middleware-sdk
+	url = https://github.com/symbioticfi/middleware-sdk
