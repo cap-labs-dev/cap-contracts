@@ -22,3 +22,6 @@
 [submodule "lib/symbioticfi-hooks"]
 	path = lib/symbioticfi-hooks
 	url = https://github.com/symbioticfi/hooks
+[submodule "lib/symbioticfi-rewards"]
+	path = lib/symbioticfi-rewards
+	url = https://github.com/symbioticfi/rewards
