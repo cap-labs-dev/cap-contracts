@@ -26,6 +26,10 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         address delegation;
         address oracle;
         mapping(address => address) restakerInterestReceiver;
+        mapping(address => uint256) liquidationStart;
+        uint256 targetHealth;
+        uint256 grace;
+        uint256 expiry;
     }
 
     /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.Lender")) - 1)) & ~bytes32(uint256(0xff))
@@ -46,13 +50,28 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
 
     /// @notice Initialize the lender
     /// @param _accessControl Access control address
-    function initialize(address _accessControl, address _delegation, address _oracle) external initializer {
+    /// @param _delegation Delegation address
+    /// @param _oracle Oracle address
+    /// @param _targetHealth Target health after liquidations
+    /// @param _grace Grace period before an agent becomes liquidatable
+    /// @param _expiry Expiry period after which an agent cannot be liquidated until called again
+    function initialize(
+        address _accessControl,
+        address _delegation,
+        address _oracle,
+        uint256 _targetHealth,
+        uint256 _grace,
+        uint256 _expiry
+    ) external initializer {
         __Access_init(_accessControl);
 
         // TODO: remove this
         LenderStorage storage $ = _getLenderStorage();
         $.delegation = _delegation;
         $.oracle = _oracle;
+        $.targetHealth = _targetHealth;
+        $.grace = _grace;
+        $.expiry = _expiry;
     }
 
     /// @notice Borrow an asset
@@ -69,6 +88,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
                 id: $.reservesData[_asset].id,
                 agent: msg.sender,
                 asset: _asset,
+                decimals: $.reservesData[_asset].decimals,
                 vault: $.reservesData[_asset].vault,
                 principalDebtToken: $.reservesData[_asset].principalDebtToken,
                 restakerDebtToken: $.reservesData[_asset].restakerDebtToken,
@@ -133,6 +153,43 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         );
     }
 
+    /// @notice Initiate liquidation of an agent when the health is below 1
+    /// @param _agent Agent address
+    function initiateLiquidation(address _agent) external {
+        LenderStorage storage $ = _getLenderStorage();
+        LiquidationLogic.initiateLiquidation(
+            $.reservesData,
+            $.reservesList,
+            $.agentConfig[_agent],
+            $.liquidationStart,
+            DataTypes.InitiateLiquidationParams({
+                agent: _agent,
+                delegation: $.delegation,
+                oracle: $.oracle,
+                reserveCount: $.reservesCount,
+                expiry: $.expiry
+            })
+        );
+    }
+
+    /// @notice Cancel liquidation of an agent when the health is above 1
+    /// @param _agent Agent address
+    function cancelLiquidation(address _agent) external {
+        LenderStorage storage $ = _getLenderStorage();
+        LiquidationLogic.cancelLiquidation(
+            $.reservesData,
+            $.reservesList,
+            $.agentConfig[_agent],
+            $.liquidationStart,
+            DataTypes.AgentParams({
+                agent: _agent,
+                delegation: $.delegation,
+                oracle: $.oracle,
+                reserveCount: $.reservesCount
+            })
+        );
+    }
+
     /// @notice Liquidate an agent when the health is below 1
     /// @param _agent Agent address
     /// @param _asset Asset to repay
@@ -152,15 +209,20 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
                 principalDebtToken: $.reservesData[_asset].principalDebtToken,
                 restakerDebtToken: $.reservesData[_asset].restakerDebtToken,
                 interestDebtToken: $.reservesData[_asset].interestDebtToken,
-                bonus: $.reservesData[_asset].bonus,
                 amount: _amount,
+                decimals: $.reservesData[_asset].decimals,
                 caller: msg.sender,
                 realizedInterest: $.reservesData[_asset].realizedInterest,
                 delegation: $.delegation,
                 oracle: $.oracle,
                 reserveCount: $.reservesCount,
                 restakerInterestReceiver: $.restakerInterestReceiver[_agent],
-                interestReceiver: $.reservesData[_asset].interestReceiver
+                interestReceiver: $.reservesData[_asset].interestReceiver,
+                bonusCap: $.reservesData[_asset].bonusCap,
+                targetHealth: $.targetHealth,
+                start: $.liquidationStart[_agent],
+                grace: $.grace,
+                expiry: $.expiry
             })
         );
     }
@@ -198,7 +260,8 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @param _restakerDebtToken Restaker debt address
     /// @param _interestDebtToken Interest debt address
     /// @param _interestReceiver Interest receiver
-    /// @param _liquidationBonus Bonus percentage for liquidating a market to cover holding risk
+    /// @param _decimals Decimals of the asset
+    /// @param _bonusCap Max bonus percentage for liquidating a market to cover holding risk
     function addAsset(
         address _asset,
         address _vault,
@@ -206,7 +269,8 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         address _restakerDebtToken,
         address _interestDebtToken,
         address _interestReceiver,
-        uint256 _liquidationBonus
+        uint8 _decimals,
+        uint256 _bonusCap
     ) external checkAccess(this.addAsset.selector) {
         LenderStorage storage $ = _getLenderStorage();
         if (
@@ -220,7 +284,8 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
                     restakerDebtToken: _restakerDebtToken,
                     interestDebtToken: _interestDebtToken,
                     interestReceiver: _interestReceiver,
-                    bonus: _liquidationBonus,
+                    decimals: _decimals,
+                    bonusCap: _bonusCap,
                     reserveCount: $.reservesCount
                 })
             )

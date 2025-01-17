@@ -50,7 +50,8 @@ library ReserveLogic {
             restakerDebtToken: params.restakerDebtToken,
             interestDebtToken: params.interestDebtToken,
             interestReceiver: params.interestReceiver,
-            bonus: params.bonus,
+            decimals: params.decimals,
+            bonusCap: params.bonusCap,
             paused: false,
             realizedInterest: 0
         });

@@ -57,6 +57,7 @@ library BorrowLogic {
             DataTypes.ValidateBorrowParams({
                 agent: params.agent,
                 asset: params.asset,
+                decimals: params.decimals,
                 amount: params.amount,
                 delegation: params.delegation,
                 oracle: params.oracle,
