@@ -72,7 +72,6 @@ contract SafeOFTLzComposerTest is Test {
     function test_lzCompose_FailAndRefund() public {
         uint256 amountLd = 100e18;
         oft.mint(address(composer), amountLd);
-        uint256 initialBalance = oft.balanceOf(user);
         uint256 initialComposerBalance = oft.balanceOf(address(composer));
         uint256 initialUserBalance = user.balance;
 

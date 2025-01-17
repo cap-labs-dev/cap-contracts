@@ -10,8 +10,8 @@
     "node": "^20.18.0"
   },
   "scripts": {
-    "compile": "forge build",
     "postinstall": "forge remappings > remappings.txt",
+    "compile": "forge build",
     "test": "forge test",
     "test:slither": "FOUNDRY_PROFILE=slither slither .",
     "gas:snapshot": "FOUNDRY_PROFILE=release forge snapshot --isolate",
@@ -22,12 +22,13 @@
   },
   "devDependencies": {
     "@openzeppelin/contracts": "npm:@openzeppelin/contracts",
-    "@openzeppelin/contracts-upgradeable": "npm:@openzeppelin/contracts-upgradeable"
-  },
-  "dependencies": {
-    "@symbioticfi/core": "^1.0.0-devnet.8"
+    "@openzeppelin/contracts-upgradeable": "npm:@openzeppelin/contracts-upgradeable",
+    "@symbioticfi/burners": "^1.0.0-devnet.2",
+    "@symbioticfi/core": "^1.0.0-devnet.10",
+    "@symbioticfi/hooks": "^1.0.0-devnet.1",
+    "@symbioticfi/rewards": "^1.0.0-devnet.6"
   },
   "resolutions": {
-    "@openzeppelin/contracts": "^5.0.1"
+    "@openzeppelin/contracts": "^5.2.0"
   }
 }

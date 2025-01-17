@@ -1,131 +1,145 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {INetworkRegistry} from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
-import {INetworkMiddlewareService} from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
-import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Network } from "../Network.sol";
+import { IStakerRewards } from "./interfaces/IStakerRewards.sol";
+import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import { Time } from "@openzeppelin/contracts/utils/types/Time.sol";
 
-import {ISlasher} from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
-import {IEntity} from "@symbioticfi/core/src/interfaces/common/IEntity.sol";
-import {IBaseDelegator} from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
-import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
-import {IRegistry} from "@symbioticfi/core/src/interfaces/common/IRegistry.sol";
-import {Subnetwork} from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {Network} from "../Network.sol";
-import {IStakerRewards} from "./interfaces/IStakerRewards.sol";
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
+import { Subnetwork } from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
+import { INetworkRegistry } from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
+import { IEntity } from "@symbioticfi/core/src/interfaces/common/IEntity.sol";
+import { IRegistry } from "@symbioticfi/core/src/interfaces/common/IRegistry.sol";
+import { IBaseDelegator } from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
+import { INetworkMiddlewareService } from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
+import { ISlasher } from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
+import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 
 /// @title Cap Symbiotic Network Middleware Contract
 /// @author Cap Labs
 /// @notice This contract manages the symbiotic collateral and slashing.
-contract CapSymbioticNetworkMiddleware is Network {
-    using SafeERC20 for IERC20;
-    using Subnetwork for address;
+contract CapSymbioticNetworkMiddleware is Initializable {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using Subnetwork for address;
+    using Math for uint256;
+    using SafeERC20 for IERC20;
 
-    address private network; 
-
-    address public vaultRegistry;
-    uint48 public requiredEpochDuration;
-
-    uint48 private constant INSTANT_SLASHER_TYPE = 0;
-
-    EnumerableSet.AddressSet private vaults;
+    event VaultRegistered(address vault, address collateral);
+    event InstantSlash(address vault, bytes32 subnetwork, uint256 amount);
 
     error VaultAlreadyRegistred();
-    error NotVault();
-    error InvalidDuration();
     error InvalidSlasher();
-    error InvalidBurner();
-    error TooBigSlashAmount();
+    error InvalidDelegator();
+    error NotVault();
+    error NoSlasher();
+    error NoBurner();
+    error VaultNotInitialized();
+    error TooBigSlashAmount(uint256 restToSlash);
+    error DidNotReceiveCollateralImmediatly(address vault, address agent);
+    error InvalidEpochDuration(uint48 required, uint48 actual);
 
-    function initialize(
-        address _vaultRegistry,
-        address _networkRegistry, 
-        uint48 _requiredEpochDuration,
-        address _collateral
-    ) external initializer {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(PAUSER_ROLE, msg.sender);
+    enum SlasherType {
+        INSTANT,
+        VETO
+    }
 
-        INetworkRegistry(_networkRegistry).registerNetwork();
+    enum DelegatorType {
+        NETWORK_RESTAKE,
+        FULL_RESTAKE,
+        OPERATOR_SPECIFIC,
+        OPERATOR_NETWORK_SPECIFIC
+    }
 
-        requiredEpochDuration = _requiredEpochDuration;
+    address public vaultRegistry;
+    address public network;
+    mapping(address => EnumerableSet.AddressSet) private vaultsByCollateral;
+    uint48 public requiredEpochDuration;
+
+    function initialize(address _network, address _vaultRegistry, uint48 _requiredEpochDuration) external initializer {
+        network = _network;
         vaultRegistry = _vaultRegistry;
+        requiredEpochDuration = _requiredEpochDuration;
+    }
 
-        network = address(this);
-
-        collateral = _collateral;
+    function subnetworkIdentifier() public pure returns (uint96) {
+        return 0;
     }
 
     function subnetwork() public view returns (bytes32) {
-        return network.subnetwork(0);
+        return network.subnetwork(subnetworkIdentifier());
     }
 
-    function registerVault(address vault, address rewards) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (vaults.contains(vault)) {
-            revert VaultAlreadyRegistred();
-        }
-
+    function _verifyVault(address vault) internal view {
         if (!IRegistry(vaultRegistry).isEntity(vault)) {
             revert NotVault();
         }
 
-        if (IVault(vault).burner() != address(this)) revert InvalidBurner();
+        address collateral = IVault(vault).collateral();
+
+        if (!IVault(vault).isInitialized()) revert VaultNotInitialized();
+        if (vaultsByCollateral[collateral].contains(vault)) revert VaultAlreadyRegistred();
 
         uint48 vaultEpoch = IVault(vault).epochDuration();
-
-        if (vaultEpoch < requiredEpochDuration) revert InvalidDuration();
+        if (vaultEpoch != requiredEpochDuration) revert InvalidEpochDuration(requiredEpochDuration, vaultEpoch);
 
         address slasher = IVault(vault).slasher();
-        if (slasher == address(0) || IEntity(slasher).TYPE() != INSTANT_SLASHER_TYPE) revert InvalidSlasher();
+        uint64 slasherType = IEntity(slasher).TYPE();
+        if (slasher == address(0)) revert NoSlasher();
+        if (slasherType != uint64(SlasherType.INSTANT)) revert InvalidSlasher();
 
-        vaults.add(vault);
+        address burner = IVault(vault).burner();
+        if (burner == address(0)) revert NoBurner();
 
-        _registerProvider(vault, IVault(vault).collateral(), rewards);
+        address delegator = IVault(vault).delegator();
+        uint64 delegatorType = IEntity(delegator).TYPE();
+        if (delegatorType != uint64(DelegatorType.NETWORK_RESTAKE)) revert InvalidDelegator();
     }
 
-    function unregisterVault(address vault) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        vaults.remove(vault);
+    function registerVault(address vault) external {
+        _verifyVault(vault);
+        vaultsByCollateral[IVault(vault).collateral()].add(vault);
+        emit VaultRegistered(vault, IVault(vault).collateral());
     }
 
-    function collateralByProvider(address _operator, address _provider) external virtual override view returns (uint256) {
-        return IBaseDelegator(IVault(_provider).delegator()).stake(subnetwork(), _operator);
-    }
+    function slashAgent(address _agent, address _collateral, uint256 _amount, address _recipient) external {
+        uint48 _timestamp = Time.timestamp() - 1;
+        address[] memory _vaults = vaultsByCollateral[_collateral].values();
 
-    function slash(address _provider, address _operator, address _liquidator, uint256 _amount)
-        external virtual override
-        onlyRole(COLLATERAL_ROLE)
-    {
+        uint256 restToSlash = _amount;
 
-        bytes32 _subnetwork = subnetwork();
-        
-        uint256 totalOperatorStake = IBaseDelegator(IVault(_provider).delegator()).stake(_subnetwork, _operator);
+        for (uint256 i = 0; i < _vaults.length; i++) {
+            IVault vault = IVault(_vaults[i]);
 
-        if (totalOperatorStake < _amount) {
-            revert TooBigSlashAmount();
+            uint256 toSlash = IBaseDelegator(vault.delegator()).stakeAt(subnetwork(), _agent, _timestamp, "");
+            toSlash = restToSlash > toSlash ? toSlash : restToSlash;
+            if (toSlash == 0) {
+                continue;
+            }
+
+            uint256 balanceBefore = IERC20(_collateral).balanceOf(address(this));
+
+            ISlasher(vault.slasher()).slash(subnetwork(), _agent, _amount, _timestamp, new bytes(0));
+            // TODO: the burner could be a non routing burner, could add hooks?
+            IBurnerRouter(vault.burner()).triggerTransfer(address(this));
+
+            uint256 balanceAfter = IERC20(_collateral).balanceOf(address(this));
+            if (balanceAfter - balanceBefore != _amount) {
+                revert DidNotReceiveCollateralImmediatly(address(vault), _agent);
+            }
+
+            restToSlash -= toSlash;
         }
 
-        _slashVault(_provider, _operator, _liquidator, _amount);
-    }
+        if (restToSlash > 0) {
+            revert TooBigSlashAmount(restToSlash);
+        }
 
-    function _slashVault(address vault, address operator, address liquidator, uint256 amount)
-        private
-    {
-        address slasher = IVault(vault).slasher();
-        ISlasher(slasher).slash(subnetwork(), operator, amount, Time.timestamp(), new bytes(0));
-
-        IERC20(IVault(vault).collateral()).safeTransferFrom(address(this), liquidator, amount);
-    }
-
-    function rewardStakers(
-        address stakerRewards,
-        address token,
-        uint256 amount
-    ) external onlyRole(COLLATERAL_ROLE) {
-        IERC20(token).forceApprove(stakerRewards, amount);
-        IStakerRewards(stakerRewards).distributeRewards(address(this), token, amount, bytes(""));
+        IERC20(_collateral).safeTransfer(_recipient, _amount);
     }
 }
