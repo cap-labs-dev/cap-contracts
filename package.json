@@ -12,7 +12,8 @@
   "scripts": {
     "postinstall": "forge remappings > remappings.txt",
     "compile": "forge build",
-    "test": "forge test",
+    "build": "forge build --skip Test",
+    "test": "forge test --via-ir",
     "test:slither": "FOUNDRY_PROFILE=slither slither .",
     "gas:snapshot": "FOUNDRY_PROFILE=release forge snapshot --isolate",
     "gas:diff": "FOUNDRY_PROFILE=release forge snapshot --diff --isolate",

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IPrincipalDebtToken} from "../../interfaces/IPrincipalDebtToken.sol";
-import {IDebtToken} from "../../interfaces/IDebtToken.sol";
+import { IDebtToken } from "../../interfaces/IDebtToken.sol";
+import { IPrincipalDebtToken } from "../../interfaces/IPrincipalDebtToken.sol";
 
-import {Errors} from "./helpers/Errors.sol";
-import {ValidationLogic} from "./ValidationLogic.sol";
-import {DataTypes} from "./types/DataTypes.sol";
+import { ValidationLogic } from "./ValidationLogic.sol";
+import { Errors } from "./helpers/Errors.sol";
+import { DataTypes } from "./types/DataTypes.sol";
 
 /// @title Reserve Logic
 /// @author kexley, @capLabs
@@ -16,10 +16,10 @@ library ReserveLogic {
     /// @param $ Lender storage
     /// @param params Parameters for adding an asset
     /// @return filled True if filling in empty space or false if appended
-    function addAsset(
-        DataTypes.LenderStorage storage $,
-        DataTypes.AddAssetParams memory params
-    ) external returns (bool filled) {
+    function addAsset(DataTypes.LenderStorage storage $, DataTypes.AddAssetParams memory params)
+        external
+        returns (bool filled)
+    {
         ValidationLogic.validateAddAsset($, params.asset, params.vault);
 
         uint256 id;
@@ -67,9 +67,7 @@ library ReserveLogic {
     /// @param $ Lender storage
     /// @param _asset Asset address
     /// @param _pause True if pausing or false if unpausing
-    function pauseAsset(DataTypes.LenderStorage storage $, address _asset, bool _pause)
-        external
-    {
+    function pauseAsset(DataTypes.LenderStorage storage $, address _asset, bool _pause) external {
         ValidationLogic.validatePauseAsset($, _asset);
         $.reservesData[_asset].paused = _pause;
     }
