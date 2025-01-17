@@ -19,6 +19,7 @@
     "layerzero-v2/=lib/layerzero-v2/",
     "@symbioticfi/burners/=lib/symbioticfi-burners",
     "@symbioticfi/core/=lib/symbioticfi-core",
-    "@symbioticfi/middleware-sdk/=lib/symbioticfi-middleware-sdk"
+    "@symbioticfi/middleware-sdk/=lib/symbioticfi-middleware-sdk",
+    "@symbioticfi/hooks/=lib/symbioticfi-hooks"
   ]
 }

@@ -4,19 +4,25 @@ pragma solidity ^0.8.28;
 import { LzUtils } from "../util/LzUtils.sol";
 
 import { CapSymbioticNetworkMiddleware } from "../../contracts/collateral/symbiotic/CapSymbioticNetworkMiddleware.sol";
+import { OperatorSpecificDecreaseHook } from "../../contracts/collateral/symbiotic/OperatorSpecificDecreaseHook.sol";
+
 import { SymbioticUtils } from "../util/SymbioticUtils.sol";
 import { WalletUtils } from "../util/WalletUtils.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 import { IBurnerRouterFactory } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouterFactory.sol";
-
 import { IVaultConfigurator } from "@symbioticfi/core/src/interfaces/IVaultConfigurator.sol";
+
+import { IDefaultStakerRewards } from
+    "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewards.sol";
+import { IDefaultStakerRewardsFactory } from
+    "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewardsFactory.sol";
 
 import { IBaseDelegator } from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
 import { INetworkRestakeDelegator } from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
 import { INetworkMiddlewareService } from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
 import { IBaseSlasher } from "@symbioticfi/core/src/interfaces/slasher/IBaseSlasher.sol";
-import { IVetoSlasher } from "@symbioticfi/core/src/interfaces/slasher/IVetoSlasher.sol";
+import { ISlasher } from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
 import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 
 import { Script } from "forge-std/Script.sol";
@@ -26,6 +32,8 @@ import { console } from "forge-std/console.sol";
  * Deploy the lockboxes for the cap token and staked cap token
  */
 contract DeployMiddleware is Script, WalletUtils, SymbioticUtils {
+    address public constant CAP_NETWORK_ADDRESS = 0x58D347334A5E6bDE7279696abE59a11873294FA4;
+
     SymbioticConfig public symbioticConfig;
     CapSymbioticNetworkMiddleware public middlewareImplementation;
 
@@ -48,23 +56,43 @@ contract DeployMiddleware is Script, WalletUtils, SymbioticUtils {
 
         vm.startBroadcast();
 
+        middlewareImplementation = new CapSymbioticNetworkMiddleware();
+        middleware = CapSymbioticNetworkMiddleware(_proxy(address(middlewareImplementation)));
+
         // setup vault
         {
+            // burner router setup
+            // https://docs.symbiotic.fi/guides/vault-deployment/#1-burner-router
+            // https://docs.symbiotic.fi/guides/vault-deployment#network-specific-burners
+            IBurnerRouter.NetworkReceiver[] memory networkReceivers = new IBurnerRouter.NetworkReceiver[](1);
+            networkReceivers[0] =
+                IBurnerRouter.NetworkReceiver({ network: CAP_NETWORK_ADDRESS, receiver: address(middleware) });
             burnerRouter = IBurnerRouterFactory(symbioticConfig.burnerRouterFactory).create(
                 IBurnerRouter.InitParams({
                     owner: admin, // address of the router’s owner
                     collateral: collateral, // address of the collateral - wstETH (MUST be the same as for the Vault to connect)
                     delay: burnerRouterDelay, // duration of the receivers’ update delay (= 21 days)
                     globalReceiver: 0x58D347334A5E6bDE7279696abE59a11873294FA4, // address of the pure burner corresponding to the collateral - wstETH_Burner (some collaterals are covered by us; see Deployments page)
-                    networkReceivers: new IBurnerRouter.NetworkReceiver[](0), // array with IBurnerRouter.NetworkReceiver elements meaning network-specific receivers
+                    networkReceivers: networkReceivers, // array with IBurnerRouter.NetworkReceiver elements meaning network-specific receivers
                     operatorNetworkReceivers: new IBurnerRouter.OperatorNetworkReceiver[](0) // array with IBurnerRouter.OperatorNetworkReceiver elements meaning network-specific receivers
                  })
             );
 
-            address[] memory networkLimitSetRoleHolders = new address[](1);
+            // hook setup
+            // https://docs.symbiotic.fi/guides/vault-deployment/#hook
+            // https://docs.symbiotic.fi/modules/extensions/hooks/
+            address hook = address(new OperatorSpecificDecreaseHook());
+
+            // vault setup
+            // https://docs.symbiotic.fi/guides/vault-deployment/#vault
+            address[] memory networkLimitSetRoleHolders = new address[](2);
             networkLimitSetRoleHolders[0] = admin;
-            address[] memory operatorNetworkSharesSetRoleHolders = new address[](1);
+            networkLimitSetRoleHolders[1] = hook;
+
+            address[] memory operatorNetworkSharesSetRoleHolders = new address[](2);
             operatorNetworkSharesSetRoleHolders[0] = admin;
+            operatorNetworkSharesSetRoleHolders[1] = hook;
+
             (address vault, address networkRestakeDelegator, address vetoSlasher) = IVaultConfigurator(
                 symbioticConfig.vaultConfigurator
             ).create(
@@ -91,7 +119,7 @@ contract DeployMiddleware is Script, WalletUtils, SymbioticUtils {
                         INetworkRestakeDelegator.InitParams({
                             baseParams: IBaseDelegator.BaseParams({
                                 defaultAdminRoleHolder: admin, // address of the Delegator’s admin (can manage all roles)
-                                hook: 0x0000000000000000000000000000000000000000, // address of the hook (if not zero, receives onSlash() call on each slashing)
+                                hook: hook, // address of the hook (if not zero, receives onSlash() call on each slashing)
                                 hookSetRoleHolder: admin // address of the hook setter
                              }),
                             networkLimitSetRoleHolders: networkLimitSetRoleHolders, // array of addresses of the network limit setters
@@ -99,25 +127,31 @@ contract DeployMiddleware is Script, WalletUtils, SymbioticUtils {
                          })
                     ),
                     withSlasher: true, // if enable Slasher module
-                    slasherIndex: 1, // Slasher’s type (= VetoSlasher)
+                    slasherIndex: 0, // Slasher’s type (0 = ImmediateSlasher, 1 = VetoSlasher)
                     slasherParams: abi.encode(
-                        IVetoSlasher.InitParams({
+                        ISlasher.InitParams({
                             baseParams: IBaseSlasher.BaseParams({
                                 isBurnerHook: true // if enable the `burner` to receive onSlash() call after each slashing (is needed for the burner router workflow)
-                             }),
-                            vetoDuration: 86400, // veto duration (= 1 day)
-                            resolverSetEpochsDelay: 3 // number of Vault epochs needed for the resolver to be changed
-                         })
+                             })
+                        })
                     )
                 })
+            );
+
+            address defaultStakerRewards = IDefaultStakerRewardsFactory(symbioticConfig.defaultStakerRewardsFactory)
+                .create(
+                IDefaultStakerRewards.InitParams({
+                    vault: vault, // address of the deployed Vault
+                    adminFee: 1000, // admin fee percent to get from all the rewards distributions (10% = 1_000 | 100% = 10_000)
+                    defaultAdminRoleHolder: admin, // address of the main admin (can manage all roles)
+                    adminFeeClaimRoleHolder: admin, // address of the admin fee claimer
+                    adminFeeSetRoleHolder: admin // address of the admin fee setter
+                 })
             );
         }
 
         // setup network
         {
-            middlewareImplementation = new CapSymbioticNetworkMiddleware();
-
-            middleware = CapSymbioticNetworkMiddleware(_proxy(address(middlewareImplementation)));
             middleware.initialize(symbioticConfig.vaultRegistry, symbioticConfig.networkRegistry, 1 hours, collateral);
 
             INetworkMiddlewareService(symbioticConfig.networkMiddlewareService).setMiddleware(address(middleware));
