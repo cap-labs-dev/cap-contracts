@@ -146,43 +146,11 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
             = ViewLogic.agent(LenderStorage.get(), _agent);
     }
 
-    /// @notice Add asset to the possible lending
-    /// @param _asset Asset address
-    /// @param _vault Vault address
-    /// @param _principalDebtToken Principal debt address
-    /// @param _restakerDebtToken Restaker debt address
-    /// @param _interestDebtToken Interest debt address
-    /// @param _interestReceiver Interest receiver
-    /// @param _decimals Decimals of the asset
-    /// @param _bonusCap Max bonus percentage for liquidating a market to cover holding risk
-    function addAsset(
-        address _asset,
-        address _vault,
-        address _principalDebtToken,
-        address _restakerDebtToken,
-        address _interestDebtToken,
-        address _interestReceiver,
-        uint8 _decimals,
-        uint256 _bonusCap
-    ) external checkAccess(this.addAsset.selector) {
+    /// @notice Add an asset to the Lender
+    /// @param _params Parameters to add an asset
+    function addAsset(DataTypes.AddAssetParams calldata _params) external checkAccess(this.addAsset.selector) {
         DataTypes.LenderStorage storage $ = LenderStorage.get();
-        if (
-            ReserveLogic.addAsset(
-                $,
-                DataTypes.AddAssetParams({
-                    asset: _asset,
-                    vault: _vault,
-                    principalDebtToken: _principalDebtToken,
-                    restakerDebtToken: _restakerDebtToken,
-                    interestDebtToken: _interestDebtToken,
-                    interestReceiver: _interestReceiver,
-                    decimals: _decimals,
-                    bonusCap: _bonusCap
-                })
-            )
-        ) {
-            ++$.reservesCount;
-        }
+        if (ReserveLogic.addAsset($, _params)) ++$.reservesCount;
     }
 
     /// @notice Remove asset from lending when there is no borrows

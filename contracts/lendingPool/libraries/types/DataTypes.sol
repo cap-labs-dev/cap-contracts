@@ -53,13 +53,6 @@ library DataTypes {
         uint256 amount;
     }
 
-    struct AgentParams {
-        address agent;
-        address delegation;
-        address oracle;
-        uint16 reserveCount;
-    }
-
     struct AddAssetParams {
         address asset;
         address vault;
