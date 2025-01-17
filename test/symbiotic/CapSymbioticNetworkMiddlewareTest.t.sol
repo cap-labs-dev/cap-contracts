@@ -6,7 +6,6 @@ import { Test } from "forge-std/Test.sol";
 
 import { SymbioticUtils } from "../../script/util/SymbioticUtils.sol";
 import { MockERC20 } from "../../test/mocks/MockERC20.sol";
-import { NetworkRestakeDecreaseHook } from "./NetworkRestakeDecreaseHook.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
@@ -95,20 +94,13 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
                 )
             );
 
-            // hook setup
-            // https://docs.symbiotic.fi/guides/vault-deployment/#hook
-            // https://docs.symbiotic.fi/modules/extensions/hooks/
-            hook = new NetworkRestakeDecreaseHook();
-
             // vault setup
             // https://docs.symbiotic.fi/guides/vault-deployment/#vault
-            address[] memory networkLimitSetRoleHolders = new address[](2);
+            address[] memory networkLimitSetRoleHolders = new address[](1);
             networkLimitSetRoleHolders[0] = user_vault_admin;
-            networkLimitSetRoleHolders[1] = address(hook);
 
-            address[] memory operatorNetworkSharesSetRoleHolders = new address[](2);
+            address[] memory operatorNetworkSharesSetRoleHolders = new address[](1);
             operatorNetworkSharesSetRoleHolders[0] = user_vault_admin;
-            operatorNetworkSharesSetRoleHolders[1] = address(hook);
 
             (address _vault, address _networkRestakeDelegator, address _immediateSlasher) = IVaultConfigurator(
                 symbioticConfig.vaultConfigurator
@@ -136,7 +128,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
                         INetworkRestakeDelegator.InitParams({
                             baseParams: IBaseDelegator.BaseParams({
                                 defaultAdminRoleHolder: user_vault_admin, // address of the Delegator’s admin (can manage all roles)
-                                hook: address(hook), // address of the hook (if not zero, receives onSlash() call on each slashing)
+                                hook: 0x0000000000000000000000000000000000000000, // address of the hook (if not zero, receives onSlash() call on each slashing)
                                 hookSetRoleHolder: user_vault_admin // address of the hook setter
                              }),
                             networkLimitSetRoleHolders: networkLimitSetRoleHolders, // array of addresses of the network limit setters
@@ -187,8 +179,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
                 symbioticConfig.vaultRegistry,
                 symbioticConfig.operatorRegistry,
                 symbioticConfig.networkOptInService,
-                user_cap_admin,
-                1 hours
+                user_cap_admin
             );
 
             INetworkRegistry(symbioticConfig.networkRegistry).registerNetwork();
@@ -251,7 +242,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
         {
             vm.startPrank(cap_network_address);
             INetworkRestakeDelegator(networkRestakeDelegator).setMaxNetworkLimit(
-                middleware.getSubnetworkIdentifier(user_agent), type(uint256).max
+                middleware.subnetworkIdentifier(), type(uint256).max
             );
             vm.stopPrank();
         }
@@ -268,7 +259,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             vm.startPrank(user_vault_admin);
 
             INetworkRestakeDelegator(networkRestakeDelegator).setNetworkLimit(
-                middleware.getSubnetwork(user_agent), type(uint256).max
+                middleware.subnetwork(), type(uint256).max
             );
 
             vm.stopPrank();
@@ -280,9 +271,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             vm.startPrank(user_vault_admin);
 
             // actually delegate to the agent
-            networkRestakeDelegator.setOperatorNetworkShares(
-                middleware.getSubnetwork(user_agent), user_agent, type(uint256).max
-            );
+            networkRestakeDelegator.setOperatorNetworkShares(middleware.subnetwork(), user_agent, type(uint256).max);
 
             vm.stopPrank();
         }

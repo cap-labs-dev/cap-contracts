@@ -52,17 +52,12 @@ contract CapSymbioticNetworkMiddleware is
     error TooBigSlashAmount();
     error DidNotReceiveCollateralImmediatly();
 
-    // TODO: use eip712
-    uint48 public requiredEpochDuration;
-    address public requiredBurner;
-
     function initialize(
         address _network,
         address _vaultRegistry,
         address _operatorRegistry,
         address _operatorNetworkOptinService,
-        address _owner,
-        uint48 _requiredEpochDuration
+        address _owner
     ) external initializer {
         uint48 _slashingWindow = 1;
         address _reader = address(0);
@@ -70,28 +65,20 @@ contract CapSymbioticNetworkMiddleware is
             _network, _slashingWindow, _vaultRegistry, _operatorRegistry, _operatorNetworkOptinService, _reader
         );
         __OwnableAccessManager_init(_owner);
-
-        requiredEpochDuration = _requiredEpochDuration;
     }
 
-    function getSubnetworkIdentifier(address /*agent?*/ ) public pure returns (uint96) {
+    function subnetworkIdentifier() public pure returns (uint96) {
         return 0;
     }
 
-    function getSubnetwork(address agent) public view returns (bytes32) {
-        address _network = _NETWORK();
-        uint96 _subnetworkIdentifier = getSubnetworkIdentifier(agent);
-        bytes32 _subnetwork = _network.subnetwork(_subnetworkIdentifier);
-        return _subnetwork;
+    function subnetwork() public view returns (bytes32) {
+        return _NETWORK().subnetwork(subnetworkIdentifier());
     }
 
     function _verifyVault(address vault) internal view {
         if (!IRegistry(_VAULT_REGISTRY()).isEntity(vault)) {
             revert NotVault();
         }
-
-        uint48 vaultEpoch = IVault(vault).epochDuration();
-        if (vaultEpoch < requiredEpochDuration) revert InvalidDuration();
 
         address slasher = IVault(vault).slasher();
         if (slasher == address(0) || IEntity(slasher).TYPE() != uint64(SlasherType.INSTANT)) revert InvalidSlasher();
@@ -103,36 +90,35 @@ contract CapSymbioticNetworkMiddleware is
     }
 
     function slashAgent(address _agent, address _collateral, uint256 _amount) external {
-        bytes32 _subnetwork = getSubnetwork(_agent);
         uint48 _timestamp = getCaptureTimestamp();
         address[] memory _vaults = _activeVaultsAt(_timestamp);
 
         uint256 restToSlash = _amount;
-        uint256 collateralBalanceBefore = IERC20(_collateral).balanceOf(address(this));
+        uint256 balanceBefore = IERC20(_collateral).balanceOf(address(this));
 
         for (uint256 i = 0; i < _vaults.length; i++) {
             if (IVault(_vaults[i]).collateral() != _collateral) {
                 continue;
             }
 
-            uint256 vaultStake = _getOperatorPowerAt(_timestamp, _agent, _vaults[i], getSubnetworkIdentifier(_agent));
+            uint256 vaultStake = _getOperatorPowerAt(_timestamp, _agent, _vaults[i], subnetworkIdentifier());
             uint256 slashFromVault = restToSlash > vaultStake ? vaultStake : restToSlash;
             if (slashFromVault == 0) {
                 continue;
             }
-            _slashVault(_timestamp, _vaults[i], _subnetwork, _agent, slashFromVault, new bytes(0));
+            _slashVault(_timestamp, _vaults[i], subnetwork(), _agent, slashFromVault, new bytes(0));
             restToSlash -= slashFromVault;
 
-            // TODO: the burner could be a non routing burner, could add hooks
+            // TODO: the burner could be a non routing burner, could add hooks?
             address burner = IVault(_vaults[i]).burner();
             IBurnerRouter(burner).triggerTransfer(address(this));
 
             // expect the amount to be sent to the middleware
-            uint256 collateralBalanceAfter = IERC20(_collateral).balanceOf(address(this));
-            if (collateralBalanceAfter - collateralBalanceBefore != slashFromVault) {
+            uint256 balanceAfter = IERC20(_collateral).balanceOf(address(this));
+            if (balanceAfter - balanceBefore != slashFromVault) {
                 revert DidNotReceiveCollateralImmediatly();
             }
-            collateralBalanceBefore = collateralBalanceAfter;
+            balanceBefore = balanceAfter;
         }
 
         if (restToSlash > 0) {
