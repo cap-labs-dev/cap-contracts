@@ -10,6 +10,7 @@ import { Time } from "@openzeppelin/contracts/utils/types/Time.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 import { Subnetwork } from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
 import { INetworkRegistry } from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
@@ -19,52 +20,52 @@ import { IBaseDelegator } from "@symbioticfi/core/src/interfaces/delegator/IBase
 import { INetworkMiddlewareService } from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
 import { ISlasher } from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
 import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
-import { Subnetworks } from "@symbioticfi/middleware-sdk/src/extensions/Subnetworks.sol";
-import { OwnableAccessManager } from
-    "@symbioticfi/middleware-sdk/src/extensions/managers/access/OwnableAccessManager.sol";
-import { TimestampCapture } from
-    "@symbioticfi/middleware-sdk/src/extensions/managers/capture-timestamps/TimestampCapture.sol";
-import { KeyManagerAddress } from "@symbioticfi/middleware-sdk/src/extensions/managers/keys/KeyManagerAddress.sol";
-import { EqualStakePower } from "@symbioticfi/middleware-sdk/src/extensions/managers/stake-powers/EqualStakePower.sol";
-
-import { EqualStakePower } from "@symbioticfi/middleware-sdk/src/extensions/managers/stake-powers/EqualStakePower.sol";
-import { Operators } from "@symbioticfi/middleware-sdk/src/extensions/operators/Operators.sol";
 
 /// @title Cap Symbiotic Network Middleware Contract
 /// @author Cap Labs
 /// @notice This contract manages the symbiotic collateral and slashing.
-contract CapSymbioticNetworkMiddleware is
-    Operators,
-    KeyManagerAddress,
-    TimestampCapture,
-    EqualStakePower,
-    Subnetworks,
-    OwnableAccessManager
-{
+contract CapSymbioticNetworkMiddleware is Initializable {
+    using EnumerableSet for EnumerableSet.AddressSet;
     using Subnetwork for address;
     using Math for uint256;
     using SafeERC20 for IERC20;
+
+    event InstantSlash(address vault, bytes32 subnetwork, uint256 amount);
 
     error VaultAlreadyRegistred();
     error InvalidDuration();
     error InvalidSlasher();
     error InvalidBurner();
+    error InvalidDelegator();
+    error NotVault();
+    error NoSlasher();
+    error NoBurner();
+    error VaultNotInitialized();
     error TooBigSlashAmount();
     error DidNotReceiveCollateralImmediatly();
+    error InvalidEpochDuration();
 
-    function initialize(
-        address _network,
-        address _vaultRegistry,
-        address _operatorRegistry,
-        address _operatorNetworkOptinService,
-        address _owner
-    ) external initializer {
-        uint48 _slashingWindow = 1;
-        address _reader = address(0);
-        __BaseMiddleware_init(
-            _network, _slashingWindow, _vaultRegistry, _operatorRegistry, _operatorNetworkOptinService, _reader
-        );
-        __OwnableAccessManager_init(_owner);
+    enum SlasherType {
+        INSTANT,
+        VETO
+    }
+
+    enum DelegatorType {
+        NETWORK_RESTAKE,
+        FULL_RESTAKE,
+        OPERATOR_SPECIFIC,
+        OPERATOR_NETWORK_SPECIFIC
+    }
+
+    address public vaultRegistry;
+    address public network;
+    mapping(address => EnumerableSet.AddressSet) private vaultsByCollateral;
+    uint48 public requiredEpochDuration;
+
+    function initialize(address _network, address _vaultRegistry, uint48 _requiredEpochDuration) external initializer {
+        network = _network;
+        vaultRegistry = _vaultRegistry;
+        requiredEpochDuration = _requiredEpochDuration;
     }
 
     function subnetworkIdentifier() public pure returns (uint96) {
@@ -72,53 +73,67 @@ contract CapSymbioticNetworkMiddleware is
     }
 
     function subnetwork() public view returns (bytes32) {
-        return _NETWORK().subnetwork(subnetworkIdentifier());
+        return network.subnetwork(subnetworkIdentifier());
     }
 
     function _verifyVault(address vault) internal view {
-        if (!IRegistry(_VAULT_REGISTRY()).isEntity(vault)) {
+        if (!IRegistry(vaultRegistry).isEntity(vault)) {
             revert NotVault();
         }
 
+        address collateral = IVault(vault).collateral();
+
+        if (!IVault(vault).isInitialized()) revert VaultNotInitialized();
+        if (vaultsByCollateral[collateral].contains(vault)) revert VaultAlreadyRegistred();
+
+        uint48 vaultEpoch = IVault(vault).epochDuration();
+        if (vaultEpoch != requiredEpochDuration) revert InvalidEpochDuration();
+
         address slasher = IVault(vault).slasher();
-        if (slasher == address(0) || IEntity(slasher).TYPE() != uint64(SlasherType.INSTANT)) revert InvalidSlasher();
+        uint64 slasherType = IEntity(slasher).TYPE();
+        if (slasher == address(0)) revert NoSlasher();
+        if (slasherType != uint64(SlasherType.INSTANT)) revert InvalidSlasher();
+
+        address burner = IVault(vault).burner();
+        if (burner == address(0)) revert NoBurner();
+
+        address delegator = IVault(vault).delegator();
+        uint64 delegatorType = IEntity(delegator).TYPE();
+        if (delegatorType != uint64(DelegatorType.NETWORK_RESTAKE)) revert InvalidDelegator();
     }
 
     function registerVault(address vault) external {
         _verifyVault(vault);
-        _registerSharedVault(vault);
+        vaultsByCollateral[IVault(vault).collateral()].add(vault);
     }
 
     function slashAgent(address _agent, address _collateral, uint256 _amount) external {
-        uint48 _timestamp = getCaptureTimestamp();
-        address[] memory _vaults = _activeVaultsAt(_timestamp);
+        uint48 _timestamp = Time.timestamp() - 1;
+        address[] memory _vaults = vaultsByCollateral[_collateral].values();
 
         uint256 restToSlash = _amount;
-        uint256 balanceBefore = IERC20(_collateral).balanceOf(address(this));
 
         for (uint256 i = 0; i < _vaults.length; i++) {
-            if (IVault(_vaults[i]).collateral() != _collateral) {
+            IVault vault = IVault(_vaults[i]);
+
+            uint256 toSlash = IBaseDelegator(vault.delegator()).stakeAt(subnetwork(), _agent, _timestamp, "");
+            toSlash = restToSlash > toSlash ? toSlash : restToSlash;
+            if (toSlash == 0) {
                 continue;
             }
 
-            uint256 vaultStake = _getOperatorPowerAt(_timestamp, _agent, _vaults[i], subnetworkIdentifier());
-            uint256 slashFromVault = restToSlash > vaultStake ? vaultStake : restToSlash;
-            if (slashFromVault == 0) {
-                continue;
-            }
-            _slashVault(_timestamp, _vaults[i], subnetwork(), _agent, slashFromVault, new bytes(0));
-            restToSlash -= slashFromVault;
+            uint256 balanceBefore = IERC20(_collateral).balanceOf(address(this));
 
+            ISlasher(vault.slasher()).slash(subnetwork(), _agent, _amount, _timestamp, new bytes(0));
             // TODO: the burner could be a non routing burner, could add hooks?
-            address burner = IVault(_vaults[i]).burner();
-            IBurnerRouter(burner).triggerTransfer(address(this));
+            IBurnerRouter(vault.burner()).triggerTransfer(address(this));
 
-            // expect the amount to be sent to the middleware
             uint256 balanceAfter = IERC20(_collateral).balanceOf(address(this));
-            if (balanceAfter - balanceBefore != slashFromVault) {
+            if (balanceAfter - balanceBefore != _amount) {
                 revert DidNotReceiveCollateralImmediatly();
             }
-            balanceBefore = balanceAfter;
+
+            restToSlash -= toSlash;
         }
 
         if (restToSlash > 0) {

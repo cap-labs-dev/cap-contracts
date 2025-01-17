@@ -10,7 +10,6 @@ remappings = [
     "@symbioticfi/burners/=node_modules/@symbioticfi/burners/",
     "@symbioticfi/hooks/=node_modules/@symbioticfi/hooks/",
     "@symbioticfi/rewards/=node_modules/@symbioticfi/rewards/",
-    "@symbioticfi/middleware-sdk/=lib/symbioticfi-middleware-sdk/",
     "@layerzerolabs/oft-evm/=lib/devtools/packages/oft-evm/",
     "@layerzerolabs/oapp-evm/=lib/devtools/packages/oapp-evm/",
     "@layerzerolabs/lz-evm-protocol-v2/=lib/layerzero-v2/packages/layerzero-v2/evm/protocol/",

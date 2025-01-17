@@ -17,7 +17,7 @@ import { IOptInService } from "@symbioticfi/core/src/interfaces/service/IOptInSe
 import { INetworkRegistry } from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
 import { IVaultConfigurator } from "@symbioticfi/core/src/interfaces/IVaultConfigurator.sol";
 import { IDelegatorHook } from "@symbioticfi/core/src/interfaces/delegator/IDelegatorHook.sol";
-import { SimpleBurner } from "@symbioticfi/middleware-sdk/lib/core/test/mocks/SimpleBurner.sol";
+import { SimpleBurner } from "@symbioticfi/core/test/mocks/SimpleBurner.sol";
 
 import { IDefaultStakerRewards } from
     "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewards.sol";
@@ -174,13 +174,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             middlewareImplementation = new CapSymbioticNetworkMiddleware();
             middleware = CapSymbioticNetworkMiddleware(_proxy(address(middlewareImplementation)));
 
-            middleware.initialize(
-                cap_network_address,
-                symbioticConfig.vaultRegistry,
-                symbioticConfig.operatorRegistry,
-                symbioticConfig.networkOptInService,
-                user_cap_admin
-            );
+            middleware.initialize(cap_network_address, symbioticConfig.vaultRegistry, vaultEpochDuration);
 
             INetworkRegistry(symbioticConfig.networkRegistry).registerNetwork();
             INetworkMiddlewareService(symbioticConfig.networkMiddlewareService).setMiddleware(address(middleware));

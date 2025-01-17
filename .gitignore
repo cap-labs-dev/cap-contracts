@@ -26,3 +26,6 @@ cache_forge
 # Coverage
 coverage
 lcov.info
+
+# Remappings
+remappings.txt
