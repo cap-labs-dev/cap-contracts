@@ -63,8 +63,7 @@ contract CapSymbioticNetworkMiddleware is
         address _operatorRegistry,
         address _operatorNetworkOptinService,
         address _owner,
-        uint48 _requiredEpochDuration,
-        address _requiredBurner
+        uint48 _requiredEpochDuration
     ) external initializer {
         uint48 _slashingWindow = 1;
         address _reader = address(0);
@@ -74,7 +73,6 @@ contract CapSymbioticNetworkMiddleware is
         __OwnableAccessManager_init(_owner);
 
         requiredEpochDuration = _requiredEpochDuration;
-        requiredBurner = _requiredBurner;
     }
 
     function getSubnetworkIdentifier(address /*agent?*/ ) public pure returns (uint96) {
@@ -92,8 +90,6 @@ contract CapSymbioticNetworkMiddleware is
         if (!IRegistry(_VAULT_REGISTRY()).isEntity(vault)) {
             revert NotVault();
         }
-
-        if (IVault(vault).burner() != requiredBurner) revert InvalidBurner();
 
         uint48 vaultEpoch = IVault(vault).epochDuration();
         if (vaultEpoch < requiredEpochDuration) revert InvalidDuration();

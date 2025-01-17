@@ -4,8 +4,17 @@ pragma solidity ^0.8.28;
 import { console } from "forge-std/console.sol";
 
 contract SymbioticUtils {
-    uint256 public constant MAINNET = 1;
-    uint256 public constant SEPOLIA = 11155111;
+    enum SlasherType {
+        INSTANT,
+        VETO
+    }
+
+    enum DelegatorType {
+        NETWORK_RESTAKE,
+        FULL_RESTAKE,
+        OPERATOR_SPECIFIC,
+        OPERATOR_NETWORK_SPECIFIC
+    }
 
     struct SymbioticConfig {
         address vaultFactory;
@@ -27,9 +36,10 @@ contract SymbioticUtils {
 
     function getConfig() public view returns (SymbioticConfig memory config) {
         console.log("block.chainid", block.chainid);
-        if (block.chainid == MAINNET) {
+        if (block.chainid == 1) {
             revert("Mainnet not supported");
-        } else if (block.chainid == SEPOLIA) {
+        } else if (block.chainid == 11155111) {
+            // ethereum sepolia
             config.vaultFactory = 0x407A039D94948484D356eFB765b3c74382A050B4;
             config.delegatorFactory = 0x890CA3f95E0f40a79885B7400926544B2214B03f;
             config.slasherFactory = 0xbf34bf75bb779c383267736c53a4ae86ac7bB299;
@@ -56,9 +66,9 @@ contract SymbioticUtils {
     }
 
     function getVaultConfig(address asset) public view returns (VaultConfig memory config) {
-        if (block.chainid == MAINNET) {
+        if (block.chainid == 1) {
             revert("Mainnet not supported");
-        } else if (block.chainid == SEPOLIA) {
+        } else if (block.chainid == 11155111) {
             if (asset == 0xB82381A3fBD3FaFA77B3a7bE693342618240067b) {
                 config.vault = 0x77F170Dcd0439c0057055a6D7e5A1Eb9c48cCD2a;
                 config.curator = 0xe8616DEcea16b5216e805B0b8caf7784de7570E7;
