@@ -10,35 +10,40 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 /// @title Amount Out Logic
 /// @author kexley, @capLabs
 /// @notice Amount out logic for exchanging underlying assets with cap tokens
-library AmountOutLogic {
+library MinterLogic {
     /// @notice Calculate the amount out from a swap including fees
+    /// @param $ Storage pointer
     /// @param params Parameters for a swap
     /// @return amount Amount out from a swap
-    function amountOut(DataTypes.AmountOutParams memory params) external view returns (uint256 amount) {
-        (uint256 amountOutBeforeFee, uint256 newRatio) = _amountOutBeforeFee(params);
+    function amountOut(
+        DataTypes.MinterStorage storage $,
+        DataTypes.AmountOutParams memory params
+    ) external view returns (uint256 amount) {
+        (uint256 amountOutBeforeFee, uint256 newRatio) = _amountOutBeforeFee($.oracle, params);
 
         amount = _applyFeeSlopes(
+            $.fees[params.asset],
             DataTypes.FeeSlopeParams({
                 mint: params.mint,
                 amount: amountOutBeforeFee,
-                ratio: newRatio,
-                slope0: params.slope0,
-                slope1: params.slope0,
-                mintKinkRatio: params.mintKinkRatio,
-                burnKinkRatio: params.burnKinkRatio,
-                optimalRatio: params.optimalRatio
+                ratio: newRatio
             })
         );
     }
 
     /// @notice Calculate the output amounts for redeeming a cap token for a proportional weighting
+    /// @param $ Storage pointer
     /// @param params Parameters for redeeming
     /// @return amounts Amount of underlying assets withdrawn
-    function redeemAmountOut(DataTypes.RedeemAmountOutParams memory params)
+    function redeemAmountOut(
+        DataTypes.MinterStorage storage $,
+        DataTypes.RedeemAmountOutParams memory params
+    )
         external
         view
         returns (uint256[] memory amounts)
     {
+        uint256 redeemFee = $.redeemFee;
         uint256 shares = params.amount * 1e27 / IERC20(address(this)).totalSupply();
         address[] memory assets = IVaultUpgradeable(address(this)).assets();
         uint256 assetLength = assets.length;
@@ -46,21 +51,22 @@ library AmountOutLogic {
             address asset = assets[i];
             uint256 withdrawAmount = IVaultUpgradeable(address(this)).totalSupplies(asset) * shares / 1e27;
 
-            amounts[i] = withdrawAmount - (withdrawAmount * params.redeemFee / 1e27);
+            amounts[i] = withdrawAmount - (withdrawAmount * redeemFee / 1e27);
         }
     }
 
     /// @notice Calculate the amount out for a swap before fees
+    /// @param _oracle Oracle address
     /// @param params Parameters for a swap
     /// @return amount Amount out from a swap before fees
     /// @return newRatio New ratio of an asset to the overall basket after swap
-    function _amountOutBeforeFee(DataTypes.AmountOutParams memory params)
+    function _amountOutBeforeFee(address _oracle, DataTypes.AmountOutParams memory params)
         internal
         view
         returns (uint256 amount, uint256 newRatio)
     {
-        uint256 assetPrice = IOracle(params.oracle).getPrice(params.asset);
-        uint256 capPrice = IOracle(params.oracle).getPrice(address(this));
+        uint256 assetPrice = IOracle(_oracle).getPrice(params.asset);
+        uint256 capPrice = IOracle(_oracle).getPrice(address(this));
 
         uint8 assetDecimals = IERC20Metadata(params.asset).decimals();
         uint8 capDecimals = IERC20Metadata(address(this)).decimals();
@@ -93,30 +99,31 @@ library AmountOutLogic {
 
     /// @notice Apply fee slopes to a mint or burn
     /// @dev Fees only apply to mints or burns that over-allocate the basket to one asset
+    /// @param fees Fee slopes and ratio kinks
     /// @param params Fee slope parameters
     /// @return amount Remaining amount after fee applied
-    function _applyFeeSlopes(DataTypes.FeeSlopeParams memory params)
+    function _applyFeeSlopes(DataTypes.FeeData memory fees, DataTypes.FeeSlopeParams memory params)
         internal
         pure
         returns (uint256 amount)
     {
         uint256 rate;
         if (params.mint) {
-            if (params.ratio > params.optimalRatio) {
-                if (params.ratio > params.mintKinkRatio) {
-                    uint256 excessRatio = params.ratio - params.mintKinkRatio;
-                    rate = params.slope0 + (params.slope1 * excessRatio);
+            if (params.ratio > fees.optimalRatio) {
+                if (params.ratio > fees.mintKinkRatio) {
+                    uint256 excessRatio = params.ratio - fees.mintKinkRatio;
+                    rate = fees.slope0 + (fees.slope1 * excessRatio);
                 } else {
-                    rate = params.slope0 * params.ratio / params.mintKinkRatio;
+                    rate = fees.slope0 * params.ratio / fees.mintKinkRatio;
                 }
             }
         } else {
-            if (params.ratio < params.optimalRatio) {
-                if (params.ratio < params.burnKinkRatio) {
-                    uint256 excessRatio = params.burnKinkRatio - params.ratio;
-                    rate = params.slope0 + (params.slope1 * excessRatio);
+            if (params.ratio < fees.optimalRatio) {
+                if (params.ratio < fees.burnKinkRatio) {
+                    uint256 excessRatio = fees.burnKinkRatio - params.ratio;
+                    rate = fees.slope0 + (fees.slope1 * excessRatio);
                 } else {
-                    rate = params.slope0 * params.burnKinkRatio / params.ratio;
+                    rate = fees.slope0 * fees.burnKinkRatio / params.ratio;
                 }
             }
         }

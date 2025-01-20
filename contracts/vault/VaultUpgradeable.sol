@@ -3,9 +3,9 @@ pragma solidity ^0.8.28;
 
 import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
 import { MinterUpgradeable } from "./MinterUpgradeable.sol";
-import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { VaultLogic } from "./libraries/VaultLogic.sol";
+import { VaultStorage } from "./libraries/VaultStorage.sol";
+import { DataTypes } from "./libraries/types/DataTypes.sol";
 import { ERC20PermitUpgradeable } from
     "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 
@@ -15,29 +15,6 @@ import { ERC20PermitUpgradeable } from
 /// @dev Supplies, borrows and utilization rates are tracked. Interest rates should be computed and
 /// charged on the external contracts, only the principle amount is counted on this contract.
 contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUpgradeable {
-    using SafeERC20 for IERC20;
-
-    /// @custom:storage-location erc7201:cap.storage.Vault
-    struct VaultStorage {
-        address[] assets;
-        mapping(address => uint256) totalSupplies;
-        mapping(address => uint256) totalBorrows;
-        mapping(address => uint256) utilizationIndex;
-        mapping(address => uint256) lastUpdate;
-        mapping(address => bool) paused;
-    }
-
-    /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.Vault")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant VaultStorageLocation = 0xe912a1b0cc7579bc5827e495c2ce52587bc3871751e3281fc5599b38c3bfc400;
-
-    /// @dev Get this contract storage pointer
-    /// @return $ Storage pointer
-    function _getVaultStorage() private pure returns (VaultStorage storage $) {
-        assembly {
-            $.slot := VaultStorageLocation
-        }
-    }
-
     /// @dev Initialize the assets
     /// @param _name Name of the cap token
     /// @param _symbol Symbol of the cap token
@@ -61,61 +38,8 @@ contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUp
     /// @dev Initialize unchained
     /// @param _assets Asset addresses
     function __Vault_init_unchained(address[] calldata _assets) internal onlyInitializing {
-        VaultStorage storage $ = _getVaultStorage();
+        DataTypes.VaultStorage storage $ = VaultStorage.get();
         $.assets = _assets;
-    }
-
-    /// @dev Timestamp is past the deadline
-    error PastDeadline();
-
-    /// @dev Amount out is less than required
-    error Slippage(address asset, uint256 amountOut, uint256 minAmountOut);
-
-    /// @dev Paused assets cannot be supplied or borrowed
-    error AssetPaused(address asset);
-
-    /// @dev Only whitelisted assets can be supplied or borrowed
-    error AssetNotSupported(address asset);
-
-    /// @dev Asset is already listed
-    error AssetAlreadySupported(address asset);
-
-    /// @dev Only non-supported assets can be rescued
-    error AssetNotRescuable(address asset);
-
-    /// @dev Cap token minted
-    event Mint(address indexed minter, address receiver, address indexed asset, uint256 amountIn, uint256 amountOut);
-
-    /// @dev Cap token burned
-    event Burn(address indexed burner, address receiver, address indexed asset, uint256 amountIn, uint256 amountOut);
-
-    /// @dev Cap token redeemed
-    event Redeem(address indexed redeemer, address receiver, uint256 amountIn, uint256[] amountsOut);
-
-    /// @dev Borrow made
-    event Borrow(address indexed borrower, address indexed asset, uint256 amount);
-
-    /// @dev Repayment made
-    event Repay(address indexed repayer, address indexed asset, uint256 amount);
-
-    /// @dev Asset paused
-    event PauseAsset(address asset);
-
-    /// @dev Asset unpaused
-    event UnpauseAsset(address asset);
-
-    /// @dev Modifier to only allow supplies and borrows when not paused
-    /// @param _asset Asset address
-    modifier whenNotPaused(address _asset) {
-        _whenNotPaused(_asset);
-        _;
-    }
-
-    /// @dev Modifier to update the utilization index
-    /// @param _asset Asset address
-    modifier updateIndex(address _asset) {
-        _updateIndex(_asset);
-        _;
     }
 
     /// @notice Mint the cap token using an asset
@@ -133,21 +57,21 @@ contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUp
         uint256 _deadline
     )
         external
-        whenNotPaused(_asset)
-        updateIndex(_asset)
         returns (uint256 amountOut)
     {
-        if (_deadline < block.timestamp) revert PastDeadline();
         amountOut = getMintAmount(_asset, _amountIn);
-        if (amountOut < _minAmountOut) revert Slippage(address(this), amountOut, _minAmountOut);
-
-        VaultStorage storage $ = _getVaultStorage();
-        $.totalSupplies[_asset] += _amountIn;
-
+        VaultLogic.mint(
+            VaultStorage.get(),
+            DataTypes.MintBurnParams({
+                asset: _asset,
+                amountIn: _amountIn,
+                amountOut: amountOut,
+                minAmountOut: _minAmountOut,
+                receiver: _receiver,
+                deadline: _deadline
+            })
+        );
         _mint(_receiver, amountOut);
-        IERC20(_asset).safeTransferFrom(msg.sender, address(this), _amountIn);
-
-        emit Mint(msg.sender, _receiver, _asset, _amountIn, amountOut);
     }
 
     /// @notice Burn the cap token for an asset
@@ -165,20 +89,21 @@ contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUp
         uint256 _deadline
     )
         external
-        updateIndex(_asset)
         returns (uint256 amountOut)
     {
-        if (_deadline < block.timestamp) revert PastDeadline();
         amountOut = getBurnAmount(_asset, _amountIn);
-        if (amountOut < _minAmountOut) revert Slippage(_asset, amountOut, _minAmountOut);
-
-        VaultStorage storage $ = _getVaultStorage();
-        $.totalSupplies[_asset] -= amountOut;
-
+        VaultLogic.burn(
+            VaultStorage.get(),
+            DataTypes.MintBurnParams({
+                asset: _asset,
+                amountIn: _amountIn,
+                amountOut: amountOut,
+                minAmountOut: _minAmountOut,
+                receiver: _receiver,
+                deadline: _deadline
+            })
+        );
         _burn(msg.sender, _amountIn);
-        IERC20(_asset).safeTransfer(_receiver, amountOut);
-
-        emit Burn(msg.sender, _receiver, _asset, _amountIn, amountOut);
     }
 
     /// @notice Redeem the Cap token for a bundle of assets
@@ -197,21 +122,18 @@ contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUp
         external
         returns (uint256[] memory amountsOut)
     {
-        if (_deadline < block.timestamp) revert PastDeadline();
         amountsOut = getRedeemAmount(_amountIn);
-
+        VaultLogic.redeem(
+            VaultStorage.get(),
+            DataTypes.RedeemParams({
+                amountIn: _amountIn,
+                amountsOut: amountsOut,
+                minAmountsOut: _minAmountsOut,
+                receiver: _receiver,
+                deadline: _deadline
+            })
+        );
         _burn(msg.sender, _amountIn);
-
-        VaultStorage storage $ = _getVaultStorage();
-        address[] memory cachedAssets = $.assets;
-        for (uint256 i; i < cachedAssets.length; ++i) {
-            if (amountsOut[i] < _minAmountsOut[i]) revert Slippage(cachedAssets[i], amountsOut[i], _minAmountsOut[i]);
-            _updateIndex(cachedAssets[i]);
-            $.totalSupplies[cachedAssets[i]] -= amountsOut[i];
-            IERC20(cachedAssets[i]).safeTransfer(_receiver, amountsOut[i]);
-        }
-
-        emit Redeem(msg.sender, _receiver, _amountIn, amountsOut);
     }
 
     /// @notice Borrow an asset
@@ -221,88 +143,66 @@ contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUp
     /// @param _receiver Receiver of the borrow
     function borrow(address _asset, uint256 _amount, address _receiver)
         external
-        whenNotPaused(_asset)
-        updateIndex(_asset)
         checkAccess(this.borrow.selector)
     {
-        VaultStorage storage $ = _getVaultStorage();
-        $.totalBorrows[_asset] += _amount;
-        IERC20(_asset).safeTransfer(_receiver, _amount);
-
-        emit Borrow(msg.sender, _asset, _amount);
+        VaultLogic.borrow(
+            VaultStorage.get(),
+            DataTypes.BorrowParams({
+                asset: _asset,
+                amount: _amount,
+                receiver: _receiver
+            })
+        );
     }
 
     /// @notice Repay an asset
     /// @param _asset Asset to repay
     /// @param _amount Amount of asset to repay
-    function repay(address _asset, uint256 _amount)
-        external
-        updateIndex(_asset)
-        checkAccess(this.repay.selector)
-    {
-        VaultStorage storage $ = _getVaultStorage();
-        $.totalBorrows[_asset] -= _amount;
-        IERC20(_asset).safeTransferFrom(msg.sender, address(this), _amount);
-
-        emit Repay(msg.sender, _asset, _amount);
+    function repay(address _asset, uint256 _amount) external checkAccess(this.repay.selector) {
+        VaultLogic.repay(
+            VaultStorage.get(),
+            DataTypes.RepayParams({
+                asset: _asset,
+                amount: _amount
+            })
+        );
     }
 
     /// @notice Add an asset to the vault list
     /// @param _asset Asset address
     function addAsset(address _asset) external checkAccess(this.addAsset.selector) {
-        if (listed(_asset)) revert AssetAlreadySupported(_asset);
-        
-        VaultStorage storage $ = _getVaultStorage();
-        $.assets.push(_asset);
+        VaultLogic.addAsset(VaultStorage.get(), _asset);
     }
 
     /// @notice Remove an asset from the vault list
     /// @param _asset Asset address
     function removeAsset(address _asset) external checkAccess(this.removeAsset.selector) {
-        VaultStorage storage $ = _getVaultStorage();
-        address[] memory cachedAssets = $.assets;
-        uint256 length = cachedAssets.length;
-        bool removed;
-        for (uint256 i; i < length; ++i) {
-            if (_asset == cachedAssets[i]) {
-                $.assets[i] = cachedAssets[length - 1];
-                $.assets.pop();
-                removed = true;
-                break;
-            }
-        }
-
-        if (!removed) revert AssetNotSupported(_asset);
+        VaultLogic.removeAsset(VaultStorage.get(), _asset);
     }
 
     /// @notice Pause an asset
     /// @param _asset Asset address
     function pause(address _asset) external checkAccess(this.pause.selector) {
-        VaultStorage storage $ = _getVaultStorage();
-        $.paused[_asset] = true;
-        emit PauseAsset(_asset);
+        VaultLogic.pause(VaultStorage.get(), _asset);
     }
 
     /// @notice Unpause an asset
     /// @param _asset Asset address
     function unpause(address _asset) external checkAccess(this.unpause.selector) {
-        VaultStorage storage $ = _getVaultStorage();
-        $.paused[_asset] = false;
-        emit UnpauseAsset(_asset);
+        VaultLogic.unpause(VaultStorage.get(), _asset);
     }
 
     /// @notice Rescue an unsupported asset
     /// @param _asset Asset to rescue
     /// @param _receiver Receiver of the rescue
     function rescueERC20(address _asset, address _receiver) external checkAccess(this.rescueERC20.selector) {
-        if (listed(_asset)) revert AssetNotRescuable(_asset);
-        IERC20(_asset).safeTransfer(_receiver, IERC20(_asset).balanceOf(address(this)));
+        VaultLogic.rescueERC20(_asset, _receiver);
     }
 
     /// @notice Get the list of assets supported by the vault
     /// @return assetList List of assets
     function assets() external view returns (address[] memory assetList) {
-        VaultStorage storage $ = _getVaultStorage();
+        DataTypes.VaultStorage storage $ = VaultStorage.get();
         assetList = $.assets;
     }
 
@@ -310,7 +210,7 @@ contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUp
     /// @param _asset Asset address
     /// @return totalSupply Total supply
     function totalSupplies(address _asset) external view returns (uint256 totalSupply) {
-        VaultStorage storage $ = _getVaultStorage();
+        DataTypes.VaultStorage storage $ = VaultStorage.get();
         totalSupply = $.totalSupplies[_asset];
     }
 
@@ -318,7 +218,7 @@ contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUp
     /// @param _asset Asset address
     /// @return totalBorrow Total borrow
     function totalBorrows(address _asset) external view returns (uint256 totalBorrow) {
-        VaultStorage storage $ = _getVaultStorage();
+        DataTypes.VaultStorage storage $ = VaultStorage.get();
         totalBorrow = $.totalBorrows[_asset];
     }
 
@@ -326,30 +226,15 @@ contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUp
     /// @param _asset Asset address
     /// @return isPaused Pause state
     function paused(address _asset) external view returns (bool isPaused) {
-        VaultStorage storage $ = _getVaultStorage();
+        DataTypes.VaultStorage storage $ = VaultStorage.get();
         isPaused = $.paused[_asset];
-    }
-
-    /// @notice Validate that an asset is listed
-    /// @param _asset Asset to check
-    /// @return isListed Asset is listed or not
-    function listed(address _asset) public view returns (bool isListed) {
-        VaultStorage storage $ = _getVaultStorage();
-        address[] memory cachedAssets = $.assets;
-        uint256 length = cachedAssets.length;
-        for (uint256 i; i < length; ++i) {
-            if (_asset == cachedAssets[i]) {
-                isListed = true;
-                break;
-            }
-        }
     }
 
     /// @notice Available balance to borrow
     /// @param _asset Asset to borrow
     /// @return amount Amount available
     function availableBalance(address _asset) external view returns (uint256 amount) {
-        VaultStorage storage $ = _getVaultStorage();
+        DataTypes.VaultStorage storage $ = VaultStorage.get();
         amount = $.totalSupplies[_asset] - $.totalBorrows[_asset];
     }
 
@@ -357,9 +242,8 @@ contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUp
     /// @dev Utilization scaled by 1e27
     /// @param _asset Utilized asset
     /// @return ratio Utilization ratio
-    function utilization(address _asset) public view returns (uint256 ratio) {
-        VaultStorage storage $ = _getVaultStorage();
-        ratio = $.totalSupplies[_asset] != 0 ? $.totalBorrows[_asset] * 1e27 / $.totalSupplies[_asset] : 0;
+    function utilization(address _asset) external view returns (uint256 ratio) {
+        ratio = VaultLogic.utilization(VaultStorage.get(), _asset);
     }
 
     /// @notice Up to date cumulative utilization index of an asset
@@ -367,24 +251,6 @@ contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUp
     /// @param _asset Utilized asset
     /// @return index Utilization ratio index
     function currentUtilizationIndex(address _asset) external view returns (uint256 index) {
-        VaultStorage storage $ = _getVaultStorage();
-        index = $.utilizationIndex[_asset] + (utilization(_asset) * (block.timestamp - $.lastUpdate[_asset]));
-    }
-
-    /// @dev Only allow supplies and borrows when not paused
-    /// @param _asset Asset address
-    function _whenNotPaused(address _asset) private view {
-        VaultStorage storage $ = _getVaultStorage();
-        if ($.paused[_asset]) revert AssetPaused(_asset);
-    }
-
-    /// @dev Update the cumulative utilization index of an asset
-    /// @param _asset Utilized asset
-    function _updateIndex(address _asset) internal {
-        if (!listed(_asset)) revert AssetNotSupported(_asset);
-
-        VaultStorage storage $ = _getVaultStorage();
-        $.utilizationIndex[_asset] += utilization(_asset) * (block.timestamp - $.lastUpdate[_asset]);
-        $.lastUpdate[_asset] = block.timestamp;
+        index = VaultLogic.currentUtilizationIndex(VaultStorage.get(), _asset);
     }
 }
