@@ -89,6 +89,8 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
             IVault vault = IVault($.vaults[$.slashingQueue[i]]);
             (uint256 toSlash, uint256 toSlashValue) = _toSlash(vault, $.oracle, _agent, timestamp, restToSlash);
 
+            if (toSlash == 0) continue;
+
             ISlasher(vault.slasher()).slash(subnetwork(), _agent, toSlash, timestamp, new bytes(0));
             // TODO: the burner could be a non routing burner, could add hooks?
             IBurnerRouter(vault.burner()).triggerTransfer(_recipient);
