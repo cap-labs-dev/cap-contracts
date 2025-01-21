@@ -82,7 +82,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             // https://docs.symbiotic.fi/guides/vault-deployment/#1-burner-router
             // https://docs.symbiotic.fi/guides/vault-deployment#network-specific-burners
             burnerRouter = IBurnerRouter(
-                IBurnerRouterFactory(symbioticConfig.burnerRouterFactory).create(
+                IBurnerRouterFactory(symbioticConfig.factories.burnerRouterFactory).create(
                     IBurnerRouter.InitParams({
                         owner: user_vault_admin, // address of the router’s owner
                         collateral: address(collateral), // address of the collateral - wstETH (MUST be the same as for the Vault to connect)
@@ -103,7 +103,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             operatorNetworkSharesSetRoleHolders[0] = user_vault_admin;
 
             (address _vault, address _networkRestakeDelegator, address _immediateSlasher) = IVaultConfigurator(
-                symbioticConfig.vaultConfigurator
+                symbioticConfig.services.vaultConfigurator
             ).create(
                 IVaultConfigurator.InitParams({
                     version: 1, // Vault’s version (= common one)
@@ -153,7 +153,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             // default staker rewards setup
             // https://docs.symbiotic.fi/guides/vault-deployment/#3-staker-rewards
             defaultStakerRewards = IDefaultStakerRewards(
-                IDefaultStakerRewardsFactory(symbioticConfig.defaultStakerRewardsFactory).create(
+                IDefaultStakerRewardsFactory(symbioticConfig.factories.defaultStakerRewardsFactory).create(
                     IDefaultStakerRewards.InitParams({
                         vault: address(vault), // address of the deployed Vault
                         adminFee: 1000, // admin fee percent to get from all the rewards distributions (10% = 1_000 | 100% = 10_000)
@@ -174,10 +174,12 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             middlewareImplementation = new CapSymbioticNetworkMiddleware();
             middleware = CapSymbioticNetworkMiddleware(_proxy(address(middlewareImplementation)));
 
-            middleware.initialize(cap_network_address, symbioticConfig.vaultRegistry, vaultEpochDuration);
+            middleware.initialize(cap_network_address, symbioticConfig.registries.vaultRegistry, vaultEpochDuration);
 
-            INetworkRegistry(symbioticConfig.networkRegistry).registerNetwork();
-            INetworkMiddlewareService(symbioticConfig.networkMiddlewareService).setMiddleware(address(middleware));
+            INetworkRegistry(symbioticConfig.registries.networkRegistry).registerNetwork();
+            INetworkMiddlewareService(symbioticConfig.services.networkMiddlewareService).setMiddleware(
+                address(middleware)
+            );
 
             vm.stopPrank();
         }
@@ -207,7 +209,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
         {
             vm.startPrank(user_agent);
 
-            IOperatorRegistry(symbioticConfig.operatorRegistry).registerOperator();
+            IOperatorRegistry(symbioticConfig.registries.operatorRegistry).registerOperator();
 
             vm.stopPrank();
         }
@@ -219,7 +221,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
         // Operators use the VaultOptInService to opt into specific vaults. This allows them to receive stake allocations from these vaults.
         {
             vm.startPrank(user_agent);
-            IOptInService(symbioticConfig.vaultOptInService).optIn(address(vault));
+            IOptInService(symbioticConfig.services.vaultOptInService).optIn(address(vault));
             vm.stopPrank();
         }
 
@@ -227,7 +229,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
         // Through the NetworkOptInService, operators can opt into networks they wish to work with. This signifies their willingness to provide services to these networks.
         {
             vm.startPrank(user_agent);
-            IOptInService(symbioticConfig.networkOptInService).optIn(cap_network_address);
+            IOptInService(symbioticConfig.services.networkOptInService).optIn(cap_network_address);
             vm.stopPrank();
         }
 
