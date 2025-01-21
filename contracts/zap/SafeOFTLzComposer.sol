@@ -38,8 +38,10 @@ abstract contract SafeOFTLzComposer is ILayerZeroComposer {
         if (msg.sender != endpoint) revert SafeOFTLzComposer_InvalidEndpoint();
 
         // execute the handler and send back the oft asset to the recipient if the handler fails
-        try SafeOFTLzComposer(address(this)).safeLzCompose(_oApp, _guid, _message, _executor, _extraData) { }
-        catch (bytes memory) {
+        // 35000 is the gas limit for the fallback handler in case of a revert
+        try SafeOFTLzComposer(address(this)).safeLzCompose{ gas: gasleft() - 35000 }(
+            _oApp, _guid, _message, _executor, _extraData
+        ) { } catch (bytes memory) {
             address fallbackRecipient = OFTComposeMsgCodec.bytes32ToAddress(OFTComposeMsgCodec.composeFrom(_message));
             address token = IOFT(oApp).token();
             uint256 amount = OFTComposeMsgCodec.amountLD(_message);
