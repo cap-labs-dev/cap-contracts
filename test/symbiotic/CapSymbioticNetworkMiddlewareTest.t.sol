@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { CapSymbioticNetworkMiddleware } from "../../contracts/collateral/symbiotic/CapSymbioticNetworkMiddleware.sol";
+import { NetworkMiddleware } from "../../contracts/delegation/providers/symbiotic/NetworkMiddleware.sol";
+import { AccessControl } from "../../contracts/access/AccessControl.sol";
+import { Oracle } from "../../contracts/oracle/Oracle.sol";
 import { Test } from "forge-std/Test.sol";
 
 import { SymbioticUtils } from "../../script/util/SymbioticUtils.sol";
 import { MockERC20 } from "../../test/mocks/MockERC20.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { Upgrades } from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 import { IBurnerRouterFactory } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouterFactory.sol";
@@ -36,13 +39,16 @@ import { console } from "forge-std/console.sol";
 
 contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
     SymbioticConfig public symbioticConfig;
-    CapSymbioticNetworkMiddleware public middlewareImplementation;
+    NetworkMiddleware public middlewareImplementation;
     MockERC20 public collateral;
     IBurnerRouter public burnerRouter;
     uint48 public burnerRouterDelay = 0;
     uint48 public vaultEpochDuration = 1 hours;
+    uint48 public slashDuration = 50 minutes;
     IDelegatorHook public hook;
-    CapSymbioticNetworkMiddleware public middleware;
+    NetworkMiddleware public middleware;
+    AccessControl public accessControl;
+    Oracle public oracle;
     IVault public vault;
     INetworkRestakeDelegator public networkRestakeDelegator;
     ISlasher public immediateSlasher;
@@ -171,10 +177,25 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
         {
             vm.startPrank(cap_network_address);
 
-            middlewareImplementation = new CapSymbioticNetworkMiddleware();
-            middleware = CapSymbioticNetworkMiddleware(_proxy(address(middlewareImplementation)));
+            accessControl = new AccessControl();
+            accessControl.initialize(_proxy(cap_network_address));
+            oracle = new Oracle();
+            oracle.initialize(_proxy(address(accessControl)));
 
-            middleware.initialize(cap_network_address, symbioticConfig.registries.vaultRegistry, vaultEpochDuration);
+            middlewareImplementation = new NetworkMiddleware();
+            middleware = NetworkMiddleware(_proxy(address(middlewareImplementation)));
+
+       
+
+            middleware.initialize(
+                address(accessControl), 
+                cap_network_address, 
+                symbioticConfig.registries.vaultRegistry, 
+                address(oracle), 
+                address(defaultStakerRewards), 
+                vaultEpochDuration, 
+                slashDuration
+            );
 
             INetworkRegistry(symbioticConfig.registries.networkRegistry).registerNetwork();
             INetworkMiddlewareService(symbioticConfig.services.networkMiddlewareService).setMiddleware(
@@ -293,7 +314,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
 
             address recipient = makeAddr("recipient");
 
-            middleware.slashAgent(user_agent, address(collateral), 10e18, recipient);
+            middleware.slash(user_agent, recipient, 10e18);
 
             assertEq(IERC20(collateral).balanceOf(recipient), 10e18);
 

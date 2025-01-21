@@ -14,6 +14,7 @@ library DataTypes {
         address oracle;
         address stakerRewarder;
         uint48 requiredEpochDuration;
+        uint48 slashDuration;
         address[] vaults;
         mapping(address => bool) registered;
         uint256[] slashingQueue;

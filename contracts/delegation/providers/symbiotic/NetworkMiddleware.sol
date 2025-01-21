@@ -35,6 +35,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
     error NoBurner();
     error VaultNotInitialized();
     error InvalidEpochDuration(uint48 required, uint48 actual);
+    error InvalidSlashDuration();
 
     /// @notice Initialize
     /// @param _accessControl Access control address
@@ -43,13 +44,15 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
     /// @param _oracle Oracle address
     /// @param _stakerRewarder Staker rewarder address
     /// @param _requiredEpochDuration Required epoch duration in seconds
+    /// @param _slashDuration amount of time we have to liquidate collateral in a slash event, needs to be < epochDuration
     function initialize(
         address _accessControl,
         address _network,
         address _vaultRegistry,
         address _oracle,
         address _stakerRewarder,
-        uint48 _requiredEpochDuration
+        uint48 _requiredEpochDuration,
+        uint48 _slashDuration
     ) external initializer {
         __Access_init(_accessControl);
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
@@ -58,6 +61,9 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
         $.oracle = _oracle;
         $.stakerRewarder = _stakerRewarder;
         $.requiredEpochDuration = _requiredEpochDuration;
+        $.slashDuration = _slashDuration;
+
+        if (_slashDuration >= _requiredEpochDuration) revert InvalidSlashDuration();
     }
 
     /// @notice Register vault at end of slashing queue
@@ -85,17 +91,19 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
     /// @param _amount USD value of assets to slash
     function slash(address _agent, address _recipient, uint256 _amount) external checkAccess(this.slash.selector) {
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
-        uint48 timestamp = uint48(block.timestamp - 1);
+
+        /// @dev We need to slash the delegated collateral that is available at timestamp - slash duration time.
+        uint48 slashTimestamp = uint48(block.timestamp - $.slashDuration);
 
         uint256 restToSlash = _amount;
 
         for (uint256 i = 0; i < $.slashingQueue.length || restToSlash > 0; i++) {
             IVault vault = IVault($.vaults[$.slashingQueue[i]]);
-            (uint256 toSlash, uint256 toSlashValue) = _toSlash(vault, $.oracle, _agent, timestamp, restToSlash);
+            (uint256 toSlash, uint256 toSlashValue) = _toSlash(vault, $.oracle, _agent, slashTimestamp, restToSlash);
 
             if (toSlash == 0) continue;
 
-            ISlasher(vault.slasher()).slash(subnetwork(), _agent, toSlash, timestamp, new bytes(0));
+            ISlasher(vault.slasher()).slash(subnetwork(), _agent, toSlash, slashTimestamp, new bytes(0));
             // TODO: the burner could be a non routing burner, could add hooks?
             IBurnerRouter(vault.burner()).triggerTransfer(_recipient);
 
@@ -136,7 +144,10 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
     /// @return delegation Delegation amount in USD (8 decimals)
     function coverage(address _agent) external view returns (uint256 delegation) {
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
-        uint48 timestamp = uint48(block.timestamp - 1);
+
+        /// @dev We look slashDuration into the past to see what time we have coverage,
+        /// this means a agent is only covered after timestamp of delegation + slash duration
+        uint48 coveredTimestamp = uint48(block.timestamp - $.slashDuration);
 
         for (uint256 i = 0; i < $.vaults.length; i++) {
             IVault vault = IVault($.vaults[i]);
@@ -144,7 +155,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
             uint8 decimals = IERC20Metadata(collateralAddress).decimals();
             uint256 collateralPrice = IOracle($.oracle).getPrice(collateralAddress);
 
-            uint256 collateral = IBaseDelegator(vault.delegator()).stakeAt(subnetwork(), _agent, timestamp, "");
+            uint256 collateral = IBaseDelegator(vault.delegator()).stakeAt(subnetwork(), _agent, coveredTimestamp, "");
             delegation += collateral * collateralPrice / (10 ** decimals);
         }
     }
