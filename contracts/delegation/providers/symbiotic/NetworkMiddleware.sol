@@ -87,7 +87,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
 
         for (uint256 i = 0; i < $.slashingQueue.length || restToSlash > 0; i++) {
             IVault vault = IVault($.vaults[$.slashingQueue[i]]);
-            (uint256 toSlash, uint256 toSlashValue) = _stake(vault, $.oracle, _agent, timestamp, restToSlash);
+            (uint256 toSlash, uint256 toSlashValue) = _toSlash(vault, $.oracle, _agent, timestamp, restToSlash);
 
             ISlasher(vault.slasher()).slash(subnetwork(), _agent, toSlash, timestamp, new bytes(0));
             // TODO: the burner could be a non routing burner, could add hooks?
@@ -99,7 +99,13 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
         emit Slash(_agent, _recipient, _amount, restToSlash);
     }
 
-    function _stake(
+    /// @dev Fetch the current amounts that can be slashed from a vault for an agent
+    /// @param _vault Vault address
+    /// @param _oracle Oracle address
+    /// @param _agent Agent address
+    /// @param _timestamp Timestamp 1 second ago
+    /// @param _restToSlash Remaining value to be slashed for an agent
+    function _toSlash(
         IVault _vault,
         address _oracle,
         address _agent,
