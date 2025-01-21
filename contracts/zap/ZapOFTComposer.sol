@@ -57,19 +57,4 @@ contract ZapOFTComposer is SafeOFTLzComposer {
         // execute the zap order
         IBeefyZapRouter(zapRouter).executeOrder(zapMessage.order, zapMessage.route);
     }
-
-    /// @notice Encode a ZapMessage into a bytes array.
-    /// @param _nonce The nonce for the message.
-    /// @param _srcEid The source endpoint ID.
-    /// @param _amountLD The amount of the message in LD.
-    /// @param zapMessage The ZapMessage to encode.
-    /// @return The encoded ZapMessage.
-    function encodeZapMessage(
-        uint64 _nonce,
-        uint16 _srcEid,
-        uint256 _amountLD,
-        IZapOFTComposer.ZapMessage memory zapMessage
-    ) internal pure returns (bytes memory) {
-        return OFTComposeMsgCodec.encode(_nonce, _srcEid, _amountLD, abi.encode(zapMessage));
-    }
 }
