@@ -5,6 +5,7 @@ import { NetworkMiddlewareStorage } from "./libraries/NetworkMiddlewareStorage.s
 import { DataTypes } from "./libraries/types/DataTypes.sol";
 import { AccessUpgradeable } from "../../../access/AccessUpgradeable.sol";
 import { IOracle } from "../../../interfaces/IOracle.sol";
+import { IStakerRewards } from "./interfaces/IStakerRewards.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -40,12 +41,14 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
     /// @param _network Network address
     /// @param _vaultRegistry Vault registry address
     /// @param _oracle Oracle address
+    /// @param _stakerRewarder Staker rewarder address
     /// @param _requiredEpochDuration Required epoch duration in seconds
     function initialize(
         address _accessControl,
         address _network,
         address _vaultRegistry,
         address _oracle,
+        address _stakerRewarder,
         uint48 _requiredEpochDuration
     ) external initializer {
         __Access_init(_accessControl);
@@ -53,6 +56,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
         $.network = _network;
         $.vaultRegistry = _vaultRegistry;
         $.oracle = _oracle;
+        $.stakerRewarder = _stakerRewarder;
         $.requiredEpochDuration = _requiredEpochDuration;
     }
 
@@ -190,6 +194,24 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
         address delegator = IVault(_vault).delegator();
         uint64 delegatorType = IEntity(delegator).TYPE();
         if (delegatorType != uint64(DataTypes.DelegatorType.NETWORK_RESTAKE)) revert InvalidDelegator();
+    }
+
+    /// @notice Distribute rewards accumulated by the agent borrowing
+    /// @param _token Token address
+    function distributeRewards(address _token) external checkAccess(this.distributeRewards.selector) {
+        uint256 amount = IERC20(_token).balanceOf(address(this));
+        DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
+        IStakerRewards($.stakerRewarder).distributeRewards(
+            $.network,
+            _token,
+            amount,
+            abi.encode(
+                uint48(block.timestamp - 1),
+                0,
+                new bytes(0),
+                new bytes(0)
+            )
+        );
     }
 
     /// @dev Only admin can upgrade

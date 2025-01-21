@@ -12,6 +12,7 @@ library DataTypes {
         address network;
         address vaultRegistry;
         address oracle;
+        address stakerRewarder;
         uint48 requiredEpochDuration;
         address[] vaults;
         mapping(address => bool) registered;
