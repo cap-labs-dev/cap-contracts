@@ -199,9 +199,10 @@
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-5.2.0.tgz#bd020694218202b811b0ea3eec07277814c658da"
   integrity sha512-bxjNie5z89W1Ea0NZLZluFh8PrFNn9DH8DQlujEok2yjsOlraUPKID5p1Wk3qdNbf6XkQ1Os2RvfiHrrXLHWKA==
 
-"@openzeppelin/foundry-upgrades@OpenZeppelin/openzeppelin-foundry-upgrades":
+"@openzeppelin/foundry-upgrades@^0.3.7":
   version "0.3.7"
-  resolved "https://codeload.github.com/OpenZeppelin/openzeppelin-foundry-upgrades/tar.gz/453d9ff3591cb42f65d2281ea792aded95d7bd8c"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/foundry-upgrades/-/foundry-upgrades-0.3.7.tgz#aed3e2d7f4a1dc975bb2b2541ea264f9ba53e1d0"
+  integrity sha512-dYmBqlzXbtQM2qWCg/nmoxnWu4FVIYQiXwV7PYp+SH55ktTfIHASbMDJ/ClXJuLggNDVj1JBSGULqIEJsB1hsA==
 
 "@openzeppelin/merkle-tree@1.0.7":
   version "1.0.7"

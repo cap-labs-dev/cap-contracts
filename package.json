@@ -33,7 +33,7 @@
     "@openzeppelin/contracts": "^5.2.0"
   },
   "dependencies": {
-    "@openzeppelin/foundry-upgrades": "OpenZeppelin/openzeppelin-foundry-upgrades",
+    "@openzeppelin/foundry-upgrades": "^0.3.7",
     "forge": "^2.3.0",
     "install": "^0.13.0"
   }

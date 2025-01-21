@@ -97,18 +97,20 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
 
         uint256 restToSlash = _amount;
 
-        for (uint256 i = 0; i < $.slashingQueue.length || restToSlash > 0; i++) {
-            IVault vault = IVault($.vaults[$.slashingQueue[i]]);
+        // TODO: Fix the loop and calc correct slash amount.
+       // for (uint256 i = 0; i < $.slashingQueue.length || restToSlash > 0; i++) {
+            IVault vault = IVault($.vaults[$.slashingQueue[0]]);
             (uint256 toSlash, uint256 toSlashValue) = _toSlash(vault, $.oracle, _agent, slashTimestamp, restToSlash);
 
-            if (toSlash == 0) continue;
+           // if (toSlash == 0) continue;
 
             ISlasher(vault.slasher()).slash(subnetwork(), _agent, toSlash, slashTimestamp, new bytes(0));
             // TODO: the burner could be a non routing burner, could add hooks?
-            IBurnerRouter(vault.burner()).triggerTransfer(_recipient);
+            IBurnerRouter(vault.burner()).triggerTransfer(address(this));
+            IERC20(vault.collateral()).safeTransfer(_recipient, toSlash);
 
             restToSlash -= toSlashValue;
-        }
+       // }
 
         emit Slash(_agent, _recipient, _amount, restToSlash);
     }

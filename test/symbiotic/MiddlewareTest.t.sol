@@ -4,10 +4,13 @@ pragma solidity ^0.8.0;
 import { NetworkMiddleware } from "../../contracts/delegation/providers/symbiotic/NetworkMiddleware.sol";
 import { AccessControl } from "../../contracts/access/AccessControl.sol";
 import { Oracle } from "../../contracts/oracle/Oracle.sol";
+import { IOracle} from "../../contracts/interfaces/IOracle.sol";
 import { Test } from "forge-std/Test.sol";
 
 import { SymbioticUtils } from "../../script/util/SymbioticUtils.sol";
 import { MockERC20 } from "../../test/mocks/MockERC20.sol";
+import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
+import { ChainlinkAdapter } from "../../contracts/oracle/libraries/ChainlinkAdapter.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { Upgrades } from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -37,10 +40,11 @@ import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 
 import { console } from "forge-std/console.sol";
 
-contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
+contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
     SymbioticConfig public symbioticConfig;
     NetworkMiddleware public middlewareImplementation;
     MockERC20 public collateral;
+    MockChainlinkPriceFeed public usdtChainlinkPriceFeed;
     IBurnerRouter public burnerRouter;
     uint48 public burnerRouterDelay = 0;
     uint48 public vaultEpochDuration = 1 hours;
@@ -59,6 +63,7 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
     address public user_cap_admin;
     address public user_vault_admin;
     address public cap_network_address;
+    address public chainlinkAdapter;
 
     function setUp() public {
         vm.createSelectFork("https://sepolia.gateway.tenderly.co", 7512723);
@@ -177,15 +182,15 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
         {
             vm.startPrank(cap_network_address);
 
-            accessControl = new AccessControl();
-            accessControl.initialize(_proxy(cap_network_address));
-            oracle = new Oracle();
-            oracle.initialize(_proxy(address(accessControl)));
+            AccessControl accessControlImp = new AccessControl();
+            accessControl = AccessControl(_proxy(address(accessControlImp)));
+            accessControl.initialize(cap_network_address);
+            Oracle oracleImp = new Oracle();
+            oracle = Oracle(_proxy(address(oracleImp)));
+            oracle.initialize(address(accessControl));
 
             middlewareImplementation = new NetworkMiddleware();
             middleware = NetworkMiddleware(_proxy(address(middlewareImplementation)));
-
-       
 
             middleware.initialize(
                 address(accessControl), 
@@ -201,6 +206,28 @@ contract CapSymbioticMiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             INetworkMiddlewareService(symbioticConfig.services.networkMiddlewareService).setMiddleware(
                 address(middleware)
             );
+
+            accessControl.grantAccess(middleware.registerVault.selector, address(middleware), user_cap_admin);
+            accessControl.grantAccess(middleware.slash.selector, address(middleware), user_cap_admin);
+            accessControl.grantAccess(oracle.setPriceOracleData.selector, address(oracle), cap_network_address);
+            accessControl.grantAccess(middleware.setSlashingQueue.selector, address(middleware), cap_network_address);
+
+            uint256[] memory queue = new uint256[](1);
+            queue[0] = 0;
+            middleware.setSlashingQueue(queue);
+
+
+            usdtChainlinkPriceFeed = new MockChainlinkPriceFeed();
+            usdtChainlinkPriceFeed.setDecimals(8);
+            usdtChainlinkPriceFeed.setLatestAnswer(1e8);
+
+            chainlinkAdapter = address(ChainlinkAdapter);
+
+            IOracle.OracleData memory usdtOracleData = IOracle.OracleData({
+                adapter: address(chainlinkAdapter),
+                payload: abi.encodeWithSelector(ChainlinkAdapter.price.selector, address(usdtChainlinkPriceFeed))
+            });
+            oracle.setPriceOracleData(address(collateral), usdtOracleData);
 
             vm.stopPrank();
         }
