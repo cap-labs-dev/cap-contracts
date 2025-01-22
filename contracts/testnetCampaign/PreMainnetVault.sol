@@ -65,11 +65,7 @@ contract PreMainnetVault is UUPSUpgradeable, ERC20PermitUpgradeable, OwnableUpgr
     /// @notice Deposit underlying asset to mint cUSD on MegaETH Testnet
     /// @param _amount Amount of underlying asset to deposit
     /// @param _destReceiver Receiver of the assets on MegaETH Testnet
-    function deposit(uint256 _amount, address _destReceiver)
-        external
-        payable
-        returns (MessagingReceipt memory msgReceipt, OFTReceipt memory oftReceipt)
-    {
+    function deposit(uint256 _amount, address _destReceiver) external payable {
         if (_amount == 0) revert ZeroAmount();
 
         PreMainnetVaultStorage storage $ = PreMainnetVaultStorageLib.get();
@@ -80,8 +76,8 @@ contract PreMainnetVault is UUPSUpgradeable, ERC20PermitUpgradeable, OwnableUpgr
         // bridge logic
         MessagingFee memory _fee = MessagingFee({ nativeFee: msg.value, lzTokenFee: 0 });
         (bytes memory message, bytes memory options) = _buildMsgAndOptions($.lzReceiveGas, _amount, _destReceiver);
-        msgReceipt = _lzSend($.dstEid, message, options, _fee, _destReceiver);
-        oftReceipt = OFTReceipt(_amount, _amount);
+        _lzSend($.dstEid, message, options, _fee, _destReceiver);
+        OFTReceipt(_amount, _amount);
 
         emit Deposit(msg.sender, _amount);
     }
