@@ -1,15 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ERC20Permit, ERC20} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import { ILayerZeroEndpointV2 } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
+
+import { OAppCore } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppCore.sol";
+import { OAppSender } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppSender.sol";
+import { OFTCore } from "@layerzerolabs/oft-evm/contracts/OFTCore.sol";
+import { MessagingFee, MessagingReceipt, OFTReceipt } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
+
+import { OFTMsgCodec } from "@layerzerolabs/oft-evm/contracts/libs/OFTMsgCodec.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { ERC20, ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title PreMainnetVault
 /// @notice Vault for pre-mainnet campaign
 /// @dev Campaign has a maximum timestamp after which transfers are enabled
-contract PreMainnetVault is ERC20Permit, Ownable {
+contract PreMainnetVault is ERC20Permit, Ownable, OAppSender {
     using SafeERC20 for IERC20;
 
     /// @notice Underlying asset
@@ -24,8 +32,14 @@ contract PreMainnetVault is ERC20Permit, Ownable {
     /// @dev Transfer enabled flag after campaign ends
     bool private _transferEnabled;
 
+    /// @notice Destination EID for the LayerZero bridge
+    uint32 public dstEid;
+
     /// @dev Zero amounts are not allowed for minting
     error ZeroAmount();
+
+    /// @dev Zero native tokens are not allowed for deposit as it's used to pay for the LayerZero bridge
+    error ZeroNativeTokens();
 
     /// @dev Transfers not yet enabled
     error TransferNotEnabled();
@@ -45,15 +59,14 @@ contract PreMainnetVault is ERC20Permit, Ownable {
     /// @param _asset Underlying asset
     /// @param _maxCampaignLength Max campaign length in seconds
     constructor(
+        address _lzEndpoint,
+        uint32 _dstEid,
         string memory _name,
         string memory _symbol,
         address _asset,
         uint256 _maxCampaignLength
-    ) 
-        ERC20(_name, _symbol)
-        ERC20Permit(_name)
-        Ownable(msg.sender)
-    {
+    ) ERC20(_name, _symbol) ERC20Permit(_name) Ownable(msg.sender) OAppCore(_lzEndpoint, msg.sender) {
+        dstEid = _dstEid;
         asset = IERC20(_asset);
         maxCampaignEnd = block.timestamp + _maxCampaignLength;
         _decimals = IERC20Metadata(_asset).decimals();
@@ -62,18 +75,69 @@ contract PreMainnetVault is ERC20Permit, Ownable {
     /// @notice Deposit underlying asset to mint cUSD on MegaETH Testnet
     /// @param _amount Amount of underlying asset to deposit
     /// @param _destReceiver Receiver of the assets on MegaETH Testnet
-    function deposit(uint256 _amount, address _destReceiver) external {
+    function deposit(uint256 _amount, address _destReceiver)
+        external
+        payable
+        returns (MessagingReceipt memory msgReceipt, OFTReceipt memory oftReceipt)
+    {
         if (_amount == 0) revert ZeroAmount();
+        if (msg.value < 0) revert ZeroNativeTokens();
 
         asset.safeTransferFrom(msg.sender, address(this), _amount);
 
         _mint(msg.sender, _amount);
 
-        /// todo: lz bridge logic to mint on testnet 
-        /// Receiver could be different on the testnet (multi-sigs)
-        _destReceiver;
+        // bridge logic
+        (bytes memory message, bytes memory options) = _buildMsgAndOptions(_amount, _destReceiver);
+        MessagingFee memory _fee = MessagingFee({ nativeFee: msg.value, lzTokenFee: 0 });
+        msgReceipt = _lzSend(dstEid, message, options, _fee, _destReceiver);
+        oftReceipt = OFTReceipt(_amount, _amount);
 
         emit Deposit(msg.sender, _amount);
+    }
+
+    /// @dev Quote the deposit amount for the LayerZero bridge
+    /// @param _amountLD Amount in local decimals
+    /// @param _destReceiver Receiver of the assets on MegaETH Testnet
+    /// @return fee Fee for the LayerZero bridge
+    function quoteDeposit(uint256 _amountLD, address _destReceiver) external view returns (MessagingFee memory fee) {
+        (bytes memory message, bytes memory options) = _buildMsgAndOptions(_amountLD, _destReceiver);
+        fee = _quote(dstEid, message, options, false);
+    }
+
+    /// @dev Build the message and options for the LayerZero bridge
+    /// @param _amountLD Amount in local decimals
+    /// @param _destReceiver Receiver of the assets on MegaETH Testnet
+    /// @return message Message for the LayerZero bridge
+    /// @return options Options for the LayerZero bridge
+    function _buildMsgAndOptions(uint256 _amountLD, address _destReceiver)
+        internal
+        view
+        returns (bytes memory message, bytes memory options)
+    {
+        (message,) = OFTMsgCodec.encode(OFTMsgCodec.addressToBytes32(_destReceiver), _toSD(_amountLD), "");
+        options = "";
+    }
+
+    /// @dev Convert amount in shared decimals to amount in local decimals
+    /// @param _amountLD Amount in local decimals
+    /// @return amountSD Amount in shared decimals
+    function _toSD(uint256 _amountLD) internal view virtual returns (uint64 amountSD) {
+        return uint64(_amountLD / (10 ** (decimals() - sharedDecimals())));
+    }
+
+    /**
+     * @dev Retrieves the shared decimals of the OFT.
+     * @return The shared decimals of the OFT.
+     *
+     * @dev Sets an implicit cap on the amount of tokens, over uint64.max() will need some sort of outbound cap / totalSupply cap
+     * Lowest common decimal denominator between chains.
+     * Defaults to 6 decimal places to provide up to 18,446,744,073,709.551615 units (max uint64).
+     * For tokens exceeding this totalSupply(), they will need to override the sharedDecimals function with something smaller.
+     * ie. 4 sharedDecimals would be 1,844,674,407,370,955.1615
+     */
+    function sharedDecimals() public view virtual returns (uint8) {
+        return 6;
     }
 
     /// @notice Withdraw underlying asset after campaign ends
@@ -113,5 +177,14 @@ contract PreMainnetVault is ERC20Permit, Ownable {
     function _update(address _from, address _to, uint256 _value) internal override {
         if (!transferEnabled() && _from != address(0)) revert TransferNotEnabled();
         super._update(_from, _to, _value);
+    }
+
+    /**
+     * @dev Transfers ownership of the contract to a new account (`newOwner`).
+     * Internal function without access restriction.
+     */
+    function _transferOwnership(address newOwner) internal override {
+        super._transferOwnership(newOwner);
+        ILayerZeroEndpointV2(endpoint).setDelegate(newOwner);
     }
 }
