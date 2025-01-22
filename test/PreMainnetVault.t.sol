@@ -76,7 +76,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5 {
         }
     }
 
-    function test_decimals_match_asset() public {
+    function test_decimals_match_asset() public view {
         assertEq(vault.decimals(), asset.decimals());
         assertEq(vault.sharedDecimals(), 6); // Default shared decimals
     }
