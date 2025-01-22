@@ -210,11 +210,6 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             accessControl.grantAccess(middleware.registerVault.selector, address(middleware), user_cap_admin);
             accessControl.grantAccess(middleware.slash.selector, address(middleware), user_cap_admin);
             accessControl.grantAccess(oracle.setPriceOracleData.selector, address(oracle), cap_network_address);
-            accessControl.grantAccess(middleware.setSlashingQueue.selector, address(middleware), cap_network_address);
-
-            uint256[] memory queue = new uint256[](1);
-            queue[0] = 0;
-            middleware.setSlashingQueue(queue);
 
 
             usdtChainlinkPriceFeed = new MockChainlinkPriceFeed();
@@ -341,9 +336,33 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
 
             address recipient = makeAddr("recipient");
 
-            middleware.slash(user_agent, recipient, 10e18);
+            middleware.slash(user_agent, address(vault), recipient, 10e18);
 
             assertEq(IERC20(collateral).balanceOf(recipient), 10e18);
+
+            vm.stopPrank();
+        }
+
+        /// Test whether or not we can slash after the slashable period??
+        {
+            vm.startPrank(user_vault_admin);
+
+            // remove delegations to our slashable agent
+            networkRestakeDelegator.setOperatorNetworkShares(middleware.subnetwork(), user_agent, 0);
+
+            vm.stopPrank();
+        }
+
+        // move ahead slashduration plus 1 into the future
+        vm.warp(slashDuration + 1);
+
+        {
+            vm.startPrank(user_cap_admin);
+
+            address recipient = makeAddr("recipient");
+
+            vm.expectRevert();
+            middleware.slash(user_agent, address(vault), recipient, 10e18);
 
             vm.stopPrank();
         }

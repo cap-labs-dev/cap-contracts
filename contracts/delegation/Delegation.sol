@@ -6,16 +6,16 @@ import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
 import { DelegationStorage } from "./libraries/DelegationStorage.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import { IProvider } from "./interfaces/IProvider.sol";
+import { INetwork } from "./interfaces/INetwork.sol";
 
 /// @title Cap Delegation Contract
 /// @author Cap Labs
 /// @notice This contract manages delegation and slashing.
 contract Delegation is UUPSUpgradeable, AccessUpgradeable {
-    event SlashProvider(address provider, uint256 amount);
+    event SlashDelegator(address network, address delegator, uint256 amount);
     event AddAgent(address agent, DataTypes.AgentData agentData);
     event ModifyAgent(address agent, DataTypes.AgentData agentData);
-    event RegisterProvider(address provider);
+    event RegisterDelegator(address network, address delegator);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -42,28 +42,30 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
 
     /// @notice How much delegation and agent has available to back their borrows
     /// @param _agent The agent address
-    /// @return delegation Amount in USD that a agent has provided as delegation from the providers
+    /// @return delegation Amount in USD that a agent has provided as delegation from the delegators
     function coverage(address _agent) public view returns (uint256 delegation) {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
-        for (uint i; i < $.providers.length; ++i) {
-            address provider = $.providers[i];
-            delegation += coverageByProvider(_agent, provider);
+        for (uint i; i < $.delegators.length; ++i) {
+            address delegator = $.delegators[i];
+            delegation += coverageByDelegator(_agent, delegator);
         }
     }
 
     /// @notice How much delegation and agent has available to back their borrows
     /// @param _agent The agent addres
-    /// @param _provider The provider covering the agent
-    /// @return delegation Amount in USD that a agent has as delegation from the providers
-    function coverageByProvider(address _agent, address _provider) public view returns (uint256 delegation) {
-        delegation = IProvider(_provider).coverage(_agent);
+    /// @param _delegator The delegator covering the agent
+    /// @return delegation Amount in USD that a agent has as delegation from the delegators
+    function coverageByDelegator(address _agent, address _delegator) public view returns (uint256 delegation) {
+        DataTypes.DelegationStorage storage $ = DelegationStorage.get();
+        address network = $.delegatorsByNetwork[_delegator];
+        delegation = INetwork(network).coverage(_agent, _delegator);
     }
 
-    /// @notice Fetch active provider addresses
-    /// @return providerAddresses Provider addresses
-    function providers() external view returns (address[] memory providerAddresses) {
+    /// @notice Fetch active delegator addresses
+    /// @return delegatorAddresses delegator addresses
+    function delegators() external view returns (address[] memory delegatorAddresses) {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
-        providerAddresses = $.providers;
+        delegatorAddresses = $.delegators;
     }
 
     /// @notice Fetch active agent addresses
@@ -89,7 +91,7 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
         lt = $.agentData[_agent].liquidationThreshold;
     }
 
-    /// @notice The slash function. Calls the underlying providers to slash the delegated capital
+    /// @notice The slash function. Calls the underlying networks to slash the delegated capital
     /// @dev Called only by the lender during liquidation
     /// @param _agent The agent who is unhealthy
     /// @param _liquidator The liquidator who receives the funds
@@ -98,15 +100,19 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
         uint256 agentsDelegation = coverage(_agent);
 
-        uint256 divisor = _amount * 1e18 / agentsDelegation;
+        uint256 divisor = agentsDelegation * 1e18 / _amount;
 
-        for (uint i; i < $.providers.length; ++i) {
-            address provider = $.providers[i];
-            uint256 providersDelegation = coverageByProvider(_agent, provider);
-            uint256 slashAmount = providersDelegation * 1e18 / divisor;
+        for (uint i; i < $.delegators.length; ++i) {
+            address delegator = $.delegators[i];
+            uint256 delegation = coverageByDelegator(_agent, delegator);
+            
+            if (delegation == 0) continue;
 
-            IProvider(provider).slash(_agent, _liquidator, slashAmount);
-            emit SlashProvider(provider, slashAmount);
+            uint256 slashAmount = delegation * 1e18 / divisor;
+            address network = $.delegatorsByNetwork[delegator];
+
+            INetwork(network).slash(_agent, delegator, _liquidator, slashAmount);
+            emit SlashDelegator(network, delegator, slashAmount);
         }
     }
 
@@ -129,12 +135,14 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
         emit ModifyAgent(_agent, _agentData);
     }
 
-    /// @notice Register a new provider
-    /// @param _provider Provider address
-    function registerProvider(address _provider) external checkAccess(this.registerProvider.selector) {
+    /// @notice Register a new delagator
+    /// @param _delegator Delegator address
+    function registerDelegator(address _delegator) external checkAccess(this.registerDelegator.selector) {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
-        $.providers.push(_provider);
-        emit RegisterProvider(_provider);
+        $.delegators.push(_delegator);
+        $.delegatorsByNetwork[_delegator] = msg.sender;
+
+        emit RegisterDelegator(msg.sender, _delegator);
     }
 
     /// @dev Only admin can upgrade

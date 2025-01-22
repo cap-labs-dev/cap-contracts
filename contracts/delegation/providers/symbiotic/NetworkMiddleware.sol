@@ -73,72 +73,49 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
         $.vaults.push(_vault);
         $.registered[_vault] = true;
-        $.slashingQueue.push($.slashingQueue.length);
         emit VaultRegistered(_vault);
-    }
-
-    /// @notice Sets the order of vault slashing
-    /// @dev Assumes a good order is inputted
-    /// @param _slashingQueue Order of vault slashing by index in vault array
-    function setSlashingQueue(uint256[] calldata _slashingQueue) external checkAccess(this.setSlashingQueue.selector) {
-        DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
-        $.slashingQueue = _slashingQueue;
     }
 
     /// @notice Slash delegation and send to recipient
     /// @param _agent Agent address
     /// @param _recipient Recipient of the slashed assets
+    /// @param _vault The vault to slash
     /// @param _amount USD value of assets to slash
-    function slash(address _agent, address _recipient, uint256 _amount) external checkAccess(this.slash.selector) {
+    function slash(address _agent, address _vault, address _recipient, uint256 _amount) external checkAccess(this.slash.selector) {
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
 
         /// @dev We need to slash the delegated collateral that is available at timestamp - slash duration time.
         uint48 slashTimestamp = uint48(block.timestamp - $.slashDuration);
 
-        uint256 restToSlash = _amount;
+        IVault vault = IVault(_vault);
+        address collateral = vault.collateral();
+    
+        uint256 toSlash = _toSlash(collateral, _amount, $.oracle);
 
-        // TODO: Fix the loop and calc correct slash amount.
-       // for (uint256 i = 0; i < $.slashingQueue.length || restToSlash > 0; i++) {
-            IVault vault = IVault($.vaults[$.slashingQueue[0]]);
-            (uint256 toSlash, uint256 toSlashValue) = _toSlash(vault, $.oracle, _agent, slashTimestamp, restToSlash);
+        ISlasher(vault.slasher()).slash(subnetwork(), _agent, toSlash, slashTimestamp, new bytes(0));
+        // TODO: the burner could be a non routing burner, could add hooks?
+        IBurnerRouter(vault.burner()).triggerTransfer(address(this));
+        IERC20(collateral).safeTransfer(_recipient, toSlash);
 
-           // if (toSlash == 0) continue;
-
-            ISlasher(vault.slasher()).slash(subnetwork(), _agent, toSlash, slashTimestamp, new bytes(0));
-            // TODO: the burner could be a non routing burner, could add hooks?
-            IBurnerRouter(vault.burner()).triggerTransfer(address(this));
-            IERC20(vault.collateral()).safeTransfer(_recipient, toSlash);
-
-            restToSlash -= toSlashValue;
-       // }
-
-        emit Slash(_agent, _recipient, _amount, restToSlash);
+        emit Slash(_agent, _recipient, _amount, toSlash);
     }
 
     /// @dev Fetch the current amounts that can be slashed from a vault for an agent
-    /// @param _vault Vault address
+    /// @param _collateral Collateral address
+    /// @param _amount Amount in USD to slash
     /// @param _oracle Oracle address
-    /// @param _agent Agent address
-    /// @param _timestamp Timestamp 1 second ago
-    /// @param _restToSlash Remaining value to be slashed for an agent
     function _toSlash(
-        IVault _vault,
-        address _oracle,
-        address _agent,
-        uint48 _timestamp,
-        uint256 _restToSlash
-    ) internal view returns (uint256 toSlash, uint256 toSlashValue) {
-        address collateral = _vault.collateral();
-        uint8 decimals = IERC20Metadata(collateral).decimals();
-        uint256 collateralPrice = IOracle(_oracle).getPrice(collateral);
+        address _collateral,
+        uint256 _amount,
+        address _oracle
+    ) internal view returns (uint256 toSlash) {
+        uint256 collateralPrice = IOracle(_oracle).getPrice(_collateral);
+        
+        /// @dev Price Oracle returns price in 8 decimals
+        /// TODO: Fetch this instead of hard code
+        uint8 ORACLE_DECIMALS = 8;
 
-        toSlash = IBaseDelegator(_vault.delegator()).stakeAt(subnetwork(), _agent, _timestamp, "");
-        toSlashValue = toSlash * collateralPrice / (10 ** decimals);
-
-        if (toSlashValue > _restToSlash) {
-            toSlashValue = _restToSlash;
-            toSlash = toSlashValue * (10 ** decimals) / collateralPrice;
-        }
+        toSlash = _amount * collateralPrice / (10 ** ORACLE_DECIMALS);
     }
 
     /// @notice Coverage of an agent by Symbiotic vaults

@@ -17,7 +17,6 @@ library DataTypes {
         uint48 slashDuration;
         address[] vaults;
         mapping(address => bool) registered;
-        uint256[] slashingQueue;
     }
 
     enum SlasherType {
