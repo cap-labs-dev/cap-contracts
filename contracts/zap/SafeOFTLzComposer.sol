@@ -14,6 +14,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 abstract contract SafeOFTLzComposer is ILayerZeroComposer {
     using SafeERC20 for IERC20;
 
+    uint256 public immutable fallbackGas = 40000;
     address public immutable oApp;
     address public immutable endpoint;
 
@@ -39,7 +40,7 @@ abstract contract SafeOFTLzComposer is ILayerZeroComposer {
 
         // execute the handler and send back the oft asset to the recipient if the handler fails
         // 35000 is the gas limit for the fallback handler in case of a revert
-        try SafeOFTLzComposer(address(this)).safeLzCompose{ gas: gasleft() - 35000 }(
+        try SafeOFTLzComposer(address(this)).safeLzCompose{ gas: gasleft() - fallbackGas }(
             _oApp, _guid, _message, _executor, _extraData
         ) { } catch (bytes memory) {
             address fallbackRecipient = OFTComposeMsgCodec.bytes32ToAddress(OFTComposeMsgCodec.composeFrom(_message));
