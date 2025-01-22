@@ -1,45 +1,32 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import { PreMainnetVaultStorage, PreMainnetVaultStorageLib } from "./PreMainnetVaultStorage.sol";
+
+import { SetConfigParam } from "@layerzerolabs/interfaces/IMessageLibManager.sol";
 import { ILayerZeroEndpointV2 } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
-
-import { OAppCore } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppCore.sol";
-import { OAppSender } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppSender.sol";
-import { OFTCore } from "@layerzerolabs/oft-evm/contracts/OFTCore.sol";
+import { OAppCoreUpgradeable } from "@layerzerolabs/oapp-evm-upgradeable/contracts/oapp/OAppCoreUpgradeable.sol";
+import { OAppSenderUpgradeable } from "@layerzerolabs/oapp-evm-upgradeable/contracts/oapp/OAppSenderUpgradeable.sol";
+import { OptionsBuilder } from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 import { MessagingFee, MessagingReceipt, OFTReceipt } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
-
 import { OFTMsgCodec } from "@layerzerolabs/oft-evm/contracts/libs/OFTMsgCodec.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { ERC20, ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { ERC20PermitUpgradeable } from
+    "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title PreMainnetVault
 /// @notice Vault for pre-mainnet campaign
 /// @dev Campaign has a maximum timestamp after which transfers are enabled
-contract PreMainnetVault is ERC20Permit, Ownable, OAppSender {
+
+contract PreMainnetVault is UUPSUpgradeable, ERC20PermitUpgradeable, OwnableUpgradeable, OAppSenderUpgradeable {
     using SafeERC20 for IERC20;
-
-    /// @notice Underlying asset
-    IERC20 public asset;
-
-    /// @notice Maximum end timestamp for the campaign
-    uint256 public maxCampaignEnd;
-
-    /// @notice Decimals of the token
-    uint8 private _decimals;
-
-    /// @dev Transfer enabled flag after campaign ends
-    bool private _transferEnabled;
-
-    /// @notice Destination EID for the LayerZero bridge
-    uint32 public dstEid;
+    using OptionsBuilder for bytes;
 
     /// @dev Zero amounts are not allowed for minting
     error ZeroAmount();
-
-    /// @dev Zero native tokens are not allowed for deposit as it's used to pay for the LayerZero bridge
-    error ZeroNativeTokens();
 
     /// @dev Transfers not yet enabled
     error TransferNotEnabled();
@@ -53,23 +40,26 @@ contract PreMainnetVault is ERC20Permit, Ownable, OAppSender {
     /// @dev Transfers enabled
     event TransferEnabled();
 
-    /// @dev Deploy the contract with the underlying asset, deployer becomes owner
-    /// @param _name Token name
-    /// @param _symbol Token symbol
+    constructor(address _lzEndpoint) OAppCoreUpgradeable(_lzEndpoint) { }
+
+    /// @notice Initialize
+    /// @param _dstEid Destination lz EID
     /// @param _asset Underlying asset
     /// @param _maxCampaignLength Max campaign length in seconds
-    constructor(
-        address _lzEndpoint,
-        uint32 _dstEid,
-        string memory _name,
-        string memory _symbol,
-        address _asset,
-        uint256 _maxCampaignLength
-    ) ERC20(_name, _symbol) ERC20Permit(_name) Ownable(msg.sender) OAppCore(_lzEndpoint, msg.sender) {
-        dstEid = _dstEid;
-        asset = IERC20(_asset);
-        maxCampaignEnd = block.timestamp + _maxCampaignLength;
-        _decimals = IERC20Metadata(_asset).decimals();
+    function initialize(uint32 _dstEid, address _asset, uint256 _maxCampaignLength) external initializer {
+        string memory _name = string.concat(string.concat("Pre-Mainnet Vault ", IERC20Metadata(_asset).name()));
+        string memory _symbol = string.concat("pm", IERC20Metadata(_asset).symbol());
+        __ERC20_init(_name, _symbol);
+        __ERC20Permit_init(_name);
+        __Ownable_init(msg.sender);
+        __OAppSender_init(msg.sender);
+
+        PreMainnetVaultStorage storage $ = PreMainnetVaultStorageLib.get();
+        $.dstEid = _dstEid;
+        $.asset = IERC20(_asset);
+        $.maxCampaignEnd = block.timestamp + _maxCampaignLength;
+        $.decimals = IERC20Metadata(_asset).decimals();
+        $.lzReceiveGas = 100_000;
     }
 
     /// @notice Deposit underlying asset to mint cUSD on MegaETH Testnet
@@ -81,16 +71,16 @@ contract PreMainnetVault is ERC20Permit, Ownable, OAppSender {
         returns (MessagingReceipt memory msgReceipt, OFTReceipt memory oftReceipt)
     {
         if (_amount == 0) revert ZeroAmount();
-        if (msg.value < 0) revert ZeroNativeTokens();
 
-        asset.safeTransferFrom(msg.sender, address(this), _amount);
+        PreMainnetVaultStorage storage $ = PreMainnetVaultStorageLib.get();
+        $.asset.safeTransferFrom(msg.sender, address(this), _amount);
 
         _mint(msg.sender, _amount);
 
         // bridge logic
-        (bytes memory message, bytes memory options) = _buildMsgAndOptions(_amount, _destReceiver);
         MessagingFee memory _fee = MessagingFee({ nativeFee: msg.value, lzTokenFee: 0 });
-        msgReceipt = _lzSend(dstEid, message, options, _fee, _destReceiver);
+        (bytes memory message, bytes memory options) = _buildMsgAndOptions($.lzReceiveGas, _amount, _destReceiver);
+        msgReceipt = _lzSend($.dstEid, message, options, _fee, _destReceiver);
         oftReceipt = OFTReceipt(_amount, _amount);
 
         emit Deposit(msg.sender, _amount);
@@ -101,8 +91,9 @@ contract PreMainnetVault is ERC20Permit, Ownable, OAppSender {
     /// @param _destReceiver Receiver of the assets on MegaETH Testnet
     /// @return fee Fee for the LayerZero bridge
     function quoteDeposit(uint256 _amountLD, address _destReceiver) external view returns (MessagingFee memory fee) {
-        (bytes memory message, bytes memory options) = _buildMsgAndOptions(_amountLD, _destReceiver);
-        fee = _quote(dstEid, message, options, false);
+        PreMainnetVaultStorage storage $ = PreMainnetVaultStorageLib.get();
+        (bytes memory message, bytes memory options) = _buildMsgAndOptions($.lzReceiveGas, _amountLD, _destReceiver);
+        fee = _quote($.dstEid, message, options, false);
     }
 
     /// @dev Build the message and options for the LayerZero bridge
@@ -110,13 +101,13 @@ contract PreMainnetVault is ERC20Permit, Ownable, OAppSender {
     /// @param _destReceiver Receiver of the assets on MegaETH Testnet
     /// @return message Message for the LayerZero bridge
     /// @return options Options for the LayerZero bridge
-    function _buildMsgAndOptions(uint256 _amountLD, address _destReceiver)
+    function _buildMsgAndOptions(uint128 _gas, uint256 _amountLD, address _destReceiver)
         internal
         view
         returns (bytes memory message, bytes memory options)
     {
         (message,) = OFTMsgCodec.encode(OFTMsgCodec.addressToBytes32(_destReceiver), _toSD(_amountLD), "");
-        options = "";
+        options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(_gas, 0);
     }
 
     /// @dev Convert amount in shared decimals to amount in local decimals
@@ -146,28 +137,31 @@ contract PreMainnetVault is ERC20Permit, Ownable, OAppSender {
     function withdraw(uint256 _amount, address _receiver) external {
         _burn(msg.sender, _amount);
 
-        asset.safeTransfer(_receiver, _amount);
+        PreMainnetVaultStorage storage $ = PreMainnetVaultStorageLib.get();
+        $.asset.safeTransfer(_receiver, _amount);
 
         emit Withdraw(msg.sender, _amount);
-    }
-
-    /// @notice Enable transfers after campaign ends
-    function enableTransfer() external onlyOwner {
-        _transferEnabled = true;
-
-        emit TransferEnabled();
     }
 
     /// @notice Override decimals to return decimals of underlying asset
     /// @return decimals Asset decimals
     function decimals() public view override returns (uint8) {
-        return _decimals;
+        PreMainnetVaultStorage storage $ = PreMainnetVaultStorageLib.get();
+        return $.decimals;
     }
 
     /// @notice Transfers enabled
     /// @return enabled Bool for whether transfers are enabled
     function transferEnabled() public view returns (bool enabled) {
-        enabled = _transferEnabled || block.timestamp > maxCampaignEnd;
+        PreMainnetVaultStorage storage $ = PreMainnetVaultStorageLib.get();
+        enabled = $.allowTransferBeforeCampaignEnd || block.timestamp > $.maxCampaignEnd;
+    }
+
+    /// @notice Enable transfers after campaign ends
+    function enableTransfer() external onlyOwner {
+        PreMainnetVaultStorage storage $ = PreMainnetVaultStorageLib.get();
+        $.allowTransferBeforeCampaignEnd = true;
+        emit TransferEnabled();
     }
 
     /// @dev Override _update to disable transfer before campaign ends
@@ -187,4 +181,7 @@ contract PreMainnetVault is ERC20Permit, Ownable, OAppSender {
         super._transferOwnership(newOwner);
         ILayerZeroEndpointV2(endpoint).setDelegate(newOwner);
     }
+
+    /// @dev Only owner can upgrade
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner { }
 }

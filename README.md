@@ -122,6 +122,7 @@ Latest testnet deploy:
 - cUSD Lockbox 0x8c170da3f52cB59b4b51FA1cadBE0d4a6bFf996e
 - scUSD OFT Composer address: 0xD5C2Bc468Bc2439dd94ea6562494832C224f5EEA
 - cUSD OFT Composer address: 0x5936177eC39ebd79cf96C5301989270e5Dd80f75
+- scUSD Pre Mainnet Vault address: 
 
 Arbitrum Sepolia:
 - Bridged scUSD 0x939Ee9Df270aa428149eBE2277B024aE096759fC

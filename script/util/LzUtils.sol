@@ -2,10 +2,14 @@
 pragma solidity ^0.8.28;
 
 import { ILayerZeroEndpointV2 } from "@layerzerolabs/interfaces/ILayerZeroEndpointV2.sol";
+
+import { stdJson } from "forge-std/StdJson.sol";
 import { Vm } from "forge-std/Vm.sol";
 import { console } from "forge-std/console.sol";
 
 contract LzUtils {
+    using stdJson for string;
+
     struct LzConfig {
         uint32 eid;
         ILayerZeroEndpointV2 endpointV2;
@@ -48,13 +52,13 @@ contract LzUtils {
         string memory path = string.concat(root, "/script/config/layerzero-v2-deployments.json");
         string memory json = vm.readFile(path);
 
-        config.eid = uint32(vm.parseJsonUint(json, _fieldKey(vm, chainId, "eid")));
-        config.endpointV2 = ILayerZeroEndpointV2(vm.parseJsonAddress(json, _fieldKey(vm, chainId, "endpointV2")));
-        config.executor = vm.parseJsonAddress(json, _fieldKey(vm, chainId, "executor"));
-        config.nativeChainId = uint32(vm.parseJsonUint(json, _fieldKey(vm, chainId, "nativeChainId")));
-        config.receiveUln301 = vm.parseJsonAddress(json, _fieldKey(vm, chainId, "receiveUln301"));
-        config.receiveUln302 = vm.parseJsonAddress(json, _fieldKey(vm, chainId, "receiveUln302"));
-        config.sendUln301 = vm.parseJsonAddress(json, _fieldKey(vm, chainId, "sendUln301"));
-        config.sendUln302 = vm.parseJsonAddress(json, _fieldKey(vm, chainId, "sendUln302"));
+        config.eid = uint32(json.readUint(_fieldKey(vm, chainId, "eid")));
+        config.endpointV2 = ILayerZeroEndpointV2(json.readAddress(_fieldKey(vm, chainId, "endpointV2")));
+        config.executor = json.readAddress(_fieldKey(vm, chainId, "executor"));
+        config.nativeChainId = uint32(json.readUint(_fieldKey(vm, chainId, "nativeChainId")));
+        config.receiveUln301 = json.readAddress(_fieldKey(vm, chainId, "receiveUln301"));
+        config.receiveUln302 = json.readAddress(_fieldKey(vm, chainId, "receiveUln302"));
+        config.sendUln301 = json.readAddress(_fieldKey(vm, chainId, "sendUln301"));
+        config.sendUln302 = json.readAddress(_fieldKey(vm, chainId, "sendUln302"));
     }
 }
