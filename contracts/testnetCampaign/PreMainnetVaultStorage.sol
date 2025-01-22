@@ -16,8 +16,6 @@ struct PreMainnetVaultStorage {
     bool allowTransferBeforeCampaignEnd;
     /// @notice Gas limit for the LayerZero bridge
     uint128 lzReceiveGas;
-    /// @notice Gas limit for the LayerZero bridge
-    uint128 sourceToDstGas;
 }
 
 /// @title Network storage pointer
