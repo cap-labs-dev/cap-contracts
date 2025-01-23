@@ -339,10 +339,14 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
 
             address recipient = makeAddr("recipient");
 
+            // collateral in USD (8 decimals)
+            uint256 agentCollateral = middleware.coverage(user_agent);
+
             // slash 10% of agent collateral
             middleware.slash(user_agent, recipient, 1e17);
 
-            assertGt(IERC20(collateral).balanceOf(recipient), 0);
+            // collateral * price ($1) * 10% * collateral decimals / price decimals
+            assertEq(IERC20(collateral).balanceOf(recipient), agentCollateral * 1e18 / 1e9);
 
             vm.stopPrank();
         }
