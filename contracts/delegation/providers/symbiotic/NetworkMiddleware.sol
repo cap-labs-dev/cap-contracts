@@ -110,12 +110,9 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
         address _oracle
     ) internal view returns (uint256 toSlash) {
         uint256 collateralPrice = IOracle(_oracle).getPrice(_collateral);
-        
-        /// @dev Price Oracle returns price in 8 decimals
-        /// TODO: Fetch this instead of hard code
-        uint8 ORACLE_DECIMALS = 8;
+        uint8 decimals = IERC20Metadata(_collateral).decimals();
 
-        toSlash = _amount * collateralPrice / (10 ** ORACLE_DECIMALS);
+        toSlash = _amount * (10 ** decimals) / collateralPrice;
     }
 
     /// @notice Coverage of an agent by Symbiotic vaults
