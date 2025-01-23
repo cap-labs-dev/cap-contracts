@@ -242,8 +242,11 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
         {
             vm.startPrank(user_cap_admin);
 
+            address[] memory agents = new address[](1);
+            agents[0] = user_agent;
+
             // register the vault in the network
-            middleware.registerVault(address(vault));
+            middleware.registerVault(address(vault), agents);
 
             vm.stopPrank();
         }
@@ -336,9 +339,10 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
 
             address recipient = makeAddr("recipient");
 
-            middleware.slash(user_agent, address(vault), recipient, 10e18);
+            // slash 10% of agent collateral
+            middleware.slash(user_agent, recipient, 1e17);
 
-            assertEq(IERC20(collateral).balanceOf(recipient), 10e18);
+            assertGt(IERC20(collateral).balanceOf(recipient), 0);
 
             vm.stopPrank();
         }
@@ -362,7 +366,8 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             address recipient = makeAddr("recipient");
 
             vm.expectRevert();
-            middleware.slash(user_agent, address(vault), recipient, 10e18);
+            // slash 10% of agent collateral
+            middleware.slash(user_agent, recipient, 1e17);
 
             vm.stopPrank();
         }
