@@ -88,42 +88,27 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
 
         for (uint256 i; i < $.vaults[_agent].length; ++i) {
             IVault vault = IVault($.vaults[_agent][i]);
-            uint256 toSlashValue = coverageByVault(_agent, address(vault), $.oracle, _timestamp) * _slashShare / 1e18;
+            (, uint256 delegatedCollateral) = coverageByVault(_agent, address(vault), $.oracle, _timestamp);
+            uint256 slashShareOfCollateral = delegatedCollateral * _slashShare / 1e18;
             address collateral = vault.collateral();
-        
-            uint256 toSlash = _toSlash(collateral, toSlashValue, $.oracle);
 
-            ISlasher(vault.slasher()).slash(subnetwork(), _agent, toSlash, _timestamp, new bytes(0));
+            ISlasher(vault.slasher()).slash(subnetwork(), _agent, slashShareOfCollateral, _timestamp, new bytes(0));
             // TODO: the burner could be a non routing burner, could add hooks?
             IBurnerRouter(vault.burner()).triggerTransfer(address(this));
-            IERC20(collateral).safeTransfer(_recipient, toSlash);
+            IERC20(collateral).safeTransfer(_recipient, slashShareOfCollateral);
 
-            emit Slash(_agent, _recipient, toSlash);
+            emit Slash(_agent, _recipient, slashShareOfCollateral);
         }
     }
 
-    /// @dev Fetch the current amounts that can be slashed from a vault for an agent
-    /// @param _collateral Collateral address
-    /// @param _amount Amount in USD to slash
-    /// @param _oracle Oracle address
-    function _toSlash(
-        address _collateral,
-        uint256 _amount,
-        address _oracle
-    ) internal view returns (uint256 toSlash) {
-        uint256 collateralPrice = IOracle(_oracle).getPrice(_collateral);
-        uint8 decimals = IERC20Metadata(_collateral).decimals();
-
-        toSlash = _amount * (10 ** decimals) / collateralPrice;
-    }
-
-    function coverageByVault(address _agent, address _vault, address _oracle, uint48 _timestamp) public view returns (uint256 delegation) {
+    function coverageByVault(address _agent, address _vault, address _oracle, uint48 _timestamp) public view returns (uint256 collateralValue, uint256 collateral) {
         address collateralAddress = IVault(_vault).collateral();
         uint8 decimals = IERC20Metadata(collateralAddress).decimals();
         uint256 collateralPrice = IOracle(_oracle).getPrice(collateralAddress);
 
-        uint256 collateral = IBaseDelegator(IVault(_vault).delegator()).stakeAt(subnetwork(), _agent, _timestamp, "");
-        delegation = collateral * collateralPrice / (10 ** decimals);
+        collateral = IBaseDelegator(IVault(_vault).delegator()).stakeAt(subnetwork(), _agent, _timestamp, "");
+        collateralValue = collateral * collateralPrice / (10 ** decimals);
+        return (collateralValue, collateral);
     }
 
     /// @notice Coverage of an agent by Symbiotic vaults
@@ -133,7 +118,8 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
 
         for (uint256 i = 0; i < $.vaults[_agent].length; i++) {
-            delegation += coverageByVault(_agent, $.vaults[_agent][i], $.oracle, timestamp());
+            (uint256 value,) = coverageByVault(_agent, $.vaults[_agent][i], $.oracle, timestamp());
+            delegation += value;
         }
     }
 
@@ -195,13 +181,14 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
     function distributeRewards(address _token) external checkAccess(this.distributeRewards.selector) {
         uint256 amount = IERC20(_token).balanceOf(address(this));
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
+        IERC20(_token).forceApprove(address(IStakerRewards($.stakerRewarder)), amount);
         IStakerRewards($.stakerRewarder).distributeRewards(
             $.network,
             _token,
             amount,
             abi.encode(
-                uint48(block.timestamp - 1),
-                0,
+                timestamp(),
+                1000, // Min Fee Amount we allow. Maybe we should make this configurable?
                 new bytes(0),
                 new bytes(0)
             )

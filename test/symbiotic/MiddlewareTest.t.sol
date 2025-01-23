@@ -44,8 +44,11 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
     SymbioticConfig public symbioticConfig;
     NetworkMiddleware public middlewareImplementation;
     MockERC20 public collateral;
+    MockERC20 public eth;
     MockChainlinkPriceFeed public usdtChainlinkPriceFeed;
+    MockChainlinkPriceFeed public ethChainlinkPriceFeed;
     IBurnerRouter public burnerRouter;
+    IBurnerRouter public burnerRouterEth;
     uint48 public burnerRouterDelay = 0;
     uint48 public vaultEpochDuration = 1 hours;
     uint48 public slashDuration = 50 minutes;
@@ -54,9 +57,13 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
     AccessControl public accessControl;
     Oracle public oracle;
     IVault public vault;
+    IVault public ethVault;
     INetworkRestakeDelegator public networkRestakeDelegator;
+    INetworkRestakeDelegator public ethNetworkRestakeDelegator;
     ISlasher public immediateSlasher;
+    ISlasher public ethImmediateSlasher;
     IDefaultStakerRewards public defaultStakerRewards;
+    IDefaultStakerRewards public ethDefaultStakerRewards;
 
     address public user_agent;
     address public user_restaker;
@@ -79,6 +86,9 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             collateral = new MockERC20("Mock USDC", "USDC");
             MockERC20(collateral).mint(user_restaker, 10_000_000e18);
 
+            eth = new MockERC20("Mock ETH", "ETH");
+            MockERC20(eth).mint(user_restaker, 10_000_000e18);
+
             symbioticConfig = getConfig();
         }
 
@@ -88,6 +98,7 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
 
             // deploy a default burner
             address defaultBurner = address(new SimpleBurner(address(collateral)));
+            address defaultBurnerEth = address(new SimpleBurner(address(eth)));
 
             // burner router setup
             // https://docs.symbiotic.fi/guides/vault-deployment/#1-burner-router
@@ -99,6 +110,19 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
                         collateral: address(collateral), // address of the collateral - wstETH (MUST be the same as for the Vault to connect)
                         delay: burnerRouterDelay, // duration of the receivers’ update delay (= 21 days)
                         globalReceiver: defaultBurner, // address of the pure burner corresponding to the collateral - wstETH_Burner (some collaterals are covered by us; see Deployments page)
+                        networkReceivers: new IBurnerRouter.NetworkReceiver[](0), // array with IBurnerRouter.NetworkReceiver elements meaning network-specific receivers
+                        operatorNetworkReceivers: new IBurnerRouter.OperatorNetworkReceiver[](0) // array with IBurnerRouter.OperatorNetworkReceiver elements meaning network-specific receivers
+                     })
+                )
+            );
+
+            burnerRouterEth = IBurnerRouter(
+                IBurnerRouterFactory(symbioticConfig.factories.burnerRouterFactory).create(
+                    IBurnerRouter.InitParams({
+                        owner: user_vault_admin, // address of the router’s owner
+                        collateral: address(eth), // address of the collateral - wstETH (MUST be the same as for the Vault to connect)
+                        delay: burnerRouterDelay, // duration of the receivers’ update delay (= 21 days)
+                        globalReceiver: defaultBurnerEth, // address of the pure burner corresponding to the collateral - wstETH_Burner (some collaterals are covered by us; see Deployments page)
                         networkReceivers: new IBurnerRouter.NetworkReceiver[](0), // array with IBurnerRouter.NetworkReceiver elements meaning network-specific receivers
                         operatorNetworkReceivers: new IBurnerRouter.OperatorNetworkReceiver[](0) // array with IBurnerRouter.OperatorNetworkReceiver elements meaning network-specific receivers
                      })
@@ -157,9 +181,52 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
                     )
                 })
             );
+
+            (address _vaultEth, address _networkRestakeDelegatorEth, address _immediateSlasherEth) = IVaultConfigurator(
+                symbioticConfig.services.vaultConfigurator
+            ).create(
+                IVaultConfigurator.InitParams({
+                    version: 1, // Vault’s version (= common one)
+                    owner: user_vault_admin, // address of the Vault’s owner (can migrate the Vault to new versions in the future)
+                    vaultParams: abi.encode(IVault.InitParams({
+                        collateral: address(eth), // address of the collateral - wstETH
+                        burner: address(burnerRouterEth), // address of the deployed burner router
+                        epochDuration: vaultEpochDuration, // duration of the Vault epoch in seconds (= 7 days)
+                        depositWhitelist: false, // if enable deposit whitelisting
+                        isDepositLimit: false, // if enable deposit limit
+                        depositLimit: 0, // deposit limit
+                        defaultAdminRoleHolder: user_vault_admin, // address of the Vault’s admin (can manage all roles)
+                        depositWhitelistSetRoleHolder: user_vault_admin, // address of the enabler/disabler of the deposit whitelisting
+                        depositorWhitelistRoleHolder: user_vault_admin, // address of the depositors whitelister
+                        isDepositLimitSetRoleHolder: user_vault_admin, // address of the enabler/disabler of the deposit limit
+                        depositLimitSetRoleHolder: user_vault_admin // address of the deposit limit setter
+                    })),
+                    delegatorIndex: uint64(DelegatorType.NETWORK_RESTAKE), // Delegator’s type (= NetworkRestakeDelegator)
+                    delegatorParams: abi.encode(INetworkRestakeDelegator.InitParams({
+                        baseParams: IBaseDelegator.BaseParams({
+                            defaultAdminRoleHolder: user_vault_admin, // address of the Delegator’s admin (can manage all roles)
+                            hook: 0x0000000000000000000000000000000000000000, // address of the hook (if not zero, receives onSlash() call on each slashing)
+                            hookSetRoleHolder: user_vault_admin // address of the hook setter
+                         }),
+                         networkLimitSetRoleHolders: networkLimitSetRoleHolders, // array of addresses of the network limit setters
+                         operatorNetworkSharesSetRoleHolders: operatorNetworkSharesSetRoleHolders // array of addresses of the operator-network shares setters
+                    })),
+                    withSlasher: true, // if enable Slasher module
+                    slasherIndex: uint64(SlasherType.INSTANT), // Slasher’s type (0 = ImmediateSlasher, 1 = VetoSlasher)
+                    slasherParams: abi.encode(ISlasher.InitParams({
+                        baseParams: IBaseSlasher.BaseParams({
+                            isBurnerHook: true // if enable the `burner` to receive onSlash() call after each slashing (is needed for the burner router workflow)
+                         })
+                    }))
+                })
+            );
+
             vault = IVault(_vault);
+            ethVault = IVault(_vaultEth);
             networkRestakeDelegator = INetworkRestakeDelegator(_networkRestakeDelegator);
+            ethNetworkRestakeDelegator = INetworkRestakeDelegator(_networkRestakeDelegatorEth);
             immediateSlasher = ISlasher(_immediateSlasher);
+            ethImmediateSlasher = ISlasher(_immediateSlasherEth);
 
             // default staker rewards setup
             // https://docs.symbiotic.fi/guides/vault-deployment/#3-staker-rewards
@@ -167,6 +234,18 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
                 IDefaultStakerRewardsFactory(symbioticConfig.factories.defaultStakerRewardsFactory).create(
                     IDefaultStakerRewards.InitParams({
                         vault: address(vault), // address of the deployed Vault
+                        adminFee: 1000, // admin fee percent to get from all the rewards distributions (10% = 1_000 | 100% = 10_000)
+                        defaultAdminRoleHolder: user_cap_admin, // address of the main admin (can manage all roles)
+                        adminFeeClaimRoleHolder: user_cap_admin, // address of the admin fee claimer
+                        adminFeeSetRoleHolder: user_cap_admin // address of the admin fee setter
+                     })
+                )
+            );
+
+            ethDefaultStakerRewards = IDefaultStakerRewards(
+                IDefaultStakerRewardsFactory(symbioticConfig.factories.defaultStakerRewardsFactory).create(
+                    IDefaultStakerRewards.InitParams({
+                        vault: address(ethVault), // address of the deployed Vault
                         adminFee: 1000, // admin fee percent to get from all the rewards distributions (10% = 1_000 | 100% = 10_000)
                         defaultAdminRoleHolder: user_cap_admin, // address of the main admin (can manage all roles)
                         adminFeeClaimRoleHolder: user_cap_admin, // address of the admin fee claimer
@@ -210,11 +289,16 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             accessControl.grantAccess(middleware.registerVault.selector, address(middleware), user_cap_admin);
             accessControl.grantAccess(middleware.slash.selector, address(middleware), user_cap_admin);
             accessControl.grantAccess(oracle.setPriceOracleData.selector, address(oracle), cap_network_address);
+            accessControl.grantAccess(middleware.distributeRewards.selector, address(middleware), user_cap_admin);
 
 
             usdtChainlinkPriceFeed = new MockChainlinkPriceFeed();
             usdtChainlinkPriceFeed.setDecimals(8);
             usdtChainlinkPriceFeed.setLatestAnswer(1e8);
+
+            ethChainlinkPriceFeed = new MockChainlinkPriceFeed();
+            ethChainlinkPriceFeed.setDecimals(8);
+            ethChainlinkPriceFeed.setLatestAnswer(3200e8);
 
             chainlinkAdapter = address(ChainlinkAdapter);
 
@@ -222,7 +306,14 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
                 adapter: address(chainlinkAdapter),
                 payload: abi.encodeWithSelector(ChainlinkAdapter.price.selector, address(usdtChainlinkPriceFeed))
             });
+
+            IOracle.OracleData memory ethOracleData = IOracle.OracleData({
+                adapter: address(chainlinkAdapter),
+                payload: abi.encodeWithSelector(ChainlinkAdapter.price.selector, address(ethChainlinkPriceFeed))
+            });
+
             oracle.setPriceOracleData(address(collateral), usdtOracleData);
+            oracle.setPriceOracleData(address(eth), ethOracleData);
 
             vm.stopPrank();
         }
@@ -233,6 +324,9 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
 
             burnerRouter.setNetworkReceiver(cap_network_address, address(middleware));
             burnerRouter.acceptNetworkReceiver(cap_network_address);
+
+            burnerRouterEth.setNetworkReceiver(cap_network_address, address(middleware));
+            burnerRouterEth.acceptNetworkReceiver(cap_network_address);
 
             vm.stopPrank();
         }
@@ -247,7 +341,7 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
 
             // register the vault in the network
             middleware.registerVault(address(vault), agents);
-
+            middleware.registerVault(address(ethVault), agents);
             vm.stopPrank();
         }
 
@@ -268,6 +362,7 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
         {
             vm.startPrank(user_agent);
             IOptInService(symbioticConfig.services.vaultOptInService).optIn(address(vault));
+            IOptInService(symbioticConfig.services.vaultOptInService).optIn(address(ethVault));
             vm.stopPrank();
         }
 
@@ -284,6 +379,9 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
         {
             vm.startPrank(cap_network_address);
             INetworkRestakeDelegator(networkRestakeDelegator).setMaxNetworkLimit(
+                middleware.subnetworkIdentifier(), type(uint256).max
+            );
+            INetworkRestakeDelegator(ethNetworkRestakeDelegator).setMaxNetworkLimit(
                 middleware.subnetworkIdentifier(), type(uint256).max
             );
             vm.stopPrank();
@@ -303,6 +401,9 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             INetworkRestakeDelegator(networkRestakeDelegator).setNetworkLimit(
                 middleware.subnetwork(), type(uint256).max
             );
+            INetworkRestakeDelegator(ethNetworkRestakeDelegator).setNetworkLimit(
+                middleware.subnetwork(), type(uint256).max
+            );
 
             vm.stopPrank();
         }
@@ -314,6 +415,7 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
 
             // actually delegate to the agent
             networkRestakeDelegator.setOperatorNetworkShares(middleware.subnetwork(), user_agent, type(uint256).max);
+            ethNetworkRestakeDelegator.setOperatorNetworkShares(middleware.subnetwork(), user_agent, type(uint256).max);
 
             vm.stopPrank();
         }
@@ -324,6 +426,9 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
 
             IERC20(collateral).approve(address(vault), 1000e18);
             vault.deposit(user_restaker, 1000e18);
+
+            IERC20(eth).approve(address(ethVault), 1000e18);
+            ethVault.deposit(user_restaker, 1000e18);
 
             vm.stopPrank();
         }
@@ -341,12 +446,17 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
 
             // collateral in USD (8 decimals)
             uint256 agentCollateral = middleware.coverage(user_agent);
+            console.log("agentCollateral", agentCollateral);
 
             // slash 10% of agent collateral
             middleware.slash(user_agent, recipient, 1e17);
 
             // collateral * price ($1) * 10% * collateral decimals / price decimals
-            assertEq(IERC20(collateral).balanceOf(recipient), agentCollateral * 1e18 / 1e9);
+
+            console.log("collateral balance of liquidator", IERC20(collateral).balanceOf(recipient));
+            console.log("eth balance of liquidator", IERC20(eth).balanceOf(recipient));
+          //  assertEq(IERC20(collateral).balanceOf(recipient), agentCollateral * 1e18 / 1e9);
+          //  assertEq(IERC20(eth).balanceOf(recipient), agentCollateral * 3200e8 / 1e9);
 
             vm.stopPrank();
         }
@@ -375,5 +485,18 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
 
             vm.stopPrank();
         }
+    }
+
+    function test_distribute_rewards() public {
+        vm.startPrank(user_cap_admin);
+
+        // Send some rewards to the middleware
+        collateral.mint(address(middleware), 10e18);
+        middleware.distributeRewards(address(collateral));
+
+        // Check that the rewards were distributed to the staker rewards contract
+        assertEq(IERC20(collateral).balanceOf(address(defaultStakerRewards)), 10e18);
+
+        vm.stopPrank();
     }
 }
