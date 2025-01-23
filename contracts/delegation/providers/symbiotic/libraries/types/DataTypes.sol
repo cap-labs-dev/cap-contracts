@@ -15,8 +15,7 @@ library DataTypes {
         address stakerRewarder;
         uint48 requiredEpochDuration;
         uint48 slashDuration;
-        address[] vaults;
-        mapping(address => bool) registered;
+        mapping(address => address[]) vaults;
     }
 
     enum SlasherType {

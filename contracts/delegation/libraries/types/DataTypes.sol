@@ -4,10 +4,9 @@ pragma solidity ^0.8.28;
 library DataTypes {
     /// @custom:storage-location erc7201:cap.storage.Delegation
     struct DelegationStorage {
-        address[] delegators;
         address[] agents;
         mapping(address => AgentData) agentData;
-        mapping(address => address) delegatorsByNetwork;
+        mapping(address => address[]) delegators;
         address oracle;
     }
 

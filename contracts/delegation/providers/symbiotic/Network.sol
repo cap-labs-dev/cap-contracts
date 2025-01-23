@@ -39,7 +39,7 @@ contract Network is UUPSUpgradeable, AccessUpgradeable {
         INetworkMiddlewareService(_middlewareService).setMiddleware(_middleware);
     }
 
-    /// @notice Register vault
+    /// @notice Register vault with Symbiotic
     /// @param _vault Vault address
     function registerVault(address _vault) external checkAccess(this.registerVault.selector) {
         DataTypes.NetworkStorage storage $ = NetworkStorage.get();
@@ -48,7 +48,6 @@ contract Network is UUPSUpgradeable, AccessUpgradeable {
             IMiddleware($.middleware).subnetworkIdentifier(),
             type(uint256).max
         );
-        IMiddleware($.middleware).registerVault(_vault);
     }
 
     /// @dev Only admin can upgrade

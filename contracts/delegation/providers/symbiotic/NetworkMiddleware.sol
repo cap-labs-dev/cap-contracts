@@ -25,9 +25,8 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
     using SafeERC20 for IERC20;
 
     event VaultRegistered(address vault);
-    event Slash(address indexed agent, address recipient, uint256 amount, uint256 leftover);
+    event Slash(address indexed agent, address recipient, uint256 amount);
 
-    error VaultAlreadyRegistered();
     error InvalidSlasher();
     error InvalidDelegator();
     error NotVault();
@@ -66,38 +65,41 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
         if (_slashDuration >= _requiredEpochDuration) revert InvalidSlashDuration();
     }
 
-    /// @notice Register vault at end of slashing queue
+    /// @notice Register vault to be used as collateral within the CAP system
     /// @param _vault Vault address
-    function registerVault(address _vault) external checkAccess(this.registerVault.selector) {
+    /// @param _agents Agents supported by the vault
+    function registerVault(address _vault, address[] calldata _agents) external checkAccess(this.registerVault.selector) {
         _verifyVault(_vault);
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
-        $.vaults.push(_vault);
-        $.registered[_vault] = true;
+        for (uint256 i; i < _agents.length; ++i) {
+            $.vaults[_agents[i]].push(_vault);
+        }
         emit VaultRegistered(_vault);
     }
 
     /// @notice Slash delegation and send to recipient
     /// @param _agent Agent address
     /// @param _recipient Recipient of the slashed assets
-    /// @param _vault The vault to slash
-    /// @param _amount USD value of assets to slash
-    function slash(address _agent, address _vault, address _recipient, uint256 _amount) external checkAccess(this.slash.selector) {
+    /// @param _slashShare Percentage of delegation to slash
+    function slash(address _agent, address _recipient, uint256 _slashShare) external checkAccess(this.slash.selector) {
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
 
-        /// @dev We need to slash the delegated collateral that is available at timestamp - slash duration time.
-        uint48 slashTimestamp = uint48(block.timestamp - $.slashDuration);
+        uint48 _timestamp = timestamp();
 
-        IVault vault = IVault(_vault);
-        address collateral = vault.collateral();
-    
-        uint256 toSlash = _toSlash(collateral, _amount, $.oracle);
+        for (uint256 i; i < $.vaults[_agent].length; ++i) {
+            IVault vault = IVault($.vaults[_agent][i]);
+            uint256 toSlashValue = coverageByVault(_agent, address(vault), $.oracle, _timestamp) * _slashShare / 1e18;
+            address collateral = vault.collateral();
+        
+            uint256 toSlash = _toSlash(collateral, toSlashValue, $.oracle);
 
-        ISlasher(vault.slasher()).slash(subnetwork(), _agent, toSlash, slashTimestamp, new bytes(0));
-        // TODO: the burner could be a non routing burner, could add hooks?
-        IBurnerRouter(vault.burner()).triggerTransfer(address(this));
-        IERC20(collateral).safeTransfer(_recipient, toSlash);
+            ISlasher(vault.slasher()).slash(subnetwork(), _agent, toSlash, _timestamp, new bytes(0));
+            // TODO: the burner could be a non routing burner, could add hooks?
+            IBurnerRouter(vault.burner()).triggerTransfer(address(this));
+            IERC20(collateral).safeTransfer(_recipient, toSlash);
 
-        emit Slash(_agent, _recipient, _amount, toSlash);
+            emit Slash(_agent, _recipient, toSlash);
+        }
     }
 
     /// @dev Fetch the current amounts that can be slashed from a vault for an agent
@@ -115,25 +117,30 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
         toSlash = _amount * (10 ** decimals) / collateralPrice;
     }
 
+    function coverageByVault(address _agent, address _vault, address _oracle, uint48 _timestamp) public view returns (uint256 delegation) {
+        address collateralAddress = IVault(_vault).collateral();
+        uint8 decimals = IERC20Metadata(collateralAddress).decimals();
+        uint256 collateralPrice = IOracle(_oracle).getPrice(collateralAddress);
+
+        uint256 collateral = IBaseDelegator(IVault(_vault).delegator()).stakeAt(subnetwork(), _agent, _timestamp, "");
+        delegation = collateral * collateralPrice / (10 ** decimals);
+    }
+
     /// @notice Coverage of an agent by Symbiotic vaults
     /// @param _agent Agent address
     /// @return delegation Delegation amount in USD (8 decimals)
     function coverage(address _agent) external view returns (uint256 delegation) {
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
 
-        /// @dev We look slashDuration into the past to see what time we have coverage,
-        /// this means a agent is only covered after timestamp of delegation + slash duration
-        uint48 coveredTimestamp = uint48(block.timestamp - $.slashDuration);
-
-        for (uint256 i = 0; i < $.vaults.length; i++) {
-            IVault vault = IVault($.vaults[i]);
-            address collateralAddress = vault.collateral();
-            uint8 decimals = IERC20Metadata(collateralAddress).decimals();
-            uint256 collateralPrice = IOracle($.oracle).getPrice(collateralAddress);
-
-            uint256 collateral = IBaseDelegator(vault.delegator()).stakeAt(subnetwork(), _agent, coveredTimestamp, "");
-            delegation += collateral * collateralPrice / (10 ** decimals);
+        for (uint256 i = 0; i < $.vaults[_agent].length; i++) {
+            delegation += coverageByVault(_agent, $.vaults[_agent][i], $.oracle, timestamp());
         }
+    }
+
+    function timestamp() public view returns (uint48 stamp) {
+        DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
+        /// @dev We need to slash the delegated collateral that is available at timestamp - slash duration time.
+        stamp = uint48(block.timestamp - $.slashDuration);
     }
 
     /// @notice Subnetwork id
@@ -148,11 +155,12 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
         id = Subnetwork.subnetwork($.network, 0);
     }
 
-    /// @notice Registered vaults
+    /// @notice Registered vaults for an agent
+    /// @param _agent Agent address
     /// @return vaultAddresses Vault addresses
-    function vaults() external view returns (address[] memory vaultAddresses) {
+    function vaults(address _agent) external view returns (address[] memory vaultAddresses) {
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
-        vaultAddresses = $.vaults;
+        vaultAddresses = $.vaults[_agent];
     }
 
     /// @dev Verify a vault has the required specifications
@@ -165,7 +173,6 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
         }
 
         if (!IVault(_vault).isInitialized()) revert VaultNotInitialized();
-        if ($.registered[_vault]) revert VaultAlreadyRegistered();
 
         uint48 vaultEpoch = IVault(_vault).epochDuration();
         if (vaultEpoch != $.requiredEpochDuration) revert InvalidEpochDuration($.requiredEpochDuration, vaultEpoch);
