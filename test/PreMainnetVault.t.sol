@@ -6,12 +6,13 @@ import { PreMainnetVault } from "../contracts/testnetCampaign/PreMainnetVault.so
 import { L2Token } from "../contracts/token/L2Token.sol";
 import { MockERC20 } from "./mocks/MockERC20.sol";
 
+import { ProxyUtils } from "../script/util/ProxyUtils.sol";
 import { MessagingFee } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import { TestHelperOz5 } from "@layerzerolabs/test-devtools-evm-foundry/contracts/TestHelperOz5.sol";
 import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
 
-contract PreMainnetVaultTest is Test, TestHelperOz5 {
+contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils {
     L2Token public dstOFT;
     PreMainnetVault public vault;
     MockERC20 public asset;
@@ -46,8 +47,9 @@ contract PreMainnetVaultTest is Test, TestHelperOz5 {
         setUpEndpoints(2, LibraryType.SimpleMessageLib);
 
         // Deploy vault implementation
-        vault = new PreMainnetVault(endpoints[srcEid]);
-        vault.initialize(dstEid, address(asset), MAX_CAMPAIGN_LENGTH);
+        PreMainnetVault vaultImpl = new PreMainnetVault(endpoints[srcEid]);
+        vault = PreMainnetVault(_proxy(address(vaultImpl)));
+        vault.initialize(address(asset), dstEid, MAX_CAMPAIGN_LENGTH);
 
         // Setup mock dst oapp
         dstOFT = L2Token(
@@ -69,7 +71,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5 {
             vm.startPrank(holder);
 
             asset.approve(address(vault), initialBalance);
-            MessagingFee memory fee = vault.quoteDeposit(initialBalance, holder);
+            MessagingFee memory fee = vault.quote(initialBalance, holder);
             vault.deposit{ value: fee.nativeFee }(initialBalance, holder);
 
             vm.stopPrank();
@@ -89,7 +91,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5 {
         asset.approve(address(vault), amount);
 
         // quote fees to get some
-        MessagingFee memory fee = vault.quoteDeposit(amount, user);
+        MessagingFee memory fee = vault.quote(amount, user);
 
         // Expect Deposit event
         vm.expectEmit(true, true, true, true);
@@ -114,7 +116,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5 {
 
         asset.approve(address(vault), 1);
 
-        MessagingFee memory fee = vault.quoteDeposit(1, user);
+        MessagingFee memory fee = vault.quote(1, user);
 
         vm.expectRevert(PreMainnetVault.ZeroAmount.selector);
         vault.deposit{ value: fee.nativeFee }(0, user);
@@ -129,7 +131,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5 {
 
         asset.approve(address(vault), amount);
 
-        MessagingFee memory fee = vault.quoteDeposit(amount, user);
+        MessagingFee memory fee = vault.quote(amount, user);
 
         vm.expectRevert();
         vault.deposit{ value: fee.nativeFee - 1 }(amount, user);
