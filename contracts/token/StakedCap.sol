@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import { StakedCapStorage } from "./storage/StakedCapStorage.sol";
+
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { ERC20PermitUpgradeable } from
     "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import { ERC4626Upgradeable, ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import { SafeERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { IERC20Metadata, IERC20 } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
 
 /// @title Staked Cap Token
@@ -15,27 +16,6 @@ import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
 /// borrowing from the underlying assets.
 /// @dev Calling notify permissionlessly will start the linear unlock
 contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeable, AccessUpgradeable {
-    using SafeERC20 for IERC20;
-
-    /// @custom:storage-location erc7201:cap.storage.StakedCap
-    struct StakedCapStorage {
-        uint256 storedTotal;
-        uint256 totalLocked;
-        uint256 lastNotify;
-        uint256 lockDuration;
-    }
-
-    /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.StakedCap")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant StakedCapStorageLocation = 0xc3a6ec7b30f1d79063d00dcbb5942b226b77fe48a28f1a19018e7d1f70fd7600;
-
-    /// @dev Get this contract storage pointer
-    /// @return $ Storage pointer
-    function _getStakedCapStorage() private pure returns (StakedCapStorage storage $) {
-        assembly {
-            $.slot := StakedCapStorageLocation
-        }
-    }
-
     /// @dev Disable initializers on the implementation
     constructor() {
         _disableInitializers();
@@ -54,8 +34,7 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
         __ERC20Permit_init(_name);
         __Access_init(_accessControl);
 
-        StakedCapStorage storage $ = _getStakedCapStorage();
-        $.lockDuration = _lockDuration;
+        StakedCapStorage.get().lockDuration = _lockDuration;
     }
 
     /// @notice Override the decimals function to match underlying decimals
@@ -67,7 +46,7 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
     /// @notice Notify the yield to start vesting
     function notify() external {
         uint256 total = IERC20(asset()).balanceOf(address(this));
-        StakedCapStorage storage $ = _getStakedCapStorage();
+        StakedCapStorage.StakedCapStorageStruct storage $ = StakedCapStorage.get();
         if (total > $.storedTotal) {
             $.totalLocked = lockedProfit() + total - $.storedTotal;
             $.storedTotal = total;
@@ -78,7 +57,7 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
     /// @notice Remaining locked profit after a notification
     /// @return locked Amount remaining to be vested
     function lockedProfit() public view returns (uint256 locked) {
-        StakedCapStorage storage $ = _getStakedCapStorage();
+        StakedCapStorage.StakedCapStorageStruct storage $ = StakedCapStorage.get();
         if ($.lockDuration == 0) return 0;
         uint256 elapsed = block.timestamp - $.lastNotify;
         uint256 remaining = elapsed < $.lockDuration ? $.lockDuration - elapsed : 0;
@@ -88,26 +67,20 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
     /// @notice Total vested cap tokens on this contract
     /// @return total Total amount of vested cap tokens
     function totalAssets() public view override returns (uint256 total) {
-        StakedCapStorage storage $ = _getStakedCapStorage();
-        total = $.storedTotal - lockedProfit();
+        total = StakedCapStorage.get().storedTotal - lockedProfit();
     }
 
-    /// @dev Overriden to update the total assets including unvested tokens
+    /// @dev Overridden to update the total assets including unvested tokens
     /// @param _caller Caller of the deposit
     /// @param _receiver Receiver of the staked cap tokens
     /// @param _assets Amount of cap tokens to pull from the caller
     /// @param _shares Amount of staked cap tokens to send to receiver
     function _deposit(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal override {
-        SafeERC20.safeTransferFrom(IERC20(asset()), _caller, address(this), _assets);
-        _mint(_receiver, _shares);
-
-        StakedCapStorage storage $ = _getStakedCapStorage();
-        $.storedTotal += _shares;
-
-        emit Deposit(_caller, _receiver, _assets, _shares);
+        super._deposit( _caller, _receiver, _assets, _shares);
+        StakedCapStorage.get().storedTotal += _assets;
     }
 
-    /// @dev Overriden to reduce the total assts including unvested tokens
+    /// @dev Overridden to reduce the total assets including unvested tokens
     /// @param _caller Caller of the withdrawal
     /// @param _receiver Receiver of the cap tokens
     /// @param _owner Owner of the staked cap tokens being burnt
@@ -117,17 +90,8 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
         internal
         override
     {
-        if (_caller != _owner) {
-            _spendAllowance(_owner, _caller, _shares);
-        }
-
-        _burn(_owner, _shares);
-        SafeERC20.safeTransfer(IERC20(asset()), _receiver, _assets);
-
-        StakedCapStorage storage $ = _getStakedCapStorage();
-        $.storedTotal -= _shares;
-
-        emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
+        super._withdraw(_caller, _receiver, _owner, _assets, _shares);
+        StakedCapStorage.get().storedTotal -= _assets;
     }
 
     /// @dev Only admin can upgrade implementation
