@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import { DataTypes } from "./DataTypes.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title OAppMessenger storage pointer
 /// @author kexley, @capLabs
