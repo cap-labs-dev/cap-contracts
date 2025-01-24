@@ -50,14 +50,14 @@ contract OAppMessenger is OAppSenderUpgradeable {
         fee = _quote($.dstEid, message, options, false);
     }
 
-    /// @dev Message using layer zero
+    /// @dev Message using layer zero. Fee overpays are refunded to caller
     /// @param _destReceiver Receiver of assets on destination chain
     /// @param _amountLD Amount of asset in local decimals
     function _sendMessage(address _destReceiver, uint256 _amountLD) internal {
         DataTypes.OAppMessengerStorage storage $ = OAppMessengerStorage.get();
         MessagingFee memory _fee = MessagingFee({ nativeFee: msg.value, lzTokenFee: 0 });
         (bytes memory message, bytes memory options) = _buildMsgAndOptions($.lzReceiveGas, _amountLD, _destReceiver);
-        _lzSend($.dstEid, message, options, _fee, _destReceiver);
+        _lzSend($.dstEid, message, options, _fee, msg.sender);
     }
 
     /// @dev Build the message and options for the LayerZero bridge
