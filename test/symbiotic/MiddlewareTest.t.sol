@@ -1,21 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { NetworkMiddleware } from "../../contracts/delegation/providers/symbiotic/NetworkMiddleware.sol";
 import { AccessControl } from "../../contracts/access/AccessControl.sol";
+import { NetworkMiddleware } from "../../contracts/delegation/providers/symbiotic/NetworkMiddleware.sol";
+
+import { IOracle } from "../../contracts/interfaces/IOracle.sol";
 import { Oracle } from "../../contracts/oracle/Oracle.sol";
-import { IOracle} from "../../contracts/interfaces/IOracle.sol";
 import { Test } from "forge-std/Test.sol";
 
+import { ChainlinkAdapter } from "../../contracts/oracle/libraries/ChainlinkAdapter.sol";
 import { SymbioticUtils } from "../../script/util/SymbioticUtils.sol";
 import { MockERC20 } from "../../test/mocks/MockERC20.sol";
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
-import { ChainlinkAdapter } from "../../contracts/oracle/libraries/ChainlinkAdapter.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import { Upgrades } from "openzeppelin-foundry-upgrades/Upgrades.sol";
+
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 import { IBurnerRouterFactory } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouterFactory.sol";
+import { Upgrades } from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 import { IOperatorRegistry } from "@symbioticfi/core/src/interfaces/IOperatorRegistry.sol";
 import { IOptInService } from "@symbioticfi/core/src/interfaces/service/IOptInService.sol";
@@ -83,10 +85,10 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             user_cap_admin = makeAddr("cap_admin");
             cap_network_address = makeAddr("cap_network_address");
 
-            collateral = new MockERC20("Mock USDC", "USDC");
-            MockERC20(collateral).mint(user_restaker, 10_000_000e18);
+            collateral = new MockERC20("Mock USDC", "USDC", 6);
+            MockERC20(collateral).mint(user_restaker, 10_000_000e6);
 
-            eth = new MockERC20("Mock ETH", "ETH");
+            eth = new MockERC20("Mock ETH", "ETH", 18);
             MockERC20(eth).mint(user_restaker, 10_000_000e18);
 
             symbioticConfig = getConfig();
@@ -188,36 +190,42 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
                 IVaultConfigurator.InitParams({
                     version: 1, // Vault’s version (= common one)
                     owner: user_vault_admin, // address of the Vault’s owner (can migrate the Vault to new versions in the future)
-                    vaultParams: abi.encode(IVault.InitParams({
-                        collateral: address(eth), // address of the collateral - wstETH
-                        burner: address(burnerRouterEth), // address of the deployed burner router
-                        epochDuration: vaultEpochDuration, // duration of the Vault epoch in seconds (= 7 days)
-                        depositWhitelist: false, // if enable deposit whitelisting
-                        isDepositLimit: false, // if enable deposit limit
-                        depositLimit: 0, // deposit limit
-                        defaultAdminRoleHolder: user_vault_admin, // address of the Vault’s admin (can manage all roles)
-                        depositWhitelistSetRoleHolder: user_vault_admin, // address of the enabler/disabler of the deposit whitelisting
-                        depositorWhitelistRoleHolder: user_vault_admin, // address of the depositors whitelister
-                        isDepositLimitSetRoleHolder: user_vault_admin, // address of the enabler/disabler of the deposit limit
-                        depositLimitSetRoleHolder: user_vault_admin // address of the deposit limit setter
-                    })),
+                    vaultParams: abi.encode(
+                        IVault.InitParams({
+                            collateral: address(eth), // address of the collateral - wstETH
+                            burner: address(burnerRouterEth), // address of the deployed burner router
+                            epochDuration: vaultEpochDuration, // duration of the Vault epoch in seconds (= 7 days)
+                            depositWhitelist: false, // if enable deposit whitelisting
+                            isDepositLimit: false, // if enable deposit limit
+                            depositLimit: 0, // deposit limit
+                            defaultAdminRoleHolder: user_vault_admin, // address of the Vault’s admin (can manage all roles)
+                            depositWhitelistSetRoleHolder: user_vault_admin, // address of the enabler/disabler of the deposit whitelisting
+                            depositorWhitelistRoleHolder: user_vault_admin, // address of the depositors whitelister
+                            isDepositLimitSetRoleHolder: user_vault_admin, // address of the enabler/disabler of the deposit limit
+                            depositLimitSetRoleHolder: user_vault_admin // address of the deposit limit setter
+                         })
+                    ),
                     delegatorIndex: uint64(DelegatorType.NETWORK_RESTAKE), // Delegator’s type (= NetworkRestakeDelegator)
-                    delegatorParams: abi.encode(INetworkRestakeDelegator.InitParams({
-                        baseParams: IBaseDelegator.BaseParams({
-                            defaultAdminRoleHolder: user_vault_admin, // address of the Delegator’s admin (can manage all roles)
-                            hook: 0x0000000000000000000000000000000000000000, // address of the hook (if not zero, receives onSlash() call on each slashing)
-                            hookSetRoleHolder: user_vault_admin // address of the hook setter
-                         }),
-                         networkLimitSetRoleHolders: networkLimitSetRoleHolders, // array of addresses of the network limit setters
-                         operatorNetworkSharesSetRoleHolders: operatorNetworkSharesSetRoleHolders // array of addresses of the operator-network shares setters
-                    })),
+                    delegatorParams: abi.encode(
+                        INetworkRestakeDelegator.InitParams({
+                            baseParams: IBaseDelegator.BaseParams({
+                                defaultAdminRoleHolder: user_vault_admin, // address of the Delegator’s admin (can manage all roles)
+                                hook: 0x0000000000000000000000000000000000000000, // address of the hook (if not zero, receives onSlash() call on each slashing)
+                                hookSetRoleHolder: user_vault_admin // address of the hook setter
+                             }),
+                            networkLimitSetRoleHolders: networkLimitSetRoleHolders, // array of addresses of the network limit setters
+                            operatorNetworkSharesSetRoleHolders: operatorNetworkSharesSetRoleHolders // array of addresses of the operator-network shares setters
+                         })
+                    ),
                     withSlasher: true, // if enable Slasher module
                     slasherIndex: uint64(SlasherType.INSTANT), // Slasher’s type (0 = ImmediateSlasher, 1 = VetoSlasher)
-                    slasherParams: abi.encode(ISlasher.InitParams({
-                        baseParams: IBaseSlasher.BaseParams({
-                            isBurnerHook: true // if enable the `burner` to receive onSlash() call after each slashing (is needed for the burner router workflow)
-                         })
-                    }))
+                    slasherParams: abi.encode(
+                        ISlasher.InitParams({
+                            baseParams: IBaseSlasher.BaseParams({
+                                isBurnerHook: true // if enable the `burner` to receive onSlash() call after each slashing (is needed for the burner router workflow)
+                             })
+                        })
+                    )
                 })
             );
 
@@ -272,12 +280,12 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             middleware = NetworkMiddleware(_proxy(address(middlewareImplementation)));
 
             middleware.initialize(
-                address(accessControl), 
-                cap_network_address, 
-                symbioticConfig.registries.vaultRegistry, 
-                address(oracle), 
-                address(defaultStakerRewards), 
-                vaultEpochDuration, 
+                address(accessControl),
+                cap_network_address,
+                symbioticConfig.registries.vaultRegistry,
+                address(oracle),
+                address(defaultStakerRewards),
+                vaultEpochDuration,
                 slashDuration
             );
 
@@ -290,7 +298,6 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
             accessControl.grantAccess(middleware.slash.selector, address(middleware), user_cap_admin);
             accessControl.grantAccess(oracle.setPriceOracleData.selector, address(oracle), cap_network_address);
             accessControl.grantAccess(middleware.distributeRewards.selector, address(middleware), user_cap_admin);
-
 
             usdtChainlinkPriceFeed = new MockChainlinkPriceFeed();
             usdtChainlinkPriceFeed.setDecimals(8);
@@ -424,8 +431,8 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
         {
             vm.startPrank(user_restaker);
 
-            IERC20(collateral).approve(address(vault), 1000e18);
-            vault.deposit(user_restaker, 1000e18);
+            IERC20(collateral).approve(address(vault), 1000e6);
+            vault.deposit(user_restaker, 1000e6);
 
             IERC20(eth).approve(address(ethVault), 1000e18);
             ethVault.deposit(user_restaker, 1000e18);
@@ -455,8 +462,8 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
 
             console.log("collateral balance of liquidator", IERC20(collateral).balanceOf(recipient));
             console.log("eth balance of liquidator", IERC20(eth).balanceOf(recipient));
-          //  assertEq(IERC20(collateral).balanceOf(recipient), agentCollateral * 1e18 / 1e9);
-          //  assertEq(IERC20(eth).balanceOf(recipient), agentCollateral * 3200e8 / 1e9);
+            //  assertEq(IERC20(collateral).balanceOf(recipient), agentCollateral * 1e18 / 1e9);
+            //  assertEq(IERC20(eth).balanceOf(recipient), agentCollateral * 3200e8 / 1e9);
 
             vm.stopPrank();
         }
@@ -491,11 +498,11 @@ contract MiddlewareTest is Test, SymbioticUtils, ProxyUtils {
         vm.startPrank(user_cap_admin);
 
         // Send some rewards to the middleware
-        collateral.mint(address(middleware), 10e18);
+        collateral.mint(address(middleware), 10e6);
         middleware.distributeRewards(address(collateral));
 
         // Check that the rewards were distributed to the staker rewards contract
-        assertEq(IERC20(collateral).balanceOf(address(defaultStakerRewards)), 10e18);
+        assertEq(IERC20(collateral).balanceOf(address(defaultStakerRewards)), 10e6);
 
         vm.stopPrank();
     }

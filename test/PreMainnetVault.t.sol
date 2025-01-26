@@ -37,7 +37,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils {
         holder = makeAddr("holder");
 
         // Deploy mock asset
-        asset = new MockERC20("Mock Token", "MTK");
+        asset = new MockERC20("Mock Token", "MTK", 18);
         initialBalance = 1000000e18;
         asset.mint(user, initialBalance);
         asset.mint(holder, initialBalance);

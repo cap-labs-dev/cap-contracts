@@ -21,13 +21,13 @@ library CapTokenAdapter {
         for (uint256 i; i < assets.length; ++i) {
             address asset = assets[i];
             uint256 supply = IVaultUpgradeable(_asset).totalSupplies(asset);
-            uint8 supplyDecimals = IERC20Metadata(asset).decimals();
+            uint256 supplyDecimalsPow = 10 ** IERC20Metadata(asset).decimals();
             uint256 assetPrice = IOracle(msg.sender).getPrice(asset);
 
-            totalUsdValue += supply * assetPrice / supplyDecimals;
+            totalUsdValue += supply * assetPrice / supplyDecimalsPow;
         }
 
-        uint8 decimals = IERC20Metadata(_asset).decimals();
-        latestAnswer = totalUsdValue * decimals / capTokenSupply;
+        uint256 decimalsPow = 10 ** IERC20Metadata(_asset).decimals();
+        latestAnswer = totalUsdValue * decimalsPow / capTokenSupply;
     }
 }

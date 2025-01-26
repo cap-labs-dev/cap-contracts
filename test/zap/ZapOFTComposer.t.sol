@@ -49,7 +49,7 @@ contract ZapOFTComposerTest is Test {
         user = makeAddr("user");
         recipient = makeAddr("recipient");
 
-        token = new MockERC20("Token1", "TK1");
+        token = new MockERC20("Token1", "TK1", 18);
         zapRouter = new MockBeefyZapRouter();
 
         composer = new ZapOFTComposer(address(0), address(0), address(zapRouter), address(zapRouter.zapTokenManager()));
