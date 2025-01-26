@@ -15,6 +15,7 @@
     "build": "forge build --skip Test",
     "test": "forge test",
     "test:slither": "FOUNDRY_PROFILE=slither slither .",
+    "gas:flamegraph": "forge test --flamegraph",
     "gas:snapshot": "FOUNDRY_PROFILE=release forge snapshot --isolate",
     "gas:diff": "FOUNDRY_PROFILE=release forge snapshot --diff --isolate",
     "gas:report": "FOUNDRY_PROFILE=release forge test --gas-report",

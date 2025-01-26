@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { DataTypes } from "./types/DataTypes.sol";
 import { IOracle } from "../../interfaces/IOracle.sol";
 import { IVaultUpgradeable } from "../../interfaces/IVaultUpgradeable.sol";
+import { DataTypes } from "./types/DataTypes.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
@@ -15,19 +15,16 @@ library MinterLogic {
     /// @param $ Storage pointer
     /// @param params Parameters for a swap
     /// @return amount Amount out from a swap
-    function amountOut(
-        DataTypes.MinterStorage storage $,
-        DataTypes.AmountOutParams memory params
-    ) external view returns (uint256 amount) {
+    function amountOut(DataTypes.MinterStorage storage $, DataTypes.AmountOutParams memory params)
+        external
+        view
+        returns (uint256 amount)
+    {
         (uint256 amountOutBeforeFee, uint256 newRatio) = _amountOutBeforeFee($.oracle, params);
 
         amount = _applyFeeSlopes(
             $.fees[params.asset],
-            DataTypes.FeeSlopeParams({
-                mint: params.mint,
-                amount: amountOutBeforeFee,
-                ratio: newRatio
-            })
+            DataTypes.FeeSlopeParams({ mint: params.mint, amount: amountOutBeforeFee, ratio: newRatio })
         );
     }
 
@@ -35,10 +32,7 @@ library MinterLogic {
     /// @param $ Storage pointer
     /// @param params Parameters for redeeming
     /// @return amounts Amount of underlying assets withdrawn
-    function redeemAmountOut(
-        DataTypes.MinterStorage storage $,
-        DataTypes.RedeemAmountOutParams memory params
-    )
+    function redeemAmountOut(DataTypes.MinterStorage storage $, DataTypes.RedeemAmountOutParams memory params)
         external
         view
         returns (uint256[] memory amounts)
@@ -68,31 +62,32 @@ library MinterLogic {
         uint256 assetPrice = IOracle(_oracle).getPrice(params.asset);
         uint256 capPrice = IOracle(_oracle).getPrice(address(this));
 
-        uint8 assetDecimals = IERC20Metadata(params.asset).decimals();
-        uint8 capDecimals = IERC20Metadata(address(this)).decimals();
+        uint256 assetDecimalsPow = 10 ** IERC20Metadata(params.asset).decimals();
+        uint256 capDecimalsPow = 10 ** IERC20Metadata(address(this)).decimals();
 
         uint256 capSupply = IERC20(address(this)).totalSupply();
-        uint256 capValue = capSupply * capPrice / capDecimals;
-        uint256 allocationValue = IVaultUpgradeable(address(this)).totalSupplies(params.asset) * assetPrice / assetDecimals;
+        uint256 capValue = capSupply * capPrice / capDecimalsPow;
+        uint256 allocationValue =
+            IVaultUpgradeable(address(this)).totalSupplies(params.asset) * assetPrice / assetDecimalsPow;
 
         uint256 assetValue;
         if (params.mint) {
-            assetValue = params.amount * assetPrice / assetDecimals;
+            assetValue = params.amount * assetPrice / assetDecimalsPow;
             if (capSupply == 0) {
                 newRatio = 1e18;
-                amount = params.amount * capDecimals / assetDecimals;
+                amount = params.amount * capDecimalsPow / assetDecimalsPow;
             } else {
                 newRatio = (allocationValue + assetValue) * 1e27 / (capValue + assetValue);
-                amount = assetValue * capDecimals / capPrice;
+                amount = assetValue * capDecimalsPow / capPrice;
             }
         } else {
-            assetValue = params.amount * capPrice / capDecimals;
+            assetValue = params.amount * capPrice / capDecimalsPow;
             if (params.amount == capSupply) {
                 newRatio = 1e18;
-                amount = params.amount * assetDecimals / capDecimals;
+                amount = params.amount * assetDecimalsPow / capDecimalsPow;
             } else {
                 newRatio = (allocationValue - assetValue) * 1e27 / (capValue - assetValue);
-                amount = assetValue * assetDecimals / assetPrice;
+                amount = assetValue * assetDecimalsPow / assetPrice;
             }
         }
     }

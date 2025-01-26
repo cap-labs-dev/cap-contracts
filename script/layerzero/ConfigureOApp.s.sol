@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { CapToken } from "../contracts/token/CapToken.sol";
-import { OFTLockbox } from "../contracts/token/OFTLockbox.sol";
-import { StakedCap } from "../contracts/token/StakedCap.sol";
-import { LzUtils } from "./util/LzUtils.sol";
-import { WalletUtils } from "./util/WalletUtils.sol";
+import { CapToken } from "../../contracts/token/CapToken.sol";
+import { OFTLockbox } from "../../contracts/token/OFTLockbox.sol";
+import { StakedCap } from "../../contracts/token/StakedCap.sol";
+import { LzUtils } from "../util/LzUtils.sol";
+import { WalletUtils } from "../util/WalletUtils.sol";
 import { ILayerZeroEndpointV2 } from "@layerzerolabs/interfaces/ILayerZeroEndpointV2.sol";
 import { SetConfigParam } from "@layerzerolabs/interfaces/IMessageLibManager.sol";
 import { Script } from "forge-std/Script.sol";

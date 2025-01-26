@@ -1,261 +1,424 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { Lender } from "../contracts/lendingPool/lender/Lender.sol";
+import { AccessControl } from "../contracts/access/AccessControl.sol";
+import { Lender } from "../contracts/lendingPool/Lender.sol";
 
 import { InterestDebtToken } from "../contracts/lendingPool/tokens/InterestDebtToken.sol";
 import { PrincipalDebtToken } from "../contracts/lendingPool/tokens/PrincipalDebtToken.sol";
 import { RestakerDebtToken } from "../contracts/lendingPool/tokens/RestakerDebtToken.sol";
-import { Minter } from "../contracts/minter/Minter.sol";
+
+import { IOracle } from "../contracts/interfaces/IOracle.sol";
+import { DataTypes } from "../contracts/lendingPool/libraries/types/DataTypes.sol";
+import { Oracle } from "../contracts/oracle/Oracle.sol";
 import { PriceOracle } from "../contracts/oracle/PriceOracle.sol";
 import { RateOracle } from "../contracts/oracle/RateOracle.sol";
 import { AaveAdapter } from "../contracts/oracle/libraries/AaveAdapter.sol";
 import { CapTokenAdapter } from "../contracts/oracle/libraries/CapTokenAdapter.sol";
 import { ChainlinkAdapter } from "../contracts/oracle/libraries/ChainlinkAdapter.sol";
 import { StakedCapAdapter } from "../contracts/oracle/libraries/StakedCapAdapter.sol";
-import { Registry } from "../contracts/registry/Registry.sol";
 import { CapToken } from "../contracts/token/CapToken.sol";
 import { StakedCap } from "../contracts/token/StakedCap.sol";
-import { Vault } from "../contracts/vault/Vault.sol";
+import { VaultUpgradeable } from "../contracts/vault/VaultUpgradeable.sol";
 import { MockAaveDataProvider } from "../test/mocks/MockAaveDataProvider.sol";
-import { MockChainlink } from "../test/mocks/MockChainlink.sol";
-import { MockCollateral } from "../test/mocks/MockCollateral.sol";
+import { MockChainlinkPriceFeed } from "../test/mocks/MockChainlinkPriceFeed.sol";
+import { MockDelegation } from "../test/mocks/MockDelegation.sol";
 import { MockERC20 } from "../test/mocks/MockERC20.sol";
+
+import { ProxyUtils } from "./util/ProxyUtils.sol";
 import { WalletUtils } from "./util/WalletUtils.sol";
 import { Script } from "forge-std/Script.sol";
 import { console } from "forge-std/console.sol";
 
-contract DeployTestnetVault is Script, WalletUtils {
-    Registry public registry;
-    Minter public minter;
-    Lender public lender;
-    Vault public vault;
-    CapToken public cUSD;
-    StakedCap public scUSD;
+contract DeployTestnetVault is Script, WalletUtils, ProxyUtils {
+    // external contract mocks
+    MockAaveDataProvider public usdtAaveDataProvider;
+    MockAaveDataProvider public usdcAaveDataProvider;
+    MockAaveDataProvider public usdxAaveDataProvider;
+    MockChainlinkPriceFeed public usdtChainlinkPriceFeed;
+    MockChainlinkPriceFeed public usdcChainlinkPriceFeed;
+    MockChainlinkPriceFeed public usdxChainlinkPriceFeed;
+    MockDelegation public delegation;
+    MockERC20 public usdt;
+    MockERC20 public usdc;
+    MockERC20 public usdx;
 
+    // cap implementations
+    AccessControl public accessControlImplementation;
+    Lender public lenderImplementation;
+    CapToken public capTokenImplementation;
     StakedCap public stakedCapImplementation;
     PrincipalDebtToken public principalDebtTokenImplementation;
     InterestDebtToken public interestDebtTokenImplementation;
     RestakerDebtToken public restakerDebtTokenImplementation;
+    Oracle public oracleImplementation;
 
-    PriceOracle public priceOracle;
-    RateOracle public rateOracle;
+    // cap instances
+    AccessControl public accessControl;
+    Lender public lender;
+    CapToken public cUSD;
+    StakedCap public scUSD;
+    Oracle public oracle;
     address public aaveAdapter;
     address public chainlinkAdapter;
     address public capTokenAdapter;
     address public stakedCapAdapter;
-    MockAaveDataProvider public aaveDataProvider;
-    MockChainlink public chainlinkOracle;
+    PrincipalDebtToken public usdtPrincipalDebtToken;
+    PrincipalDebtToken public usdcPrincipalDebtToken;
+    PrincipalDebtToken public usdxPrincipalDebtToken;
+    RestakerDebtToken public usdtRestakerDebtToken;
+    RestakerDebtToken public usdcRestakerDebtToken;
+    RestakerDebtToken public usdxRestakerDebtToken;
+    InterestDebtToken public usdtInterestDebtToken;
+    InterestDebtToken public usdcInterestDebtToken;
+    InterestDebtToken public usdxInterestDebtToken;
 
-    MockCollateral public collateral;
+    function log_addresses() private view {
+        // external contract mocks
+        console.log("usdtAaveDataProvider", address(usdtAaveDataProvider));
+        console.log("usdcAaveDataProvider", address(usdcAaveDataProvider));
+        console.log("usdxAaveDataProvider", address(usdxAaveDataProvider));
+        console.log("usdtChainlinkPriceFeed", address(usdtChainlinkPriceFeed));
+        console.log("usdcChainlinkPriceFeed", address(usdcChainlinkPriceFeed));
+        console.log("usdxChainlinkPriceFeed", address(usdxChainlinkPriceFeed));
+        console.log("delegation", address(delegation));
+        console.log("usdt", address(usdt));
+        console.log("usdc", address(usdc));
+        console.log("usdx", address(usdx));
 
-    MockERC20 public usdt;
-    MockERC20 public usdc;
-    MockERC20 public usdx;
-    MockERC20 public weth;
+        // cap implementations
+        console.log("accessControlImplementation", address(accessControlImplementation));
+        console.log("lenderImplementation", address(lenderImplementation));
+        console.log("capTokenImplementation", address(capTokenImplementation));
+        console.log("stakedCapImplementation", address(stakedCapImplementation));
+        console.log("principalDebtTokenImplementation", address(principalDebtTokenImplementation));
+        console.log("interestDebtTokenImplementation", address(interestDebtTokenImplementation));
+        console.log("restakerDebtTokenImplementation", address(restakerDebtTokenImplementation));
+        console.log("oracleImplementation", address(oracleImplementation));
+
+        // cap instances
+        console.log("accessControl", address(accessControl));
+        console.log("lender", address(lender));
+        console.log("cUSD", address(cUSD));
+        console.log("scUSD", address(scUSD));
+        console.log("oracle", address(oracle));
+        console.log("aaveAdapter", address(aaveAdapter));
+        console.log("chainlinkAdapter", address(chainlinkAdapter));
+        console.log("capTokenAdapter", address(capTokenAdapter));
+        console.log("stakedCapAdapter", address(stakedCapAdapter));
+        console.log("usdtPrincipalDebtToken", address(usdtPrincipalDebtToken));
+        console.log("usdcPrincipalDebtToken", address(usdcPrincipalDebtToken));
+        console.log("usdxPrincipalDebtToken", address(usdxPrincipalDebtToken));
+        console.log("usdtRestakerDebtToken", address(usdtRestakerDebtToken));
+        console.log("usdcRestakerDebtToken", address(usdcRestakerDebtToken));
+        console.log("usdxRestakerDebtToken", address(usdxRestakerDebtToken));
+        console.log("usdtInterestDebtToken", address(usdtInterestDebtToken));
+        console.log("usdcInterestDebtToken", address(usdcInterestDebtToken));
+        console.log("usdxInterestDebtToken", address(usdxInterestDebtToken));
+    }
 
     function run() external {
         vm.startBroadcast();
 
         // Get the broadcast address (deployer's address)
-        address user_deployer = getWalletAddress();
         address user_agent = getWalletAddress();
+        address user_access_control_admin = getWalletAddress();
+        address user_oracle_admin = getWalletAddress();
+        address user_rate_oracle_admin = getWalletAddress();
+        address user_lender_admin = getWalletAddress();
+        address user_stablecoin_minter = getWalletAddress();
+        address user_liquidator = getWalletAddress();
+        address user_interest_receiver = getWalletAddress();
 
         // Deploy mock tokens
         {
-            usdt = new MockERC20("USDT", "USDT");
-            usdc = new MockERC20("USDC", "USDC");
-            usdx = new MockERC20("USDx", "USDx");
-
-            // Print mock token addresses
-            console.log("Mock USDT address:", address(usdt));
-            console.log("Mock USDC address:", address(usdc));
-            console.log("Mock USDx address:", address(usdx));
+            usdt = new MockERC20("USDT", "USDT", 6);
+            usdc = new MockERC20("USDC", "USDC", 6);
+            usdx = new MockERC20("USDx", "USDx", 18);
 
             // Mint tokens to minter
-            usdt.mint(user_deployer, 1000e18);
-            usdc.mint(user_deployer, 1000e18);
-            usdx.mint(user_deployer, 1000e18);
+            usdt.mint(user_stablecoin_minter, 1_000_000e6);
+            usdc.mint(user_stablecoin_minter, 1_000_000e6);
+            usdx.mint(user_stablecoin_minter, 1_000_000e18);
+
+            // mint some tokens to the liquidator for repayments
+            usdt.mint(user_liquidator, 1000e6);
+            usdc.mint(user_liquidator, 1000e6);
+            usdx.mint(user_liquidator, 1000e18);
         }
 
-        // deploy infra contracts
+        // deploy implementations and contracts
         {
-            // Deploy and initialize Registry
-            registry = new Registry();
-            registry.initialize();
-            console.log("Registry address:", address(registry));
-
-            // Deploy and initialize Minter with Registry
-            minter = new Minter();
-            minter.initialize(address(registry));
-            console.log("Minter address:", address(minter));
-
-            // Deploy and initialize Lender with Registry
-            lender = new Lender();
-            lender.initialize(address(registry));
-            console.log("Lender address:", address(lender));
-
-            // Deploy and initialize Vault with Registry
-            vault = new Vault();
-            vault.initialize(address(registry));
-            console.log("Vault address:", address(vault));
-
-            // Deploy and initialize cUSD token
-            cUSD = new CapToken();
-            cUSD.initialize("Capped USD", "cUSD");
-            console.log("cUSD address:", address(cUSD));
-
-            // Deploy and initialize scUSD token
+            accessControlImplementation = new AccessControl();
+            lenderImplementation = new Lender();
+            capTokenImplementation = new CapToken();
             stakedCapImplementation = new StakedCap();
-            registry.setStakedCapImplementation(address(stakedCapImplementation));
-            console.log("Staked Cap Implementation address:", address(stakedCapImplementation));
-
-            // Deploy debt tokens
+            oracleImplementation = new Oracle();
             principalDebtTokenImplementation = new PrincipalDebtToken();
-            registry.setPrincipalDebtTokenImplementation(address(principalDebtTokenImplementation));
-            console.log("Principal Debt Token Implementation:", address(principalDebtTokenImplementation));
-
             interestDebtTokenImplementation = new InterestDebtToken();
-            registry.setInterestDebtTokenImplementation(address(interestDebtTokenImplementation));
-            console.log("Interest Debt Token Implementation:", address(interestDebtTokenImplementation));
-
             restakerDebtTokenImplementation = new RestakerDebtToken();
-            registry.setRestakerDebtTokenImplementation(address(restakerDebtTokenImplementation));
-            console.log("Restaker Debt Token Implementation:", address(restakerDebtTokenImplementation));
-        }
 
-        // deploy oracles
-        {
-            // Deploy oracles and adapters
-            priceOracle = new PriceOracle();
-            priceOracle.initialize(address(registry));
-            console.log("Price Oracle address:", address(priceOracle));
-
-            rateOracle = new RateOracle();
-            rateOracle.initialize(address(registry));
-            console.log("Rate Oracle address:", address(rateOracle));
-
+            // grab libraries addresses
             aaveAdapter = address(AaveAdapter);
             chainlinkAdapter = address(ChainlinkAdapter);
-            capTokenAdapter = address(new CapTokenAdapter(address(registry)));
-            stakedCapAdapter = address(new StakedCapAdapter(address(registry)));
-            console.log("Aave Adapter address:", aaveAdapter);
-            console.log("Chainlink Adapter address:", chainlinkAdapter);
-            console.log("Cap Token Adapter address:", capTokenAdapter);
-            console.log("Staked Cap Adapter address:", stakedCapAdapter);
+            capTokenAdapter = address(CapTokenAdapter);
+            stakedCapAdapter = address(StakedCapAdapter);
 
             // Deploy mock data providers
-            aaveDataProvider = new MockAaveDataProvider();
-            chainlinkOracle = new MockChainlink();
-            console.log("Aave Data Provider address:", address(aaveDataProvider));
-            console.log("Chainlink Oracle address:", address(chainlinkOracle));
+            usdtAaveDataProvider = new MockAaveDataProvider();
+            usdcAaveDataProvider = new MockAaveDataProvider();
+            usdxAaveDataProvider = new MockAaveDataProvider();
+            usdtChainlinkPriceFeed = new MockChainlinkPriceFeed();
+            usdcChainlinkPriceFeed = new MockChainlinkPriceFeed();
+            usdxChainlinkPriceFeed = new MockChainlinkPriceFeed();
+            delegation = new MockDelegation();
 
-            // Set oracles in registry
-            registry.setPriceOracle(address(priceOracle));
-            registry.setRateOracle(address(rateOracle));
+            // deploy proxy contracts
+            accessControl = AccessControl(_proxy(address(accessControlImplementation)));
+            lender = Lender(_proxy(address(lenderImplementation)));
+            oracle = Oracle(_proxy(address(oracleImplementation)));
+
+            // init infra instances
+            accessControl.initialize(user_access_control_admin);
+            uint256 targetHealth = 1e18;
+            uint256 grace = 1 hours;
+            uint256 expiry = block.timestamp + 1 hours;
+            uint256 bonusCap = 1e18;
+            lender.initialize(
+                address(accessControl), address(delegation), address(oracle), targetHealth, grace, expiry, bonusCap
+            );
+            oracle.initialize(address(accessControl));
+
+            // deploy and init cap instances
+            cUSD = CapToken(_proxy(address(capTokenImplementation)));
+            scUSD = StakedCap(_proxy(address(stakedCapImplementation)));
+
+            address[] memory assets = new address[](3);
+            assets[0] = address(usdt);
+            assets[1] = address(usdc);
+            assets[2] = address(usdx);
+
+            cUSD.initialize("Capped USD", "cUSD", address(accessControl), address(oracle), assets);
+            scUSD.initialize(address(accessControl), address(cUSD), 6 hours);
+
+            // deploy and init debt tokens
+            usdcPrincipalDebtToken = PrincipalDebtToken(_proxy(address(principalDebtTokenImplementation)));
+            usdxPrincipalDebtToken = PrincipalDebtToken(_proxy(address(principalDebtTokenImplementation)));
+            usdtPrincipalDebtToken = PrincipalDebtToken(_proxy(address(principalDebtTokenImplementation)));
+
+            usdtRestakerDebtToken = RestakerDebtToken(_proxy(address(restakerDebtTokenImplementation)));
+            usdcRestakerDebtToken = RestakerDebtToken(_proxy(address(restakerDebtTokenImplementation)));
+            usdxRestakerDebtToken = RestakerDebtToken(_proxy(address(restakerDebtTokenImplementation)));
+
+            usdcInterestDebtToken = InterestDebtToken(_proxy(address(interestDebtTokenImplementation)));
+            usdtInterestDebtToken = InterestDebtToken(_proxy(address(interestDebtTokenImplementation)));
+            usdxInterestDebtToken = InterestDebtToken(_proxy(address(interestDebtTokenImplementation)));
+
+            usdcPrincipalDebtToken.initialize(address(accessControl), address(usdc));
+            usdtPrincipalDebtToken.initialize(address(accessControl), address(usdt));
+            usdxPrincipalDebtToken.initialize(address(accessControl), address(usdx));
+
+            usdcRestakerDebtToken.initialize(
+                address(accessControl), address(oracle), address(usdcPrincipalDebtToken), address(usdc)
+            );
+            usdtRestakerDebtToken.initialize(
+                address(accessControl), address(oracle), address(usdtPrincipalDebtToken), address(usdt)
+            );
+            usdxRestakerDebtToken.initialize(
+                address(accessControl), address(oracle), address(usdxPrincipalDebtToken), address(usdx)
+            );
+
+            usdcInterestDebtToken.initialize(
+                address(accessControl), address(oracle), address(usdcPrincipalDebtToken), address(usdc)
+            );
+            usdtInterestDebtToken.initialize(
+                address(accessControl), address(oracle), address(usdtPrincipalDebtToken), address(usdt)
+            );
+            usdxInterestDebtToken.initialize(
+                address(accessControl), address(oracle), address(usdxPrincipalDebtToken), address(usdx)
+            );
         }
 
-        // Setup roles
+        // Setup access control roles
         {
-            registry.setAssetManager(user_deployer);
-            registry.grantRole(registry.DEFAULT_ADMIN_ROLE(), user_deployer);
-            registry.grantRole(registry.MANAGER_ROLE(), user_deployer);
-            cUSD.grantRole(cUSD.MINTER_ROLE(), address(minter));
-            cUSD.grantRole(cUSD.BURNER_ROLE(), address(minter));
-            vault.grantRole(vault.SUPPLIER_ROLE(), address(minter));
-            vault.grantRole(vault.BORROWER_ROLE(), address(lender));
+            accessControl.grantAccess(IOracle.setPriceOracleData.selector, address(oracle), user_oracle_admin);
+            accessControl.grantAccess(IOracle.setPriceBackupOracleData.selector, address(oracle), user_oracle_admin);
+            accessControl.grantAccess(IOracle.setRateOracleData.selector, address(oracle), user_oracle_admin);
+
+            accessControl.grantAccess(IOracle.setPriceOracleData.selector, address(oracle), user_rate_oracle_admin);
+            accessControl.grantAccess(IOracle.setBenchmarkRate.selector, address(oracle), user_rate_oracle_admin);
+            accessControl.grantAccess(IOracle.setRestakerRate.selector, address(oracle), user_rate_oracle_admin);
+
+            accessControl.grantAccess(Lender.addAsset.selector, address(lender), user_lender_admin);
+            accessControl.grantAccess(Lender.removeAsset.selector, address(lender), user_lender_admin);
+            accessControl.grantAccess(Lender.pauseAsset.selector, address(lender), user_lender_admin);
+
+            accessControl.grantAccess(VaultUpgradeable.borrow.selector, address(cUSD), address(lender));
+            accessControl.grantAccess(VaultUpgradeable.repay.selector, address(cUSD), address(lender));
         }
 
-        // Set initial oracles data
+        // Setup oracle for assets (usdt, usdc, usdx)
         {
-            // Set initial oracles data
-            chainlinkOracle.setDecimals(8);
-            chainlinkOracle.setLatestAnswer(1e8); // $1.00 with 8 decimals
+            // assets price oracle data
+            usdtChainlinkPriceFeed.setDecimals(8);
+            usdcChainlinkPriceFeed.setDecimals(8);
+            usdxChainlinkPriceFeed.setDecimals(8);
+            usdtChainlinkPriceFeed.setLatestAnswer(1e8); // $1.00 with 8 decimals
+            usdcChainlinkPriceFeed.setLatestAnswer(1e8); // $1.00 with 8 decimals
+            usdxChainlinkPriceFeed.setLatestAnswer(1e8); // $1.00 with 8 decimals
 
-            // Set initial Aave data for USDT
-            aaveDataProvider.setVariableBorrowRate(1e17); // 10% APY, 1e18 = 100%
+            // assets rate oracle data
+            usdtAaveDataProvider.setVariableBorrowRate(1e17); // 10% APY, 1e18 = 100%
+            usdcAaveDataProvider.setVariableBorrowRate(1e17); // 10% APY, 1e18 = 100%
+            usdxAaveDataProvider.setVariableBorrowRate(1e17); // 10% APY, 1e18 = 100%
+
+            // cUSD price oracle data
+            IOracle.OracleData memory usdtOracleData = IOracle.OracleData({
+                adapter: address(chainlinkAdapter),
+                payload: abi.encodeWithSelector(ChainlinkAdapter.price.selector, address(usdtChainlinkPriceFeed))
+            });
+            IOracle.OracleData memory usdcOracleData = IOracle.OracleData({
+                adapter: address(chainlinkAdapter),
+                payload: abi.encodeWithSelector(ChainlinkAdapter.price.selector, address(usdcChainlinkPriceFeed))
+            });
+            IOracle.OracleData memory usdxOracleData = IOracle.OracleData({
+                adapter: address(chainlinkAdapter),
+                payload: abi.encodeWithSelector(ChainlinkAdapter.price.selector, address(usdxChainlinkPriceFeed))
+            });
+            oracle.setPriceOracleData(address(usdt), usdtOracleData);
+            oracle.setPriceOracleData(address(usdc), usdcOracleData);
+            oracle.setPriceOracleData(address(usdx), usdxOracleData);
+            oracle.setPriceBackupOracleData(address(usdt), usdtOracleData);
+            oracle.setPriceBackupOracleData(address(usdc), usdcOracleData);
+            oracle.setPriceBackupOracleData(address(usdx), usdxOracleData);
+
+            // cUSD rate oracle data
+            IOracle.OracleData memory usdtRateData = IOracle.OracleData({
+                adapter: address(aaveAdapter),
+                payload: abi.encodeWithSelector(AaveAdapter.rate.selector, address(usdtAaveDataProvider), address(usdt))
+            });
+            IOracle.OracleData memory usdcRateData = IOracle.OracleData({
+                adapter: address(aaveAdapter),
+                payload: abi.encodeWithSelector(AaveAdapter.rate.selector, address(usdcAaveDataProvider), address(usdc))
+            });
+            IOracle.OracleData memory usdxRateData = IOracle.OracleData({
+                adapter: address(aaveAdapter),
+                payload: abi.encodeWithSelector(AaveAdapter.rate.selector, address(usdxAaveDataProvider), address(usdx))
+            });
+            oracle.setRateOracleData(address(usdt), usdtRateData);
+            oracle.setRateOracleData(address(usdc), usdcRateData);
+            oracle.setRateOracleData(address(usdx), usdxRateData);
+
+            // cUSD and scUSD price oracle data
+            IOracle.OracleData memory cUSDOracleData = IOracle.OracleData({
+                adapter: address(capTokenAdapter),
+                payload: abi.encodeWithSelector(CapTokenAdapter.price.selector, address(cUSD))
+            });
+            IOracle.OracleData memory scUSDOracleData = IOracle.OracleData({
+                adapter: address(stakedCapAdapter),
+                payload: abi.encodeWithSelector(StakedCapAdapter.price.selector, address(scUSD))
+            });
+            oracle.setPriceOracleData(address(cUSD), cUSDOracleData);
+            oracle.setPriceOracleData(address(scUSD), scUSDOracleData);
+            oracle.setPriceBackupOracleData(address(cUSD), cUSDOracleData);
+            oracle.setPriceBackupOracleData(address(scUSD), scUSDOracleData);
         }
 
-        // Setup price sources and adapters
+        // configure lender access control
         {
-            // Setup price sources and adapters
-            priceOracle.setAdapter(address(chainlinkOracle), address(ChainlinkAdapter));
-            priceOracle.setSource(address(usdt), address(chainlinkOracle));
-            priceOracle.setSource(address(usdc), address(chainlinkOracle));
-            priceOracle.setSource(address(usdx), address(chainlinkOracle));
+            accessControl.grantAccess(Lender.addAsset.selector, address(lender), address(user_lender_admin));
+            accessControl.grantAccess(Lender.removeAsset.selector, address(lender), address(user_lender_admin));
 
-            // Set Aave as rate source
-            rateOracle.setAdapter(address(aaveDataProvider), address(AaveAdapter));
-            rateOracle.setSource(address(usdt), address(aaveDataProvider));
-            rateOracle.setSource(address(usdc), address(aaveDataProvider));
-            rateOracle.setSource(address(usdx), address(aaveDataProvider));
+            accessControl.grantAccess(Lender.borrow.selector, address(lender), address(user_lender_admin));
+            accessControl.grantAccess(Lender.repay.selector, address(lender), address(user_lender_admin));
 
-            // set initial prices
-            chainlinkOracle.setLatestAnswer(100000000); // $1.00 for all stablecoins
+            accessControl.grantAccess(Lender.liquidate.selector, address(lender), address(user_lender_admin));
+            accessControl.grantAccess(Lender.pauseAsset.selector, address(lender), address(user_lender_admin));
+
+            bytes4[] memory selectors = new bytes4[](4);
+            selectors[0] = PrincipalDebtToken.mint.selector;
+            selectors[1] = PrincipalDebtToken.burn.selector;
+            selectors[2] = RestakerDebtToken.burn.selector;
+            selectors[3] = InterestDebtToken.burn.selector;
+
+            address[] memory addresses = new address[](3);
+            addresses[0] = address(usdcPrincipalDebtToken);
+            addresses[1] = address(usdtPrincipalDebtToken);
+            addresses[2] = address(usdxPrincipalDebtToken);
+
+            for (uint256 i = 0; i < selectors.length; i++) {
+                for (uint256 j = 0; j < addresses.length; j++) {
+                    accessControl.grantAccess(selectors[i], addresses[j], address(lender));
+                }
+            }
         }
 
-        // Setup minter, lender and collateral
+        // allow agents to borrow any assets
         {
-            // Deploy and setup mock collateral
-            collateral = new MockCollateral();
-            registry.setCollateral(address(collateral));
-            console.log("Collateral address:", address(collateral));
+            lender.addAsset(
+                DataTypes.AddAssetParams({
+                    asset: address(usdc),
+                    vault: address(cUSD),
+                    principalDebtToken: address(usdcPrincipalDebtToken),
+                    restakerDebtToken: address(usdcRestakerDebtToken),
+                    interestDebtToken: address(usdcInterestDebtToken),
+                    interestReceiver: address(user_interest_receiver),
+                    decimals: 18,
+                    bonusCap: 1e18
+                })
+            );
 
-            // Set minter in registry
-            registry.setMinter(address(minter));
-            registry.setLender(address(lender));
+            lender.addAsset(
+                DataTypes.AddAssetParams({
+                    asset: address(usdt),
+                    vault: address(cUSD),
+                    principalDebtToken: address(usdtPrincipalDebtToken),
+                    restakerDebtToken: address(usdtRestakerDebtToken),
+                    interestDebtToken: address(usdtInterestDebtToken),
+                    interestReceiver: address(user_interest_receiver),
+                    decimals: 18,
+                    bonusCap: 1e18
+                })
+            );
+
+            lender.addAsset(
+                DataTypes.AddAssetParams({
+                    asset: address(usdx),
+                    vault: address(cUSD),
+                    principalDebtToken: address(usdxPrincipalDebtToken),
+                    restakerDebtToken: address(usdxRestakerDebtToken),
+                    interestDebtToken: address(usdxInterestDebtToken),
+                    interestReceiver: address(user_interest_receiver),
+                    decimals: 18,
+                    bonusCap: 1e18
+                })
+            );
+
+            lender.pauseAsset(address(usdc), false);
+            lender.pauseAsset(address(usdt), false);
+            lender.pauseAsset(address(usdx), false);
         }
 
-        // Setup vault assets
+        // make the agent covered
         {
-            // update the registry with the new basket
-            registry.setBasket(address(cUSD), address(vault), 0); // No base fee for testing
-            registry.addAsset(address(cUSD), address(usdt));
-            registry.addAsset(address(cUSD), address(usdc));
-            registry.addAsset(address(cUSD), address(usdx));
-
-            scUSD = StakedCap(registry.basketScToken(address(cUSD)));
-            console.log("scUSD address:", address(scUSD));
-
-            // Set CapTokenAdapter as price source for cUSD
-            priceOracle.setAdapter(address(capTokenAdapter), address(capTokenAdapter));
-            priceOracle.setSource(address(cUSD), address(capTokenAdapter));
-
-            // Set StakedCapAdapter as price source for scUSD
-            priceOracle.setAdapter(address(stakedCapAdapter), address(stakedCapAdapter));
-            priceOracle.setSource(address(scUSD), address(stakedCapAdapter));
+            delegation.setCoverage(user_agent, 100000e18);
+            delegation.setLtv(user_agent, 1e18);
         }
 
-        // have something in the vault already
+        // init the vault with some assets
         {
-            vault.grantRole(vault.SUPPLIER_ROLE(), address(user_deployer));
-            usdt.mint(address(user_deployer), 1000e18);
-            usdc.mint(address(user_deployer), 1000e18);
-            usdx.mint(address(user_deployer), 1000e18);
-            usdt.approve(address(vault), 1000e18);
-            usdc.approve(address(vault), 1000e18);
-            usdx.approve(address(vault), 1000e18);
-            vault.deposit(address(usdt), 1000e18);
-            vault.deposit(address(usdc), 1000e18);
-            vault.deposit(address(usdx), 1000e18);
-            vault.revokeRole(vault.SUPPLIER_ROLE(), address(user_deployer));
-            cUSD.grantRole(cUSD.MINTER_ROLE(), address(user_deployer));
-            cUSD.mint(address(user_deployer), 3000e18);
-            cUSD.revokeRole(cUSD.MINTER_ROLE(), address(user_deployer));
+            usdc.approve(address(cUSD), 4000e18);
+            cUSD.mint(address(usdc), 4000e6, 0, user_stablecoin_minter, block.timestamp + 1 hours);
+            usdt.approve(address(cUSD), 4000e18);
+            cUSD.mint(address(usdt), 4000e6, 0, user_stablecoin_minter, block.timestamp + 1 hours);
+            usdx.approve(address(cUSD), 4000e18);
+            cUSD.mint(address(usdx), 4000e18, 0, user_stablecoin_minter, block.timestamp + 1 hours);
+
+            console.log("cUSD balance", cUSD.balanceOf(user_stablecoin_minter));
+            cUSD.transfer(address(0xDead), cUSD.balanceOf(user_stablecoin_minter));
         }
 
-        // Allow agents to borrow any assets
-        {
-            lender.addAsset(address(usdc), address(vault), 1e18);
-            lender.addAsset(address(usdt), address(vault), 1e18);
-            lender.addAsset(address(usdx), address(vault), 1e18);
-        }
-
-        // Make the agent covered
-        {
-            collateral.setCoverage(user_agent, 100000e18);
-            collateral.setLtv(user_agent, 1e18);
-        }
+        log_addresses();
 
         vm.stopBroadcast();
     }

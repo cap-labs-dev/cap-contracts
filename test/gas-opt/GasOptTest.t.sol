@@ -129,18 +129,18 @@ contract GasOptTest is Test, ProxyUtils {
         {
             vm.startPrank(user_deployer);
 
-            usdt = new MockERC20("USDT", "USDT");
-            usdc = new MockERC20("USDC", "USDC");
-            usdx = new MockERC20("USDx", "USDx");
+            usdt = new MockERC20("USDT", "USDT", 6);
+            usdc = new MockERC20("USDC", "USDC", 6);
+            usdx = new MockERC20("USDx", "USDx", 18);
 
             // Mint tokens to minter
-            usdt.mint(user_stablecoin_minter, 1_000_000e18);
-            usdc.mint(user_stablecoin_minter, 1_000_000e18);
+            usdt.mint(user_stablecoin_minter, 1_000_000e6);
+            usdc.mint(user_stablecoin_minter, 1_000_000e6);
             usdx.mint(user_stablecoin_minter, 1_000_000e18);
 
             // mint some tokens to the liquidator for repayments
-            usdt.mint(user_liquidator, 1000e18);
-            usdc.mint(user_liquidator, 1000e18);
+            usdt.mint(user_liquidator, 1000e6);
+            usdc.mint(user_liquidator, 1000e6);
             usdx.mint(user_liquidator, 1000e18);
 
             vm.stopPrank();
@@ -433,9 +433,9 @@ contract GasOptTest is Test, ProxyUtils {
         {
             vm.startPrank(user_stablecoin_minter);
             usdc.approve(address(cUSD), 4000e18);
-            cUSD.mint(address(usdc), 4000e18, 0, user_stablecoin_minter, block.timestamp + 1 hours);
+            cUSD.mint(address(usdc), 4000e6, 0, user_stablecoin_minter, block.timestamp + 1 hours);
             usdt.approve(address(cUSD), 4000e18);
-            cUSD.mint(address(usdt), 4000e18, 0, user_stablecoin_minter, block.timestamp + 1 hours);
+            cUSD.mint(address(usdt), 4000e6, 0, user_stablecoin_minter, block.timestamp + 1 hours);
             usdx.approve(address(cUSD), 4000e18);
             cUSD.mint(address(usdx), 4000e18, 0, user_stablecoin_minter, block.timestamp + 1 hours);
 
@@ -455,11 +455,11 @@ contract GasOptTest is Test, ProxyUtils {
         uint256 backingBefore = usdt.balanceOf(address(cUSD));
 
         // Approve USDT spending
-        usdt.approve(address(cUSD), 100e18);
+        usdt.approve(address(cUSD), 100e6);
 
         // Mint cUSD with USDT
-        uint256 amountIn = 100e18;
-        uint256 minAmountOut = 95e18; // Accounting for potential fees
+        uint256 amountIn = 100e6;
+        uint256 minAmountOut = 95e6; // Accounting for potential fees
         uint256 deadline = block.timestamp + 1 hours;
 
         cUSD.mint(address(usdt), amountIn, minAmountOut, user_stablecoin_minter, deadline);
@@ -480,11 +480,11 @@ contract GasOptTest is Test, ProxyUtils {
         usdtChainlinkPriceFeed.setLatestAnswer(102e8);
 
         // Approve USDT spending
-        usdt.approve(address(cUSD), 100e18);
+        usdt.approve(address(cUSD), 100e6);
 
         // Mint cUSD with USDT
-        uint256 amountIn = 100e18;
-        uint256 minAmountOut = 90e18;
+        uint256 amountIn = 100e6;
+        uint256 minAmountOut = 90e6;
         uint256 deadline = block.timestamp + 1 hours;
 
         cUSD.mint(address(usdt), amountIn, minAmountOut, user_stablecoin_minter, deadline);
@@ -508,7 +508,7 @@ contract GasOptTest is Test, ProxyUtils {
         uint256 backingBefore = usdt.balanceOf(address(cUSD));
 
         // First mint cUSD with USDT
-        uint256 amountIn = 100e18;
+        uint256 amountIn = 100e6;
         uint256 minAmountOut = 95e18;
         uint256 deadline = block.timestamp + 1 hours;
 
@@ -522,7 +522,7 @@ contract GasOptTest is Test, ProxyUtils {
 
         // Now burn the cUSD tokens
         uint256 burnAmount = mintedAmount;
-        uint256 minOutputAmount = burnAmount * 95e18 / 100e18; // Expect at least 95% back accounting for potential fees
+        uint256 minOutputAmount = 95e6; // Expect at least 95% back accounting for potential fees
 
         cUSD.burn(address(usdt), burnAmount, minOutputAmount, user_stablecoin_minter, deadline);
 
@@ -537,6 +537,7 @@ contract GasOptTest is Test, ProxyUtils {
         vm.stopPrank();
     }
 
+    // TODO: slippage error
     function testMintStakeUnstakeBurn() public {
         vm.startPrank(user_stablecoin_minter);
 
@@ -545,7 +546,7 @@ contract GasOptTest is Test, ProxyUtils {
         uint256 backingBefore = usdt.balanceOf(address(cUSD));
 
         // First mint cUSD with USDT
-        uint256 amountIn = 100e18;
+        uint256 amountIn = 100e6;
         uint256 minAmountOut = 95e18;
         uint256 deadline = block.timestamp + 1 hours;
 
@@ -573,7 +574,7 @@ contract GasOptTest is Test, ProxyUtils {
 
         // Now burn the cUSD tokens
         uint256 burnAmount = mintedAmount;
-        uint256 minOutputAmount = burnAmount * 95 / 100; // Expect at least 95% back accounting for potential fees
+        uint256 minOutputAmount = 95e6; // Expect at least 95% back accounting for potential fees
 
         cUSD.burn(address(usdt), burnAmount, minOutputAmount, user_stablecoin_minter, deadline);
 
@@ -592,7 +593,7 @@ contract GasOptTest is Test, ProxyUtils {
         vm.startPrank(user_agent);
 
         address borrowAsset = address(usdc);
-        uint256 borrowAmount = 1e18; // mock usdc has 18 decimals
+        uint256 borrowAmount = 1e6; // mock usdc has 18 decimals
         address receiver = user_agent;
 
         uint256 backingBefore = usdc.balanceOf(address(cUSD));
@@ -601,7 +602,7 @@ contract GasOptTest is Test, ProxyUtils {
         assertEq(usdc.balanceOf(receiver), borrowAmount);
 
         //simulate yield
-        usdc.mint(user_agent, 1000e18);
+        usdc.mint(user_agent, 1000e6);
 
         // repay the debt
         uint256 interest = 10;
@@ -614,7 +615,7 @@ contract GasOptTest is Test, ProxyUtils {
 
     function testLiquidation() public {
         address borrowAsset = address(usdc);
-        uint256 borrowAmount = 1e18; // mock usdc has 18 decimals
+        uint256 borrowAmount = 1e6; // mock usdc has 18 decimals
         address receiver = user_agent;
 
         // borrow some assets
@@ -628,9 +629,9 @@ contract GasOptTest is Test, ProxyUtils {
         // simulate a price drop
         {
             vm.startPrank(user_oracle_admin);
-            usdtChainlinkPriceFeed.setLatestAnswer(1);
-            usdcChainlinkPriceFeed.setLatestAnswer(1);
-            usdxChainlinkPriceFeed.setLatestAnswer(1);
+            usdtChainlinkPriceFeed.setLatestAnswer(1e1);
+            usdcChainlinkPriceFeed.setLatestAnswer(1e1);
+            usdxChainlinkPriceFeed.setLatestAnswer(1e1);
             vm.stopPrank();
         }
 
