@@ -414,7 +414,6 @@ contract DeployTestnetVault is Script, WalletUtils, ProxyUtils {
             usdx.approve(address(cUSD), 4000e18);
             cUSD.mint(address(usdx), 4000e18, 0, user_stablecoin_minter, block.timestamp + 1 hours);
 
-            console.log("cUSD balance", cUSD.balanceOf(user_stablecoin_minter));
             cUSD.transfer(address(0xDead), cUSD.balanceOf(user_stablecoin_minter));
         }
 

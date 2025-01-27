@@ -3,10 +3,10 @@ pragma solidity ^0.8.28;
 
 import { PreMainnetVault } from "../contracts/testnetCampaign/PreMainnetVault.sol";
 
+import { ProxyUtils } from "../contracts/deploy/utils/ProxyUtils.sol";
 import { L2Token } from "../contracts/token/L2Token.sol";
 import { MockERC20 } from "./mocks/MockERC20.sol";
 
-import { ProxyUtils } from "../script/util/ProxyUtils.sol";
 import { MessagingFee } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import { TestHelperOz5 } from "@layerzerolabs/test-devtools-evm-foundry/contracts/TestHelperOz5.sol";
 import { Test } from "forge-std/Test.sol";

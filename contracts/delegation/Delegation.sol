@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { DataTypes } from "./libraries/types/DataTypes.sol";
 import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
+import { IDelegation } from "../interfaces/IDelegation.sol";
 import { DelegationStorage } from "./libraries/DelegationStorage.sol";
+import { DataTypes } from "./libraries/types/DataTypes.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import { IDelegator } from "./interfaces/IDelegator.sol";
@@ -11,7 +12,7 @@ import { IDelegator } from "./interfaces/IDelegator.sol";
 /// @title Cap Delegation Contract
 /// @author Cap Labs
 /// @notice This contract manages delegation and slashing.
-contract Delegation is UUPSUpgradeable, AccessUpgradeable {
+contract Delegation is UUPSUpgradeable, AccessUpgradeable, IDelegation {
     event SlashDelegator(address delegator, uint256 slashShare);
     event AddAgent(address agent, DataTypes.AgentData agentData);
     event ModifyAgent(address agent, DataTypes.AgentData agentData);
@@ -75,7 +76,7 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
     }
 
     /// @notice The LTV of a specific agent
-    /// @param _agent Agent who we are querying 
+    /// @param _agent Agent who we are querying
     /// @return currentLtv Loan to value ratio of the agent
     function ltv(address _agent) external view returns (uint256 currentLtv) {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
@@ -85,7 +86,7 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Liquidation threshold of the agent
     /// @param _agent Agent who we are querying
     /// @return lt Liquidation threshold of the agent
-    function liquidiationThreshold(address _agent) external view returns (uint256 lt) {
+    function liquidationThreshold(address _agent) external view returns (uint256 lt) {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
         lt = $.agentData[_agent].liquidationThreshold;
     }
@@ -111,17 +112,23 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Add agent to be delegated to
     /// @param _agent Agent address
     /// @param _agentData Agent data
-    function addAgent(address _agent, DataTypes.AgentData calldata _agentData) external checkAccess(this.addAgent.selector) {
+    function addAgent(address _agent, DataTypes.AgentData calldata _agentData)
+        external
+        checkAccess(this.addAgent.selector)
+    {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
         $.agents.push(_agent);
         $.agentData[_agent] = _agentData;
         emit AddAgent(_agent, _agentData);
     }
 
-    /// @notice Modify an agents config only callable by the operator 
+    /// @notice Modify an agents config only callable by the operator
     /// @param _agent the agent to modify
     /// @param _agentData the struct of data
-    function modifyAgent(address _agent, DataTypes.AgentData calldata _agentData) external checkAccess(this.modifyAgent.selector) {
+    function modifyAgent(address _agent, DataTypes.AgentData calldata _agentData)
+        external
+        checkAccess(this.modifyAgent.selector)
+    {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
         $.agentData[_agent] = _agentData;
         emit ModifyAgent(_agent, _agentData);
@@ -130,7 +137,10 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Register a new delagator
     /// @param _agent Agent address
     /// @param _delegator Delegator address
-    function registerDelegator(address _agent, address _delegator) external checkAccess(this.registerDelegator.selector) {
+    function registerDelegator(address _agent, address _delegator)
+        external
+        checkAccess(this.registerDelegator.selector)
+    {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
         $.delegators[_agent].push(_delegator);
 
@@ -138,5 +148,5 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
     }
 
     /// @dev Only admin can upgrade
-    function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) {}
+    function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }
 }

@@ -8,11 +8,10 @@ import { IOracle } from "../../contracts/interfaces/IOracle.sol";
 import { Oracle } from "../../contracts/oracle/Oracle.sol";
 import { Test } from "forge-std/Test.sol";
 
+import { SymbioticUtils } from "../../contracts/deploy/utils/SymbioticUtils.sol";
 import { ChainlinkAdapter } from "../../contracts/oracle/libraries/ChainlinkAdapter.sol";
-import { SymbioticUtils } from "../../script/util/SymbioticUtils.sol";
 import { MockERC20 } from "../../test/mocks/MockERC20.sol";
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
-import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
@@ -32,7 +31,7 @@ import { IDefaultStakerRewards } from
 import { IDefaultStakerRewardsFactory } from
     "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewardsFactory.sol";
 
-import { ProxyUtils } from "../../script/util/ProxyUtils.sol";
+import { ProxyUtils } from "../../contracts/deploy/utils/ProxyUtils.sol";
 import { IBaseDelegator } from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
 import { INetworkRestakeDelegator } from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
 import { INetworkMiddlewareService } from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
