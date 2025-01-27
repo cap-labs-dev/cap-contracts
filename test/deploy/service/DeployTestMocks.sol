@@ -5,7 +5,7 @@ import { MockAaveDataProvider } from "../../mocks/MockAaveDataProvider.sol";
 import { MockChainlinkPriceFeed } from "../../mocks/MockChainlinkPriceFeed.sol";
 import { MockDelegation } from "../../mocks/MockDelegation.sol";
 import { MockERC20 } from "../../mocks/MockERC20.sol";
-import { DelegationMockConfig, OracleMocksConfig, TestUsersConfig } from "../interfaces/TestDeployConfig.sol";
+import { DelegationMockConfig, OracleMocksConfig } from "../interfaces/TestDeployConfig.sol";
 
 contract DeployMocks {
     function _deployDelegationMock(address agent) internal returns (DelegationMockConfig memory d) {

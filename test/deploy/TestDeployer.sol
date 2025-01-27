@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { UsersConfig, VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
+import { VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import { ProxyUtils } from "../../contracts/deploy/utils/ProxyUtils.sol";
 
 import { ConfigureAccessControl } from "../../contracts/deploy/service/ConfigureAccessControl.sol";
