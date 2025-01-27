@@ -25,7 +25,8 @@ remappings = [
     "@openzeppelin/=node_modules/@openzeppelin/",
 ]
 fs_permissions = [
-    { access = "read", path = "./script/config/layerzero-v2-deployments.json" },
+    { access = "read", path = "./config/symbiotic.json" },
+    { access = "read", path = "./config/layerzero-v2-deployments.json" },
 ]
 
 [fmt]

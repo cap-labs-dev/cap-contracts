@@ -29,3 +29,5 @@ remappings.txt
 # Coverage
 coverage
 lcov.info
+
+bin

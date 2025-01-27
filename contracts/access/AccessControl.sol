@@ -38,7 +38,11 @@ contract AccessControl is UUPSUpgradeable, AccessControlEnumerableUpgradeable {
     /// @param _contract Contract being called
     /// @return roleId Role id
     function role(bytes4 _selector, address _contract) public pure returns (bytes32 roleId) {
-        roleId = bytes32(abi.encodePacked(_selector, _contract));
+        /// @dev: make the role id easier to read by humans
+        /// selector: 0x40c10f19
+        /// contract: 0x521291e5c6c2b8a98ad57ea5f165d25d0bf8f65a
+        /// roleId: 0x40c10f190000000000000000521291e5c6c2b8a98ad57ea5f165d25d0bf8f65a
+        roleId = bytes32(_selector) | bytes32(uint256(uint160(_contract)));
     }
 
     /// @dev Only admin can upgrade

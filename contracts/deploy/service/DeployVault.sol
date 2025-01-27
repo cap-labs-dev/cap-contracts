@@ -1,0 +1,80 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import { AccessControl } from "../../access/AccessControl.sol";
+import { Lender } from "../../lendingPool/Lender.sol";
+import { DataTypes } from "../../lendingPool/libraries/types/DataTypes.sol";
+import { InterestDebtToken } from "../../lendingPool/tokens/InterestDebtToken.sol";
+import { PrincipalDebtToken } from "../../lendingPool/tokens/PrincipalDebtToken.sol";
+import { RestakerDebtToken } from "../../lendingPool/tokens/RestakerDebtToken.sol";
+import { CapToken } from "../../token/CapToken.sol";
+import { StakedCap } from "../../token/StakedCap.sol";
+import { VaultUpgradeable } from "../../vault/VaultUpgradeable.sol";
+import { ImplementationsConfig, InfraConfig, UsersConfig, VaultConfig } from "../interfaces/DeployConfigs.sol";
+import { ProxyUtils } from "../utils/ProxyUtils.sol";
+
+contract DeployVault is ProxyUtils {
+    function _deployVault(
+        ImplementationsConfig memory implementations,
+        InfraConfig memory infra,
+        string memory name,
+        string memory symbol,
+        address[] memory assets
+    ) internal returns (VaultConfig memory d) {
+        // deploy and init cap instances
+        d.capToken = _proxy(implementations.capToken);
+        d.stakedCapToken = _proxy(implementations.stakedCap);
+
+        CapToken(d.capToken).initialize(name, symbol, infra.accessControl, infra.oracle, assets);
+        StakedCap(d.stakedCapToken).initialize(infra.accessControl, d.capToken, 6 hours);
+
+        // deploy and init debt tokens
+        d.assets = assets;
+        d.principalDebtTokens = new address[](assets.length);
+        d.restakerDebtTokens = new address[](assets.length);
+        d.interestDebtTokens = new address[](assets.length);
+        for (uint256 i = 0; i < assets.length; i++) {
+            d.principalDebtTokens[i] = _proxy(implementations.principalDebtToken);
+            d.restakerDebtTokens[i] = _proxy(implementations.restakerDebtToken);
+            d.interestDebtTokens[i] = _proxy(implementations.interestDebtToken);
+            PrincipalDebtToken(d.principalDebtTokens[i]).initialize(infra.accessControl, assets[i]);
+            RestakerDebtToken(d.restakerDebtTokens[i]).initialize(
+                infra.accessControl, infra.oracle, d.principalDebtTokens[i], assets[i]
+            );
+            InterestDebtToken(d.interestDebtTokens[i]).initialize(
+                infra.accessControl, infra.oracle, d.principalDebtTokens[i], assets[i]
+            );
+        }
+    }
+
+    function _initVaultAccessControl(InfraConfig memory infra, VaultConfig memory vault) internal {
+        AccessControl accessControl = AccessControl(infra.accessControl);
+        accessControl.grantAccess(VaultUpgradeable.borrow.selector, vault.capToken, infra.lender);
+        accessControl.grantAccess(VaultUpgradeable.repay.selector, vault.capToken, infra.lender);
+
+        for (uint256 i = 0; i < vault.assets.length; i++) {
+            accessControl.grantAccess(PrincipalDebtToken.mint.selector, vault.principalDebtTokens[i], infra.lender);
+            accessControl.grantAccess(PrincipalDebtToken.burn.selector, vault.principalDebtTokens[i], infra.lender);
+            accessControl.grantAccess(RestakerDebtToken.burn.selector, vault.restakerDebtTokens[i], infra.lender);
+            accessControl.grantAccess(InterestDebtToken.burn.selector, vault.interestDebtTokens[i], infra.lender);
+        }
+    }
+
+    function _initVaultLender(VaultConfig memory d, InfraConfig memory infra, UsersConfig memory users) internal {
+        for (uint256 i = 0; i < d.assets.length; i++) {
+            Lender(infra.lender).addAsset(
+                DataTypes.AddAssetParams({
+                    asset: d.assets[i],
+                    vault: d.capToken,
+                    principalDebtToken: d.principalDebtTokens[i],
+                    restakerDebtToken: d.restakerDebtTokens[i],
+                    interestDebtToken: d.interestDebtTokens[i],
+                    interestReceiver: users.interest_receiver,
+                    decimals: 18,
+                    bonusCap: 1e18
+                })
+            );
+            Lender(infra.lender).pauseAsset(d.assets[i], false);
+        }
+    }
+}

@@ -10,6 +10,8 @@ import { console } from "forge-std/console.sol";
 contract LzUtils {
     using stdJson for string;
 
+    string public constant LZ_CONFIG_PATH_FROM_PROJECT_ROOT = "config/layerzero-v2-deployments.json";
+
     struct LzConfig {
         uint32 eid;
         ILayerZeroEndpointV2 endpointV2;
@@ -49,7 +51,7 @@ contract LzUtils {
      */
     function getLzConfig(Vm vm, uint chainId) public view returns (LzConfig memory config) {
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script/config/layerzero-v2-deployments.json");
+        string memory path = string.concat(root, "/", LZ_CONFIG_PATH_FROM_PROJECT_ROOT);
         string memory json = vm.readFile(path);
 
         config.eid = uint32(json.readUint(_fieldKey(vm, chainId, "eid")));
