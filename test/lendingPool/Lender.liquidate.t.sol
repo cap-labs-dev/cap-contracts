@@ -11,7 +11,7 @@ contract LenderLiquidateTest is TestDeployer {
     function setUp() public {
         _deployCapTestEnvironment();
         _initTestVaultLiquidity(env.vault);
-        user_agent = env.testUsers.agent;
+        user_agent = env.testUsers.agents[0];
     }
 
     function test_lender_liquidate() public {

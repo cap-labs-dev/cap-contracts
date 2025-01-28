@@ -35,9 +35,10 @@ struct UsersConfig {
     address access_control_admin;
     address address_provider_admin;
     address interest_receiver;
-    address vault_keeper;
     address rate_oracle_admin;
     address vault_config_admin;
+    address middleware_admin;
+    address staker_rewards_admin;
 }
 
 struct VaultConfig {

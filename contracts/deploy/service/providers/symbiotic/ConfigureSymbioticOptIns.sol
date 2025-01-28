@@ -1,0 +1,91 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import { AccessControl } from "../../../../access/AccessControl.sol";
+
+import { Network } from "../../../../delegation/providers/symbiotic/Network.sol";
+import { NetworkMiddleware } from "../../../../delegation/providers/symbiotic/NetworkMiddleware.sol";
+import { InfraConfig, UsersConfig } from "../../../interfaces/DeployConfigs.sol";
+import {
+    SymbioticNetworkAdapterConfig,
+    SymbioticNetworkAdapterImplementationsConfig,
+    SymbioticNetworkAdapterParams,
+    SymbioticVaultConfig
+} from "../../../interfaces/SymbioticsDeployConfigs.sol";
+import { ProxyUtils } from "../../../utils/ProxyUtils.sol";
+import { SymbioticUtils } from "../../../utils/SymbioticUtils.sol";
+
+import { TestUsersConfig } from "../../../../../test/deploy/interfaces/TestDeployConfig.sol";
+
+import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
+
+import { SymbioticAddressbook } from "../../../utils/SymbioticUtils.sol";
+import { INetworkRegistry } from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
+import { IOperatorRegistry } from "@symbioticfi/core/src/interfaces/IOperatorRegistry.sol";
+import { INetworkRestakeDelegator } from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
+import { INetworkMiddlewareService } from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
+import { IOptInService } from "@symbioticfi/core/src/interfaces/service/IOptInService.sol";
+import { IDefaultStakerRewards } from
+    "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewards.sol";
+import { IDefaultStakerRewardsFactory } from
+    "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewardsFactory.sol";
+
+contract ConfigureSymbioticOptIns {
+    /// OPT-INS
+    // https://docs.symbiotic.fi/modules/registries#opt-ins-in-symbiotic
+
+    // 1. Operator to Vault Opt-in
+    // Operators use the VaultOptInService to opt into specific vaults. This allows them to receive stake allocations from these vaults.
+    function _agentOptInToSymbioticVault(SymbioticAddressbook memory addressbook, SymbioticVaultConfig memory vault)
+        internal
+    {
+        IOptInService(addressbook.services.vaultOptInService).optIn(vault.vault);
+    }
+
+    // 2. Operator to Network Opt-in
+    // Through the NetworkOptInService, operators can opt into networks they wish to work with. This signifies their willingness to provide services to these networks.
+    function _agentOptInToSymbioticNetwork(
+        SymbioticAddressbook memory addressbook,
+        SymbioticNetworkAdapterConfig memory networkAdapter
+    ) internal {
+        IOptInService(addressbook.services.networkOptInService).optIn(networkAdapter.network);
+    }
+
+    // 3. Network to Vault Opt-in
+    // Networks can opt into vaults to set maximum stake limits they’re willing to accept. This is done using the setMaxNetworkLimit function of the vault’s delegator.
+    function _networkOptInToSymbioticVault(
+        SymbioticNetworkAdapterConfig memory networkAdapter,
+        SymbioticVaultConfig memory vault
+    ) internal {
+        Network(networkAdapter.network).registerVault(vault.vault);
+    }
+
+    // 4. Vault to Network Opt-in
+    // Vaults can opt into networks by setting non-zero limits.
+    // https://docs.symbiotic.fi/modules/registries/#vault-allocation-to-networks
+    // After a network opts into a vault, the vault manager can allocate stake to the network:
+    // - The vault manager reviews the conditions proposed by the network (resolvers and limits).
+    // - If agreed, the vault manager allocates stake by calling:
+    // `INetworkRestakeDelegator(IVault(vault).delegator).setNetworkLimit(subnetwork, amount)`
+    // Where amount is the total network stake limit, which can be set up to the MAX_STAKE defined by the network.
+    function _symbioticVaultOptInToNetwork(
+        SymbioticVaultConfig memory vault,
+        SymbioticNetworkAdapterConfig memory networkAdapter,
+        uint256 amount
+    ) internal {
+        NetworkMiddleware middleware = NetworkMiddleware(networkAdapter.networkMiddleware);
+        INetworkRestakeDelegator(vault.delegator).setNetworkLimit(middleware.subnetwork(), amount);
+    }
+
+    // 5. Vault to Operators Opt-in
+    // Vaults can opt into operators by setting non-zero limits.
+    function _symbioticVaultOptInToAgent(
+        SymbioticVaultConfig memory vault,
+        SymbioticNetworkAdapterConfig memory networkAdapter,
+        address user_agent,
+        uint256 amount
+    ) internal {
+        NetworkMiddleware middleware = NetworkMiddleware(networkAdapter.networkMiddleware);
+        INetworkRestakeDelegator(vault.delegator).setOperatorNetworkShares(middleware.subnetwork(), user_agent, amount);
+    }
+}

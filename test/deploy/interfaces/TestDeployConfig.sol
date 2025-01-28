@@ -9,6 +9,12 @@ import {
     VaultConfig
 } from "../../../contracts/deploy/interfaces/DeployConfigs.sol";
 
+import {
+    SymbioticNetworkAdapterConfig,
+    SymbioticNetworkAdapterImplementationsConfig,
+    SymbioticUsersConfig
+} from "../../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
+
 struct TestEnvConfig {
     // non-test specific
     LibsConfig libs;
@@ -18,12 +24,29 @@ struct TestEnvConfig {
     VaultConfig vault;
     // test specific
     TestUsersConfig testUsers;
+    address[] usdMocks;
     OracleMocksConfig oracleMocks;
     DelegationMockConfig delegationMock;
+    // symbiotic
+    SymbioticTestEnvConfig symbiotic;
+}
+
+struct SymbioticTestEnvConfig {
+    SymbioticUsersConfig users;
+    SymbioticNetworkAdapterImplementationsConfig networkAdapterImplems;
+    SymbioticNetworkAdapterConfig networkAdapter;
+    address[] vaults;
+    address[] collaterals;
+    address[] burnerRouters;
+    address[] globalReceivers;
+    address[] delegators;
+    address[] slashers;
+    uint48[] vaultEpochDurations;
+    address[] networkRewards;
 }
 
 struct TestUsersConfig {
-    address agent;
+    address[] agents;
     address stablecoin_minter;
     address liquidator;
 }

@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import { NetworkMiddleware } from "../../contracts/delegation/providers/symbiotic/NetworkMiddleware.sol";
 import { VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
-import { ProxyUtils } from "../../contracts/deploy/utils/ProxyUtils.sol";
-
+import { SymbioticVaultParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
+import { SymbioticNetworkAdapterParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
+import {
+    SymbioticNetworkRewardsConfig,
+    SymbioticUsersConfig,
+    SymbioticVaultConfig
+} from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 import { ConfigureAccessControl } from "../../contracts/deploy/service/ConfigureAccessControl.sol";
 import { ConfigureDelegation } from "../../contracts/deploy/service/ConfigureDelegation.sol";
 import { ConfigureOracle } from "../../contracts/deploy/service/ConfigureOracle.sol";
@@ -11,18 +17,31 @@ import { DeployImplems } from "../../contracts/deploy/service/DeployImplems.sol"
 import { DeployInfra } from "../../contracts/deploy/service/DeployInfra.sol";
 import { DeployLibs } from "../../contracts/deploy/service/DeployLibs.sol";
 import { DeployVault } from "../../contracts/deploy/service/DeployVault.sol";
+import { ConfigureSymbioticOptIns } from
+    "../../contracts/deploy/service/providers/symbiotic/ConfigureSymbioticOptIns.sol";
+import { DeployCapNetworkAdapter } from "../../contracts/deploy/service/providers/symbiotic/DeployCapNetworkAdapter.sol";
+import { DeploySymbioticVault } from "../../contracts/deploy/service/providers/symbiotic/DeploySymbioticVault.sol";
+import { ProxyUtils } from "../../contracts/deploy/utils/ProxyUtils.sol";
+import { SymbioticAddressbook, SymbioticUtils } from "../../contracts/deploy/utils/SymbioticUtils.sol";
 import { CapToken } from "../../contracts/token/CapToken.sol";
 import { StakedCap } from "../../contracts/token/StakedCap.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
-import { TestEnvConfig } from "./interfaces/TestDeployConfig.sol";
+import { SymbioticTestEnvConfig, TestEnvConfig } from "./interfaces/TestDeployConfig.sol";
+
 import { DeployMocks } from "./service/DeployTestMocks.sol";
 import { DeployTestUsers } from "./service/DeployTestUsers.sol";
 import { InitTestVaultLiquidity } from "./service/InitTestVaultLiquidity.sol";
+import { InitSymbioticVaultLiquidity } from "./service/provider/symbiotic/InitSymbioticVaultLiquidity.sol";
+import { TimeUtils } from "./utils/TimeUtils.sol";
 
-import { Test, console } from "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
+import { Vm } from "forge-std/Vm.sol";
+import { console } from "forge-std/console.sol";
 
 contract TestDeployer is
     Test,
+    SymbioticUtils,
+    TimeUtils,
     DeployMocks,
     DeployInfra,
     DeployVault,
@@ -32,29 +51,33 @@ contract TestDeployer is
     ConfigureDelegation,
     ConfigureAccessControl,
     DeployTestUsers,
-    InitTestVaultLiquidity
+    InitTestVaultLiquidity,
+    DeploySymbioticVault,
+    DeployCapNetworkAdapter,
+    ConfigureSymbioticOptIns,
+    InitSymbioticVaultLiquidity
 {
     TestEnvConfig env;
-    VaultConfig vault;
-    MockERC20 usdt;
-    MockERC20 usdc;
-    MockERC20 usdx;
-    CapToken cUSD;
-    StakedCap scUSD;
 
     function _deployCapTestEnvironment() internal {
+        // we need to fork the sepolia network to deploy the symbiotic network adapter
+        // hardcoding the block number to benefit from the anvil cache
+        vm.createSelectFork("https://sepolia.gateway.tenderly.co", 7512723);
+
         (env.users, env.testUsers) = _deployTestUsers();
 
         /// DEPLOY
         vm.startPrank(env.users.deployer);
 
+        address agent = env.testUsers.agents[0];
+
         env.implems = _deployImplementations();
         env.libs = _deployLibs();
         env.infra = _deployInfra(env.implems, env.users);
 
-        address[] memory assets = _deployUSDMocks();
-        env.delegationMock = _deployDelegationMock(env.testUsers.agent);
-        env.oracleMocks = _deployOracleMocks(assets);
+        env.usdMocks = _deployUSDMocks();
+        env.delegationMock = _deployDelegationMock(agent);
+        env.oracleMocks = _deployOracleMocks(env.usdMocks);
 
         console.log("deploying vault");
         env.vault = _deployVault(env.implems, env.infra, "Cap USD", "cUSD", env.oracleMocks.assets);
@@ -87,14 +110,178 @@ contract TestDeployer is
         /// DELEGATION
         console.log("deploying delegation");
         vm.startPrank(env.users.delegation_admin);
-        _initDelegation(env.infra, env.testUsers.agent, env.delegationMock.delegators);
+        _initDelegation(env.infra, agent, env.delegationMock.delegators);
 
-        // unwrap some config to make the tests more readable
+        /// SYMBIOTIC NETWORK ADAPTER
+        SymbioticAddressbook memory addressbook = _getSymbioticAddressbook();
+        console.log("deploying symbiotic cap network address");
+        env.symbiotic.users.vault_admin = makeAddr("vault_admin");
+
+        console.log("deploying symbiotic network adapter");
+        vm.startPrank(env.users.deployer);
+        env.symbiotic.networkAdapterImplems = _deploySymbioticNetworkAdapterImplems();
+        env.symbiotic.networkAdapter = _deploySymbioticNetworkAdapterInfra(
+            env.infra,
+            addressbook,
+            env.symbiotic.networkAdapterImplems,
+            SymbioticNetworkAdapterParams({ vaultEpochDuration: 1 hours, slashDuration: 50 minutes })
+        );
+
+        console.log("deploying symbiotic vaults");
+        vm.startPrank(env.symbiotic.users.vault_admin);
+        _symbioticVaultConfigToEnv(
+            _deploySymbioticVault(
+                addressbook,
+                SymbioticVaultParams({
+                    vault_admin: env.symbiotic.users.vault_admin,
+                    collateral: env.usdMocks[0],
+                    vaultEpochDuration: 1 hours,
+                    burnerRouterDelay: 0
+                })
+            )
+        );
+
+        console.log("deployed vault 2", env.symbiotic.vaults[0]);
+        _symbioticVaultConfigToEnv(
+            _deploySymbioticVault(
+                addressbook,
+                SymbioticVaultParams({
+                    vault_admin: env.symbiotic.users.vault_admin,
+                    collateral: env.usdMocks[2],
+                    vaultEpochDuration: 1 hours,
+                    burnerRouterDelay: 0
+                })
+            )
+        );
+
+        console.log("deploying symbiotic network rewards");
+        vm.startPrank(env.users.staker_rewards_admin);
+        _symbioticNetworkRewardsConfigToEnv(
+            _deploySymbioticRestakerRewardContract(addressbook, env.users, _getSymbioticVaultConfig(0))
+        );
+        _symbioticNetworkRewardsConfigToEnv(
+            _deploySymbioticRestakerRewardContract(addressbook, env.users, _getSymbioticVaultConfig(1))
+        );
+
+        console.log("access control mgmt");
+        vm.startPrank(env.users.access_control_admin);
+        _initSymbioticNetworkAdapterAccessControl(env.infra, env.symbiotic.networkAdapter, env.users);
+
+        console.log("registering symbiotic network");
+        vm.startPrank(env.users.middleware_admin);
+        _registerCapNetwork(addressbook, env.symbiotic.networkAdapter);
+
+        console.log("registering symbiotic network in vaults");
+        vm.startPrank(env.symbiotic.users.vault_admin);
+        _registerCapNetworkInVault(env.symbiotic.networkAdapter, _getSymbioticVaultConfig(0));
+        _registerCapNetworkInVault(env.symbiotic.networkAdapter, _getSymbioticVaultConfig(1));
+
+        console.log("registering vaults in network middleware");
+        vm.startPrank(env.users.middleware_admin);
+        _registerVaultsInNetworkMiddleware(
+            env.testUsers,
+            env.symbiotic.networkAdapter,
+            _getSymbioticVaultConfig(0),
+            _getSymbioticNetworkRewardsConfig(0)
+        );
+        _registerVaultsInNetworkMiddleware(
+            env.testUsers,
+            env.symbiotic.networkAdapter,
+            _getSymbioticVaultConfig(1),
+            _getSymbioticNetworkRewardsConfig(1)
+        );
+
+        console.log("registering agents as operator");
+        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
+            vm.startPrank(env.testUsers.agents[i]);
+            _agentRegisterAsOperator(addressbook);
+            _agentOptInToSymbioticVault(addressbook, _getSymbioticVaultConfig(0));
+            _agentOptInToSymbioticVault(addressbook, _getSymbioticVaultConfig(1));
+            _agentOptInToSymbioticNetwork(addressbook, env.symbiotic.networkAdapter);
+        }
+
+        console.log("registering network in vaults");
+        vm.startPrank(env.users.middleware_admin);
+        _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, _getSymbioticVaultConfig(0));
+        _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, _getSymbioticVaultConfig(1));
+
+        console.log("registering vaults in network");
+        vm.startPrank(env.symbiotic.users.vault_admin);
+        _symbioticVaultOptInToNetwork(_getSymbioticVaultConfig(0), env.symbiotic.networkAdapter, type(uint256).max);
+        _symbioticVaultOptInToNetwork(_getSymbioticVaultConfig(1), env.symbiotic.networkAdapter, type(uint256).max);
+
+        console.log("registering vault to all agents");
+        vm.startPrank(env.symbiotic.users.vault_admin);
+        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
+            address agent = env.testUsers.agents[i];
+            _symbioticVaultOptInToAgent(_getSymbioticVaultConfig(0), env.symbiotic.networkAdapter, agent, 1e42);
+            _symbioticVaultOptInToAgent(_getSymbioticVaultConfig(1), env.symbiotic.networkAdapter, agent, 1e42);
+        }
+
+        // change  epoch
+        _timeTravel(7 days);
+
+        _unwrapEnvToMakeTestsReadable();
+    }
+
+    function _symbioticVaultConfigToEnv(SymbioticVaultConfig memory _vault) internal {
+        console.log("symbiotic vault config to env", _vault.vault);
+        env.symbiotic.vaults.push(_vault.vault);
+        env.symbiotic.collaterals.push(_vault.collateral);
+        env.symbiotic.burnerRouters.push(_vault.burnerRouter);
+        env.symbiotic.globalReceivers.push(_vault.globalReceiver);
+        env.symbiotic.delegators.push(_vault.delegator);
+        env.symbiotic.slashers.push(_vault.slasher);
+        env.symbiotic.vaultEpochDurations.push(_vault.vaultEpochDuration);
+    }
+
+    function _getSymbioticVaultConfig(uint256 index) internal view returns (SymbioticVaultConfig memory _vault) {
+        _vault.vault = env.symbiotic.vaults[index];
+        _vault.collateral = env.symbiotic.collaterals[index];
+        _vault.burnerRouter = env.symbiotic.burnerRouters[index];
+        _vault.globalReceiver = env.symbiotic.globalReceivers[index];
+        _vault.delegator = env.symbiotic.delegators[index];
+        _vault.slasher = env.symbiotic.slashers[index];
+        _vault.vaultEpochDuration = env.symbiotic.vaultEpochDurations[index];
+    }
+
+    function _symbioticNetworkRewardsConfigToEnv(SymbioticNetworkRewardsConfig memory _rewards) internal {
+        env.symbiotic.networkRewards.push(_rewards.stakerRewarder);
+    }
+
+    function _getSymbioticNetworkRewardsConfig(uint256 index)
+        internal
+        view
+        returns (SymbioticNetworkRewardsConfig memory _rewards)
+    {
+        _rewards.stakerRewarder = env.symbiotic.networkRewards[index];
+    }
+
+    VaultConfig vault;
+    MockERC20 usdt;
+    MockERC20 usdc;
+    MockERC20 usdx;
+    CapToken cUSD;
+    StakedCap scUSD;
+
+    NetworkMiddleware middleware;
+    SymbioticVaultConfig symbioticUsdtVault;
+    SymbioticVaultConfig symbioticUsdxVault;
+    SymbioticNetworkRewardsConfig symbioticUsdtNetworkRewards;
+    SymbioticNetworkRewardsConfig symbioticUsdxNetworkRewards;
+
+    function _unwrapEnvToMakeTestsReadable() internal {
         vault = env.vault;
         usdt = MockERC20(vault.assets[0]);
         usdc = MockERC20(vault.assets[1]);
         usdx = MockERC20(vault.assets[2]);
         cUSD = CapToken(vault.capToken);
         scUSD = StakedCap(vault.stakedCapToken);
+
+        middleware = NetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
+        symbioticUsdtVault = _getSymbioticVaultConfig(0);
+        symbioticUsdxVault = _getSymbioticVaultConfig(1);
+        symbioticUsdtNetworkRewards = _getSymbioticNetworkRewardsConfig(0);
+        symbioticUsdxNetworkRewards = _getSymbioticNetworkRewardsConfig(1);
     }
 }
