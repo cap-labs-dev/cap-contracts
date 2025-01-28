@@ -26,7 +26,6 @@ struct TestEnvConfig {
     TestUsersConfig testUsers;
     address[] usdMocks;
     OracleMocksConfig oracleMocks;
-    address[][] delegationMocks; // [agent][delegator]
     // symbiotic
     SymbioticTestEnvConfig symbiotic;
 }

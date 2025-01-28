@@ -2,8 +2,12 @@
 pragma solidity ^0.8.0;
 
 import { SymbioticUtils } from "../../../../../contracts/deploy/utils/SymbioticUtils.sol";
+
+import { IDelegation } from "../../../../../contracts/interfaces/IDelegation.sol";
 import { MockERC20 } from "../../../../mocks/MockERC20.sol";
 import { TestEnvConfig } from "../../../interfaces/TestDeployConfig.sol";
+
+import { InfraConfig } from "../../../interfaces/TestDeployConfig.sol";
 import { TimeUtils } from "../../../utils/TimeUtils.sol";
 import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 import { Vm } from "forge-std/Vm.sol";
@@ -15,25 +19,31 @@ contract InitSymbioticVaultLiquidity is SymbioticUtils, TimeUtils {
             address vault = env.symbiotic.vaults[i];
             for (uint256 j = 0; j < env.testUsers.agents.length; j++) {
                 address agent = env.testUsers.agents[j];
-                _initSymbioticVaultLiquidityForAgent(vault, agent, 30_000);
+                _initSymbioticVaultLiquidityForAgent(env.infra, vault, agent, 30_000);
             }
         }
 
         _timeTravel(7 days);
     }
 
-    function _initSymbioticVaultLiquidityForAgent(address vault, address agent, uint256 amountNoDecimals)
-        internal
-        returns (uint256 depositedAmount, uint256 mintedShares)
-    {
+    function _initSymbioticVaultLiquidityForAgent(
+        InfraConfig memory infra,
+        address vault,
+        address agent,
+        uint256 amountNoDecimals
+    ) internal returns (uint256 depositedAmount, uint256 mintedShares) {
         Vm vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
         address collateral = IVault(vault).collateral();
         uint256 amount = amountNoDecimals * 10 ** MockERC20(collateral).decimals();
-        MockERC20(collateral).mint(agent, amount);
+        address[] memory delegators = IDelegation(infra.delegation).delegators(agent);
 
-        vm.startPrank(agent);
-        MockERC20(collateral).approve(address(vault), amount);
-        (depositedAmount, mintedShares) = IVault(vault).deposit(agent, amount);
+        for (uint256 i = 0; i < delegators.length; i++) {
+            address delegator = delegators[i];
+            vm.startPrank(delegator);
+            MockERC20(collateral).mint(delegator, amount);
+            MockERC20(collateral).approve(address(vault), amount);
+            (depositedAmount, mintedShares) = IVault(vault).deposit(delegator, amount);
+        }
     }
 }
