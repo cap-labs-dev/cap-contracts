@@ -20,11 +20,24 @@ struct ImplementationsConfig {
     address restakerDebtToken;
 }
 
+struct PreMainnetImplementationsConfig {
+    address preMainnetVault;
+}
+
 struct InfraConfig {
     address oracle;
     address accessControl;
     address lender;
     address delegation;
+}
+
+struct PreMainnetInfraConfig {
+    address preMainnetVault;
+}
+
+struct L2VaultConfig {
+    address bridgedCapToken;
+    address bridgedStakedCapToken;
 }
 
 struct UsersConfig {
@@ -44,6 +57,8 @@ struct UsersConfig {
 struct VaultConfig {
     address capToken; // also called the vault
     address stakedCapToken;
+    address capOFTLockbox;
+    address stakedCapOFTLockbox;
     address[] assets;
     address[] principalDebtTokens;
     address[] restakerDebtTokens;
