@@ -11,7 +11,7 @@ contract CapAdapterGetPriceTest is TestDeployer {
         _initTestVaultLiquidity(env.vault);
     }
 
-    function test_cap_adapter_get_price() public {
+    function test_cap_adapter_get_price() public view {
         uint256 cUSDPrice = IOracle(env.infra.oracle).getPrice(address(cUSD));
         uint256 scUSDPrice = IOracle(env.infra.oracle).getPrice(address(scUSD));
         assertApproxEqAbs(cUSDPrice, 1e8, 10, "cUSD price should be $1");

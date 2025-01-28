@@ -1,22 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { NetworkMiddlewareStorage } from "./libraries/NetworkMiddlewareStorage.sol";
-import { DataTypes } from "./libraries/types/DataTypes.sol";
 import { AccessUpgradeable } from "../../../access/AccessUpgradeable.sol";
 import { IOracle } from "../../../interfaces/IOracle.sol";
 import { IStakerRewards } from "./interfaces/IStakerRewards.sol";
-import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { NetworkMiddlewareStorage } from "./libraries/NetworkMiddlewareStorage.sol";
+import { DataTypes } from "./libraries/types/DataTypes.sol";
+
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
+
+import { Subnetwork } from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
 import { IEntity } from "@symbioticfi/core/src/interfaces/common/IEntity.sol";
 import { IRegistry } from "@symbioticfi/core/src/interfaces/common/IRegistry.sol";
 import { IBaseDelegator } from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
 import { ISlasher } from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
 import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
-import { Subnetwork } from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
 
 /// @title Cap Symbiotic Network Middleware Contract
 /// @author Cap Labs
@@ -32,6 +34,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
     error NotVault();
     error NoSlasher();
     error NoBurner();
+    error NoStakerRewarder();
     error VaultNotInitialized();
     error InvalidEpochDuration(uint48 required, uint48 actual);
     error InvalidSlashDuration();
@@ -41,7 +44,6 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
     /// @param _network Network address
     /// @param _vaultRegistry Vault registry address
     /// @param _oracle Oracle address
-    /// @param _stakerRewarder Staker rewarder address
     /// @param _requiredEpochDuration Required epoch duration in seconds
     /// @param _slashDuration amount of time we have to liquidate collateral in a slash event, needs to be < epochDuration
     function initialize(
@@ -49,7 +51,6 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
         address _network,
         address _vaultRegistry,
         address _oracle,
-        address _stakerRewarder,
         uint48 _requiredEpochDuration,
         uint48 _slashDuration
     ) external initializer {
@@ -58,7 +59,6 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
         $.network = _network;
         $.vaultRegistry = _vaultRegistry;
         $.oracle = _oracle;
-        $.stakerRewarder = _stakerRewarder;
         $.requiredEpochDuration = _requiredEpochDuration;
         $.slashDuration = _slashDuration;
 
@@ -68,9 +68,13 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Register vault to be used as collateral within the CAP system
     /// @param _vault Vault address
     /// @param _agents Agents supported by the vault
-    function registerVault(address _vault, address[] calldata _agents) external checkAccess(this.registerVault.selector) {
+    function registerVault(address _vault, address _stakerRewarder, address[] calldata _agents)
+        external
+        checkAccess(this.registerVault.selector)
+    {
         _verifyVault(_vault);
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
+        $.stakerRewarders[_vault] = _stakerRewarder;
         for (uint256 i; i < _agents.length; ++i) {
             $.vaults[_agents[i]].push(_vault);
         }
@@ -101,7 +105,11 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
         }
     }
 
-    function coverageByVault(address _agent, address _vault, address _oracle, uint48 _timestamp) public view returns (uint256 collateralValue, uint256 collateral) {
+    function coverageByVault(address _agent, address _vault, address _oracle, uint48 _timestamp)
+        public
+        view
+        returns (uint256 collateralValue, uint256 collateral)
+    {
         address collateralAddress = IVault(_vault).collateral();
         uint8 decimals = IERC20Metadata(collateralAddress).decimals();
         uint256 collateralPrice = IOracle(_oracle).getPrice(collateralAddress);
@@ -178,11 +186,14 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
 
     /// @notice Distribute rewards accumulated by the agent borrowing
     /// @param _token Token address
-    function distributeRewards(address _token) external checkAccess(this.distributeRewards.selector) {
+    function distributeRewards(address _vault, address _token) external checkAccess(this.distributeRewards.selector) {
         uint256 amount = IERC20(_token).balanceOf(address(this));
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
-        IERC20(_token).forceApprove(address(IStakerRewards($.stakerRewarder)), amount);
-        IStakerRewards($.stakerRewarder).distributeRewards(
+        address stakerRewarder = $.stakerRewarders[_vault];
+        if (stakerRewarder == address(0)) revert NoStakerRewarder();
+
+        IERC20(_token).forceApprove(address(IStakerRewards(stakerRewarder)), amount);
+        IStakerRewards(stakerRewarder).distributeRewards(
             $.network,
             _token,
             amount,
@@ -196,5 +207,5 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
     }
 
     /// @dev Only admin can upgrade
-    function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) {}
+    function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }
 }

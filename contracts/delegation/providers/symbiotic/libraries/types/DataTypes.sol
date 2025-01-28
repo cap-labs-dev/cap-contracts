@@ -12,10 +12,10 @@ library DataTypes {
         address network;
         address vaultRegistry;
         address oracle;
-        address stakerRewarder;
         uint48 requiredEpochDuration;
         uint48 slashDuration;
-        mapping(address => address[]) vaults;
+        mapping(address => address) stakerRewarders; // vault => stakerRewarder
+        mapping(address => address[]) vaults; // agent => vault[]
     }
 
     enum SlasherType {
