@@ -41,7 +41,12 @@ import {
     SymbioticVaultConfig
 } from "../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 
+import { PreMainnetImplementationsConfig } from "../contracts/deploy/interfaces/DeployConfigs.sol";
+import { PreMainnetInfraConfig } from "../contracts/deploy/interfaces/DeployConfigs.sol";
+
 import { Script } from "forge-std/Script.sol";
+
+import { stdJson } from "forge-std/StdJson.sol";
 import { console } from "forge-std/console.sol";
 
 struct Env {
@@ -55,6 +60,8 @@ struct Env {
     address[] usdMocks;
     address[][] delegationMocks; // [agent][delegator]
     VaultConfig cUsdVault;
+    PreMainnetImplementationsConfig preMainnetImplementations;
+    PreMainnetInfraConfig preMainnetInfra;
 }
 
 contract DeployTestnet is
@@ -74,81 +81,147 @@ contract DeployTestnet is
     DeployCapNetworkAdapter,
     ConfigureSymbioticOptIns
 {
+    string constant OUTPUT_PATH_FROM_PROJECT_ROOT = "config/cap-testnet.json";
+
+    using stdJson for string;
+
     LzAddressbook lzAb;
     SymbioticAddressbook symbioticAb;
     Env env;
 
-    function log_addresses() internal view {
-        console.log("env.implems.accessControl", env.implems.accessControl);
-        console.log("env.implems.lender", env.implems.lender);
-        console.log("env.implems.delegation", env.implems.delegation);
-        console.log("env.implems.capToken", env.implems.capToken);
-        console.log("env.implems.stakedCap", env.implems.stakedCap);
-        console.log("env.implems.oracle", env.implems.oracle);
-        console.log("env.implems.principalDebtToken", env.implems.principalDebtToken);
-        console.log("env.implems.interestDebtToken", env.implems.interestDebtToken);
-        console.log("env.implems.restakerDebtToken", env.implems.restakerDebtToken);
+    function log_addresses() internal {
+        string memory json = "output";
 
-        console.log("env.libs.aaveAdapter", env.libs.aaveAdapter);
-        console.log("env.libs.chainlinkAdapter", env.libs.chainlinkAdapter);
-        console.log("env.libs.capTokenAdapter", env.libs.capTokenAdapter);
-        console.log("env.libs.stakedCapAdapter", env.libs.stakedCapAdapter);
+        vm.serializeAddress(json, "env.implems.accessControl", env.implems.accessControl);
+        vm.serializeAddress(json, "env.implems.lender", env.implems.lender);
+        vm.serializeAddress(json, "env.implems.delegation", env.implems.delegation);
+        vm.serializeAddress(json, "env.implems.capToken", env.implems.capToken);
+        vm.serializeAddress(json, "env.implems.stakedCap", env.implems.stakedCap);
+        vm.serializeAddress(json, "env.implems.oracle", env.implems.oracle);
+        vm.serializeAddress(json, "env.implems.principalDebtToken", env.implems.principalDebtToken);
+        vm.serializeAddress(json, "env.implems.interestDebtToken", env.implems.interestDebtToken);
+        vm.serializeAddress(json, "env.implems.restakerDebtToken", env.implems.restakerDebtToken);
 
-        console.log("infra.oracle", env.infra.oracle);
-        console.log("infra.accessControl", env.infra.accessControl);
-        console.log("infra.lender", env.infra.lender);
-        console.log("infra.delegation", env.infra.delegation);
+        vm.serializeAddress(json, "env.libs.aaveAdapter", env.libs.aaveAdapter);
+        vm.serializeAddress(json, "env.libs.chainlinkAdapter", env.libs.chainlinkAdapter);
+        vm.serializeAddress(json, "env.libs.capTokenAdapter", env.libs.capTokenAdapter);
+        vm.serializeAddress(json, "env.libs.stakedCapAdapter", env.libs.stakedCapAdapter);
 
-        console.log("env.symbiotic.users.vault_admin", env.symbiotic.users.vault_admin);
-        console.log("env.symbiotic.networkAdapterImplems.network", env.symbiotic.networkAdapterImplems.network);
-        console.log(
+        vm.serializeAddress(json, "env.infra.oracle", env.infra.oracle);
+        vm.serializeAddress(json, "env.infra.accessControl", env.infra.accessControl);
+        vm.serializeAddress(json, "env.infra.lender", env.infra.lender);
+        vm.serializeAddress(json, "env.infra.delegation", env.infra.delegation);
+
+        vm.serializeAddress(json, "env.symbiotic.users.vault_admin", env.symbiotic.users.vault_admin);
+        vm.serializeAddress(
+            json, "env.symbiotic.networkAdapterImplems.network", env.symbiotic.networkAdapterImplems.network
+        );
+        vm.serializeAddress(
+            json,
             "env.symbiotic.networkAdapterImplems.restakerRewarder",
             env.symbiotic.networkAdapterImplems.networkMiddleware
         );
-        console.log("env.symbiotic.networkAdapter.network", env.symbiotic.networkAdapter.network);
-        console.log("env.symbiotic.networkAdapter.networkMiddleware", env.symbiotic.networkAdapter.networkMiddleware);
-        console.log("env.symbiotic.networkAdapter.slashDuration", env.symbiotic.networkAdapter.slashDuration);
+        vm.serializeAddress(json, "env.symbiotic.networkAdapter.network", env.symbiotic.networkAdapter.network);
+        vm.serializeAddress(
+            json, "env.symbiotic.networkAdapter.networkMiddleware", env.symbiotic.networkAdapter.networkMiddleware
+        );
+        vm.serializeUint(json, "env.symbiotic.networkAdapter.slashDuration", env.symbiotic.networkAdapter.slashDuration);
         for (uint256 i = 0; i < env.symbiotic.vaults.length; i++) {
-            console.log("env.symbiotic.vaults[", i, "]", env.symbiotic.vaults[i]);
-            console.log("env.symbiotic.collaterals[", i, "]", env.symbiotic.collaterals[i]);
-            console.log("env.symbiotic.burnerRouters[", i, "]", env.symbiotic.burnerRouters[i]);
-            console.log("env.symbiotic.globalReceivers[", i, "]", env.symbiotic.globalReceivers[i]);
-            console.log("env.symbiotic.delegators[", i, "]", env.symbiotic.delegators[i]);
-            console.log("env.symbiotic.slashers[", i, "]", env.symbiotic.slashers[i]);
-            console.log("env.symbiotic.networkRewards[", i, "]", env.symbiotic.networkRewards[i]);
-            console.log("env.symbiotic.vaultEpochDurations[", i, "]", env.symbiotic.vaultEpochDurations[i]);
+            vm.serializeAddress(
+                json, string.concat("env.symbiotic.vaults[", Strings.toString(i), "]"), env.symbiotic.vaults[i]
+            );
+            vm.serializeAddress(
+                json,
+                string.concat("env.symbiotic.collaterals[", Strings.toString(i), "]"),
+                env.symbiotic.collaterals[i]
+            );
+            vm.serializeAddress(
+                json,
+                string.concat("env.symbiotic.burnerRouters[", Strings.toString(i), "]"),
+                env.symbiotic.burnerRouters[i]
+            );
+            vm.serializeAddress(
+                json,
+                string.concat("env.symbiotic.globalReceivers[", Strings.toString(i), "]"),
+                env.symbiotic.globalReceivers[i]
+            );
+            vm.serializeAddress(
+                json, string.concat("env.symbiotic.delegators[", Strings.toString(i), "]"), env.symbiotic.delegators[i]
+            );
+            vm.serializeAddress(
+                json, string.concat("env.symbiotic.slashers[", Strings.toString(i), "]"), env.symbiotic.slashers[i]
+            );
+            vm.serializeAddress(
+                json,
+                string.concat("env.symbiotic.networkRewards[", Strings.toString(i), "]"),
+                env.symbiotic.networkRewards[i]
+            );
+            vm.serializeUint(
+                json,
+                string.concat("env.symbiotic.vaultEpochDurations[", Strings.toString(i), "]"),
+                env.symbiotic.vaultEpochDurations[i]
+            );
         }
 
         for (uint256 i = 0; i < env.oracleMocks.assets.length; i++) {
-            console.log("env.oracleMocks.assets[", i, "]", env.oracleMocks.assets[i]);
-        }
-        for (uint256 i = 0; i < env.oracleMocks.aaveDataProviders.length; i++) {
-            console.log("env.oracleMocks.aaveDataProviders[", i, "]", env.oracleMocks.aaveDataProviders[i]);
-        }
-        for (uint256 i = 0; i < env.oracleMocks.chainlinkPriceFeeds.length; i++) {
-            console.log("env.oracleMocks.chainlinkPriceFeeds[", i, "]", env.oracleMocks.chainlinkPriceFeeds[i]);
+            vm.serializeAddress(
+                json, string.concat("env.oracleMocks.assets[", Strings.toString(i), "]"), env.oracleMocks.assets[i]
+            );
+            vm.serializeAddress(
+                json,
+                string.concat("env.oracleMocks.aaveDataProviders[", Strings.toString(i), "]"),
+                env.oracleMocks.aaveDataProviders[i]
+            );
+            vm.serializeAddress(
+                json,
+                string.concat("env.oracleMocks.chainlinkPriceFeeds[", Strings.toString(i), "]"),
+                env.oracleMocks.chainlinkPriceFeeds[i]
+            );
         }
 
         for (uint256 i = 0; i < env.delegationMocks.length; i++) {
             for (uint256 j = 0; j < env.delegationMocks[i].length; j++) {
-                console.log(
+                vm.serializeAddress(
+                    json,
                     string.concat("env.delegationMocks[", Strings.toString(i), "][", Strings.toString(j), "]"),
                     env.delegationMocks[i][j]
                 );
             }
         }
 
-        console.log("env.cUsdVault.capToken", env.cUsdVault.capToken);
-        console.log("env.cUsdVault.stakedCapToken", env.cUsdVault.stakedCapToken);
-        console.log("env.cUsdVault.capOFTLockbox", env.cUsdVault.capOFTLockbox);
-        console.log("env.cUsdVault.stakedCapOFTLockbox", env.cUsdVault.stakedCapOFTLockbox);
+        vm.serializeAddress(json, "env.cUsdVault.capToken", env.cUsdVault.capToken);
+        vm.serializeAddress(json, "env.cUsdVault.stakedCapToken", env.cUsdVault.stakedCapToken);
+        vm.serializeAddress(json, "env.cUsdVault.capOFTLockbox", env.cUsdVault.capOFTLockbox);
+        vm.serializeAddress(json, "env.cUsdVault.stakedCapOFTLockbox", env.cUsdVault.stakedCapOFTLockbox);
 
         for (uint256 i = 0; i < env.cUsdVault.assets.length; i++) {
-            console.log("env.cUsdVault.assets[", i, "]", env.cUsdVault.assets[i]);
-            console.log("env.cUsdVault.principalDebtTokens[", i, "]", env.cUsdVault.principalDebtTokens[i]);
-            console.log("env.cUsdVault.restakerDebtTokens[", i, "]", env.cUsdVault.restakerDebtTokens[i]);
-            console.log("env.cUsdVault.interestDebtTokens[", i, "]", env.cUsdVault.interestDebtTokens[i]);
+            vm.serializeAddress(
+                json, string.concat("env.cUsdVault.assets[", Strings.toString(i), "]"), env.cUsdVault.assets[i]
+            );
+            vm.serializeAddress(
+                json,
+                string.concat("env.cUsdVault.principalDebtTokens[", Strings.toString(i), "]"),
+                env.cUsdVault.principalDebtTokens[i]
+            );
+            vm.serializeAddress(
+                json,
+                string.concat("env.cUsdVault.restakerDebtTokens[", Strings.toString(i), "]"),
+                env.cUsdVault.restakerDebtTokens[i]
+            );
+            vm.serializeAddress(
+                json,
+                string.concat("env.cUsdVault.interestDebtTokens[", Strings.toString(i), "]"),
+                env.cUsdVault.interestDebtTokens[i]
+            );
         }
+
+        vm.serializeAddress(
+            json, "env.preMainnetImplementations.preMainnetVault", env.preMainnetImplementations.preMainnetVault
+        );
+
+        json = vm.serializeAddress(json, "env.preMainnetInfra.preMainnetVault", env.preMainnetInfra.preMainnetVault);
+        console.log(json);
+        vm.writeFile(OUTPUT_PATH_FROM_PROJECT_ROOT, json);
     }
 
     function run() external {
@@ -310,9 +383,15 @@ contract DeployTestnet is
             _symbioticVaultOptInToAgent(_getSymbioticVaultConfig(1), env.symbiotic.networkAdapter, _agent, 1e42);
         }
 
-        vm.stopBroadcast();
+        /// PRE-MAINNET
+        console.log("deploying pre-mainnet infra");
+        LzAddressbook memory dstAddressbook = _getLzAddressbook(421614);
+        env.preMainnetImplementations = _deployPreMainnetImplementations(lzAb);
+        env.preMainnetInfra =
+            _deployPreMainnetInfra(dstAddressbook, env.preMainnetImplementations, env.usdMocks[1], /* usdc */ 30 days);
 
         log_addresses();
+        vm.stopBroadcast();
     }
 
     function _symbioticVaultConfigToEnv(SymbioticVaultConfig memory _vault) internal {

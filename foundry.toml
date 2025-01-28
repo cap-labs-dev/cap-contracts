@@ -27,6 +27,7 @@ remappings = [
 fs_permissions = [
     { access = "read", path = "./config/symbiotic.json" },
     { access = "read", path = "./config/layerzero-v2-deployments.json" },
+    { access = "read-write", path = "./config/cap-testnet.json" },
 ]
 
 [fmt]

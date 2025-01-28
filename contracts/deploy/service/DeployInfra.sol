@@ -10,6 +10,7 @@ import { Oracle } from "../../oracle/Oracle.sol";
 import { L2Token } from "../../token/L2Token.sol";
 import { VaultUpgradeable } from "../../vault/VaultUpgradeable.sol";
 
+import { PreMainnetVault } from "../../testnetCampaign/PreMainnetVault.sol";
 import {
     ImplementationsConfig,
     InfraConfig,
@@ -44,11 +45,14 @@ contract DeployInfra is ProxyUtils {
         Delegation(d.delegation).initialize(d.accessControl, d.oracle);
     }
 
-    function _deployPreMainnetInfra(PreMainnetImplementationsConfig memory implementations, UsersConfig memory users)
-        internal
-        returns (PreMainnetInfraConfig memory d)
-    {
+    function _deployPreMainnetInfra(
+        LzAddressbook memory dstAddressbook,
+        PreMainnetImplementationsConfig memory implementations,
+        address asset,
+        uint48 maxCampaignLength
+    ) internal returns (PreMainnetInfraConfig memory d) {
         d.preMainnetVault = _proxy(implementations.preMainnetVault);
+        PreMainnetVault(d.preMainnetVault).initialize(asset, dstAddressbook.eid, maxCampaignLength);
     }
 
     function _deployL2InfraForVault(
