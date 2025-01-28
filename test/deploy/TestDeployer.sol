@@ -79,7 +79,6 @@ contract TestDeployer is
         env.infra = _deployInfra(env.implems, env.users);
 
         env.usdMocks = _deployUSDMocks();
-        env.delegationMocks = _deployDelegationMocks(env.testUsers, 3);
         env.oracleMocks = _deployOracleMocks(env.usdMocks);
 
         console.log("deploying vault");
@@ -109,14 +108,6 @@ contract TestDeployer is
         console.log("deploying lender");
         vm.startPrank(env.users.lender_admin);
         _initVaultLender(env.vault, env.infra, env.users);
-
-        /// DELEGATION
-        console.log("deploying delegation");
-        vm.startPrank(env.users.delegation_admin);
-        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            address agent = env.testUsers.agents[i];
-            _initDelegation(env.infra, agent, env.delegationMocks[i]);
-        }
 
         /// SYMBIOTIC NETWORK ADAPTER
         console.log("deploying symbiotic cap network address");
@@ -221,6 +212,14 @@ contract TestDeployer is
             address _agent = env.testUsers.agents[i];
             _symbioticVaultOptInToAgent(_getSymbioticVaultConfig(0), env.symbiotic.networkAdapter, _agent, 1e42);
             _symbioticVaultOptInToAgent(_getSymbioticVaultConfig(1), env.symbiotic.networkAdapter, _agent, 1e42);
+        }
+
+        console.log("init delegation");
+        vm.startPrank(env.users.delegation_admin);
+        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
+            address agent = env.testUsers.agents[i];
+            _initDelegationAgent(env.infra, agent);
+            _initDelegationAgentDelegator(env.infra, agent, env.symbiotic.networkAdapter.networkMiddleware);
         }
 
         // change  epoch

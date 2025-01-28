@@ -10,6 +10,8 @@ contract LenderBorrowTest is TestDeployer {
     function setUp() public {
         _deployCapTestEnvironment();
         _initTestVaultLiquidity(env.vault);
+        _initSymbioticVaultsLiquidity(env);
+
         user_agent = env.testUsers.agents[0];
     }
 

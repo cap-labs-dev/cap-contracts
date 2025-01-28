@@ -13,17 +13,18 @@ import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/Saf
 
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 
+import { IDelegator } from "../../../delegation/interfaces/IDelegator.sol";
 import { Subnetwork } from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
 import { IEntity } from "@symbioticfi/core/src/interfaces/common/IEntity.sol";
 import { IRegistry } from "@symbioticfi/core/src/interfaces/common/IRegistry.sol";
 import { IBaseDelegator } from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
 import { ISlasher } from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
 import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
-
 /// @title Cap Symbiotic Network Middleware Contract
 /// @author Cap Labs
 /// @notice This contract manages the symbiotic collateral and slashing.
-contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable {
+
+contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, IDelegator {
     using SafeERC20 for IERC20;
 
     event VaultRegistered(address vault);

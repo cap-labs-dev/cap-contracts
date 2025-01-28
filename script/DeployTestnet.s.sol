@@ -58,7 +58,6 @@ struct Env {
     SymbioticTestEnvConfig symbiotic;
     OracleMocksConfig oracleMocks;
     address[] usdMocks;
-    address[][] delegationMocks; // [agent][delegator]
     VaultConfig cUsdVault;
     PreMainnetImplementationsConfig preMainnetImplementations;
     PreMainnetInfraConfig preMainnetInfra;
@@ -179,16 +178,6 @@ contract DeployTestnet is
             );
         }
 
-        for (uint256 i = 0; i < env.delegationMocks.length; i++) {
-            for (uint256 j = 0; j < env.delegationMocks[i].length; j++) {
-                vm.serializeAddress(
-                    json,
-                    string.concat("env.delegationMocks[", Strings.toString(i), "][", Strings.toString(j), "]"),
-                    env.delegationMocks[i][j]
-                );
-            }
-        }
-
         vm.serializeAddress(json, "env.cUsdVault.capToken", env.cUsdVault.capToken);
         vm.serializeAddress(json, "env.cUsdVault.stakedCapToken", env.cUsdVault.stakedCapToken);
         vm.serializeAddress(json, "env.cUsdVault.capOFTLockbox", env.cUsdVault.capOFTLockbox);
@@ -256,11 +245,11 @@ contract DeployTestnet is
         env.infra = _deployInfra(env.implems, env.users);
 
         env.usdMocks = _deployUSDMocks();
-        env.delegationMocks = _deployDelegationMocks(env.testUsers, 3);
         env.oracleMocks = _deployOracleMocks(env.usdMocks);
 
         console.log("deploying vault");
         env.cUsdVault = _deployVault(lzAb, env.implems, env.infra, env.users, "Cap USD", "cUSD", env.oracleMocks.assets);
+        // env.cEthVault = _deployVault(lzAb, env.implems, env.infra, env.users, "Cap ETH", "cETH", env.oracleMocks.assets);
 
         /// ACCESS CONTROL
         console.log("deploying access control");
@@ -284,13 +273,6 @@ contract DeployTestnet is
         /// LENDER
         console.log("deploying lender");
         _initVaultLender(env.cUsdVault, env.infra, env.users);
-
-        /// DELEGATION
-        console.log("deploying delegation");
-        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            address agent = env.testUsers.agents[i];
-            _initDelegation(env.infra, agent, env.delegationMocks[i]);
-        }
 
         /// SYMBIOTIC NETWORK ADAPTER
         console.log("deploying symbiotic network adapter");
@@ -381,6 +363,13 @@ contract DeployTestnet is
             address _agent = env.testUsers.agents[i];
             _symbioticVaultOptInToAgent(_getSymbioticVaultConfig(0), env.symbiotic.networkAdapter, _agent, 1e42);
             _symbioticVaultOptInToAgent(_getSymbioticVaultConfig(1), env.symbiotic.networkAdapter, _agent, 1e42);
+        }
+
+        console.log("init delegation");
+        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
+            address agent = env.testUsers.agents[i];
+            _initDelegationAgent(env.infra, agent);
+            _initDelegationAgentDelegator(env.infra, agent, env.symbiotic.networkAdapter.networkMiddleware);
         }
 
         /// PRE-MAINNET
