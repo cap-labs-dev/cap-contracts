@@ -6,7 +6,21 @@ import { AccessControl } from "../../access/AccessControl.sol";
 import { Delegation } from "../../delegation/Delegation.sol";
 import { Lender } from "../../lendingPool/Lender.sol";
 import { Oracle } from "../../oracle/Oracle.sol";
-import { ImplementationsConfig, InfraConfig, UsersConfig } from "../interfaces/DeployConfigs.sol";
+
+import { L2Token } from "../../token/L2Token.sol";
+import { VaultUpgradeable } from "../../vault/VaultUpgradeable.sol";
+
+import { PreMainnetVault } from "../../testnetCampaign/PreMainnetVault.sol";
+import {
+    ImplementationsConfig,
+    InfraConfig,
+    L2VaultConfig,
+    PreMainnetImplementationsConfig,
+    PreMainnetInfraConfig,
+    UsersConfig,
+    VaultConfig
+} from "../interfaces/DeployConfigs.sol";
+import { LzAddressbook } from "../utils/LzUtils.sol";
 import { ProxyUtils } from "../utils/ProxyUtils.sol";
 
 contract DeployInfra is ProxyUtils {
@@ -29,5 +43,34 @@ contract DeployInfra is ProxyUtils {
         Lender(d.lender).initialize(d.accessControl, d.delegation, d.oracle, targetHealth, grace, expiry, bonusCap);
         Oracle(d.oracle).initialize(d.accessControl);
         Delegation(d.delegation).initialize(d.accessControl, d.oracle);
+    }
+
+    function _deployPreMainnetInfra(
+        LzAddressbook memory dstAddressbook,
+        PreMainnetImplementationsConfig memory implementations,
+        address asset,
+        uint48 maxCampaignLength
+    ) internal returns (PreMainnetInfraConfig memory d) {
+        d.preMainnetVault = _proxy(implementations.preMainnetVault);
+        PreMainnetVault(d.preMainnetVault).initialize(asset, dstAddressbook.eid, maxCampaignLength);
+    }
+
+    function _deployL2InfraForVault(
+        UsersConfig memory users,
+        VaultConfig memory l1Vault,
+        LzAddressbook memory addressbook
+    ) internal returns (L2VaultConfig memory d) {
+        address lzEndpoint = address(addressbook.endpointV2);
+        string memory name;
+        string memory symbol;
+        address delegate = users.vault_config_admin;
+
+        name = VaultUpgradeable(l1Vault.capToken).name();
+        symbol = VaultUpgradeable(l1Vault.capToken).symbol();
+        d.bridgedCapToken = address(new L2Token(name, symbol, lzEndpoint, delegate));
+
+        name = VaultUpgradeable(l1Vault.stakedCapToken).name();
+        symbol = VaultUpgradeable(l1Vault.stakedCapToken).symbol();
+        d.bridgedStakedCapToken = address(new L2Token(name, symbol, lzEndpoint, delegate));
     }
 }

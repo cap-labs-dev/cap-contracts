@@ -7,21 +7,21 @@ import { stdJson } from "forge-std/StdJson.sol";
 import { Vm } from "forge-std/Vm.sol";
 import { console } from "forge-std/console.sol";
 
+struct LzAddressbook {
+    uint32 eid;
+    ILayerZeroEndpointV2 endpointV2;
+    address executor;
+    uint32 nativeChainId;
+    address receiveUln301;
+    address receiveUln302;
+    address sendUln301;
+    address sendUln302;
+}
+
 contract LzUtils {
     using stdJson for string;
 
     string public constant LZ_CONFIG_PATH_FROM_PROJECT_ROOT = "config/layerzero-v2-deployments.json";
-
-    struct LzConfig {
-        uint32 eid;
-        ILayerZeroEndpointV2 endpointV2;
-        address executor;
-        uint32 nativeChainId;
-        address receiveUln301;
-        address receiveUln302;
-        address sendUln301;
-        address sendUln302;
-    }
 
     /**
      * @dev Converts an address to bytes32.
@@ -44,23 +44,31 @@ contract LzUtils {
     }
 
     /**
-     * @dev Retrieves the LayerZero configuration for a given chain ID.
-     * @param vm The Vm instance.
-     * @param chainId The chain ID.
-     * @return config The LayerZero configuration.
+     * @dev Retrieves the LayerZero configuration for the current chain ID.
+     * @return addressbook The LayerZero addressbook.
      */
-    function getLzConfig(Vm vm, uint chainId) public view returns (LzConfig memory config) {
+    function _getLzAddressbook() internal view returns (LzAddressbook memory addressbook) {
+        addressbook = _getLzAddressbook(block.chainid);
+    }
+
+    /**
+     * @dev Retrieves the LayerZero configuration for a given chain ID.
+     * @param chainId The chain ID.
+     * @return addressbook The LayerZero addressbook.
+     */
+    function _getLzAddressbook(uint chainId) internal view returns (LzAddressbook memory addressbook) {
+        Vm vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/", LZ_CONFIG_PATH_FROM_PROJECT_ROOT);
         string memory json = vm.readFile(path);
 
-        config.eid = uint32(json.readUint(_fieldKey(vm, chainId, "eid")));
-        config.endpointV2 = ILayerZeroEndpointV2(json.readAddress(_fieldKey(vm, chainId, "endpointV2")));
-        config.executor = json.readAddress(_fieldKey(vm, chainId, "executor"));
-        config.nativeChainId = uint32(json.readUint(_fieldKey(vm, chainId, "nativeChainId")));
-        config.receiveUln301 = json.readAddress(_fieldKey(vm, chainId, "receiveUln301"));
-        config.receiveUln302 = json.readAddress(_fieldKey(vm, chainId, "receiveUln302"));
-        config.sendUln301 = json.readAddress(_fieldKey(vm, chainId, "sendUln301"));
-        config.sendUln302 = json.readAddress(_fieldKey(vm, chainId, "sendUln302"));
+        addressbook.eid = uint32(json.readUint(_fieldKey(vm, chainId, "eid")));
+        addressbook.endpointV2 = ILayerZeroEndpointV2(json.readAddress(_fieldKey(vm, chainId, "endpointV2")));
+        addressbook.executor = json.readAddress(_fieldKey(vm, chainId, "executor"));
+        addressbook.nativeChainId = uint32(json.readUint(_fieldKey(vm, chainId, "nativeChainId")));
+        addressbook.receiveUln301 = json.readAddress(_fieldKey(vm, chainId, "receiveUln301"));
+        addressbook.receiveUln302 = json.readAddress(_fieldKey(vm, chainId, "receiveUln302"));
+        addressbook.sendUln301 = json.readAddress(_fieldKey(vm, chainId, "sendUln301"));
+        addressbook.sendUln302 = json.readAddress(_fieldKey(vm, chainId, "sendUln302"));
     }
 }

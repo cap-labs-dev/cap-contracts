@@ -7,16 +7,22 @@ import { DataTypes } from "../../lendingPool/libraries/types/DataTypes.sol";
 import { InterestDebtToken } from "../../lendingPool/tokens/InterestDebtToken.sol";
 import { PrincipalDebtToken } from "../../lendingPool/tokens/PrincipalDebtToken.sol";
 import { RestakerDebtToken } from "../../lendingPool/tokens/RestakerDebtToken.sol";
+
 import { CapToken } from "../../token/CapToken.sol";
+import { OFTLockbox } from "../../token/OFTLockbox.sol";
 import { StakedCap } from "../../token/StakedCap.sol";
 import { VaultUpgradeable } from "../../vault/VaultUpgradeable.sol";
 import { ImplementationsConfig, InfraConfig, UsersConfig, VaultConfig } from "../interfaces/DeployConfigs.sol";
+
+import { LzAddressbook } from "../utils/LzUtils.sol";
 import { ProxyUtils } from "../utils/ProxyUtils.sol";
 
 contract DeployVault is ProxyUtils {
     function _deployVault(
+        LzAddressbook memory addressbook,
         ImplementationsConfig memory implementations,
         InfraConfig memory infra,
+        UsersConfig memory users,
         string memory name,
         string memory symbol,
         address[] memory assets
@@ -45,6 +51,11 @@ contract DeployVault is ProxyUtils {
                 infra.accessControl, infra.oracle, d.principalDebtTokens[i], assets[i]
             );
         }
+
+        // deploy the lockboxes
+        d.capOFTLockbox = address(new OFTLockbox(d.capToken, address(addressbook.endpointV2), users.vault_config_admin));
+        d.stakedCapOFTLockbox =
+            address(new OFTLockbox(d.stakedCapToken, address(addressbook.endpointV2), users.vault_config_admin));
     }
 
     function _initVaultAccessControl(InfraConfig memory infra, VaultConfig memory vault) internal {

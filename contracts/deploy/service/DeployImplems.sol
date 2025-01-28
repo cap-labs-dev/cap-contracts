@@ -10,9 +10,13 @@ import { PrincipalDebtToken } from "../../lendingPool/tokens/PrincipalDebtToken.
 import { RestakerDebtToken } from "../../lendingPool/tokens/RestakerDebtToken.sol";
 
 import { Oracle } from "../../oracle/Oracle.sol";
+import { PreMainnetVault } from "../../testnetCampaign/PreMainnetVault.sol";
 import { CapToken } from "../../token/CapToken.sol";
+import { L2Token } from "../../token/L2Token.sol";
+import { OFTLockbox } from "../../token/OFTLockbox.sol";
 import { StakedCap } from "../../token/StakedCap.sol";
-import { ImplementationsConfig } from "../interfaces/DeployConfigs.sol";
+import { ImplementationsConfig, PreMainnetImplementationsConfig } from "../interfaces/DeployConfigs.sol";
+import { LzAddressbook } from "../utils/LzUtils.sol";
 
 contract DeployImplems {
     function _deployImplementations() internal returns (ImplementationsConfig memory d) {
@@ -25,5 +29,12 @@ contract DeployImplems {
         d.principalDebtToken = address(new PrincipalDebtToken());
         d.interestDebtToken = address(new InterestDebtToken());
         d.restakerDebtToken = address(new RestakerDebtToken());
+    }
+
+    function _deployPreMainnetImplementations(LzAddressbook memory addressbook)
+        internal
+        returns (PreMainnetImplementationsConfig memory d)
+    {
+        d.preMainnetVault = address(new PreMainnetVault(address(addressbook.endpointV2)));
     }
 }

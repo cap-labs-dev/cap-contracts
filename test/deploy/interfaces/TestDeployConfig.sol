@@ -26,7 +26,7 @@ struct TestEnvConfig {
     TestUsersConfig testUsers;
     address[] usdMocks;
     OracleMocksConfig oracleMocks;
-    DelegationMockConfig delegationMock;
+    address[][] delegationMocks; // [agent][delegator]
     // symbiotic
     SymbioticTestEnvConfig symbiotic;
 }
@@ -41,8 +41,8 @@ struct SymbioticTestEnvConfig {
     address[] globalReceivers;
     address[] delegators;
     address[] slashers;
-    uint48[] vaultEpochDurations;
     address[] networkRewards;
+    uint48[] vaultEpochDurations;
 }
 
 struct TestUsersConfig {
@@ -55,8 +55,4 @@ struct OracleMocksConfig {
     address[] assets;
     address[] aaveDataProviders;
     address[] chainlinkPriceFeeds;
-}
-
-struct DelegationMockConfig {
-    address[] delegators;
 }
