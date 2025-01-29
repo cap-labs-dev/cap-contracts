@@ -13,7 +13,13 @@ import { OFTLockbox } from "../../token/OFTLockbox.sol";
 import { StakedCap } from "../../token/StakedCap.sol";
 import { VaultUpgradeable } from "../../vault/VaultUpgradeable.sol";
 import { ZapOFTComposer } from "../../zap/ZapOFTComposer.sol";
-import { ImplementationsConfig, InfraConfig, UsersConfig, VaultConfig } from "../interfaces/DeployConfigs.sol";
+import {
+    ImplementationsConfig,
+    InfraConfig,
+    UsersConfig,
+    VaultConfig,
+    VaultLzPeriphery
+} from "../interfaces/DeployConfigs.sol";
 
 import { LzAddressbook } from "../utils/LzUtils.sol";
 import { ProxyUtils } from "../utils/ProxyUtils.sol";
@@ -21,8 +27,6 @@ import { ZapAddressbook } from "../utils/ZapUtils.sol";
 
 contract DeployVault is ProxyUtils {
     function _deployVault(
-        LzAddressbook memory lzAddressbook,
-        ZapAddressbook memory zapAddressbook,
         ImplementationsConfig memory implementations,
         InfraConfig memory infra,
         UsersConfig memory users,
@@ -33,7 +37,6 @@ contract DeployVault is ProxyUtils {
         // deploy and init cap instances
         d.capToken = _proxy(implementations.capToken);
         d.stakedCapToken = _proxy(implementations.stakedCap);
-
         CapToken(d.capToken).initialize(name, symbol, infra.accessControl, infra.oracle, assets);
         StakedCap(d.stakedCapToken).initialize(infra.accessControl, d.capToken, 6 hours);
 
@@ -54,12 +57,20 @@ contract DeployVault is ProxyUtils {
                 infra.accessControl, infra.oracle, d.principalDebtTokens[i], assets[i]
             );
         }
+    }
 
+    function _deployVaultLzPeripherals(
+        LzAddressbook memory lzAddressbook,
+        ZapAddressbook memory zapAddressbook,
+        VaultConfig memory vault,
+        UsersConfig memory users
+    ) internal returns (VaultLzPeriphery memory d) {
         // deploy the lockboxes
         d.capOFTLockbox =
-            address(new OFTLockbox(d.capToken, address(lzAddressbook.endpointV2), users.vault_config_admin));
+            address(new OFTLockbox(vault.capToken, address(lzAddressbook.endpointV2), users.vault_config_admin));
+
         d.stakedCapOFTLockbox =
-            address(new OFTLockbox(d.stakedCapToken, address(lzAddressbook.endpointV2), users.vault_config_admin));
+            address(new OFTLockbox(vault.stakedCapToken, address(lzAddressbook.endpointV2), users.vault_config_admin));
 
         // deploy the zap composers
         d.capZapComposer = address(

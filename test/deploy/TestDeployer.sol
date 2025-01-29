@@ -62,6 +62,10 @@ contract TestDeployer is
 {
     TestEnvConfig env;
 
+    LzAddressbook lzAb;
+    SymbioticAddressbook symbioticAb;
+    ZapAddressbook zapAb;
+
     function _deployCapTestEnvironment() internal {
         // we need to fork the sepolia network to deploy the symbiotic network adapter
         // hardcoding the block number to benefit from the anvil cache
@@ -72,9 +76,9 @@ contract TestDeployer is
         /// DEPLOY
         vm.startPrank(env.users.deployer);
 
-        LzAddressbook memory lzAb = _getLzAddressbook();
-        SymbioticAddressbook memory symbioticAb = _getSymbioticAddressbook();
-        ZapAddressbook memory zapAb = _getZapAddressbook();
+        lzAb = _getLzAddressbook();
+        symbioticAb = _getSymbioticAddressbook();
+        zapAb = _getZapAddressbook();
 
         env.implems = _deployImplementations();
         env.libs = _deployLibs();
@@ -84,8 +88,8 @@ contract TestDeployer is
         env.oracleMocks = _deployOracleMocks(env.usdMocks);
 
         console.log("deploying vault");
-        env.vault =
-            _deployVault(lzAb, zapAb, env.implems, env.infra, env.users, "Cap USD", "cUSD", env.oracleMocks.assets);
+        env.vault = _deployVault(env.implems, env.infra, env.users, "Cap USD", "cUSD", env.oracleMocks.assets);
+        env.vault.lzperiphery = _deployVaultLzPeripherals(lzAb, zapAb, env.vault, env.users);
 
         /// ACCESS CONTROL
         console.log("deploying access control");

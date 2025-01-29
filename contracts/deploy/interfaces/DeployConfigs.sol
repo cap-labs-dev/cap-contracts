@@ -57,12 +57,16 @@ struct UsersConfig {
 struct VaultConfig {
     address capToken; // also called the vault
     address stakedCapToken;
-    address capOFTLockbox;
-    address stakedCapOFTLockbox;
-    address capZapComposer;
-    address stakedCapZapComposer;
+    VaultLzPeriphery lzperiphery;
     address[] assets;
     address[] principalDebtTokens;
     address[] restakerDebtTokens;
     address[] interestDebtTokens;
+}
+
+struct VaultLzPeriphery {
+    address capOFTLockbox;
+    address stakedCapOFTLockbox;
+    address capZapComposer;
+    address stakedCapZapComposer;
 }

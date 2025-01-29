@@ -62,7 +62,8 @@ contract DeployTestnetVault is
         assetMocks[2] = address(new MockERC20("USDx", "USDx", 18));
         oracleMocks = _deployOracleMocks(assetMocks);
 
-        vault = _deployVault(lzAb, implems, infra, users, "Cap USD", "cUSD", oracleMocks.assets);
+        vault = _deployVault(implems, infra, users, "Cap USD", "cUSD", oracleMocks.assets);
+        vault.lzperiphery = _deployVaultLzPeripherals(lzAb, zapAb, implems, infra, users);
 
         /// ACCESS CONTROL
         _initVaultAccessControl(infra, vault);
