@@ -29,12 +29,12 @@ import { MockERC20 } from "../mocks/MockERC20.sol";
 import { SymbioticTestEnvConfig, TestEnvConfig } from "./interfaces/TestDeployConfig.sol";
 
 import { LzAddressbook, LzUtils } from "../../contracts/deploy/utils/LzUtils.sol";
+import { ZapAddressbook, ZapUtils } from "../../contracts/deploy/utils/ZapUtils.sol";
 import { DeployMocks } from "./service/DeployMocks.sol";
 import { DeployTestUsers } from "./service/DeployTestUsers.sol";
 import { InitTestVaultLiquidity } from "./service/InitTestVaultLiquidity.sol";
 import { InitSymbioticVaultLiquidity } from "./service/provider/symbiotic/InitSymbioticVaultLiquidity.sol";
 import { TimeUtils } from "./utils/TimeUtils.sol";
-
 import { Test } from "forge-std/Test.sol";
 import { Vm } from "forge-std/Vm.sol";
 import { console } from "forge-std/console.sol";
@@ -44,6 +44,7 @@ contract TestDeployer is
     LzUtils,
     SymbioticUtils,
     TimeUtils,
+    ZapUtils,
     DeployMocks,
     DeployInfra,
     DeployVault,
@@ -73,6 +74,7 @@ contract TestDeployer is
 
         LzAddressbook memory lzAb = _getLzAddressbook();
         SymbioticAddressbook memory symbioticAb = _getSymbioticAddressbook();
+        ZapAddressbook memory zapAb = _getZapAddressbook();
 
         env.implems = _deployImplementations();
         env.libs = _deployLibs();
@@ -82,7 +84,8 @@ contract TestDeployer is
         env.oracleMocks = _deployOracleMocks(env.usdMocks);
 
         console.log("deploying vault");
-        env.vault = _deployVault(lzAb, env.implems, env.infra, env.users, "Cap USD", "cUSD", env.oracleMocks.assets);
+        env.vault =
+            _deployVault(lzAb, zapAb, env.implems, env.infra, env.users, "Cap USD", "cUSD", env.oracleMocks.assets);
 
         /// ACCESS CONTROL
         console.log("deploying access control");

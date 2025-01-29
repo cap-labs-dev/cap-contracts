@@ -13,12 +13,12 @@ struct ZapAddressbook {
 contract ZapUtils {
     using stdJson for string;
 
-    string public constant CONFIG_PATH_FROM_PROJECT_ROOT = "config/zap.json";
+    string public constant ZAP_CONFIG_PATH_FROM_PROJECT_ROOT = "config/zap.json";
 
     function _getZapAddressbook() internal view returns (ZapAddressbook memory ab) {
         Vm vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-        string memory configJson = vm.readFile(CONFIG_PATH_FROM_PROJECT_ROOT);
+        string memory configJson = vm.readFile(ZAP_CONFIG_PATH_FROM_PROJECT_ROOT);
         string memory selectorPrefix = string.concat("$['", vm.toString(block.chainid), "']");
 
         console.log("block.chainid", block.chainid);

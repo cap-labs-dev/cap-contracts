@@ -34,19 +34,6 @@ fs_permissions = [
     { access = "read-write", path = "./config/cap-l2tokens-421614.json" },
     { access = "read-write", path = "./config/cap-symbiotic-vaults-11155111.json" },
 ]
-libraries = [
-    "contracts/lendingPool/libraries/BorrowLogic.sol:BorrowLogic:0x46d6fF832291080943FA6D8E50e44117e6F5982c",
-    "contracts/lendingPool/libraries/LiquidationLogic.sol:LiquidationLogic:0x8a99F7b038767B70b683050f3014474d4bf0a9BB",
-    "contracts/lendingPool/libraries/ReserveLogic.sol:ReserveLogic:0x4BDB7fc8b10Af9697a7791713EDd87b25fEE30eF",
-    "contracts/lendingPool/libraries/ValidationLogic.sol:ValidationLogic:0xbE074d38Ae8ef3745d71029C9F46739180ab4590",
-    "contracts/lendingPool/libraries/ViewLogic.sol:ViewLogic:0xFe33c720D0F3920d657FDB13258cEDc6300448ED",
-    "contracts/oracle/libraries/AaveAdapter.sol:AaveAdapter:0xD15C84f778A760bd0cd627A537Ba79Dd7731BE3a",
-    "contracts/oracle/libraries/CapTokenAdapter.sol:CapTokenAdapter:0xfF4abFca368228468d1a9aa006eAC09eabbDC973",
-    "contracts/oracle/libraries/ChainlinkAdapter.sol:ChainlinkAdapter:0x6a522d3bF9A35908D8314c3294FAA64694C6252A",
-    "contracts/oracle/libraries/StakedCapAdapter.sol:StakedCapAdapter:0x502BC9603F23cb7157E3B892faFeA63Dc060A209",
-    "contracts/vault/libraries/MinterLogic.sol:MinterLogic:0x6c8Bb6721b7a6780F75a62d55ebb712895287470",
-    "contracts/vault/libraries/VaultLogic.sol:VaultLogic:0xE15Bdae0aB24E98595a6eb2b03443326DFBbBc97",
-]
 
 [fmt]
 bracket_spacing = true

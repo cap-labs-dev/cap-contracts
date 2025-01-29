@@ -57,12 +57,12 @@ struct VaultAddressbook {
 contract SymbioticUtils {
     using stdJson for string;
 
-    string public constant CONFIG_PATH_FROM_PROJECT_ROOT = "config/symbiotic.json";
+    string public constant SYMBIOTIC_CONFIG_PATH_FROM_PROJECT_ROOT = "config/symbiotic.json";
 
     function _getSymbioticAddressbook() internal view returns (SymbioticAddressbook memory ab) {
         Vm vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-        string memory configJson = vm.readFile(CONFIG_PATH_FROM_PROJECT_ROOT);
+        string memory configJson = vm.readFile(SYMBIOTIC_CONFIG_PATH_FROM_PROJECT_ROOT);
         string memory selectorPrefix = string.concat("$['", vm.toString(block.chainid), "']");
 
         console.log("block.chainid", block.chainid);
@@ -102,7 +102,7 @@ contract SymbioticUtils {
     function _getSymbioticVaultAddressbook(address asset) internal view returns (VaultAddressbook memory ab) {
         Vm vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-        string memory configJson = vm.readFile(CONFIG_PATH_FROM_PROJECT_ROOT);
+        string memory configJson = vm.readFile(SYMBIOTIC_CONFIG_PATH_FROM_PROJECT_ROOT);
         string memory selectorPrefix =
             string.concat("$['", vm.toString(block.chainid), "'].vaults[", vm.toString(asset), "]");
 
