@@ -3,10 +3,10 @@ pragma solidity ^0.8.28;
 
 /**
  * @title Zap router interface
- * @author kexley, Beefy
+ * @author kexley
  * @notice Interface for zap router that contains the structs for orders and routes
  */
-interface IBeefyZapRouter {
+interface IZapRouter {
     /**
      * @dev Input token and amount used in a step of the zap
      * @param token Address of token

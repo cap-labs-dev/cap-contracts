@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import { IBeefyZapRouter } from "../interfaces/IBeefyZapRouter.sol";
+import { IZapRouter } from "../interfaces/IZapRouter.sol";
 
 import { IZapOFTComposer } from "../interfaces/IZapOFTComposer.sol";
 import { SafeOFTLzComposer } from "./SafeOFTLzComposer.sol";
@@ -45,16 +45,16 @@ contract ZapOFTComposer is SafeOFTLzComposer {
         IZapOFTComposer.ZapMessage memory zapMessage = abi.decode(payload, (IZapOFTComposer.ZapMessage));
 
         // approve all inputs to the zapTokenManager
-        IBeefyZapRouter.Input[] memory inputs = zapMessage.order.inputs;
+        IZapRouter.Input[] memory inputs = zapMessage.order.inputs;
         uint256 inputLength = inputs.length;
         for (uint256 i = 0; i < inputLength; i++) {
-            IBeefyZapRouter.Input memory input = inputs[i];
+            IZapRouter.Input memory input = inputs[i];
             if (input.amount > 0) {
                 IERC20(input.token).approve(zapTokenManager, input.amount);
             }
         }
 
         // execute the zap order
-        IBeefyZapRouter(zapRouter).executeOrder(zapMessage.order, zapMessage.route);
+        IZapRouter(zapRouter).executeOrder(zapMessage.order, zapMessage.route);
     }
 }

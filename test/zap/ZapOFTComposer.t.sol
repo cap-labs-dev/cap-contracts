@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import { IBeefyZapRouter } from "../../contracts/interfaces/IBeefyZapRouter.sol";
+import { IZapRouter } from "../../contracts/interfaces/IZapRouter.sol";
 import { IZapOFTComposer } from "../../contracts/interfaces/IZapOFTComposer.sol";
 
 import { ZapOFTComposer } from "../../contracts/zap/ZapOFTComposer.sol";
@@ -17,20 +17,20 @@ contract MockZapTokenManager {
 }
 
 // Mock BeefyZapRouter for testing
-contract MockBeefyZapRouter {
+contract MockZapRouter {
     MockZapTokenManager public zapTokenManager;
 
     constructor() {
         zapTokenManager = new MockZapTokenManager();
     }
 
-    function executeOrder(IBeefyZapRouter.Order calldata order, IBeefyZapRouter.Step[] calldata route) external {
+    function executeOrder(IZapRouter.Order calldata order, IZapRouter.Step[] calldata route) external {
         assert(route.length == 0);
 
         // Transfer input token directly to recipient
-        IBeefyZapRouter.Input[] memory inputs = order.inputs;
+        IZapRouter.Input[] memory inputs = order.inputs;
         for (uint256 i = 0; i < inputs.length; i++) {
-            IBeefyZapRouter.Input memory input = inputs[i];
+            IZapRouter.Input memory input = inputs[i];
 
             zapTokenManager.sendToken(input.token, order.user, order.recipient, input.amount);
         }
@@ -40,7 +40,7 @@ contract MockBeefyZapRouter {
 contract ZapOFTComposerTest is Test {
     ZapOFTComposer public composer;
     MockERC20 public token;
-    MockBeefyZapRouter public zapRouter;
+    MockZapRouter public zapRouter;
     address public user;
     address public recipient;
     address public zapTokenManager;
@@ -50,7 +50,7 @@ contract ZapOFTComposerTest is Test {
         recipient = makeAddr("recipient");
 
         token = new MockERC20("Token1", "TK1", 18);
-        zapRouter = new MockBeefyZapRouter();
+        zapRouter = new MockZapRouter();
 
         composer = new ZapOFTComposer(address(0), address(0), address(zapRouter), address(zapRouter.zapTokenManager()));
 
@@ -78,22 +78,22 @@ contract ZapOFTComposerTest is Test {
     ) internal pure returns (bytes memory) {
         IZapOFTComposer.ZapMessage memory zapMessage;
         {
-            IBeefyZapRouter.Input[] memory inputs = new IBeefyZapRouter.Input[](1);
-            inputs[0] = IBeefyZapRouter.Input({ token: _token, amount: _zapAmount });
+            IZapRouter.Input[] memory inputs = new IZapRouter.Input[](1);
+            inputs[0] = IZapRouter.Input({ token: _token, amount: _zapAmount });
 
-            IBeefyZapRouter.Output[] memory outputs = new IBeefyZapRouter.Output[](1);
-            outputs[0] = IBeefyZapRouter.Output({ token: _token, minOutputAmount: _zapAmount });
+            IZapRouter.Output[] memory outputs = new IZapRouter.Output[](1);
+            outputs[0] = IZapRouter.Output({ token: _token, minOutputAmount: _zapAmount });
 
-            IBeefyZapRouter.Relay memory noopRelay = IBeefyZapRouter.Relay({ target: address(0), value: 0, data: "" });
+            IZapRouter.Relay memory noopRelay = IZapRouter.Relay({ target: address(0), value: 0, data: "" });
 
-            IBeefyZapRouter.Order memory order = IBeefyZapRouter.Order({
+            IZapRouter.Order memory order = IZapRouter.Order({
                 inputs: inputs,
                 outputs: outputs,
                 relay: noopRelay,
                 user: _from,
                 recipient: _to
             });
-            IBeefyZapRouter.Step[] memory route = new IBeefyZapRouter.Step[](0);
+            IZapRouter.Step[] memory route = new IZapRouter.Step[](0);
 
             zapMessage = IZapOFTComposer.ZapMessage({ order: order, route: route });
         }
