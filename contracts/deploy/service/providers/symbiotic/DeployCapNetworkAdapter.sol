@@ -16,8 +16,6 @@ import {
 import { ProxyUtils } from "../../../utils/ProxyUtils.sol";
 import { SymbioticAddressbook, SymbioticUtils } from "../../../utils/SymbioticUtils.sol";
 
-import { TestUsersConfig } from "../../../../../test/deploy/interfaces/TestDeployConfig.sol";
-
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 
 import { INetworkRegistry } from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
@@ -113,14 +111,12 @@ contract DeployCapNetworkAdapter is ProxyUtils {
     }
 
     function _registerVaultsInNetworkMiddleware(
-        TestUsersConfig memory testUsers,
         SymbioticNetworkAdapterConfig memory adapter,
         SymbioticVaultConfig memory vault,
-        SymbioticNetworkRewardsConfig memory rewards
+        SymbioticNetworkRewardsConfig memory rewards,
+        address[] memory agents
     ) internal {
-        NetworkMiddleware(adapter.networkMiddleware).registerVault(
-            vault.vault, rewards.stakerRewarder, testUsers.agents
-        );
+        NetworkMiddleware(adapter.networkMiddleware).registerVault(vault.vault, rewards.stakerRewarder, agents);
     }
 
     function _agentRegisterAsOperator(SymbioticAddressbook memory addressbook) internal {

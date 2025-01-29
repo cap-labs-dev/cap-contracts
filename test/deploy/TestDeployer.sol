@@ -175,16 +175,16 @@ contract TestDeployer is
         console.log("registering vaults in network middleware");
         vm.startPrank(env.users.middleware_admin);
         _registerVaultsInNetworkMiddleware(
-            env.testUsers,
             env.symbiotic.networkAdapter,
             _getSymbioticVaultConfig(0),
-            _getSymbioticNetworkRewardsConfig(0)
+            _getSymbioticNetworkRewardsConfig(0),
+            env.testUsers.agents
         );
         _registerVaultsInNetworkMiddleware(
-            env.testUsers,
             env.symbiotic.networkAdapter,
             _getSymbioticVaultConfig(1),
-            _getSymbioticNetworkRewardsConfig(1)
+            _getSymbioticNetworkRewardsConfig(1),
+            env.testUsers.agents
         );
 
         console.log("registering agents as operator");
