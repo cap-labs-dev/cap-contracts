@@ -6,7 +6,7 @@ library DataTypes {
     struct DelegationStorage {
         address[] agents;
         mapping(address => AgentData) agentData;
-        mapping(address => address[]) delegators;
+        mapping(address => address[]) networks;
         address oracle;
     }
 

@@ -11,6 +11,6 @@ contract ConfigureDelegation {
     }
 
     function _initDelegationAgentDelegator(InfraConfig memory infra, address agent, address delegator) internal {
-        Delegation(infra.delegation).registerDelegator(agent, delegator);
+        Delegation(infra.delegation).registerNetwork(agent, delegator);
     }
 }

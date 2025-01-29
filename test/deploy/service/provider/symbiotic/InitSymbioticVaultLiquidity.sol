@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import { SymbioticUtils } from "../../../../../contracts/deploy/utils/SymbioticUtils.sol";
 
-import { IDelegation } from "../../../../../contracts/interfaces/IDelegation.sol";
+import { INetwork } from "../../../../../contracts/interfaces/INetwork.sol";
 import { MockERC20 } from "../../../../mocks/MockERC20.sol";
 import { TestEnvConfig } from "../../../interfaces/TestDeployConfig.sol";
 
@@ -36,14 +36,14 @@ contract InitSymbioticVaultLiquidity is SymbioticUtils, TimeUtils {
 
         address collateral = IVault(vault).collateral();
         uint256 amount = amountNoDecimals * 10 ** MockERC20(collateral).decimals();
-        address[] memory delegators = IDelegation(infra.delegation).delegators(agent);
+        address[] memory networks = INetwork(infra.delegation).networks(agent);
 
-        for (uint256 i = 0; i < delegators.length; i++) {
-            address delegator = delegators[i];
-            vm.startPrank(delegator);
-            MockERC20(collateral).mint(delegator, amount);
+        for (uint256 i = 0; i < networks.length; i++) {
+            address network = networks[i];
+            vm.startPrank(network);
+            MockERC20(collateral).mint(network, amount);
             MockERC20(collateral).approve(address(vault), amount);
-            (depositedAmount, mintedShares) = IVault(vault).deposit(delegator, amount);
+            (depositedAmount, mintedShares) = IVault(vault).deposit(network, amount);
         }
     }
 }

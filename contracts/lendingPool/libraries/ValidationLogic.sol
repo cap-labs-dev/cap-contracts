@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IDelegation } from "../../interfaces/IDelegation.sol";
+import { INetwork } from "../../interfaces/INetwork.sol";
 import { IOracle } from "../../interfaces/IOracle.sol";
 
 import { Errors } from "./helpers/Errors.sol";
@@ -28,7 +28,7 @@ library ValidationLogic {
 
         require(health >= 1e27, Errors.HEALTH_FACTOR_LOWER_THAN_LIQUIDATION_THRESHOLD);
 
-        uint256 ltv = IDelegation($.delegation).ltv(params.agent);
+        uint256 ltv = INetwork($.delegation).ltv(params.agent);
         uint256 assetPrice = IOracle($.oracle).getPrice(params.asset);
         uint256 newTotalDebt = ( params.amount * assetPrice / $.reservesData[params.asset].decimals ) + totalDebt;
         uint256 borrowCapacity = totalDelegation * ltv;

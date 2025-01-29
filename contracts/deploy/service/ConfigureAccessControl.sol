@@ -29,6 +29,6 @@ contract ConfigureAccessControl {
         accessControl.grantAccess(Lender.pauseAsset.selector, infra.lender, users.lender_admin);
 
         accessControl.grantAccess(Delegation.addAgent.selector, infra.delegation, users.delegation_admin);
-        accessControl.grantAccess(Delegation.registerDelegator.selector, infra.delegation, users.delegation_admin);
+        accessControl.grantAccess(Delegation.registerNetwork.selector, infra.delegation, users.delegation_admin);
     }
 }
