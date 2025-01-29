@@ -10,7 +10,7 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 /// @title Cap Delegation Contract
 /// @author Cap Labs
 /// @notice This contract manages delegation and slashing.
-contract Delegation is UUPSUpgradeable, AccessUpgradeable, INetwork {
+contract Delegation is UUPSUpgradeable, AccessUpgradeable {
     event SlashNetwork(address network, uint256 slashShare);
     event AddAgent(address agent, DataTypes.AgentData agentData);
     event ModifyAgent(address agent, DataTypes.AgentData agentData);
