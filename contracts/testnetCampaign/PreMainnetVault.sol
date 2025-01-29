@@ -5,18 +5,18 @@ import { DataTypes } from "./libraries/DataTypes.sol";
 import { PreMainnetVaultStorage } from "./libraries/PreMainnetVaultStorage.sol";
 import { OAppMessenger } from "./OAppMessenger.sol";
 
-import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { ERC20PermitUpgradeable } from
     "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title PreMainnetVault
+/// @author @capLabs
 /// @notice Vault for pre-mainnet campaign
 /// @dev Underlying asset is deposited on this contract and LayerZero is used to bridge across a
 /// minting message to the testnet. The campaign has a maximum timestamp after which transfers are 
 /// enabled to prevent the owner from unduly locking assets.
-contract PreMainnetVault is UUPSUpgradeable, ERC20PermitUpgradeable, OAppMessenger {
+contract PreMainnetVault is ERC20PermitUpgradeable, OAppMessenger {
     using SafeERC20 for IERC20;
 
     /// @dev Zero amounts are not allowed for minting
@@ -36,9 +36,7 @@ contract PreMainnetVault is UUPSUpgradeable, ERC20PermitUpgradeable, OAppMesseng
 
     /// @dev OAppCore sets the endpoint as an immutable variable
     /// @param _lzEndpoint Local layerzero endpoint
-    constructor(address _lzEndpoint) OAppMessenger(_lzEndpoint) {
-        _disableInitializers();
-    }
+    constructor(address _lzEndpoint) OAppMessenger(_lzEndpoint) {}
 
     /// @notice Initialize
     /// @param _asset Underlying asset
@@ -112,7 +110,4 @@ contract PreMainnetVault is UUPSUpgradeable, ERC20PermitUpgradeable, OAppMesseng
         if (!transferEnabled() && _from != address(0)) revert TransferNotEnabled();
         super._update(_from, _to, _value);
     }
-
-    /// @dev Only owner can upgrade
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner { }
 }
