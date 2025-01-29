@@ -17,6 +17,8 @@ import {
     VaultConfig
 } from "../contracts/deploy/interfaces/DeployConfigs.sol";
 
+import { DeployZapComposer } from "../contracts/deploy/service/DeployZapComposer.sol";
+
 import { MockERC20 } from "../test/mocks/MockERC20.sol";
 import { InfraConfigSerializer } from "./config/InfraConfigSerializer.sol";
 
@@ -34,6 +36,7 @@ contract DeployTestnetVault is
     LzUtils,
     DeployMocks,
     DeployVault,
+    DeployZapComposer,
     ConfigureOracle
 {
     LzAddressbook lzAb;

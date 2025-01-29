@@ -12,14 +12,17 @@ import { CapToken } from "../../token/CapToken.sol";
 import { OFTLockbox } from "../../token/OFTLockbox.sol";
 import { StakedCap } from "../../token/StakedCap.sol";
 import { VaultUpgradeable } from "../../vault/VaultUpgradeable.sol";
+import { ZapOFTComposer } from "../../zap/ZapOFTComposer.sol";
 import { ImplementationsConfig, InfraConfig, UsersConfig, VaultConfig } from "../interfaces/DeployConfigs.sol";
 
 import { LzAddressbook } from "../utils/LzUtils.sol";
 import { ProxyUtils } from "../utils/ProxyUtils.sol";
+import { ZapAddressbook } from "../utils/ZapUtils.sol";
 
 contract DeployVault is ProxyUtils {
     function _deployVault(
-        LzAddressbook memory addressbook,
+        LzAddressbook memory lzAddressbook,
+        ZapAddressbook memory zapAddressbook,
         ImplementationsConfig memory implementations,
         InfraConfig memory infra,
         UsersConfig memory users,
@@ -53,9 +56,28 @@ contract DeployVault is ProxyUtils {
         }
 
         // deploy the lockboxes
-        d.capOFTLockbox = address(new OFTLockbox(d.capToken, address(addressbook.endpointV2), users.vault_config_admin));
+        d.capOFTLockbox =
+            address(new OFTLockbox(d.capToken, address(lzAddressbook.endpointV2), users.vault_config_admin));
         d.stakedCapOFTLockbox =
-            address(new OFTLockbox(d.stakedCapToken, address(addressbook.endpointV2), users.vault_config_admin));
+            address(new OFTLockbox(d.stakedCapToken, address(lzAddressbook.endpointV2), users.vault_config_admin));
+
+        // deploy the zap composers
+        d.capZapComposer = address(
+            new ZapOFTComposer(
+                address(lzAddressbook.endpointV2),
+                d.capOFTLockbox,
+                zapAddressbook.zapRouter,
+                zapAddressbook.tokenManager
+            )
+        );
+        d.stakedCapZapComposer = address(
+            new ZapOFTComposer(
+                address(lzAddressbook.endpointV2),
+                d.stakedCapOFTLockbox,
+                zapAddressbook.zapRouter,
+                zapAddressbook.tokenManager
+            )
+        );
     }
 
     function _initVaultAccessControl(InfraConfig memory infra, VaultConfig memory vault) internal {

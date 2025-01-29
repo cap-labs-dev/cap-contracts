@@ -47,12 +47,14 @@
             }
         ],
         "capOFTLockbox": "0x75279C6Dd77bFF08DcE9E4CD4EAc7162c4f38039",
+        "capZapComposer": "0x775C9188e8b73002728d94c4Be2bc2810087363B",
         "capToken": {
             "address": "0x464b6Eada794c9d8A8606F15e2a8fae43A06eF8A",
             "decimals": 18,
             "symbol": "cETH"
         },
         "stakedCapOFTLockbox": "0xB196Add2013311ad29755A537369F74978Fb7477",
+        "stakedCapZapComposer": "0xA82B9210eBA4E27DB6994D39159210eCCA93b1Dc",
         "stakedCapToken": {
             "address": "0xc026e333d6b31AD755302fA7d034E8A44f9fe9Db",
             "decimals": 18,
@@ -129,12 +131,14 @@
             }
         ],
         "capOFTLockbox": "0x2bB873d03bc834a021794a778d1ED6F5c12d978c",
+        "capZapComposer": "0x94D62fBBcc6Aa39001903daEf633B82B7B02B80f",
         "capToken": {
             "address": "0xb147E154ED09616069527D5dca3c7f42fE03A2b6",
             "decimals": 18,
             "symbol": "cUSD"
         },
         "stakedCapOFTLockbox": "0xb1B5a8809fA830fB4c8425ba29E5Fe20AB254794",
+        "stakedCapZapComposer": "0x931b84827B3CA929c3e2c4F6C3cC9aaA3a8e81f1",
         "stakedCapToken": {
             "address": "0x6936cc300aE44248A8f3bFC441DfbacE4479235A",
             "decimals": 18,

@@ -59,6 +59,8 @@ struct VaultConfig {
     address stakedCapToken;
     address capOFTLockbox;
     address stakedCapOFTLockbox;
+    address capZapComposer;
+    address stakedCapZapComposer;
     address[] assets;
     address[] principalDebtTokens;
     address[] restakerDebtTokens;
