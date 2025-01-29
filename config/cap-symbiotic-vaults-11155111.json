@@ -1,0 +1,42 @@
+{
+    "0x38ebe8546e2dc321835ff1e02c26f5a4bbcc63e1": {
+        "burnerRouter": "0x7a9b2D5c638b94b0526D22f535Ba02afb45E64b9",
+        "collateral": "0xeA3b182ece22D4B5545B2A43fEFBd62F2BFd1D4a",
+        "delegator": "0xBb1dB9a9B6d7F53BA67F511f388e569ED3457baD",
+        "globalReceiver": "0x442cA042f52cbef0C3B63a903bDcE001fa05C16a",
+        "slasher": "0x3dFEc6B83a3C69e7376D3C25902eE35e4D2Aa11b",
+        "stakerRewarder": "0x41D556a1dF04FA5aD355255c19b14D2687a38289",
+        "vault": "0x38EBE8546E2dc321835ff1e02c26f5A4Bbcc63e1",
+        "vaultEpochDuration": 3600
+    },
+    "0x3a487f86220a0f90166f91f61be5971d058eefa0": {
+        "burnerRouter": "0xA6A01BE096274346947D5D1a84Bb34ab5bAc2586",
+        "collateral": "0x5Fe726B9aF8f0f47B2BAfbabdA92Ef074a829778",
+        "delegator": "0xC4f46e66373f520dA38D5DaEF1c89F2C8C1fa65B",
+        "globalReceiver": "0xbE225dc0754FD787a1c79c4089736E79cf19286A",
+        "slasher": "0x96aD2aAC69534d785aD2D4B3F83C521EB49B5D8E",
+        "stakerRewarder": "0x3d11EC12c34979433147730bedD5f71152458777",
+        "vault": "0x3A487F86220a0f90166f91F61BE5971d058EEFa0",
+        "vaultEpochDuration": 3600
+    },
+    "0xa3c9c74b484e07094c02bac6b36a3f9c5645d54b": {
+        "burnerRouter": "0x556d1fe2c1AAC95240B56957CA5D5C11B96174d2",
+        "collateral": "0x0EA87dF76E4c1241Fb48A0aBB4C165016c3497C6",
+        "delegator": "0x0E154b1CbD509597d572D75508467c3BB4d318E5",
+        "globalReceiver": "0x8A0b4AE45c2cC4f9460305cCE813F4E2397AD8C9",
+        "slasher": "0x5C495752aEB455E96d863bd2642FD46Bf5FA2dA3",
+        "stakerRewarder": "0xEC6519B7837C678f0DB5C125Fd9ff419f9254e0f",
+        "vault": "0xA3C9c74b484e07094C02Bac6b36A3F9C5645d54b",
+        "vaultEpochDuration": 3600
+    },
+    "0xf3e0ec9b30dde4b5b76e62b2c155a8f1af8b87c7": {
+        "burnerRouter": "0x9BEcF20Cb53e32560c58f6908b6F552411624138",
+        "collateral": "0x171D567A266371D87B39919Dc1F75c162263da78",
+        "delegator": "0xdCfb5131bF10a2fF2a637691102E97B694fD2404",
+        "globalReceiver": "0x1E3045d3A8607Ac710d2F00Bf1b3C696edD4D6B3",
+        "slasher": "0x3783C11365567e8802FCe156BB9f6C2aB951ee4b",
+        "stakerRewarder": "0x4F729076289Ee4A6081C690bCb1Ba699DbfC9B8B",
+        "vault": "0xf3E0EC9b30dDe4b5B76E62B2c155A8F1AF8B87c7",
+        "vaultEpochDuration": 3600
+    }
+}

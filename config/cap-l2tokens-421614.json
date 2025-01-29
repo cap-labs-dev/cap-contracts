@@ -1,0 +1,30 @@
+{
+    "cETH": {
+        "bridgedCapToken": {
+            "address": "0x4a814f5686EB9dDd607589E37f8AB0E8593AaFBd",
+            "decimals": 18,
+            "name": "Cap cETH",
+            "symbol": "cETH"
+        },
+        "bridgedStakedCapToken": {
+            "address": "0x631C9fC1DFDBE11D819f7432BA3aa55F3326Af60",
+            "decimals": 18,
+            "name": "Staked Cap cETH",
+            "symbol": "scETH"
+        }
+    },
+    "cUSD": {
+        "bridgedCapToken": {
+            "address": "0x78C26816f9031bDA8796bF967d9c842df36A07cA",
+            "decimals": 18,
+            "name": "Cap cUSD",
+            "symbol": "cUSD"
+        },
+        "bridgedStakedCapToken": {
+            "address": "0xBea251cED1c3861Ff62d1EC38EB8E7aB87b0D484",
+            "decimals": 18,
+            "name": "Staked Cap cUSD",
+            "symbol": "scUSD"
+        }
+    }
+}

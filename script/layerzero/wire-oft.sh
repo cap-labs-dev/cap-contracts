@@ -7,13 +7,8 @@ ACCOUNT=cap-dev
 SOURCE_CHAIN=sepolia
 TARGET_CHAIN=arbitrum-sepolia
 
-# scUSD
-SOURCE_LOCKBOX=0xE2be24Ea84ff4935561910682a6D598a3B8Ea520
-TARGET_TOKEN=0x939Ee9Df270aa428149eBE2277B024aE096759fC
-
-# cUSD
-# SOURCE_LOCKBOX=0x8c170da3f52cB59b4b51FA1cadBE0d4a6bFf996e
-# TARGET_TOKEN=0x3E47E3003338023C96286f524AD4bB84FA82a3C4
+SOURCE_LOCKBOX=0x75279C6Dd77bFF08DcE9E4CD4EAc7162c4f38039
+TARGET_TOKEN=0xB196Add2013311ad29755A537369F74978Fb7477
 
 # ------------------
 
@@ -26,7 +21,7 @@ get_lz_config() {
     local chain=$1
     local chain_id=$(get_chain_id $chain)
     local key=$2
-    cat script/config/layerzero-v2-deployments.json | jq -r "to_entries | map(select(.value.nativeChainId == $chain_id)) | .[0].value.$key"
+    cat config/layerzero-v2-deployments.json | jq -r "to_entries | map(select(.value.nativeChainId == $chain_id)) | .[0].value.$key"
 }
 
 # ------------------
