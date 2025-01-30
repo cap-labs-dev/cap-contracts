@@ -43,8 +43,8 @@ contract MiddlewareTest is TestDeployer {
 
             // remove all delegations to our slashable agent
             address agent = env.testUsers.agents[0];
-            _symbioticVaultOptInToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 0);
-            _symbioticVaultOptInToAgent(symbioticUsdxVault, env.symbiotic.networkAdapter, agent, 0);
+            _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 0);
+            _symbioticVaultDelegateToAgent(symbioticUsdxVault, env.symbiotic.networkAdapter, agent, 0);
 
             vm.stopPrank();
         }

@@ -14,17 +14,19 @@ import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/Saf
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 
 import { INetwork } from "../../../delegation/interfaces/INetwork.sol";
+
+import { IMiddleware } from "./interfaces/IMiddleware.sol";
 import { Subnetwork } from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
 import { IEntity } from "@symbioticfi/core/src/interfaces/common/IEntity.sol";
 import { IRegistry } from "@symbioticfi/core/src/interfaces/common/IRegistry.sol";
 import { IBaseDelegator } from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
 import { ISlasher } from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
 import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
+
 /// @title Cap Symbiotic Network Middleware Contract
 /// @author Cap Labs
 /// @notice This contract manages the symbiotic collateral and slashing.
-
-contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork {
+contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMiddleware {
     using SafeERC20 for IERC20;
 
     event VaultRegistered(address vault);
@@ -100,7 +102,9 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork {
             uint256 slashShareOfCollateral = delegatedCollateral * _slashShare / 1e18;
             address collateral = vault.collateral();
 
-            ISlasher(vault.slasher()).slash(subnetwork(), _agent, slashShareOfCollateral, _timestamp, new bytes(0));
+            ISlasher(vault.slasher()).slash(
+                subnetwork(_agent), _agent, slashShareOfCollateral, _timestamp, new bytes(0)
+            );
             // TODO: the burner could be a non routing burner, could add hooks?
             IBurnerRouter(vault.burner()).triggerTransfer(address(this));
             IERC20(collateral).safeTransfer(_recipient, slashShareOfCollateral);
@@ -121,7 +125,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork {
         uint8 decimals = IERC20Metadata(collateralAddress).decimals();
         uint256 collateralPrice = IOracle(_oracle).getPrice(collateralAddress);
 
-        collateral = IBaseDelegator(IVault(_vault).delegator()).stakeAt(subnetwork(), _agent, _timestamp, "");
+        collateral = IBaseDelegator(IVault(_vault).delegator()).stakeAt(subnetwork(_agent), _agent, _timestamp, "");
         collateralValue = collateral * collateralPrice / (10 ** decimals);
         return (collateralValue, collateral);
     }
@@ -145,15 +149,16 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork {
     }
 
     /// @notice Subnetwork id
-    function subnetworkIdentifier() public pure returns (uint96) {
-        return 0;
+    /// TODO: not collision resistant
+    function subnetworkIdentifier(address _agent) public pure returns (uint96 id) {
+        id = uint96(uint256(uint160(_agent)));
     }
 
     /// @notice Subnetwork id concatenated with network address
     /// @return id Subnetwork id
-    function subnetwork() public view returns (bytes32 id) {
+    function subnetwork(address _agent) public view returns (bytes32 id) {
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
-        id = Subnetwork.subnetwork($.network, 0);
+        id = Subnetwork.subnetwork($.network, subnetworkIdentifier(_agent));
     }
 
     /// @notice Registered vaults for an agent
