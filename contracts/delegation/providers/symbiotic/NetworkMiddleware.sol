@@ -149,9 +149,13 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     }
 
     /// @notice Subnetwork id
-    /// TODO: not collision resistant
+    /// @dev Creates a collision resistant uint96 identifier by taking keccak256 hash of agent address
+    /// and using the first 96 bits of the hash
+    /// @param _agent Agent address
+    /// @return id Subnetwork identifier (first 96 bits of keccak256 hash of agent address)
     function subnetworkIdentifier(address _agent) public pure returns (uint96 id) {
-        id = uint96(uint256(uint160(_agent)));
+        bytes32 hash = keccak256(abi.encodePacked(_agent));
+        id = uint96(uint256(hash)); // Takes first 96 bits of hash
     }
 
     /// @notice Subnetwork id concatenated with network address
