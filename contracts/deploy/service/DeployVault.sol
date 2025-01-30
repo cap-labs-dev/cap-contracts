@@ -29,7 +29,6 @@ contract DeployVault is ProxyUtils {
     function _deployVault(
         ImplementationsConfig memory implementations,
         InfraConfig memory infra,
-        UsersConfig memory users,
         string memory name,
         string memory symbol,
         address[] memory assets

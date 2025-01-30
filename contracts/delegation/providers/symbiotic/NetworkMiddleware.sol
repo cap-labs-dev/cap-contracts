@@ -39,6 +39,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork {
     error VaultNotInitialized();
     error InvalidEpochDuration(uint48 required, uint48 actual);
     error InvalidSlashDuration();
+    error NoSlashableCollateral();
 
     /// @notice Initialize
     /// @param _accessControl Access control address
@@ -90,10 +91,12 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork {
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
 
         uint48 _timestamp = timestamp();
-
+        bool slashed = false;
         for (uint256 i; i < $.vaults[_agent].length; ++i) {
             IVault vault = IVault($.vaults[_agent][i]);
             (, uint256 delegatedCollateral) = coverageByVault(_agent, address(vault), $.oracle, _timestamp);
+            if (delegatedCollateral == 0) continue;
+
             uint256 slashShareOfCollateral = delegatedCollateral * _slashShare / 1e18;
             address collateral = vault.collateral();
 
@@ -103,7 +106,10 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork {
             IERC20(collateral).safeTransfer(_recipient, slashShareOfCollateral);
 
             emit Slash(_agent, _recipient, slashShareOfCollateral);
+            slashed = true;
         }
+
+        if (!slashed) revert NoSlashableCollateral();
     }
 
     function coverageByVault(address _agent, address _vault, address _oracle, uint48 _timestamp)

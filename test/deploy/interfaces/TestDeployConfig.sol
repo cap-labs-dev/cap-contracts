@@ -46,6 +46,7 @@ struct SymbioticTestEnvConfig {
 
 struct TestUsersConfig {
     address[] agents;
+    address[] restakers;
     address stablecoin_minter;
     address liquidator;
 }

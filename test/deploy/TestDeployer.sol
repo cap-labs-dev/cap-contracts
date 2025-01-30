@@ -88,7 +88,7 @@ contract TestDeployer is
         env.oracleMocks = _deployOracleMocks(env.usdMocks);
 
         console.log("deploying vault");
-        env.vault = _deployVault(env.implems, env.infra, env.users, "Cap USD", "cUSD", env.oracleMocks.assets);
+        env.vault = _deployVault(env.implems, env.infra, "Cap USD", "cUSD", env.oracleMocks.assets);
         env.vault.lzperiphery = _deployVaultLzPeripherals(lzAb, zapAb, env.vault, env.users);
 
         /// ACCESS CONTROL

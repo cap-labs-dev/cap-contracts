@@ -12,6 +12,11 @@ contract DeployTestUsers is Test {
         testUsers.agents[1] = makeAddr("agent_2");
         testUsers.agents[2] = makeAddr("agent_3");
 
+        testUsers.restakers = new address[](3);
+        testUsers.restakers[0] = makeAddr("restaker_1");
+        testUsers.restakers[1] = makeAddr("restaker_2");
+        testUsers.restakers[2] = makeAddr("restaker_3");
+
         testUsers.stablecoin_minter = makeAddr("stablecoin_minter");
         testUsers.liquidator = makeAddr("liquidator");
         vm.deal(testUsers.agents[0], 100 ether);
