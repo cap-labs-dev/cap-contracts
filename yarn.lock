@@ -273,6 +273,25 @@ brorand@^1.1.0:
   resolved "https://registry.yarnpkg.com/brorand/-/brorand-1.1.0.tgz#12c25efe40a45e3c323eb8675a0a0ce57b22371f"
   integrity sha512-cKV8tMCEpQs4hK/ik71d6LrPOnpkpGBR0wzxqr68g2m/LB2GxVYQroAjMJZRVM1Y4BCjCKc3vAamxSzOY2RP+w==
 
+eigenlayer-contracts@^1.0.1, eigenlayer-contracts@^1.0.4:
+  version "1.0.4"
+  resolved "https://registry.yarnpkg.com/eigenlayer-contracts/-/eigenlayer-contracts-1.0.4.tgz#847cf8be9a20c12a470aee4602c7f1499974a231"
+  integrity sha512-ki5RGwVIMsywbAuSWbkKqdEV8MshrHec68yNsp1jNwZyDRers0t2E0iGYNLQejIGQTSj/FlTDGQNnkRRIQ/9UQ==
+  dependencies:
+    eigenlayer-contracts "^1.0.1"
+    openzeppelin "^1.0.0"
+    openzeppelin-upgrades "^4.7.0"
+    solidity-docgen "^0.6.0-beta.32"
+
+eigenlayer@^2.1.5:
+  version "2.1.5"
+  resolved "https://registry.yarnpkg.com/eigenlayer/-/eigenlayer-2.1.5.tgz#ac77929c9e7c332a4703c4510acf23c8517ec033"
+  integrity sha512-UmlJqnr7EujpWr50vEf1xKCUQWQEqnhCXzykpjmL06IQ7fFzZFSZZgd1wVfkyH3AVboK8AJ982b3N0EXBhX1UQ==
+  dependencies:
+    eigenlayer-contracts "^1.0.4"
+    openzeppelin "^1.0.0"
+    openzeppelin-upgrades "^4.7.0"
+
 elliptic@6.5.4:
   version "6.5.4"
   resolved "https://registry.yarnpkg.com/elliptic/-/elliptic-6.5.4.tgz#da37cebd31e79a1367e941b592ed1fbebd58abbb"
@@ -285,6 +304,18 @@ elliptic@6.5.4:
     inherits "^2.0.4"
     minimalistic-assert "^1.0.1"
     minimalistic-crypto-utils "^1.0.1"
+
+handlebars@^4.7.7:
+  version "4.7.8"
+  resolved "https://registry.yarnpkg.com/handlebars/-/handlebars-4.7.8.tgz#41c42c18b1be2365439188c77c6afae71c0cd9e9"
+  integrity sha512-vafaFqs8MZkRrSX7sFVUdo3ap/eNiLnb4IakshzvP56X5Nr1iGKAIqdX6tMlm6HcNRIkr6AxO5jFEoJzzpT8aQ==
+  dependencies:
+    minimist "^1.2.5"
+    neo-async "^2.6.2"
+    source-map "^0.6.1"
+    wordwrap "^1.0.0"
+  optionalDependencies:
+    uglify-js "^3.1.4"
 
 hash.js@1.1.7, hash.js@^1.0.0, hash.js@^1.0.3:
   version "1.1.7"
@@ -322,3 +353,51 @@ minimalistic-crypto-utils@^1.0.1:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/minimalistic-crypto-utils/-/minimalistic-crypto-utils-1.0.1.tgz#f6c00c1c0b082246e5c4d99dfb8c7c083b2b582a"
   integrity sha512-JIYlbt6g8i5jKfJ3xz7rF0LXmv2TkDxBLUkiBeZ7bAx4GnnNMr8xFpGnOxn6GhTEHx3SjRrZEoU+j04prX1ktg==
+
+minimist@^1.2.5:
+  version "1.2.8"
+  resolved "https://registry.yarnpkg.com/minimist/-/minimist-1.2.8.tgz#c1a464e7693302e082a075cee0c057741ac4772c"
+  integrity sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==
+
+neo-async@^2.6.2:
+  version "2.6.2"
+  resolved "https://registry.yarnpkg.com/neo-async/-/neo-async-2.6.2.tgz#b4aafb93e3aeb2d8174ca53cf163ab7d7308305f"
+  integrity sha512-Yd3UES5mWCSqR+qNT93S3UoYUkqAZ9lLg8a7g9rimsWmYGK8cVToA4/sF3RrshdyV3sAGMXVUmpMYOw+dLpOuw==
+
+openzeppelin-upgrades@^4.7.0:
+  version "4.7.0"
+  resolved "https://registry.yarnpkg.com/openzeppelin-upgrades/-/openzeppelin-upgrades-4.7.0.tgz#8b1f5bdd51841a83dcb6431988e3ff473e091290"
+  integrity sha512-RW3VyaOOGzxoaQ3dgLZZiuJvOQeM9Fp2B/3DiVxdngont4sdwvs2BHUxda7jpYzhmHMpWbMbTtOde1zLzAwZWw==
+
+openzeppelin@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/openzeppelin/-/openzeppelin-1.0.0.tgz#8055cb9a4e2e3914ab937925d1022c83190bf167"
+  integrity sha512-qemLpGK5krO6Wp9mdoaKvzzqAwKsyghJUEyrbue7gdn3PtPJf2gJ910qPFIUgs7ZgRnClseLX/R6bWTsq/TwJQ==
+
+solidity-ast@^0.4.38:
+  version "0.4.59"
+  resolved "https://registry.yarnpkg.com/solidity-ast/-/solidity-ast-0.4.59.tgz#290a2815aef70a61092591ab3e991da080ae5931"
+  integrity sha512-I+CX0wrYUN9jDfYtcgWSe+OAowaXy8/1YQy7NS4ni5IBDmIYBq7ZzaP/7QqouLjzZapmQtvGLqCaYgoUWqBo5g==
+
+solidity-docgen@^0.6.0-beta.32:
+  version "0.6.0-beta.36"
+  resolved "https://registry.yarnpkg.com/solidity-docgen/-/solidity-docgen-0.6.0-beta.36.tgz#9c76eda58580fb52e2db318c22fe3154e0c09dd1"
+  integrity sha512-f/I5G2iJgU1h0XrrjRD0hHMr7C10u276vYvm//rw1TzFcYQ4xTOyAoi9oNAHRU0JU4mY9eTuxdVc2zahdMuhaQ==
+  dependencies:
+    handlebars "^4.7.7"
+    solidity-ast "^0.4.38"
+
+source-map@^0.6.1:
+  version "0.6.1"
+  resolved "https://registry.yarnpkg.com/source-map/-/source-map-0.6.1.tgz#74722af32e9614e9c287a8d0bbde48b5e2f1a263"
+  integrity sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==
+
+uglify-js@^3.1.4:
+  version "3.19.3"
+  resolved "https://registry.yarnpkg.com/uglify-js/-/uglify-js-3.19.3.tgz#82315e9bbc6f2b25888858acd1fff8441035b77f"
+  integrity sha512-v3Xu+yuwBXisp6QYTcH4UbH+xYJXqnq2m/LtQVWKWzYc1iehYnLixoQDN9FH6/j9/oybfd6W9Ghwkl8+UMKTKQ==
+
+wordwrap@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/wordwrap/-/wordwrap-1.0.0.tgz#27584810891456a4171c8d0226441ade90cbcaeb"
+  integrity sha512-gvVzJFlPycKc5dZN4yPkP8w7Dc37BtP1yczEneOb4uq34pXZcvrtRTmWV8W+Ume+XCxKgbjM+nevkyFPMybd4Q==

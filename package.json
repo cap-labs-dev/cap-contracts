@@ -28,12 +28,14 @@
     "@symbioticfi/burners": "^1.0.0-devnet.2",
     "@symbioticfi/core": "^1.0.0-devnet.10",
     "@symbioticfi/hooks": "^1.0.0-devnet.1",
-    "@symbioticfi/rewards": "^1.0.0-devnet.6"
+    "@symbioticfi/rewards": "^1.0.0-devnet.6",
+    "eigenlayer-contracts": "^1.0.4"
   },
   "resolutions": {
     "@openzeppelin/contracts": "^5.2.0"
   },
   "dependencies": {
-    "@openzeppelin/foundry-upgrades": "^0.3.7"
+    "@openzeppelin/foundry-upgrades": "^0.3.7",
+    "eigenlayer": "^2.1.5"
   }
 }
