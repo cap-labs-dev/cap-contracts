@@ -6,6 +6,7 @@ import { ConfigureOracle } from "../contracts/deploy/service/ConfigureOracle.sol
 
 import { DeployVault } from "../contracts/deploy/service/DeployVault.sol";
 import { LzAddressbook, LzUtils } from "../contracts/deploy/utils/LzUtils.sol";
+import { ZapAddressbook, ZapUtils } from "../contracts/deploy/utils/ZapUtils.sol";
 import { OracleMocksConfig } from "../test/deploy/interfaces/TestDeployConfig.sol";
 import { DeployMocks } from "../test/deploy/service/DeployMocks.sol";
 
@@ -16,8 +17,6 @@ import {
     UsersConfig,
     VaultConfig
 } from "../contracts/deploy/interfaces/DeployConfigs.sol";
-
-import { DeployZapComposer } from "../contracts/deploy/service/DeployZapComposer.sol";
 
 import { MockERC20 } from "../test/mocks/MockERC20.sol";
 import { InfraConfigSerializer } from "./config/InfraConfigSerializer.sol";
@@ -34,12 +33,13 @@ contract DeployTestnetVault is
     InfraConfigSerializer,
     VaultConfigSerializer,
     LzUtils,
+    ZapUtils,
     DeployMocks,
     DeployVault,
-    DeployZapComposer,
     ConfigureOracle
 {
     LzAddressbook lzAb;
+    ZapAddressbook zapAb;
 
     UsersConfig users;
     InfraConfig infra;
@@ -54,6 +54,7 @@ contract DeployTestnetVault is
 
         users = _getUsersConfig();
         lzAb = _getLzAddressbook();
+        zapAb = _getZapAddressbook();
         (implems, libs, infra) = _readInfraConfig();
 
         assetMocks = new address[](3);
@@ -63,7 +64,7 @@ contract DeployTestnetVault is
         oracleMocks = _deployOracleMocks(assetMocks);
 
         vault = _deployVault(implems, infra, "Cap USD", "cUSD", oracleMocks.assets);
-        vault.lzperiphery = _deployVaultLzPeripherals(lzAb, zapAb, implems, infra, users);
+        vault.lzperiphery = _deployVaultLzPeriphery(lzAb, zapAb, vault, users);
 
         /// ACCESS CONTROL
         _initVaultAccessControl(infra, vault);

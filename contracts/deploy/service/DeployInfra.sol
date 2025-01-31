@@ -15,7 +15,6 @@ import {
     ImplementationsConfig,
     InfraConfig,
     L2VaultConfig,
-    PreMainnetImplementationsConfig,
     PreMainnetInfraConfig,
     UsersConfig,
     VaultConfig
@@ -44,12 +43,12 @@ contract DeployInfra is ProxyUtils {
     }
 
     function _deployPreMainnetInfra(
+        LzAddressbook memory srcAddressbook,
         LzAddressbook memory dstAddressbook,
-        PreMainnetImplementationsConfig memory implementations,
         address asset,
         uint48 maxCampaignLength
     ) internal returns (PreMainnetInfraConfig memory d) {
-        d.preMainnetVault = _proxy(implementations.preMainnetVault);
+        d.preMainnetVault = address(new PreMainnetVault(address(srcAddressbook.endpointV2)));
         PreMainnetVault(d.preMainnetVault).initialize(asset, dstAddressbook.eid, maxCampaignLength);
     }
 

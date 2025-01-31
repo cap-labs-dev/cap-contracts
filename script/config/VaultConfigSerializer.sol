@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
+import { VaultConfig, VaultLzPeriphery } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import { TokenSerializer } from "./TokenSerializer.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
@@ -37,11 +37,11 @@ contract VaultConfigSerializer is TokenSerializer {
 
         vaultJson.serialize("assets", assetsJson);
         vaultJson.serialize("capToken", _serializeToken(vault.capToken));
-        vaultJson.serialize("capOFTLockbox", vault.capOFTLockbox);
-        vaultJson.serialize("capZapComposer", vault.capZapComposer);
+        vaultJson.serialize("capOFTLockbox", vault.lzperiphery.capOFTLockbox);
+        vaultJson.serialize("capZapComposer", vault.lzperiphery.capZapComposer);
         vaultJson.serialize("stakedCapToken", _serializeToken(vault.stakedCapToken));
-        vaultJson = vaultJson.serialize("stakedCapOFTLockbox", vault.stakedCapOFTLockbox);
-        vaultJson = vaultJson.serialize("stakedCapZapComposer", vault.stakedCapZapComposer);
+        vaultJson = vaultJson.serialize("stakedCapOFTLockbox", vault.lzperiphery.stakedCapOFTLockbox);
+        vaultJson = vaultJson.serialize("stakedCapZapComposer", vault.lzperiphery.stakedCapZapComposer);
         console.log(vaultJson);
 
         Vm vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
@@ -110,10 +110,12 @@ contract VaultConfigSerializer is TokenSerializer {
         vault = VaultConfig({
             capToken: json.readAddress(string.concat(tokenPrefix, "['capToken'].address")),
             stakedCapToken: json.readAddress(string.concat(tokenPrefix, "['stakedCapToken'].address")),
-            capOFTLockbox: json.readAddress(string.concat(tokenPrefix, "capOFTLockbox")),
-            stakedCapOFTLockbox: json.readAddress(string.concat(tokenPrefix, "stakedCapOFTLockbox")),
-            capZapComposer: json.readAddress(string.concat(tokenPrefix, "capZapComposer")),
-            stakedCapZapComposer: json.readAddress(string.concat(tokenPrefix, "stakedCapZapComposer")),
+            lzperiphery: VaultLzPeriphery({
+                capOFTLockbox: json.readAddress(string.concat(tokenPrefix, "capOFTLockbox")),
+                stakedCapOFTLockbox: json.readAddress(string.concat(tokenPrefix, "stakedCapOFTLockbox")),
+                capZapComposer: json.readAddress(string.concat(tokenPrefix, "capZapComposer")),
+                stakedCapZapComposer: json.readAddress(string.concat(tokenPrefix, "stakedCapZapComposer"))
+            }),
             assets: trueAssets,
             principalDebtTokens: truePrincipalDebtTokens,
             restakerDebtTokens: trueRestakerDebtTokens,

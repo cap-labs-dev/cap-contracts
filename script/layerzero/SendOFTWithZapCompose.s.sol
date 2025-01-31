@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import { IBeefyZapRouter } from "../../contracts/interfaces/IBeefyZapRouter.sol";
+import { LzAddressbook, LzUtils } from "../../contracts/deploy/utils/LzUtils.sol";
+import { WalletUtils } from "../../contracts/deploy/utils/WalletUtils.sol";
+
 import { IZapOFTComposer } from "../../contracts/interfaces/IZapOFTComposer.sol";
-import { LzUtils } from "../util/LzUtils.sol";
-import { WalletUtils } from "../util/WalletUtils.sol";
+import { IZapRouter } from "../../contracts/interfaces/IZapRouter.sol";
+
 import { MessagingFee } from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import { IOAppCore } from "@layerzerolabs/oapp-evm/contracts/oapp/interfaces/IOAppCore.sol";
 import { OptionsBuilder } from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
@@ -20,16 +22,27 @@ import { Script, console } from "forge-std/Script.sol";
 contract SendOFTWithZapCompose is Script, WalletUtils, LzUtils {
     using OptionsBuilder for bytes;
 
+    LzAddressbook dstLzAb;
+    IZapOFTComposer.ZapMessage zapMessage;
+
+    address srcOftAddress;
+    uint256 srcAmount;
+    uint256 dstChainId;
+    address dstComposerAddress;
+    address dstZapRouter;
+    address dstStakedCapToken;
+    address dstCapToken;
+
     function run() public {
         // Fetching environment variables
-        address srcOftAddress = vm.envAddress("SRC_OFT_ADDRESS");
-        uint256 srcAmount = vm.envUint("SRC_AMOUNT");
-        uint256 dstChainId = vm.envUint("DST_CHAIN_ID");
-        address dstComposerAddress = vm.envAddress("DST_COMPOSER_ADDRESS");
-        address dstZapRouter = vm.envAddress("DST_ZAP_ROUTER");
-        address dstStakedCapToken = vm.envAddress("DST_STAKED_CAP_TOKEN");
-        address dstCapToken = vm.envAddress("DST_CAP_TOKEN");
-        LzConfig memory toConfig = getLzConfig(vm, dstChainId);
+        srcOftAddress = vm.envAddress("SRC_OFT_ADDRESS");
+        srcAmount = vm.envUint("SRC_AMOUNT");
+        dstChainId = vm.envUint("DST_CHAIN_ID");
+        dstComposerAddress = vm.envAddress("DST_COMPOSER_ADDRESS");
+        dstZapRouter = vm.envAddress("DST_ZAP_ROUTER");
+        dstStakedCapToken = vm.envAddress("DST_STAKED_CAP_TOKEN");
+        dstCapToken = vm.envAddress("DST_CAP_TOKEN");
+        dstLzAb = _getLzAddressbook(dstChainId);
 
         vm.startBroadcast();
 
@@ -43,34 +56,33 @@ contract SendOFTWithZapCompose is Script, WalletUtils, LzUtils {
         IERC20 token = IERC20(sourceOFT.token());
 
         // ------------------------------- build OFTZapMessage
+        {
+            IZapRouter.Input[] memory inputs = new IZapRouter.Input[](1);
+            inputs[0] = IZapRouter.Input({ token: address(dstStakedCapToken), amount: srcAmount });
 
-        IBeefyZapRouter.Input[] memory inputs = new IBeefyZapRouter.Input[](1);
-        inputs[0] = IBeefyZapRouter.Input({ token: address(dstStakedCapToken), amount: srcAmount });
+            IZapRouter.Output[] memory outputs = new IZapRouter.Output[](1);
+            outputs[0] = IZapRouter.Output({ token: address(dstCapToken), minOutputAmount: srcAmount * 999 / 1000 });
 
-        IBeefyZapRouter.Output[] memory outputs = new IBeefyZapRouter.Output[](1);
-        outputs[0] = IBeefyZapRouter.Output({ token: address(dstCapToken), minOutputAmount: srcAmount * 999 / 1000 });
+            IZapRouter.Order memory order = IZapRouter.Order({
+                inputs: inputs,
+                outputs: outputs,
+                relay: IZapRouter.Relay({ target: address(0), value: 0, data: "" }),
+                user: dstComposerAddress,
+                recipient: toAddress
+            });
 
-        IBeefyZapRouter.Relay memory noRelay = IBeefyZapRouter.Relay({ target: address(0), value: 0, data: "" });
+            IZapRouter.StepToken[] memory tokens = new IZapRouter.StepToken[](1);
+            tokens[0] = IZapRouter.StepToken({ token: address(dstStakedCapToken), index: 4 /* selector size */ });
+            IZapRouter.Step[] memory route = new IZapRouter.Step[](1);
+            route[0] = IZapRouter.Step({
+                target: dstStakedCapToken,
+                value: 0,
+                data: abi.encodeWithSelector(IERC4626.withdraw.selector, srcAmount, dstZapRouter, dstZapRouter),
+                tokens: new IZapRouter.StepToken[](0)
+            });
 
-        IBeefyZapRouter.Order memory order = IBeefyZapRouter.Order({
-            inputs: inputs,
-            outputs: outputs,
-            relay: noRelay,
-            user: dstComposerAddress,
-            recipient: toAddress
-        });
-
-        IBeefyZapRouter.StepToken[] memory tokens = new IBeefyZapRouter.StepToken[](1);
-        tokens[0] = IBeefyZapRouter.StepToken({ token: address(dstStakedCapToken), index: 4 /* selector size */ });
-        IBeefyZapRouter.Step[] memory route = new IBeefyZapRouter.Step[](1);
-        route[0] = IBeefyZapRouter.Step({
-            target: dstStakedCapToken,
-            value: 0,
-            data: abi.encodeWithSelector(IERC4626.withdraw.selector, srcAmount, dstZapRouter, dstZapRouter),
-            tokens: new IBeefyZapRouter.StepToken[](0)
-        });
-
-        IZapOFTComposer.ZapMessage memory zapMessage = IZapOFTComposer.ZapMessage({ order: order, route: route });
+            zapMessage = IZapOFTComposer.ZapMessage({ order: order, route: route });
+        }
 
         uint128 dstZapGasEstimate = 700000;
         uint128 srcZapGasEstimate = dstZapGasEstimate * 3; // src gas is 3x cheaper than dst gas
@@ -83,7 +95,7 @@ contract SendOFTWithZapCompose is Script, WalletUtils, LzUtils {
             bytes memory encodedZapMessage = abi.encode(zapMessage);
 
             SendParam memory sendParam = SendParam(
-                toConfig.eid,
+                dstLzAb.eid,
                 addressToBytes32(dstComposerAddress),
                 srcAmount,
                 srcAmount * 9 / 10,
@@ -106,7 +118,7 @@ contract SendOFTWithZapCompose is Script, WalletUtils, LzUtils {
             console.log("Sending incorrect zap");
             // modify the zap message to make the zap fail
             // removing the input will make the token manager empty and the zap will fail
-            zapMessage.order.inputs = new IBeefyZapRouter.Input[](0);
+            zapMessage.order.inputs = new IZapRouter.Input[](0);
 
             bytes memory _extraOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(65000, 0)
                 .addExecutorLzComposeOption(0, dstZapGasEstimate, 0);
@@ -114,7 +126,7 @@ contract SendOFTWithZapCompose is Script, WalletUtils, LzUtils {
             bytes memory encodedZapMessage = abi.encode(zapMessage);
 
             SendParam memory sendParam = SendParam(
-                toConfig.eid,
+                dstLzAb.eid,
                 addressToBytes32(dstComposerAddress),
                 srcAmount,
                 srcAmount * 9 / 10,

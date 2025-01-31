@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import { LzAddressbook, LzUtils } from "../../contracts/deploy/utils/LzUtils.sol";
+import { WalletUtils } from "../../contracts/deploy/utils/WalletUtils.sol";
+
 import { CapToken } from "../../contracts/token/CapToken.sol";
 import { OFTLockbox } from "../../contracts/token/OFTLockbox.sol";
 import { StakedCap } from "../../contracts/token/StakedCap.sol";
-import { LzUtils } from "../util/LzUtils.sol";
-import { WalletUtils } from "../util/WalletUtils.sol";
 import { ILayerZeroEndpointV2 } from "@layerzerolabs/interfaces/ILayerZeroEndpointV2.sol";
 import { SetConfigParam } from "@layerzerolabs/interfaces/IMessageLibManager.sol";
 import { Script } from "forge-std/Script.sol";
@@ -19,9 +20,9 @@ contract ConfigureOApp is Script, WalletUtils, LzUtils {
         address oapp = vm.envAddress("OAPP");
         uint256 targetId = vm.envUint("TARGET_CHAIN_ID");
 
-        LzConfig memory config = getLzConfig(vm, block.chainid);
+        LzAddressbook memory config = _getLzAddressbook(block.chainid);
         ILayerZeroEndpointV2 lzEndpoint = config.endpointV2;
-        uint32 targetEid = getLzConfig(vm, targetId).eid;
+        uint32 targetEid = _getLzAddressbook(targetId).eid;
 
         vm.startBroadcast();
 
