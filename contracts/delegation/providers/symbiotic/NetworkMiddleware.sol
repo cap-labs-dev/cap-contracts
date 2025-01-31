@@ -106,7 +106,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     /// @notice Slash delegation and send to recipient
     /// @param _agent Agent address
     /// @param _recipient Recipient of the slashed assets
-    /// @param _slashShare Percentage of delegation to slashn encoded with 18 decimals
+    /// @param _slashShare Percentage of delegation to slash encoded with 18 decimals
     /// @param _slashHints Slash hint specific to symbiotic
     function slash(address _agent, address _recipient, uint256 _slashShare, bytes memory _slashHints)
         external
