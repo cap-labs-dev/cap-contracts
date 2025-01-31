@@ -58,7 +58,7 @@ contract DeployVault is ProxyUtils {
         }
     }
 
-    function _deployVaultLzPeripherals(
+    function _deployVaultLzPeriphery(
         LzAddressbook memory lzAddressbook,
         ZapAddressbook memory zapAddressbook,
         VaultConfig memory vault,

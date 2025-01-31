@@ -20,10 +20,6 @@ struct ImplementationsConfig {
     address restakerDebtToken;
 }
 
-struct PreMainnetImplementationsConfig {
-    address preMainnetVault;
-}
-
 struct InfraConfig {
     address oracle;
     address accessControl;

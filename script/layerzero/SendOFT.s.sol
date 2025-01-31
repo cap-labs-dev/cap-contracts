@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import { LzUtils } from "../util/LzUtils.sol";
-import { WalletUtils } from "../util/WalletUtils.sol";
+import { LzAddressbook, LzUtils } from "../../contracts/deploy/utils/LzUtils.sol";
+import { WalletUtils } from "../../contracts/deploy/utils/WalletUtils.sol";
+
 import { MessagingFee } from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import { IOAppCore } from "@layerzerolabs/oapp-evm/contracts/oapp/interfaces/IOAppCore.sol";
 import { OptionsBuilder } from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
@@ -21,7 +22,7 @@ contract SendOFT is Script, WalletUtils, LzUtils {
         // Fetching environment variables
         address oftAddress = vm.envAddress("OFT_ADDRESS");
         uint toChainId = vm.envUint("TO_CHAIN_ID");
-        LzConfig memory toConfig = getLzConfig(vm, toChainId);
+        LzAddressbook memory toConfig = _getLzAddressbook(toChainId);
         uint256 _amount = vm.envUint("AMOUNT");
 
         vm.startBroadcast();

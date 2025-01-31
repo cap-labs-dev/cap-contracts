@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.22;
 
-import { IZapRouter } from "../../contracts/interfaces/IZapRouter.sol";
 import { IZapOFTComposer } from "../../contracts/interfaces/IZapOFTComposer.sol";
+import { IZapRouter } from "../../contracts/interfaces/IZapRouter.sol";
 
 import { ZapOFTComposer } from "../../contracts/zap/ZapOFTComposer.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
@@ -16,7 +16,7 @@ contract MockZapTokenManager {
     }
 }
 
-// Mock BeefyZapRouter for testing
+// Mock IZapRouter for testing
 contract MockZapRouter {
     MockZapTokenManager public zapTokenManager;
 
@@ -86,13 +86,8 @@ contract ZapOFTComposerTest is Test {
 
             IZapRouter.Relay memory noopRelay = IZapRouter.Relay({ target: address(0), value: 0, data: "" });
 
-            IZapRouter.Order memory order = IZapRouter.Order({
-                inputs: inputs,
-                outputs: outputs,
-                relay: noopRelay,
-                user: _from,
-                recipient: _to
-            });
+            IZapRouter.Order memory order =
+                IZapRouter.Order({ inputs: inputs, outputs: outputs, relay: noopRelay, user: _from, recipient: _to });
             IZapRouter.Step[] memory route = new IZapRouter.Step[](0);
 
             zapMessage = IZapOFTComposer.ZapMessage({ order: order, route: route });
