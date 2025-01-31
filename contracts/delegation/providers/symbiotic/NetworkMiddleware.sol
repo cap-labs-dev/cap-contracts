@@ -34,6 +34,10 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     /// @dev Slash event
     event Slash(address indexed agent, address recipient, uint256 amount);
 
+    struct SymbioticSlashHint {
+        uint48 slashTimestamp;
+    }
+
     /// @dev Invalid slasher
     error InvalidSlasher();
     /// @dev Invalid delegator
@@ -100,32 +104,35 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     /// @notice Slash delegation and send to recipient
     /// @param _agent Agent address
     /// @param _recipient Recipient of the slashed assets
-    /// @param _slashShare Percentage of delegation to slash
-    function slash(address _agent, address _recipient, uint256 _slashShare) external checkAccess(this.slash.selector) {
+    /// @param _slashShare Percentage of delegation to slashn encoded with 18 decimals
+    /// @param _slashHints Slash hint specific to symbiotic
+    function slash(address _agent, address _recipient, uint256 _slashShare, bytes memory _slashHints)
+        external
+        checkAccess(this.slash.selector)
+    {
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
+        SymbioticSlashHint memory slashHint = abi.decode(_slashHints, (SymbioticSlashHint));
 
         uint48 _timestamp = timestamp();
-        bool slashed = false;
         for (uint256 i; i < $.vaults[_agent].length; ++i) {
             IVault vault = IVault($.vaults[_agent][i]);
             (, uint256 delegatedCollateral) = coverageByVault(_agent, address(vault), $.oracle, _timestamp);
             if (delegatedCollateral == 0) continue;
 
             uint256 slashShareOfCollateral = delegatedCollateral * _slashShare / 1e18;
-            address collateral = vault.collateral();
+            uint48 slashTimestamp = slashHint.slashTimestamp;
+            if (slashTimestamp == 0) slashTimestamp = _timestamp - IVault(vault).epochDuration();
 
             ISlasher(vault.slasher()).slash(
-                subnetwork(_agent), _agent, slashShareOfCollateral, _timestamp, new bytes(0)
+                subnetwork(_agent), _agent, slashShareOfCollateral, slashTimestamp, new bytes(0)
             );
+
             // TODO: the burner could be a non routing burner, could add hooks?
             IBurnerRouter(vault.burner()).triggerTransfer(address(this));
-            IERC20(collateral).safeTransfer(_recipient, slashShareOfCollateral);
+            IERC20(vault.collateral()).safeTransfer(_recipient, slashShareOfCollateral);
 
             emit Slash(_agent, _recipient, slashShareOfCollateral);
-            slashed = true;
         }
-
-        if (!slashed) revert NoSlashableCollateral();
     }
 
     /// @notice Coverage by vault
