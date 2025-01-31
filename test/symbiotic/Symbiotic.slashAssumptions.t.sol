@@ -17,6 +17,21 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
     function setUp() public {
         _deployCapTestEnvironment();
         _initSymbioticVaultsLiquidity(env);
+
+        // reset the initial stakes for this test
+        {
+            vm.startPrank(env.symbiotic.users.vault_admin);
+
+            for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
+                address agent = env.testUsers.agents[i];
+                _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 1000e6);
+                _symbioticVaultDelegateToAgent(symbioticUsdxVault, env.symbiotic.networkAdapter, agent, 1000e18);
+            }
+
+            _timeTravel(symbioticUsdtVault.vaultEpochDuration + 1 days);
+
+            vm.stopPrank();
+        }
     }
 
     function _get_stake_at(SymbioticVaultConfig memory _vault, address _agent, uint256 _timestamp)
@@ -44,9 +59,9 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
         address agent2 = env.testUsers.agents[1];
         address agent3 = env.testUsers.agents[2];
 
-        assertEq(_get_stake_at(symbioticUsdtVault, agent1, block.timestamp), 9e10); // this is what the TestDeployer sets
-        assertEq(_get_stake_at(symbioticUsdtVault, agent2, block.timestamp), 9e10); // this is what the TestDeployer sets
-        assertEq(_get_stake_at(symbioticUsdtVault, agent3, block.timestamp), 9e10); // this is what the TestDeployer sets
+        assertEq(_get_stake_at(symbioticUsdtVault, agent1, block.timestamp), 1000e6); // this is what the TestDeployer sets
+        assertEq(_get_stake_at(symbioticUsdtVault, agent2, block.timestamp), 1000e6); // this is what the TestDeployer sets
+        assertEq(_get_stake_at(symbioticUsdtVault, agent3, block.timestamp), 1000e6); // this is what the TestDeployer sets
 
         // now, the restaker completely undelegates from the usdt vault
         _timeTravel(1 days);
@@ -61,8 +76,8 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
         assertEq(_get_stake_at(_vault, agent1, block.timestamp - 1), 0);
         assertEq(_get_stake_at(_vault, agent1, block.timestamp - 2), 0);
         assertEq(_get_stake_at(_vault, agent1, block.timestamp - 3), 0);
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp - 4), 9e10);
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp - 5), 9e10);
+        assertEq(_get_stake_at(_vault, agent1, block.timestamp - 4), 1000e6);
+        assertEq(_get_stake_at(_vault, agent1, block.timestamp - 5), 1000e6);
 
         /// ==== try slashing
         bytes32 agent1_subnetwork = _middleware.subnetwork(agent1);
@@ -88,9 +103,9 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
         address agent2 = env.testUsers.agents[1];
         address agent3 = env.testUsers.agents[2];
 
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp), 9e10); // this is what the TestDeployer sets
-        assertEq(_get_stake_at(_vault, agent2, block.timestamp), 9e10); // this is what the TestDeployer sets
-        assertEq(_get_stake_at(_vault, agent3, block.timestamp), 9e10); // this is what the TestDeployer sets
+        assertEq(_get_stake_at(_vault, agent1, block.timestamp), 1000e6); // this is what the TestDeployer sets
+        assertEq(_get_stake_at(_vault, agent2, block.timestamp), 1000e6); // this is what the TestDeployer sets
+        assertEq(_get_stake_at(_vault, agent3, block.timestamp), 1000e6); // this is what the TestDeployer sets
 
         _timeTravel(1);
 
@@ -99,8 +114,8 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
         _timeTravel(1);
 
         assertEq(_get_stake_at(_vault, agent1, block.timestamp), 0);
-        assertEq(_get_stake_at(_vault, agent2, block.timestamp), 9e10);
-        assertEq(_get_stake_at(_vault, agent3, block.timestamp), 9e10);
+        assertEq(_get_stake_at(_vault, agent2, block.timestamp), 1000e6);
+        assertEq(_get_stake_at(_vault, agent3, block.timestamp), 1000e6);
 
         _timeTravel(1);
 
@@ -110,7 +125,7 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
 
         assertEq(_get_stake_at(_vault, agent1, block.timestamp), 0);
         assertEq(_get_stake_at(_vault, agent2, block.timestamp), 0);
-        assertEq(_get_stake_at(_vault, agent3, block.timestamp), 9e10);
+        assertEq(_get_stake_at(_vault, agent3, block.timestamp), 1000e6);
 
         _timeTravel(1);
 
@@ -139,5 +154,25 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
         assertEq(_get_stake_at(symbioticUsdtVault, agent1, block.timestamp), 10);
         assertEq(_get_stake_at(_vault, agent2, block.timestamp), 20);
         assertEq(_get_stake_at(_vault, agent3, block.timestamp), 0);
+    }
+
+    function test_slashing_decreases_the_operator_total_stake() public {
+        SymbioticVaultConfig memory _vault = symbioticUsdtVault;
+        NetworkMiddleware _middleware = NetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
+
+        address agent1 = env.testUsers.agents[0];
+        bytes32 agent1_subnetwork = _middleware.subnetwork(agent1);
+
+        assertEq(_get_stake_at(_vault, agent1, block.timestamp), 1000e6);
+
+        // slash 10% of the stake
+        vm.startPrank(address(_middleware));
+        ISlasher(_vault.slasher).slash(agent1_subnetwork, agent1, 100e6, uint48(block.timestamp - 1), "");
+        vm.stopPrank();
+
+        _timeTravel(1);
+
+        // the total stake should decrease by 10%
+        assertEq(_get_stake_at(_vault, agent1, block.timestamp), 900e6);
     }
 }

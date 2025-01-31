@@ -10,11 +10,11 @@ import { Upgrades } from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import { IOperatorRegistry } from "@symbioticfi/core/src/interfaces/IOperatorRegistry.sol";
 import { IOptInService } from "@symbioticfi/core/src/interfaces/service/IOptInService.sol";
 
+import { NetworkRestakeDecreaseHook } from "./NetworkRestakeDecreaseHook.sol";
 import { INetworkRegistry } from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
 import { IVaultConfigurator } from "@symbioticfi/core/src/interfaces/IVaultConfigurator.sol";
 import { IDelegatorHook } from "@symbioticfi/core/src/interfaces/delegator/IDelegatorHook.sol";
 import { SimpleBurner } from "@symbioticfi/core/test/mocks/SimpleBurner.sol";
-
 import { IDefaultStakerRewards } from
     "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewards.sol";
 import { IDefaultStakerRewardsFactory } from
@@ -63,11 +63,15 @@ contract DeploySymbioticVault is ProxyUtils {
 
         // vault setup
         // https://docs.symbiotic.fi/guides/vault-deployment/#vault
-        address[] memory networkLimitSetRoleHolders = new address[](1);
-        networkLimitSetRoleHolders[0] = params.vault_admin;
+        NetworkRestakeDecreaseHook hook = new NetworkRestakeDecreaseHook();
 
-        address[] memory operatorNetworkSharesSetRoleHolders = new address[](1);
+        address[] memory networkLimitSetRoleHolders = new address[](2);
+        networkLimitSetRoleHolders[0] = params.vault_admin;
+        networkLimitSetRoleHolders[1] = address(hook);
+
+        address[] memory operatorNetworkSharesSetRoleHolders = new address[](2);
         operatorNetworkSharesSetRoleHolders[0] = params.vault_admin;
+        operatorNetworkSharesSetRoleHolders[1] = address(hook);
 
         (config.vault, config.delegator, config.slasher) = IVaultConfigurator(addressbook.services.vaultConfigurator)
             .create(
@@ -94,7 +98,7 @@ contract DeploySymbioticVault is ProxyUtils {
                     INetworkRestakeDelegator.InitParams({
                         baseParams: IBaseDelegator.BaseParams({
                             defaultAdminRoleHolder: params.vault_admin, // address of the Delegator’s admin (can manage all roles)
-                            hook: 0x0000000000000000000000000000000000000000, // address of the hook (if not zero, receives onSlash() call on each slashing)
+                            hook: address(hook), // address of the hook (if not zero, receives onSlash() call on each slashing)
                             hookSetRoleHolder: params.vault_admin // address of the hook setter
                          }),
                         networkLimitSetRoleHolders: networkLimitSetRoleHolders, // array of addresses of the network limit setters
