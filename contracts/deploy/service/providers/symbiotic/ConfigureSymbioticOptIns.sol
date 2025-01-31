@@ -72,17 +72,13 @@ contract ConfigureSymbioticOptIns {
         address agent,
         uint256 amount
     ) internal {
+        INetworkRestakeDelegator delegator = INetworkRestakeDelegator(vault.delegator);
         NetworkMiddleware middleware = NetworkMiddleware(networkAdapter.networkMiddleware);
-        if (amount > 0) {
-            INetworkRestakeDelegator(vault.delegator).setNetworkLimit(middleware.subnetwork(agent), amount);
-            INetworkRestakeDelegator(vault.delegator).setOperatorNetworkShares(
-                middleware.subnetwork(agent), agent, amount
-            );
-        } else {
-            INetworkRestakeDelegator(vault.delegator).setOperatorNetworkShares(
-                middleware.subnetwork(agent), agent, amount
-            );
-            INetworkRestakeDelegator(vault.delegator).setNetworkLimit(middleware.subnetwork(agent), amount);
+        bytes32 subnetwork = middleware.subnetwork(agent);
+
+        delegator.setNetworkLimit(subnetwork, amount);
+        if (delegator.operatorNetworkShares(subnetwork, agent) != 1e18) {
+            delegator.setOperatorNetworkShares(subnetwork, agent, 1e18);
         }
     }
 }
