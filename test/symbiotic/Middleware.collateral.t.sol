@@ -30,6 +30,7 @@ contract MiddlewareTest is TestDeployer {
         }
     }
 
+
     function test_slash_sends_funds_to_middleware() public {
         vm.startPrank(env.users.middleware_admin);
 
