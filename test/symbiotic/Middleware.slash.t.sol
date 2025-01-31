@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
+import { NetworkMiddleware } from "../../contracts/delegation/providers/symbiotic/NetworkMiddleware.sol";
 import { TestDeployer } from "../../test/deploy/TestDeployer.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
 
@@ -14,30 +15,33 @@ contract MiddlewareTest is TestDeployer {
     }
 
     function test_slash_sends_funds_to_middleware() public {
-        // it is slashable
-        {
-            vm.startPrank(env.users.middleware_admin);
+        vm.startPrank(env.users.middleware_admin);
 
-            address recipient = makeAddr("recipient");
-            address agent = env.testUsers.agents[0];
+        address recipient = makeAddr("recipient");
+        address agent = env.testUsers.agents[0];
 
-            // collateral in USDT (8 decimals)
-            uint256 agentCollateral = middleware.coverage(agent);
-            console.log("agentCollateral", agentCollateral);
+        // collateral in USDT (8 decimals)
+        assertEq(middleware.coverage(agent), 180_000e8);
 
-            // slash 10% of agent collateral
-            middleware.slash(agent, recipient, 1e17);
+        // slash 10% of agent collateral
+        NetworkMiddleware.SymbioticSlashHint memory slashHint =
+            NetworkMiddleware.SymbioticSlashHint({ slashTimestamp: uint48(block.timestamp - 1) });
+        middleware.slash(agent, recipient, 0.1e18, abi.encode(slashHint));
 
-            // collateral * price ($1) * 10% * collateral decimals / price decimals
-            console.log("usdt balance of liquidator", IERC20(usdt).balanceOf(recipient));
-            console.log("usdx balance of liquidator", IERC20(usdx).balanceOf(recipient));
-            //  assertEq(IERC20(collateral).balanceOf(recipient), agentCollateral * 1e18 / 1e9);
-            //  assertEq(IERC20(usdx).balanceOf(recipient), agentCollateral * 3200e8 / 1e9);
+        // all vaults have been slashed and sent to the recipient
+        assertEq(IERC20(usdt).balanceOf(recipient), 9000e6);
+        assertEq(IERC20(usdx).balanceOf(recipient), 9000e18);
 
-            vm.stopPrank();
-        }
+        // collateral * price ($1) * 10% * collateral decimals / price decimals
+        console.log("usdt balance of liquidator", IERC20(usdt).balanceOf(recipient));
+        console.log("usdx balance of liquidator", IERC20(usdx).balanceOf(recipient));
+        //  assertEq(IERC20(collateral).balanceOf(recipient), agentCollateral * 1e18 / 1e9);
+        //  assertEq(IERC20(usdx).balanceOf(recipient), agentCollateral * 3200e8 / 1e9);
 
-        /// Test whether or not we can slash after the slashable period??
+        vm.stopPrank();
+    }
+
+    function test_slash_does_not_work_if_not_slashable() public {
         {
             vm.startPrank(env.symbiotic.users.vault_admin);
 
@@ -49,7 +53,6 @@ contract MiddlewareTest is TestDeployer {
             vm.stopPrank();
         }
 
-        // move ahead slashduration plus 1 into the future
         _timeTravel(symbioticUsdtVault.vaultEpochDuration + 1);
 
         {
@@ -58,10 +61,14 @@ contract MiddlewareTest is TestDeployer {
             address recipient = makeAddr("recipient");
             address agent = env.testUsers.agents[0];
 
-            vm.expectRevert();
-            // slash 10% of agent collateral
-            middleware.slash(agent, recipient, 1e17);
+            // we request a slash for a timestamp where there is a stake to be slashed
+            NetworkMiddleware.SymbioticSlashHint memory slashHint =
+                NetworkMiddleware.SymbioticSlashHint({ slashTimestamp: uint48(block.timestamp - 10) });
+            middleware.slash(agent, recipient, 1e17, abi.encode(slashHint));
 
+            // slash should not have worked
+            assertEq(IERC20(usdt).balanceOf(recipient), 0);
+            assertEq(IERC20(usdx).balanceOf(recipient), 0);
             vm.stopPrank();
         }
     }
