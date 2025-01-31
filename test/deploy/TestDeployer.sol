@@ -205,20 +205,22 @@ contract TestDeployer is
 
         console.log("registering network in vaults");
         vm.startPrank(env.users.middleware_admin);
-        _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, _getSymbioticVaultConfig(0));
-        _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, _getSymbioticVaultConfig(1));
+        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
+            address _agent = env.testUsers.agents[i];
+            _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, _getSymbioticVaultConfig(0), _agent);
+            _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, _getSymbioticVaultConfig(1), _agent);
+        }
 
-        console.log("registering vaults in network");
-        vm.startPrank(env.symbiotic.users.vault_admin);
-        _symbioticVaultOptInToNetwork(_getSymbioticVaultConfig(0), env.symbiotic.networkAdapter, type(uint256).max);
-        _symbioticVaultOptInToNetwork(_getSymbioticVaultConfig(1), env.symbiotic.networkAdapter, type(uint256).max);
-
-        console.log("registering vault to all agents");
+        console.log("vaults delegating to agents");
         vm.startPrank(env.symbiotic.users.vault_admin);
         for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
             address _agent = env.testUsers.agents[i];
-            _symbioticVaultOptInToAgent(_getSymbioticVaultConfig(0), env.symbiotic.networkAdapter, _agent, 1e42);
-            _symbioticVaultOptInToAgent(_getSymbioticVaultConfig(1), env.symbiotic.networkAdapter, _agent, 1e42);
+            _symbioticVaultDelegateToAgent(
+                _getSymbioticVaultConfig(0), env.symbiotic.networkAdapter, _agent, type(uint256).max
+            );
+            _symbioticVaultDelegateToAgent(
+                _getSymbioticVaultConfig(1), env.symbiotic.networkAdapter, _agent, type(uint256).max
+            );
         }
 
         console.log("init delegation");

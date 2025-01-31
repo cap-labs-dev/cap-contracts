@@ -55,37 +55,34 @@ contract ConfigureSymbioticOptIns {
     // Networks can opt into vaults to set maximum stake limits they’re willing to accept. This is done using the setMaxNetworkLimit function of the vault’s delegator.
     function _networkOptInToSymbioticVault(
         SymbioticNetworkAdapterConfig memory networkAdapter,
-        SymbioticVaultConfig memory vault
+        SymbioticVaultConfig memory vault,
+        address agent
     ) internal {
-        Network(networkAdapter.network).registerVault(vault.vault);
+        Network(networkAdapter.network).registerVault(vault.vault, agent);
     }
 
-    // 4. Vault to Network Opt-in
-    // Vaults can opt into networks by setting non-zero limits.
-    // https://docs.symbiotic.fi/modules/registries/#vault-allocation-to-networks
-    // After a network opts into a vault, the vault manager can allocate stake to the network:
-    // - The vault manager reviews the conditions proposed by the network (resolvers and limits).
-    // - If agreed, the vault manager allocates stake by calling:
-    // `INetworkRestakeDelegator(IVault(vault).delegator).setNetworkLimit(subnetwork, amount)`
-    // Where amount is the total network stake limit, which can be set up to the MAX_STAKE defined by the network.
-    function _symbioticVaultOptInToNetwork(
+    // 4. Vault to Agent Delegation
+    // > Vaults can opt into networks by setting non-zero limits.
+    // > https://docs.symbiotic.fi/modules/registries/#vault-allocation-to-networks
+    // Since CAP want agent isolation we have a subnetwork per agent
+    // this means that setting the network limit is the same as setting the agent delegation
+    function _symbioticVaultDelegateToAgent(
         SymbioticVaultConfig memory vault,
         SymbioticNetworkAdapterConfig memory networkAdapter,
+        address agent,
         uint256 amount
     ) internal {
         NetworkMiddleware middleware = NetworkMiddleware(networkAdapter.networkMiddleware);
-        INetworkRestakeDelegator(vault.delegator).setNetworkLimit(middleware.subnetwork(), amount);
-    }
-
-    // 5. Vault to Operators Opt-in
-    // Vaults can opt into operators by setting non-zero limits.
-    function _symbioticVaultOptInToAgent(
-        SymbioticVaultConfig memory vault,
-        SymbioticNetworkAdapterConfig memory networkAdapter,
-        address user_agent,
-        uint256 amount
-    ) internal {
-        NetworkMiddleware middleware = NetworkMiddleware(networkAdapter.networkMiddleware);
-        INetworkRestakeDelegator(vault.delegator).setOperatorNetworkShares(middleware.subnetwork(), user_agent, amount);
+        if (amount > 0) {
+            INetworkRestakeDelegator(vault.delegator).setNetworkLimit(middleware.subnetwork(agent), amount);
+            INetworkRestakeDelegator(vault.delegator).setOperatorNetworkShares(
+                middleware.subnetwork(agent), agent, amount
+            );
+        } else {
+            INetworkRestakeDelegator(vault.delegator).setOperatorNetworkShares(
+                middleware.subnetwork(agent), agent, amount
+            );
+            INetworkRestakeDelegator(vault.delegator).setNetworkLimit(middleware.subnetwork(agent), amount);
+        }
     }
 }
