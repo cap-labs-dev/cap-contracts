@@ -33,6 +33,9 @@ library VaultLogic {
     /// @dev Only non-supported assets can be rescued
     error AssetNotRescuable(address asset);
 
+    /// @dev Invalid min amounts out as they dont match the number of assets
+    error InvalidMinAmountsOut();
+
     /// @dev Cap token minted
     event Mint(address indexed minter, address receiver, address indexed asset, uint256 amountIn, uint256 amountOut);
 
@@ -130,6 +133,7 @@ library VaultLogic {
     )
         external
     {
+        if (params.amountsOut.length != $.assets.length) revert InvalidMinAmountsOut();
         if (params.deadline < block.timestamp) revert PastDeadline();
 
         address[] memory cachedAssets = $.assets;
