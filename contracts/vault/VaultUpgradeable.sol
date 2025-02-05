@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
 import { MinterUpgradeable } from "./MinterUpgradeable.sol";
+import { FractionalReserve } from "./FractionalReserve.sol";
 import { VaultLogic } from "./libraries/VaultLogic.sol";
 import { VaultStorage } from "./libraries/VaultStorage.sol";
 import { DataTypes } from "./libraries/types/DataTypes.sol";
@@ -14,23 +15,26 @@ import { ERC20PermitUpgradeable } from
 /// @notice Tokens are supplied by cToken minters and borrowed by covered agents
 /// @dev Supplies, borrows and utilization rates are tracked. Interest rates should be computed and
 /// charged on the external contracts, only the principle amount is counted on this contract.
-contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUpgradeable {
+contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUpgradeable, FractionalReserve {
     /// @dev Initialize the assets
     /// @param _name Name of the cap token
     /// @param _symbol Symbol of the cap token
     /// @param _accessControl Access control address
+    /// @param _feeAuction Fee auction address
     /// @param _oracle Oracle address
     /// @param _assets Asset addresses
     function __Vault_init(
         string memory _name,
         string memory _symbol,
         address _accessControl,
+        address _feeAuction,
         address _oracle,
         address[] calldata _assets
     ) internal onlyInitializing {
         __ERC20_init(_name, _symbol);
         __ERC20Permit_init(_name);
         __Access_init(_accessControl);
+        __FractionalReserve_init_unchained(_feeAuction);
         __Minter_init_unchained(_oracle);
         __Vault_init_unchained(_assets);
     }
@@ -75,7 +79,7 @@ contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUp
     }
 
     /// @notice Burn the cap token for an asset
-    /// @dev Can only withdraw up to the amount remaining on this contract
+    /// @dev Asset is withdrawn from the reserve or divested from the underlying vault
     /// @param _asset Asset to withdraw
     /// @param _amountIn Amount of cap token to burn
     /// @param _minAmountOut Minimum amount out to receive
@@ -92,6 +96,7 @@ contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUp
         returns (uint256 amountOut)
     {
         amountOut = getBurnAmount(_asset, _amountIn);
+        divest(_asset, amountOut);
         VaultLogic.burn(
             VaultStorage.get(),
             DataTypes.MintBurnParams({
@@ -107,7 +112,7 @@ contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUp
     }
 
     /// @notice Redeem the Cap token for a bundle of assets
-    /// @dev Can only withdraw up to the amount remaining on this contract
+    /// @dev Assets are withdrawn from the reserve or divested from the underlying vault
     /// @param _amountIn Amount of Cap token to burn
     /// @param _minAmountsOut Minimum amounts of assets to withdraw
     /// @param _receiver Receiver of the withdrawal
@@ -123,6 +128,7 @@ contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUp
         returns (uint256[] memory amountsOut)
     {
         amountsOut = getRedeemAmount(_amountIn);
+        divestMany(assets(), amountsOut);
         VaultLogic.redeem(
             VaultStorage.get(),
             DataTypes.RedeemParams({
@@ -145,6 +151,7 @@ contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUp
         external
         checkAccess(this.borrow.selector)
     {
+        divest(_asset, _amount);
         VaultLogic.borrow(
             VaultStorage.get(),
             DataTypes.BorrowParams({
@@ -201,7 +208,7 @@ contract VaultUpgradeable is ERC20PermitUpgradeable, AccessUpgradeable, MinterUp
 
     /// @notice Get the list of assets supported by the vault
     /// @return assetList List of assets
-    function assets() external view returns (address[] memory assetList) {
+    function assets() public view returns (address[] memory assetList) {
         DataTypes.VaultStorage storage $ = VaultStorage.get();
         assetList = $.assets;
     }

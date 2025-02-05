@@ -36,7 +36,7 @@ contract DeployVault is ProxyUtils {
         // deploy and init cap instances
         d.capToken = _proxy(implementations.capToken);
         d.stakedCapToken = _proxy(implementations.stakedCap);
-        CapToken(d.capToken).initialize(name, symbol, infra.accessControl, infra.oracle, assets);
+        CapToken(d.capToken).initialize(name, symbol, infra.accessControl, infra.feeAuction, infra.oracle, assets);
         StakedCap(d.stakedCapToken).initialize(infra.accessControl, d.capToken, 6 hours);
 
         // deploy and init debt tokens

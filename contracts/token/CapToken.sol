@@ -17,16 +17,18 @@ contract CapToken is UUPSUpgradeable, VaultUpgradeable {
     /// @param _name Name of the cap token
     /// @param _symbol Symbol of the cap token
     /// @param _accessControl Access controller
+    /// @param _feeAuction Fee auction address
     /// @param _oracle Oracle address
     /// @param _assets Asset addresses to mint Cap token with
     function initialize(
         string memory _name,
         string memory _symbol,
         address _accessControl,
+        address _feeAuction,
         address _oracle,
         address[] calldata _assets
     ) external initializer {
-        __Vault_init(_name, _symbol, _accessControl, _oracle, _assets);
+        __Vault_init(_name, _symbol, _accessControl, _feeAuction, _oracle, _assets);
     }
 
     /// @dev Only admin can upgrade
