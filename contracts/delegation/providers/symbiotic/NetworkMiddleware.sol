@@ -29,18 +29,30 @@ import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMiddleware {
     using SafeERC20 for IERC20;
 
+    /// @dev Vault registered
     event VaultRegistered(address vault);
+    /// @dev Slash event
     event Slash(address indexed agent, address recipient, uint256 amount);
 
+    /// @dev Invalid slasher
     error InvalidSlasher();
+    /// @dev Invalid delegator
     error InvalidDelegator();
+    /// @dev Not a vault
     error NotVault();
+    /// @dev No slasher
     error NoSlasher();
+    /// @dev No burner
     error NoBurner();
+    /// @dev No staker rewarder
     error NoStakerRewarder();
+    /// @dev Vault not initialized
     error VaultNotInitialized();
+    /// @dev Invalid epoch duration
     error InvalidEpochDuration(uint48 required, uint48 actual);
+    /// @dev Invalid slash duration
     error InvalidSlashDuration();
+    /// @dev No slashable collateral
     error NoSlashableCollateral();
 
     /// @notice Initialize
@@ -116,6 +128,13 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
         if (!slashed) revert NoSlashableCollateral();
     }
 
+    /// @notice Coverage by vault
+    /// @param _agent Agent address
+    /// @param _vault Vault address
+    /// @param _oracle Oracle address
+    /// @param _timestamp Timestamp
+    /// @return collateralValue Collateral value
+    /// @return collateral Collateral amount
     function coverageByVault(address _agent, address _vault, address _oracle, uint48 _timestamp)
         public
         view
@@ -142,6 +161,8 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
         }
     }
 
+    /// @notice Timestamp
+    /// @return stamp Timestamp of the current block minus the slash duration
     function timestamp() public view returns (uint48 stamp) {
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
         /// @dev We need to slash the delegated collateral that is available at timestamp - slash duration time.
