@@ -84,7 +84,7 @@ contract FeeAuction is UUPSUpgradeable, AccessUpgradeable {
         FeeAuctionStorage storage $ = _getFeeAuctionStorage();
         uint256 elapsed = block.timestamp - $.startTimestamp;
         if (elapsed > $.duration) elapsed = $.duration;
-        price = ($.startPrice * (1e27 - elapsed * 1e27)) / ($.duration * 1e27);
+        price = $.startPrice * (1e27 - (elapsed * 1e27 / $.duration)) / 1e27;
     }
 
     /// @notice Buy fees in exchange for the payment token
