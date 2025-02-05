@@ -88,7 +88,7 @@ contract MinterUpgradeable is AccessUpgradeable {
 
     /// @notice Set the redeem fee
     /// @param _redeemFee Redeem fee amount
-    function setRedeemFee(uint256 _redeemFee) external checkAccess(this.setFeeData.selector) {
+    function setRedeemFee(uint256 _redeemFee) external checkAccess(this.setRedeemFee.selector) {
         DataTypes.MinterStorage storage $ = MinterStorage.get();
         $.redeemFee = _redeemFee;
         emit SetRedeemFee(_redeemFee);
