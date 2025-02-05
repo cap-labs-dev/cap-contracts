@@ -39,8 +39,9 @@ contract MinterUpgradeable is AccessUpgradeable {
     /// @param _amountIn Amount of asset to use
     /// @return amountOut Amount minted
     function getMintAmount(address _asset, uint256 _amountIn) public view returns (uint256 amountOut) {
+        DataTypes.MinterStorage storage $ = MinterStorage.get();
         amountOut = MinterLogic.amountOut(
-            MinterStorage.get(),
+            $,
             DataTypes.AmountOutParams({
                 mint: true,
                 asset: _asset,
@@ -54,8 +55,9 @@ contract MinterUpgradeable is AccessUpgradeable {
     /// @param _amountIn Amount of cap token to burn
     /// @return amountOut Amount of the asset withdrawn
     function getBurnAmount(address _asset, uint256 _amountIn) public view returns (uint256 amountOut) {
+        DataTypes.MinterStorage storage $ = MinterStorage.get();
         amountOut = MinterLogic.amountOut(
-            MinterStorage.get(),
+            $,
             DataTypes.AmountOutParams({
                 mint: false,
                 asset: _asset,
@@ -68,8 +70,9 @@ contract MinterUpgradeable is AccessUpgradeable {
     /// @param _amountIn Amount of cap token to burn
     /// @return amountsOut Amounts of assets to be withdrawn
     function getRedeemAmount(uint256 _amountIn) public view returns (uint256[] memory amountsOut) {
+        DataTypes.MinterStorage storage $ = MinterStorage.get();
         amountsOut = MinterLogic.redeemAmountOut(
-            MinterStorage.get(),
+            $,
             DataTypes.RedeemAmountOutParams({amount: _amountIn})
         );
     }
