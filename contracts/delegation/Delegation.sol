@@ -16,6 +16,10 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
     event ModifyAgent(address agent, DataTypes.AgentData agentData);
     event RegisterNetwork(address agent, address network);
 
+    error AgentDoesNotExist();
+    error DuplicateAgent();
+    error DuplicateNetwork();
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -95,15 +99,32 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
     /// @param _liquidator The liquidator who receives the funds
     /// @param _amount The USD value of the delegation needed to cover the debt
     function slash(address _agent, address _liquidator, uint256 _amount) external checkAccess(this.slash.selector) {
-        uint256 agentsDelegation = coverage(_agent);
-
-        uint256 slashShare = _amount * 1e18 / agentsDelegation;
-
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
-        for (uint i; i < $.networks[_agent].length; ++i) {
+        uint256 agentsDelegation = coverage(_agent);
+        
+        // Track actual slashed amount
+        uint256 totalSlashed;
+        
+        // Calculate each network's proportion of total delegation
+        for (uint i; i < $.networks[_agent].length - 1; ++i) {
             address network = $.networks[_agent][i];
-            INetwork(network).slash(_agent, _liquidator, slashShare);
-            emit SlashNetwork(network, slashShare);
+            uint256 networkCoverage = coverageByNetwork(_agent, network);
+            
+            // Calculate this network's share
+            uint256 networkSlash = (_amount * networkCoverage) / agentsDelegation;
+            totalSlashed += networkSlash;
+            
+            INetwork(network).slash(_agent, _liquidator, networkSlash);
+            emit SlashNetwork(network, networkSlash);
+        }
+        
+        // Last network gets the remainder to ensure exact total
+        if ($.networks[_agent].length > 0) {
+            address lastNetwork = $.networks[_agent][$.networks[_agent].length - 1];
+            uint256 finalSlash = _amount - totalSlashed;
+            
+            INetwork(lastNetwork).slash(_agent, _liquidator, finalSlash);
+            emit SlashNetwork(lastNetwork, finalSlash);
         }
     }
 
@@ -115,6 +136,12 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
         checkAccess(this.addAgent.selector)
     {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
+
+        // If the agent already exists, we revert
+        for (uint i; i < $.agents.length; ++i) {
+            if ($.agents[i] == _agent) revert DuplicateAgent();
+        }
+
         $.agents.push(_agent);
         $.agentData[_agent] = _agentData;
         emit AddAgent(_agent, _agentData);
@@ -128,8 +155,16 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
         checkAccess(this.modifyAgent.selector)
     {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
-        $.agentData[_agent] = _agentData;
-        emit ModifyAgent(_agent, _agentData);
+
+        // Check that the agent exists
+        for (uint i; i < $.agents.length; ++i) {
+            if ($.agents[i] == _agent) {
+                $.agentData[_agent] = _agentData;
+                emit ModifyAgent(_agent, _agentData);
+                return;
+            }
+        }
+        revert AgentDoesNotExist();
     }
 
     /// @notice Register a new delagator
@@ -140,6 +175,12 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
         checkAccess(this.registerNetwork.selector)
     {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
+
+        // Check for duplicates
+        for (uint i; i < $.networks[_agent].length; ++i) {
+            if ($.networks[_agent][i] == _network) revert DuplicateNetwork();
+        }
+
         $.networks[_agent].push(_network);
 
         emit RegisterNetwork(_agent, _network);
