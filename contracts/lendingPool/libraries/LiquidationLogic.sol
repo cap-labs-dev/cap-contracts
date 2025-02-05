@@ -8,6 +8,7 @@ import {ValidationLogic} from "./ValidationLogic.sol";
 import {ViewLogic} from "./ViewLogic.sol";
 import {BorrowLogic} from "./BorrowLogic.sol";
 import {DataTypes} from "./types/DataTypes.sol";
+import {Errors} from "./helpers/Errors.sol";
 
 /// @title Liquidation Logic
 /// @author kexley, @capLabs
@@ -24,6 +25,7 @@ library LiquidationLogic {
     /// @param $ Lender storage
     /// @param _agent Agent address
     function initiateLiquidation(DataTypes.LenderStorage storage $, address _agent) external {
+        require(_agent != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
         (,,,, uint256 health) = ViewLogic.agent($, _agent);
 
         ValidationLogic.validateInitiateLiquidation(health, $.liquidationStart[_agent], $.expiry);
@@ -37,6 +39,7 @@ library LiquidationLogic {
     /// @param $ Lender storage
     /// @param _agent Agent address
     function cancelLiquidation(DataTypes.LenderStorage storage $, address _agent) external {
+        require(_agent != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
         (,,,, uint256 health) = ViewLogic.agent($, _agent);
 
         ValidationLogic.validateCancelLiquidation(health);

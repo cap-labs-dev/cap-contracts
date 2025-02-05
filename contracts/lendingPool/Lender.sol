@@ -30,6 +30,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @param _targetHealth Target health after liquidations
     /// @param _grace Grace period before an agent becomes liquidatable
     /// @param _expiry Expiry period after which an agent cannot be liquidated until called again
+    /// @param _bonusCap Bonus cap for liquidations
     function initialize(
         address _accessControl,
         address _delegation,
@@ -40,6 +41,9 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         uint256 _bonusCap
     ) external initializer {
         __Access_init(_accessControl);
+        __UUPSUpgradeable_init();
+
+        require(_delegation != address(0) && _oracle != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
 
         // TODO: remove this
         DataTypes.LenderStorage storage $ = LenderStorage.get();
@@ -76,6 +80,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         external
         returns (uint256 repaid)
     {
+        require(_agent != address(0) && _asset != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
         repaid = BorrowLogic.repay(
             LenderStorage.get(),
             DataTypes.RepayParams({
@@ -119,6 +124,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @param _amount Amount of asset to repay on behalf of the agent
     /// @param liquidatedValue Value of the liquidation returned to the liquidator
     function liquidate(address _agent, address _asset, uint256 _amount) external returns (uint256 liquidatedValue) {
+        require(_agent != address(0) && _asset != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
         liquidatedValue = LiquidationLogic.liquidate(
             LenderStorage.get(),
             DataTypes.RepayParams({
@@ -156,6 +162,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Remove asset from lending when there is no borrows
     /// @param _asset Asset address
     function removeAsset(address _asset) external checkAccess(this.removeAsset.selector) {
+        require(_asset != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
         ReserveLogic.removeAsset(LenderStorage.get(), _asset);
     }
 
@@ -163,6 +170,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @param _asset Asset address
     /// @param _pause True if pausing or false if unpausing
     function pauseAsset(address _asset, bool _pause) external checkAccess(this.pauseAsset.selector) {
+        require(_asset != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
         ReserveLogic.pauseAsset(LenderStorage.get(), _asset, _pause);
     }
 

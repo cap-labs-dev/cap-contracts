@@ -23,6 +23,7 @@ library ValidationLogic {
         DataTypes.BorrowParams memory params
     ) external view {
         require(!$.reservesData[params.asset].paused, Errors.RESERVE_PAUSED);
+        require(params.receiver != address(0) && params.asset != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
 
         (uint256 totalDelegation, uint256 totalDebt,,, uint256 health) = ViewLogic.agent($, params.agent);
 
