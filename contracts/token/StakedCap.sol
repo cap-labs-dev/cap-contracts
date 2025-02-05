@@ -53,11 +53,12 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
         uint256 total = IERC20(asset()).balanceOf(address(this));
         StakedCapStorage.StakedCapStorageStruct storage $ = StakedCapStorage.get();
         if (total > $.storedTotal) {
-            $.totalLocked = lockedProfit() + total - $.storedTotal;
+            uint256 diff = total - $.storedTotal;
+            $.totalLocked = lockedProfit() + diff;
             $.storedTotal = total;
             $.lastNotify = block.timestamp;
 
-            emit Notify(msg.sender, total - $.storedTotal);
+            emit Notify(msg.sender, diff);
         }
     }
 
