@@ -84,7 +84,7 @@ contract FeeAuction is UUPSUpgradeable, AccessUpgradeable {
         FeeAuctionStorage storage $ = _getFeeAuctionStorage();
         uint256 elapsed = block.timestamp - $.startTimestamp;
         if (elapsed > $.duration) elapsed = $.duration;
-        price = $.startPrice * (1e27 - (elapsed * 1e27 / $.duration)) / 1e27;
+        price = ($.startPrice * (1e27 - elapsed * 1e27)) / ($.duration * 1e27);
     }
 
     /// @notice Buy fees in exchange for the payment token
@@ -104,7 +104,7 @@ contract FeeAuction is UUPSUpgradeable, AccessUpgradeable {
 
         uint256[] memory balances = _transferOutAssets(_assets, _receiver);
 
-        IAuctionCallback(msg.sender).auctionCallback(_assets, balances, price, _callback);
+        if (_callback.length > 0) IAuctionCallback(msg.sender).auctionCallback(_assets, balances, price, _callback);
 
         IERC20($.paymentToken).safeTransferFrom(msg.sender, $.paymentRecipient, price);
 
@@ -147,6 +147,7 @@ contract FeeAuction is UUPSUpgradeable, AccessUpgradeable {
         address _receiver
     ) internal returns (uint256[] memory balances) {
         uint256 assetsLength = _assets.length;
+        balances = new uint256[](assetsLength);
         for (uint256 i; i < assetsLength; ++i) {
             address asset = _assets[i];
             balances[i] = IERC20(asset).balanceOf(address(this));
