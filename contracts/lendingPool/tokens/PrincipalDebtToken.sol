@@ -6,12 +6,14 @@ import { ERC20Upgradeable, IERC20 } from "@openzeppelin/contracts-upgradeable/to
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import { AccessUpgradeable } from "../../access/AccessUpgradeable.sol";
-import { Errors } from "../libraries/helpers/Errors.sol";
 
 /// @title Principal debt token for a market on the Lender
 /// @author kexley, @capLabs
 /// @notice Principal debt tokens are minted 1:1 with the principal loan amount
 contract PrincipalDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeable {
+    /// @dev Operation not supported
+    error OperationNotSupported();
+
     /// @custom:storage-location erc7201:cap.storage.PrincipalDebt
     struct PrincipalDebtStorage {
         address asset;
@@ -73,22 +75,22 @@ contract PrincipalDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradea
 
     /// @notice Disabled due to this being a non-transferrable token
     function transfer(address, uint256) public pure override returns (bool) {
-        revert(Errors.OPERATION_NOT_SUPPORTED);
+        revert OperationNotSupported();
     }
 
     /// @notice Disabled due to this being a non-transferrable token
     function allowance(address, address) public pure override returns (uint256) {
-        revert(Errors.OPERATION_NOT_SUPPORTED);
+        revert OperationNotSupported();
     }
 
     /// @notice Disabled due to this being a non-transferrable token
     function approve(address, uint256) public pure override returns (bool) {
-        revert(Errors.OPERATION_NOT_SUPPORTED);
+        revert OperationNotSupported();
     }
 
     /// @notice Disabled due to this being a non-transferrable token
     function transferFrom(address, address, uint256) public pure override returns (bool) {
-        revert(Errors.OPERATION_NOT_SUPPORTED);
+        revert OperationNotSupported();
     }
 
     function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }

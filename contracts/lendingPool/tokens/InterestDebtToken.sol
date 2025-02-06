@@ -7,7 +7,6 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 
 import { IOracle } from "../../interfaces/IOracle.sol";
 import { AccessUpgradeable } from "../../access/AccessUpgradeable.sol";
-import { Errors } from "../libraries/helpers/Errors.sol";
 import { MathUtils } from "../libraries/math/MathUtils.sol";
 import { WadRayMath } from "../libraries/math/WadRayMath.sol";
 
@@ -18,6 +17,9 @@ import { WadRayMath } from "../libraries/math/WadRayMath.sol";
 contract InterestDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeable {
     using MathUtils for uint256;
     using WadRayMath for uint256;
+
+    /// @dev Operation not supported 
+    error OperationNotSupported();
 
     /// @custom:storage-location erc7201:cap.storage.InterestDebt
     struct InterestDebtStorage {
@@ -200,22 +202,22 @@ contract InterestDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
 
     /// @notice Disabled due to this being a non-transferrable token
     function transfer(address, uint256) public pure override returns (bool) {
-        revert(Errors.OPERATION_NOT_SUPPORTED);
+        revert OperationNotSupported();
     }
 
     /// @notice Disabled due to this being a non-transferrable token
     function allowance(address, address) public pure override returns (uint256) {
-        revert(Errors.OPERATION_NOT_SUPPORTED);
+        revert OperationNotSupported();
     }
 
     /// @notice Disabled due to this being a non-transferrable token
     function approve(address, uint256) public pure override returns (bool) {
-        revert(Errors.OPERATION_NOT_SUPPORTED);
+        revert OperationNotSupported();
     }
 
     /// @notice Disabled due to this being a non-transferrable token
     function transferFrom(address, address, uint256) public pure override returns (bool) {
-        revert(Errors.OPERATION_NOT_SUPPORTED);
+        revert OperationNotSupported();
     }
 
     function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }
