@@ -40,6 +40,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         uint256 _bonusCap
     ) external initializer {
         __Access_init(_accessControl);
+        __UUPSUpgradeable_init();
 
         // TODO: remove this
         DataTypes.LenderStorage storage $ = LenderStorage.get();

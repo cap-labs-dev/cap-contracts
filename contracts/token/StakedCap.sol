@@ -38,7 +38,7 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
         __ERC20_init(_name, _symbol);
         __ERC20Permit_init(_name);
         __Access_init(_accessControl);
-
+        __UUPSUpgradeable_init();
         StakedCapStorage.get().lockDuration = _lockDuration;
     }
 

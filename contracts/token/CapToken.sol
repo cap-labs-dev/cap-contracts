@@ -27,6 +27,7 @@ contract CapToken is UUPSUpgradeable, VaultUpgradeable {
         address[] calldata _assets
     ) external initializer {
         __Vault_init(_name, _symbol, _accessControl, _oracle, _assets);
+        __UUPSUpgradeable_init();
     }
 
     /// @dev Only admin can upgrade

@@ -67,6 +67,7 @@ contract FeeAuction is UUPSUpgradeable, AccessUpgradeable {
         uint256 _minStartPrice
     ) external initializer {
         __Access_init(_accessControl);
+        __UUPSUpgradeable_init();
 
         FeeAuctionStorage storage $ = _getFeeAuctionStorage();
         $.paymentToken = _paymentToken;
