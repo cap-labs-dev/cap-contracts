@@ -82,7 +82,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         external
         returns (uint256 repaid)
     {
-        require(_agent != address(0) && _asset != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
+        if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();
         repaid = BorrowLogic.repay(
             LenderStorage.get(),
             DataTypes.RepayParams({
@@ -126,7 +126,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @param _amount Amount of asset to repay on behalf of the agent
     /// @param liquidatedValue Value of the liquidation returned to the liquidator
     function liquidate(address _agent, address _asset, uint256 _amount) external returns (uint256 liquidatedValue) {
-        require(_agent != address(0) && _asset != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
+        if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();
         liquidatedValue = LiquidationLogic.liquidate(
             LenderStorage.get(),
             DataTypes.RepayParams({
@@ -164,7 +164,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Remove asset from lending when there is no borrows
     /// @param _asset Asset address
     function removeAsset(address _asset) external checkAccess(this.removeAsset.selector) {
-        require(_asset != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
+        if (_asset == address(0)) revert ZeroAddressNotValid();
         ReserveLogic.removeAsset(LenderStorage.get(), _asset);
     }
 
@@ -172,7 +172,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @param _asset Asset address
     /// @param _pause True if pausing or false if unpausing
     function pauseAsset(address _asset, bool _pause) external checkAccess(this.pauseAsset.selector) {
-        require(_asset != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
+        if (_asset == address(0)) revert ZeroAddressNotValid();
         ReserveLogic.pauseAsset(LenderStorage.get(), _asset, _pause);
     }
 
