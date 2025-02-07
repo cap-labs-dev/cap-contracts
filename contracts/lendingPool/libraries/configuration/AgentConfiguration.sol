@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { Errors } from '../helpers/Errors.sol';
 import { DataTypes } from '../types/DataTypes.sol';
 
 /// @title AgentConfiguration library
 /// @author kexley
 /// @notice Implements the bitmap logic to handle the agent configuration
 library AgentConfiguration {
+    /// @dev Invalid reserve index
+    error InvalidReserveIndex();
 
     /// @notice Sets if the user is borrowing the reserve identified by reserveIndex
     /// @param self The configuration object
@@ -19,7 +20,7 @@ library AgentConfiguration {
         bool borrowing
     ) internal {
         unchecked {
-            require(reserveIndex < 256, Errors.INVALID_RESERVE_INDEX);
+            if (reserveIndex >= 256) revert InvalidReserveIndex();
             uint256 bit = 1 << (reserveIndex << 1);
             if (borrowing) {
                 self.data |= bit;
@@ -38,7 +39,7 @@ library AgentConfiguration {
         uint256 reserveIndex
     ) internal pure returns (bool) {
         unchecked {
-            require(reserveIndex < 256, Errors.INVALID_RESERVE_INDEX);
+            if (reserveIndex >= 256) revert InvalidReserveIndex();
             return (self.data >> (reserveIndex << 1)) & 1 != 0;
         }
     }
