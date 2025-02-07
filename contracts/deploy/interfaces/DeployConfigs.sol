@@ -23,6 +23,7 @@ struct ImplementationsConfig {
 struct InfraConfig {
     address oracle;
     address accessControl;
+    address feeAuction;
     address lender;
     address delegation;
 }

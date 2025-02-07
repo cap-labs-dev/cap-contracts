@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { MinterUpgradeable } from "../MinterUpgradeable.sol";
 import { VaultStorage } from "./VaultStorage.sol";
 import { DataTypes } from "./types/DataTypes.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
