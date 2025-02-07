@@ -13,6 +13,9 @@ import {DataTypes} from "./types/DataTypes.sol";
 /// @author kexley, @capLabs
 /// @notice Liquidate an agent that has an unhealthy ltv by slashing their delegation backing
 library LiquidationLogic {
+    /// @dev Zero address not valid
+    error ZeroAddressNotValid();    
+    
     /// @notice A liquidation has been initiated against an agent
     event InitiateLiquidation(address agent);
     /// @notice A liquidation has been cancelled
@@ -24,6 +27,7 @@ library LiquidationLogic {
     /// @param $ Lender storage
     /// @param _agent Agent address
     function initiateLiquidation(DataTypes.LenderStorage storage $, address _agent) external {
+        if (_agent == address(0)) revert ZeroAddressNotValid();
         (,,,, uint256 health) = ViewLogic.agent($, _agent);
 
         ValidationLogic.validateInitiateLiquidation(health, $.liquidationStart[_agent], $.expiry);
@@ -37,6 +41,7 @@ library LiquidationLogic {
     /// @param $ Lender storage
     /// @param _agent Agent address
     function cancelLiquidation(DataTypes.LenderStorage storage $, address _agent) external {
+        if (_agent == address(0)) revert ZeroAddressNotValid();
         (,,,, uint256 health) = ViewLogic.agent($, _agent);
 
         ValidationLogic.validateCancelLiquidation(health);

@@ -54,6 +54,7 @@ library ValidationLogic {
         DataTypes.LenderStorage storage $,
         DataTypes.BorrowParams memory params
     ) external view {
+        if (params.receiver == address(0) || params.asset == address(0)) revert ZeroAddressNotValid();
         if ($.reservesData[params.asset].paused) revert ReservePaused();
 
         (uint256 totalDelegation, uint256 totalDebt,,, uint256 health) = ViewLogic.agent($, params.agent);
