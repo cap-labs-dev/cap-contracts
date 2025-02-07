@@ -14,10 +14,13 @@ interface IOracle {
     function setPriceBackupOracleData(address asset, OracleData calldata oracleData) external;
 
     function marketRate(address asset) external returns (uint256 rate);
+    function utilizationRate(address asset) external returns (uint256 rate);
     function benchmarkRate(address asset) external view returns (uint256 rate);
     function restakerRate(address agent) external view returns (uint256 rate);
-    function rateOracleData(address asset) external view returns (OracleData memory data);
-    function setRateOracleData(address asset, OracleData calldata oracleData) external;
+    function marketOracleData(address asset) external view returns (OracleData memory data);
+    function utilizationOracleData(address asset) external view returns (OracleData memory data);
+    function setMarketOracleData(address asset, OracleData calldata oracleData) external;
+    function setUtilizationOracleData(address asset, OracleData calldata oracleData) external;
     function setBenchmarkRate(address asset, uint256 rate) external;
     function setRestakerRate(address agent, uint256 rate) external;
 }

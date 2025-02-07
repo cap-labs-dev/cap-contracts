@@ -73,15 +73,7 @@ contract RestakerDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
     /// @dev Left permissionless
     /// @param _agent Agent address to update interest rate for
     function update(address _agent) external {
-        _accrueInterest(_agent);
-
-        RestakerDebtStorage storage $ = _getRestakerDebtStorage();
-        uint256 rate = IOracle($.oracle).restakerRate(_agent);
-        uint256 oldInterestPerSecond = $.interestPerSecond[_agent];
-        uint256 newInterestPerSecond = IERC20($.debtToken).balanceOf(_agent).rayMul(rate);
-
-        $.interestPerSecond[_agent] = newInterestPerSecond;
-        $.totalInterestPerSecond = $.totalInterestPerSecond + newInterestPerSecond - oldInterestPerSecond;
+        _update(_agent);
     }
 
     /// @notice Burn the debt token, only callable by the lender
@@ -94,7 +86,7 @@ contract RestakerDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
         checkAccess(this.burn.selector)
         returns (uint256 actualRepaid)
     {
-        _accrueInterest(_agent);
+        _update(_agent);
 
         uint256 agentBalance = super.balanceOf(_agent);
 
@@ -143,6 +135,20 @@ contract RestakerDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
         RestakerDebtStorage storage $ = _getRestakerDebtStorage();
         uint256 totalDebt = IERC20($.debtToken).totalSupply();
         rate = totalDebt > 0 ? $.totalInterestPerSecond.rayDiv(totalDebt) : 0;
+    }
+
+    /// @dev Update the interest per second of the agent and the scaled total supply
+    /// @param _agent Agent address to update interest rate for
+    function _update(address _agent) internal {
+        _accrueInterest(_agent);
+
+        RestakerDebtStorage storage $ = _getRestakerDebtStorage();
+        uint256 rate = IOracle($.oracle).restakerRate(_agent);
+        uint256 oldInterestPerSecond = $.interestPerSecond[_agent];
+        uint256 newInterestPerSecond = IERC20($.debtToken).balanceOf(_agent).rayMul(rate);
+
+        $.interestPerSecond[_agent] = newInterestPerSecond;
+        $.totalInterestPerSecond = $.totalInterestPerSecond + newInterestPerSecond - oldInterestPerSecond;
     }
 
     /// @notice Accrue interest for a specific agent and the total supply

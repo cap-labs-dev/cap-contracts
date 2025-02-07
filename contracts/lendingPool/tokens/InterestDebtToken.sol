@@ -161,8 +161,10 @@ contract InterestDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
         address oracle = $.oracle;
         uint256 marketRate = IOracle(oracle).marketRate($.asset);
         uint256 benchmarkRate = IOracle(oracle).benchmarkRate($.asset);
+        uint256 utilizationRate = IOracle(oracle).utilizationRate($.asset);
 
         rate = marketRate > benchmarkRate ? marketRate : benchmarkRate;
+        rate += utilizationRate;
     }
 
     /// @notice Accrue interest for a specific agent and the total supply
