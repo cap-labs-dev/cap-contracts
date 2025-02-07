@@ -13,6 +13,9 @@ import {DataTypes} from "./types/DataTypes.sol";
 /// @author kexley, @capLabs
 /// @notice Liquidate an agent that has an unhealthy ltv by slashing their delegation backing
 library LiquidationLogic {
+    /// @dev Zero address not valid
+    error ZeroAddressNotValid();    
+    
     /// @notice A liquidation has been initiated against an agent
     event InitiateLiquidation(address agent);
     /// @notice A liquidation has been cancelled
