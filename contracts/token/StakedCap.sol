@@ -3,12 +3,15 @@ pragma solidity ^0.8.28;
 
 import { StakedCapStorage } from "./storage/StakedCapStorage.sol";
 
+import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { ERC20PermitUpgradeable } from
     "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
-import { ERC4626Upgradeable, ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import { IERC20Metadata, IERC20 } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
+import {
+    ERC20Upgradeable,
+    ERC4626Upgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import { IERC20, IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /// @title Staked Cap Token
 /// @author kexley, @capLabs
@@ -20,6 +23,8 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
     constructor() {
         _disableInitializers();
     }
+
+    event Notify(address indexed caller, uint256 amount);
 
     /// @notice Initialize the staked cap token by matching the name and symbol of the underlying
     /// @param _accessControl Address of the access control
@@ -33,7 +38,7 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
         __ERC20_init(_name, _symbol);
         __ERC20Permit_init(_name);
         __Access_init(_accessControl);
-
+        __UUPSUpgradeable_init();
         StakedCapStorage.get().lockDuration = _lockDuration;
     }
 
@@ -48,9 +53,12 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
         uint256 total = IERC20(asset()).balanceOf(address(this));
         StakedCapStorage.StakedCapStorageStruct storage $ = StakedCapStorage.get();
         if (total > $.storedTotal) {
-            $.totalLocked = lockedProfit() + total - $.storedTotal;
+            uint256 diff = total - $.storedTotal;
+            $.totalLocked = lockedProfit() + diff;
             $.storedTotal = total;
             $.lastNotify = block.timestamp;
+
+            emit Notify(msg.sender, diff);
         }
     }
 
@@ -76,7 +84,7 @@ contract StakedCap is UUPSUpgradeable, ERC4626Upgradeable, ERC20PermitUpgradeabl
     /// @param _assets Amount of cap tokens to pull from the caller
     /// @param _shares Amount of staked cap tokens to send to receiver
     function _deposit(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal override {
-        super._deposit( _caller, _receiver, _assets, _shares);
+        super._deposit(_caller, _receiver, _assets, _shares);
         StakedCapStorage.get().storedTotal += _assets;
     }
 

@@ -48,8 +48,7 @@ contract DeployInfra is ProxyUtils {
         address asset,
         uint48 maxCampaignLength
     ) internal returns (PreMainnetInfraConfig memory d) {
-        d.preMainnetVault = address(new PreMainnetVault(address(srcAddressbook.endpointV2)));
-        PreMainnetVault(d.preMainnetVault).initialize(asset, dstAddressbook.eid, maxCampaignLength);
+        d.preMainnetVault = address(new PreMainnetVault(asset, address(srcAddressbook.endpointV2), dstAddressbook.eid, maxCampaignLength));
     }
 
     function _deployL2InfraForVault(

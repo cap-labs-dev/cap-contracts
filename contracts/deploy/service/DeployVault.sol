@@ -114,7 +114,7 @@ contract DeployVault is ProxyUtils {
                     interestDebtToken: d.interestDebtTokens[i],
                     interestReceiver: users.interest_receiver,
                     decimals: 18,
-                    bonusCap: 1e18
+                    bonusCap: 1e26 /// 10%
                 })
             );
             Lender(infra.lender).pauseAsset(d.assets[i], false);

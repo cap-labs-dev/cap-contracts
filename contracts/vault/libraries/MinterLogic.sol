@@ -74,7 +74,7 @@ library MinterLogic {
         if (params.mint) {
             assetValue = params.amount * assetPrice / assetDecimalsPow;
             if (capSupply == 0) {
-                newRatio = 1e18;
+                newRatio = 1e27;
                 amount = params.amount * capDecimalsPow / assetDecimalsPow;
             } else {
                 newRatio = (allocationValue + assetValue) * 1e27 / (capValue + assetValue);
@@ -83,7 +83,7 @@ library MinterLogic {
         } else {
             assetValue = params.amount * capPrice / capDecimalsPow;
             if (params.amount == capSupply) {
-                newRatio = 1e18;
+                newRatio = 1e27;
                 amount = params.amount * assetDecimalsPow / capDecimalsPow;
             } else {
                 newRatio = (allocationValue - assetValue) * 1e27 / (capValue - assetValue);
@@ -107,7 +107,7 @@ library MinterLogic {
             if (params.ratio > fees.optimalRatio) {
                 if (params.ratio > fees.mintKinkRatio) {
                     uint256 excessRatio = params.ratio - fees.mintKinkRatio;
-                    rate = fees.slope0 + (fees.slope1 * excessRatio);
+                    rate = fees.slope0 + (fees.slope1 * excessRatio / 1e27);
                 } else {
                     rate = fees.slope0 * params.ratio / fees.mintKinkRatio;
                 }
@@ -116,7 +116,7 @@ library MinterLogic {
             if (params.ratio < fees.optimalRatio) {
                 if (params.ratio < fees.burnKinkRatio) {
                     uint256 excessRatio = fees.burnKinkRatio - params.ratio;
-                    rate = fees.slope0 + (fees.slope1 * excessRatio);
+                    rate = fees.slope0 + (fees.slope1 * excessRatio / 1e27);
                 } else {
                     rate = fees.slope0 * fees.burnKinkRatio / params.ratio;
                 }

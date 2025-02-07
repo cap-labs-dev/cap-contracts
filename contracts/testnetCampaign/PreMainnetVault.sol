@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { DataTypes } from "./libraries/DataTypes.sol";
-import { PreMainnetVaultStorage } from "./libraries/PreMainnetVaultStorage.sol";
-import { OAppMessenger } from "./OAppMessenger.sol";
-
-import { ERC20PermitUpgradeable } from
-    "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
+import { ERC20, ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+
+import { OAppMessenger } from "./OAppMessenger.sol";
 
 /// @title PreMainnetVault
 /// @author @capLabs
@@ -16,8 +14,17 @@ import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/Saf
 /// @dev Underlying asset is deposited on this contract and LayerZero is used to bridge across a
 /// minting message to the testnet. The campaign has a maximum timestamp after which transfers are 
 /// enabled to prevent the owner from unduly locking assets.
-contract PreMainnetVault is ERC20PermitUpgradeable, OAppMessenger {
-    using SafeERC20 for IERC20;
+contract PreMainnetVault is ERC20Permit, OAppMessenger {
+    using SafeERC20 for IERC20Metadata;
+
+    /// @notice Underlying asset
+    IERC20Metadata public asset;
+
+    /// @notice Maximum end timestamp for the campaign after which transfers are enabled
+    uint256 public maxCampaignEnd;
+
+    /// @dev Bool for if the transfers are unlocked before the campaign ends
+    bool private unlocked;
 
     /// @dev Zero amounts are not allowed for minting
     error ZeroAmount();
@@ -34,27 +41,24 @@ contract PreMainnetVault is ERC20PermitUpgradeable, OAppMessenger {
     /// @dev Transfers enabled
     event TransferEnabled();
 
-    /// @dev OAppCore sets the endpoint as an immutable variable
-    /// @param _lzEndpoint Local layerzero endpoint
-    constructor(address _lzEndpoint) OAppMessenger(_lzEndpoint) {}
-
-    /// @notice Initialize
+    /// @dev Initialize the token with the underlying asset and bridge info
     /// @param _asset Underlying asset
+    /// @param _lzEndpoint Local layerzero endpoint
     /// @param _dstEid Destination lz EID
     /// @param _maxCampaignLength Max campaign length in seconds
-    function initialize(address _asset, uint32 _dstEid, uint256 _maxCampaignLength) external initializer {
-        string memory _name = string.concat(string.concat("Pre-Mainnet Vault ", IERC20Metadata(_asset).name()));
-        string memory _symbol = string.concat("pm", IERC20Metadata(_asset).symbol());
-        uint8 assetDecimals = IERC20Metadata(_asset).decimals();
-        
-        __ERC20_init(_name, _symbol);
-        __ERC20Permit_init(_name);
-        __OAppMessenger_init(msg.sender, _dstEid, assetDecimals);
-
-        DataTypes.PreMainnetVaultStorage storage $ = PreMainnetVaultStorage.get();
-        $.asset = IERC20(_asset);
-        $.maxCampaignEnd = block.timestamp + _maxCampaignLength;
-        $.decimals = assetDecimals;
+    constructor(
+        address _asset,
+        address _lzEndpoint,
+        uint32 _dstEid,
+        uint256 _maxCampaignLength
+    )
+        ERC20("Boosted cUSD", "bcUSD")
+        ERC20Permit("Boosted cUSD")
+        OAppMessenger(_lzEndpoint, _dstEid, IERC20Metadata(_asset).decimals())
+        Ownable(msg.sender)
+    {
+        asset = IERC20Metadata(_asset);
+        maxCampaignEnd = block.timestamp + _maxCampaignLength;
     }
 
     /// @notice Deposit underlying asset to mint cUSD on MegaETH Testnet
@@ -63,7 +67,7 @@ contract PreMainnetVault is ERC20PermitUpgradeable, OAppMessenger {
     function deposit(uint256 _amount, address _destReceiver) external payable {
         if (_amount == 0) revert ZeroAmount();
 
-        PreMainnetVaultStorage.get().asset.safeTransferFrom(msg.sender, address(this), _amount);
+        asset.safeTransferFrom(msg.sender, address(this), _amount);
 
         _mint(msg.sender, _amount);
 
@@ -78,7 +82,7 @@ contract PreMainnetVault is ERC20PermitUpgradeable, OAppMessenger {
     function withdraw(uint256 _amount, address _receiver) external {
         _burn(msg.sender, _amount);
 
-        PreMainnetVaultStorage.get().asset.safeTransfer(_receiver, _amount);
+        asset.safeTransfer(_receiver, _amount);
 
         emit Withdraw(msg.sender, _amount);
     }
@@ -86,19 +90,18 @@ contract PreMainnetVault is ERC20PermitUpgradeable, OAppMessenger {
     /// @notice Override decimals to return decimals of underlying asset
     /// @return decimals Asset decimals
     function decimals() public view override returns (uint8) {
-        return PreMainnetVaultStorage.get().decimals;
+        return asset.decimals();
     }
 
     /// @notice Transfers enabled
     /// @return enabled Bool for whether transfers are enabled
     function transferEnabled() public view returns (bool enabled) {
-        DataTypes.PreMainnetVaultStorage storage $ = PreMainnetVaultStorage.get();
-        enabled = $.allowTransferBeforeCampaignEnd || block.timestamp > $.maxCampaignEnd;
+        enabled = unlocked || block.timestamp > maxCampaignEnd;
     }
 
-    /// @notice Enable transfers after campaign ends
+    /// @notice Enable transfers before campaign ends
     function enableTransfer() external onlyOwner {
-        PreMainnetVaultStorage.get().allowTransferBeforeCampaignEnd = true;
+        unlocked = true;
         emit TransferEnabled();
     }
 

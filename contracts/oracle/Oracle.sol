@@ -20,6 +20,7 @@ contract Oracle is UUPSUpgradeable, AccessUpgradeable, PriceOracle, RateOracle {
     /// @param _accessControl Access control
     function initialize(address _accessControl) external initializer {
         __Access_init(_accessControl);
+        __UUPSUpgradeable_init();
         __PriceOracle_init_unchained();
         __RateOracle_init_unchained();
     }

@@ -75,7 +75,7 @@ library BorrowLogic {
 
         /// Maturity order of repayment is principal, restaker, then interest
         if (params.amount > principalDebt) {
-            principalRepaid = params.amount - principalDebt;
+            principalRepaid = principalDebt;
             restakerRepaid =
                 restakerDebt < params.amount - principalRepaid ? restakerDebt : params.amount - principalRepaid;
             interestRepaid = interestDebt < params.amount - principalRepaid - restakerRepaid

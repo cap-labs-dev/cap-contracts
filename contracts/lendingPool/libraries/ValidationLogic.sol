@@ -30,7 +30,8 @@ library ValidationLogic {
 
         uint256 ltv = INetwork($.delegation).ltv(params.agent);
         uint256 assetPrice = IOracle($.oracle).getPrice(params.asset);
-        uint256 newTotalDebt = ( params.amount * assetPrice / $.reservesData[params.asset].decimals ) + totalDebt;
+        uint256 newTotalDebt = totalDebt + 
+            ( params.amount * assetPrice / (10 ** $.reservesData[params.asset].decimals) );
         uint256 borrowCapacity = totalDelegation * ltv;
         
         require(newTotalDebt <= borrowCapacity, Errors.COLLATERAL_CANNOT_COVER_NEW_BORROW);
