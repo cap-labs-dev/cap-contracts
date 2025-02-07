@@ -5,13 +5,15 @@ import { IDebtToken } from "../../interfaces/IDebtToken.sol";
 import { IPrincipalDebtToken } from "../../interfaces/IPrincipalDebtToken.sol";
 
 import { ValidationLogic } from "./ValidationLogic.sol";
-import { Errors } from "./helpers/Errors.sol";
 import { DataTypes } from "./types/DataTypes.sol";
 
 /// @title Reserve Logic
 /// @author kexley, @capLabs
 /// @notice Add, remove or pause reserves on the Lender
 library ReserveLogic {
+    /// @dev No more reserves allowed
+    error NoMoreReservesAllowed();
+
     /// @notice Add asset to the lender
     /// @param $ Lender storage
     /// @param params Parameters for adding an asset
@@ -35,7 +37,7 @@ library ReserveLogic {
         }
 
         if (!filled) {
-            require($.reservesCount + 1 < 256, Errors.NO_MORE_RESERVES_ALLOWED);
+            if ($.reservesCount + 1 >= 256) revert NoMoreReservesAllowed();
             id = $.reservesCount;
             $.reservesList[$.reservesCount] = params.asset;
         }

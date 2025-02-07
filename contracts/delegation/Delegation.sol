@@ -30,6 +30,7 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
     /// @param _oracle Oracle address
     function initialize(address _accessControl, address _oracle) external initializer {
         __Access_init(_accessControl);
+        __UUPSUpgradeable_init();
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
         $.oracle = _oracle;
     }

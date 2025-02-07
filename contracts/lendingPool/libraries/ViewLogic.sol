@@ -43,7 +43,7 @@ library ViewLogic {
                 IERC20($.reservesData[asset].principalDebtToken).balanceOf(_agent)
                 + IERC20($.reservesData[asset].interestDebtToken).balanceOf(_agent)
                 + IERC20($.reservesData[asset].restakerDebtToken).balanceOf(_agent)
-            ) * IOracle($.oracle).getPrice(asset) / $.reservesData[asset].decimals;
+            ) * IOracle($.oracle).getPrice(asset) / (10 ** $.reservesData[asset].decimals);
         }
 
         ltv = totalDebt / totalDelegation;

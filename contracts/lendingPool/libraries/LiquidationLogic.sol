@@ -71,7 +71,7 @@ library LiquidationLogic {
 
         uint256 assetPrice = IOracle($.oracle).getPrice(params.asset);
         uint256 maxLiquidation = (($.targetHealth * totalDebt) - (totalDelegation * liquidationThreshold)) 
-            * $.reservesData[params.asset].decimals
+            * (10 ** $.reservesData[params.asset].decimals)
             / (($.targetHealth - liquidationThreshold) * assetPrice);
         uint256 liquidated = params.amount > maxLiquidation ? maxLiquidation : params.amount;
 
@@ -90,7 +90,7 @@ library LiquidationLogic {
         if (elapsed > duration) elapsed = duration;
         uint256 bonus = liquidated * $.bonusCap * elapsed / (duration * 1e27);
 
-        liquidatedValue = (liquidated + bonus) * assetPrice / $.reservesData[params.asset].decimals;
+        liquidatedValue = (liquidated + bonus) * assetPrice / (10 ** $.reservesData[params.asset].decimals);
         if (totalDelegation < liquidatedValue) liquidatedValue = totalDelegation;
 
         INetwork($.delegation).slash(params.agent, params.caller, liquidatedValue);

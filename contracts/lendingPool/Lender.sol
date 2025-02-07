@@ -8,7 +8,6 @@ import { BorrowLogic } from "./libraries/BorrowLogic.sol";
 import { LiquidationLogic } from "./libraries/LiquidationLogic.sol";
 import { ReserveLogic } from "./libraries/ReserveLogic.sol";
 import { ViewLogic } from "./libraries/ViewLogic.sol";
-import { Errors } from "./libraries/helpers/Errors.sol";
 import { DataTypes } from "./libraries/types/DataTypes.sol";
 import { LenderStorage } from "./libraries/LenderStorage.sol";
 
@@ -18,6 +17,9 @@ import { LenderStorage } from "./libraries/LenderStorage.sol";
 /// @dev Borrow interest rates are calculated from the underlying utilization rates of the assets
 /// in the vaults.
 contract Lender is UUPSUpgradeable, AccessUpgradeable {
+    /// @dev Zero address not valid
+    error ZeroAddressNotValid();
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -43,7 +45,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         __Access_init(_accessControl);
         __UUPSUpgradeable_init();
 
-        require(_delegation != address(0) && _oracle != address(0), Errors.ZERO_ADDRESS_NOT_VALID);
+        if (_delegation == address(0) || _oracle == address(0)) revert ZeroAddressNotValid();
 
         // TODO: remove this
         DataTypes.LenderStorage storage $ = LenderStorage.get();

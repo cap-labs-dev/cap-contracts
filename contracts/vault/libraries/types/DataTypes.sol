@@ -19,6 +19,14 @@ library DataTypes {
         mapping(address => FeeData) fees;
     }
 
+    /// @custom:storage-location erc7201:cap.storage.FractionalReserve
+    struct FractionalReserveStorage {
+        address feeAuction;
+        mapping(address => uint256) loaned;
+        mapping(address => uint256) reserve;
+        mapping(address => address) vault;
+    }
+
     struct MintBurnParams {
         address asset;
         uint256 amountIn;

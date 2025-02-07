@@ -12,6 +12,7 @@ contract AccessControl is UUPSUpgradeable, AccessControlEnumerableUpgradeable {
     /// @notice Initialize the default admin
     /// @param _admin Default admin address
     function initialize(address _admin) external initializer {
+        __UUPSUpgradeable_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(role(this.grantAccess.selector, address(this)), _admin);
     }
