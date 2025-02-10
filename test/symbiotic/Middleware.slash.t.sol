@@ -40,9 +40,7 @@ contract MiddlewareTest is TestDeployer {
         assertEq(middleware.coverage(agent), 2000e8);
 
         // slash 10% of agent collateral
-        NetworkMiddleware.SymbioticSlashHint memory slashHint =
-            NetworkMiddleware.SymbioticSlashHint({ slashTimestamp: uint48(block.timestamp - 1) });
-        middleware.slash(agent, recipient, 0.1e18, abi.encode(slashHint));
+        middleware.slash(agent, recipient, 0.1e18);
 
         // all vaults have been slashed 10% and sent to the recipient
         assertEq(IERC20(usdt).balanceOf(recipient), 100e6);
@@ -77,9 +75,7 @@ contract MiddlewareTest is TestDeployer {
             assertEq(middleware.coverage(agent), 0);
 
             // we request a slash for a timestamp where there is a stake to be slashed
-            NetworkMiddleware.SymbioticSlashHint memory slashHint =
-                NetworkMiddleware.SymbioticSlashHint({ slashTimestamp: uint48(block.timestamp - 10) });
-            middleware.slash(agent, recipient, 0.1e18, abi.encode(slashHint));
+            middleware.slash(agent, recipient, 0.1e18);
 
             // slash should not have worked
             assertEq(IERC20(usdt).balanceOf(recipient), 0);
@@ -141,4 +137,54 @@ contract MiddlewareTest is TestDeployer {
         // current coverage must reflect that change
         assertEq(middleware.coverage(agent), 1000e8);
     }
+
+    function test_can_slash_immediately_after_delegation() public {
+        address agent = env.testUsers.agents[0];
+
+        // reset the initial stakes for this test
+        {
+            vm.startPrank(env.symbiotic.users.vault_admin);
+
+            _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 0);
+            _symbioticVaultDelegateToAgent(symbioticUsdxVault, env.symbiotic.networkAdapter, agent, 0);
+            _timeTravel(symbioticUsdtVault.vaultEpochDuration + 1 days);
+
+            vm.stopPrank();
+        }
+
+        assertEq(middleware.coverage(agent), 0);
+
+        // delegate to the agent
+        {
+            vm.startPrank(env.symbiotic.users.vault_admin);
+
+            _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 1000e6);
+            _symbioticVaultDelegateToAgent(symbioticUsdxVault, env.symbiotic.networkAdapter, agent, 1000e18);
+
+            vm.stopPrank();
+        }
+
+        // collateral is now active
+        _timeTravel(1);
+        assertEq(middleware.coverage(agent), 2000e8);
+
+        // we should be able to slash immediately after delegation
+        {
+            vm.startPrank(env.users.middleware_admin);
+
+            address recipient = makeAddr("recipient");
+
+            middleware.slash(agent, recipient, 0.1e18);
+
+            // all vaults have been slashed 10% and sent to the recipient
+            assertEq(IERC20(usdt).balanceOf(recipient), 100e6);
+            assertEq(IERC20(usdx).balanceOf(recipient), 100e18);
+
+            vm.stopPrank();
+        }
+    }
+
+    // ensure we can't slash if the vault epoch has ended
+    // are funds active immediately after delegation?
+    // can someone undelegate right before the epoch ends so that we don't have many blocks to react?
 }

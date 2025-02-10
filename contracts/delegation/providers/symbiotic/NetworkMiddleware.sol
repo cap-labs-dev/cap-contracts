@@ -34,10 +34,6 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     /// @dev Slash event
     event Slash(address indexed agent, address recipient, uint256 amount);
 
-    struct SymbioticSlashHint {
-        uint48 slashTimestamp;
-    }
-
     /// @dev Invalid slasher
     error InvalidSlasher();
     /// @dev Invalid delegator
@@ -107,13 +103,8 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     /// @param _agent Agent address
     /// @param _recipient Recipient of the slashed assets
     /// @param _slashShare Percentage of delegation to slash encoded with 18 decimals
-    /// @param _slashHints Slash hint specific to symbiotic
-    function slash(address _agent, address _recipient, uint256 _slashShare, bytes memory _slashHints)
-        external
-        checkAccess(this.slash.selector)
-    {
+    function slash(address _agent, address _recipient, uint256 _slashShare) external checkAccess(this.slash.selector) {
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
-        SymbioticSlashHint memory slashHint = abi.decode(_slashHints, (SymbioticSlashHint));
 
         uint48 _timestamp = uint48(block.timestamp);
 
@@ -123,8 +114,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
             if (delegatedCollateral == 0) continue;
 
             uint256 slashShareOfCollateral = delegatedCollateral * _slashShare / 1e18;
-            uint48 slashTimestamp = slashHint.slashTimestamp;
-            if (slashTimestamp == 0) slashTimestamp = _timestamp - IVault(vault).epochDuration();
+            uint48 slashTimestamp = _timestamp - 1;
 
             ISlasher(vault.slasher()).slash(
                 subnetwork(_agent), _agent, slashShareOfCollateral, slashTimestamp, new bytes(0)
