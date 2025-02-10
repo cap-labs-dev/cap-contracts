@@ -29,13 +29,13 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Initialize the contract
     /// @param _accessControl Access control address
     /// @param _oracle Oracle address
-    /// @param _epochLength Epoch length in seconds
-    function initialize(address _accessControl, address _oracle, uint256 _epochLength) external initializer {
+    /// @param _epochDuration Epoch duration in seconds
+    function initialize(address _accessControl, address _oracle, uint256 _epochDuration) external initializer {
         __Access_init(_accessControl);
         __UUPSUpgradeable_init();
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
         $.oracle = _oracle;
-        $.epochLength = _epochLength;
+        $.epochDuration = _epochDuration;
     }
 
     /// @notice How much global delegation we have in the system
@@ -51,14 +51,14 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
     /// @return duration Epoch duration in seconds
     function epochDuration() external view returns (uint256 duration) {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
-        duration = $.epochLength;
+        duration = $.epochDuration;
     }
 
     /// @notice Get the current epoch
     /// @return currentEpoch Current epoch
-    function epoch() external view returns (uint256 currentEpoch) {
+    function epoch() public view returns (uint256 currentEpoch) {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
-        currentEpoch = block.timestamp / $.epochLength;
+        currentEpoch = block.timestamp / $.epochDuration;
     }
 
     /// @notice How much delegation and agent has available to back their borrows
@@ -124,7 +124,7 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
         uint256 totalSlashed;
 
         // Get the timestamp that is most recent between the last borrow and the epoch -1 
-        uint256 slashTimestamp = Math.max((block.timestamp / $.epochLength - 1) * $.epochLength, $.agentData[_agent].lastBorrow);
+        uint256 slashTimestamp = Math.max((epoch() - 1) * $.epochDuration, $.agentData[_agent].lastBorrow);
         
         // Calculate each network's proportion of total delegation
         for (uint i; i < $.networks[_agent].length - 1; ++i) {

@@ -8,7 +8,7 @@ library DataTypes {
         mapping(address => AgentData) agentData;
         mapping(address => address[]) networks;
         address oracle;
-        uint256 epochLength;
+        uint256 epochDuration;
     }
 
     struct AgentData {
