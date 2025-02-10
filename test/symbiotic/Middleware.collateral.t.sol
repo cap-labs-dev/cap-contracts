@@ -30,7 +30,6 @@ contract MiddlewareTest is TestDeployer {
         }
     }
 
-
     function test_slash_sends_funds_to_middleware() public {
         vm.startPrank(env.users.middleware_admin);
 
@@ -41,9 +40,7 @@ contract MiddlewareTest is TestDeployer {
         assertEq(middleware.coverage(agent), 2000e8);
 
         // slash 10% of agent collateral
-        NetworkMiddleware.SymbioticSlashHint memory slashHint =
-            NetworkMiddleware.SymbioticSlashHint({ slashTimestamp: uint48(block.timestamp - 1) });
-        middleware.slash(agent, recipient, 0.1e18, abi.encode(slashHint));
+        middleware.slash(agent, recipient, 0.1e18);
 
         // all vaults have been slashed 10% and sent to the recipient
         assertEq(IERC20(usdt).balanceOf(recipient), 100e6);
@@ -78,9 +75,7 @@ contract MiddlewareTest is TestDeployer {
             assertEq(middleware.coverage(agent), 0);
 
             // we request a slash for a timestamp where there is a stake to be slashed
-            NetworkMiddleware.SymbioticSlashHint memory slashHint =
-                NetworkMiddleware.SymbioticSlashHint({ slashTimestamp: uint48(block.timestamp - 10) });
-            middleware.slash(agent, recipient, 0.1e18, abi.encode(slashHint));
+            middleware.slash(agent, recipient, 0.1e18);
 
             // slash should not have worked
             assertEq(IERC20(usdt).balanceOf(recipient), 0);
