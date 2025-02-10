@@ -7,7 +7,7 @@ import { InfraConfig } from "../interfaces/DeployConfigs.sol";
 
 contract ConfigureDelegation {
     function _initDelegationAgent(InfraConfig memory infra, address agent) internal {
-        Delegation(infra.delegation).addAgent(agent, DataTypes.AgentData({ ltv: 0.8e18, liquidationThreshold: 0.7e18 }));
+        Delegation(infra.delegation).addAgent(agent, 0.8e18, 0.7e18);
     }
 
     function _initDelegationAgentDelegator(InfraConfig memory infra, address agent, address delegator) internal {
