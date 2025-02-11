@@ -83,16 +83,15 @@ library VaultLogic {
     /// @dev This contract must have approval to move asset from msg.sender
     /// @param $ Vault storage pointer
     /// @param params Mint parameters
-    function mint(
-        DataTypes.VaultStorage storage $,
-        DataTypes.MintBurnParams memory params
-    )
+    function mint(DataTypes.VaultStorage storage $, DataTypes.MintBurnParams memory params)
         external
         whenNotPaused(params.asset)
         updateIndex(params.asset)
     {
         if (params.deadline < block.timestamp) revert PastDeadline();
-        if (params.amountOut < params.minAmountOut) revert Slippage(address(this), params.amountOut, params.minAmountOut);
+        if (params.amountOut < params.minAmountOut) {
+            revert Slippage(address(this), params.amountOut, params.minAmountOut);
+        }
 
         $.totalSupplies[params.asset] += params.amountIn;
 
@@ -105,15 +104,14 @@ library VaultLogic {
     /// @dev Can only withdraw up to the amount remaining on this contract
     /// @param $ Vault storage pointer
     /// @param params Burn parameters
-    function burn(
-        DataTypes.VaultStorage storage $,
-        DataTypes.MintBurnParams memory params
-    )
+    function burn(DataTypes.VaultStorage storage $, DataTypes.MintBurnParams memory params)
         external
         updateIndex(params.asset)
     {
         if (params.deadline < block.timestamp) revert PastDeadline();
-        if (params.amountOut < params.minAmountOut) revert Slippage(params.asset, params.amountOut, params.minAmountOut);
+        if (params.amountOut < params.minAmountOut) {
+            revert Slippage(params.asset, params.amountOut, params.minAmountOut);
+        }
 
         $.totalSupplies[params.asset] -= params.amountOut;
 
@@ -126,19 +124,15 @@ library VaultLogic {
     /// @dev Can only withdraw up to the amount remaining on this contract
     /// @param $ Vault storage pointer
     /// @param params Redeem parameters
-    function redeem(
-        DataTypes.VaultStorage storage $,
-        DataTypes.RedeemParams memory params
-    )
-        external
-    {
+    function redeem(DataTypes.VaultStorage storage $, DataTypes.RedeemParams memory params) external {
         if (params.amountsOut.length != $.assets.length) revert InvalidMinAmountsOut();
         if (params.deadline < block.timestamp) revert PastDeadline();
 
         address[] memory cachedAssets = $.assets;
         for (uint256 i; i < cachedAssets.length; ++i) {
-            if (params.amountsOut[i] < params.minAmountsOut[i]) 
+            if (params.amountsOut[i] < params.minAmountsOut[i]) {
                 revert Slippage(cachedAssets[i], params.amountsOut[i], params.minAmountsOut[i]);
+            }
             _updateIndex(cachedAssets[i]);
             $.totalSupplies[cachedAssets[i]] -= params.amountsOut[i];
             IERC20(cachedAssets[i]).safeTransfer(params.receiver, params.amountsOut[i]);
@@ -151,10 +145,7 @@ library VaultLogic {
     /// @dev Whitelisted agents can borrow any amount, LTV is handled by Agent contracts
     /// @param $ Vault storage pointer
     /// @param params Borrow parameters
-    function borrow(
-        DataTypes.VaultStorage storage $,
-        DataTypes.BorrowParams memory params
-    )
+    function borrow(DataTypes.VaultStorage storage $, DataTypes.BorrowParams memory params)
         external
         whenNotPaused(params.asset)
         updateIndex(params.asset)
@@ -168,10 +159,7 @@ library VaultLogic {
     /// @notice Repay an asset
     /// @param $ Vault storage pointer
     /// @param params Repay parameters
-    function repay(
-        DataTypes.VaultStorage storage $,
-        DataTypes.RepayParams memory params
-    )
+    function repay(DataTypes.VaultStorage storage $, DataTypes.RepayParams memory params)
         external
         updateIndex(params.asset)
     {
@@ -186,7 +174,7 @@ library VaultLogic {
     /// @param _asset Asset address
     function addAsset(DataTypes.VaultStorage storage $, address _asset) external {
         if (_listed(_asset)) revert AssetAlreadySupported(_asset);
-        
+
         $.assets.push(_asset);
         emit AddAsset(_asset);
     }
@@ -251,7 +239,11 @@ library VaultLogic {
     /// @param $ Vault storage pointer
     /// @param _asset Utilized asset
     /// @return index Utilization ratio index
-    function currentUtilizationIndex(DataTypes.VaultStorage storage $, address _asset) external view returns (uint256 index) {
+    function currentUtilizationIndex(DataTypes.VaultStorage storage $, address _asset)
+        external
+        view
+        returns (uint256 index)
+    {
         index = $.utilizationIndex[_asset] + (utilization($, _asset) * (block.timestamp - $.lastUpdate[_asset]));
     }
 
