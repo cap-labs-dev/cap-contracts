@@ -14,7 +14,6 @@ contract VaultAdapter is AccessUpgradeable {
         mapping(address => UtilizationData) utilizationData;
         uint256 maxMultiplier;
         uint256 minMultiplier;
-        uint256 epoch;
         uint256 rate;
     }
 
