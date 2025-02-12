@@ -8,10 +8,12 @@ library DataTypes {
         mapping(address => AgentData) agentData;
         mapping(address => address[]) networks;
         address oracle;
+        uint256 epochDuration;
     }
 
     struct AgentData {
         uint256 ltv;
         uint256 liquidationThreshold;
+        uint256 lastBorrow;
     }
 }

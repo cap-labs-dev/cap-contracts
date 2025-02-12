@@ -37,6 +37,10 @@ fs_permissions = [
     { access = "read-write", path = "./config/cap-symbiotic-vaults-11155111.json" },
 ]
 
+[invariant]
+show_metrics = true
+fail_on_revert = true
+
 [fmt]
 bracket_spacing = true
 int_types = "preserve"

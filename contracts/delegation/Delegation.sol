@@ -2,18 +2,19 @@
 pragma solidity ^0.8.28;
 
 import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
-import { INetwork } from "../interfaces/INetwork.sol";
+import { INetwork } from "../delegation/interfaces/INetwork.sol";
 import { DelegationStorage } from "./libraries/DelegationStorage.sol";
 import { DataTypes } from "./libraries/types/DataTypes.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title Cap Delegation Contract
 /// @author Cap Labs
 /// @notice This contract manages delegation and slashing.
 contract Delegation is UUPSUpgradeable, AccessUpgradeable {
     event SlashNetwork(address network, uint256 slashShare);
-    event AddAgent(address agent, DataTypes.AgentData agentData);
-    event ModifyAgent(address agent, DataTypes.AgentData agentData);
+    event AddAgent(address agent, uint256 ltv, uint256 liquidationThreshold);
+    event ModifyAgent(address agent, uint256 ltv, uint256 liquidationThreshold);
     event RegisterNetwork(address agent, address network);
 
     error AgentDoesNotExist();
@@ -28,11 +29,13 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Initialize the contract
     /// @param _accessControl Access control address
     /// @param _oracle Oracle address
-    function initialize(address _accessControl, address _oracle) external initializer {
+    /// @param _epochDuration Epoch duration in seconds
+    function initialize(address _accessControl, address _oracle, uint256 _epochDuration) external initializer {
         __Access_init(_accessControl);
         __UUPSUpgradeable_init();
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
         $.oracle = _oracle;
+        $.epochDuration = _epochDuration;
     }
 
     /// @notice How much global delegation we have in the system
@@ -42,6 +45,20 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
         for (uint i; i < $.agents.length; ++i) {
             delegation += coverage($.agents[i]);
         }
+    }
+
+    /// @notice Get the epoch duration
+    /// @return duration Epoch duration in seconds
+    function epochDuration() external view returns (uint256 duration) {
+        DataTypes.DelegationStorage storage $ = DelegationStorage.get();
+        duration = $.epochDuration;
+    }
+
+    /// @notice Get the current epoch
+    /// @return currentEpoch Current epoch
+    function epoch() public view returns (uint256 currentEpoch) {
+        DataTypes.DelegationStorage storage $ = DelegationStorage.get();
+        currentEpoch = block.timestamp / $.epochDuration;
     }
 
     /// @notice How much delegation and agent has available to back their borrows
@@ -105,6 +122,9 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
         
         // Track actual slashed amount
         uint256 totalSlashed;
+
+        // Get the timestamp that is most recent between the last borrow and the epoch -1 
+        uint256 slashTimestamp = Math.max((epoch() - 1) * $.epochDuration, $.agentData[_agent].lastBorrow);
         
         // Calculate each network's proportion of total delegation
         for (uint i; i < $.networks[_agent].length - 1; ++i) {
@@ -115,7 +135,7 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
             uint256 networkSlash = (_amount * networkCoverage) / agentsDelegation;
             totalSlashed += networkSlash;
             
-            INetwork(network).slash(_agent, _liquidator, networkSlash);
+            INetwork(network).slash(_agent, _liquidator, networkSlash, uint48(slashTimestamp));
             emit SlashNetwork(network, networkSlash);
         }
         
@@ -124,15 +144,21 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
             address lastNetwork = $.networks[_agent][$.networks[_agent].length - 1];
             uint256 finalSlash = _amount - totalSlashed;
             
-            INetwork(lastNetwork).slash(_agent, _liquidator, finalSlash);
+            INetwork(lastNetwork).slash(_agent, _liquidator, finalSlash, uint48(slashTimestamp));
             emit SlashNetwork(lastNetwork, finalSlash);
         }
     }
 
+    function setLastBorrow(address _agent) external checkAccess(this.setLastBorrow.selector) {
+        DataTypes.DelegationStorage storage $ = DelegationStorage.get();
+        $.agentData[_agent].lastBorrow = block.timestamp;
+    }
+
     /// @notice Add agent to be delegated to
     /// @param _agent Agent address
-    /// @param _agentData Agent data
-    function addAgent(address _agent, DataTypes.AgentData calldata _agentData)
+    /// @param _ltv Loan to value ratio
+    /// @param _liquidationThreshold Liquidation threshold
+    function addAgent(address _agent, uint256 _ltv, uint256 _liquidationThreshold)
         external
         checkAccess(this.addAgent.selector)
     {
@@ -144,14 +170,16 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
         }
 
         $.agents.push(_agent);
-        $.agentData[_agent] = _agentData;
-        emit AddAgent(_agent, _agentData);
+        $.agentData[_agent].ltv = _ltv;
+        $.agentData[_agent].liquidationThreshold = _liquidationThreshold;
+        emit AddAgent(_agent, _ltv, _liquidationThreshold);
     }
 
     /// @notice Modify an agents config only callable by the operator
     /// @param _agent the agent to modify
-    /// @param _agentData the struct of data
-    function modifyAgent(address _agent, DataTypes.AgentData calldata _agentData)
+    /// @param _ltv Loan to value ratio
+    /// @param _liquidationThreshold Liquidation threshold
+    function modifyAgent(address _agent, uint256 _ltv, uint256 _liquidationThreshold)
         external
         checkAccess(this.modifyAgent.selector)
     {
@@ -160,15 +188,16 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
         // Check that the agent exists
         for (uint i; i < $.agents.length; ++i) {
             if ($.agents[i] == _agent) {
-                $.agentData[_agent] = _agentData;
-                emit ModifyAgent(_agent, _agentData);
+                $.agentData[_agent].ltv = _ltv;
+                $.agentData[_agent].liquidationThreshold = _liquidationThreshold;
+                emit ModifyAgent(_agent, _ltv, _liquidationThreshold);
                 return;
             }
         }
         revert AgentDoesNotExist();
     }
 
-    /// @notice Register a new delagator
+    /// @notice Register a new network
     /// @param _agent Agent address
     /// @param _network Network address
     function registerNetwork(address _agent, address _network)

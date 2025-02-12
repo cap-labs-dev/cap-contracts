@@ -13,7 +13,9 @@
     "postinstall": "forge remappings > remappings.txt",
     "compile": "forge build",
     "build": "forge build --skip Test",
-    "test": "forge test",
+    "test": "yarn test:unit",
+    "test:unit": "forge test --no-match-path 'test/**/*.invariants.t.sol'",
+    "test:invariants": "forge test --match-path 'test/**/*.invariants.t.sol'",
     "test:slither": "FOUNDRY_PROFILE=slither slither . --include-paths 'contracts'",
     "test:build": "forge build ./contracts ./test ./script --via-ir",
     "gas:flamegraph": "forge test --flamegraph",
@@ -21,7 +23,7 @@
     "gas:diff": "FOUNDRY_PROFILE=release forge snapshot --diff --isolate",
     "gas:report": "FOUNDRY_PROFILE=release forge test --gas-report",
     "coverage:forge": "forge coverage --report summary --ir-minimum",
-    "coverage:forge:report": "forge coverage --report lcov --ir-minimum && lcov --remove lcov.info \"*test/*\" \"*script/*\" \"*node_modules/*\" --output-file lcov.info --rc lcov_branch_coverage=1 --ignore-errors inconsistent --ignore-errors unused && genhtml lcov.info --branch-coverage --output-dir coverage --ignore-errors inconsistent --ignore-errors unused"
+    "coverage:forge:report": "forge coverage --report lcov --ir-minimum && lcov --remove lcov.info \"*test/*\" \"lendingPool/libraries/math\" \"*/deploy/*\" \"*script/*\" \"*node_modules/*\" --output-file lcov.info --rc lcov_branch_coverage=1 --ignore-errors inconsistent --ignore-errors unused && genhtml lcov.info --branch-coverage --output-dir coverage --ignore-errors inconsistent --ignore-errors unused"
   },
   "devDependencies": {
     "@openzeppelin/contracts": "npm:@openzeppelin/contracts",

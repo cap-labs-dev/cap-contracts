@@ -103,10 +103,9 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     /// @param _agent Agent address
     /// @param _recipient Recipient of the slashed assets
     /// @param _slashShare Percentage of delegation to slash encoded with 18 decimals
-    function slash(address _agent, address _recipient, uint256 _slashShare) external checkAccess(this.slash.selector) {
+    /// @param _timestamp Timestamp to slash at
+    function slash(address _agent, address _recipient, uint256 _slashShare, uint48 _timestamp) external checkAccess(this.slash.selector) {
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
-
-        uint48 _timestamp = uint48(block.timestamp);
 
         for (uint256 i; i < $.vaults[_agent].length; ++i) {
             IVault vault = IVault($.vaults[_agent][i]);

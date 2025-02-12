@@ -86,7 +86,11 @@ library MinterLogic {
                 newRatio = 1e27;
                 amount = params.amount * assetDecimalsPow / capDecimalsPow;
             } else {
-                newRatio = (allocationValue - assetValue) * 1e27 / (capValue - assetValue);
+                if (allocationValue < assetValue || capValue <= assetValue) {
+                    newRatio = 0;
+                } else {
+                    newRatio = (allocationValue - assetValue) * 1e27 / (capValue - assetValue);
+                }
                 amount = assetValue * assetDecimalsPow / assetPrice;
             }
         }

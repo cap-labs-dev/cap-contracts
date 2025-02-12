@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { INetwork } from "../../interfaces/INetwork.sol";
+import { IDelegation } from "../../interfaces/IDelegation.sol";
 import { IOracle } from "../../interfaces/IOracle.sol";
 
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
@@ -29,8 +29,8 @@ library ViewLogic {
         uint256 liquidationThreshold,
         uint256 health
     ) {
-        totalDelegation = INetwork($.delegation).coverage(_agent);
-        liquidationThreshold = INetwork($.delegation).liquidationThreshold(_agent);
+        totalDelegation = IDelegation($.delegation).coverage(_agent);
+        liquidationThreshold = IDelegation($.delegation).liquidationThreshold(_agent);
 
         for (uint256 i; i < $.reservesCount; ++i) {
             if (!$.agentConfig[_agent].isBorrowing(i)) {
