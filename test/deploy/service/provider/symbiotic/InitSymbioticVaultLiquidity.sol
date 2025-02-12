@@ -22,7 +22,7 @@ contract InitSymbioticVaultLiquidity is Test, SymbioticUtils, TimeUtils {
             _initSymbioticVaultLiquidityForAgent(env.testUsers, vault, 30_000);
         }
 
-        _timeTravel(7 days);
+        _timeTravel(28 days);
     }
 
     function _initSymbioticVaultLiquidityForAgent(

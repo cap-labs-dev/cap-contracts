@@ -25,6 +25,7 @@ struct TestEnvConfig {
     // test specific
     TestUsersConfig testUsers;
     address[] usdMocks;
+    address ethMock;
     OracleMocksConfig oracleMocks;
     // symbiotic
     SymbioticTestEnvConfig symbiotic;

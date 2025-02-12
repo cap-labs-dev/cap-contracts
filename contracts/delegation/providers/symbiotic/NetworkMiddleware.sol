@@ -52,8 +52,6 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     error VaultNotInitialized();
     /// @dev Invalid epoch duration
     error InvalidEpochDuration(uint48 required, uint48 actual);
-    /// @dev Invalid slash duration
-    error InvalidSlashDuration();
     /// @dev No slashable collateral
     error NoSlashableCollateral();
 
@@ -63,14 +61,14 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     /// @param _vaultRegistry Vault registry address
     /// @param _oracle Oracle address
     /// @param _requiredEpochDuration Required epoch duration in seconds
-    /// @param _slashDuration amount of time we have to liquidate collateral in a slash event, needs to be < epochDuration
+    /// @param _feeAllowed Fee allowed to be charged on rewards by restakers
     function initialize(
         address _accessControl,
         address _network,
         address _vaultRegistry,
         address _oracle,
         uint48 _requiredEpochDuration,
-        uint48 _slashDuration
+        uint256 _feeAllowed
     ) external initializer {
         __Access_init(_accessControl);
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
@@ -78,9 +76,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
         $.vaultRegistry = _vaultRegistry;
         $.oracle = _oracle;
         $.requiredEpochDuration = _requiredEpochDuration;
-        $.slashDuration = _slashDuration;
-
-        if (_slashDuration >= _requiredEpochDuration) revert InvalidSlashDuration();
+        $.feeAllowed = _feeAllowed;
     }
 
     /// @notice Register vault to be used as collateral within the CAP system
@@ -97,6 +93,13 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
             $.vaults[_agents[i]].push(_vault);
         }
         emit VaultRegistered(_vault);
+    }
+
+    /// @notice Set fee allowed
+    /// @param _feeAllowed Fee allowed to be charged on rewards by restakers
+    function setFeeAllowed(uint256 _feeAllowed) external checkAccess(this.setFeeAllowed.selector) {
+        DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
+        $.feeAllowed = _feeAllowed;
     }
 
     /// @notice Slash delegation and send to recipient
@@ -208,7 +211,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
         if (!IVault(_vault).isInitialized()) revert VaultNotInitialized();
 
         uint48 vaultEpoch = IVault(_vault).epochDuration();
-        if (vaultEpoch != $.requiredEpochDuration) revert InvalidEpochDuration($.requiredEpochDuration, vaultEpoch);
+        if (vaultEpoch < $.requiredEpochDuration) revert InvalidEpochDuration($.requiredEpochDuration, vaultEpoch);
 
         address slasher = IVault(_vault).slasher();
         uint64 slasherType = IEntity(slasher).TYPE();
@@ -240,7 +243,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
             amount,
             abi.encode(
                 uint48(block.timestamp - 1),
-                1000, // Min Fee Amount we allow. Maybe we should make this configurable?
+                $.feeAllowed, 
                 new bytes(0),
                 new bytes(0)
             )

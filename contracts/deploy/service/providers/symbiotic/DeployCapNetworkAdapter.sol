@@ -41,7 +41,6 @@ contract DeployCapNetworkAdapter is ProxyUtils {
         SymbioticNetworkAdapterImplementationsConfig memory implems,
         SymbioticNetworkAdapterParams memory params
     ) internal returns (SymbioticNetworkAdapterConfig memory d) {
-        d.slashDuration = params.slashDuration;
         d.network = _proxy(address(implems.network));
         Network(d.network).initialize(infra.accessControl, addressbook.registries.networkRegistry);
 
@@ -52,7 +51,7 @@ contract DeployCapNetworkAdapter is ProxyUtils {
             addressbook.registries.vaultRegistry,
             infra.oracle,
             params.vaultEpochDuration,
-            params.slashDuration
+            params.feeAllowed
         );
     }
 

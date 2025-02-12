@@ -13,7 +13,7 @@ library DataTypes {
         address vaultRegistry;
         address oracle;
         uint48 requiredEpochDuration;
-        uint48 slashDuration;
+        uint256 feeAllowed;
         mapping(address => address) stakerRewarders; // vault => stakerRewarder
         mapping(address => address[]) vaults; // agent => vault[]
     }

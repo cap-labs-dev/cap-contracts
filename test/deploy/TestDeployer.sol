@@ -85,7 +85,9 @@ contract TestDeployer is
         env.infra = _deployInfra(env.implems, env.users);
 
         env.usdMocks = _deployUSDMocks();
+        env.ethMock = _deployEthMock();
         env.oracleMocks = _deployOracleMocks(env.usdMocks);
+
 
         console.log("deploying vault");
         env.vault = _deployVault(env.implems, env.infra, "Cap USD", "cUSD", env.oracleMocks.assets);
@@ -105,6 +107,8 @@ contract TestDeployer is
         for (uint256 i = 0; i < env.vault.assets.length; i++) {
             _initChainlinkPriceOracle(env.libs, env.infra, env.vault.assets[i], env.oracleMocks.chainlinkPriceFeeds[i]);
         }
+        _initChainlinkPriceOracle(env.libs, env.infra, env.ethMock, env.oracleMocks.chainlinkPriceFeeds[env.oracleMocks.assets.length]); // weth
+
         console.log("deploying rate oracle");
         vm.startPrank(env.users.rate_oracle_admin);
         for (uint256 i = 0; i < env.vault.assets.length; i++) {
@@ -127,7 +131,7 @@ contract TestDeployer is
             env.infra,
             symbioticAb,
             env.symbiotic.networkAdapterImplems,
-            SymbioticNetworkAdapterParams({ vaultEpochDuration: 1 hours, slashDuration: 50 minutes })
+            SymbioticNetworkAdapterParams({ vaultEpochDuration: 7 days, feeAllowed: 1000 })
         );
 
         console.log("deploying symbiotic vaults");
@@ -137,8 +141,8 @@ contract TestDeployer is
                 symbioticAb,
                 SymbioticVaultParams({
                     vault_admin: env.symbiotic.users.vault_admin,
-                    collateral: env.usdMocks[0],
-                    vaultEpochDuration: 1 hours,
+                    collateral: env.ethMock,
+                    vaultEpochDuration: 7 days,
                     burnerRouterDelay: 0
                 })
             )
@@ -150,8 +154,8 @@ contract TestDeployer is
                 symbioticAb,
                 SymbioticVaultParams({
                     vault_admin: env.symbiotic.users.vault_admin,
-                    collateral: env.usdMocks[2],
-                    vaultEpochDuration: 1 hours,
+                    collateral: env.usdMocks[0],
+                    vaultEpochDuration: 14 days,
                     burnerRouterDelay: 0
                 })
             )
@@ -232,7 +236,7 @@ contract TestDeployer is
         }
 
         // change  epoch
-        _timeTravel(7 days);
+        _timeTravel(28 days);
 
         _unwrapEnvToMakeTestsReadable();
     }
@@ -274,27 +278,29 @@ contract TestDeployer is
     MockERC20 usdt;
     MockERC20 usdc;
     MockERC20 usdx;
+    MockERC20 weth;
     CapToken cUSD;
     StakedCap scUSD;
 
     NetworkMiddleware middleware;
+    SymbioticVaultConfig symbioticWethVault;
     SymbioticVaultConfig symbioticUsdtVault;
-    SymbioticVaultConfig symbioticUsdxVault;
+    SymbioticNetworkRewardsConfig symbioticWethNetworkRewards;
     SymbioticNetworkRewardsConfig symbioticUsdtNetworkRewards;
-    SymbioticNetworkRewardsConfig symbioticUsdxNetworkRewards;
 
     function _unwrapEnvToMakeTestsReadable() internal {
         vault = env.vault;
         usdt = MockERC20(vault.assets[0]);
         usdc = MockERC20(vault.assets[1]);
         usdx = MockERC20(vault.assets[2]);
+        weth = MockERC20(env.ethMock);
         cUSD = CapToken(vault.capToken);
         scUSD = StakedCap(vault.stakedCapToken);
 
         middleware = NetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
-        symbioticUsdtVault = _getSymbioticVaultConfig(0);
-        symbioticUsdxVault = _getSymbioticVaultConfig(1);
-        symbioticUsdtNetworkRewards = _getSymbioticNetworkRewardsConfig(0);
-        symbioticUsdxNetworkRewards = _getSymbioticNetworkRewardsConfig(1);
+        symbioticWethVault = _getSymbioticVaultConfig(0);
+        symbioticUsdtVault = _getSymbioticVaultConfig(1);
+        symbioticWethNetworkRewards = _getSymbioticNetworkRewardsConfig(0);
+        symbioticUsdtNetworkRewards = _getSymbioticNetworkRewardsConfig(1);
     }
 }

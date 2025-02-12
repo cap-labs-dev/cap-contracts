@@ -25,7 +25,7 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
             for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
                 address agent = env.testUsers.agents[i];
                 _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 1000e6);
-                _symbioticVaultDelegateToAgent(symbioticUsdxVault, env.symbiotic.networkAdapter, agent, 1000e18);
+                _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 2e18);
             }
 
             _timeTravel(symbioticUsdtVault.vaultEpochDuration + 1 days);

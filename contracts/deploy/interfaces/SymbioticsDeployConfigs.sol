@@ -9,7 +9,7 @@ struct SymbioticNetworkAdapterImplementationsConfig {
 struct SymbioticNetworkAdapterConfig {
     address network;
     address networkMiddleware;
-    uint48 slashDuration;
+    uint256 feeAllowed;
 }
 
 struct SymbioticNetworkRewardsConfig {
@@ -18,7 +18,7 @@ struct SymbioticNetworkRewardsConfig {
 
 struct SymbioticNetworkAdapterParams {
     uint48 vaultEpochDuration;
-    uint48 slashDuration;
+    uint256 feeAllowed;
 }
 
 struct SymbioticUsersConfig {

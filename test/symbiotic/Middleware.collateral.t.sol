@@ -20,8 +20,8 @@ contract MiddlewareTest is TestDeployer {
 
             for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
                 address agent = env.testUsers.agents[i];
+                _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 2e18);
                 _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 1000e6);
-                _symbioticVaultDelegateToAgent(symbioticUsdxVault, env.symbiotic.networkAdapter, agent, 1000e18);
             }
 
             _timeTravel(symbioticUsdtVault.vaultEpochDuration + 1 days);
@@ -37,17 +37,18 @@ contract MiddlewareTest is TestDeployer {
         address agent = env.testUsers.agents[0];
 
         // collateral in USDT (8 decimals)
-        assertEq(middleware.coverage(agent), 2000e8);
+        console.log("coverage", middleware.coverage(agent));
+        assertEq(middleware.coverage(agent), 6200e8); // 1000 USDT + 5200 (2600 * 2) WETH
 
         // slash 10% of agent collateral
         middleware.slash(agent, recipient, 0.1e18, uint48(block.timestamp));
 
         // all vaults have been slashed 10% and sent to the recipient
+        assertEq(IERC20(weth).balanceOf(recipient), 2e17);
         assertEq(IERC20(usdt).balanceOf(recipient), 100e6);
-        assertEq(IERC20(usdx).balanceOf(recipient), 100e18);
 
         // vaults have hooks that update the limits on slash
-        assertEq(middleware.coverage(agent), 1800e8);
+        assertEq(middleware.coverage(agent), 5580e8); 
 
         vm.stopPrank();
     }
@@ -58,8 +59,8 @@ contract MiddlewareTest is TestDeployer {
 
             // remove all delegations to our slashable agent
             address agent = env.testUsers.agents[0];
+            _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 0);
             _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 0);
-            _symbioticVaultDelegateToAgent(symbioticUsdxVault, env.symbiotic.networkAdapter, agent, 0);
 
             vm.stopPrank();
         }
@@ -92,14 +93,14 @@ contract MiddlewareTest is TestDeployer {
             vm.startPrank(env.symbiotic.users.vault_admin);
 
             // remove all delegations to our slashable agent
+            _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 0);
             _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 0);
-            _symbioticVaultDelegateToAgent(symbioticUsdxVault, env.symbiotic.networkAdapter, agent, 0);
 
             _timeTravel(10);
 
             // remove all delegations to our slashable agent
+            _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 2e18);
             _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 1000e6);
-            _symbioticVaultDelegateToAgent(symbioticUsdxVault, env.symbiotic.networkAdapter, agent, 1000e18);
 
             _timeTravel(10);
 
@@ -111,16 +112,15 @@ contract MiddlewareTest is TestDeployer {
         //      2000   |    0     |    2000  |
         // -30        -20        -10         0
 
-        assertEq(middleware.coverage(agent), 2000e8);
+        assertEq(middleware.coverage(agent), 6200e8);
     }
 
     function test_current_agent_coverage_accounts_for_burner_router_changes() public {
         Network _network = Network(env.symbiotic.networkAdapter.network);
-        NetworkMiddleware _middleware = NetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
 
         address agent = env.testUsers.agents[0];
 
-        assertEq(middleware.coverage(agent), 2000e8);
+        assertEq(middleware.coverage(agent), 6200e8);
 
         // vault admin changes the burner router receiver of the USDT vault
         {
@@ -135,6 +135,6 @@ contract MiddlewareTest is TestDeployer {
         }
 
         // current coverage must reflect that change
-        assertEq(middleware.coverage(agent), 1000e8);
+        assertEq(middleware.coverage(agent), 5200e8);
     }
 }
