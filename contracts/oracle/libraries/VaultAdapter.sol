@@ -15,6 +15,7 @@ contract VaultAdapter is AccessUpgradeable {
         uint256 maxMultiplier;
         uint256 minMultiplier;
         uint256 epoch;
+        uint256 rate;
     }
 
     /// @dev Slope data for an asset
