@@ -118,34 +118,20 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
     /// @param _amount The USD value of the delegation needed to cover the debt
     function slash(address _agent, address _liquidator, uint256 _amount) external checkAccess(this.slash.selector) {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
-        uint256 agentsDelegation = coverage(_agent);
-        
-        // Track actual slashed amount
-        uint256 totalSlashed;
 
         // Get the timestamp that is most recent between the last borrow and the epoch -1 
         uint256 slashTimestamp = Math.max((epoch() - 1) * $.epochDuration, $.agentData[_agent].lastBorrow);
         
         // Calculate each network's proportion of total delegation
-        for (uint i; i < $.networks[_agent].length - 1; ++i) {
+        for (uint i; i < $.networks[_agent].length; ++i) {
             address network = $.networks[_agent][i];
             uint256 networkCoverage = coverageByNetwork(_agent, network);
             
-            // Calculate this network's share
-            uint256 networkSlash = (_amount * networkCoverage) / agentsDelegation;
-            totalSlashed += networkSlash;
+            // Calculate this network's share of the total amount to slash
+            uint256 networkSlash = _amount * 1e18 / networkCoverage;
             
             INetwork(network).slash(_agent, _liquidator, networkSlash, uint48(slashTimestamp));
             emit SlashNetwork(network, networkSlash);
-        }
-        
-        // Last network gets the remainder to ensure exact total
-        if ($.networks[_agent].length > 0) {
-            address lastNetwork = $.networks[_agent][$.networks[_agent].length - 1];
-            uint256 finalSlash = _amount - totalSlashed;
-            
-            INetwork(lastNetwork).slash(_agent, _liquidator, finalSlash, uint48(slashTimestamp));
-            emit SlashNetwork(lastNetwork, finalSlash);
         }
     }
 

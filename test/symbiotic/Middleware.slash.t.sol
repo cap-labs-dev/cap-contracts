@@ -31,7 +31,7 @@ contract MiddlewareTest is TestDeployer {
     }
 
     function test_slash_sends_funds_to_middleware() public {
-        vm.startPrank(env.users.middleware_admin);
+        vm.startPrank(env.infra.delegation);
 
         address recipient = makeAddr("recipient");
         address agent = env.testUsers.agents[0];
@@ -67,7 +67,7 @@ contract MiddlewareTest is TestDeployer {
         _timeTravel(symbioticUsdtVault.vaultEpochDuration + 1);
 
         {
-            vm.startPrank(env.users.middleware_admin);
+            vm.startPrank(env.infra.delegation);
 
             address recipient = makeAddr("recipient");
             address agent = env.testUsers.agents[0];
@@ -169,7 +169,7 @@ contract MiddlewareTest is TestDeployer {
 
         // we should be able to slash immediately after delegation
         {
-            vm.startPrank(env.users.middleware_admin);
+            vm.startPrank(env.infra.delegation);
 
             address recipient = makeAddr("recipient");
 

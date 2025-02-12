@@ -7,6 +7,8 @@ import { DataTypes } from "../../lendingPool/libraries/types/DataTypes.sol";
 import { InterestDebtToken } from "../../lendingPool/tokens/InterestDebtToken.sol";
 import { PrincipalDebtToken } from "../../lendingPool/tokens/PrincipalDebtToken.sol";
 import { RestakerDebtToken } from "../../lendingPool/tokens/RestakerDebtToken.sol";
+import { Delegation } from "../../delegation/Delegation.sol";
+import { NetworkMiddleware } from "../../delegation/providers/symbiotic/NetworkMiddleware.sol";
 
 import { CapToken } from "../../token/CapToken.sol";
 import { OFTLockbox } from "../../token/OFTLockbox.sol";
