@@ -1,85 +1,51 @@
-## Foundry
+## CAP Labs Core Contracts
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+This repository contains the core contracts for the CAP platform. Foundry is used as the development framework.
 
-Foundry consists of:
+## Dependencies
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+Required:
+- `git`: [https://git-scm.com/downloads](https://git-scm.com/downloads)
+- `yarn`: [https://yarnpkg.com/getting-started](https://yarnpkg.com/getting-started)
+- `foundry`: [https://getfoundry.sh/](https://getfoundry.sh/)
 
-## Documentation
+Optional:
+- `slither`: [https://github.com/crytic/slither](https://github.com/crytic/slither)
 
-https://book.getfoundry.sh/
-
-## Usage
-
-### Build
+## Setup
 
 ```shell
-$ forge build
+# pull foundry's deps
+git pull --recurse-submodules
+
+# install deps
+yarn install
 ```
 
-### Test
+## Commands
 
-```shell
-$ forge test
-```
+## Available Scripts
 
-### Format
+The following scripts are available to run with `yarn`:
 
-```shell
-$ forge fmt
-```
+### Build and Compile
+- `yarn compile`: Build the project using Forge
+- `yarn build`: Build the project using Forge (skips test files)
+- `yarn test:build`: Build contracts, tests, and scripts with IR optimization
 
-### Gas Snapshots
+### Testing
+- `yarn test`: Run unit tests
+- `yarn test:unit`: Run unit tests (excluding slow tests)
+- `yarn test:invariants`: Run invariant tests only
+- `yarn test:slither`: Run Slither static analysis tool
 
-```shell
-$ FOUNDRY_PROFILE=release forge snapshot
-```
+### Gas Analysis
+- `yarn gas:flamegraph`: Generate a flamegraph of gas usage
+- `yarn gas:snapshot`: Create a gas snapshot in isolation
+- `yarn gas:diff`: Compare gas usage against the last snapshot
+- `yarn gas:report`: Generate a gas usage report
 
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
-
-### Testnet Deploy
-
-Prepare config in `~/.foundry/foundry.toml`
-```toml
-[rpc_endpoints]
-anvil = "http://127.0.0.1:8545"
-```
-
-Create anvil wallet
-```shell
-cast wallet import anvil --interactive
-```
-
-Start anvil
-```shell
-anvil -f $RPC_URL --accounts 3 --balance 300 --no-cors --block-time 5
-```
+### Coverage
+- `yarn coverage:forge`: Generate a summary coverage report
+- `yarn coverage:forge:report`: Generate a detailed LCOV coverage report with branch coverage
 
