@@ -34,6 +34,9 @@ contract ConfigureOracle {
             payload: abi.encodeWithSelector(AaveAdapter.rate.selector, dataProvider, asset)
         });
         Oracle(infra.oracle).setMarketOracleData(asset, oracleData);
+        Oracle(infra.oracle).setUtilizationOracleData(asset, oracleData);
+        Oracle(infra.oracle).setBenchmarkRate(asset, 8e25);
+        Oracle(infra.oracle).setRestakerRate(asset, 5e25);
     }
 
     function _initVaultOracle(LibsConfig memory libs, InfraConfig memory infra, VaultConfig memory vault) internal {

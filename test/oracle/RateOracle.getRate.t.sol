@@ -12,6 +12,6 @@ contract RateOracleGetRateTest is TestDeployer {
 
     function test_rate_oracle_get_rate() public {
         uint256 usdtRate = IOracle(env.infra.oracle).marketRate(address(usdt));
-        assertEq(usdtRate, 1e17, "USDT borrow rate should be 10%, 1e18 being 100%");
+        assertEq(usdtRate, 1e26, "USDT borrow rate should be 10%, 1e27 being 100%");
     }
 }

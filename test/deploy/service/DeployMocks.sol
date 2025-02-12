@@ -22,7 +22,7 @@ contract DeployMocks {
         for (uint256 i = 0; i < d.assets.length; i++) {
             MockChainlinkPriceFeed(d.chainlinkPriceFeeds[i]).setDecimals(8);
             MockChainlinkPriceFeed(d.chainlinkPriceFeeds[i]).setLatestAnswer(1e8); // $1.00 with 8 decimals
-            MockAaveDataProvider(d.aaveDataProviders[i]).setVariableBorrowRate(1e17); // 10% APY, 1e18 = 100%
+            MockAaveDataProvider(d.aaveDataProviders[i]).setVariableBorrowRate(1e26); // 10% APY, 1e27 = 100%
         }
     }
 
