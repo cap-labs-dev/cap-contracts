@@ -33,7 +33,7 @@ contract ConfigureOracle {
             adapter: libs.aaveAdapter,
             payload: abi.encodeWithSelector(AaveAdapter.rate.selector, dataProvider, asset)
         });
-        Oracle(infra.oracle).setRateOracleData(asset, oracleData);
+        Oracle(infra.oracle).setMarketOracleData(asset, oracleData);
     }
 
     function _initVaultOracle(LibsConfig memory libs, InfraConfig memory infra, VaultConfig memory vault) internal {

@@ -36,8 +36,8 @@ library BorrowLogic {
     event RealizeInterest(address indexed asset, uint256 realizedInterest, address interestReceiver);
 
     /// @notice Borrow an asset from the Lender, minting a debt token which must be repaid
-    /// @dev Interest debt token is updated before borrow happens to bring index up to date. Restaker
-    /// debt token is updated after so the new principal debt can be used in calculations
+    /// @dev Interest debt token is updated before principal token is minted to bring index up to date. 
+    /// Restaker debt token is updated after so the new principal debt can be used in calculations
     /// @param $ Lender storage
     /// @param params Parameters to borrow an asset
     function borrow(DataTypes.LenderStorage storage $, DataTypes.BorrowParams memory params) external {
@@ -46,11 +46,11 @@ library BorrowLogic {
         if (!$.agentConfig[params.agent].isBorrowing($.reservesData[params.asset].id)) 
             $.agentConfig[params.agent].setBorrowing($.reservesData[params.asset].id, true);
 
+        IVaultUpgradeable($.reservesData[params.asset].vault).borrow(params.asset, params.amount, params.receiver);
+
         IDebtToken($.reservesData[params.asset].interestDebtToken).update(params.agent);
         IPrincipalDebtToken($.reservesData[params.asset].principalDebtToken).mint(params.agent, params.amount);
         IDebtToken($.reservesData[params.asset].restakerDebtToken).update(params.agent);
-
-        IVaultUpgradeable($.reservesData[params.asset].vault).borrow(params.asset, params.amount, params.receiver);
 
         emit Borrow(params.agent, params.asset, params.amount);
     }
@@ -76,18 +76,36 @@ library BorrowLogic {
         /// Maturity order of repayment is principal, restaker, then interest
         if (params.amount > principalDebt) {
             principalRepaid = principalDebt;
-            restakerRepaid =
-                restakerDebt < params.amount - principalRepaid ? restakerDebt : params.amount - principalRepaid;
-            interestRepaid = interestDebt < params.amount - principalRepaid - restakerRepaid
-                ? interestDebt
-                : params.amount - principalRepaid - restakerRepaid;
+            if (params.amount > principalDebt + restakerDebt) {
+                restakerRepaid = restakerDebt;
+                if (params.amount > principalDebt + restakerDebt + interestDebt) {
+                    interestRepaid = interestDebt;
+                } else {
+                    interestRepaid = params.amount - principalDebt - restakerDebt;
+                }
+            } else {
+                restakerRepaid = params.amount - principalDebt;
+            }
         } else {
             principalRepaid = params.amount;
+        }
+
+        if (principalRepaid > 0) {
+            IPrincipalDebtToken($.reservesData[params.asset].principalDebtToken).burn(params.agent, principalRepaid);
+            IERC20(params.asset).safeTransferFrom(params.caller, address(this), principalRepaid);
+            IERC20(params.asset).forceApprove($.reservesData[params.asset].vault, principalRepaid);
+            IVaultUpgradeable($.reservesData[params.asset].vault).repay(params.asset, principalRepaid);
+        }
+
+        if (restakerRepaid > 0) {
+            restakerRepaid = IDebtToken($.reservesData[params.asset].restakerDebtToken).burn(params.agent, restakerRepaid);
+            IERC20(params.asset).safeTransferFrom(params.caller, $.restakerInterestReceiver[params.agent], restakerRepaid);
         }
 
         if (interestRepaid > 0) {
             uint256 realizedInterestRepaid;
             if ($.reservesData[params.asset].realizedInterest > 0) {
+                /// Repay realized interest directly back to vault instead of to fee auction
                 realizedInterestRepaid = interestRepaid < $.reservesData[params.asset].realizedInterest 
                     ? interestRepaid 
                     : $.reservesData[params.asset].realizedInterest;
@@ -104,18 +122,6 @@ library BorrowLogic {
                     params.caller, $.reservesData[params.asset].interestReceiver, interestRepaid - realizedInterestRepaid
                 );
             }
-        }
-
-        if (principalRepaid > 0) {
-            IPrincipalDebtToken($.reservesData[params.asset].principalDebtToken).burn(params.agent, principalRepaid);
-            IERC20(params.asset).safeTransferFrom(params.caller, address(this), principalRepaid);
-            IERC20(params.asset).forceApprove($.reservesData[params.asset].vault, principalRepaid);
-            IVaultUpgradeable($.reservesData[params.asset].vault).repay(params.asset, principalRepaid);
-        }
-
-        if (restakerRepaid > 0) {
-            restakerRepaid = IDebtToken($.reservesData[params.asset].restakerDebtToken).burn(params.agent, restakerRepaid);
-            IERC20(params.asset).safeTransferFrom(params.caller, $.restakerInterestReceiver[params.agent], restakerRepaid);
         }
 
         if (

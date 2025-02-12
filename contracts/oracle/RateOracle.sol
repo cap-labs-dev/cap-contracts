@@ -10,7 +10,8 @@ import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
 contract RateOracle is AccessUpgradeable {
     /// @custom:storage-location erc7201:cap.storage.RateOracle
     struct RateOracleStorage {
-        mapping(address => IOracle.OracleData) oracleData;
+        mapping(address => IOracle.OracleData) marketOracleData;
+        mapping(address => IOracle.OracleData) utilizationOracleData;
         mapping(address => uint256) benchmarkRate;
         mapping(address => uint256) restakerRate;
     }
@@ -26,8 +27,11 @@ contract RateOracle is AccessUpgradeable {
         }
     }
 
-    /// @dev Set oracle data
-    event SetRateOracleData(address asset, IOracle.OracleData data);
+    /// @dev Set market oracle data
+    event SetMarketOracleData(address asset, IOracle.OracleData data);
+
+    /// @dev Set utilization oracle data
+    event SetUtilizationOracleData(address asset, IOracle.OracleData data);
 
     /// @dev Set benchmark rate
     event SetBenchmarkRate(address asset, uint256 rate);
@@ -50,7 +54,16 @@ contract RateOracle is AccessUpgradeable {
     /// @return rate Borrow interest rate
     function marketRate(address _asset) external returns (uint256 rate) {
         RateOracleStorage storage $ = _getRateOracleStorage();
-        IOracle.OracleData memory data = $.oracleData[_asset];
+        IOracle.OracleData memory data = $.marketOracleData[_asset];
+        rate = _getRate(data.adapter, data.payload);
+    }
+
+    /// @notice View the utilization rate for an asset
+    /// @param _asset Asset address
+    /// @return rate Utilization rate
+    function utilizationRate(address _asset) external returns (uint256 rate) {
+        RateOracleStorage storage $ = _getRateOracleStorage();
+        IOracle.OracleData memory data = $.utilizationOracleData[_asset];
         rate = _getRate(data.adapter, data.payload);
     }
 
@@ -70,24 +83,44 @@ contract RateOracle is AccessUpgradeable {
         rate = $.restakerRate[_agent];
     }
 
-    /// @notice View the oracle data for an asset
+    /// @notice View the market oracle data for an asset
     /// @param _asset Asset address
     /// @return data Oracle data for an asset
-    function rateOracleData(address _asset) external view returns (IOracle.OracleData memory data) {
+    function marketOracleData(address _asset) external view returns (IOracle.OracleData memory data) {
         RateOracleStorage storage $ = _getRateOracleStorage();
-        data = $.oracleData[_asset];
+        data = $.marketOracleData[_asset];
     }
 
-    /// @notice Set a rate source for an asset
+    /// @notice View the utilization oracle data for an asset
+    /// @param _asset Asset address
+    /// @return data Oracle data for an asset
+    function utilizationOracleData(address _asset) external view returns (IOracle.OracleData memory data) {
+        RateOracleStorage storage $ = _getRateOracleStorage();
+        data = $.utilizationOracleData[_asset];
+    }
+
+    /// @notice Set a market source for an asset
     /// @param _asset Asset address
     /// @param _oracleData Oracle data
-    function setRateOracleData(address _asset, IOracle.OracleData calldata _oracleData)
+    function setMarketOracleData(address _asset, IOracle.OracleData calldata _oracleData)
         external
-        checkAccess(this.setRateOracleData.selector)
+        checkAccess(this.setMarketOracleData.selector)
     {
         RateOracleStorage storage $ = _getRateOracleStorage();
-        $.oracleData[_asset] = _oracleData;
-        emit SetRateOracleData(_asset, _oracleData);
+        $.marketOracleData[_asset] = _oracleData;
+        emit SetMarketOracleData(_asset, _oracleData);
+    }
+
+    /// @notice Set a utilization source for an asset
+    /// @param _asset Asset address
+    /// @param _oracleData Oracle data
+    function setUtilizationOracleData(address _asset, IOracle.OracleData calldata _oracleData)
+        external
+        checkAccess(this.setUtilizationOracleData.selector)
+    {
+        RateOracleStorage storage $ = _getRateOracleStorage();
+        $.utilizationOracleData[_asset] = _oracleData;
+        emit SetUtilizationOracleData(_asset, _oracleData);
     }
 
     /// @notice Update the minimum interest rate for an asset

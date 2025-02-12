@@ -16,7 +16,7 @@ contract ConfigureAccessControl {
 
         accessControl.grantAccess(IOracle.setBenchmarkRate.selector, infra.oracle, users.rate_oracle_admin);
         accessControl.grantAccess(IOracle.setRestakerRate.selector, infra.oracle, users.rate_oracle_admin);
-        accessControl.grantAccess(IOracle.setRateOracleData.selector, infra.oracle, users.rate_oracle_admin);
+        accessControl.grantAccess(IOracle.setMarketOracleData.selector, infra.oracle, users.rate_oracle_admin);
 
         accessControl.grantAccess(Lender.addAsset.selector, infra.lender, users.lender_admin);
         accessControl.grantAccess(Lender.removeAsset.selector, infra.lender, users.lender_admin);
