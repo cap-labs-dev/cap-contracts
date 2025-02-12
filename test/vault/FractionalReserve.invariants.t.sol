@@ -184,7 +184,7 @@ contract TestFractionalReserveHandler is StdUtils {
         lastInterestUpdate[currentAsset] = block.timestamp;
     }
 
-    function divest(uint256 assetSeed, uint256 amount) external useAsset(assetSeed) {
+    function divest(uint256 assetSeed) external useAsset(assetSeed) {
         uint256 invested = getInvestedAmount(currentAsset);
         if (invested == 0) return;
 
