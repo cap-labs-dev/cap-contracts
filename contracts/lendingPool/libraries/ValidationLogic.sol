@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { INetwork } from "../../interfaces/INetwork.sol";
+import { IDelegation } from "../../interfaces/IDelegation.sol";
 import { IOracle } from "../../interfaces/IOracle.sol";
 
 import { ViewLogic } from "./ViewLogic.sol";
@@ -53,7 +53,7 @@ library ValidationLogic {
     function validateBorrow(
         DataTypes.LenderStorage storage $,
         DataTypes.BorrowParams memory params
-    ) external view {
+    ) external {
         if (params.receiver == address(0) || params.asset == address(0)) revert ZeroAddressNotValid();
         if ($.reservesData[params.asset].paused) revert ReservePaused();
 
@@ -61,13 +61,15 @@ library ValidationLogic {
 
         if (health < 1e27) revert HealthFactorLowerThanLiquidationThreshold();
 
-        uint256 ltv = INetwork($.delegation).ltv(params.agent);
+        uint256 ltv = IDelegation($.delegation).ltv(params.agent);
         uint256 assetPrice = IOracle($.oracle).getPrice(params.asset);
         uint256 newTotalDebt = totalDebt + 
             ( params.amount * assetPrice / (10 ** $.reservesData[params.asset].decimals) );
         uint256 borrowCapacity = totalDelegation * ltv;
         
         if (newTotalDebt > borrowCapacity) revert CollateralCannotCoverNewBorrow();
+
+        IDelegation($.delegation).setLastBorrow(params.agent);
     }
 
     /// @notice Validate the initialization of the liquidation of an agent

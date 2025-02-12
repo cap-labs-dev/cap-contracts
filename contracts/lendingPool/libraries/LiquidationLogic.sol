@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { INetwork } from "../../interfaces/INetwork.sol";
+import { IDelegation } from "../../interfaces/IDelegation.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
 
 import {ValidationLogic} from "./ValidationLogic.sol";
@@ -95,7 +95,7 @@ library LiquidationLogic {
         liquidatedValue = (liquidated + bonus) * assetPrice / (10 ** $.reservesData[params.asset].decimals);
         if (totalDelegation < liquidatedValue) liquidatedValue = totalDelegation;
 
-        INetwork($.delegation).slash(params.agent, params.caller, liquidatedValue);
+        IDelegation($.delegation).slash(params.agent, params.caller, liquidatedValue);
 
         emit Liquidate(params.agent, params.caller, params.asset, liquidated, liquidatedValue);
     }
