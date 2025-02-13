@@ -117,10 +117,16 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
             IVault vault = IVault($.vaults[_agent][i]);
 
             (, uint256 totalSlashableCollateral) =
-                coverageByVault($.network, _agent, address(vault), $.oracle, _timestamp);
+                slashableCollateralByVault($.network, _agent, address(vault), $.oracle, _timestamp);
             if (totalSlashableCollateral == 0) continue;
 
-            uint256 slashShareOfCollateral = totalSlashableCollateral * _slashShare / 1e18;
+            // Round up in favor of the liquidator
+            uint256 slashShareOfCollateral =(totalSlashableCollateral * _slashShare / 1e18) + 1;
+
+            // If the slash share is greater than the total slashable collateral, set it to the total slashable collateral
+            if (slashShareOfCollateral > totalSlashableCollateral) {
+                slashShareOfCollateral = totalSlashableCollateral;
+            }
 
             ISlasher(vault.slasher()).slash(
                 subnetwork(_agent), _agent, slashShareOfCollateral, _timestamp, new bytes(0)
@@ -134,35 +140,84 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
         }
     }
 
-    /// @notice Coverage by vault
+    /// @dev get vault info
     /// @param _network Network address
     /// @param _agent Agent address
     /// @param _vault Vault address
     /// @param _oracle Oracle address
-    /// @param _timestamp Timestamp
-    /// @return collateralValue Collateral value
-    /// @return collateral Collateral amount
-    function coverageByVault(address _network, address _agent, address _vault, address _oracle, uint48 _timestamp)
-        public
-        view
-        returns (uint256 collateralValue, uint256 collateral)
-    {
-        IBurnerRouter burnerRouter = IBurnerRouter(IVault(_vault).burner());
+    /// @return burnerRouter The burner router contract
+    /// @return decimals The collateral token decimals
+    /// @return collateralPrice The collateral token price
+    function _getVaultInfo(
+        address _network,
+        address _agent,
+        address _vault,
+        address _oracle
+    ) private view returns (
+        IBurnerRouter burnerRouter,
+        uint8 decimals,
+        uint256 collateralPrice
+    ) {
+        burnerRouter = IBurnerRouter(IVault(_vault).burner());
 
-        // the funds will not be sent to us, so the coverage is effectively 0
+        // Check pending receivers
         (address pendingReceiver,) = burnerRouter.pendingNetworkReceiver(_network);
-        if (pendingReceiver != address(0) && pendingReceiver != address(this)) return (0, 0);
+        if (pendingReceiver != address(0) && pendingReceiver != address(this)) {
+            return (IBurnerRouter(address(0)), 0, 0);
+        }
 
         (pendingReceiver,) = burnerRouter.pendingOperatorNetworkReceiver(_network, _agent);
-        if (pendingReceiver != address(0) && pendingReceiver != address(this)) return (0, 0);
+        if (pendingReceiver != address(0) && pendingReceiver != address(this)) {
+            return (IBurnerRouter(address(0)), 0, 0);
+        }
 
         address collateralAddress = IVault(_vault).collateral();
-        uint8 decimals = IERC20Metadata(collateralAddress).decimals();
-        uint256 collateralPrice = IOracle(_oracle).getPrice(collateralAddress);
+        decimals = IERC20Metadata(collateralAddress).decimals();
+        collateralPrice = IOracle(_oracle).getPrice(collateralAddress);
+    }
 
-        collateral = IBaseDelegator(IVault(_vault).delegator()).stakeAt(subnetwork(_agent), _agent, _timestamp, "");
+    function coverageByVault(
+        address _network,
+        address _agent,
+        address _vault,
+        address _oracle,
+        uint48 _timestamp
+    ) public view returns (uint256 collateralValue, uint256 collateral) {
+        (
+            IBurnerRouter burnerRouter,
+            uint8 decimals,
+            uint256 collateralPrice
+        ) = _getVaultInfo(_network, _agent, _vault, _oracle);
+        
+        if (address(burnerRouter) == address(0)) return (0, 0);
+
+        collateral = IBaseDelegator(IVault(_vault).delegator()).stakeAt(
+            subnetwork(_agent),
+            _agent,
+            _timestamp,
+            ""
+        );
         collateralValue = collateral * collateralPrice / (10 ** decimals);
-        return (collateralValue, collateral);
+    }
+
+    function slashableCollateralByVault(
+        address _network,
+        address _agent,
+        address _vault,
+        address _oracle,
+        uint48 _timestamp
+    ) public view returns (uint256 collateralValue, uint256 collateral) {
+        (
+            IBurnerRouter burnerRouter,
+            uint8 decimals,
+            uint256 collateralPrice
+        ) = _getVaultInfo(_network, _agent, _vault, _oracle);
+        
+        if (address(burnerRouter) == address(0)) return (0, 0);
+
+        ISlasher slasher = ISlasher(IVault(_vault).slasher());
+        collateral = slasher.slashableStake(subnetwork(_agent), _agent, _timestamp, "");
+        collateralValue = collateral * collateralPrice / (10 ** decimals);
     }
 
     /// @notice Coverage of an agent by Symbiotic vaults
