@@ -60,7 +60,6 @@ library DataTypes {
         address restakerDebtToken;
         address interestDebtToken;
         address interestReceiver;
-        uint8 decimals;
         uint256 bonusCap;
     }
 }
