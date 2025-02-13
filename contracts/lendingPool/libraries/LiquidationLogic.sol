@@ -87,10 +87,18 @@ library LiquidationLogic {
             })
         );
 
-        uint256 elapsed = block.timestamp - ($.liquidationStart[params.agent] + $.grace);
-        uint256 duration = $.expiry - $.grace;
-        if (elapsed > duration) elapsed = duration;
-        uint256 bonus = liquidated * $.bonusCap * elapsed / (duration * 1e27);
+        uint256 bonus;
+        if (totalDelegation > totalDebt) {
+            uint256 elapsed = block.timestamp - ($.liquidationStart[params.agent] + $.grace);
+            uint256 duration = $.expiry - $.grace;
+            if (elapsed > duration) elapsed = duration;
+
+            uint256 bonusPercentage = $.bonusCap * elapsed / duration;
+            uint256 maxHealthyBonusPercentage = (totalDelegation - totalDebt) * 1e27 / totalDebt;
+            if (bonusPercentage > maxHealthyBonusPercentage) bonusPercentage = maxHealthyBonusPercentage;
+
+            bonus = liquidated * bonusPercentage / 1e27;
+        }
 
         liquidatedValue = (liquidated + bonus) * assetPrice / (10 ** $.reservesData[params.asset].decimals);
         if (totalDelegation < liquidatedValue) liquidatedValue = totalDelegation;
