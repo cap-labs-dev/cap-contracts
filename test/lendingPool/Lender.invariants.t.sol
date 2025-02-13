@@ -46,7 +46,7 @@ contract LenderInvariantsTest is TestDeployer {
     }
 
     /// @dev Test that total borrowed never exceeds available assets
-    /// forge-config: default.invariant.runs = 5
+    /// forge-config: default.invariant.runs = 10
     /// forge-config: default.invariant.depth = 20
     function invariant_borrowingLimits() public view {
         address[] memory assets = env.vault.assets;
@@ -67,7 +67,7 @@ contract LenderInvariantsTest is TestDeployer {
     }
 
     /// @dev Test that user borrows never exceed their delegation
-    /// forge-config: default.invariant.runs = 5
+    /// forge-config: default.invariant.runs = 10
     /// forge-config: default.invariant.depth = 20
     function invariant_agentDelegationLimitsDebt() public view {
         address[] memory agents = env.testUsers.agents;
@@ -104,7 +104,6 @@ contract TestLenderHandler is StdUtils, TimeUtils, RandomActorUtils, RandomAsset
         address currentAsset = randomAsset(assetSeed);
 
         uint256 availableToBorrow = lender.maxBorrowable(agent, currentAsset);
-        console.log("availableToBorrow", availableToBorrow);
         amount = bound(amount, 0, availableToBorrow);
         if (amount == 0) return;
 
@@ -125,12 +124,15 @@ contract TestLenderHandler is StdUtils, TimeUtils, RandomActorUtils, RandomAsset
 
         // Mint tokens to repay
         MockERC20(currentAsset).mint(agent, amount);
-        IERC20(currentAsset).approve(address(lender), amount);
 
         // Execute repay
-        vm.startPrank(agent);
-        lender.repay(currentAsset, amount, agent);
-        vm.stopPrank();
+        {
+            vm.startPrank(agent);
+            IERC20(currentAsset).approve(address(lender), amount);
+
+            lender.repay(currentAsset, amount, agent);
+            vm.stopPrank();
+        }
     }
 
     function liquidate(uint256 agentSeed, uint256 liquidatorSeed, uint256 assetSeed, uint256 amount) external {
@@ -150,13 +152,16 @@ contract TestLenderHandler is StdUtils, TimeUtils, RandomActorUtils, RandomAsset
 
         // Mint tokens for liquidation
         MockERC20(currentAsset).mint(agent, amount);
-        IERC20(currentAsset).approve(address(lender), amount);
 
         // Execute liquidation
-        vm.startPrank(liquidator);
-        lender.initiateLiquidation(agent);
-        _timeTravel(lender.grace() + 1);
-        lender.liquidate(agent, currentAsset, amount);
-        vm.stopPrank();
+        {
+            vm.startPrank(liquidator);
+            IERC20(currentAsset).approve(address(lender), amount);
+
+            lender.initiateLiquidation(agent);
+            _timeTravel(lender.grace() + 1);
+            lender.liquidate(agent, currentAsset, amount);
+            vm.stopPrank();
+        }
     }
 }
