@@ -145,7 +145,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @param _params Parameters to add an asset
     function addAsset(DataTypes.AddAssetParams calldata _params) external checkAccess(this.addAsset.selector) {
         DataTypes.LenderStorage storage $ = LenderStorage.get();
-        if (ReserveLogic.addAsset($, _params)) ++$.reservesCount;
+        if (!ReserveLogic.addAsset($, _params)) ++$.reservesCount;
     }
 
     /// @notice Remove asset from lending when there is no borrows
