@@ -6,10 +6,6 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
 import { BorrowLogic } from "./libraries/BorrowLogic.sol";
 
-import { IDelegation } from "../interfaces/IDelegation.sol";
-import { IOracle } from "../interfaces/IOracle.sol";
-
-import { IVaultUpgradeable } from "../interfaces/IVaultUpgradeable.sol";
 import { LenderStorage } from "./libraries/LenderStorage.sol";
 import { LiquidationLogic } from "./libraries/LiquidationLogic.sol";
 import { ReserveLogic } from "./libraries/ReserveLogic.sol";
@@ -142,36 +138,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @return maxBorrowableAmount Maximum amount that can be borrowed in asset decimals
     function maxBorrowable(address _agent, address _asset) external view returns (uint256 maxBorrowableAmount) {
         if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();
-
-        DataTypes.LenderStorage storage $ = LenderStorage.get();
-        (uint256 totalDelegation, uint256 totalDebt,,, uint256 health) = ViewLogic.agent($, _agent);
-
-        // health is below liquidation threshold, no borrowing allowed
-        if (health < 1e27) return 0;
-
-        uint256 ltv = IDelegation($.delegation).ltv(_agent);
-        uint256 borrowCapacity = totalDelegation * ltv / 1e27;
-
-        //  already at or above borrow capacity
-        if (totalDebt >= borrowCapacity) return 0;
-
-        // Calculate remaining borrow capacity in USD (8 decimals)
-        uint256 remainingCapacity = borrowCapacity - totalDebt;
-
-        // Convert to asset amount using price and decimals
-        uint256 assetPrice = IOracle($.oracle).getPrice(_asset);
-        if (assetPrice == 0) return 0;
-
-        uint256 assetDecimals = $.reservesData[_asset].decimals;
-        maxBorrowableAmount = remainingCapacity * (10 ** assetDecimals) / assetPrice;
-
-        // Get total available assets using the vault's availableBalance function
-        uint256 totalAvailable = IVaultUpgradeable($.reservesData[_asset].vault).availableBalance(_asset);
-
-        // Limit maxBorrowableAmount by total available assets
-        if (totalAvailable < maxBorrowableAmount) {
-            maxBorrowableAmount = totalAvailable;
-        }
+        maxBorrowableAmount = ViewLogic.maxBorrowable(LenderStorage.get(), _agent, _asset);
     }
 
     /// @notice Add an asset to the Lender
