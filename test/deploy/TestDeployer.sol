@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
 import { NetworkMiddleware } from "../../contracts/delegation/providers/symbiotic/NetworkMiddleware.sol";
 import { VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
+
 import { SymbioticVaultParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 import { SymbioticNetworkAdapterParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 import {
@@ -24,6 +25,7 @@ import { DeployCapNetworkAdapter } from "../../contracts/deploy/service/provider
 import { DeploySymbioticVault } from "../../contracts/deploy/service/providers/symbiotic/DeploySymbioticVault.sol";
 import { ProxyUtils } from "../../contracts/deploy/utils/ProxyUtils.sol";
 import { SymbioticAddressbook, SymbioticUtils } from "../../contracts/deploy/utils/SymbioticUtils.sol";
+import { FeeAuction } from "../../contracts/lendingPool/FeeAuction.sol";
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
 import { CapToken } from "../../contracts/token/CapToken.sol";
 import { StakedCap } from "../../contracts/token/StakedCap.sol";
@@ -258,7 +260,6 @@ contract TestDeployer is
 
         vm.label(address(env.infra.accessControl), "AccessControlProxy");
         vm.label(address(env.infra.delegation), "DelegationProxy");
-        vm.label(address(env.infra.feeAuction), "FeeAuctionProxy");
         vm.label(address(env.infra.oracle), "OracleProxy");
         vm.label(address(env.infra.lender), "LenderProxy");
 
@@ -272,8 +273,8 @@ contract TestDeployer is
         }
 
         // Label vault contracts
-        vm.label(address(env.vault.capToken), "CapToken");
-        vm.label(address(env.vault.stakedCapToken), "StakedCapToken");
+        vm.label(address(env.vault.capToken), "cUSD");
+        vm.label(address(env.vault.stakedCapToken), "scUSD");
         vm.label(address(env.vault.feeAuction), "FeeAuction");
 
         // Label symbiotic contracts
@@ -298,6 +299,10 @@ contract TestDeployer is
         vm.label(address(env.libs.lenderReserveLogic), "LenderReserveLogic");
         vm.label(address(env.libs.lenderValidationLogic), "LenderValidationLogic");
         vm.label(address(env.libs.lenderViewLogic), "LenderViewLogic");
+
+        vm.label(address(vault.assets[0]), "USDT");
+        vm.label(address(vault.assets[1]), "USDC");
+        vm.label(address(vault.assets[2]), "USDX");
     }
 
     function _symbioticVaultConfigToEnv(SymbioticVaultConfig memory _vault) internal {
@@ -349,6 +354,7 @@ contract TestDeployer is
 
     Lender lender;
     Delegation delegation;
+    FeeAuction feeAuction;
 
     function _unwrapEnvToMakeTestsReadable() internal {
         vault = env.vault;
@@ -358,6 +364,7 @@ contract TestDeployer is
         weth = MockERC20(env.ethMock);
         cUSD = CapToken(vault.capToken);
         scUSD = StakedCap(vault.stakedCapToken);
+        feeAuction = FeeAuction(vault.feeAuction);
 
         middleware = NetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
         symbioticWethVault = _getSymbioticVaultConfig(0);
