@@ -1,0 +1,6 @@
+pre-commit:
+  parallel: true
+  commands:
+    forge-fmt:
+      glob: "*.sol"
+      run: forge fmt {staged_files} 
