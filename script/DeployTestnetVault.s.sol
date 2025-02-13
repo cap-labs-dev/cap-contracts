@@ -67,7 +67,7 @@ contract DeployTestnetVault is
         vault.lzperiphery = _deployVaultLzPeriphery(lzAb, zapAb, vault, users);
 
         /// ACCESS CONTROL
-        _initVaultAccessControl(infra, vault);
+        _initVaultAccessControl(infra, vault, env.users);
 
         /// VAULT ORACLE
         _initVaultOracle(libs, infra, vault);
@@ -80,7 +80,7 @@ contract DeployTestnetVault is
         }
 
         /// LENDER
-        _initVaultLender(vault, infra, users);
+        _initVaultLender(vault, infra);
 
         _saveVaultConfig(vault);
         vm.stopBroadcast();

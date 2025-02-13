@@ -42,6 +42,7 @@ struct UsersConfig {
     address delegation_admin;
     address oracle_admin;
     address lender_admin;
+    address fee_auction_admin;
     address access_control_admin;
     address address_provider_admin;
     address rate_oracle_admin;

@@ -44,7 +44,12 @@ contract FeeAuctionBuyTest is TestDeployer {
         assertEq(usdc.balanceOf(address(realizer)), 0);
 
         // ensure the auction price is the minimum start price
-        assertEq(feeAuction.currentPrice(), feeAuction.minStartPrice());
+        assertEq(feeAuction.currentPrice(), 1e18);
+        assertEq(feeAuction.paymentToken(), env.vault.capToken);
+        assertEq(feeAuction.paymentRecipient(), env.vault.stakedCapToken);
+        assertEq(feeAuction.startPrice(), 1e18);
+        assertEq(feeAuction.minStartPrice(), 1e18);
+        assertEq(feeAuction.duration(), 3 hours);
 
         _timeTravel(1 hours);
 
@@ -77,5 +82,61 @@ contract FeeAuctionBuyTest is TestDeployer {
 
         // fee auction price doubles after buy
         assertEq(feeAuction.currentPrice(), priceBeforeBuy * 2);
+    }
+
+    function test_setStartPrice() public {
+        uint256 newStartPrice = 2000e18;
+
+        // Non-admin should not be able to set start price
+        vm.prank(makeAddr("non_admin"));
+        vm.expectRevert();
+        feeAuction.setStartPrice(newStartPrice);
+
+        // Admin should be able to set start price
+        vm.prank(env.users.fee_auction_admin);
+        vm.expectEmit(false, false, false, true);
+        emit FeeAuction.SetStartPrice(newStartPrice);
+        feeAuction.setStartPrice(newStartPrice);
+
+        assertEq(feeAuction.startPrice(), newStartPrice);
+    }
+
+    function test_setDuration() public {
+        uint256 newDuration = 4 hours;
+
+        // Non-admin should not be able to set duration
+        vm.prank(makeAddr("non_admin"));
+        vm.expectRevert();
+        feeAuction.setDuration(newDuration);
+
+        // Admin should be able to set duration
+        vm.prank(env.users.fee_auction_admin);
+        vm.expectEmit(false, false, false, true);
+        emit FeeAuction.SetDuration(newDuration);
+        feeAuction.setDuration(newDuration);
+
+        assertEq(feeAuction.duration(), newDuration);
+
+        // Should revert when trying to set duration to 0
+        vm.prank(env.users.fee_auction_admin);
+        vm.expectRevert(FeeAuction.NoDuration.selector);
+        feeAuction.setDuration(0);
+    }
+
+    function test_setMinStartPrice() public {
+        uint256 newMinStartPrice = 500e18;
+
+        // Non-admin should not be able to set min start price
+        vm.prank(makeAddr("non_admin"));
+        vm.expectRevert();
+        feeAuction.setMinStartPrice(newMinStartPrice);
+
+        // Admin should be able to set min start price
+        vm.prank(env.users.fee_auction_admin);
+        vm.expectEmit(false, false, false, true);
+        emit FeeAuction.SetMinStartPrice(newMinStartPrice);
+        feeAuction.setMinStartPrice(newMinStartPrice);
+
+        assertEq(feeAuction.minStartPrice(), newMinStartPrice);
     }
 }

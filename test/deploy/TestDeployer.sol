@@ -102,7 +102,7 @@ contract TestDeployer is
         console.log("deploying access control");
         vm.startPrank(env.users.access_control_admin);
         _initInfraAccessControl(env.infra, env.users);
-        _initVaultAccessControl(env.infra, env.vault);
+        _initVaultAccessControl(env.infra, env.vault, env.users);
 
         /// ORACLE
         console.log("deploying oracle");

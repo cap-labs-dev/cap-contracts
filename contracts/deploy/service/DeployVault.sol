@@ -106,7 +106,9 @@ contract DeployVault is ProxyUtils {
         );
     }
 
-    function _initVaultAccessControl(InfraConfig memory infra, VaultConfig memory vault) internal {
+    function _initVaultAccessControl(InfraConfig memory infra, VaultConfig memory vault, UsersConfig memory users)
+        internal
+    {
         AccessControl accessControl = AccessControl(infra.accessControl);
         accessControl.grantAccess(VaultUpgradeable.borrow.selector, vault.capToken, infra.lender);
         accessControl.grantAccess(VaultUpgradeable.repay.selector, vault.capToken, infra.lender);
@@ -122,6 +124,10 @@ contract DeployVault is ProxyUtils {
             accessControl.grantAccess(RestakerDebtToken.burn.selector, vault.restakerDebtTokens[i], infra.lender);
             accessControl.grantAccess(InterestDebtToken.burn.selector, vault.interestDebtTokens[i], infra.lender);
         }
+
+        accessControl.grantAccess(FeeAuction.setMinStartPrice.selector, vault.feeAuction, users.fee_auction_admin);
+        accessControl.grantAccess(FeeAuction.setDuration.selector, vault.feeAuction, users.fee_auction_admin);
+        accessControl.grantAccess(FeeAuction.setStartPrice.selector, vault.feeAuction, users.fee_auction_admin);
     }
 
     function _initVaultLender(VaultConfig memory d, InfraConfig memory infra) internal {
