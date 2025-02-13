@@ -33,6 +33,7 @@ contract LenderInvariantsTest is TestDeployer {
     uint256 private constant BONUS_CAP = 1.1e27; // 110% bonus cap
     uint256 private constant GRACE_PERIOD = 1 days;
     uint256 private constant EXPIRY_PERIOD = 7 days;
+    uint256 private constant EMERGENCY_LIQUIDATION_THRESHOLD = 0.91e27; // CR <110% have no grace periods
 
     function setUp() public {
         _deployCapTestEnvironment();

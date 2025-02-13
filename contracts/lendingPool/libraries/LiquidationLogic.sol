@@ -65,7 +65,13 @@ library LiquidationLogic {
         (uint256 totalDelegation, uint256 totalDebt,, uint256 liquidationThreshold, uint256 health) =
             ViewLogic.agent($, params.agent);
 
-        ValidationLogic.validateLiquidation(health, $.liquidationStart[params.agent], $.grace, $.expiry);
+        ValidationLogic.validateLiquidation(
+            health,
+            totalDelegation * $.emergencyLiquidationThreshold / totalDebt,
+            $.liquidationStart[params.agent],
+            $.grace,
+            $.expiry
+        );
 
         uint256 assetPrice = IOracle($.oracle).getPrice(params.asset);
         uint256 maxLiquidation = (($.targetHealth * totalDebt) - (totalDelegation * liquidationThreshold))
@@ -77,9 +83,33 @@ library LiquidationLogic {
             DataTypes.RepayParams({ agent: params.agent, asset: params.asset, amount: liquidated, caller: params.caller })
         );
 
-        uint256 bonus;
+        uint256 bonus = getBonus($, totalDelegation, totalDebt, params.agent, liquidated);
+
+        liquidatedValue = (liquidated + bonus) * assetPrice / (10 ** $.reservesData[params.asset].decimals);
+        if (totalDelegation < liquidatedValue) liquidatedValue = totalDelegation;
+
+        IDelegation($.delegation).slash(params.agent, params.caller, liquidatedValue);
+
+        emit Liquidate(params.agent, params.caller, params.asset, liquidated, liquidatedValue);
+    }
+
+    /// @dev Get the bonus for a liquidation in asset decimals up to the pro-rata bonus cap or 
+    /// credit ratio, whichever is smaller.
+    /// @param $ Lender storage
+    /// @param totalDelegation Total delegation of an agent
+    /// @param totalDebt Total debt of an agent
+    /// @param agent Agent address
+    /// @param liquidated Liquidated amount in asset decimals
+    /// @param bonus Bonus amount of asset
+    function getBonus(
+        DataTypes.LenderStorage storage $,
+        uint256 totalDelegation,
+        uint256 totalDebt,
+        address agent,
+        uint256 liquidated
+    ) internal view returns (uint256 bonus) {
         if (totalDelegation > totalDebt) {
-            uint256 elapsed = block.timestamp - ($.liquidationStart[params.agent] + $.grace);
+            uint256 elapsed = block.timestamp - ($.liquidationStart[agent] + $.grace);
             uint256 duration = $.expiry - $.grace;
             if (elapsed > duration) elapsed = duration;
 
@@ -89,12 +119,5 @@ library LiquidationLogic {
 
             bonus = liquidated * bonusPercentage / 1e27;
         }
-
-        liquidatedValue = (liquidated + bonus) * assetPrice / (10 ** $.reservesData[params.asset].decimals);
-        if (totalDelegation < liquidatedValue) liquidatedValue = totalDelegation;
-
-        IDelegation($.delegation).slash(params.agent, params.caller, liquidatedValue);
-
-        emit Liquidate(params.agent, params.caller, params.asset, liquidated, liquidatedValue);
     }
 }

@@ -34,6 +34,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @param _grace Grace period before an agent becomes liquidatable
     /// @param _expiry Expiry period after which an agent cannot be liquidated until called again
     /// @param _bonusCap Bonus cap for liquidations
+    /// @param _emergencyLiquidationThreshold Liquidation threshold below which grace periods are voided
     function initialize(
         address _accessControl,
         address _delegation,
@@ -41,7 +42,8 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         uint256 _targetHealth,
         uint256 _grace,
         uint256 _expiry,
-        uint256 _bonusCap
+        uint256 _bonusCap,
+        uint256 _emergencyLiquidationThreshold
     ) external initializer {
         __Access_init(_accessControl);
         __UUPSUpgradeable_init();
@@ -56,6 +58,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         $.grace = _grace;
         $.expiry = _expiry;
         $.bonusCap = _bonusCap;
+        $.emergencyLiquidationThreshold = _emergencyLiquidationThreshold;
     }
 
     /// @notice Borrow an asset

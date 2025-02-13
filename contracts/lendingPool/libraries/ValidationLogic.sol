@@ -90,13 +90,22 @@ library ValidationLogic {
     /// @notice Validate the liquidation of an agent
     /// @dev Health of above 1e27 is healthy, below is liquidatable
     /// @param health Health of an agent's position
+    /// @param emergencyHealth Emergency health below which the grace period is voided
     /// @param start Last liquidation start time
     /// @param grace Grace period duration
     /// @param expiry Liquidation duration after which it expires
-    function validateLiquidation(uint256 health, uint256 start, uint256 grace, uint256 expiry) external view {
+    function validateLiquidation(
+        uint256 health,
+        uint256 emergencyHealth,
+        uint256 start,
+        uint256 grace,
+        uint256 expiry
+    ) external view {
         if (health >= 1e27) revert HealthFactorNotBelowThreshold();
-        if (block.timestamp <= start + grace) revert GracePeriodNotOver();
-        if (block.timestamp >= start + expiry) revert LiquidationExpired();
+        if (emergencyHealth >= 1e27) {
+            if (block.timestamp <= start + grace) revert GracePeriodNotOver();
+            if (block.timestamp >= start + expiry) revert LiquidationExpired();
+        }
     }
 
     /// TODO Check that the asset is borrowable from the vault

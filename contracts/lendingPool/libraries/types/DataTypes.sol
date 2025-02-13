@@ -16,6 +16,7 @@ library DataTypes {
         uint256 grace;
         uint256 expiry;
         uint256 bonusCap;
+        uint256 emergencyLiquidationThreshold;
     }
 
     struct ReserveData {
