@@ -20,11 +20,5 @@ contract DeployLibs {
         d.chainlinkAdapter = address(ChainlinkAdapter);
         d.capTokenAdapter = address(CapTokenAdapter);
         d.stakedCapAdapter = address(StakedCapAdapter);
-
-        d.lenderBorrowLogic = address(BorrowLogic);
-        d.lenderLiquidationLogic = address(LiquidationLogic);
-        d.lenderReserveLogic = address(ReserveLogic);
-        d.lenderValidationLogic = address(ValidationLogic);
-        d.lenderViewLogic = address(ViewLogic);
     }
 }

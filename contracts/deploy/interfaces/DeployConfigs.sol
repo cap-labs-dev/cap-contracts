@@ -6,11 +6,6 @@ struct LibsConfig {
     address chainlinkAdapter;
     address capTokenAdapter;
     address stakedCapAdapter;
-    address lenderBorrowLogic;
-    address lenderLiquidationLogic;
-    address lenderReserveLogic;
-    address lenderValidationLogic;
-    address lenderViewLogic;
 }
 
 struct ImplementationsConfig {

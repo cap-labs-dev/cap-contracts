@@ -125,7 +125,7 @@ contract TestDeployer is
         /// LENDER
         console.log("deploying lender");
         vm.startPrank(env.users.lender_admin);
-        _initVaultLender(env.vault, env.infra, env.users);
+        _initVaultLender(env.vault, env.infra);
 
         /// SYMBIOTIC NETWORK ADAPTER
         console.log("deploying symbiotic cap network address");
@@ -294,11 +294,6 @@ contract TestDeployer is
         vm.label(address(env.libs.chainlinkAdapter), "ChainlinkAdapter");
         vm.label(address(env.libs.capTokenAdapter), "CapTokenAdapter");
         vm.label(address(env.libs.stakedCapAdapter), "StakedCapTokenAdapter");
-        vm.label(address(env.libs.lenderBorrowLogic), "LenderBorrowLogic");
-        vm.label(address(env.libs.lenderLiquidationLogic), "LenderLiquidationLogic");
-        vm.label(address(env.libs.lenderReserveLogic), "LenderReserveLogic");
-        vm.label(address(env.libs.lenderValidationLogic), "LenderValidationLogic");
-        vm.label(address(env.libs.lenderViewLogic), "LenderViewLogic");
 
         vm.label(address(vault.assets[0]), "USDT");
         vm.label(address(vault.assets[1]), "USDC");

@@ -124,7 +124,7 @@ contract DeployVault is ProxyUtils {
         }
     }
 
-    function _initVaultLender(VaultConfig memory d, InfraConfig memory infra, UsersConfig memory users) internal {
+    function _initVaultLender(VaultConfig memory d, InfraConfig memory infra) internal {
         for (uint256 i = 0; i < d.assets.length; i++) {
             Lender(infra.lender).addAsset(
                 DataTypes.AddAssetParams({
