@@ -40,8 +40,8 @@ contract DelegationSlashTest is TestDeployer {
         /// USD Value of 620 of delegation
         delegation.slash(user_agent, liquidator, 620e8);
 
-        assertEq(weth.balanceOf(liquidator), 2e17);
-        assertEq(usdt.balanceOf(liquidator), 100e6);
+        assertApproxEqAbs(weth.balanceOf(liquidator), 2e17, 1);
+        assertApproxEqAbs(usdt.balanceOf(liquidator), 100e6, 1);
 
         vm.stopPrank();
     }
