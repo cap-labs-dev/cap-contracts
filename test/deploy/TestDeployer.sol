@@ -248,6 +248,14 @@ contract TestDeployer is
     }
 
     function _applyTestnetLabels() internal {
+        vm.label(address(env.implems.accessControl), "AccessControlImplem");
+        vm.label(address(env.implems.delegation), "DelegationImplem");
+        vm.label(address(env.implems.feeAuction), "FeeAuctionImplem");
+        vm.label(address(env.implems.oracle), "OracleImplem");
+        vm.label(address(env.implems.lender), "LenderImplem");
+        vm.label(address(env.implems.stakedCap), "StakedCapImplem");
+        vm.label(address(env.implems.capToken), "CapTokenImplem");
+
         vm.label(address(env.infra.accessControl), "AccessControlProxy");
         vm.label(address(env.infra.delegation), "DelegationProxy");
         vm.label(address(env.infra.feeAuction), "FeeAuctionProxy");
@@ -263,6 +271,11 @@ contract TestDeployer is
             vm.label(address(env.vault.interestDebtTokens[i]), IERC20Metadata(env.vault.interestDebtTokens[i]).symbol());
         }
 
+        // Label vault contracts
+        vm.label(address(env.vault.capToken), "CapToken");
+        vm.label(address(env.vault.stakedCapToken), "StakedCapToken");
+        vm.label(address(env.vault.feeAuction), "FeeAuction");
+
         // Label symbiotic contracts
         for (uint256 i = 0; i < env.symbiotic.vaults.length; i++) {
             vm.label(env.symbiotic.vaults[i], string.concat("SymbioticVault_", vm.toString(i)));
@@ -275,6 +288,16 @@ contract TestDeployer is
 
         vm.label(address(env.symbiotic.networkAdapter.networkMiddleware), "SymbioticNetworkMiddleware");
         vm.label(address(env.symbiotic.networkAdapter.network), "Cap_SymbioticNetwork");
+
+        vm.label(address(env.libs.aaveAdapter), "AaveAdapter");
+        vm.label(address(env.libs.chainlinkAdapter), "ChainlinkAdapter");
+        vm.label(address(env.libs.capTokenAdapter), "CapTokenAdapter");
+        vm.label(address(env.libs.stakedCapAdapter), "StakedCapTokenAdapter");
+        vm.label(address(env.libs.lenderBorrowLogic), "LenderBorrowLogic");
+        vm.label(address(env.libs.lenderLiquidationLogic), "LenderLiquidationLogic");
+        vm.label(address(env.libs.lenderReserveLogic), "LenderReserveLogic");
+        vm.label(address(env.libs.lenderValidationLogic), "LenderValidationLogic");
+        vm.label(address(env.libs.lenderViewLogic), "LenderViewLogic");
     }
 
     function _symbioticVaultConfigToEnv(SymbioticVaultConfig memory _vault) internal {

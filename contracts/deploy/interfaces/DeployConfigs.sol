@@ -6,6 +6,11 @@ struct LibsConfig {
     address chainlinkAdapter;
     address capTokenAdapter;
     address stakedCapAdapter;
+    address lenderBorrowLogic;
+    address lenderLiquidationLogic;
+    address lenderReserveLogic;
+    address lenderValidationLogic;
+    address lenderViewLogic;
 }
 
 struct ImplementationsConfig {
@@ -18,6 +23,7 @@ struct ImplementationsConfig {
     address principalDebtToken;
     address interestDebtToken;
     address restakerDebtToken;
+    address feeAuction;
 }
 
 struct InfraConfig {
@@ -44,7 +50,6 @@ struct UsersConfig {
     address lender_admin;
     address access_control_admin;
     address address_provider_admin;
-    address interest_receiver;
     address rate_oracle_admin;
     address vault_config_admin;
     address middleware_admin;
@@ -54,6 +59,7 @@ struct UsersConfig {
 struct VaultConfig {
     address capToken; // also called the vault
     address stakedCapToken;
+    address feeAuction;
     VaultLzPeriphery lzperiphery;
     address[] assets;
     address[] principalDebtTokens;

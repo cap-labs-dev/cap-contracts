@@ -35,9 +35,7 @@ contract DeployInfra is ProxyUtils {
 
         // init infra instances
         AccessControl(d.accessControl).initialize(users.access_control_admin);
-        Lender(d.lender).initialize(
-            d.accessControl, d.delegation, d.oracle, 1.33e27, 1 hours, 1 days, 1e26, 0.91e27
-        );
+        Lender(d.lender).initialize(d.accessControl, d.delegation, d.oracle, 1.33e27, 1 hours, 1 days, 1e26, 0.91e27);
         Oracle(d.oracle).initialize(d.accessControl);
         Delegation(d.delegation).initialize(d.accessControl, d.oracle, 1 days);
     }
@@ -48,7 +46,9 @@ contract DeployInfra is ProxyUtils {
         address asset,
         uint48 maxCampaignLength
     ) internal returns (PreMainnetInfraConfig memory d) {
-        d.preMainnetVault = address(new PreMainnetVault(asset, address(srcAddressbook.endpointV2), dstAddressbook.eid, maxCampaignLength));
+        d.preMainnetVault = address(
+            new PreMainnetVault(asset, address(srcAddressbook.endpointV2), dstAddressbook.eid, maxCampaignLength)
+        );
     }
 
     function _deployL2InfraForVault(

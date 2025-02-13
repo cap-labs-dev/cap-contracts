@@ -2,13 +2,16 @@
 pragma solidity ^0.8.0;
 
 import { AccessControl } from "../../access/AccessControl.sol";
+
+import { Delegation } from "../../delegation/Delegation.sol";
+import { NetworkMiddleware } from "../../delegation/providers/symbiotic/NetworkMiddleware.sol";
+
+import { FeeAuction } from "../../lendingPool/FeeAuction.sol";
 import { Lender } from "../../lendingPool/Lender.sol";
 import { DataTypes } from "../../lendingPool/libraries/types/DataTypes.sol";
 import { InterestDebtToken } from "../../lendingPool/tokens/InterestDebtToken.sol";
 import { PrincipalDebtToken } from "../../lendingPool/tokens/PrincipalDebtToken.sol";
 import { RestakerDebtToken } from "../../lendingPool/tokens/RestakerDebtToken.sol";
-import { Delegation } from "../../delegation/Delegation.sol";
-import { NetworkMiddleware } from "../../delegation/providers/symbiotic/NetworkMiddleware.sol";
 
 import { CapToken } from "../../token/CapToken.sol";
 import { OFTLockbox } from "../../token/OFTLockbox.sol";
@@ -38,7 +41,18 @@ contract DeployVault is ProxyUtils {
         // deploy and init cap instances
         d.capToken = _proxy(implementations.capToken);
         d.stakedCapToken = _proxy(implementations.stakedCap);
-        CapToken(d.capToken).initialize(name, symbol, infra.accessControl, infra.feeAuction, infra.oracle, assets);
+
+        // deploy fee auction for this vault
+        d.feeAuction = _proxy(implementations.feeAuction);
+        FeeAuction(d.feeAuction).initialize(
+            infra.accessControl,
+            d.capToken, // payment token is the vault's cap token
+            d.stakedCapToken, // payment recipient is the staked cap token
+            1 days, // 24 hour auctions
+            1e18 // min price of 1 token
+        );
+
+        CapToken(d.capToken).initialize(name, symbol, infra.accessControl, d.feeAuction, infra.oracle, assets);
         StakedCap(d.stakedCapToken).initialize(infra.accessControl, d.capToken, 24 hours);
 
         // deploy and init debt tokens
@@ -97,6 +111,11 @@ contract DeployVault is ProxyUtils {
         accessControl.grantAccess(VaultUpgradeable.borrow.selector, vault.capToken, infra.lender);
         accessControl.grantAccess(VaultUpgradeable.repay.selector, vault.capToken, infra.lender);
 
+        // Configure FeeAuction access control
+        accessControl.grantAccess(FeeAuction.setStartPrice.selector, vault.feeAuction, infra.lender);
+        accessControl.grantAccess(FeeAuction.setDuration.selector, vault.feeAuction, infra.lender);
+        accessControl.grantAccess(FeeAuction.setMinStartPrice.selector, vault.feeAuction, infra.lender);
+
         for (uint256 i = 0; i < vault.assets.length; i++) {
             accessControl.grantAccess(PrincipalDebtToken.mint.selector, vault.principalDebtTokens[i], infra.lender);
             accessControl.grantAccess(PrincipalDebtToken.burn.selector, vault.principalDebtTokens[i], infra.lender);
@@ -114,10 +133,11 @@ contract DeployVault is ProxyUtils {
                     principalDebtToken: d.principalDebtTokens[i],
                     restakerDebtToken: d.restakerDebtTokens[i],
                     interestDebtToken: d.interestDebtTokens[i],
-                    interestReceiver: users.interest_receiver,
-                    bonusCap: 1e26 /// 10%
+                    interestReceiver: d.feeAuction,
+                    bonusCap: 0.1e27
                 })
             );
+
             Lender(infra.lender).pauseAsset(d.assets[i], false);
         }
     }

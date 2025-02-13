@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
+import { BorrowLogic } from "../../lendingPool/libraries/BorrowLogic.sol";
+import { LiquidationLogic } from "../../lendingPool/libraries/LiquidationLogic.sol";
+import { ReserveLogic } from "../../lendingPool/libraries/ReserveLogic.sol";
+import { ValidationLogic } from "../../lendingPool/libraries/ValidationLogic.sol";
+import { ViewLogic } from "../../lendingPool/libraries/ViewLogic.sol";
 import { AaveAdapter } from "../../oracle/libraries/AaveAdapter.sol";
 import { CapTokenAdapter } from "../../oracle/libraries/CapTokenAdapter.sol";
 import { ChainlinkAdapter } from "../../oracle/libraries/ChainlinkAdapter.sol";
@@ -15,5 +20,11 @@ contract DeployLibs {
         d.chainlinkAdapter = address(ChainlinkAdapter);
         d.capTokenAdapter = address(CapTokenAdapter);
         d.stakedCapAdapter = address(StakedCapAdapter);
+
+        d.lenderBorrowLogic = address(BorrowLogic);
+        d.lenderLiquidationLogic = address(LiquidationLogic);
+        d.lenderReserveLogic = address(ReserveLogic);
+        d.lenderValidationLogic = address(ValidationLogic);
+        d.lenderViewLogic = address(ViewLogic);
     }
 }
