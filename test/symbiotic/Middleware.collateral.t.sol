@@ -30,29 +30,6 @@ contract MiddlewareTest is TestDeployer {
         }
     }
 
-    function test_slash_sends_funds_to_middleware() public {
-        vm.startPrank(env.infra.delegation);
-
-        address recipient = makeAddr("recipient");
-        address agent = env.testUsers.agents[0];
-
-        // collateral in USDT (8 decimals)
-        console.log("coverage", middleware.coverage(agent));
-        assertEq(middleware.coverage(agent), 6200e8); // 1000 USDT + 5200 (2600 * 2) WETH
-
-        // slash 10% of agent collateral
-        middleware.slash(agent, recipient, 0.1e18, uint48(block.timestamp));
-
-        // all vaults have been slashed 10% and sent to the recipient
-        assertEq(IERC20(weth).balanceOf(recipient), 2e17);
-        assertEq(IERC20(usdt).balanceOf(recipient), 100e6);
-
-        // vaults have hooks that update the limits on slash
-        assertEq(middleware.coverage(agent), 5580e8); 
-
-        vm.stopPrank();
-    }
-
     function test_slash_does_not_work_if_not_slashable() public {
         {
             vm.startPrank(env.symbiotic.users.vault_admin);

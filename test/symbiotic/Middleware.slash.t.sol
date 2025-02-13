@@ -40,7 +40,7 @@ contract MiddlewareTest is TestDeployer {
         assertEq(middleware.coverage(agent), 6200e8);
 
         // slash 10% of agent collateral
-        middleware.slash(agent, recipient, 0.1e18, uint48(block.timestamp));
+        middleware.slash(agent, recipient, 0.1e18, uint48(block.timestamp) - 10);
 
         // all vaults have been slashed 10% and sent to the recipient
         assertEq(IERC20(usdt).balanceOf(recipient), 100e6);
@@ -164,7 +164,7 @@ contract MiddlewareTest is TestDeployer {
         }
 
         // collateral is now active
-        _timeTravel(1);
+        _timeTravel(3);
         assertEq(middleware.coverage(agent), 6200e8);
 
         // we should be able to slash immediately after delegation
@@ -173,7 +173,7 @@ contract MiddlewareTest is TestDeployer {
 
             address recipient = makeAddr("recipient");
 
-            middleware.slash(agent, recipient, 0.1e18, uint48(block.timestamp));
+            middleware.slash(agent, recipient, 0.1e18, uint48(block.timestamp) - 1);
 
             // all vaults have been slashed 10% and sent to the recipient
             assertEq(IERC20(usdt).balanceOf(recipient), 100e6);
