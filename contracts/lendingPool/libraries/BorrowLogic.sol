@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IVaultUpgradeable} from "../../interfaces/IVaultUpgradeable.sol";
-import {IPrincipalDebtToken} from "../../interfaces/IPrincipalDebtToken.sol";
-import {IDebtToken} from "../../interfaces/IDebtToken.sol";
+import { IDebtToken } from "../../interfaces/IDebtToken.sol";
+import { IPrincipalDebtToken } from "../../interfaces/IPrincipalDebtToken.sol";
+import { IVaultUpgradeable } from "../../interfaces/IVaultUpgradeable.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {ValidationLogic} from "./ValidationLogic.sol";
-import {AgentConfiguration} from "./configuration/AgentConfiguration.sol";
-import {DataTypes} from "./types/DataTypes.sol";
+import { ValidationLogic } from "./ValidationLogic.sol";
+import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
+import { DataTypes } from "./types/DataTypes.sol";
 
 /// @title BorrowLogic
 /// @author kexley, @capLabs
@@ -36,21 +36,23 @@ library BorrowLogic {
     event RealizeInterest(address indexed asset, uint256 realizedInterest, address interestReceiver);
 
     /// @notice Borrow an asset from the Lender, minting a debt token which must be repaid
-    /// @dev Interest debt token is updated before principal token is minted to bring index up to date. 
+    /// @dev Interest debt token is updated before principal token is minted to bring index up to date.
     /// Restaker debt token is updated after so the new principal debt can be used in calculations
     /// @param $ Lender storage
     /// @param params Parameters to borrow an asset
     function borrow(DataTypes.LenderStorage storage $, DataTypes.BorrowParams memory params) external {
         ValidationLogic.validateBorrow($, params);
 
-        if (!$.agentConfig[params.agent].isBorrowing($.reservesData[params.asset].id)) 
-            $.agentConfig[params.agent].setBorrowing($.reservesData[params.asset].id, true);
+        DataTypes.ReserveData memory reserve = $.reservesData[params.asset];
+        if (!$.agentConfig[params.agent].isBorrowing(reserve.id)) {
+            $.agentConfig[params.agent].setBorrowing(reserve.id, true);
+        }
 
-        IVaultUpgradeable($.reservesData[params.asset].vault).borrow(params.asset, params.amount, params.receiver);
+        IVaultUpgradeable(reserve.vault).borrow(params.asset, params.amount, params.receiver);
 
-        IDebtToken($.reservesData[params.asset].interestDebtToken).update(params.agent);
-        IPrincipalDebtToken($.reservesData[params.asset].principalDebtToken).mint(params.agent, params.amount);
-        IDebtToken($.reservesData[params.asset].restakerDebtToken).update(params.agent);
+        IDebtToken(reserve.interestDebtToken).update(params.agent);
+        IPrincipalDebtToken(reserve.principalDebtToken).mint(params.agent, params.amount);
+        IDebtToken(reserve.restakerDebtToken).update(params.agent);
 
         emit Borrow(params.agent, params.asset, params.amount);
     }
@@ -66,9 +68,10 @@ library BorrowLogic {
         external
         returns (uint256 repaid)
     {
-        uint256 principalDebt = IERC20($.reservesData[params.asset].principalDebtToken).balanceOf(params.agent);
-        uint256 restakerDebt = IERC20($.reservesData[params.asset].restakerDebtToken).balanceOf(params.agent);
-        uint256 interestDebt = IERC20($.reservesData[params.asset].interestDebtToken).balanceOf(params.agent);
+        DataTypes.ReserveData memory reserve = $.reservesData[params.asset];
+        uint256 principalDebt = IERC20(reserve.principalDebtToken).balanceOf(params.agent);
+        uint256 restakerDebt = IERC20(reserve.restakerDebtToken).balanceOf(params.agent);
+        uint256 interestDebt = IERC20(reserve.interestDebtToken).balanceOf(params.agent);
         uint256 principalRepaid;
         uint256 restakerRepaid;
         uint256 interestRepaid;
@@ -91,45 +94,46 @@ library BorrowLogic {
         }
 
         if (principalRepaid > 0) {
-            IPrincipalDebtToken($.reservesData[params.asset].principalDebtToken).burn(params.agent, principalRepaid);
+            IPrincipalDebtToken(reserve.principalDebtToken).burn(params.agent, principalRepaid);
             IERC20(params.asset).safeTransferFrom(params.caller, address(this), principalRepaid);
-            IERC20(params.asset).forceApprove($.reservesData[params.asset].vault, principalRepaid);
-            IVaultUpgradeable($.reservesData[params.asset].vault).repay(params.asset, principalRepaid);
+            IERC20(params.asset).forceApprove(reserve.vault, principalRepaid);
+            IVaultUpgradeable(reserve.vault).repay(params.asset, principalRepaid);
         }
 
         if (restakerRepaid > 0) {
-            restakerRepaid = IDebtToken($.reservesData[params.asset].restakerDebtToken).burn(params.agent, restakerRepaid);
-            IERC20(params.asset).safeTransferFrom(params.caller, $.restakerInterestReceiver[params.agent], restakerRepaid);
+            restakerRepaid = IDebtToken(reserve.restakerDebtToken).burn(params.agent, restakerRepaid);
+            IERC20(params.asset).safeTransferFrom(
+                params.caller, $.restakerInterestReceiver[params.agent], restakerRepaid
+            );
         }
 
         if (interestRepaid > 0) {
             uint256 realizedInterestRepaid;
-            if ($.reservesData[params.asset].realizedInterest > 0) {
+            if (reserve.realizedInterest > 0) {
                 /// Repay realized interest directly back to vault instead of to fee auction
-                realizedInterestRepaid = interestRepaid < $.reservesData[params.asset].realizedInterest 
-                    ? interestRepaid 
-                    : $.reservesData[params.asset].realizedInterest;
-                
+                realizedInterestRepaid =
+                    interestRepaid < reserve.realizedInterest ? interestRepaid : reserve.realizedInterest;
+
                 $.reservesData[params.asset].realizedInterest -= realizedInterestRepaid;
                 IERC20(params.asset).safeTransferFrom(params.caller, address(this), realizedInterestRepaid);
-                IERC20(params.asset).forceApprove($.reservesData[params.asset].vault, realizedInterestRepaid);
-                IVaultUpgradeable($.reservesData[params.asset].vault).repay(params.asset, realizedInterestRepaid);
+                IERC20(params.asset).forceApprove(reserve.vault, realizedInterestRepaid);
+                IVaultUpgradeable(reserve.vault).repay(params.asset, realizedInterestRepaid);
             }
 
-            interestRepaid = IDebtToken($.reservesData[params.asset].interestDebtToken).burn(params.agent, interestRepaid);
+            interestRepaid = IDebtToken(reserve.interestDebtToken).burn(params.agent, interestRepaid);
             if (interestRepaid > realizedInterestRepaid) {
                 IERC20(params.asset).safeTransferFrom(
-                    params.caller, $.reservesData[params.asset].interestReceiver, interestRepaid - realizedInterestRepaid
+                    params.caller, reserve.interestReceiver, interestRepaid - realizedInterestRepaid
                 );
             }
         }
 
         if (
-            IERC20($.reservesData[params.asset].principalDebtToken).balanceOf(params.agent) == 0
-                && IERC20($.reservesData[params.asset].restakerDebtToken).balanceOf(params.agent) == 0
-                && IERC20($.reservesData[params.asset].interestDebtToken).balanceOf(params.agent) == 0
+            IERC20(reserve.principalDebtToken).balanceOf(params.agent) == 0
+                && IERC20(reserve.restakerDebtToken).balanceOf(params.agent) == 0
+                && IERC20(reserve.interestDebtToken).balanceOf(params.agent) == 0
         ) {
-            $.agentConfig[params.agent].setBorrowing($.reservesData[params.asset].id, false);
+            $.agentConfig[params.agent].setBorrowing(reserve.id, false);
             emit TotalRepayment(params.agent, params.asset);
         }
 
@@ -142,22 +146,17 @@ library BorrowLogic {
     /// @param $ Lender storage
     /// @param params Parameters for realizing interest
     /// @return realizedInterest Actual realized interest
-    function realizeInterest(
-        DataTypes.LenderStorage storage $,
-        DataTypes.RealizeInterestParams memory params
-    ) external returns (uint256 realizedInterest) {
-        uint256 totalInterest = IERC20($.reservesData[params.asset].interestDebtToken).totalSupply();
-        uint256 maxRealization = totalInterest > $.reservesData[params.asset].realizedInterest 
-            ? totalInterest - $.reservesData[params.asset].realizedInterest 
-            : 0;
+    function realizeInterest(DataTypes.LenderStorage storage $, DataTypes.RealizeInterestParams memory params)
+        external
+        returns (uint256 realizedInterest)
+    {
+        DataTypes.ReserveData memory reserve = $.reservesData[params.asset];
+        uint256 totalInterest = IERC20(reserve.interestDebtToken).totalSupply();
+        uint256 maxRealization = totalInterest > reserve.realizedInterest ? totalInterest - reserve.realizedInterest : 0;
         realizedInterest = params.amount > maxRealization ? maxRealization : params.amount;
 
         $.reservesData[params.asset].realizedInterest += realizedInterest;
-        IVaultUpgradeable($.reservesData[params.asset].vault).borrow(
-            params.asset,
-            realizedInterest,
-            $.reservesData[params.asset].interestReceiver
-        );
-        emit RealizeInterest(params.asset, realizedInterest, $.reservesData[params.asset].interestReceiver);
+        IVaultUpgradeable(reserve.vault).borrow(params.asset, realizedInterest, reserve.interestReceiver);
+        emit RealizeInterest(params.asset, realizedInterest, reserve.interestReceiver);
     }
 }

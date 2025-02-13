@@ -32,7 +32,8 @@ contract VaultAdapter is AccessUpgradeable {
     }
 
     /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.VaultAdapter")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant VaultAdapterStorageLocation = 0x2b1d5d801322d1007f654ac87d8072a5f5ca4203517edc869ef2aa54addad600;
+    bytes32 private constant VaultAdapterStorageLocation =
+        0x2b1d5d801322d1007f654ac87d8072a5f5ca4203517edc869ef2aa54addad600;
 
     /// @dev Get this contract storage pointer
     /// @return $ Storage pointer
@@ -81,11 +82,10 @@ contract VaultAdapter is AccessUpgradeable {
     /// @param _maxMultiplier Maximum slope multiplier
     /// @param _minMultiplier Minimum slope multiplier
     /// @param _rate Rate at which the multiplier shifts
-    function setLimits(
-        uint256 _maxMultiplier,
-        uint256 _minMultiplier,
-        uint256 _rate
-    ) external checkAccess(this.setLimits.selector) {
+    function setLimits(uint256 _maxMultiplier, uint256 _minMultiplier, uint256 _rate)
+        external
+        checkAccess(this.setLimits.selector)
+    {
         VaultAdapterStorage storage $ = get();
         $.maxMultiplier = _maxMultiplier;
         $.minMultiplier = _minMultiplier;
@@ -94,36 +94,38 @@ contract VaultAdapter is AccessUpgradeable {
 
     /// @dev Interest is applied according to where on the slope the current utilization is and the
     /// multiplier depends on the duration and distance the utilization is from the kink point.
+    /// All utilization values, kinks, and multipliers are in ray (1e27)
     /// @param _asset Asset address
-    /// @param _utilization Utilization ratio
+    /// @param _utilization Utilization ratio in ray (1e27)
     /// @param _elapsed Length of time at the utilization
-    /// @return interestRate Interest rate
-    function _applySlopes(
-        address _asset,
-        uint256 _utilization,
-        uint256 _elapsed
-    ) internal returns (uint256 interestRate) {
+    /// @return interestRate Interest rate in ray (1e27)
+    function _applySlopes(address _asset, uint256 _utilization, uint256 _elapsed)
+        internal
+        returns (uint256 interestRate)
+    {
         VaultAdapterStorage storage $ = get();
         SlopeData memory slopes = $.slopeData[_asset];
         if (_utilization > slopes.kink) {
             uint256 excess = _utilization - slopes.kink;
-            $.utilizationData[_asset].utilizationMultiplier *= 
+            $.utilizationData[_asset].utilizationMultiplier *=
                 (1e27 + (1e27 * excess / (1e27 - slopes.kink)) * (_elapsed * $.rate / 1e27));
 
-            if ($.utilizationData[_asset].utilizationMultiplier > $.maxMultiplier) 
+            if ($.utilizationData[_asset].utilizationMultiplier > $.maxMultiplier) {
                 $.utilizationData[_asset].utilizationMultiplier = $.maxMultiplier;
+            }
 
-            interestRate = (slopes.slope0 + (slopes.slope1 * excess / 1e27)) 
+            interestRate = (slopes.slope0 + (slopes.slope1 * excess / 1e27))
                 * $.utilizationData[_asset].utilizationMultiplier / 1e27;
         } else {
-            $.utilizationData[_asset].utilizationMultiplier /= 
+            $.utilizationData[_asset].utilizationMultiplier /=
                 (1e27 + (1e27 * (slopes.kink - _utilization) / slopes.kink) * (_elapsed * $.rate / 1e27));
-                
-            if ($.utilizationData[_asset].utilizationMultiplier < $.minMultiplier) 
-                $.utilizationData[_asset].utilizationMultiplier = $.minMultiplier;
 
-            interestRate = (slopes.slope0 * _utilization / slopes.kink) 
-                * $.utilizationData[_asset].utilizationMultiplier / 1e27;
+            if ($.utilizationData[_asset].utilizationMultiplier < $.minMultiplier) {
+                $.utilizationData[_asset].utilizationMultiplier = $.minMultiplier;
+            }
+
+            interestRate =
+                (slopes.slope0 * _utilization / slopes.kink) * $.utilizationData[_asset].utilizationMultiplier / 1e27;
         }
     }
 }

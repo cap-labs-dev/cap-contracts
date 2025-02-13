@@ -115,11 +115,12 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
 
         for (uint256 i; i < $.vaults[_agent].length; ++i) {
             IVault vault = IVault($.vaults[_agent][i]);
-            (, uint256 delegatedCollateral) =
-                coverageByVault($.network, _agent, address(vault), $.oracle, uint48(block.timestamp));
-            if (delegatedCollateral == 0) continue;
 
-            uint256 slashShareOfCollateral = delegatedCollateral * _slashShare / 1e18;
+            (, uint256 totalSlashableCollateral) =
+                coverageByVault($.network, _agent, address(vault), $.oracle, _timestamp);
+            if (totalSlashableCollateral == 0) continue;
+
+            uint256 slashShareOfCollateral = totalSlashableCollateral * _slashShare / 1e18;
 
             ISlasher(vault.slasher()).slash(
                 subnetwork(_agent), _agent, slashShareOfCollateral, _timestamp, new bytes(0)

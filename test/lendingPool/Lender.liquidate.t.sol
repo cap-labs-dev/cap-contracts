@@ -20,7 +20,7 @@ contract LenderLiquidateTest is TestDeployer {
         // borrow some assets
         {
             vm.startPrank(user_agent);
-            Lender(env.infra.lender).borrow(address(usdc), 1000e6, user_agent);
+            lender.borrow(address(usdc), 1000e6, user_agent);
             assertEq(usdc.balanceOf(user_agent), 1000e6);
             vm.stopPrank();
         }

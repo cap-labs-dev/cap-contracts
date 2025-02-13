@@ -8,14 +8,11 @@ import { console } from "forge-std/console.sol";
 
 contract DelegationSlashTest is TestDeployer {
     address user_agent;
-    Delegation delegation;
 
     function setUp() public {
         _deployCapTestEnvironment();
         _initTestVaultLiquidity(env.vault);
         _initSymbioticVaultsLiquidity(env);
-
-        delegation = Delegation(env.infra.delegation);
 
         user_agent = env.testUsers.agents[0];
 
@@ -40,7 +37,8 @@ contract DelegationSlashTest is TestDeployer {
 
         address liquidator = makeAddr("liquidator");
 
-        delegation.slash(user_agent, liquidator, 620e8); /// USD Value of 620 of delegation
+        /// USD Value of 620 of delegation
+        delegation.slash(user_agent, liquidator, 620e8);
 
         assertEq(weth.balanceOf(liquidator), 2e17);
         assertEq(usdt.balanceOf(liquidator), 100e6);
