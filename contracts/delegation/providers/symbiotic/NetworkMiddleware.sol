@@ -107,19 +107,22 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     /// @param _recipient Recipient of the slashed assets
     /// @param _slashShare Percentage of delegation to slash encoded with 18 decimals
     /// @param _timestamp Timestamp to slash at
-    function slash(address _agent, address _recipient, uint256 _slashShare, uint48 _timestamp) external checkAccess(this.slash.selector) {
+    function slash(address _agent, address _recipient, uint256 _slashShare, uint48 _timestamp)
+        external
+        checkAccess(this.slash.selector)
+    {
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
 
         for (uint256 i; i < $.vaults[_agent].length; ++i) {
             IVault vault = IVault($.vaults[_agent][i]);
-            (, uint256 delegatedCollateral) = coverageByVault($.network, _agent, address(vault), $.oracle, _timestamp);
+            (, uint256 delegatedCollateral) =
+                coverageByVault($.network, _agent, address(vault), $.oracle, uint48(block.timestamp));
             if (delegatedCollateral == 0) continue;
 
             uint256 slashShareOfCollateral = delegatedCollateral * _slashShare / 1e18;
-            uint48 slashTimestamp = _timestamp - 1;
 
             ISlasher(vault.slasher()).slash(
-                subnetwork(_agent), _agent, slashShareOfCollateral, slashTimestamp, new bytes(0)
+                subnetwork(_agent), _agent, slashShareOfCollateral, _timestamp, new bytes(0)
             );
 
             // TODO: the burner could be a non routing burner, could add hooks?
@@ -238,15 +241,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
 
         IERC20(_token).forceApprove(address(IStakerRewards(stakerRewarder)), amount);
         IStakerRewards(stakerRewarder).distributeRewards(
-            $.network,
-            _token,
-            amount,
-            abi.encode(
-                uint48(block.timestamp - 1),
-                $.feeAllowed, 
-                new bytes(0),
-                new bytes(0)
-            )
+            $.network, _token, amount, abi.encode(uint48(block.timestamp - 1), $.feeAllowed, new bytes(0), new bytes(0))
         );
     }
 
