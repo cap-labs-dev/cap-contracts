@@ -37,9 +37,8 @@ contract DelegationSlashTest is TestDeployer {
 
         address liquidator = makeAddr("liquidator");
 
-        delegation.slash(user_agent, liquidator, 620e8);
-
         /// USD Value of 620 of delegation
+        delegation.slash(user_agent, liquidator, 620e8);
 
         assertEq(weth.balanceOf(liquidator), 2e17);
         assertEq(usdt.balanceOf(liquidator), 100e6);

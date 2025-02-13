@@ -19,9 +19,9 @@ library ViewLogic {
     /// @param _agent Agent address
     /// @return totalDelegation Total delegation of an agent in USD, encoded with 8 decimals
     /// @return totalDebt Total debt of an agent in USD, encoded with 8 decimals
-    /// @return ltv Loan to value ratio, encoded with 18 decimals
-    /// @return liquidationThreshold Liquidation ratio of an agent, encoded with 18 decimals
-    /// @return health Health status of an agent, encoded with 18 decimals
+    /// @return ltv Loan to value ratio, encoded in ray (1e27)
+    /// @return liquidationThreshold Liquidation ratio of an agent, encoded in ray (1e27)
+    /// @return health Health status of an agent, encoded in ray (1e27)
     function agent(DataTypes.LenderStorage storage $, address _agent)
         external
         view
@@ -44,7 +44,7 @@ library ViewLogic {
             ) * IOracle($.oracle).getPrice(asset) / (10 ** $.reservesData[asset].decimals);
         }
 
-        ltv = totalDelegation == 0 ? 0 : totalDebt / totalDelegation;
-        health = totalDebt == 0 ? type(uint256).max : totalDelegation * liquidationThreshold / totalDebt;
+        ltv = totalDelegation == 0 ? 0 : (totalDebt * 1e27) / totalDelegation;
+        health = totalDebt == 0 ? type(uint256).max : (totalDelegation * liquidationThreshold) / totalDebt;
     }
 }

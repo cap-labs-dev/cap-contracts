@@ -28,9 +28,9 @@ contract LenderInvariantsTest is TestDeployer {
     TestLenderHandler public handler;
     address[] private actors;
 
-    // Constants
-    uint256 private constant TARGET_HEALTH = 2e18; // 2.0 target health factor
-    uint256 private constant BONUS_CAP = 1.1e18; // 110% bonus cap
+    // Constants - all values in ray (1e27)
+    uint256 private constant TARGET_HEALTH = 2e27; // 2.0 target health factor
+    uint256 private constant BONUS_CAP = 1.1e27; // 110% bonus cap
     uint256 private constant GRACE_PERIOD = 1 days;
     uint256 private constant EXPIRY_PERIOD = 7 days;
 
@@ -138,7 +138,7 @@ contract TestLenderHandler is StdUtils, TimeUtils, RandomActorUtils, RandomAsset
         address currentAsset = randomAsset(assetSeed);
 
         (,,,, uint256 health) = lender.agent(agent);
-        if (health >= 1e18) return;
+        if (health >= 1e27) return;
 
         // Get current debt
         (, uint256 totalDebt,,,) = lender.agent(agent);

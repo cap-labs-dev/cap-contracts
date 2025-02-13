@@ -125,9 +125,9 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @param _agent Address of agent
     /// @return totalDelegation Total delegation of an agent in USD, encoded with 8 decimals
     /// @return totalDebt Total debt of an agent in USD, encoded with 8 decimals
-    /// @return ltv Loan to value ratio, encoded with 18 decimals
-    /// @return liquidationThreshold Liquidation ratio of an agent, encoded with 18 decimals
-    /// @return health Health status of an agent, encoded with 18 decimals
+    /// @return ltv Loan to value ratio, encoded in ray (1e27)
+    /// @return liquidationThreshold Liquidation ratio of an agent, encoded in ray (1e27)
+    /// @return health Health status of an agent, encoded in ray (1e27)
     function agent(address _agent)
         external
         view
@@ -150,7 +150,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         if (health < 1e27) return 0;
 
         uint256 ltv = IDelegation($.delegation).ltv(_agent);
-        uint256 borrowCapacity = totalDelegation * ltv / 1e18;
+        uint256 borrowCapacity = totalDelegation * ltv / 1e27;
 
         //  already at or above borrow capacity
         if (totalDebt >= borrowCapacity) return 0;

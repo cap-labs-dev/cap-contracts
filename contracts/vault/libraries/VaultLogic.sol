@@ -225,20 +225,20 @@ library VaultLogic {
         emit RescueERC20(_asset, _receiver);
     }
 
-    /// @notice Utilization rate of an asset
-    /// @dev Utilization scaled by 1e27
+    /// @notice Calculate the utilization ratio of an asset
+    /// @dev Returns the ratio of borrowed assets to total supply, scaled to ray (1e27)
     /// @param $ Vault storage pointer
-    /// @param _asset Utilized asset
-    /// @return ratio Utilization ratio
+    /// @param _asset Asset address
+    /// @return ratio Utilization ratio in ray (1e27)
     function utilization(DataTypes.VaultStorage storage $, address _asset) public view returns (uint256 ratio) {
         ratio = $.totalSupplies[_asset] != 0 ? $.totalBorrows[_asset] * 1e27 / $.totalSupplies[_asset] : 0;
     }
 
     /// @notice Up to date cumulative utilization index of an asset
-    /// @dev Utilization scaled by 1e27
+    /// @dev Utilization and index are both scaled in ray (1e27)
     /// @param $ Vault storage pointer
     /// @param _asset Utilized asset
-    /// @return index Utilization ratio index
+    /// @return index Utilization ratio index in ray (1e27)
     function currentUtilizationIndex(DataTypes.VaultStorage storage $, address _asset)
         external
         view
