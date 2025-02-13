@@ -8,4 +8,6 @@ interface IDelegation {
     function liquidationThreshold(address agent) external view returns (uint256 liquidationThreshold);
     function networks(address agent) external view returns (address[] memory);
     function setLastBorrow(address agent) external;
+    function addAgent(address agent, uint256 ltv, uint256 liquidationThreshold) external;
+    function registerNetwork(address agent, address network) external;
 }

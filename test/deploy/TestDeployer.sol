@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
+import { Delegation } from "../../contracts/delegation/Delegation.sol";
 import { NetworkMiddleware } from "../../contracts/delegation/providers/symbiotic/NetworkMiddleware.sol";
 import { VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import { SymbioticVaultParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
@@ -23,6 +24,7 @@ import { DeployCapNetworkAdapter } from "../../contracts/deploy/service/provider
 import { DeploySymbioticVault } from "../../contracts/deploy/service/providers/symbiotic/DeploySymbioticVault.sol";
 import { ProxyUtils } from "../../contracts/deploy/utils/ProxyUtils.sol";
 import { SymbioticAddressbook, SymbioticUtils } from "../../contracts/deploy/utils/SymbioticUtils.sol";
+import { Lender } from "../../contracts/lendingPool/Lender.sol";
 import { CapToken } from "../../contracts/token/CapToken.sol";
 import { StakedCap } from "../../contracts/token/StakedCap.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
@@ -35,6 +37,8 @@ import { DeployTestUsers } from "./service/DeployTestUsers.sol";
 import { InitTestVaultLiquidity } from "./service/InitTestVaultLiquidity.sol";
 import { InitSymbioticVaultLiquidity } from "./service/provider/symbiotic/InitSymbioticVaultLiquidity.sol";
 import { TimeUtils } from "./utils/TimeUtils.sol";
+
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { Test } from "forge-std/Test.sol";
 import { Vm } from "forge-std/Vm.sol";
 import { console } from "forge-std/console.sol";
@@ -69,7 +73,7 @@ contract TestDeployer is
     function _deployCapTestEnvironment() internal {
         // we need to fork the sepolia network to deploy the symbiotic network adapter
         // hardcoding the block number to benefit from the anvil cache
-        vm.createSelectFork("https://sepolia.gateway.tenderly.co", 7512723);
+        vm.createSelectFork("sepolia", 7699085);
 
         (env.users, env.testUsers) = _deployTestUsers();
 
@@ -87,7 +91,6 @@ contract TestDeployer is
         env.usdMocks = _deployUSDMocks();
         env.ethMock = _deployEthMock();
         env.oracleMocks = _deployOracleMocks(env.usdMocks);
-
 
         console.log("deploying vault");
         env.vault = _deployVault(env.implems, env.infra, "Cap USD", "cUSD", env.oracleMocks.assets);
@@ -107,7 +110,9 @@ contract TestDeployer is
         for (uint256 i = 0; i < env.vault.assets.length; i++) {
             _initChainlinkPriceOracle(env.libs, env.infra, env.vault.assets[i], env.oracleMocks.chainlinkPriceFeeds[i]);
         }
-        _initChainlinkPriceOracle(env.libs, env.infra, env.ethMock, env.oracleMocks.chainlinkPriceFeeds[env.oracleMocks.assets.length]); // weth
+        _initChainlinkPriceOracle(
+            env.libs, env.infra, env.ethMock, env.oracleMocks.chainlinkPriceFeeds[env.oracleMocks.assets.length]
+        ); // weth
 
         console.log("deploying rate oracle");
         vm.startPrank(env.users.rate_oracle_admin);
@@ -239,6 +244,37 @@ contract TestDeployer is
         _timeTravel(28 days);
 
         _unwrapEnvToMakeTestsReadable();
+        _applyTestnetLabels();
+    }
+
+    function _applyTestnetLabels() internal {
+        vm.label(address(env.infra.accessControl), "AccessControlProxy");
+        vm.label(address(env.infra.delegation), "DelegationProxy");
+        vm.label(address(env.infra.feeAuction), "FeeAuctionProxy");
+        vm.label(address(env.infra.oracle), "OracleProxy");
+        vm.label(address(env.infra.lender), "LenderProxy");
+
+        for (uint256 i = 0; i < env.vault.assets.length; i++) {
+            vm.label(address(env.vault.assets[i]), IERC20Metadata(env.vault.assets[i]).symbol());
+            vm.label(
+                address(env.vault.principalDebtTokens[i]), IERC20Metadata(env.vault.principalDebtTokens[i]).symbol()
+            );
+            vm.label(address(env.vault.restakerDebtTokens[i]), IERC20Metadata(env.vault.restakerDebtTokens[i]).symbol());
+            vm.label(address(env.vault.interestDebtTokens[i]), IERC20Metadata(env.vault.interestDebtTokens[i]).symbol());
+        }
+
+        // Label symbiotic contracts
+        for (uint256 i = 0; i < env.symbiotic.vaults.length; i++) {
+            vm.label(env.symbiotic.vaults[i], string.concat("SymbioticVault_", vm.toString(i)));
+            vm.label(env.symbiotic.collaterals[i], string.concat("SymbioticCollateral_", vm.toString(i)));
+            vm.label(env.symbiotic.burnerRouters[i], string.concat("SymbioticBurnerRouter_", vm.toString(i)));
+            vm.label(env.symbiotic.globalReceivers[i], string.concat("SymbioticGlobalReceiver_", vm.toString(i)));
+            vm.label(env.symbiotic.delegators[i], string.concat("SymbioticDelegator_", vm.toString(i)));
+            vm.label(env.symbiotic.slashers[i], string.concat("SymbioticSlasher_", vm.toString(i)));
+        }
+
+        vm.label(address(env.symbiotic.networkAdapter.networkMiddleware), "SymbioticNetworkMiddleware");
+        vm.label(address(env.symbiotic.networkAdapter.network), "Cap_SymbioticNetwork");
     }
 
     function _symbioticVaultConfigToEnv(SymbioticVaultConfig memory _vault) internal {
@@ -288,6 +324,9 @@ contract TestDeployer is
     SymbioticNetworkRewardsConfig symbioticWethNetworkRewards;
     SymbioticNetworkRewardsConfig symbioticUsdtNetworkRewards;
 
+    Lender lender;
+    Delegation delegation;
+
     function _unwrapEnvToMakeTestsReadable() internal {
         vault = env.vault;
         usdt = MockERC20(vault.assets[0]);
@@ -302,5 +341,8 @@ contract TestDeployer is
         symbioticUsdtVault = _getSymbioticVaultConfig(1);
         symbioticWethNetworkRewards = _getSymbioticNetworkRewardsConfig(0);
         symbioticUsdtNetworkRewards = _getSymbioticNetworkRewardsConfig(1);
+
+        lender = Lender(env.infra.lender);
+        delegation = Delegation(env.infra.delegation);
     }
 }

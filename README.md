@@ -11,8 +11,11 @@ Required:
 
 Optional:
 - `slither`: [https://github.com/crytic/slither](https://github.com/crytic/slither)
+- `lcov`: [https://github.com/linux-test-project/lcov](https://github.com/linux-test-project/lcov)
 
 ## Setup
+
+### Pull dependencies
 
 ```shell
 # pull foundry's deps
@@ -20,6 +23,19 @@ git pull --recurse-submodules
 
 # install deps
 yarn install
+```
+
+### Setup environment
+
+Define `sepolia` chain in your `~/.foundry/foundry.toml`
+
+```toml
+[rpc_endpoints]
+sepolia = "https://sepolia.gateway.tenderly.co"
+...
+
+[etherscan]
+sepolia = { key = "...", url = "https://api-sepolia.etherscan.io/api" }
 ```
 
 ## Commands

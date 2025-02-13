@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
 import { INetwork } from "../delegation/interfaces/INetwork.sol";
+import { IDelegation } from "../interfaces/IDelegation.sol";
 import { DelegationStorage } from "./libraries/DelegationStorage.sol";
 import { DataTypes } from "./libraries/types/DataTypes.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -11,7 +12,7 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 /// @title Cap Delegation Contract
 /// @author Cap Labs
 /// @notice This contract manages delegation and slashing.
-contract Delegation is UUPSUpgradeable, AccessUpgradeable {
+contract Delegation is IDelegation, UUPSUpgradeable, AccessUpgradeable {
     event SlashNetwork(address network, uint256 slashShare);
     event AddAgent(address agent, uint256 ltv, uint256 liquidationThreshold);
     event ModifyAgent(address agent, uint256 ltv, uint256 liquidationThreshold);
@@ -119,17 +120,17 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
     function slash(address _agent, address _liquidator, uint256 _amount) external checkAccess(this.slash.selector) {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
 
-        // Get the timestamp that is most recent between the last borrow and the epoch -1 
+        // Get the timestamp that is most recent between the last borrow and the epoch -1
         uint256 slashTimestamp = Math.max((epoch() - 1) * $.epochDuration, $.agentData[_agent].lastBorrow);
-        
+
         // Calculate each network's proportion of total delegation
         for (uint i; i < $.networks[_agent].length; ++i) {
             address network = $.networks[_agent][i];
             uint256 networkCoverage = coverageByNetwork(_agent, network);
-            
+
             // Calculate this network's share of the total amount to slash
             uint256 networkSlash = _amount * 1e18 / networkCoverage;
-            
+
             INetwork(network).slash(_agent, _liquidator, networkSlash, uint48(slashTimestamp));
             emit SlashNetwork(network, networkSlash);
         }
@@ -186,10 +187,7 @@ contract Delegation is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Register a new network
     /// @param _agent Agent address
     /// @param _network Network address
-    function registerNetwork(address _agent, address _network)
-        external
-        checkAccess(this.registerNetwork.selector)
-    {
+    function registerNetwork(address _agent, address _network) external checkAccess(this.registerNetwork.selector) {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
 
         // Check for duplicates
