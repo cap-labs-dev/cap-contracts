@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { Lender } from "../../contracts/lendingPool/Lender.sol";
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
+import { Lender } from "../../contracts/lendingPool/Lender.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
 import { console } from "forge-std/console.sol";
@@ -22,8 +22,8 @@ contract LenderLiquidateTest is TestDeployer {
         // borrow some assets
         {
             vm.startPrank(user_agent);
-            lender.borrow(address(usdc), 1000000e6, user_agent);
-            assertEq(usdc.balanceOf(user_agent), 1000000e6);
+            lender.borrow(address(usdc), 10000e6, user_agent);
+            assertEq(usdc.balanceOf(user_agent), 10000e6);
 
             vm.stopPrank();
         }
@@ -38,11 +38,14 @@ contract LenderLiquidateTest is TestDeployer {
         // change eth oracle price
         {
             vm.startPrank(env.users.oracle_admin);
-            MockChainlinkPriceFeed(env.oracleMocks.chainlinkPriceFeeds[env.oracleMocks.assets.length]).setLatestAnswer(10e8);
+            MockChainlinkPriceFeed(env.oracleMocks.chainlinkPriceFeeds[env.oracleMocks.assets.length]).setLatestAnswer(
+                10e8
+            );
             vm.stopPrank();
         }
 
-        (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health) = lender.agent(user_agent);
+        (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health) =
+            lender.agent(user_agent);
         console.log("totalDelegation", totalDelegation);
         console.log("totalDebt", totalDebt);
         console.log("ltv", ltv);
