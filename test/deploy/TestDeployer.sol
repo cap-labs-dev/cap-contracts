@@ -75,7 +75,7 @@ contract TestDeployer is
     function _deployCapTestEnvironment() internal {
         // we need to fork the sepolia network to deploy the symbiotic network adapter
         // hardcoding the block number to benefit from the anvil cache
-        vm.createSelectFork("sepolia", 7699085);
+        vm.createSelectFork("https://eth-sepolia.public.blastapi.io", 7699085);
 
         (env.users, env.testUsers) = _deployTestUsers();
 
