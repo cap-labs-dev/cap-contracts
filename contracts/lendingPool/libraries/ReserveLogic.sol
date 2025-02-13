@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import { IDebtToken } from "../../interfaces/IDebtToken.sol";
 import { IPrincipalDebtToken } from "../../interfaces/IPrincipalDebtToken.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import { ValidationLogic } from "./ValidationLogic.sol";
 import { DataTypes } from "./types/DataTypes.sol";
@@ -49,7 +50,7 @@ library ReserveLogic {
             restakerDebtToken: params.restakerDebtToken,
             interestDebtToken: params.interestDebtToken,
             interestReceiver: params.interestReceiver,
-            decimals: params.decimals,
+            decimals: IERC20Metadata(params.asset).decimals(),
             paused: true,
             realizedInterest: 0
         });
