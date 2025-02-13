@@ -176,6 +176,14 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
         collateralPrice = IOracle(_oracle).getPrice(collateralAddress);
     }
 
+    /// @notice Coverage of an agent by a specific vault at a given timestamp
+    /// @param _network Network address
+    /// @param _agent Agent address
+    /// @param _vault Vault address
+    /// @param _oracle Oracle address
+    /// @param _timestamp Timestamp to check coverage at
+    /// @return collateralValue Coverage value in USD (8 decimals)
+    /// @return collateral Coverage amount
     function coverageByVault(
         address _network,
         address _agent,
@@ -200,6 +208,13 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
         collateralValue = collateral * collateralPrice / (10 ** decimals);
     }
 
+    /// @notice Slashable collateral of an agent by a specific vault at a given timestamp
+    /// @param _network Network address
+    /// @param _agent Agent address
+    /// @param _vault Vault address
+    /// @param _oracle Oracle address
+    /// @param _timestamp Timestamp to check slashable collateral at
+    /// @return collateralValue Slashable collateral value in USD (8 decimals)
     function slashableCollateralByVault(
         address _network,
         address _agent,
