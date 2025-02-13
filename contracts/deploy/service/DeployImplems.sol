@@ -4,6 +4,8 @@ pragma solidity ^0.8.0;
 import { AccessControl } from "../../access/AccessControl.sol";
 
 import { Delegation } from "../../delegation/Delegation.sol";
+
+import { FeeAuction } from "../../lendingPool/FeeAuction.sol";
 import { Lender } from "../../lendingPool/Lender.sol";
 import { InterestDebtToken } from "../../lendingPool/tokens/InterestDebtToken.sol";
 import { PrincipalDebtToken } from "../../lendingPool/tokens/PrincipalDebtToken.sol";
@@ -28,5 +30,6 @@ contract DeployImplems {
         d.principalDebtToken = address(new PrincipalDebtToken());
         d.interestDebtToken = address(new InterestDebtToken());
         d.restakerDebtToken = address(new RestakerDebtToken());
+        d.feeAuction = address(new FeeAuction());
     }
 }

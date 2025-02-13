@@ -10,11 +10,11 @@ contract WalletUsersConfig is WalletUtils {
             deployer: getWalletAddress(),
             access_control_admin: getWalletAddress(),
             address_provider_admin: getWalletAddress(),
-            interest_receiver: getWalletAddress(),
             oracle_admin: getWalletAddress(),
             rate_oracle_admin: getWalletAddress(),
             vault_config_admin: getWalletAddress(),
             lender_admin: getWalletAddress(),
+            fee_auction_admin: getWalletAddress(),
             delegation_admin: getWalletAddress(),
             middleware_admin: getWalletAddress(),
             staker_rewards_admin: getWalletAddress()

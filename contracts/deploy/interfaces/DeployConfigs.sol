@@ -18,12 +18,12 @@ struct ImplementationsConfig {
     address principalDebtToken;
     address interestDebtToken;
     address restakerDebtToken;
+    address feeAuction;
 }
 
 struct InfraConfig {
     address oracle;
     address accessControl;
-    address feeAuction;
     address lender;
     address delegation;
 }
@@ -42,9 +42,9 @@ struct UsersConfig {
     address delegation_admin;
     address oracle_admin;
     address lender_admin;
+    address fee_auction_admin;
     address access_control_admin;
     address address_provider_admin;
-    address interest_receiver;
     address rate_oracle_admin;
     address vault_config_admin;
     address middleware_admin;
@@ -54,6 +54,7 @@ struct UsersConfig {
 struct VaultConfig {
     address capToken; // also called the vault
     address stakedCapToken;
+    address feeAuction;
     VaultLzPeriphery lzperiphery;
     address[] assets;
     address[] principalDebtTokens;
