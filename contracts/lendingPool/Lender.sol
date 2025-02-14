@@ -144,6 +144,20 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         maxBorrowableAmount = ViewLogic.maxBorrowable(LenderStorage.get(), _agent, _asset);
     }
 
+    /// @notice Get the current debt balances for an agent for a specific asset
+    /// @param _agent Agent address to check debt for
+    /// @param _asset Asset to check debt for
+    /// @return principalDebt Principal debt amount in asset decimals
+    /// @return interestDebt Interest debt amount in asset decimals
+    /// @return restakerDebt Restaker debt amount in asset decimals
+    function debt(address _agent, address _asset)
+        external
+        returns (uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt)
+    {
+        if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();
+        (principalDebt, interestDebt, restakerDebt) = ViewLogic.debt(LenderStorage.get(), _agent, _asset);
+    }
+
     /// @notice Add an asset to the Lender
     /// @param _params Parameters to add an asset
     function addAsset(DataTypes.AddAssetParams calldata _params) external checkAccess(this.addAsset.selector) {
