@@ -68,7 +68,7 @@ contract LenderBorrowTest is TestDeployer {
 
         // balances should accrue interest over time
         assertEq(principalDebtToken.balanceOf(user_agent), 1000e6);
-        assertEq(interestDebtToken.balanceOf(user_agent), 68495);
+        assertEq(interestDebtToken.balanceOf(user_agent), 68_495);
         assertEq(restakerDebtToken.balanceOf(user_agent), 0);
         (interestPerSecond, lastRestakerUpdate) = restakerDebtToken.agent(user_agent);
         assertEq(interestPerSecond, 50000000);
@@ -79,20 +79,25 @@ contract LenderBorrowTest is TestDeployer {
 
         // simulate yield
         usdc.mint(user_agent, 1_000_000e6);
-
-        // repay the debt
         usdc.approve(env.infra.lender, 1_000_000e6);
+
+        // repay some of the debt
         lender.repay(address(usdc), 100e6, user_agent);
 
-        //_timeTravel(1);
-
-        // // principal debt should be repaid first
-        // assertEq(principalDebtToken.balanceOf(user_agent), 900e6);
-        assertEq(interestDebtToken.balanceOf(user_agent), 68495);
-        // assertEq(restakerDebtToken.balanceOf(user_agent), 0);
+        // principal debt should be repaid first
+        assertEq(principalDebtToken.balanceOf(user_agent), 900e6);
+        assertEq(interestDebtToken.balanceOf(user_agent), 68_495);
+        assertEq(restakerDebtToken.balanceOf(user_agent), 0);
 
         // interest debt should be repaid next
-        // lender.repay(address(usdc), 900e6, user_agent);
-        // assertEq(principalDebtToken.balanceOf(user_agent), 0);
+        lender.repay(address(usdc), 900e6 + 8495, user_agent);
+        assertEq(principalDebtToken.balanceOf(user_agent), 0);
+        assertEq(interestDebtToken.balanceOf(user_agent), 60_000);
+        assertEq(restakerDebtToken.balanceOf(user_agent), 0);
+
+        // cannot repay more than the debt
+        uint256 balanceBefore = usdc.balanceOf(user_agent);
+        lender.repay(address(usdc), 100e6, user_agent);
+        assertEq(usdc.balanceOf(user_agent), balanceBefore - 60_000);
     }
 }
