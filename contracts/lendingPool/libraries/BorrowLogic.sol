@@ -69,6 +69,8 @@ library BorrowLogic {
         returns (uint256 repaid)
     {
         DataTypes.ReserveData memory reserve = $.reservesData[params.asset];
+        IDebtToken(reserve.interestDebtToken).update(params.agent);
+        IDebtToken(reserve.restakerDebtToken).update(params.agent);
         uint256 principalDebt = IERC20(reserve.principalDebtToken).balanceOf(params.agent);
         uint256 restakerDebt = IERC20(reserve.restakerDebtToken).balanceOf(params.agent);
         uint256 interestDebt = IERC20(reserve.interestDebtToken).balanceOf(params.agent);

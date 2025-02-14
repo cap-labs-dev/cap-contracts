@@ -84,11 +84,11 @@ contract LenderBorrowTest is TestDeployer {
         usdc.approve(env.infra.lender, 1_000_000e6);
         lender.repay(address(usdc), 100e6, user_agent);
 
-        _timeTravel(1);
+        //_timeTravel(1);
 
         // // principal debt should be repaid first
         // assertEq(principalDebtToken.balanceOf(user_agent), 900e6);
-        // assertEq(interestDebtToken.balanceOf(user_agent), 68495);
+        assertEq(interestDebtToken.balanceOf(user_agent), 68495);
         // assertEq(restakerDebtToken.balanceOf(user_agent), 0);
 
         // interest debt should be repaid next
