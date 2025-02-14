@@ -27,7 +27,13 @@ library BorrowLogic {
     event Borrow(address indexed asset, address indexed agent, uint256 amount);
 
     /// @dev An agent, or someone on behalf of an agent, has repaid
-    event Repay(address indexed asset, address indexed agent, uint256 repaid);
+    event Repay(
+        address indexed asset,
+        address indexed agent,
+        uint256 principalRepaid,
+        uint256 interestRepaid,
+        uint256 restakerRepaid
+    );
 
     /// @dev An agent has totally repaid their debt of an asset including all interests
     event TotalRepayment(address indexed agent, address indexed asset);
@@ -139,9 +145,7 @@ library BorrowLogic {
             emit TotalRepayment(params.agent, params.asset);
         }
 
-        repaid = interestRepaid + principalRepaid + restakerRepaid;
-
-        emit Repay(params.agent, params.asset, repaid);
+        emit Repay(params.agent, params.asset, principalRepaid, interestRepaid, restakerRepaid);
     }
 
     /// @notice Realize the interest before it is repaid by borrowing from the vault

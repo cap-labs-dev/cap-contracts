@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { IDebtToken } from "../../interfaces/IDebtToken.sol";
 import { IDelegation } from "../../interfaces/IDelegation.sol";
 import { IOracle } from "../../interfaces/IOracle.sol";
 import { IVaultUpgradeable } from "../../interfaces/IVaultUpgradeable.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
 import { DataTypes } from "./types/DataTypes.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title View Logic
 /// @author kexley, @capLabs
@@ -87,5 +87,23 @@ library ViewLogic {
         if (totalAvailable < maxBorrowableAmount) {
             maxBorrowableAmount = totalAvailable;
         }
+    }
+
+    /// @notice Get the current debt balances for an agent for a specific asset
+    /// @param $ Lender storage
+    /// @param _agent Agent address to check debt for
+    /// @param _asset Asset to check debt for
+    /// @return principalDebt Principal debt amount in asset decimals
+    /// @return interestDebt Interest debt amount in asset decimals
+    /// @return restakerDebt Restaker debt amount in asset decimals
+    function debt(DataTypes.LenderStorage storage $, address _agent, address _asset)
+        external
+        view
+        returns (uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt)
+    {
+        DataTypes.ReserveData memory reserve = $.reservesData[_asset];
+        principalDebt = IERC20(reserve.principalDebtToken).balanceOf(_agent);
+        restakerDebt = IERC20(reserve.restakerDebtToken).balanceOf(_agent);
+        interestDebt = IERC20(reserve.interestDebtToken).balanceOf(_agent);
     }
 }
