@@ -140,6 +140,7 @@ contract DeployVault is ProxyUtils {
                     restakerDebtToken: d.restakerDebtTokens[i],
                     interestDebtToken: d.interestDebtTokens[i],
                     interestReceiver: d.feeAuction,
+                    restakerInterestReceiver: infra.delegation,
                     bonusCap: 0.1e27
                 })
             );

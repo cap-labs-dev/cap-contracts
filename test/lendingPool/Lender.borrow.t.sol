@@ -2,10 +2,10 @@
 pragma solidity ^0.8.28;
 
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
+
 import { InterestDebtToken } from "../../contracts/lendingPool/tokens/InterestDebtToken.sol";
 import { PrincipalDebtToken } from "../../contracts/lendingPool/tokens/PrincipalDebtToken.sol";
 import { RestakerDebtToken } from "../../contracts/lendingPool/tokens/RestakerDebtToken.sol";
-
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 
 contract LenderBorrowTest is TestDeployer {
@@ -60,7 +60,7 @@ contract LenderBorrowTest is TestDeployer {
 
         // check on the view functions
         (uint256 interestPerSecond, uint256 lastUpdate) = restakerDebtToken.agent(user_agent);
-        assertEq(interestPerSecond, 50000000);
+        assertEq(interestPerSecond, 50e27);
         assertEq(lastUpdate, block.timestamp);
 
         (uint256 storedIndex, uint256 lastUpdateInterest) = interestDebtToken.agent(user_agent);
@@ -70,11 +70,11 @@ contract LenderBorrowTest is TestDeployer {
         _timeTravel(3 hours);
 
         // balances should accrue interest over time
-        assertDebtEq(1000e6, 68_495, 0);
+        assertDebtEq(1000e6, 68_495, 540_000);
 
         // check on the view functions
         (interestPerSecond, lastUpdate) = restakerDebtToken.agent(user_agent);
-        assertEq(interestPerSecond, 50000000);
+        assertEq(interestPerSecond, 50e27);
         assertEq(lastUpdate, block.timestamp - 3 hours);
 
         (storedIndex, lastUpdateInterest) = interestDebtToken.agent(user_agent);
@@ -87,16 +87,23 @@ contract LenderBorrowTest is TestDeployer {
 
         // principal debt should be repaid first
         lender.repay(address(usdc), 100e6, user_agent);
-        assertDebtEq(900e6, 68_495, 0);
+        assertDebtEq(900e6, 68_495, 540_000);
 
-        // interest debt should be repaid next
-        lender.repay(address(usdc), 900e6 + 8495, user_agent);
-        assertDebtEq(0, 60_000, 0);
+        // restaker debt should be repaid next
+        lender.repay(address(usdc), 900e6 + 530_000, user_agent);
+        assertDebtEq(0, 68_495, 10_000);
 
-        // cannot repay more than the debt
+        // interest continue to accrue when principal debt is repaid but restaker debt is not
+        _timeTravel(10 days);
+        assertDebtEq(0, 68_871, 10_000);
+
+        // repay more than the debt just repays the debt
         uint256 balanceBefore = usdc.balanceOf(user_agent);
         lender.repay(address(usdc), 100e6, user_agent);
-        assertEq(usdc.balanceOf(user_agent), balanceBefore - 60_000);
+        assertEq(usdc.balanceOf(user_agent), balanceBefore - 78_871);
+
+        // all square now
+        assertDebtEq(0, 0, 0);
     }
 
     function assertDebtEq(uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt) internal {

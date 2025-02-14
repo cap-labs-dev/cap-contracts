@@ -50,6 +50,7 @@ library ReserveLogic {
             restakerDebtToken: params.restakerDebtToken,
             interestDebtToken: params.interestDebtToken,
             interestReceiver: params.interestReceiver,
+            restakerInterestReceiver: params.restakerInterestReceiver,
             decimals: IERC20Metadata(params.asset).decimals(),
             paused: true,
             realizedInterest: 0

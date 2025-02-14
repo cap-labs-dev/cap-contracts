@@ -10,7 +10,6 @@ library DataTypes {
         uint16 reservesCount;
         address delegation;
         address oracle;
-        mapping(address => address) restakerInterestReceiver;
         mapping(address => uint256) liquidationStart;
         uint256 targetHealth;
         uint256 grace;
@@ -26,6 +25,7 @@ library DataTypes {
         address restakerDebtToken;
         address interestDebtToken;
         address interestReceiver;
+        address restakerInterestReceiver;
         uint8 decimals;
         bool paused;
         uint256 realizedInterest;
@@ -61,6 +61,7 @@ library DataTypes {
         address restakerDebtToken;
         address interestDebtToken;
         address interestReceiver;
+        address restakerInterestReceiver;
         uint256 bonusCap;
     }
 }

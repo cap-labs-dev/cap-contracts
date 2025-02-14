@@ -110,9 +110,7 @@ library BorrowLogic {
 
         if (restakerRepaid > 0) {
             restakerRepaid = IDebtToken(reserve.restakerDebtToken).burn(params.agent, restakerRepaid);
-            IERC20(params.asset).safeTransferFrom(
-                params.caller, $.restakerInterestReceiver[params.agent], restakerRepaid
-            );
+            IERC20(params.asset).safeTransferFrom(params.caller, reserve.restakerInterestReceiver, restakerRepaid);
         }
 
         if (interestRepaid > 0) {
