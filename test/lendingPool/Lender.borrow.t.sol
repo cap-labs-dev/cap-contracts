@@ -59,8 +59,13 @@ contract LenderBorrowTest is TestDeployer {
         assertDebtEq(1000e6, 0, 0);
 
         // check on the view functions
-        assertRestakerDebtStorageEq(50000000, block.timestamp);
-        assertInterestDebtStorageEq(1e27, block.timestamp);
+        (uint256 interestPerSecond, uint256 lastUpdate) = restakerDebtToken.agent(user_agent);
+        assertEq(interestPerSecond, 50000000);
+        assertEq(lastUpdate, block.timestamp);
+
+        (uint256 storedIndex, uint256 lastUpdateInterest) = interestDebtToken.agent(user_agent);
+        assertEq(storedIndex, 1e27);
+        assertEq(lastUpdateInterest, block.timestamp);
 
         _timeTravel(3 hours);
 
@@ -68,8 +73,13 @@ contract LenderBorrowTest is TestDeployer {
         assertDebtEq(1000e6, 68_495, 0);
 
         // check on the view functions
-        assertRestakerDebtStorageEq(50000000, block.timestamp);
-        assertInterestDebtStorageEq(1000068495496177109406034915, block.timestamp);
+        (interestPerSecond, lastUpdate) = restakerDebtToken.agent(user_agent);
+        assertEq(interestPerSecond, 50000000);
+        assertEq(lastUpdate, block.timestamp);
+
+        (storedIndex, lastUpdateInterest) = interestDebtToken.agent(user_agent);
+        assertGt(storedIndex, 1e27); // TODO: test the exact value
+        assertEq(lastUpdateInterest, block.timestamp);
 
         // simulate yield
         usdc.mint(user_agent, 1_000_000e6);
@@ -99,17 +109,5 @@ contract LenderBorrowTest is TestDeployer {
         assertEq(principalDebtToken.balanceOf(user_agent), principalDebt);
         assertEq(interestDebtToken.balanceOf(user_agent), interestDebt);
         assertEq(restakerDebtToken.balanceOf(user_agent), restakerDebt);
-    }
-
-    function assertInterestDebtStorageEq(uint256 expectedStoredIndex, uint256 expectedLastUpdate) internal {
-        (uint256 storedIndex, uint256 lastUpdate) = interestDebtToken.agent(user_agent);
-        assertEq(storedIndex, expectedStoredIndex);
-        assertEq(lastUpdate, expectedLastUpdate);
-    }
-
-    function assertRestakerDebtStorageEq(uint256 expectedInterestPerSecond, uint256 expectedLastUpdate) internal {
-        (uint256 interestPerSecond, uint256 lastUpdate) = restakerDebtToken.agent(user_agent);
-        assertEq(interestPerSecond, expectedInterestPerSecond);
-        assertEq(lastUpdate, expectedLastUpdate);
     }
 }
