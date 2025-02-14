@@ -7,7 +7,6 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 
 import { AccessUpgradeable } from "../../access/AccessUpgradeable.sol";
 import { IOracle } from "../../interfaces/IOracle.sol";
-import { WadRayMath } from "../libraries/math/WadRayMath.sol";
 
 /// @title Restaker debt token for a market on the Lender
 /// @author kexley, @capLabs
@@ -16,8 +15,6 @@ import { WadRayMath } from "../libraries/math/WadRayMath.sol";
 /// @dev Each agent can have a different rate so the weighted mean is used to calculate the total
 /// accrued debt. This means that the total supply may not be exact.
 contract RestakerDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeable {
-    using WadRayMath for uint256;
-
     /// @dev Operation not supported
     error OperationNotSupported();
 
@@ -116,7 +113,7 @@ contract RestakerDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
         uint256 timestamp = block.timestamp;
         if (timestamp > $.lastAgentUpdate[_agent]) {
             balance =
-                super.balanceOf(_agent) + $.interestPerSecond[_agent].rayMul(timestamp - $.lastAgentUpdate[_agent]);
+                super.balanceOf(_agent) + $.interestPerSecond[_agent] * (timestamp - $.lastAgentUpdate[_agent]) / 1e27;
         } else {
             balance = super.balanceOf(_agent);
         }
@@ -128,7 +125,7 @@ contract RestakerDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
         RestakerDebtStorage storage $ = _getRestakerDebtStorage();
         uint256 timestamp = block.timestamp;
         if (timestamp > $.lastUpdate) {
-            supply = $.totalSupply + $.totalInterestPerSecond.rayMul(timestamp - $.lastUpdate);
+            supply = $.totalSupply + $.totalInterestPerSecond * (timestamp - $.lastUpdate) / 1e27;
         } else {
             supply = $.totalSupply;
         }
@@ -139,7 +136,7 @@ contract RestakerDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
     function averageRate() external view returns (uint256 rate) {
         RestakerDebtStorage storage $ = _getRestakerDebtStorage();
         uint256 totalDebt = IERC20($.debtToken).totalSupply();
-        rate = totalDebt > 0 ? $.totalInterestPerSecond.rayDiv(totalDebt) : 0;
+        rate = totalDebt > 0 ? $.totalInterestPerSecond * 10**$.decimals / totalDebt : 0;
     }
 
     /// @dev Update the interest per second of the agent and the scaled total supply
@@ -150,7 +147,7 @@ contract RestakerDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
         RestakerDebtStorage storage $ = _getRestakerDebtStorage();
         uint256 rate = IOracle($.oracle).restakerRate(_agent);
         uint256 oldInterestPerSecond = $.interestPerSecond[_agent];
-        uint256 newInterestPerSecond = IERC20($.debtToken).balanceOf(_agent).rayMul(rate);
+        uint256 newInterestPerSecond = IERC20($.debtToken).balanceOf(_agent) * rate / 10**$.decimals;
 
         $.interestPerSecond[_agent] = newInterestPerSecond;
         $.totalInterestPerSecond = $.totalInterestPerSecond + newInterestPerSecond - oldInterestPerSecond;
@@ -163,7 +160,7 @@ contract RestakerDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
         uint256 timestamp = block.timestamp;
 
         if (timestamp > $.lastAgentUpdate[_agent]) {
-            uint256 amount = $.interestPerSecond[_agent].rayMul(timestamp - $.lastAgentUpdate[_agent]);
+            uint256 amount = $.interestPerSecond[_agent] * (timestamp - $.lastAgentUpdate[_agent]) / 1e27;
 
             if (amount > 0) _mint(_agent, amount);
 
@@ -171,7 +168,7 @@ contract RestakerDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
         }
 
         if (timestamp > $.lastUpdate) {
-            $.totalSupply += $.totalInterestPerSecond.rayMul(timestamp - $.lastUpdate);
+            $.totalSupply += $.totalInterestPerSecond * (timestamp - $.lastUpdate) / 1e27;
 
             $.lastUpdate = timestamp;
         }

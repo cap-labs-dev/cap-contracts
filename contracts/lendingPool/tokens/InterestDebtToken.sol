@@ -133,9 +133,9 @@ contract InterestDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
         uint256 timestamp = block.timestamp;
         if (timestamp > $.lastAgentUpdate[_agent]) {
             balance = super.balanceOf(_agent)
-                + (IERC20($.debtToken).balanceOf(_agent) + super.balanceOf(_agent)).rayMul(
+                + (IERC20($.debtToken).balanceOf(_agent) + super.balanceOf(_agent)) * (
                     currentIndex() - $.storedIndex[_agent]
-                );
+                ) / 1e27;
         } else {
             balance = super.balanceOf(_agent);
         }
@@ -148,7 +148,7 @@ contract InterestDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
         uint256 timestamp = block.timestamp;
         if (timestamp > $.lastUpdate) {
             supply =
-                $.totalSupply + (IERC20($.debtToken).totalSupply() + $.totalSupply).rayMul(currentIndex() - $.index);
+                $.totalSupply + (IERC20($.debtToken).totalSupply() + $.totalSupply) * (currentIndex() - $.index) / 1e27;
         } else {
             supply = $.totalSupply;
         }
@@ -174,9 +174,9 @@ contract InterestDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
         uint256 timestamp = block.timestamp;
 
         if (timestamp > $.lastAgentUpdate[_agent]) {
-            uint256 amount = (IERC20($.debtToken).balanceOf(_agent) + super.balanceOf(_agent)).rayMul(
+            uint256 amount = (IERC20($.debtToken).balanceOf(_agent) + super.balanceOf(_agent)) * (
                 currentIndex() - $.storedIndex[_agent]
-            );
+            ) / 1e27;
 
             if (amount > 0) _mint(_agent, amount);
 
@@ -185,7 +185,7 @@ contract InterestDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
         }
 
         if (timestamp > $.lastUpdate) {
-            $.totalSupply += (IERC20($.debtToken).totalSupply() + $.totalSupply).rayMul(currentIndex() - $.index);
+            $.totalSupply += (IERC20($.debtToken).totalSupply() + $.totalSupply) * (currentIndex() - $.index) / 1e27;
 
             $.index = currentIndex();
 
