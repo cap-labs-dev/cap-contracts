@@ -36,6 +36,8 @@ fs_permissions = [
     { access = "read-write", path = "./config/cap-l2tokens-421614.json" },
     { access = "read-write", path = "./config/cap-symbiotic-vaults-11155111.json" },
 ]
+optimizer = true
+optimizer_runs = 200
 
 [invariant]
 show_metrics = true
