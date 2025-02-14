@@ -79,9 +79,9 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @return repaid Actual amount repaid
     function repay(address _asset, uint256 _amount, address _agent) external returns (uint256 repaid) {
         if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();
+        DataTypes.LenderStorage storage $ = LenderStorage.get();
         repaid = BorrowLogic.repay(
-            LenderStorage.get(),
-            DataTypes.RepayParams({ agent: _agent, asset: _asset, amount: _amount, caller: msg.sender })
+            $, DataTypes.RepayParams({ agent: _agent, asset: _asset, amount: _amount, caller: msg.sender })
         );
     }
 

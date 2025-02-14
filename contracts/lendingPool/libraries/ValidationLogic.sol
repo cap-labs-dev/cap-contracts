@@ -45,6 +45,12 @@ library ValidationLogic {
     /// @dev Reserve already initialized
     error ReserveAlreadyInitialized();
 
+    /// @dev Interest receiver not set
+    error InterestReceiverNotSet();
+
+    /// @dev Restaker interest receiver not set
+    error RestakerInterestReceiverNotSet();
+
     /// @notice Validate the borrow of an agent
     /// @dev Check the pause state of the reserve and the health of the agent before and after the
     /// borrow.
@@ -94,13 +100,10 @@ library ValidationLogic {
     /// @param start Last liquidation start time
     /// @param grace Grace period duration
     /// @param expiry Liquidation duration after which it expires
-    function validateLiquidation(
-        uint256 health,
-        uint256 emergencyHealth,
-        uint256 start,
-        uint256 grace,
-        uint256 expiry
-    ) external view {
+    function validateLiquidation(uint256 health, uint256 emergencyHealth, uint256 start, uint256 grace, uint256 expiry)
+        external
+        view
+    {
         if (health >= 1e27) revert HealthFactorNotBelowThreshold();
         if (emergencyHealth >= 1e27) {
             if (block.timestamp <= start + grace) revert GracePeriodNotOver();
@@ -111,11 +114,15 @@ library ValidationLogic {
     /// TODO Check that the asset is borrowable from the vault
     /// @notice Validate adding an asset as a reserve
     /// @param $ Lender storage
-    /// @param _asset Asset to add
-    /// @param _vault Vault to borrow asset from
-    function validateAddAsset(DataTypes.LenderStorage storage $, address _asset, address _vault) external view {
-        if (_asset == address(0) || _vault == address(0)) revert ZeroAddressNotValid();
-        if ($.reservesData[_asset].vault != address(0)) revert ReserveAlreadyInitialized();
+    /// @param params Parameters for adding an asset
+    function validateAddAsset(DataTypes.LenderStorage storage $, DataTypes.AddAssetParams memory params)
+        external
+        view
+    {
+        if (params.asset == address(0) || params.vault == address(0)) revert ZeroAddressNotValid();
+        if (params.interestReceiver == address(0)) revert InterestReceiverNotSet();
+        if (params.restakerInterestReceiver == address(0)) revert RestakerInterestReceiverNotSet();
+        if ($.reservesData[params.asset].vault != address(0)) revert ReserveAlreadyInitialized();
     }
 
     /// @notice Validate dropping an asset as a reserve

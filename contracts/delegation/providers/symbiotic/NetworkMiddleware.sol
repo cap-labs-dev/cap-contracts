@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import { AccessUpgradeable } from "../../../access/AccessUpgradeable.sol";
 import { IOracle } from "../../../interfaces/IOracle.sol";
+import { IRestakerRewardReceiver } from "../../../interfaces/IRestakerRewardReceiver.sol";
 import { IStakerRewards } from "./interfaces/IStakerRewards.sol";
 import { NetworkMiddlewareStorage } from "./libraries/NetworkMiddlewareStorage.sol";
 import { DataTypes } from "./libraries/types/DataTypes.sol";
@@ -26,7 +27,7 @@ import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 /// @title Cap Symbiotic Network Middleware Contract
 /// @author Cap Labs
 /// @notice This contract manages the symbiotic collateral and slashing.
-contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMiddleware {
+contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMiddleware, IRestakerRewardReceiver {
     using SafeERC20 for IERC20;
 
     /// @dev Vault registered
@@ -121,7 +122,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
             if (totalSlashableCollateral == 0) continue;
 
             // Round up in favor of the liquidator
-            uint256 slashShareOfCollateral =(totalSlashableCollateral * _slashShare / 1e18) + 1;
+            uint256 slashShareOfCollateral = (totalSlashableCollateral * _slashShare / 1e18) + 1;
 
             // If the slash share is greater than the total slashable collateral, set it to the total slashable collateral
             if (slashShareOfCollateral > totalSlashableCollateral) {
@@ -148,16 +149,11 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     /// @return burnerRouter The burner router contract
     /// @return decimals The collateral token decimals
     /// @return collateralPrice The collateral token price
-    function _getVaultInfo(
-        address _network,
-        address _agent,
-        address _vault,
-        address _oracle
-    ) private view returns (
-        IBurnerRouter burnerRouter,
-        uint8 decimals,
-        uint256 collateralPrice
-    ) {
+    function _getVaultInfo(address _network, address _agent, address _vault, address _oracle)
+        private
+        view
+        returns (IBurnerRouter burnerRouter, uint8 decimals, uint256 collateralPrice)
+    {
         burnerRouter = IBurnerRouter(IVault(_vault).burner());
 
         // Check pending receivers
@@ -184,27 +180,17 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     /// @param _timestamp Timestamp to check coverage at
     /// @return collateralValue Coverage value in USD (8 decimals)
     /// @return collateral Coverage amount
-    function coverageByVault(
-        address _network,
-        address _agent,
-        address _vault,
-        address _oracle,
-        uint48 _timestamp
-    ) public view returns (uint256 collateralValue, uint256 collateral) {
-        (
-            IBurnerRouter burnerRouter,
-            uint8 decimals,
-            uint256 collateralPrice
-        ) = _getVaultInfo(_network, _agent, _vault, _oracle);
-        
+    function coverageByVault(address _network, address _agent, address _vault, address _oracle, uint48 _timestamp)
+        public
+        view
+        returns (uint256 collateralValue, uint256 collateral)
+    {
+        (IBurnerRouter burnerRouter, uint8 decimals, uint256 collateralPrice) =
+            _getVaultInfo(_network, _agent, _vault, _oracle);
+
         if (address(burnerRouter) == address(0)) return (0, 0);
 
-        collateral = IBaseDelegator(IVault(_vault).delegator()).stakeAt(
-            subnetwork(_agent),
-            _agent,
-            _timestamp,
-            ""
-        );
+        collateral = IBaseDelegator(IVault(_vault).delegator()).stakeAt(subnetwork(_agent), _agent, _timestamp, "");
         collateralValue = collateral * collateralPrice / (10 ** decimals);
     }
 
@@ -222,12 +208,9 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
         address _oracle,
         uint48 _timestamp
     ) public view returns (uint256 collateralValue, uint256 collateral) {
-        (
-            IBurnerRouter burnerRouter,
-            uint8 decimals,
-            uint256 collateralPrice
-        ) = _getVaultInfo(_network, _agent, _vault, _oracle);
-        
+        (IBurnerRouter burnerRouter, uint8 decimals, uint256 collateralPrice) =
+            _getVaultInfo(_network, _agent, _vault, _oracle);
+
         if (address(burnerRouter) == address(0)) return (0, 0);
 
         ISlasher slasher = ISlasher(IVault(_vault).slasher());

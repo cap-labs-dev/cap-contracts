@@ -3,6 +3,8 @@ pragma solidity ^0.8.28;
 
 import { IDebtToken } from "../../interfaces/IDebtToken.sol";
 import { IPrincipalDebtToken } from "../../interfaces/IPrincipalDebtToken.sol";
+
+import { IRestakerRewardReceiver } from "../../interfaces/IRestakerRewardReceiver.sol";
 import { IVaultUpgradeable } from "../../interfaces/IVaultUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -111,6 +113,7 @@ library BorrowLogic {
         if (restakerRepaid > 0) {
             restakerRepaid = IDebtToken(reserve.restakerDebtToken).burn(params.agent, restakerRepaid);
             IERC20(params.asset).safeTransferFrom(params.caller, reserve.restakerInterestReceiver, restakerRepaid);
+            IRestakerRewardReceiver(reserve.restakerInterestReceiver).distributeRewards(reserve.vault, params.asset);
         }
 
         if (interestRepaid > 0) {

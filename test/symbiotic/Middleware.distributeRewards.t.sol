@@ -14,7 +14,7 @@ contract MiddlewareTest is TestDeployer {
     }
 
     function test_distribute_rewards() public {
-        vm.startPrank(env.users.middleware_admin);
+        vm.startPrank(env.infra.lender);
 
         // Send some rewards to the middleware
         MockERC20(symbioticUsdtVault.collateral).mint(address(middleware), 10e6);

@@ -23,7 +23,7 @@ library ReserveLogic {
         external
         returns (bool filled)
     {
-        ValidationLogic.validateAddAsset($, params.asset, params.vault);
+        ValidationLogic.validateAddAsset($, params);
 
         uint256 id;
 
