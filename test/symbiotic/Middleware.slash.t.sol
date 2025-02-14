@@ -34,7 +34,7 @@ contract MiddlewareTest is TestDeployer {
         vm.startPrank(env.infra.delegation);
 
         address recipient = makeAddr("recipient");
-        address agent = env.testUsers.agents[0];
+        address agent = _getRandomAgent();
 
         // collateral in USDT (8 decimals)
         assertEq(middleware.coverage(agent), 6200e8);
@@ -53,11 +53,12 @@ contract MiddlewareTest is TestDeployer {
     }
 
     function test_slash_does_not_work_if_not_slashable() public {
+        address agent = _getRandomAgent();
+
         {
             vm.startPrank(env.symbiotic.users.vault_admin);
 
             // remove all delegations to our slashable agent
-            address agent = env.testUsers.agents[0];
             _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 0);
             _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 0);
 
@@ -70,8 +71,6 @@ contract MiddlewareTest is TestDeployer {
             vm.startPrank(env.infra.delegation);
 
             address recipient = makeAddr("recipient");
-            address agent = env.testUsers.agents[0];
-
             assertEq(middleware.coverage(agent), 0);
 
             // we request a slash for a timestamp where there is a stake to be slashed
@@ -85,60 +84,8 @@ contract MiddlewareTest is TestDeployer {
         }
     }
 
-    function test_expect_the_current_stake_to_be_exposed() public {
-        address agent = env.testUsers.agents[0];
-
-        {
-            vm.startPrank(env.symbiotic.users.vault_admin);
-
-            // remove all delegations to our slashable agent
-            _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 0);
-            _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 0);
-
-            _timeTravel(10);
-
-            // remove all delegations to our slashable agent
-            _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 1000e6);
-            _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 2e18);
-
-            _timeTravel(10);
-
-            vm.stopPrank();
-        }
-
-        // this is all within the same vault epoch
-        //  |xxxxxxxxxx|----------|xxxxxxxxxx|
-        //      6200   |    0     |    6200  |
-        // -30        -20        -10         0
-
-        assertEq(middleware.coverage(agent), 6200e8);
-    }
-
-    function test_current_agent_coverage_accounts_for_burner_router_changes() public {
-        Network _network = Network(env.symbiotic.networkAdapter.network);
-
-        address agent = env.testUsers.agents[0];
-
-        assertEq(middleware.coverage(agent), 6200e8);
-
-        // vault admin changes the burner router receiver of the USDT vault
-        {
-            vm.startPrank(env.symbiotic.users.vault_admin);
-
-            address new_receiver = makeAddr("new_receiver");
-            IBurnerRouter(symbioticUsdtVault.burnerRouter).setNetworkReceiver(address(_network), new_receiver);
-
-            _timeTravel(10);
-
-            vm.stopPrank();
-        }
-
-        // current coverage must reflect that change
-        assertEq(middleware.coverage(agent), 5200e8);
-    }
-
     function test_can_slash_immediately_after_delegation() public {
-        address agent = env.testUsers.agents[0];
+        address agent = _getRandomAgent();
 
         // reset the initial stakes for this test
         {

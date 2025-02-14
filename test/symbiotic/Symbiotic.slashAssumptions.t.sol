@@ -160,7 +160,7 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
         SymbioticVaultConfig memory _vault = symbioticUsdtVault;
         NetworkMiddleware _middleware = NetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
 
-        address agent1 = env.testUsers.agents[0];
+        address agent1 = _getRandomAgent();
         bytes32 agent1_subnetwork = _middleware.subnetwork(agent1);
 
         assertEq(_get_stake_at(_vault, agent1, block.timestamp), 1000e6);

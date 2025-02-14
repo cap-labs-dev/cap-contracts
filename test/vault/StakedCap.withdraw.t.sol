@@ -8,10 +8,10 @@ contract StakedCapWithdrawTest is TestDeployer {
 
     function setUp() public {
         _deployCapTestEnvironment();
-        _initTestVaultLiquidity(env.vault);
+        _initTestVaultLiquidity(usdVault);
 
         user = makeAddr("test_user");
-        _initTestUserStakedCapToken(env.vault, user, 4000e18);
+        _initTestUserStakedCapToken(usdVault, user, 4000e18);
     }
 
     function test_staked_cap_withdraw() public {

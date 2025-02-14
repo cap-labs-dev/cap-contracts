@@ -5,8 +5,8 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 import { ERC20Upgradeable, IERC20 } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import { IOracle } from "../../interfaces/IOracle.sol";
 import { AccessUpgradeable } from "../../access/AccessUpgradeable.sol";
+import { IOracle } from "../../interfaces/IOracle.sol";
 import { MathUtils } from "../libraries/math/MathUtils.sol";
 import { WadRayMath } from "../libraries/math/WadRayMath.sol";
 
@@ -18,7 +18,7 @@ contract InterestDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
     using MathUtils for uint256;
     using WadRayMath for uint256;
 
-    /// @dev Operation not supported 
+    /// @dev Operation not supported
     error OperationNotSupported();
 
     /// @custom:storage-location erc7201:cap.storage.InterestDebt
@@ -36,7 +36,8 @@ contract InterestDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
     }
 
     /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.InterestDebt")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant InterestDebtStorageLocation = 0x162fe0b309d5cb2212ec304072bcf3222b3d6f4b4391048e3b69d42273fdd600;
+    bytes32 private constant InterestDebtStorageLocation =
+        0x162fe0b309d5cb2212ec304072bcf3222b3d6f4b4391048e3b69d42273fdd600;
 
     /// @dev Get this contract storage pointer
     /// @return $ Storage pointer
@@ -56,12 +57,10 @@ contract InterestDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
     /// @param _oracle Oracle address
     /// @param _debtToken Principal debt token
     /// @param _asset Asset address
-    function initialize(
-        address _accessControl,
-        address _oracle,
-        address _debtToken,
-        address _asset
-    ) external initializer {
+    function initialize(address _accessControl, address _oracle, address _debtToken, address _asset)
+        external
+        initializer
+    {
         InterestDebtStorage storage $ = _getInterestDebtStorage();
         $.oracle = _oracle;
         $.debtToken = _debtToken;
@@ -148,7 +147,8 @@ contract InterestDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
         InterestDebtStorage storage $ = _getInterestDebtStorage();
         uint256 timestamp = block.timestamp;
         if (timestamp > $.lastUpdate) {
-            supply = $.totalSupply + (IERC20($.debtToken).totalSupply() + $.totalSupply).rayMul(currentIndex() - $.index);
+            supply =
+                $.totalSupply + (IERC20($.debtToken).totalSupply() + $.totalSupply).rayMul(currentIndex() - $.index);
         } else {
             supply = $.totalSupply;
         }
@@ -158,10 +158,10 @@ contract InterestDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
     /// @param rate Interest rate
     function nextInterestRate() public returns (uint256 rate) {
         InterestDebtStorage storage $ = _getInterestDebtStorage();
-        address oracle = $.oracle;
-        uint256 marketRate = IOracle(oracle).marketRate($.asset);
-        uint256 benchmarkRate = IOracle(oracle).benchmarkRate($.asset);
-        uint256 utilizationRate = IOracle(oracle).utilizationRate($.asset);
+        address _oracle = $.oracle;
+        uint256 marketRate = IOracle(_oracle).marketRate($.asset);
+        uint256 benchmarkRate = IOracle(_oracle).benchmarkRate($.asset);
+        uint256 utilizationRate = IOracle(_oracle).utilizationRate($.asset);
 
         rate = marketRate > benchmarkRate ? marketRate : benchmarkRate;
         rate += utilizationRate;
@@ -220,6 +220,52 @@ contract InterestDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
     /// @notice Disabled due to this being a non-transferrable token
     function transferFrom(address, address, uint256) public pure override returns (bool) {
         revert OperationNotSupported();
+    }
+
+    /// @notice Get the current state for a restaker/agent
+    /// @param _agent The address of the agent/restaker
+    /// @return _storedIndex The stored index for the agent
+    /// @return _lastUpdate The timestamp of the last update for this agent
+    function agent(address _agent) external view returns (uint256 _storedIndex, uint256 _lastUpdate) {
+        InterestDebtStorage storage $ = _getInterestDebtStorage();
+        _storedIndex = $.storedIndex[_agent];
+        _lastUpdate = $.lastAgentUpdate[_agent];
+    }
+
+    /// @notice Get the oracle address
+    /// @return _oracle The oracle address
+    function oracle() external view returns (address _oracle) {
+        _oracle = _getInterestDebtStorage().oracle;
+    }
+
+    /// @notice Get the debt token address
+    /// @return _debtToken The debt token address
+    function debtToken() external view returns (address _debtToken) {
+        _debtToken = _getInterestDebtStorage().debtToken;
+    }
+
+    /// @notice Get the asset address
+    /// @return _asset The asset address
+    function asset() external view returns (address _asset) {
+        _asset = _getInterestDebtStorage().asset;
+    }
+
+    /// @notice Get the current interest rate
+    /// @return _interestRate The current interest rate
+    function interestRate() external view returns (uint256 _interestRate) {
+        _interestRate = _getInterestDebtStorage().interestRate;
+    }
+
+    /// @notice Get the current index
+    /// @return _index The current index
+    function index() external view returns (uint256 _index) {
+        _index = _getInterestDebtStorage().index;
+    }
+
+    /// @notice Get the last update timestamp
+    /// @return _lastUpdate The last update timestamp
+    function lastUpdate() external view returns (uint256 _lastUpdate) {
+        _lastUpdate = _getInterestDebtStorage().lastUpdate;
     }
 
     function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }

@@ -37,7 +37,7 @@ contract LenderInvariantsTest is TestDeployer {
 
     function setUp() public {
         _deployCapTestEnvironment();
-        _initTestVaultLiquidity(env.vault);
+        _initTestVaultLiquidity(usdVault);
         _initSymbioticVaultsLiquidity(env);
 
         // Create and target handler
@@ -49,7 +49,7 @@ contract LenderInvariantsTest is TestDeployer {
     /// forge-config: default.invariant.runs = 10
     /// forge-config: default.invariant.depth = 20
     function invariant_borrowingLimits() public view {
-        address[] memory assets = env.vault.assets;
+        address[] memory assets = usdVault.assets;
 
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i];
@@ -93,7 +93,7 @@ contract TestLenderHandler is StdUtils, TimeUtils, RandomActorUtils, RandomAsset
 
     constructor(TestEnvConfig memory _env)
         RandomActorUtils(_env.testUsers.agents)
-        RandomAssetUtils(_env.vault.assets)
+        RandomAssetUtils(_env.usdVault.assets)
     {
         env = _env;
         lender = Lender(env.infra.lender);

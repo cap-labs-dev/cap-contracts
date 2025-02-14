@@ -34,10 +34,10 @@ contract VaultMintTest is TestDeployer {
     }
 
     function test_vault_mint_with_different_prices() public {
-        vm.startPrank(user);
-
         // Set USDT price to 1.02 USD
-        MockChainlinkPriceFeed(env.oracleMocks.chainlinkPriceFeeds[0]).setLatestAnswer(102e8);
+        _setAssetOraclePrice(address(usdt), 102e8);
+
+        vm.startPrank(user);
 
         // Approve USDT spending
         usdt.mint(user, 100e6);
@@ -56,7 +56,7 @@ contract VaultMintTest is TestDeployer {
     }
 
     function test_mint_on_non_empty_vault() public {
-        _initTestVaultLiquidity(vault);
+        _initTestVaultLiquidity(usdVault);
 
         vm.startPrank(user);
 

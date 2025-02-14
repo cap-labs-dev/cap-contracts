@@ -12,10 +12,10 @@ contract LenderLiquidateTest is TestDeployer {
 
     function setUp() public {
         _deployCapTestEnvironment();
-        _initTestVaultLiquidity(env.vault);
+        _initTestVaultLiquidity(usdVault);
         _initSymbioticVaultsLiquidity(env);
 
-        user_agent = env.testUsers.agents[0];
+        user_agent = _getRandomAgent();
 
         vm.startPrank(env.symbiotic.users.vault_admin);
         _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e18);
@@ -41,13 +41,7 @@ contract LenderLiquidateTest is TestDeployer {
         }
 
         // change eth oracle price
-        {
-            vm.startPrank(env.users.oracle_admin);
-            MockChainlinkPriceFeed(env.oracleMocks.chainlinkPriceFeeds[env.oracleMocks.assets.length]).setLatestAnswer(
-                1000e8
-            );
-            vm.stopPrank();
-        }
+        _setAssetOraclePrice(address(weth), 1000e8);
 
         // anyone can liquidate the debt
         {
@@ -55,8 +49,7 @@ contract LenderLiquidateTest is TestDeployer {
 
             deal(address(usdc), env.testUsers.liquidator, 3000e6);
 
-
-            // start the first liquidation 
+            // start the first liquidation
             lender.initiateLiquidation(user_agent);
             uint256 gracePeriod = lender.grace();
 
@@ -71,13 +64,13 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("Liquidator weth balance after first liquidation", weth.balanceOf(env.testUsers.liquidator));
             console.log("");
 
-            // start the second liquidation 
+            // start the second liquidation
             lender.liquidate(user_agent, address(usdc), 1000e6);
 
             console.log("Liquidator usdt balance after second liquidation", usdt.balanceOf(env.testUsers.liquidator));
             console.log("Liquidator weth balance after second liquidation", weth.balanceOf(env.testUsers.liquidator));
             console.log("");
-            // start the third liquidation 
+            // start the third liquidation
             lender.liquidate(user_agent, address(usdc), 1000e6);
 
             console.log("Liquidator usdt balance after third liquidation", usdt.balanceOf(env.testUsers.liquidator));
@@ -95,7 +88,7 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("");
             assertEq(coverage, 0);
 
-            (uint256 totalDelegation, uint256 totalDebt, , , ) = lender.agent(user_agent);
+            (uint256 totalDelegation, uint256 totalDebt,,,) = lender.agent(user_agent);
 
             assertEq(totalDelegation, 0);
             assertEq(totalDebt, 0);
@@ -122,13 +115,7 @@ contract LenderLiquidateTest is TestDeployer {
         }
 
         // change eth oracle price
-        {
-            vm.startPrank(env.users.oracle_admin);
-            MockChainlinkPriceFeed(env.oracleMocks.chainlinkPriceFeeds[env.oracleMocks.assets.length]).setLatestAnswer(
-                2000e8
-            );
-            vm.stopPrank();
-        }
+        _setAssetOraclePrice(address(weth), 2000e8);
 
         // anyone can liquidate the debt
         {
@@ -136,7 +123,7 @@ contract LenderLiquidateTest is TestDeployer {
 
             deal(address(usdc), env.testUsers.liquidator, 3000e6);
 
-            // start the first liquidation 
+            // start the first liquidation
             lender.initiateLiquidation(user_agent);
             uint256 gracePeriod = lender.grace();
 
@@ -151,13 +138,13 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("Liquidator weth balance after first liquidation", weth.balanceOf(env.testUsers.liquidator));
             console.log("");
 
-            // start the second liquidation 
+            // start the second liquidation
             lender.liquidate(user_agent, address(usdc), 1000e6);
 
             console.log("Liquidator usdt balance after second liquidation", usdt.balanceOf(env.testUsers.liquidator));
             console.log("Liquidator weth balance after second liquidation", weth.balanceOf(env.testUsers.liquidator));
             console.log("");
-            // start the third liquidation 
+            // start the third liquidation
             lender.liquidate(user_agent, address(usdc), 1000e6);
 
             console.log("Liquidator usdt balance after third liquidation", usdt.balanceOf(env.testUsers.liquidator));
@@ -166,27 +153,28 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("Liquidator usdc balance after third liquidation", usdc.balanceOf(env.testUsers.liquidator));
             console.log("");
 
-        //    assertEq(usdc.balanceOf(env.testUsers.liquidator), 0);
-        //    assertEq(usdt.balanceOf(env.testUsers.liquidator), 1000e6);
-        //    assertEq(weth.balanceOf(env.testUsers.liquidator), 2e18);
+            //    assertEq(usdc.balanceOf(env.testUsers.liquidator), 0);
+            //    assertEq(usdt.balanceOf(env.testUsers.liquidator), 1000e6);
+            //    assertEq(weth.balanceOf(env.testUsers.liquidator), 2e18);
 
             uint256 coverage = Delegation(env.infra.delegation).coverage(user_agent);
             console.log("Coverage after liquidations", coverage);
             console.log("");
-       //     assertEq(coverage, 0);
+            //     assertEq(coverage, 0);
 
-            (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health) = lender.agent(user_agent);
+            (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health) =
+                lender.agent(user_agent);
 
             console.log("Health after liquidations", health);
             assertGt(health, 1e27);
-        //    assertEq(totalDelegation, 0);
-        //    assertEq(totalDebt, 0);
+            //    assertEq(totalDelegation, 0);
+            //    assertEq(totalDebt, 0);
 
             vm.stopPrank();
         }
     }
 
-      function test_lender_liquidate_in_the_future() public {
+    function test_lender_liquidate_in_the_future() public {
         // borrow some assets
         {
             vm.startPrank(user_agent);
@@ -207,13 +195,7 @@ contract LenderLiquidateTest is TestDeployer {
         }
 
         // change eth oracle price
-        {
-            vm.startPrank(env.users.oracle_admin);
-            MockChainlinkPriceFeed(env.oracleMocks.chainlinkPriceFeeds[env.oracleMocks.assets.length]).setLatestAnswer(
-                2000e8
-            );
-            vm.stopPrank();
-        }
+        _setAssetOraclePrice(address(weth), 2000e8);
 
         // anyone can liquidate the debt
         {
@@ -221,7 +203,7 @@ contract LenderLiquidateTest is TestDeployer {
 
             deal(address(usdc), env.testUsers.liquidator, 3000e6);
 
-            // start the first liquidation 
+            // start the first liquidation
             lender.initiateLiquidation(user_agent);
             uint256 gracePeriod = lender.grace();
 
@@ -236,13 +218,13 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("Liquidator weth balance after first liquidation", weth.balanceOf(env.testUsers.liquidator));
             console.log("");
 
-            // start the second liquidation 
+            // start the second liquidation
             lender.liquidate(user_agent, address(usdc), 1000e6);
 
             console.log("Liquidator usdt balance after second liquidation", usdt.balanceOf(env.testUsers.liquidator));
             console.log("Liquidator weth balance after second liquidation", weth.balanceOf(env.testUsers.liquidator));
             console.log("");
-            // start the third liquidation 
+            // start the third liquidation
             lender.liquidate(user_agent, address(usdc), 1000e6);
 
             console.log("Liquidator usdt balance after third liquidation", usdt.balanceOf(env.testUsers.liquidator));
@@ -251,25 +233,24 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("Liquidator usdc balance after third liquidation", usdc.balanceOf(env.testUsers.liquidator));
             console.log("");
 
-        //    assertEq(usdc.balanceOf(env.testUsers.liquidator), 0);
-        //    assertEq(usdt.balanceOf(env.testUsers.liquidator), 1000e6);
-        //    assertEq(weth.balanceOf(env.testUsers.liquidator), 2e18);
+            //    assertEq(usdc.balanceOf(env.testUsers.liquidator), 0);
+            //    assertEq(usdt.balanceOf(env.testUsers.liquidator), 1000e6);
+            //    assertEq(weth.balanceOf(env.testUsers.liquidator), 2e18);
 
             uint256 coverage = Delegation(env.infra.delegation).coverage(user_agent);
             console.log("Coverage after liquidations", coverage);
             console.log("");
-       //     assertEq(coverage, 0);
+            //     assertEq(coverage, 0);
 
-            (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health) = lender.agent(user_agent);
+            (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health) =
+                lender.agent(user_agent);
 
             console.log("Health after liquidations", health);
             assertGt(health, 1e27);
-        //    assertEq(totalDelegation, 0);
-        //    assertEq(totalDebt, 0);
+            //    assertEq(totalDelegation, 0);
+            //    assertEq(totalDebt, 0);
 
             vm.stopPrank();
         }
     }
 }
-
-

@@ -7,7 +7,7 @@ import { TestDeployer } from "../deploy/TestDeployer.sol";
 contract RateOracleGetRateTest is TestDeployer {
     function setUp() public {
         _deployCapTestEnvironment();
-        _initTestVaultLiquidity(env.vault);
+        _initTestVaultLiquidity(usdVault);
     }
 
     function test_rate_oracle_get_rate() public {

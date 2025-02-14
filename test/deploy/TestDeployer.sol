@@ -5,6 +5,8 @@ import { Delegation } from "../../contracts/delegation/Delegation.sol";
 import { NetworkMiddleware } from "../../contracts/delegation/providers/symbiotic/NetworkMiddleware.sol";
 import { VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 
+import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
+
 import { SymbioticVaultParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 import { SymbioticNetworkAdapterParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 import {
@@ -31,6 +33,7 @@ import { CapToken } from "../../contracts/token/CapToken.sol";
 import { StakedCap } from "../../contracts/token/StakedCap.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
 import { SymbioticTestEnvConfig, TestEnvConfig } from "./interfaces/TestDeployConfig.sol";
+import { VaultConfigHelpers } from "./service/VaultConfigHelpers.sol";
 
 import { LzAddressbook, LzUtils } from "../../contracts/deploy/utils/LzUtils.sol";
 import { ZapAddressbook, ZapUtils } from "../../contracts/deploy/utils/ZapUtils.sol";
@@ -64,7 +67,8 @@ contract TestDeployer is
     DeploySymbioticVault,
     DeployCapNetworkAdapter,
     ConfigureSymbioticOptIns,
-    InitSymbioticVaultLiquidity
+    InitSymbioticVaultLiquidity,
+    VaultConfigHelpers
 {
     TestEnvConfig env;
 
@@ -91,41 +95,60 @@ contract TestDeployer is
         env.infra = _deployInfra(env.implems, env.users);
 
         env.usdMocks = _deployUSDMocks();
-        env.ethMock = _deployEthMock();
-        env.oracleMocks = _deployOracleMocks(env.usdMocks);
+        env.ethMocks = _deployEthMocks();
 
-        console.log("deploying vault");
-        env.vault = _deployVault(env.implems, env.infra, "Cap USD", "cUSD", env.oracleMocks.assets);
-        env.vault.lzperiphery = _deployVaultLzPeriphery(lzAb, zapAb, env.vault, env.users);
+        env.usdOracleMocks = _deployOracleMocks(env.usdMocks);
+        env.ethOracleMocks = _deployOracleMocks(env.ethMocks);
+
+        console.log("deploying usdVault");
+        env.usdVault = _deployVault(env.implems, env.infra, "Cap USD", "cUSD", env.usdOracleMocks.assets);
+        env.usdVault.lzperiphery = _deployVaultLzPeriphery(lzAb, zapAb, env.usdVault, env.users);
+
+        console.log("deploying ethVault");
+        env.ethVault = _deployVault(env.implems, env.infra, "Cap ETH", "cETH", env.ethOracleMocks.assets);
+        env.ethVault.lzperiphery = _deployVaultLzPeriphery(lzAb, zapAb, env.ethVault, env.users);
 
         /// ACCESS CONTROL
         console.log("deploying access control");
         vm.startPrank(env.users.access_control_admin);
         _initInfraAccessControl(env.infra, env.users);
-        _initVaultAccessControl(env.infra, env.vault, env.users);
+        _initVaultAccessControl(env.infra, env.usdVault, env.users);
 
         /// ORACLE
         console.log("deploying oracle");
         vm.startPrank(env.users.oracle_admin);
-        _initOracleMocks(env.oracleMocks);
-        _initVaultOracle(env.libs, env.infra, env.vault);
-        for (uint256 i = 0; i < env.vault.assets.length; i++) {
-            _initChainlinkPriceOracle(env.libs, env.infra, env.vault.assets[i], env.oracleMocks.chainlinkPriceFeeds[i]);
+        _initOracleMocks(env.usdOracleMocks, 1e8, 0.1e27); // $1.00 with 8 decimals & 10% APY
+        _initOracleMocks(env.ethOracleMocks, 2600e8, 0.1e27); // $2600 with 8 decimals & 10% APY
+        _initVaultOracle(env.libs, env.infra, env.usdVault);
+        _initVaultOracle(env.libs, env.infra, env.ethVault);
+        for (uint256 i = 0; i < env.usdVault.assets.length; i++) {
+            address asset = env.usdVault.assets[i];
+            address priceFeed = env.usdOracleMocks.chainlinkPriceFeeds[i];
+            _initChainlinkPriceOracle(env.libs, env.infra, asset, priceFeed);
         }
-        _initChainlinkPriceOracle(
-            env.libs, env.infra, env.ethMock, env.oracleMocks.chainlinkPriceFeeds[env.oracleMocks.assets.length]
-        ); // weth
+        for (uint256 i = 0; i < env.ethOracleMocks.assets.length; i++) {
+            address asset = env.ethOracleMocks.assets[i];
+            address priceFeed = env.ethOracleMocks.chainlinkPriceFeeds[i];
+            _initChainlinkPriceOracle(env.libs, env.infra, asset, priceFeed);
+        }
 
         console.log("deploying rate oracle");
         vm.startPrank(env.users.rate_oracle_admin);
-        for (uint256 i = 0; i < env.vault.assets.length; i++) {
-            _initAaveRateOracle(env.libs, env.infra, env.vault.assets[i], env.oracleMocks.aaveDataProviders[i]);
+        for (uint256 i = 0; i < env.usdVault.assets.length; i++) {
+            _initAaveRateOracle(env.libs, env.infra, env.usdVault.assets[i], env.usdOracleMocks.aaveDataProviders[i]);
+        }
+        for (uint256 i = 0; i < env.ethVault.assets.length; i++) {
+            _initAaveRateOracle(env.libs, env.infra, env.ethVault.assets[i], env.ethOracleMocks.aaveDataProviders[i]);
+        }
+        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
+            _initRestakerRateForAgent(env.infra, env.testUsers.agents[i]);
         }
 
         /// LENDER
         console.log("deploying lender");
         vm.startPrank(env.users.lender_admin);
-        _initVaultLender(env.vault, env.infra);
+        _initVaultLender(env.usdVault, env.infra);
+        _initVaultLender(env.ethVault, env.infra);
 
         /// SYMBIOTIC NETWORK ADAPTER
         console.log("deploying symbiotic cap network address");
@@ -141,21 +164,21 @@ contract TestDeployer is
             SymbioticNetworkAdapterParams({ vaultEpochDuration: 7 days, feeAllowed: 1000 })
         );
 
-        console.log("deploying symbiotic vaults");
+        console.log("deploying symbiotic WETH vault");
         vm.startPrank(env.symbiotic.users.vault_admin);
         _symbioticVaultConfigToEnv(
             _deploySymbioticVault(
                 symbioticAb,
                 SymbioticVaultParams({
                     vault_admin: env.symbiotic.users.vault_admin,
-                    collateral: env.ethMock,
+                    collateral: env.ethMocks[0],
                     vaultEpochDuration: 7 days,
                     burnerRouterDelay: 0
                 })
             )
         );
 
-        console.log("deployed vault 2", env.symbiotic.vaults[0]);
+        console.log("deploying symbiotic USDT vault");
         _symbioticVaultConfigToEnv(
             _deploySymbioticVault(
                 symbioticAb,
@@ -263,19 +286,35 @@ contract TestDeployer is
         vm.label(address(env.infra.oracle), "OracleProxy");
         vm.label(address(env.infra.lender), "LenderProxy");
 
-        for (uint256 i = 0; i < env.vault.assets.length; i++) {
-            vm.label(address(env.vault.assets[i]), IERC20Metadata(env.vault.assets[i]).symbol());
-            vm.label(
-                address(env.vault.principalDebtTokens[i]), IERC20Metadata(env.vault.principalDebtTokens[i]).symbol()
-            );
-            vm.label(address(env.vault.restakerDebtTokens[i]), IERC20Metadata(env.vault.restakerDebtTokens[i]).symbol());
-            vm.label(address(env.vault.interestDebtTokens[i]), IERC20Metadata(env.vault.interestDebtTokens[i]).symbol());
+        for (uint256 i = 0; i < env.usdVault.assets.length; i++) {
+            IERC20Metadata asset = IERC20Metadata(env.usdVault.assets[i]);
+            IERC20Metadata principalDebtToken = IERC20Metadata(env.usdVault.principalDebtTokens[i]);
+            IERC20Metadata restakerDebtToken = IERC20Metadata(env.usdVault.restakerDebtTokens[i]);
+            IERC20Metadata interestDebtToken = IERC20Metadata(env.usdVault.interestDebtTokens[i]);
+            vm.label(address(asset), asset.symbol());
+            vm.label(address(principalDebtToken), principalDebtToken.symbol());
+            vm.label(address(restakerDebtToken), restakerDebtToken.symbol());
+            vm.label(address(interestDebtToken), interestDebtToken.symbol());
+        }
+
+        for (uint256 i = 0; i < env.ethVault.assets.length; i++) {
+            IERC20Metadata asset = IERC20Metadata(env.ethVault.assets[i]);
+            IERC20Metadata principalDebtToken = IERC20Metadata(env.ethVault.principalDebtTokens[i]);
+            IERC20Metadata restakerDebtToken = IERC20Metadata(env.ethVault.restakerDebtTokens[i]);
+            IERC20Metadata interestDebtToken = IERC20Metadata(env.ethVault.interestDebtTokens[i]);
+            vm.label(address(asset), asset.symbol());
+            vm.label(address(principalDebtToken), principalDebtToken.symbol());
+            vm.label(address(restakerDebtToken), restakerDebtToken.symbol());
+            vm.label(address(interestDebtToken), interestDebtToken.symbol());
         }
 
         // Label vault contracts
-        vm.label(address(env.vault.capToken), "cUSD");
-        vm.label(address(env.vault.stakedCapToken), "scUSD");
-        vm.label(address(env.vault.feeAuction), "FeeAuction");
+        vm.label(address(env.usdVault.capToken), "cUSD");
+        vm.label(address(env.usdVault.stakedCapToken), "scUSD");
+        vm.label(address(env.usdVault.feeAuction), "cUSD_FeeAuction");
+        vm.label(address(env.ethVault.capToken), "cETH");
+        vm.label(address(env.ethVault.stakedCapToken), "scETH");
+        vm.label(address(env.ethVault.feeAuction), "cETH_FeeAuction");
 
         // Label symbiotic contracts
         for (uint256 i = 0; i < env.symbiotic.vaults.length; i++) {
@@ -295,9 +334,10 @@ contract TestDeployer is
         vm.label(address(env.libs.capTokenAdapter), "CapTokenAdapter");
         vm.label(address(env.libs.stakedCapAdapter), "StakedCapTokenAdapter");
 
-        vm.label(address(vault.assets[0]), "USDT");
-        vm.label(address(vault.assets[1]), "USDC");
-        vm.label(address(vault.assets[2]), "USDX");
+        vm.label(address(usdVault.assets[0]), "USDT");
+        vm.label(address(usdVault.assets[1]), "USDC");
+        vm.label(address(usdVault.assets[2]), "USDX");
+        vm.label(address(ethVault.assets[0]), "WETH");
     }
 
     function _symbioticVaultConfigToEnv(SymbioticVaultConfig memory _vault) internal {
@@ -333,13 +373,18 @@ contract TestDeployer is
         _rewards.stakerRewarder = env.symbiotic.networkRewards[index];
     }
 
-    VaultConfig vault;
+    VaultConfig usdVault;
+    VaultConfig ethVault;
     MockERC20 usdt;
     MockERC20 usdc;
     MockERC20 usdx;
     MockERC20 weth;
     CapToken cUSD;
     StakedCap scUSD;
+    FeeAuction cUSDFeeAuction;
+    CapToken cETH;
+    StakedCap scETH;
+    FeeAuction cETHFeeAuction;
 
     NetworkMiddleware middleware;
     SymbioticVaultConfig symbioticWethVault;
@@ -349,17 +394,20 @@ contract TestDeployer is
 
     Lender lender;
     Delegation delegation;
-    FeeAuction feeAuction;
 
     function _unwrapEnvToMakeTestsReadable() internal {
-        vault = env.vault;
-        usdt = MockERC20(vault.assets[0]);
-        usdc = MockERC20(vault.assets[1]);
-        usdx = MockERC20(vault.assets[2]);
-        weth = MockERC20(env.ethMock);
-        cUSD = CapToken(vault.capToken);
-        scUSD = StakedCap(vault.stakedCapToken);
-        feeAuction = FeeAuction(vault.feeAuction);
+        usdVault = env.usdVault;
+        ethVault = env.ethVault;
+        usdt = MockERC20(usdVault.assets[0]);
+        usdc = MockERC20(usdVault.assets[1]);
+        usdx = MockERC20(usdVault.assets[2]);
+        weth = MockERC20(ethVault.assets[0]);
+        cUSD = CapToken(usdVault.capToken);
+        scUSD = StakedCap(usdVault.stakedCapToken);
+        cUSDFeeAuction = FeeAuction(usdVault.feeAuction);
+        cETH = CapToken(ethVault.capToken);
+        scETH = StakedCap(ethVault.stakedCapToken);
+        cETHFeeAuction = FeeAuction(ethVault.feeAuction);
 
         middleware = NetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
         symbioticWethVault = _getSymbioticVaultConfig(0);
@@ -369,5 +417,35 @@ contract TestDeployer is
 
         lender = Lender(env.infra.lender);
         delegation = Delegation(env.infra.delegation);
+    }
+
+    // helpers
+
+    function _getRandomAgent() internal view returns (address) {
+        return env.testUsers.agents[uint256(
+            keccak256(abi.encodePacked(block.timestamp, block.prevrandao, block.coinbase))
+        ) % env.testUsers.agents.length];
+    }
+
+    function _setAssetOraclePrice(address asset, int256 price) internal {
+        for (uint256 i = 0; i < env.usdOracleMocks.chainlinkPriceFeeds.length; i++) {
+            if (env.usdOracleMocks.assets[i] == asset) {
+                vm.startPrank(env.users.oracle_admin);
+                MockChainlinkPriceFeed(env.usdOracleMocks.chainlinkPriceFeeds[i]).setLatestAnswer(price);
+                vm.stopPrank();
+                return;
+            }
+        }
+
+        for (uint256 i = 0; i < env.ethOracleMocks.chainlinkPriceFeeds.length; i++) {
+            if (env.ethOracleMocks.assets[i] == asset) {
+                vm.startPrank(env.users.oracle_admin);
+                MockChainlinkPriceFeed(env.ethOracleMocks.chainlinkPriceFeeds[i]).setLatestAnswer(price);
+                vm.stopPrank();
+                return;
+            }
+        }
+
+        revert("Asset not found");
     }
 }

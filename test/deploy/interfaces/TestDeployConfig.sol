@@ -21,12 +21,14 @@ struct TestEnvConfig {
     ImplementationsConfig implems;
     UsersConfig users;
     InfraConfig infra;
-    VaultConfig vault;
+    VaultConfig usdVault;
+    VaultConfig ethVault;
     // test specific
     TestUsersConfig testUsers;
     address[] usdMocks;
-    address ethMock;
-    OracleMocksConfig oracleMocks;
+    address[] ethMocks;
+    OracleMocksConfig usdOracleMocks;
+    OracleMocksConfig ethOracleMocks;
     // symbiotic
     SymbioticTestEnvConfig symbiotic;
 }
