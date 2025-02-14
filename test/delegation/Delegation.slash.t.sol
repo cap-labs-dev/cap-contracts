@@ -20,16 +20,21 @@ contract DelegationSlashTest is TestDeployer {
         _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e18);
         _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, user_agent, 1000e6);
 
-        _timeTravel(symbioticUsdtVault.vaultEpochDuration + 1 days);
+        _timeTravel(30 days);
         vm.stopPrank();
     }
 
-    function test_view_functions() public view {
+    function test_delegation_view_functions() public view {
         assertEq(delegation.epochDuration(), 1 days);
         assertEq(delegation.epoch(), block.timestamp / 1 days);
         assertEq(delegation.agents().length, 3);
         assertEq(delegation.networks(user_agent).length, 1);
-        console.logUint(delegation.globalDelegation());
+        assertEq(delegation.globalDelegation(), 468186200e8);
+        assertEq(delegation.slashableCollateral(user_agent), 2 * 2600e8 + 1000e8);
+        assertEq(
+            delegation.slashableCollateralByNetwork(user_agent, env.symbiotic.networkAdapter.networkMiddleware),
+            2 * 2600e8 + 1000e8
+        );
     }
 
     function test_slash_delegation() public {

@@ -210,7 +210,7 @@ contract LenderLiquidateTest is TestDeployer {
         {
             vm.startPrank(env.testUsers.liquidator);
 
-            // dealing a bit more since now we cover the interest 
+            // dealing a bit more since now we cover the interest
             deal(address(usdc), env.testUsers.liquidator, 3100e6);
 
             // start the first liquidation

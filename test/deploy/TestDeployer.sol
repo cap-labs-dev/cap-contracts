@@ -144,6 +144,12 @@ contract TestDeployer is
             _initRestakerRateForAgent(env.infra, env.testUsers.agents[i]);
         }
 
+        /// LENDER
+        console.log("deploying lender");
+        vm.startPrank(env.users.lender_admin);
+        _initVaultLender(env.usdVault, env.infra);
+        _initVaultLender(env.ethVault, env.infra);
+
         /// SYMBIOTIC NETWORK ADAPTER
         console.log("deploying symbiotic cap network address");
         env.symbiotic.users.vault_admin = makeAddr("vault_admin");
@@ -250,16 +256,6 @@ contract TestDeployer is
                 _getSymbioticVaultConfig(1), env.symbiotic.networkAdapter, _agent, type(uint256).max
             );
         }
-
-        // send all restaker interest to the network middleware
-        env.usdVault.restakerInterestReceiver = env.symbiotic.networkAdapter.networkMiddleware;
-        env.ethVault.restakerInterestReceiver = env.symbiotic.networkAdapter.networkMiddleware;
-
-        /// LENDER
-        console.log("deploying lender");
-        vm.startPrank(env.users.lender_admin);
-        _initVaultLender(env.usdVault, env.infra);
-        _initVaultLender(env.ethVault, env.infra);
 
         /// DELEGATION
         console.log("init delegation");

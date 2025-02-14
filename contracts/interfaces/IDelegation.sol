@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-interface IDelegation {
+import { IRestakerRewardReceiver } from "./IRestakerRewardReceiver.sol";
+
+interface IDelegation is IRestakerRewardReceiver {
     function coverage(address agent) external view returns (uint256 coverage);
     function slash(address agent, address receiver, uint256 liquidatedValue) external;
     function ltv(address agent) external view returns (uint256 ltv);

@@ -22,6 +22,10 @@ contract LenderBorrowTest is TestDeployer {
 
         user_agent = _getRandomAgent();
 
+        vm.startPrank(env.symbiotic.users.vault_admin);
+        _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e18);
+        _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, user_agent, 1000e6);
+
         uint256 assetIndex = _getAssetIndex(usdVault, address(usdc));
         principalDebtToken = PrincipalDebtToken(usdVault.principalDebtTokens[assetIndex]);
         restakerDebtToken = RestakerDebtToken(usdVault.restakerDebtTokens[assetIndex]);
@@ -48,9 +52,11 @@ contract LenderBorrowTest is TestDeployer {
     }
 
     function test_lender_borrow_and_repay_debt_tokens() public {
-        vm.startPrank(user_agent);
+        // ensure reward targets are empty
+        assertEq(usdc.balanceOf(symbioticUsdtNetworkRewards.stakerRewarder), 0);
+        assertEq(usdc.balanceOf(usdVault.feeAuction), 0);
 
-        uint256 backingBefore = usdc.balanceOf(address(cUSD));
+        vm.startPrank(user_agent);
 
         lender.borrow(address(usdc), 1000e6, user_agent);
         assertEq(usdc.balanceOf(user_agent), 1000e6);
@@ -104,9 +110,15 @@ contract LenderBorrowTest is TestDeployer {
 
         // all square now
         assertDebtEq(0, 0, 0);
+
+        // restaker rewards should be distributed to the networks
+        assertEq(usdc.balanceOf(symbioticUsdtNetworkRewards.stakerRewarder), 87_096);
+
+        // interest rewards should be distributed to fee auction
+        assertEq(usdc.balanceOf(usdVault.feeAuction), 68_871);
     }
 
-    function assertDebtEq(uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt) internal {
+    function assertDebtEq(uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt) internal view {
         (uint256 principalDebtView, uint256 interestDebtView, uint256 restakerDebtView) =
             lender.debt(user_agent, address(usdc));
         assertEq(principalDebtView, principalDebt);

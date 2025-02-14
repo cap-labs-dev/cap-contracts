@@ -6,7 +6,7 @@ pragma solidity ^0.8.28;
 /// @notice Interface for contracts that can receive and distribute rewards from restaking
 interface IRestakerRewardReceiver {
     /// @notice Distribute rewards accumulated by the agent borrowing
-    /// @param _vault Vault address
+    /// @param _agent Agent address
     /// @param _token Token address
-    function distributeRewards(address _vault, address _token) external;
+    function distributeRewards(address _agent, address _token) external;
 }

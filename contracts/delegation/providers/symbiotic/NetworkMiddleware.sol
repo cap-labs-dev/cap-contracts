@@ -3,7 +3,6 @@ pragma solidity ^0.8.28;
 
 import { AccessUpgradeable } from "../../../access/AccessUpgradeable.sol";
 import { IOracle } from "../../../interfaces/IOracle.sol";
-import { IRestakerRewardReceiver } from "../../../interfaces/IRestakerRewardReceiver.sol";
 import { IStakerRewards } from "./interfaces/IStakerRewards.sol";
 import { NetworkMiddlewareStorage } from "./libraries/NetworkMiddlewareStorage.sol";
 import { DataTypes } from "./libraries/types/DataTypes.sol";
@@ -27,7 +26,7 @@ import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 /// @title Cap Symbiotic Network Middleware Contract
 /// @author Cap Labs
 /// @notice This contract manages the symbiotic collateral and slashing.
-contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMiddleware, IRestakerRewardReceiver {
+contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMiddleware {
     using SafeERC20 for IERC20;
 
     /// @dev Vault registered
@@ -179,7 +178,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     /// @param _oracle Oracle address
     /// @param _timestamp Timestamp to check coverage at
     /// @return collateralValue Coverage value in USD (8 decimals)
-    /// @return collateral Coverage amount
+    /// @return collateral Coverage amount in the vault's collateral token decimals
     function coverageByVault(address _network, address _agent, address _vault, address _oracle, uint48 _timestamp)
         public
         view
@@ -221,13 +220,35 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     /// @notice Coverage of an agent by Symbiotic vaults
     /// @param _agent Agent address
     /// @return delegation Delegation amount in USD (8 decimals)
-    function coverage(address _agent) external view returns (uint256 delegation) {
+    function coverage(address _agent) public view returns (uint256 delegation) {
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
+        address[] memory _vaults = $.vaults[_agent];
+        address _network = $.network;
+        address _oracle = $.oracle;
 
-        for (uint256 i = 0; i < $.vaults[_agent].length; i++) {
-            (uint256 value,) =
-                coverageByVault($.network, _agent, $.vaults[_agent][i], $.oracle, uint48(block.timestamp));
+        for (uint256 i = 0; i < _vaults.length; i++) {
+            (uint256 value,) = coverageByVault(_network, _agent, _vaults[i], _oracle, uint48(block.timestamp));
             delegation += value;
+        }
+    }
+
+    /// @notice Slashable collateral of an agent by Symbiotic vaults
+    /// @param _agent Agent address
+    /// @param _timestamp Timestamp to check slashable collateral at
+    /// @return _slashableCollateral Slashable collateral amount in USD (8 decimals)
+    function slashableCollateral(address _agent, uint48 _timestamp)
+        external
+        view
+        returns (uint256 _slashableCollateral)
+    {
+        DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
+        address[] memory _vaults = $.vaults[_agent];
+        address _network = $.network;
+        address _oracle = $.oracle;
+
+        for (uint256 i = 0; i < _vaults.length; i++) {
+            (uint256 value,) = slashableCollateralByVault(_network, _agent, _vaults[i], _oracle, _timestamp);
+            _slashableCollateral += value;
         }
     }
 
@@ -286,17 +307,27 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     }
 
     /// @notice Distribute rewards accumulated by the agent borrowing
+    /// @param _agent Agent address
     /// @param _token Token address
-    function distributeRewards(address _vault, address _token) external checkAccess(this.distributeRewards.selector) {
-        uint256 amount = IERC20(_token).balanceOf(address(this));
+    function distributeRewards(address _agent, address _token) external checkAccess(this.distributeRewards.selector) {
         DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
-        address stakerRewarder = $.stakerRewarders[_vault];
-        if (stakerRewarder == address(0)) revert NoStakerRewarder();
+        uint256 totalCollateralValue = coverage(_agent);
+        uint256 _amount = IERC20(_token).balanceOf(address(this));
 
-        IERC20(_token).forceApprove(address(IStakerRewards(stakerRewarder)), amount);
-        IStakerRewards(stakerRewarder).distributeRewards(
-            $.network, _token, amount, abi.encode(uint48(block.timestamp - 1), $.feeAllowed, new bytes(0), new bytes(0))
-        );
+        // here, distribute proportionally to the collateral value of the vaults
+        address[] memory _vaults = $.vaults[_agent];
+        for (uint256 i = 0; i < _vaults.length; i++) {
+            address vault = _vaults[i];
+            (uint256 collateralValue,) = coverageByVault($.network, _agent, vault, $.oracle, uint48(block.timestamp));
+            uint256 reward = _amount * collateralValue / totalCollateralValue;
+            address stakerRewarder = $.stakerRewarders[vault];
+            if (stakerRewarder == address(0)) revert NoStakerRewarder();
+
+            IERC20(_token).forceApprove(address(IStakerRewards(stakerRewarder)), reward);
+            IStakerRewards(stakerRewarder).distributeRewards(
+                $.network, _token, reward, abi.encode(uint48(block.timestamp - 1), $.feeAllowed, "", "")
+            );
+        }
     }
 
     /// @dev Only admin can upgrade
