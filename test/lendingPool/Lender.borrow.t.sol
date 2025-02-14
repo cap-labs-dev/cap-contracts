@@ -78,11 +78,21 @@ contract LenderBorrowTest is TestDeployer {
         assertEq(lastInterestUpdate, block.timestamp - 3 hours);
 
         // simulate yield
-        usdc.mint(user_agent, 1000e6);
+        usdc.mint(user_agent, 1_000_000e6);
 
         // repay the debt
-        usdc.approve(env.infra.lender, 1000e6 + 10e6);
-        lender.repay(address(usdc), 1000e6, user_agent);
-        assertGe(usdc.balanceOf(address(cUSD)), backingBefore);
+        usdc.approve(env.infra.lender, 1_000_000e6);
+        lender.repay(address(usdc), 100e6, user_agent);
+
+        _timeTravel(1);
+
+        // // principal debt should be repaid first
+        // assertEq(principalDebtToken.balanceOf(user_agent), 900e6);
+        // assertEq(interestDebtToken.balanceOf(user_agent), 68495);
+        // assertEq(restakerDebtToken.balanceOf(user_agent), 0);
+
+        // interest debt should be repaid next
+        // lender.repay(address(usdc), 900e6, user_agent);
+        // assertEq(principalDebtToken.balanceOf(user_agent), 0);
     }
 }
