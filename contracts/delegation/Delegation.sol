@@ -4,25 +4,34 @@ pragma solidity ^0.8.28;
 import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
 import { INetwork } from "../delegation/interfaces/INetwork.sol";
 import { IDelegation } from "../interfaces/IDelegation.sol";
+
+import { IRestakerRewardReceiver } from "../interfaces/IRestakerRewardReceiver.sol";
 import { DelegationStorage } from "./libraries/DelegationStorage.sol";
 import { DataTypes } from "./libraries/types/DataTypes.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title Cap Delegation Contract
 /// @author Cap Labs
 /// @notice This contract manages delegation and slashing.
 contract Delegation is IDelegation, UUPSUpgradeable, AccessUpgradeable {
+    using SafeERC20 for IERC20;
+
     event SlashNetwork(address network, uint256 slashShare);
     event AddAgent(address agent, uint256 ltv, uint256 liquidationThreshold);
     event ModifyAgent(address agent, uint256 ltv, uint256 liquidationThreshold);
     event RegisterNetwork(address agent, address network);
+    event DistributeReward(address agent, address asset, uint256 amount);
+    event NetworkReward(address network, address asset, uint256 amount);
 
     error AgentDoesNotExist();
     error DuplicateAgent();
     error DuplicateNetwork();
-
+    error NoCoverageForAgent(address agent);
     /// @custom:oz-upgrades-unsafe-allow constructor
+
     constructor() {
         _disableInitializers();
     }
@@ -62,23 +71,54 @@ contract Delegation is IDelegation, UUPSUpgradeable, AccessUpgradeable {
         currentEpoch = block.timestamp / $.epochDuration;
     }
 
+    /// @notice Get the timestamp that is most recent between the last borrow and the epoch -1
+    /// @param _agent The agent address
+    /// @return _slashTimestamp Timestamp that is most recent between the last borrow and the epoch -1
+    function slashTimestamp(address _agent) public view returns (uint48 _slashTimestamp) {
+        DataTypes.DelegationStorage storage $ = DelegationStorage.get();
+        _slashTimestamp = uint48(Math.max((epoch() - 1) * $.epochDuration, $.agentData[_agent].lastBorrow));
+    }
+
     /// @notice How much delegation and agent has available to back their borrows
     /// @param _agent The agent address
-    /// @return delegation Amount in USD that a agent has provided as delegation from the delegators
+    /// @return delegation Amount in USD (8 decimals) that a agent has provided as delegation from the delegators
     function coverage(address _agent) public view returns (uint256 delegation) {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
         for (uint i; i < $.networks[_agent].length; ++i) {
-            address network = $.networks[_agent][i];
-            delegation += coverageByNetwork(_agent, network);
+            delegation += coverageByNetwork(_agent, $.networks[_agent][i]);
+        }
+    }
+
+    /// @notice How much slashable coverage an agent has available to back their borrows
+    /// @param _agent The agent address
+    /// @return _slashableCollateral Amount in USD (8 decimals) that a agent has provided as slashable collateral from the delegators
+    function slashableCollateral(address _agent) public view returns (uint256 _slashableCollateral) {
+        DataTypes.DelegationStorage storage $ = DelegationStorage.get();
+        uint48 _slashTimestamp = slashTimestamp(_agent);
+        for (uint i; i < $.networks[_agent].length; ++i) {
+            _slashableCollateral += INetwork($.networks[_agent][i]).slashableCollateral(_agent, _slashTimestamp);
         }
     }
 
     /// @notice How much delegation and agent has available to back their borrows
     /// @param _agent The agent addres
     /// @param _network The network covering the agent
-    /// @return delegation Amount in USD that a agent has as delegation from the networks
+    /// @return delegation Amount in USD that a agent has as delegation from the networks, encoded with 8 decimals
     function coverageByNetwork(address _agent, address _network) public view returns (uint256 delegation) {
         delegation = INetwork(_network).coverage(_agent);
+    }
+
+    /// @notice Slashable collateral of an agent by a specific network
+    /// @param _agent Agent address
+    /// @param _network Network address
+    /// @return _slashableCollateral Slashable collateral amount in USD (8 decimals)
+    function slashableCollateralByNetwork(address _agent, address _network)
+        public
+        view
+        returns (uint256 _slashableCollateral)
+    {
+        uint48 _slashTimestamp = slashTimestamp(_agent);
+        _slashableCollateral = INetwork(_network).slashableCollateral(_agent, _slashTimestamp);
     }
 
     /// @notice Fetch active network addresses
@@ -119,23 +159,48 @@ contract Delegation is IDelegation, UUPSUpgradeable, AccessUpgradeable {
     /// @param _amount The USD value of the delegation needed to cover the debt
     function slash(address _agent, address _liquidator, uint256 _amount) external checkAccess(this.slash.selector) {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
-
-        // Get the timestamp that is most recent between the last borrow and the epoch -1
-        uint256 slashTimestamp = Math.max((epoch() - 1) * $.epochDuration, $.agentData[_agent].lastBorrow);
+        uint48 _slashTimestamp = slashTimestamp(_agent);
 
         // Calculate each network's proportion of total delegation
         for (uint i; i < $.networks[_agent].length; ++i) {
             address network = $.networks[_agent][i];
-            uint256 networkCoverage = coverageByNetwork(_agent, network);
+            uint256 networkSlashableCollateral = INetwork(network).slashableCollateral(_agent, _slashTimestamp);
+            if (networkSlashableCollateral == 0) continue;
 
             // Calculate this network's share of the total amount to slash
-            uint256 networkSlash = _amount * 1e18 / networkCoverage;
-
-            INetwork(network).slash(_agent, _liquidator, networkSlash, uint48(slashTimestamp));
+            uint256 networkSlash = _amount * 1e18 / networkSlashableCollateral;
+            INetwork(network).slash(_agent, _liquidator, networkSlash, _slashTimestamp);
             emit SlashNetwork(network, networkSlash);
         }
     }
 
+    /// @notice Distribute rewards to networks covering an agent proportionally to their coverage
+    /// @param _agent The agent address
+    /// @param _asset The reward token address
+    function distributeRewards(address _agent, address _asset) external {
+        DataTypes.DelegationStorage storage $ = DelegationStorage.get();
+        uint256 _amount = IERC20(_asset).balanceOf(address(this));
+
+        uint256 totalCoverage = coverage(_agent);
+        if (totalCoverage == 0) revert NoCoverageForAgent(_agent);
+
+        // Distribute to each network based on their coverage proportion
+        for (uint i; i < $.networks[_agent].length; ++i) {
+            address network = $.networks[_agent][i];
+            uint256 networkCoverage = coverageByNetwork(_agent, network);
+            if (networkCoverage == 0) continue;
+
+            uint256 networkReward = _amount * networkCoverage / totalCoverage;
+            IERC20(_asset).safeTransfer(network, networkReward);
+            INetwork(network).distributeRewards(_agent, _asset);
+            emit NetworkReward(network, _asset, networkReward);
+        }
+
+        emit DistributeReward(_agent, _asset, _amount);
+    }
+
+    /// @notice Set the last borrow timestamp for an agent
+    /// @param _agent Agent address
     function setLastBorrow(address _agent) external checkAccess(this.setLastBorrow.selector) {
         DataTypes.DelegationStorage storage $ = DelegationStorage.get();
         $.agentData[_agent].lastBorrow = block.timestamp;

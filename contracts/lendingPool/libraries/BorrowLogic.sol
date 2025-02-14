@@ -3,6 +3,8 @@ pragma solidity ^0.8.28;
 
 import { IDebtToken } from "../../interfaces/IDebtToken.sol";
 import { IPrincipalDebtToken } from "../../interfaces/IPrincipalDebtToken.sol";
+
+import { IRestakerRewardReceiver } from "../../interfaces/IRestakerRewardReceiver.sol";
 import { IVaultUpgradeable } from "../../interfaces/IVaultUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -69,10 +71,10 @@ library BorrowLogic {
     /// debt is paid last as the future rate is calculated based on the resulting principal debt.
     /// @param $ Lender storage
     /// @param params Parameters to repay a debt
-    /// @return repaid Actual amount repaid
+    /// @return _repaid Actual amount repaid
     function repay(DataTypes.LenderStorage storage $, DataTypes.RepayParams memory params)
         external
-        returns (uint256 repaid)
+        returns (uint256 _repaid)
     {
         DataTypes.ReserveData memory reserve = $.reservesData[params.asset];
         IDebtToken(reserve.interestDebtToken).update(params.agent);
@@ -110,9 +112,8 @@ library BorrowLogic {
 
         if (restakerRepaid > 0) {
             restakerRepaid = IDebtToken(reserve.restakerDebtToken).burn(params.agent, restakerRepaid);
-            IERC20(params.asset).safeTransferFrom(
-                params.caller, $.restakerInterestReceiver[params.agent], restakerRepaid
-            );
+            IERC20(params.asset).safeTransferFrom(params.caller, reserve.restakerInterestReceiver, restakerRepaid);
+            IRestakerRewardReceiver(reserve.restakerInterestReceiver).distributeRewards(params.agent, params.asset);
         }
 
         if (interestRepaid > 0) {
@@ -144,6 +145,8 @@ library BorrowLogic {
             $.agentConfig[params.agent].setBorrowing(reserve.id, false);
             emit TotalRepayment(params.agent, params.asset);
         }
+
+        _repaid = principalRepaid + interestRepaid + restakerRepaid;
 
         emit Repay(params.agent, params.asset, principalRepaid, interestRepaid, restakerRepaid);
     }

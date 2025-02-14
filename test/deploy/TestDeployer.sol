@@ -257,6 +257,7 @@ contract TestDeployer is
             );
         }
 
+        /// DELEGATION
         console.log("init delegation");
         vm.startPrank(env.users.delegation_admin);
         for (uint256 i = 0; i < env.testUsers.agents.length; i++) {

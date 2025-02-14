@@ -55,6 +55,7 @@ struct VaultConfig {
     address capToken; // also called the vault
     address stakedCapToken;
     address feeAuction;
+    address restakerInterestReceiver;
     VaultLzPeriphery lzperiphery;
     address[] assets;
     address[] principalDebtTokens;
