@@ -11,10 +11,10 @@ contract DelegationSlashTest is TestDeployer {
 
     function setUp() public {
         _deployCapTestEnvironment();
-        _initTestVaultLiquidity(env.vault);
+        _initTestVaultLiquidity(usdVault);
         _initSymbioticVaultsLiquidity(env);
 
-        user_agent = env.testUsers.agents[0];
+        user_agent = _getRandomAgent();
 
         vm.startPrank(env.symbiotic.users.vault_admin);
         _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e18);

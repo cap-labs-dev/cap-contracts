@@ -5,8 +5,8 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 import { ERC20Upgradeable, IERC20 } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import { IOracle } from "../../interfaces/IOracle.sol";
 import { AccessUpgradeable } from "../../access/AccessUpgradeable.sol";
+import { IOracle } from "../../interfaces/IOracle.sol";
 import { WadRayMath } from "../libraries/math/WadRayMath.sol";
 
 /// @title Restaker debt token for a market on the Lender
@@ -35,7 +35,8 @@ contract RestakerDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
     }
 
     /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.RestakerDebt")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant RestakerDebtStorageLocation = 0x2dd1dd482e00c02bf87ac740376f032edca8a52ab1bbd273a66a2eb62e294e00;
+    bytes32 private constant RestakerDebtStorageLocation =
+        0x2dd1dd482e00c02bf87ac740376f032edca8a52ab1bbd273a66a2eb62e294e00;
 
     /// @dev Get this contract storage pointer
     /// @return $ Storage pointer
@@ -55,7 +56,10 @@ contract RestakerDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
     /// @param _oracle Oracle address
     /// @param _debtToken Principal debt token
     /// @param _asset Asset address
-    function initialize(address _accessControl, address _oracle, address _debtToken, address _asset) external initializer {
+    function initialize(address _accessControl, address _oracle, address _debtToken, address _asset)
+        external
+        initializer
+    {
         RestakerDebtStorage storage $ = _getRestakerDebtStorage();
         $.oracle = _oracle;
         $.debtToken = _debtToken;
@@ -111,7 +115,8 @@ contract RestakerDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
         RestakerDebtStorage storage $ = _getRestakerDebtStorage();
         uint256 timestamp = block.timestamp;
         if (timestamp > $.lastAgentUpdate[_agent]) {
-            balance = super.balanceOf(_agent) + $.interestPerSecond[_agent].rayMul(timestamp - $.lastAgentUpdate[_agent]);
+            balance =
+                super.balanceOf(_agent) + $.interestPerSecond[_agent].rayMul(timestamp - $.lastAgentUpdate[_agent]);
         } else {
             balance = super.balanceOf(_agent);
         }
@@ -197,6 +202,46 @@ contract RestakerDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeab
     /// @notice Disabled due to this being a non-transferrable token
     function transferFrom(address, address, uint256) public pure override returns (bool) {
         revert OperationNotSupported();
+    }
+
+    /// @notice Get the current state for a restaker/agent
+    /// @param _agent The address of the agent/restaker
+    /// @return _interestPerSecond The current interest rate per second for the agent
+    /// @return _lastUpdate The timestamp of the last update for this agent
+    function agent(address _agent) external view returns (uint256 _interestPerSecond, uint256 _lastUpdate) {
+        RestakerDebtStorage storage $ = _getRestakerDebtStorage();
+        _interestPerSecond = $.interestPerSecond[_agent];
+        _lastUpdate = $.lastAgentUpdate[_agent];
+    }
+
+    /// @notice Get the oracle address
+    /// @return _oracle The oracle address
+    function oracle() external view returns (address _oracle) {
+        _oracle = _getRestakerDebtStorage().oracle;
+    }
+
+    /// @notice Get the debt token address
+    /// @return _debtToken The debt token address
+    function debtToken() external view returns (address _debtToken) {
+        _debtToken = _getRestakerDebtStorage().debtToken;
+    }
+
+    /// @notice Get the asset address
+    /// @return _asset The asset address
+    function asset() external view returns (address _asset) {
+        _asset = _getRestakerDebtStorage().asset;
+    }
+
+    /// @notice Get the total interest per second
+    /// @return _totalInterestPerSecond The total interest per second
+    function totalInterestPerSecond() external view returns (uint256 _totalInterestPerSecond) {
+        _totalInterestPerSecond = _getRestakerDebtStorage().totalInterestPerSecond;
+    }
+
+    /// @notice Get the last update timestamp
+    /// @return _lastUpdate The last update timestamp
+    function lastUpdate() external view returns (uint256 _lastUpdate) {
+        _lastUpdate = _getRestakerDebtStorage().lastUpdate;
     }
 
     function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }

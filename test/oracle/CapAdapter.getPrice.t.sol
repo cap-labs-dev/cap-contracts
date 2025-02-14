@@ -8,7 +8,7 @@ import { TestDeployer } from "../deploy/TestDeployer.sol";
 contract CapAdapterGetPriceTest is TestDeployer {
     function setUp() public {
         _deployCapTestEnvironment();
-        _initTestVaultLiquidity(env.vault);
+        _initTestVaultLiquidity(usdVault);
     }
 
     function test_cap_adapter_get_price() public view {

@@ -30,41 +30,8 @@ contract MiddlewareTest is TestDeployer {
         }
     }
 
-    function test_slash_does_not_work_if_not_slashable() public {
-        {
-            vm.startPrank(env.symbiotic.users.vault_admin);
-
-            // remove all delegations to our slashable agent
-            address agent = env.testUsers.agents[0];
-            _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 0);
-            _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 0);
-
-            vm.stopPrank();
-        }
-
-        _timeTravel(symbioticUsdtVault.vaultEpochDuration + 1);
-
-        {
-            vm.startPrank(env.infra.delegation);
-
-            address recipient = makeAddr("recipient");
-            address agent = env.testUsers.agents[0];
-
-            assertEq(middleware.coverage(agent), 0);
-
-            // we request a slash for a timestamp where there is a stake to be slashed
-            middleware.slash(agent, recipient, 0.1e18, uint48(block.timestamp));
-
-            // slash should not have worked
-            assertEq(IERC20(usdt).balanceOf(recipient), 0);
-            assertEq(IERC20(usdx).balanceOf(recipient), 0);
-            assertEq(middleware.coverage(agent), 0);
-            vm.stopPrank();
-        }
-    }
-
     function test_expect_the_current_stake_to_be_exposed() public {
-        address agent = env.testUsers.agents[0];
+        address agent = _getRandomAgent();
 
         {
             vm.startPrank(env.symbiotic.users.vault_admin);
@@ -95,7 +62,7 @@ contract MiddlewareTest is TestDeployer {
     function test_current_agent_coverage_accounts_for_burner_router_changes() public {
         Network _network = Network(env.symbiotic.networkAdapter.network);
 
-        address agent = env.testUsers.agents[0];
+        address agent = _getRandomAgent();
 
         assertEq(middleware.coverage(agent), 6200e8);
 

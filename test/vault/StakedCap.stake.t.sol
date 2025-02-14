@@ -8,10 +8,10 @@ contract StakedCapStakeTest is TestDeployer {
 
     function setUp() public {
         _deployCapTestEnvironment();
-        _initTestVaultLiquidity(env.vault);
+        _initTestVaultLiquidity(usdVault);
 
         user = makeAddr("test_user");
-        _initTestUserMintCapToken(env.vault, user, 4000e18);
+        _initTestUserMintCapToken(usdVault, user, 4000e18);
     }
 
     function test_staked_cap_stake() public {

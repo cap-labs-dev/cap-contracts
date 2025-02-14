@@ -10,15 +10,15 @@ contract FeeAuctionBuyTest is TestDeployer {
 
     function setUp() public {
         _deployCapTestEnvironment();
-        _initTestVaultLiquidity(env.vault);
+        _initTestVaultLiquidity(usdVault);
         _initSymbioticVaultsLiquidity(env);
 
         // initialize the realizer
         realizer = makeAddr("interest_realizer");
-        _initTestUserMintCapToken(env.vault, realizer, 1000e18);
+        _initTestUserMintCapToken(usdVault, realizer, 1000e18);
 
         // Have a random agent borrow to generate fees
-        address borrower = env.testUsers.agents[1];
+        address borrower = _getRandomAgent();
         vm.startPrank(borrower);
         lender.borrow(address(usdc), 1000e6, borrower);
         vm.stopPrank();
@@ -31,35 +31,35 @@ contract FeeAuctionBuyTest is TestDeployer {
         {
             vm.startPrank(realizer);
             lender.realizeInterest(address(usdc), 1);
-            feeAuction.buy(env.vault.assets, realizer, "");
+            cUSDFeeAuction.buy(usdVault.assets, realizer, "");
             usdc.transfer(makeAddr("burn"), usdc.balanceOf(address(realizer)));
             vm.stopPrank();
         }
 
         // ensure the auction timestamp is reset
-        assertEq(feeAuction.startTimestamp(), block.timestamp);
+        assertEq(cUSDFeeAuction.startTimestamp(), block.timestamp);
 
         // ensure the fee auction and realizer have nothing in it
-        assertEq(usdc.balanceOf(address(feeAuction)), 0);
+        assertEq(usdc.balanceOf(address(cUSDFeeAuction)), 0);
         assertEq(usdc.balanceOf(address(realizer)), 0);
 
         // ensure the auction price is the minimum start price
-        assertEq(feeAuction.currentPrice(), 1e18);
-        assertEq(feeAuction.paymentToken(), env.vault.capToken);
-        assertEq(feeAuction.paymentRecipient(), env.vault.stakedCapToken);
-        assertEq(feeAuction.startPrice(), 1e18);
-        assertEq(feeAuction.minStartPrice(), 1e18);
-        assertEq(feeAuction.duration(), 3 hours);
+        assertEq(cUSDFeeAuction.currentPrice(), 1e18);
+        assertEq(cUSDFeeAuction.paymentToken(), address(cUSD));
+        assertEq(cUSDFeeAuction.paymentRecipient(), address(scUSD));
+        assertEq(cUSDFeeAuction.startPrice(), 1e18);
+        assertEq(cUSDFeeAuction.minStartPrice(), 1e18);
+        assertEq(cUSDFeeAuction.duration(), 3 hours);
 
         _timeTravel(1 hours);
 
-        assertEq(feeAuction.currentPrice(), feeAuction.minStartPrice() * 2 / 3); // fee auction is 3h long
+        assertEq(cUSDFeeAuction.currentPrice(), cUSDFeeAuction.minStartPrice() * 2 / 3); // fee auction is 3h long
 
         // Save balances before buying
-        uint256 usdcInterest = usdc.balanceOf(address(feeAuction));
+        uint256 usdcInterest = usdc.balanceOf(address(cUSDFeeAuction));
         assertEq(usdcInterest, 0, "Fee auction should be empty before realizing interest");
 
-        uint256 priceBeforeBuy = feeAuction.currentPrice();
+        uint256 priceBeforeBuy = cUSDFeeAuction.currentPrice();
 
         {
             vm.startPrank(realizer);
@@ -68,11 +68,11 @@ contract FeeAuctionBuyTest is TestDeployer {
             lender.realizeInterest(address(usdc), type(uint256).max);
 
             // realising interest should have created some fees
-            assertGt(usdc.balanceOf(address(feeAuction)), 11e6, "Fee auction should have some fees");
+            assertGt(usdc.balanceOf(address(cUSDFeeAuction)), 11e6, "Fee auction should have some fees");
 
             // Approve payment token (cUSD) for fee auction
-            IERC20(env.vault.capToken).approve(address(feeAuction), type(uint256).max);
-            feeAuction.buy(env.vault.assets, realizer, "");
+            cUSD.approve(address(cUSDFeeAuction), type(uint256).max);
+            cUSDFeeAuction.buy(usdVault.assets, realizer, "");
 
             // ensure realizer balance increased by the expected amount
             assertGt(usdc.balanceOf(address(realizer)), 11e6, "Realizer USDC balance should have increased");
@@ -81,7 +81,7 @@ contract FeeAuctionBuyTest is TestDeployer {
         }
 
         // fee auction price doubles after buy
-        assertEq(feeAuction.currentPrice(), priceBeforeBuy * 2);
+        assertEq(cUSDFeeAuction.currentPrice(), priceBeforeBuy * 2);
     }
 
     function test_setStartPrice() public {
@@ -90,15 +90,15 @@ contract FeeAuctionBuyTest is TestDeployer {
         // Non-admin should not be able to set start price
         vm.prank(makeAddr("non_admin"));
         vm.expectRevert();
-        feeAuction.setStartPrice(newStartPrice);
+        cUSDFeeAuction.setStartPrice(newStartPrice);
 
         // Admin should be able to set start price
         vm.prank(env.users.fee_auction_admin);
         vm.expectEmit(false, false, false, true);
         emit FeeAuction.SetStartPrice(newStartPrice);
-        feeAuction.setStartPrice(newStartPrice);
+        cUSDFeeAuction.setStartPrice(newStartPrice);
 
-        assertEq(feeAuction.startPrice(), newStartPrice);
+        assertEq(cUSDFeeAuction.startPrice(), newStartPrice);
     }
 
     function test_setDuration() public {
@@ -107,20 +107,20 @@ contract FeeAuctionBuyTest is TestDeployer {
         // Non-admin should not be able to set duration
         vm.prank(makeAddr("non_admin"));
         vm.expectRevert();
-        feeAuction.setDuration(newDuration);
+        cUSDFeeAuction.setDuration(newDuration);
 
         // Admin should be able to set duration
         vm.prank(env.users.fee_auction_admin);
         vm.expectEmit(false, false, false, true);
         emit FeeAuction.SetDuration(newDuration);
-        feeAuction.setDuration(newDuration);
+        cUSDFeeAuction.setDuration(newDuration);
 
-        assertEq(feeAuction.duration(), newDuration);
+        assertEq(cUSDFeeAuction.duration(), newDuration);
 
         // Should revert when trying to set duration to 0
         vm.prank(env.users.fee_auction_admin);
         vm.expectRevert(FeeAuction.NoDuration.selector);
-        feeAuction.setDuration(0);
+        cUSDFeeAuction.setDuration(0);
     }
 
     function test_setMinStartPrice() public {
@@ -129,14 +129,14 @@ contract FeeAuctionBuyTest is TestDeployer {
         // Non-admin should not be able to set min start price
         vm.prank(makeAddr("non_admin"));
         vm.expectRevert();
-        feeAuction.setMinStartPrice(newMinStartPrice);
+        cUSDFeeAuction.setMinStartPrice(newMinStartPrice);
 
         // Admin should be able to set min start price
         vm.prank(env.users.fee_auction_admin);
         vm.expectEmit(false, false, false, true);
         emit FeeAuction.SetMinStartPrice(newMinStartPrice);
-        feeAuction.setMinStartPrice(newMinStartPrice);
+        cUSDFeeAuction.setMinStartPrice(newMinStartPrice);
 
-        assertEq(feeAuction.minStartPrice(), newMinStartPrice);
+        assertEq(cUSDFeeAuction.minStartPrice(), newMinStartPrice);
     }
 }
