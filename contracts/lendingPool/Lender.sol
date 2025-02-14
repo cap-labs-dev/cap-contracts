@@ -152,6 +152,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @return restakerDebt Restaker debt amount in asset decimals
     function debt(address _agent, address _asset)
         external
+        view
         returns (uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt)
     {
         if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();

@@ -98,11 +98,10 @@ library ViewLogic {
     /// @return restakerDebt Restaker debt amount in asset decimals
     function debt(DataTypes.LenderStorage storage $, address _agent, address _asset)
         external
+        view
         returns (uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt)
     {
         DataTypes.ReserveData memory reserve = $.reservesData[_asset];
-        IDebtToken(reserve.interestDebtToken).update(_agent);
-        IDebtToken(reserve.restakerDebtToken).update(_agent);
         principalDebt = IERC20(reserve.principalDebtToken).balanceOf(_agent);
         restakerDebt = IERC20(reserve.restakerDebtToken).balanceOf(_agent);
         interestDebt = IERC20(reserve.interestDebtToken).balanceOf(_agent);

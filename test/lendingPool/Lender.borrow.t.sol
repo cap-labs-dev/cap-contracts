@@ -75,11 +75,11 @@ contract LenderBorrowTest is TestDeployer {
         // check on the view functions
         (interestPerSecond, lastUpdate) = restakerDebtToken.agent(user_agent);
         assertEq(interestPerSecond, 50000000);
-        assertEq(lastUpdate, block.timestamp);
+        assertEq(lastUpdate, block.timestamp - 3 hours);
 
         (storedIndex, lastUpdateInterest) = interestDebtToken.agent(user_agent);
-        assertGt(storedIndex, 1e27); // TODO: test the exact value
-        assertEq(lastUpdateInterest, block.timestamp);
+        assertEq(storedIndex, 1e27);
+        assertEq(lastUpdateInterest, block.timestamp - 3 hours);
 
         // simulate yield
         usdc.mint(user_agent, 1_000_000e6);
