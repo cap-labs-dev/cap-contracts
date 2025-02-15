@@ -35,11 +35,11 @@ contract ConfigureOracle {
         });
         Oracle(infra.oracle).setMarketOracleData(asset, oracleData);
         Oracle(infra.oracle).setUtilizationOracleData(asset, oracleData);
-        Oracle(infra.oracle).setBenchmarkRate(asset, 0.08e27);
+        Oracle(infra.oracle).setBenchmarkRate(asset, uint256(0.15e27));
     }
 
-    function _initRestakerRateForAgent(InfraConfig memory infra, address agent) internal {
-        Oracle(infra.oracle).setRestakerRate(agent, 0.05e27);
+    function _initRestakerRateForAgent(InfraConfig memory infra, address agent, uint256 rate) internal {
+        Oracle(infra.oracle).setRestakerRate(agent, rate);
     }
 
     function _initVaultOracle(LibsConfig memory libs, InfraConfig memory infra, VaultConfig memory vault) internal {
