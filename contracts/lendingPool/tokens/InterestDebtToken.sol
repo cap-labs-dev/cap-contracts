@@ -136,6 +136,7 @@ contract InterestDebtToken is
     }
 
     /// @notice Next interest rate on update
+    /// @dev Value is encoded in ray (27 decimals) and encodes rate per second
     /// @param rate Interest rate
     function nextInterestRate() public returns (uint256 rate) {
         InterestDebtTokenStorage storage $ = getInterestDebtTokenStorage();
@@ -230,6 +231,7 @@ contract InterestDebtToken is
     }
 
     /// @notice Get the current interest rate
+    /// @dev Value is encoded in ray (27 decimals) and encodes rate per second
     /// @return _interestRate The current interest rate
     function interestRate() external view returns (uint256 _interestRate) {
         _interestRate = getInterestDebtTokenStorage().interestRate;

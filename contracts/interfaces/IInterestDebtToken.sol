@@ -11,8 +11,10 @@ interface IInterestDebtToken {
         // Token parameters
         uint8 decimals;
         uint256 totalSupply;
+        /// @dev Value is encoded in ray (27 decimals) and encodes rate per second
         uint256 interestRate;
         uint256 index;
+        /// @dev timestamp of the last update
         uint256 lastUpdate;
         // Agent state
         mapping(address => uint256) storedIndex;
@@ -48,6 +50,7 @@ interface IInterestDebtToken {
     function burn(address _agent, uint256 _amount) external returns (uint256 actualRepaid);
 
     /// @notice Next interest rate on update
+    /// @dev Value is encoded in ray (27 decimals) and encodes rate per second
     /// @param rate Interest rate
     function nextInterestRate() external returns (uint256 rate);
 
@@ -70,6 +73,7 @@ interface IInterestDebtToken {
     function asset() external view returns (address _asset);
 
     /// @notice Get the current interest rate
+    /// @dev Value is encoded in ray (27 decimals) and encodes rate per second
     /// @return _interestRate The current interest rate
     function interestRate() external view returns (uint256 _interestRate);
 
