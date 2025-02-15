@@ -30,14 +30,19 @@ contract MainEverydayTest is TestDeployer {
 
     function test_everyday_functionality() public {
 
-        address alice = makeAddr("Alice");
-        address bob = makeAddr("Bob");
+    uint256 alice_cUSD_balance;
+    address alice = makeAddr("Alice");
+    address bob = makeAddr("Bob");
+    {   /// Alice and Bob get some CAP tokens
 
         /// Alice and Bob have 10000 USDT and USDC
         deal(address(usdt), alice, 10000e6);
         deal(address(usdc), bob, 10000e6);
 
+        console.log("");
+        console.log("--------------------------------");
         console.log("Alice and Bob Lifecycle Test");
+        console.log("--------------------------------");
         console.log("");
 
         console.log("Price of USDT in 8 decimals", uint256(1e8));
@@ -64,8 +69,11 @@ contract MainEverydayTest is TestDeployer {
 
         assertLt(cUSD.balanceOf(bob), 2000e18);
 
-        console.log("Alice's cUSD balance", cUSD.balanceOf(alice));
-        console.log("Bob's cUSD balance", cUSD.balanceOf(bob));
+        alice_cUSD_balance = cUSD.balanceOf(alice);
+        uint256 bob_cUSD_balance = cUSD.balanceOf(bob);
+
+        console.log("Alice's cUSD balance", alice_cUSD_balance);
+        console.log("Bob's cUSD balance", bob_cUSD_balance);
         console.log("");
 
         console.log("Alice's USDT balance", usdt.balanceOf(alice));
@@ -73,7 +81,7 @@ contract MainEverydayTest is TestDeployer {
         console.log("");
         
         vm.stopPrank();
-
+    
         vm.startPrank(alice);
 
         uint256 alice_cUSD_balance = cUSD.balanceOf(alice);
@@ -85,7 +93,14 @@ contract MainEverydayTest is TestDeployer {
         console.log("");
 
         vm.stopPrank();
+    }
 
+    address mev_bot = makeAddr("Mev Bot");
+    deal(address(usdt), mev_bot, 4000e6);
+    address[] memory assets = new address[](1);
+    assets[0] = address(usdt);
+
+    {   /// An Operater comes to borrow USDT
         vm.startPrank(user_agent);
 
         /// Start with 1000 USDT in the operator's wallet
@@ -96,32 +111,25 @@ contract MainEverydayTest is TestDeployer {
         console.log("Operator Borrowed 1000 USDT");
         console.log("Move time forward 10 days");
         console.log("");
-        _timeTravel(1 days);
-
-        address mev_bot = makeAddr("Mev Bot");
-        deal(address(usdt), mev_bot, 1000e6);
-        vm.startPrank(mev_bot);
-
-     //   usdt.approve(address(cUSD), 1000e6);
-     //   cUSD.mint(address(usdt), 1000e6, 0, mev_bot, block.timestamp + 1 hours);
-
-     //   lender.realizeInterest(address(usdt), 1);
-
-   //     cUSD.approve(address(cUSDFeeAuction), 1000e18);
-        address[] memory assets = new address[](1);
-        assets[0] = address(usdt);
-   //     cUSDFeeAuction.buy(assets, mev_bot, "");
-    {    uint256 block_timestamp = block.timestamp;
-        console.log("Block timestamp", block_timestamp);
-        (uint256 interest_per_second, uint256 last_update) = IRestakerDebtToken(env.usdVault.interestDebtTokens[0]).agent(user_agent);
-        uint256 current_index = IInterestDebtToken(env.usdVault.interestDebtTokens[0]).currentIndex();
-        console.log("Current Index", current_index);
-        console.log("Interest Per Second", interest_per_second);
-        console.log("Last Update", last_update);}
         _timeTravel(10 days);
 
-        vm.stopPrank();
+        /// Lets get the fee auction started
+        vm.startPrank(mev_bot);
 
+        usdt.approve(address(cUSD), 4000e6);
+        cUSD.mint(address(usdt), 1000e6, 0, mev_bot, block.timestamp + 1 hours);
+
+        lender.realizeInterest(address(usdt), 1);
+
+        cUSD.approve(address(cUSDFeeAuction), 1000e18);
+        uint256 startPrice = cUSDFeeAuction.currentPrice();
+        console.log("Start price of fee auction", startPrice);
+        cUSDFeeAuction.buy(assets, mev_bot, "");
+
+        vm.stopPrank();
+    }
+
+    {   /// The operator repays the debt
         vm.startPrank(user_agent);
         (uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt) = lender.debt(user_agent, address(usdt));
         console.log("Debt in USDT 6 Decimals");
@@ -134,12 +142,6 @@ contract MainEverydayTest is TestDeployer {
         usdt.approve(address(lender), debt);
         console.log("Operator Repays", debt);
 
-        console.log("Market Rate", IOracle(env.infra.oracle).marketRate(address(usdt)));
-        console.log("Benchmark Rate", IOracle(env.infra.oracle).benchmarkRate(address(usdt)));
-        console.log("Utilization Rate", IOracle(env.infra.oracle).utilizationRate(address(usdt)));
-        console.log("Restaker Rate", IOracle(env.infra.oracle).restakerRate(user_agent));
-        console.log("Total Interest Per Second", IRestakerDebtToken(env.usdVault.restakerDebtTokens[0]).totalInterestPerSecond());
-
         lender.repay(address(usdt), debt, user_agent);
         console.log("");
 
@@ -148,7 +150,9 @@ contract MainEverydayTest is TestDeployer {
         assertEq(interestDebt, 0);
         assertEq(restakerDebt, 0);
         vm.stopPrank();
-{
+    }
+
+    {   /// The fee auction is started and we send cUSD to scUSD
         vm.startPrank(mev_bot);
 
         usdt.approve(address(cUSD), 1000e6);
@@ -159,8 +163,17 @@ contract MainEverydayTest is TestDeployer {
         uint256 cUSD_balance_before = cUSD.balanceOf(address(scUSD));
         console.log("USDT balance of fee auction before buy", usdt_balance_before);
         console.log("cUSD balance of scUSD before buy", cUSD_balance_before);
+
+        // Cheat a bit and get the price to match the assets in the auction
+        vm.startPrank(env.users.fee_auction_admin);
+        cUSDFeeAuction.setStartPrice(usdt_balance_before * 1e12);
+        vm.stopPrank();
+
+        vm.startPrank(mev_bot);
+
         uint256 startPrice = cUSDFeeAuction.startPrice();
-        console.log("Start price of fee auction", startPrice);
+        assertEq(startPrice, usdt_balance_before * 1e12);
+       // console.log("Start price of fee auction", startPrice);
         cUSDFeeAuction.buy(assets, mev_bot, "");
         uint256 usdt_balance_after = usdt.balanceOf(address(cUSDFeeAuction));
         uint256 cUSD_balance_after = cUSD.balanceOf(address(scUSD));
@@ -173,10 +186,13 @@ contract MainEverydayTest is TestDeployer {
         console.log("");
 
         vm.stopPrank();
-}
+    }
+
+    {   /// Alice wants to withdraw her scUSD and should have more cUSD than before
         vm.startPrank(alice);
         _timeTravel(1 days);
         
+        console.log("Locked profit of scUSD", scUSD.lockedProfit());
         uint256 alice_scUSD_balance = scUSD.balanceOf(alice);
         console.log("Alice's scUSD balance", alice_scUSD_balance);
         console.log("");
@@ -185,17 +201,21 @@ contract MainEverydayTest is TestDeployer {
 
         vm.startPrank(bob);
 
+        /// Bob is being malicious and trying to withdraw Alice's cUSD
         vm.expectRevert();
         scUSD.withdraw(alice_scUSD_balance, bob, alice);
 
         vm.stopPrank();
 
         vm.startPrank(alice);
-        scUSD.withdraw(alice_scUSD_balance, alice, alice);
+        scUSD.redeem(alice_scUSD_balance, alice, alice);
         console.log("Alice's cUSD balance after 11 day in scUSD and a borrow", cUSD.balanceOf(alice));
         console.log("");
 
+        assertGt(cUSD.balanceOf(alice), alice_cUSD_balance);
+
         vm.stopPrank();
+    }
 
     }
 }
