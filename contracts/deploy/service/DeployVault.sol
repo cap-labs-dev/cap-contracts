@@ -13,6 +13,7 @@ import { Lender } from "../../lendingPool/Lender.sol";
 import { InterestDebtToken } from "../../lendingPool/tokens/InterestDebtToken.sol";
 import { PrincipalDebtToken } from "../../lendingPool/tokens/PrincipalDebtToken.sol";
 import { RestakerDebtToken } from "../../lendingPool/tokens/RestakerDebtToken.sol";
+import { FractionalReserve } from "../../vault/FractionalReserve.sol";
 
 import { CapToken } from "../../token/CapToken.sol";
 import { OFTLockbox } from "../../token/OFTLockbox.sol";
@@ -114,6 +115,14 @@ contract DeployVault is ProxyUtils {
         AccessControl accessControl = AccessControl(infra.accessControl);
         accessControl.grantAccess(Vault.borrow.selector, vault.capToken, infra.lender);
         accessControl.grantAccess(Vault.repay.selector, vault.capToken, infra.lender);
+
+        accessControl.grantAccess(FractionalReserve.setReserve.selector, vault.capToken, users.vault_config_admin);
+        accessControl.grantAccess(
+            FractionalReserve.setFractionalReserveVault.selector, vault.capToken, users.vault_config_admin
+        );
+        accessControl.grantAccess(FractionalReserve.investAll.selector, vault.capToken, users.vault_config_admin);
+        accessControl.grantAccess(FractionalReserve.divestAll.selector, vault.capToken, users.vault_config_admin);
+        accessControl.grantAccess(FractionalReserve.realizeInterest.selector, vault.capToken, users.vault_config_admin);
 
         // Configure FeeAuction access control
         accessControl.grantAccess(FeeAuction.setStartPrice.selector, vault.feeAuction, infra.lender);

@@ -99,7 +99,7 @@ contract FractionalReserveInvariantsTest is Test {
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i];
             uint256 actualInterest = reserve.claimableInterest(asset);
-            uint256 expectedInterest = handler.getExpectedInterest(asset);
+            uint256 expectedInterest = mockVaults[i].__estimateMockErc4626Yield();
 
             // Allow for small rounding error (1 wei)
             assertApproxEqAbs(actualInterest, expectedInterest, 1, "Interest calculation should be accurate");
@@ -214,10 +214,11 @@ contract TestFractionalReserveHandler is StdUtils {
     }
 
     function realizeInterest(uint256 assetSeed) external useAsset(assetSeed) {
+        uint256 interest = reserve.claimableInterest(currentAsset);
         reserve.realizeInterest(currentAsset);
 
         // Update ghost variables
-        accumulatedInterest[currentAsset] += getExpectedInterest(currentAsset);
+        accumulatedInterest[currentAsset] += interest;
         lastInterestUpdate[currentAsset] = block.timestamp;
     }
 
@@ -238,11 +239,6 @@ contract TestFractionalReserveHandler is StdUtils {
 
     function getTotalAssets(address asset) public view returns (uint256) {
         return getInvestedAmount(asset) + reserve.reserve(asset);
-    }
-
-    function getExpectedInterest(address asset) public view returns (uint256) {
-        if (address(vaults[asset]) == address(0)) return 0;
-        return vaults[asset].claimableInterest();
     }
 
     function getMaxDivestableAmount(address asset) public view returns (uint256) {
