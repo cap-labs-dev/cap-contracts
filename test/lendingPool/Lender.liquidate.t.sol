@@ -211,7 +211,7 @@ contract LenderLiquidateTest is TestDeployer {
             vm.startPrank(env.testUsers.liquidator);
 
             // dealing a bit more since now we cover the interest
-            deal(address(usdc), env.testUsers.liquidator, 3100e6);
+            deal(address(usdc), env.testUsers.liquidator, 3200e6);
 
             // start the first liquidation
             lender.initiateLiquidation(user_agent);
@@ -220,8 +220,18 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("Starting Liquidations");
             console.log("");
             _timeTravel(gracePeriod + 1);
+
+            (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health) =
+                lender.agent(user_agent);
+
+            console.log("Total debt after 60 days", totalDebt);
+            console.log("Total delegation after 60 days", totalDelegation);
+            console.log("LTV after 60 days", ltv);
+            console.log("Liquidation threshold after 60 days", liquidationThreshold);
+            console.log("Health after 60 days", health);
+
             // approve repay amount for liquidation
-            usdc.approve(address(lender), 3100e6);
+            usdc.approve(address(lender), 3200e6);
             lender.liquidate(user_agent, address(usdc), 1000e6);
 
             console.log("Liquidator usdt balance after first liquidation", usdt.balanceOf(env.testUsers.liquidator));
@@ -235,7 +245,7 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("Liquidator weth balance after second liquidation", weth.balanceOf(env.testUsers.liquidator));
             console.log("");
             // start the third liquidation
-            lender.liquidate(user_agent, address(usdc), 1100e6);
+            lender.liquidate(user_agent, address(usdc), 1200e6);
 
             console.log("Liquidator usdt balance after third liquidation", usdt.balanceOf(env.testUsers.liquidator));
             console.log("Liquidator weth balance after third liquidation", weth.balanceOf(env.testUsers.liquidator));
@@ -252,8 +262,7 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("");
             //     assertEq(coverage, 0);
 
-            (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health) =
-                lender.agent(user_agent);
+            (totalDelegation, totalDebt, ltv, liquidationThreshold, health) = lender.agent(user_agent);
 
             console.log("Health after liquidations", health);
 
