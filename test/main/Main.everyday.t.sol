@@ -217,5 +217,102 @@ contract MainEverydayTest is TestDeployer {
         vm.stopPrank();
     }
 
+    {   /// Alice redeems and burns her cUSD
+        vm.startPrank(bob);
+        cUSD.approve(address(scUSD), cUSD.balanceOf(bob));
+        scUSD.deposit(cUSD.balanceOf(bob), bob);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+
+        /// Alice trying to borrow USDT but shes not allowed to
+        vm.expectRevert();
+        lender.borrow(address(usdt), 1000e6, alice);
+
+        uint256[] memory minAmountsOut = new uint256[](3);
+        minAmountsOut[0] = 0;
+        minAmountsOut[1] = 0;
+        minAmountsOut[2] = 0;
+
+        console.log("minAmountsOut length", minAmountsOut.length);
+        uint256 alice_usdc_balance_before = usdc.balanceOf(alice);
+        uint256 alice_usdt_balance_before = usdt.balanceOf(alice);
+        /// Alice wants to redeem half her cUSD
+        cUSD.redeem(cUSD.balanceOf(alice) / 2, minAmountsOut, alice, block.timestamp + 1 hours);
+
+        uint256 alice_usdc_balance_after = usdc.balanceOf(alice);
+        uint256 alice_usdt_balance_after = usdt.balanceOf(alice);
+        uint256 alice_usdx_balance_after = usdx.balanceOf(alice);
+
+        assertGt(alice_usdc_balance_after, alice_usdc_balance_before);
+        assertGt(alice_usdt_balance_after, alice_usdt_balance_before);
+
+        console.log("Alice's USDC balance after redeeming half her cUSD", alice_usdc_balance_after);
+        console.log("Alice's USDT balance after redeeming half her cUSD", alice_usdt_balance_after);
+        console.log("Alice's USDx balance after redeeming half her cUSD", alice_usdx_balance_after);
+
+        /// Alice decides to burn the rest of her cUSD
+        cUSD.burn(address(usdt), cUSD.balanceOf(alice), 0, alice, block.timestamp + 1 hours);
+
+        console.log("Alice's USDT balance after burning the rest of her cUSD", usdt.balanceOf(alice));
+        console.log("Alice's equivalent balance of USDT after everything", usdt.balanceOf(alice) + usdc.balanceOf(alice) + (usdx.balanceOf(alice)) / 1e12);
+
+        assertEq(cUSD.balanceOf(alice), 0);
+        assertGt(usdt.balanceOf(alice), alice_usdt_balance_after);
+
+        assertGt(usdt.balanceOf(alice) + usdc.balanceOf(alice) + (usdx.balanceOf(alice)) / 1e12, 10000e6);
+
+        vm.stopPrank();
+    }
+
+    {   /// The operator borrows and gets liquidated
+        vm.startPrank(user_agent);
+
+        console.log("");
+        console.log("Operator borrows and gets liquidated");
+        lender.borrow(address(usdc), 3000e6, user_agent);
+
+        console.log("");
+        console.log("Operator's debt as he borrows 3000 USDC", usdc.balanceOf(user_agent));
+        console.log("");
+
+        console.log("Move time forward 10 days");
+        _timeTravel(10 days);
+        console.log("");
+
+        vm.stopPrank();
+
+        vm.startPrank(env.users.delegation_admin);
+
+        (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health) = lender.agent(user_agent);
+        console.log("Total delegation of the operator", totalDelegation);
+        console.log("Total debt of the operator", totalDebt);
+        console.log("LTV of the operator", ltv);
+        console.log("Liquidation threshold of the operator", liquidationThreshold);
+        console.log("Health of the operator", health);
+        /// Bad actor so we set his liquidation threshold to 1%
+        Delegation(env.infra.delegation).modifyAgent(user_agent, 0.5e27, 0.01e27);
+        vm.stopPrank();
+
+        vm.startPrank(env.testUsers.liquidator);
+        deal(address(usdc), env.testUsers.liquidator, 4000e6);
+        usdc.approve(address(lender), 4000e6);
+        lender.initiateLiquidation(user_agent);
+
+        _timeTravel(lender.grace() + 1);
+        lender.liquidate(user_agent, address(usdc), 4000e6);
+        vm.stopPrank();
+
+        (totalDelegation, totalDebt, ltv, liquidationThreshold, health) = lender.agent(user_agent);
+        console.log("");
+        console.log("Total delegation of the operator after liquidation", totalDelegation);
+        console.log("Total debt of the operator after liquidation", totalDebt);
+        console.log("LTV of the operator after liquidation", ltv);
+        console.log("Liquidation threshold of the operator after liquidation", liquidationThreshold);
+        console.log("Health of the operator after liquidation", health);
+
+        console.log("Liquidator's USDC balance after liquidating the operator", usdc.balanceOf(env.testUsers.liquidator));
+    }
+
     }
 }

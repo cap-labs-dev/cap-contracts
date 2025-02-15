@@ -41,6 +41,7 @@ library MinterLogic {
         uint256 shares = params.amount * 1e27 / IERC20(address(this)).totalSupply();
         address[] memory assets = IVault(address(this)).assets();
         uint256 assetLength = assets.length;
+        amounts = new uint256[](assetLength);
         for (uint256 i; i < assetLength; ++i) {
             address asset = assets[i];
             uint256 withdrawAmount = IVault(address(this)).totalSupplies(asset) * shares / 1e27;
