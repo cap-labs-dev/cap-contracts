@@ -142,7 +142,7 @@ contract TestDeployer is
         }
         for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
             uint256 increment = (i + 1) * 0.01e27; // Vary the restakers rate by 1% each
-            _initRestakerRateForAgent(env.infra, env.testUsers.agents[i], uint256(0.05e27 + increment) / uint256(365 days)); // Restakers rate is per second in ray 
+            _initRestakerRateForAgent(env.infra, env.testUsers.agents[i], uint256(0.05e27 + increment)); // Restakers rate is per second in ray 
         }
 
         /// LENDER
