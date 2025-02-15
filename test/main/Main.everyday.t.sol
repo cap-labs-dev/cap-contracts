@@ -2,6 +2,9 @@
 pragma solidity ^0.8.28;
 
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
+import { IOracle } from "../../contracts/interfaces/IOracle.sol";
+import { IRestakerDebtToken } from "../../contracts/interfaces/IRestakerDebtToken.sol";
+import { IInterestDebtToken } from "../../contracts/interfaces/IInterestDebtToken.sol";
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
@@ -93,7 +96,7 @@ contract MainEverydayTest is TestDeployer {
         console.log("Operator Borrowed 1000 USDT");
         console.log("Move time forward 10 days");
         console.log("");
-        _timeTravel(block.timestamp + 1 days);
+        _timeTravel(1 days);
 
         address mev_bot = makeAddr("Mev Bot");
         deal(address(usdt), mev_bot, 1000e6);
@@ -108,7 +111,13 @@ contract MainEverydayTest is TestDeployer {
         address[] memory assets = new address[](1);
         assets[0] = address(usdt);
    //     cUSDFeeAuction.buy(assets, mev_bot, "");
-
+    {    uint256 block_timestamp = block.timestamp;
+        console.log("Block timestamp", block_timestamp);
+        (uint256 interest_per_second, uint256 last_update) = IRestakerDebtToken(env.usdVault.interestDebtTokens[0]).agent(user_agent);
+        uint256 current_index = IInterestDebtToken(env.usdVault.interestDebtTokens[0]).currentIndex();
+        console.log("Current Index", current_index);
+        console.log("Interest Per Second", interest_per_second);
+        console.log("Last Update", last_update);}
         _timeTravel(10 days);
 
         vm.stopPrank();
@@ -124,6 +133,12 @@ contract MainEverydayTest is TestDeployer {
 
         usdt.approve(address(lender), debt);
         console.log("Operator Repays", debt);
+
+        console.log("Market Rate", IOracle(env.infra.oracle).marketRate(address(usdt)));
+        console.log("Benchmark Rate", IOracle(env.infra.oracle).benchmarkRate(address(usdt)));
+        console.log("Utilization Rate", IOracle(env.infra.oracle).utilizationRate(address(usdt)));
+        console.log("Restaker Rate", IOracle(env.infra.oracle).restakerRate(user_agent));
+        console.log("Total Interest Per Second", IRestakerDebtToken(env.usdVault.restakerDebtTokens[0]).totalInterestPerSecond());
 
         lender.repay(address(usdt), debt, user_agent);
         console.log("");

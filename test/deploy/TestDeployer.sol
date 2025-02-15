@@ -117,8 +117,8 @@ contract TestDeployer is
         /// ORACLE
         console.log("deploying oracle");
         vm.startPrank(env.users.oracle_admin);
-        _initOracleMocks(env.usdOracleMocks, 1e8, 0.1e27); // $1.00 with 8 decimals & 10% APY
-        _initOracleMocks(env.ethOracleMocks, 2600e8, 0.1e27); // $2600 with 8 decimals & 10% APY
+        _initOracleMocks(env.usdOracleMocks, 1e8, uint256(0.1e27)); // $1.00 with 8 decimals & 10% Annualized in ray decimals
+        _initOracleMocks(env.ethOracleMocks, 2600e8, uint256(0.1e27)); // $2600 with 8 decimals & 10% Annualized in ray decimals
         _initVaultOracle(env.libs, env.infra, env.usdVault);
         _initVaultOracle(env.libs, env.infra, env.ethVault);
         for (uint256 i = 0; i < env.usdVault.assets.length; i++) {
@@ -141,7 +141,8 @@ contract TestDeployer is
             _initAaveRateOracle(env.libs, env.infra, env.ethVault.assets[i], env.ethOracleMocks.aaveDataProviders[i]);
         }
         for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            _initRestakerRateForAgent(env.infra, env.testUsers.agents[i]);
+            uint256 increment = (i + 1) * 0.01e27; // Vary the restakers rate by 1% each
+            _initRestakerRateForAgent(env.infra, env.testUsers.agents[i], uint256(0.05e27 + increment) / uint256(365 days)); // Restakers rate is per second in ray 
         }
 
         /// LENDER
