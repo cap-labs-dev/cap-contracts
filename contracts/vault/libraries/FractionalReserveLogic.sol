@@ -35,12 +35,10 @@ library FractionalReserveLogic {
         if ($.vault[_asset] != address(0)) {
             uint256 loanedAssets = $.loaned[_asset];
             $.loaned[_asset] = 0;
-            uint256 vaultBalance = IERC20($.vault[_asset]).balanceOf(address(this));
 
+            uint256 vaultBalance = IERC20($.vault[_asset]).balanceOf(address(this));
             if (vaultBalance > 0) {
-                uint256 redeemedAssets = IERC4626($.vault[_asset]).redeem(
-                    IERC20($.vault[_asset]).balanceOf(address(this)), address(this), address(this)
-                );
+                uint256 redeemedAssets = IERC4626($.vault[_asset]).redeem(vaultBalance, address(this), address(this));
                 if (redeemedAssets > loanedAssets) {
                     IERC20(_asset).safeTransfer($.feeAuction, redeemedAssets - loanedAssets);
                 }
