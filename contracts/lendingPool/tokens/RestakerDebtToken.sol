@@ -28,6 +28,8 @@ contract RestakerDebtToken is
         _disableInitializers();
     }
 
+    uint256 internal constant SECONDS_PER_YEAR = 365 days;
+
     /// @notice Initialize the debt token with the underlying asset
     /// @param _accessControl Access control address
     /// @param _oracle Oracle address
@@ -117,7 +119,7 @@ contract RestakerDebtToken is
     function averageRate() external view returns (uint256 rate) {
         RestakerDebtTokenStorage storage $ = getRestakerDebtTokenStorage();
         uint256 totalDebt = IERC20($.debtToken).totalSupply();
-        rate = totalDebt > 0 ? $.totalInterestPerSecond / totalDebt : 0;
+        rate = totalDebt > 0 ? $.totalInterestPerSecond * SECONDS_PER_YEAR / totalDebt : 0;
     }
 
     /// @dev Update the interest per second of the agent and the scaled total supply
@@ -128,7 +130,7 @@ contract RestakerDebtToken is
         RestakerDebtTokenStorage storage $ = getRestakerDebtTokenStorage();
         uint256 rate = IOracle($.oracle).restakerRate(_agent);
         uint256 oldInterestPerSecond = $.interestPerSecond[_agent];
-        uint256 newInterestPerSecond = IERC20($.debtToken).balanceOf(_agent) * rate;
+        uint256 newInterestPerSecond = IERC20($.debtToken).balanceOf(_agent) * rate / SECONDS_PER_YEAR;
 
         $.interestPerSecond[_agent] = newInterestPerSecond;
         $.totalInterestPerSecond = $.totalInterestPerSecond + newInterestPerSecond - oldInterestPerSecond;
