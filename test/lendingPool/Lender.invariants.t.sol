@@ -3,7 +3,6 @@ pragma solidity ^0.8.28;
 
 import { ProxyUtils } from "../../contracts/deploy/utils/ProxyUtils.sol";
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
-import { DataTypes } from "../../contracts/lendingPool/libraries/types/DataTypes.sol";
 
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { TestEnvConfig } from "../deploy/interfaces/TestDeployConfig.sol";

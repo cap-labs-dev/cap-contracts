@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { DataTypes } from "../lendingPool/libraries/types/DataTypes.sol";
-
 /// @title ILender
 /// @author kexley, @capLabs
 /// @notice Interface for the Lender contract
@@ -25,11 +23,11 @@ interface ILender {
         address delegation;
         address oracle;
         // Reserve configuration
-        mapping(address => DataTypes.ReserveData) reservesData;
+        mapping(address => ReserveData) reservesData;
         mapping(uint256 => address) reservesList;
         uint16 reservesCount;
         // Agent configuration
-        mapping(address => DataTypes.AgentConfigurationMap) agentConfig;
+        mapping(address => AgentConfigurationMap) agentConfig;
         mapping(address => uint256) liquidationStart;
         // Liquidation parameters
         uint256 targetHealth;
@@ -37,6 +35,82 @@ interface ILender {
         uint256 expiry;
         uint256 bonusCap;
         uint256 emergencyLiquidationThreshold;
+    }
+
+    /// @dev Reserve data
+    /// @param id Id of the reserve
+    /// @param vault Address of the vault
+    /// @param principalDebtToken Address of the principal debt token
+    /// @param restakerDebtToken Address of the restaker debt token
+    /// @param interestDebtToken Address of the interest debt token
+    /// @param interestReceiver Address of the interest receiver
+    struct ReserveData {
+        uint256 id;
+        address vault;
+        address principalDebtToken;
+        address restakerDebtToken;
+        address interestDebtToken;
+        address interestReceiver;
+        address restakerInterestReceiver;
+        uint8 decimals;
+        bool paused;
+        uint256 realizedInterest;
+    }
+
+    /// @dev Agent configuration map
+    /// @param data Data of the agent configuration
+    struct AgentConfigurationMap {
+        uint256 data;
+    }
+
+    /// @dev Borrow parameters
+    /// @param agent Address of the agent
+    /// @param asset Asset to borrow
+    /// @param amount Amount to borrow
+    /// @param receiver Receiver of the borrowed asset
+    struct BorrowParams {
+        address agent;
+        address asset;
+        uint256 amount;
+        address receiver;
+    }
+
+    /// @dev Repay parameters
+    /// @param agent Address of the agent
+    /// @param asset Asset to repay
+    /// @param amount Amount to repay
+    /// @param caller Caller of the repay function
+    struct RepayParams {
+        address agent;
+        address asset;
+        uint256 amount;
+        address caller;
+    }
+
+    /// @dev Realize interest parameters
+    /// @param asset Asset to realize interest for
+    /// @param amount Amount of interest to realize
+    struct RealizeInterestParams {
+        address asset;
+        uint256 amount;
+    }
+
+    /// @dev Add asset parameters
+    /// @param asset Asset to add
+    /// @param vault Address of the vault
+    /// @param principalDebtToken Address of the principal debt token
+    /// @param restakerDebtToken Address of the restaker debt token
+    /// @param interestDebtToken Address of the interest debt token
+    /// @param interestReceiver Address of the interest receiver
+    struct AddAssetParams {
+        address asset;
+        address vault;
+        address principalDebtToken;
+        address restakerDebtToken;
+        address interestDebtToken;
+        address interestReceiver;
+        address restakerInterestReceiver;
+        uint256 bonusCap;
     }
 
     /// @notice Initialize the lender
@@ -124,7 +198,7 @@ interface ILender {
 
     /// @notice Add an asset to the Lender
     /// @param _params Parameters to add an asset
-    function addAsset(DataTypes.AddAssetParams calldata _params) external;
+    function addAsset(AddAssetParams calldata _params) external;
 
     /// @notice Remove asset from lending when there is no borrows
     /// @param _asset Asset address

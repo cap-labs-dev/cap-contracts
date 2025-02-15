@@ -8,7 +8,6 @@ import { ILender } from "../../interfaces/ILender.sol";
 import { BorrowLogic } from "./BorrowLogic.sol";
 import { ValidationLogic } from "./ValidationLogic.sol";
 import { ViewLogic } from "./ViewLogic.sol";
-import { DataTypes } from "./types/DataTypes.sol";
 
 /// @title Liquidation Logic
 /// @author kexley, @capLabs
@@ -19,8 +18,10 @@ library LiquidationLogic {
 
     /// @notice A liquidation has been initiated against an agent
     event InitiateLiquidation(address agent);
+
     /// @notice A liquidation has been cancelled
     event CancelLiquidation(address agent);
+
     /// @notice An agent has been liquidated
     event Liquidate(address indexed agent, address indexed liquidator, address asset, uint256 amount, uint256 value);
 
@@ -59,7 +60,7 @@ library LiquidationLogic {
     /// @param $ Lender storage
     /// @param params Parameters to liquidate an agent
     /// @return liquidatedValue Value of the liquidation returned to the liquidator
-    function liquidate(ILender.LenderStorage storage $, DataTypes.RepayParams memory params)
+    function liquidate(ILender.LenderStorage storage $, ILender.RepayParams memory params)
         external
         returns (uint256 liquidatedValue)
     {
@@ -81,7 +82,7 @@ library LiquidationLogic {
 
         liquidated = BorrowLogic.repay(
             $,
-            DataTypes.RepayParams({ agent: params.agent, asset: params.asset, amount: liquidated, caller: params.caller })
+            ILender.RepayParams({ agent: params.agent, asset: params.asset, amount: liquidated, caller: params.caller })
         );
 
         uint256 bonus = getBonus($, totalDelegation, totalDebt, params.agent, liquidated);

@@ -11,7 +11,6 @@ import { BorrowLogic } from "./libraries/BorrowLogic.sol";
 import { LiquidationLogic } from "./libraries/LiquidationLogic.sol";
 import { ReserveLogic } from "./libraries/ReserveLogic.sol";
 import { ViewLogic } from "./libraries/ViewLogic.sol";
-import { DataTypes } from "./libraries/types/DataTypes.sol";
 
 /// @title Lender for covered agents
 /// @author kexley, @capLabs
@@ -28,11 +27,11 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     /// @param _accessControl Access control address
     /// @param _delegation Delegation address
     /// @param _oracle Oracle address
-    /// @param _targetHealth Target health after liquidations
-    /// @param _grace Grace period before an agent becomes liquidatable
-    /// @param _expiry Expiry period after which an agent cannot be liquidated until called again
-    /// @param _bonusCap Bonus cap for liquidations
-    /// @param _emergencyLiquidationThreshold Liquidation threshold below which grace periods are voided
+    /// @param _targetHealth Target health after liquidations (scaled by 1e27)
+    /// @param _grace Grace period in seconds before an agent becomes liquidatable
+    /// @param _expiry Expiry period in seconds after which an agent cannot be liquidated until called again
+    /// @param _bonusCap Bonus cap for liquidations (scaled by 1e27)
+    /// @param _emergencyLiquidationThreshold Liquidation threshold below which grace periods are voided (scaled by 1e27)
     function initialize(
         address _accessControl,
         address _delegation,
@@ -65,8 +64,7 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     /// @param _receiver Receiver of the borrowed asset
     function borrow(address _asset, uint256 _amount, address _receiver) external {
         BorrowLogic.borrow(
-            getLenderStorage(),
-            DataTypes.BorrowParams({ agent: msg.sender, asset: _asset, amount: _amount, receiver: _receiver })
+            getLenderStorage(), BorrowParams({ agent: msg.sender, asset: _asset, amount: _amount, receiver: _receiver })
         );
     }
 
@@ -78,8 +76,7 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     function repay(address _asset, uint256 _amount, address _agent) external returns (uint256 repaid) {
         if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();
         repaid = BorrowLogic.repay(
-            getLenderStorage(),
-            DataTypes.RepayParams({ agent: _agent, asset: _asset, amount: _amount, caller: msg.sender })
+            getLenderStorage(), RepayParams({ agent: _agent, asset: _asset, amount: _amount, caller: msg.sender })
         );
     }
 
@@ -88,9 +85,8 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     /// @param _amount Amount of interest to realize (type(uint).max for all available interest)
     /// @return actualRealized Actual amount realized
     function realizeInterest(address _asset, uint256 _amount) external returns (uint256 actualRealized) {
-        actualRealized = BorrowLogic.realizeInterest(
-            getLenderStorage(), DataTypes.RealizeInterestParams({ asset: _asset, amount: _amount })
-        );
+        actualRealized =
+            BorrowLogic.realizeInterest(getLenderStorage(), RealizeInterestParams({ asset: _asset, amount: _amount }));
     }
 
     /// @notice Initiate liquidation of an agent when the health is below 1
@@ -113,8 +109,7 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     function liquidate(address _agent, address _asset, uint256 _amount) external returns (uint256 liquidatedValue) {
         if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();
         liquidatedValue = LiquidationLogic.liquidate(
-            getLenderStorage(),
-            DataTypes.RepayParams({ agent: _agent, asset: _asset, amount: _amount, caller: msg.sender })
+            getLenderStorage(), RepayParams({ agent: _agent, asset: _asset, amount: _amount, caller: msg.sender })
         );
     }
 
@@ -159,7 +154,7 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
 
     /// @notice Add an asset to the Lender
     /// @param _params Parameters to add an asset
-    function addAsset(DataTypes.AddAssetParams calldata _params) external checkAccess(this.addAsset.selector) {
+    function addAsset(AddAssetParams calldata _params) external checkAccess(this.addAsset.selector) {
         LenderStorage storage $ = getLenderStorage();
         if (!ReserveLogic.addAsset($, _params)) ++$.reservesCount;
     }
@@ -248,7 +243,7 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
             uint256 realizedInterest
         )
     {
-        DataTypes.ReserveData storage reserve = getLenderStorage().reservesData[_asset];
+        ReserveData storage reserve = getLenderStorage().reservesData[_asset];
         id = reserve.id;
         vault = reserve.vault;
         principalDebtToken = reserve.principalDebtToken;

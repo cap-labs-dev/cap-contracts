@@ -7,7 +7,6 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import { ILender } from "../../interfaces/ILender.sol";
 import { ViewLogic } from "./ViewLogic.sol";
-import { DataTypes } from "./types/DataTypes.sol";
 
 /// @title Validation Logic
 /// @author kexley, @capLabs
@@ -57,10 +56,10 @@ library ValidationLogic {
     /// borrow.
     /// @param $ Lender storage
     /// @param params Validation parameters
-    function validateBorrow(ILender.LenderStorage storage $, DataTypes.BorrowParams memory params) external {
+    function validateBorrow(ILender.LenderStorage storage $, ILender.BorrowParams memory params) external {
         if (params.receiver == address(0) || params.asset == address(0)) revert ZeroAddressNotValid();
 
-        DataTypes.ReserveData memory reserve = $.reservesData[params.asset];
+        ILender.ReserveData memory reserve = $.reservesData[params.asset];
         if (reserve.paused) revert ReservePaused();
 
         (uint256 totalDelegation, uint256 totalDebt,,, uint256 health) = ViewLogic.agent($, params.agent);
@@ -116,7 +115,7 @@ library ValidationLogic {
     /// @notice Validate adding an asset as a reserve
     /// @param $ Lender storage
     /// @param params Parameters for adding an asset
-    function validateAddAsset(ILender.LenderStorage storage $, DataTypes.AddAssetParams memory params) external view {
+    function validateAddAsset(ILender.LenderStorage storage $, ILender.AddAssetParams memory params) external view {
         if (params.asset == address(0) || params.vault == address(0)) revert ZeroAddressNotValid();
         if (params.interestReceiver == address(0)) revert InterestReceiverNotSet();
         if (params.restakerInterestReceiver == address(0)) revert RestakerInterestReceiverNotSet();

@@ -7,8 +7,9 @@ import { Delegation } from "../../delegation/Delegation.sol";
 import { NetworkMiddleware } from "../../delegation/providers/symbiotic/NetworkMiddleware.sol";
 
 import { FeeAuction } from "../../feeAuction/FeeAuction.sol";
+
+import { ILender } from "../../interfaces/ILender.sol";
 import { Lender } from "../../lendingPool/Lender.sol";
-import { DataTypes } from "../../lendingPool/libraries/types/DataTypes.sol";
 import { InterestDebtToken } from "../../lendingPool/tokens/InterestDebtToken.sol";
 import { PrincipalDebtToken } from "../../lendingPool/tokens/PrincipalDebtToken.sol";
 import { RestakerDebtToken } from "../../lendingPool/tokens/RestakerDebtToken.sol";
@@ -134,7 +135,7 @@ contract DeployVault is ProxyUtils {
     function _initVaultLender(VaultConfig memory d, InfraConfig memory infra) internal {
         for (uint256 i = 0; i < d.assets.length; i++) {
             Lender(infra.lender).addAsset(
-                DataTypes.AddAssetParams({
+                ILender.AddAssetParams({
                     asset: d.assets[i],
                     vault: d.capToken,
                     principalDebtToken: d.principalDebtTokens[i],

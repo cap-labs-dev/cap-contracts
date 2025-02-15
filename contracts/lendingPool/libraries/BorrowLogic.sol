@@ -12,7 +12,6 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { ILender } from "../../interfaces/ILender.sol";
 import { ValidationLogic } from "./ValidationLogic.sol";
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
-import { DataTypes } from "./types/DataTypes.sol";
 
 /// @title BorrowLogic
 /// @author kexley, @capLabs
@@ -24,7 +23,7 @@ import { DataTypes } from "./types/DataTypes.sol";
 /// paid to the restakers that guarantee the agent.
 library BorrowLogic {
     using SafeERC20 for IERC20;
-    using AgentConfiguration for DataTypes.AgentConfigurationMap;
+    using AgentConfiguration for ILender.AgentConfigurationMap;
 
     /// @dev An agent has borrowed an asset from the Lender
     event Borrow(address indexed asset, address indexed agent, uint256 amount);
@@ -49,10 +48,10 @@ library BorrowLogic {
     /// Restaker debt token is updated after so the new principal debt can be used in calculations
     /// @param $ Lender storage
     /// @param params Parameters to borrow an asset
-    function borrow(ILender.LenderStorage storage $, DataTypes.BorrowParams memory params) external {
+    function borrow(ILender.LenderStorage storage $, ILender.BorrowParams memory params) external {
         ValidationLogic.validateBorrow($, params);
 
-        DataTypes.ReserveData memory reserve = $.reservesData[params.asset];
+        ILender.ReserveData memory reserve = $.reservesData[params.asset];
         if (!$.agentConfig[params.agent].isBorrowing(reserve.id)) {
             $.agentConfig[params.agent].setBorrowing(reserve.id, true);
         }
@@ -73,11 +72,11 @@ library BorrowLogic {
     /// @param $ Lender storage
     /// @param params Parameters to repay a debt
     /// @return _repaid Actual amount repaid
-    function repay(ILender.LenderStorage storage $, DataTypes.RepayParams memory params)
+    function repay(ILender.LenderStorage storage $, ILender.RepayParams memory params)
         external
         returns (uint256 _repaid)
     {
-        DataTypes.ReserveData memory reserve = $.reservesData[params.asset];
+        ILender.ReserveData memory reserve = $.reservesData[params.asset];
         IDebtToken(reserve.interestDebtToken).update(params.agent);
         IDebtToken(reserve.restakerDebtToken).update(params.agent);
         uint256 principalDebt = IERC20(reserve.principalDebtToken).balanceOf(params.agent);
@@ -156,11 +155,11 @@ library BorrowLogic {
     /// @param $ Lender storage
     /// @param params Parameters for realizing interest
     /// @return realizedInterest Actual realized interest
-    function realizeInterest(ILender.LenderStorage storage $, DataTypes.RealizeInterestParams memory params)
+    function realizeInterest(ILender.LenderStorage storage $, ILender.RealizeInterestParams memory params)
         external
         returns (uint256 realizedInterest)
     {
-        DataTypes.ReserveData memory reserve = $.reservesData[params.asset];
+        ILender.ReserveData memory reserve = $.reservesData[params.asset];
         uint256 totalInterest = IERC20(reserve.interestDebtToken).totalSupply();
         uint256 maxRealization = totalInterest > reserve.realizedInterest ? totalInterest - reserve.realizedInterest : 0;
         realizedInterest = params.amount > maxRealization ? maxRealization : params.amount;

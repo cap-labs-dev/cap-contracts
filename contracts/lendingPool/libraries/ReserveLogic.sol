@@ -7,7 +7,6 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 
 import { ILender } from "../../interfaces/ILender.sol";
 import { ValidationLogic } from "./ValidationLogic.sol";
-import { DataTypes } from "./types/DataTypes.sol";
 
 /// @title Reserve Logic
 /// @author kexley, @capLabs
@@ -20,7 +19,7 @@ library ReserveLogic {
     /// @param $ Lender storage
     /// @param params Parameters for adding an asset
     /// @return filled True if filling in empty space or false if appended
-    function addAsset(ILender.LenderStorage storage $, DataTypes.AddAssetParams memory params)
+    function addAsset(ILender.LenderStorage storage $, ILender.AddAssetParams memory params)
         external
         returns (bool filled)
     {
@@ -44,7 +43,7 @@ library ReserveLogic {
             $.reservesList[$.reservesCount] = params.asset;
         }
 
-        $.reservesData[params.asset] = DataTypes.ReserveData({
+        $.reservesData[params.asset] = ILender.ReserveData({
             id: id,
             vault: params.vault,
             principalDebtToken: params.principalDebtToken,

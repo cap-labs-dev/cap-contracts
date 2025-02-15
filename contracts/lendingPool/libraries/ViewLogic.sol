@@ -8,14 +8,13 @@ import { ILender } from "../../interfaces/ILender.sol";
 import { IOracle } from "../../interfaces/IOracle.sol";
 import { IVault } from "../../interfaces/IVault.sol";
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
-import { DataTypes } from "./types/DataTypes.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title View Logic
 /// @author kexley, @capLabs
 /// @notice View functions to see the state of an agent's health
 library ViewLogic {
-    using AgentConfiguration for DataTypes.AgentConfigurationMap;
+    using AgentConfiguration for ILender.AgentConfigurationMap;
 
     /// @notice Calculate the agent data
     /// @param $ Lender storage
@@ -103,7 +102,7 @@ library ViewLogic {
         view
         returns (uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt)
     {
-        DataTypes.ReserveData memory reserve = $.reservesData[_asset];
+        ILender.ReserveData memory reserve = $.reservesData[_asset];
         principalDebt = IERC20(reserve.principalDebtToken).balanceOf(_agent);
         restakerDebt = IERC20(reserve.restakerDebtToken).balanceOf(_agent);
         interestDebt = IERC20(reserve.interestDebtToken).balanceOf(_agent);

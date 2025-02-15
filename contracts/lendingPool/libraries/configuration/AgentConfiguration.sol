@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { DataTypes } from '../types/DataTypes.sol';
+import { ILender } from "../../../interfaces/ILender.sol";
 
 /// @title AgentConfiguration library
 /// @author kexley
@@ -14,11 +14,7 @@ library AgentConfiguration {
     /// @param self The configuration object
     /// @param reserveIndex The index of the reserve in the bitmap
     /// @param borrowing True if the user is borrowing the reserve, false otherwise
-    function setBorrowing(
-        DataTypes.AgentConfigurationMap storage self,
-        uint256 reserveIndex,
-        bool borrowing
-    ) internal {
+    function setBorrowing(ILender.AgentConfigurationMap storage self, uint256 reserveIndex, bool borrowing) internal {
         unchecked {
             if (reserveIndex >= 256) revert InvalidReserveIndex();
             uint256 bit = 1 << (reserveIndex << 1);
@@ -34,10 +30,11 @@ library AgentConfiguration {
     /// @param self The configuration object
     /// @param reserveIndex The index of the reserve in the bitmap
     /// @return True if the user has been using a reserve for borrowing, false otherwise
-    function isBorrowing(
-        DataTypes.AgentConfigurationMap memory self,
-        uint256 reserveIndex
-    ) internal pure returns (bool) {
+    function isBorrowing(ILender.AgentConfigurationMap memory self, uint256 reserveIndex)
+        internal
+        pure
+        returns (bool)
+    {
         unchecked {
             if (reserveIndex >= 256) revert InvalidReserveIndex();
             return (self.data >> (reserveIndex << 1)) & 1 != 0;
