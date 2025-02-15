@@ -85,32 +85,102 @@ contract MainEverydayTest is TestDeployer {
 
         vm.startPrank(user_agent);
 
+        /// Start with 1000 USDT in the operator's wallet
+        deal(address(usdt), user_agent, 1000e6);
         lender.borrow(address(usdt), 1000e6, user_agent);
-        assertEq(usdt.balanceOf(user_agent), 1000e6);
+        assertEq(usdt.balanceOf(user_agent), 2000e6);
 
         console.log("Operator Borrowed 1000 USDT");
         console.log("Move time forward 10 days");
         console.log("");
+        _timeTravel(block.timestamp + 1 days);
+
+        address mev_bot = makeAddr("Mev Bot");
+        deal(address(usdt), mev_bot, 1000e6);
+        vm.startPrank(mev_bot);
+
+     //   usdt.approve(address(cUSD), 1000e6);
+     //   cUSD.mint(address(usdt), 1000e6, 0, mev_bot, block.timestamp + 1 hours);
+
+     //   lender.realizeInterest(address(usdt), 1);
+
+   //     cUSD.approve(address(cUSDFeeAuction), 1000e18);
+        address[] memory assets = new address[](1);
+        assets[0] = address(usdt);
+   //     cUSDFeeAuction.buy(assets, mev_bot, "");
+
         _timeTravel(10 days);
 
-        console.log("Operator Repays 1000 USDT plus interest");
+        vm.stopPrank();
+
+        vm.startPrank(user_agent);
         (uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt) = lender.debt(user_agent, address(usdt));
+        console.log("Debt in USDT 6 Decimals");
         console.log("Principal Debt", principalDebt);
         console.log("Interest Debt", interestDebt);
         console.log("Restaker Debt", restakerDebt);
         uint256 debt = principalDebt + interestDebt + restakerDebt;
         console.log("");
 
-        deal(address(usdt), user_agent,  1000e6);
         usdt.approve(address(lender), debt);
-        lender.repay(address(usdt), debt, user_agent);
-
         console.log("Operator Repays", debt);
+
+        lender.repay(address(usdt), debt, user_agent);
+        console.log("");
 
         (principalDebt, interestDebt, restakerDebt) = lender.debt(user_agent, address(usdt));
         assertEq(principalDebt, 0);
         assertEq(interestDebt, 0);
         assertEq(restakerDebt, 0);
         vm.stopPrank();
+{
+        vm.startPrank(mev_bot);
+
+        usdt.approve(address(cUSD), 1000e6);
+        cUSD.mint(address(usdt), 1000e6, 0, mev_bot, block.timestamp + 1 hours);
+
+        cUSD.approve(address(cUSDFeeAuction), 1000e18);
+        uint256 usdt_balance_before = usdt.balanceOf(address(cUSDFeeAuction));
+        uint256 cUSD_balance_before = cUSD.balanceOf(address(scUSD));
+        console.log("USDT balance of fee auction before buy", usdt_balance_before);
+        console.log("cUSD balance of scUSD before buy", cUSD_balance_before);
+        uint256 startPrice = cUSDFeeAuction.startPrice();
+        console.log("Start price of fee auction", startPrice);
+        cUSDFeeAuction.buy(assets, mev_bot, "");
+        uint256 usdt_balance_after = usdt.balanceOf(address(cUSDFeeAuction));
+        uint256 cUSD_balance_after = cUSD.balanceOf(address(scUSD));
+        console.log("USDT balance of fee auction after buy", usdt_balance_after);
+        console.log("cUSD balance of scUSD after buy", cUSD_balance_after);
+
+        scUSD.notify();
+
+        console.log("Mev Bot's cUSD balance", cUSD.balanceOf(mev_bot));
+        console.log("");
+
+        vm.stopPrank();
+}
+        vm.startPrank(alice);
+        _timeTravel(1 days);
+        
+        uint256 alice_scUSD_balance = scUSD.balanceOf(alice);
+        console.log("Alice's scUSD balance", alice_scUSD_balance);
+        console.log("");
+
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+
+        vm.expectRevert();
+        scUSD.withdraw(alice_scUSD_balance, bob, alice);
+
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        scUSD.withdraw(alice_scUSD_balance, alice, alice);
+        console.log("Alice's cUSD balance after 11 day in scUSD and a borrow", cUSD.balanceOf(alice));
+        console.log("");
+
+        vm.stopPrank();
+
     }
 }
