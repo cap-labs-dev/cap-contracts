@@ -117,7 +117,7 @@ contract RestakerDebtToken is
     function averageRate() external view returns (uint256 rate) {
         RestakerDebtTokenStorage storage $ = getRestakerDebtTokenStorage();
         uint256 totalDebt = IERC20($.debtToken).totalSupply();
-        rate = totalDebt > 0 ? $.totalInterestPerSecond * 10 ** $.decimals / totalDebt : 0;
+        rate = totalDebt > 0 ? $.totalInterestPerSecond / totalDebt : 0;
     }
 
     /// @dev Update the interest per second of the agent and the scaled total supply
@@ -128,7 +128,7 @@ contract RestakerDebtToken is
         RestakerDebtTokenStorage storage $ = getRestakerDebtTokenStorage();
         uint256 rate = IOracle($.oracle).restakerRate(_agent);
         uint256 oldInterestPerSecond = $.interestPerSecond[_agent];
-        uint256 newInterestPerSecond = IERC20($.debtToken).balanceOf(_agent) * rate / 10 ** $.decimals;
+        uint256 newInterestPerSecond = IERC20($.debtToken).balanceOf(_agent) * rate;
 
         $.interestPerSecond[_agent] = newInterestPerSecond;
         $.totalInterestPerSecond = $.totalInterestPerSecond + newInterestPerSecond - oldInterestPerSecond;
