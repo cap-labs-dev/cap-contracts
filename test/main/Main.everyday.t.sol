@@ -262,6 +262,21 @@ contract MainEverydayTest is TestDeployer {
 
         assertGt(usdt.balanceOf(alice) + usdc.balanceOf(alice) + (usdx.balanceOf(alice)) / 1e12, 10000e6);
 
+        /// USDC goes over peg now
+        console.log("");
+        console.log("USDC is over peg now", uint256(1.01e8));
+        console.log("");
+        _setAssetOraclePrice(address(usdc), 1.01e8);
+
+        vm.startPrank(alice);
+        usdt.approve(address(cUSD), 1000e6);
+        cUSD.mint(address(usdt), 1000e6, 0, alice, block.timestamp + 1 hours);
+
+        alice_cUSD_balance = cUSD.balanceOf(alice);
+
+        cUSD.burn(address(usdt), cUSD.balanceOf(alice), 0, alice, block.timestamp + 1 hours);
+        console.log("Alice's cUSD balance after burning the rest of her cUSD", alice_cUSD_balance);
+        console.log("");
         vm.stopPrank();
     }
 
@@ -271,6 +286,15 @@ contract MainEverydayTest is TestDeployer {
         console.log("");
         console.log("Operator borrows and gets liquidated");
         lender.borrow(address(usdc), 3000e6, user_agent);
+
+        uint256 total_borrows = cUSD.totalBorrows(address(usdc));
+        assertEq(total_borrows, 3000e6);
+
+        uint256 utilization = cUSD.utilization(address(usdc));
+        assertLt(utilization, 1e27);
+
+        uint256 current_utilization_index = cUSD.currentUtilizationIndex(address(usdc));
+        console.log("Current utilization index of USDC", current_utilization_index);
 
         console.log("");
         console.log("Operator's debt as he borrows 3000 USDC", usdc.balanceOf(user_agent));
@@ -299,8 +323,15 @@ contract MainEverydayTest is TestDeployer {
         usdc.approve(address(lender), 4000e6);
         lender.initiateLiquidation(user_agent);
 
+        vm.expectRevert();
+        lender.cancelLiquidation(user_agent);
+
+        vm.expectRevert();
+        lender.initiateLiquidation(user_agent);
         _timeTravel(lender.grace() + 1);
         lender.liquidate(user_agent, address(usdc), 4000e6);
+
+        lender.cancelLiquidation(user_agent);
         vm.stopPrank();
 
         (totalDelegation, totalDebt, ltv, liquidationThreshold, health) = lender.agent(user_agent);

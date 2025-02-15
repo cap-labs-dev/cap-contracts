@@ -158,5 +158,21 @@ contract DeployVault is ProxyUtils {
 
             Lender(infra.lender).pauseAsset(d.assets[i], false);
         }
+
+        // Try removing and re-adding the asset 
+        Lender(infra.lender).removeAsset(d.assets[0]);
+        Lender(infra.lender).addAsset(
+                ILender.AddAssetParams({
+                    asset: d.assets[0],
+                    vault: d.capToken,
+                    principalDebtToken: d.principalDebtTokens[0],
+                    restakerDebtToken: d.restakerDebtTokens[0],
+                    interestDebtToken: d.interestDebtTokens[0],
+                    interestReceiver: d.feeAuction,
+                    restakerInterestReceiver: d.restakerInterestReceiver,
+                    bonusCap: 0.1e27
+                })
+            );
+        Lender(infra.lender).pauseAsset(d.assets[0], false);
     }
 }
