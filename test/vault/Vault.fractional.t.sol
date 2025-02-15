@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { IAccessControl } from "../../contracts/interfaces/IAccessControl.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { MockFractionalReserveVault } from "../mocks/MockFractionalReserveVault.sol";
 import { console } from "forge-std/console.sol";
 
 contract VaultFractionalTest is TestDeployer {
     address user;
+    address borrower;
     uint256 constant USDT_RESERVE_AMOUNT = 10_000e6;
     uint256 constant INTEREST_RATE = 0.1e18; // 10% annual interest rate
 
@@ -19,6 +21,12 @@ contract VaultFractionalTest is TestDeployer {
 
         // Setup test user
         user = makeAddr("test_user");
+        borrower = makeAddr("borrower");
+
+        // allow borrower to borrow
+        vm.prank(env.users.access_control_admin);
+        IAccessControl(env.infra.accessControl).grantAccess(cUSD.borrow.selector, address(cUSD), borrower);
+        vm.stopPrank();
 
         // Initialize vault with some liquidity
         _initTestVaultLiquidity(usdVault);
@@ -138,6 +146,34 @@ contract VaultFractionalTest is TestDeployer {
         assertEq(usdt.balanceOf(address(newFRVault)), investmentAmount, "New FR vault should receive investment");
 
         vm.stopPrank();
+    }
+
+    function test_borrow_more_than_reserve() public {
+        uint256 initialVaultBalance = usdt.balanceOf(address(cUSD));
+        uint256 investmentAmount = initialVaultBalance - USDT_RESERVE_AMOUNT;
+
+        vm.startPrank(env.users.vault_config_admin);
+
+        // Set FR vault and invest
+        cUSD.setFractionalReserveVault(address(usdt), address(mockFRVault));
+        cUSD.investAll(address(usdt));
+
+        // Verify initial state
+        assertEq(usdt.balanceOf(address(mockFRVault)), investmentAmount, "FR vault should have investment");
+        assertEq(usdt.balanceOf(address(cUSD)), USDT_RESERVE_AMOUNT, "Vault should maintain reserve amount");
+
+        vm.stopPrank();
+
+        // Try to borrow more than the reserve amount
+        uint256 borrowAmount = USDT_RESERVE_AMOUNT + 1000e6; // Reserve amount + 1000 USDT
+        vm.startPrank(borrower);
+        cUSD.borrow(address(usdt), borrowAmount, borrower);
+        vm.stopPrank();
+
+        // Verify that the borrow succeeded and funds were divested from FR vault
+        assertEq(usdt.balanceOf(borrower), borrowAmount, "Borrower should receive requested amount");
+        assertEq(usdt.balanceOf(address(mockFRVault)), 0, "FR vault should have reduced balance");
+        assertEq(usdt.balanceOf(address(cUSD)), initialVaultBalance - borrowAmount, "Vault should have reduced balance");
     }
 
     function test_realize_interest_are_sent_to_fee_auction() public {

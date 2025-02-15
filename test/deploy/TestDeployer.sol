@@ -266,6 +266,8 @@ contract TestDeployer is
             _initDelegationAgentDelegator(env.infra, agent, env.symbiotic.networkAdapter.networkMiddleware);
         }
 
+        vm.stopPrank();
+
         // change  epoch
         _timeTravel(28 days);
 
