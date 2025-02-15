@@ -1,32 +1,32 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { IVaultUpgradeable } from "../../../contracts/interfaces/IVaultUpgradeable.sol";
+import { IMinter } from "../../../contracts/interfaces/IMinter.sol";
+import { IVault } from "../../../contracts/interfaces/IVault.sol";
 import { MinterLogic } from "../../../contracts/vault/libraries/MinterLogic.sol";
 
-import { MinterStorage } from "../../../contracts/vault/libraries/MinterStorage.sol";
-import { DataTypes } from "../../../contracts/vault/libraries/types/DataTypes.sol";
+import { MinterStorageUtils } from "../../../contracts/storage/MinterStorageUtils.sol";
 import { MockERC20 } from "../../mocks/MockERC20.sol";
 import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
 
-contract MockVault is MockERC20 {
+contract MockVault is MockERC20, MinterStorageUtils {
     mapping(address => uint256) public _totalSupplies;
 
     constructor() MockERC20("Mock Cap Token", "MCT", 18) { }
 
     function mockRedeemFee(uint256 _redeemFee) external {
-        DataTypes.MinterStorage storage $ = MinterStorage.get();
+        IMinter.MinterStorage storage $ = getMinterStorage();
         $.redeemFee = _redeemFee;
     }
 
     function mockOracle(address _oracle) external {
-        DataTypes.MinterStorage storage $ = MinterStorage.get();
+        IMinter.MinterStorage storage $ = getMinterStorage();
         $.oracle = _oracle;
     }
 
-    function mockFees(address _asset, DataTypes.FeeData memory _feeData) external {
-        DataTypes.MinterStorage storage $ = MinterStorage.get();
+    function mockFees(address _asset, IMinter.FeeData memory _feeData) external {
+        IMinter.MinterStorage storage $ = getMinterStorage();
         $.fees[_asset] = _feeData;
     }
 
@@ -38,8 +38,8 @@ contract MockVault is MockERC20 {
         return _totalSupplies[_asset];
     }
 
-    function minter_getAmountOut(DataTypes.AmountOutParams memory params) external view returns (uint256) {
-        DataTypes.MinterStorage storage $ = MinterStorage.get();
+    function minter_getAmountOut(IMinter.AmountOutParams memory params) external view returns (uint256) {
+        IMinter.MinterStorage storage $ = getMinterStorage();
         return MinterLogic.amountOut($, params);
     }
 }
@@ -75,7 +75,7 @@ contract MinterLogicTest is Test {
         vault.mockRedeemFee(0);
         vault.mockFees(
             address(asset),
-            DataTypes.FeeData({ slope0: 0, slope1: 0, mintKinkRatio: 0, burnKinkRatio: 0, optimalRatio: 0 })
+            IMinter.FeeData({ slope0: 0, slope1: 0, mintKinkRatio: 0, burnKinkRatio: 0, optimalRatio: 0 })
         );
         vault.mockDecimals(18);
     }
@@ -86,8 +86,8 @@ contract MinterLogicTest is Test {
         vault.mockTotalSupplies(address(asset), 0);
         oracle.setPrice(address(vault), 0); // there is no price for the vault at that point
 
-        DataTypes.AmountOutParams memory params =
-            DataTypes.AmountOutParams({ asset: address(asset), amount: 1000e18, mint: true });
+        IMinter.AmountOutParams memory params =
+            IMinter.AmountOutParams({ asset: address(asset), amount: 1000e18, mint: true });
         uint256 amount = vault.minter_getAmountOut(params);
 
         assertEq(amount, 1000e18, "Amount should be equal to input for first deposit");
@@ -99,8 +99,8 @@ contract MinterLogicTest is Test {
         vault.mockTotalSupplies(address(asset), 1000e18);
         vault.mockTotalSupplies(address(vault), 1000e18);
 
-        DataTypes.AmountOutParams memory params =
-            DataTypes.AmountOutParams({ asset: address(asset), amount: 500e18, mint: true });
+        IMinter.AmountOutParams memory params =
+            IMinter.AmountOutParams({ asset: address(asset), amount: 500e18, mint: true });
         uint256 amount = vault.minter_getAmountOut(params);
 
         assertApproxEqAbs(amount, 500e18, 2, "Amount should be proportional to existing supply");
@@ -112,8 +112,8 @@ contract MinterLogicTest is Test {
         vault.mockTotalSupplies(address(asset), 1000e18);
         vault.mockTotalSupplies(address(vault), 1000e18);
 
-        DataTypes.AmountOutParams memory params =
-            DataTypes.AmountOutParams({ asset: address(asset), amount: 300e18, mint: false });
+        IMinter.AmountOutParams memory params =
+            IMinter.AmountOutParams({ asset: address(asset), amount: 300e18, mint: false });
 
         uint256 amount = vault.minter_getAmountOut(params);
 
@@ -126,8 +126,8 @@ contract MinterLogicTest is Test {
         vault.mockTotalSupplies(address(asset), 1000e18);
         vault.mockTotalSupplies(address(vault), 1000e18);
 
-        DataTypes.AmountOutParams memory params =
-            DataTypes.AmountOutParams({ asset: address(asset), amount: 1000e18, mint: false });
+        IMinter.AmountOutParams memory params =
+            IMinter.AmountOutParams({ asset: address(asset), amount: 1000e18, mint: false });
 
         uint256 amount = vault.minter_getAmountOut(params);
 
@@ -144,8 +144,8 @@ contract MinterLogicTest is Test {
         vault.mockTotalSupplies(address(asset), 1000e18);
         vault.mockTotalSupplies(address(vault), 1000e18);
 
-        DataTypes.AmountOutParams memory params =
-            DataTypes.AmountOutParams({ asset: address(asset), amount: 100e18, mint: true });
+        IMinter.AmountOutParams memory params =
+            IMinter.AmountOutParams({ asset: address(asset), amount: 100e18, mint: true });
 
         uint256 amount = vault.minter_getAmountOut(params);
 
@@ -158,8 +158,8 @@ contract MinterLogicTest is Test {
         vault.mockTotalSupplies(address(asset), 1000e18);
         vault.mockTotalSupplies(address(vault), 1000e18);
 
-        DataTypes.AmountOutParams memory params =
-            DataTypes.AmountOutParams({ asset: address(asset), amount: 0, mint: true });
+        IMinter.AmountOutParams memory params =
+            IMinter.AmountOutParams({ asset: address(asset), amount: 0, mint: true });
 
         uint256 amount = vault.minter_getAmountOut(params);
 
@@ -180,11 +180,11 @@ contract MinterLogicTest is Test {
         vault.mockTotalSupplies(address(vault), 1000e18);
         vault.mockFees(
             address(asset6Dec),
-            DataTypes.FeeData({ slope0: 0, slope1: 0, mintKinkRatio: 0, burnKinkRatio: 0, optimalRatio: 0 })
+            IMinter.FeeData({ slope0: 0, slope1: 0, mintKinkRatio: 0, burnKinkRatio: 0, optimalRatio: 0 })
         );
 
-        DataTypes.AmountOutParams memory params =
-            DataTypes.AmountOutParams({ asset: address(asset6Dec), amount: 100e6, mint: true });
+        IMinter.AmountOutParams memory params =
+            IMinter.AmountOutParams({ asset: address(asset6Dec), amount: 100e6, mint: true });
         uint256 amount = vault.minter_getAmountOut(params);
 
         assertApproxEqAbs(amount, 100e18, 2, "Amount should be scaled to 18 decimals");

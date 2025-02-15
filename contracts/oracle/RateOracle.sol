@@ -1,44 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { Access } from "../access/Access.sol";
 import { IOracle } from "../interfaces/IOracle.sol";
-import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
+import { IRateOracle } from "../interfaces/IRateOracle.sol";
+import { RateOracleStorageUtils } from "../storage/RateOracleStorageUtils.sol";
 
 /// @title Oracle for fetching interest rates
 /// @author kexley, @capLabs
 /// @notice Admin can set the minimum interest rates and the restaker interest rates.
-contract RateOracle is AccessUpgradeable {
-    /// @custom:storage-location erc7201:cap.storage.RateOracle
-    struct RateOracleStorage {
-        mapping(address => IOracle.OracleData) marketOracleData;
-        mapping(address => IOracle.OracleData) utilizationOracleData;
-        mapping(address => uint256) benchmarkRate;
-        mapping(address => uint256) restakerRate;
-    }
-
-    /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.RateOracle")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant RateOracleStorageLocation = 0xc2fe5bdef19b00667b17c16a6e885c9ed219a037de5cdf872528698fdc749f00;
-
-    /// @dev Get this contract storage pointer
-    /// @return $ Storage pointer
-    function _getRateOracleStorage() private pure returns (RateOracleStorage storage $) {
-        assembly {
-            $.slot := RateOracleStorageLocation
-        }
-    }
-
-    /// @dev Set market oracle data
-    event SetMarketOracleData(address asset, IOracle.OracleData data);
-
-    /// @dev Set utilization oracle data
-    event SetUtilizationOracleData(address asset, IOracle.OracleData data);
-
-    /// @dev Set benchmark rate
-    event SetBenchmarkRate(address asset, uint256 rate);
-
-    /// @dev Set restaker rate
-    event SetRestakerRate(address agent, uint256 rate);
-
+contract RateOracle is IRateOracle, Access, RateOracleStorageUtils {
     /// @dev Initialize the rate oracle
     /// @param _accessControl Access control address
     function __RateOracle_init(address _accessControl) internal onlyInitializing {
@@ -47,14 +18,13 @@ contract RateOracle is AccessUpgradeable {
     }
 
     /// @dev Initialize unchained
-    function __RateOracle_init_unchained() internal onlyInitializing {}
+    function __RateOracle_init_unchained() internal onlyInitializing { }
 
     /// @notice Fetch the market rate for an asset being borrowed
     /// @param _asset Asset address
     /// @return rate Borrow interest rate
     function marketRate(address _asset) external returns (uint256 rate) {
-        RateOracleStorage storage $ = _getRateOracleStorage();
-        IOracle.OracleData memory data = $.marketOracleData[_asset];
+        IOracle.OracleData memory data = getRateOracleStorage().marketOracleData[_asset];
         rate = _getRate(data.adapter, data.payload);
     }
 
@@ -62,8 +32,7 @@ contract RateOracle is AccessUpgradeable {
     /// @param _asset Asset address
     /// @return rate Utilization rate
     function utilizationRate(address _asset) external returns (uint256 rate) {
-        RateOracleStorage storage $ = _getRateOracleStorage();
-        IOracle.OracleData memory data = $.utilizationOracleData[_asset];
+        IOracle.OracleData memory data = getRateOracleStorage().utilizationOracleData[_asset];
         rate = _getRate(data.adapter, data.payload);
     }
 
@@ -71,32 +40,28 @@ contract RateOracle is AccessUpgradeable {
     /// @param _asset Asset address
     /// @return rate Benchmark rate
     function benchmarkRate(address _asset) external view returns (uint256 rate) {
-        RateOracleStorage storage $ = _getRateOracleStorage();
-        rate = $.benchmarkRate[_asset];
+        rate = getRateOracleStorage().benchmarkRate[_asset];
     }
 
     /// @notice View the restaker rate for an agent
     /// @param _agent Agent address
     /// @return rate Restaker rate
     function restakerRate(address _agent) external view returns (uint256 rate) {
-        RateOracleStorage storage $ = _getRateOracleStorage();
-        rate = $.restakerRate[_agent];
+        rate = getRateOracleStorage().restakerRate[_agent];
     }
 
     /// @notice View the market oracle data for an asset
     /// @param _asset Asset address
     /// @return data Oracle data for an asset
     function marketOracleData(address _asset) external view returns (IOracle.OracleData memory data) {
-        RateOracleStorage storage $ = _getRateOracleStorage();
-        data = $.marketOracleData[_asset];
+        data = getRateOracleStorage().marketOracleData[_asset];
     }
 
     /// @notice View the utilization oracle data for an asset
     /// @param _asset Asset address
     /// @return data Oracle data for an asset
     function utilizationOracleData(address _asset) external view returns (IOracle.OracleData memory data) {
-        RateOracleStorage storage $ = _getRateOracleStorage();
-        data = $.utilizationOracleData[_asset];
+        data = getRateOracleStorage().utilizationOracleData[_asset];
     }
 
     /// @notice Set a market source for an asset
@@ -106,8 +71,7 @@ contract RateOracle is AccessUpgradeable {
         external
         checkAccess(this.setMarketOracleData.selector)
     {
-        RateOracleStorage storage $ = _getRateOracleStorage();
-        $.marketOracleData[_asset] = _oracleData;
+        getRateOracleStorage().marketOracleData[_asset] = _oracleData;
         emit SetMarketOracleData(_asset, _oracleData);
     }
 
@@ -118,8 +82,7 @@ contract RateOracle is AccessUpgradeable {
         external
         checkAccess(this.setUtilizationOracleData.selector)
     {
-        RateOracleStorage storage $ = _getRateOracleStorage();
-        $.utilizationOracleData[_asset] = _oracleData;
+        getRateOracleStorage().utilizationOracleData[_asset] = _oracleData;
         emit SetUtilizationOracleData(_asset, _oracleData);
     }
 
@@ -127,8 +90,7 @@ contract RateOracle is AccessUpgradeable {
     /// @param _asset Asset address
     /// @param _rate New interest rate
     function setBenchmarkRate(address _asset, uint256 _rate) external checkAccess(this.setBenchmarkRate.selector) {
-        RateOracleStorage storage $ = _getRateOracleStorage();
-        $.benchmarkRate[_asset] = _rate;
+        getRateOracleStorage().benchmarkRate[_asset] = _rate;
         emit SetBenchmarkRate(_asset, _rate);
     }
 
@@ -136,8 +98,7 @@ contract RateOracle is AccessUpgradeable {
     /// @param _agent Agent address
     /// @param _rate New interest rate
     function setRestakerRate(address _agent, uint256 _rate) external checkAccess(this.setRestakerRate.selector) {
-        RateOracleStorage storage $ = _getRateOracleStorage();
-        $.restakerRate[_agent] = _rate;
+        getRateOracleStorage().restakerRate[_agent] = _rate;
         emit SetRestakerRate(_agent, _rate);
     }
 

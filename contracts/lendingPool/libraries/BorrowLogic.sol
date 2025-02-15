@@ -5,10 +5,11 @@ import { IDebtToken } from "../../interfaces/IDebtToken.sol";
 import { IPrincipalDebtToken } from "../../interfaces/IPrincipalDebtToken.sol";
 
 import { IRestakerRewardReceiver } from "../../interfaces/IRestakerRewardReceiver.sol";
-import { IVaultUpgradeable } from "../../interfaces/IVaultUpgradeable.sol";
+import { IVault } from "../../interfaces/IVault.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import { ILender } from "../../interfaces/ILender.sol";
 import { ValidationLogic } from "./ValidationLogic.sol";
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
 import { DataTypes } from "./types/DataTypes.sol";
@@ -48,7 +49,7 @@ library BorrowLogic {
     /// Restaker debt token is updated after so the new principal debt can be used in calculations
     /// @param $ Lender storage
     /// @param params Parameters to borrow an asset
-    function borrow(DataTypes.LenderStorage storage $, DataTypes.BorrowParams memory params) external {
+    function borrow(ILender.LenderStorage storage $, DataTypes.BorrowParams memory params) external {
         ValidationLogic.validateBorrow($, params);
 
         DataTypes.ReserveData memory reserve = $.reservesData[params.asset];
@@ -56,7 +57,7 @@ library BorrowLogic {
             $.agentConfig[params.agent].setBorrowing(reserve.id, true);
         }
 
-        IVaultUpgradeable(reserve.vault).borrow(params.asset, params.amount, params.receiver);
+        IVault(reserve.vault).borrow(params.asset, params.amount, params.receiver);
 
         IDebtToken(reserve.interestDebtToken).update(params.agent);
         IPrincipalDebtToken(reserve.principalDebtToken).mint(params.agent, params.amount);
@@ -72,7 +73,7 @@ library BorrowLogic {
     /// @param $ Lender storage
     /// @param params Parameters to repay a debt
     /// @return _repaid Actual amount repaid
-    function repay(DataTypes.LenderStorage storage $, DataTypes.RepayParams memory params)
+    function repay(ILender.LenderStorage storage $, DataTypes.RepayParams memory params)
         external
         returns (uint256 _repaid)
     {
@@ -107,7 +108,7 @@ library BorrowLogic {
             IPrincipalDebtToken(reserve.principalDebtToken).burn(params.agent, principalRepaid);
             IERC20(params.asset).safeTransferFrom(params.caller, address(this), principalRepaid);
             IERC20(params.asset).forceApprove(reserve.vault, principalRepaid);
-            IVaultUpgradeable(reserve.vault).repay(params.asset, principalRepaid);
+            IVault(reserve.vault).repay(params.asset, principalRepaid);
         }
 
         if (restakerRepaid > 0) {
@@ -126,7 +127,7 @@ library BorrowLogic {
                 $.reservesData[params.asset].realizedInterest -= realizedInterestRepaid;
                 IERC20(params.asset).safeTransferFrom(params.caller, address(this), realizedInterestRepaid);
                 IERC20(params.asset).forceApprove(reserve.vault, realizedInterestRepaid);
-                IVaultUpgradeable(reserve.vault).repay(params.asset, realizedInterestRepaid);
+                IVault(reserve.vault).repay(params.asset, realizedInterestRepaid);
             }
 
             interestRepaid = IDebtToken(reserve.interestDebtToken).burn(params.agent, interestRepaid);
@@ -155,7 +156,7 @@ library BorrowLogic {
     /// @param $ Lender storage
     /// @param params Parameters for realizing interest
     /// @return realizedInterest Actual realized interest
-    function realizeInterest(DataTypes.LenderStorage storage $, DataTypes.RealizeInterestParams memory params)
+    function realizeInterest(ILender.LenderStorage storage $, DataTypes.RealizeInterestParams memory params)
         external
         returns (uint256 realizedInterest)
     {
@@ -165,7 +166,7 @@ library BorrowLogic {
         realizedInterest = params.amount > maxRealization ? maxRealization : params.amount;
 
         $.reservesData[params.asset].realizedInterest += realizedInterest;
-        IVaultUpgradeable(reserve.vault).borrow(params.asset, realizedInterest, reserve.interestReceiver);
+        IVault(reserve.vault).borrow(params.asset, realizedInterest, reserve.interestReceiver);
         emit RealizeInterest(params.asset, realizedInterest, reserve.interestReceiver);
     }
 }

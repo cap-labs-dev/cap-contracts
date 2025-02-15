@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { VaultUpgradeable } from "../vault/VaultUpgradeable.sol";
+import { Vault } from "../vault/Vault.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 /// @title Cap Token
 /// @author kexley, @capLabs
 /// @notice Token representing the basket of underlying assets
-contract CapToken is UUPSUpgradeable, VaultUpgradeable {
+contract CapToken is UUPSUpgradeable, Vault {
     /// @dev Disable initializers on the implementation
     constructor() {
         _disableInitializers();

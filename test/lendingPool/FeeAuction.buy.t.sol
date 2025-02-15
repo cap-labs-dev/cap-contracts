@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { FeeAuction } from "../../contracts/lendingPool/FeeAuction.sol";
+import { IFeeAuction } from "../../contracts/interfaces/IFeeAuction.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -95,7 +95,7 @@ contract FeeAuctionBuyTest is TestDeployer {
         // Admin should be able to set start price
         vm.prank(env.users.fee_auction_admin);
         vm.expectEmit(false, false, false, true);
-        emit FeeAuction.SetStartPrice(newStartPrice);
+        emit IFeeAuction.SetStartPrice(newStartPrice);
         cUSDFeeAuction.setStartPrice(newStartPrice);
 
         assertEq(cUSDFeeAuction.startPrice(), newStartPrice);
@@ -112,14 +112,14 @@ contract FeeAuctionBuyTest is TestDeployer {
         // Admin should be able to set duration
         vm.prank(env.users.fee_auction_admin);
         vm.expectEmit(false, false, false, true);
-        emit FeeAuction.SetDuration(newDuration);
+        emit IFeeAuction.SetDuration(newDuration);
         cUSDFeeAuction.setDuration(newDuration);
 
         assertEq(cUSDFeeAuction.duration(), newDuration);
 
         // Should revert when trying to set duration to 0
         vm.prank(env.users.fee_auction_admin);
-        vm.expectRevert(FeeAuction.NoDuration.selector);
+        vm.expectRevert(IFeeAuction.NoDuration.selector);
         cUSDFeeAuction.setDuration(0);
     }
 
@@ -134,7 +134,7 @@ contract FeeAuctionBuyTest is TestDeployer {
         // Admin should be able to set min start price
         vm.prank(env.users.fee_auction_admin);
         vm.expectEmit(false, false, false, true);
-        emit FeeAuction.SetMinStartPrice(newMinStartPrice);
+        emit IFeeAuction.SetMinStartPrice(newMinStartPrice);
         cUSDFeeAuction.setMinStartPrice(newMinStartPrice);
 
         assertEq(cUSDFeeAuction.minStartPrice(), newMinStartPrice);

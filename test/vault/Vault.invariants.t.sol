@@ -4,9 +4,8 @@ pragma solidity ^0.8.28;
 import { AccessControl } from "../../contracts/access/AccessControl.sol";
 
 import { ProxyUtils } from "../../contracts/deploy/utils/ProxyUtils.sol";
-import { FeeAuction } from "../../contracts/lendingPool/FeeAuction.sol";
-import { VaultUpgradeable } from "../../contracts/vault/VaultUpgradeable.sol";
-import { DataTypes } from "../../contracts/vault/libraries/types/DataTypes.sol";
+import { FeeAuction } from "../../contracts/feeAuction/FeeAuction.sol";
+import { Vault } from "../../contracts/vault/Vault.sol";
 
 import { MockAccessControl } from "../mocks/MockAccessControl.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
@@ -26,8 +25,8 @@ import { Vm } from "forge-std/Vm.sol";
 import { console } from "forge-std/console.sol";
 
 contract VaultInvariantsTest is Test, ProxyUtils {
-    TestVaultUpgradeableHandler public handler;
-    TestVaultUpgradeable public vault;
+    TestVaultHandler public handler;
+    TestVault public vault;
     FeeAuction public feeAuction;
     address[] public assets;
 
@@ -74,7 +73,7 @@ contract VaultInvariantsTest is Test, ProxyUtils {
         feeAuction.initialize(address(accessControl), address(mockTokens[0]), address(this), 1 days, 1e18);
 
         // Deploy and initialize vault
-        vault = new TestVaultUpgradeable();
+        vault = new TestVault();
         vault.initialize(
             "Test Vault", "tVAULT", address(accessControl), address(feeAuction), address(mockOracle), assets
         );
@@ -97,7 +96,7 @@ contract VaultInvariantsTest is Test, ProxyUtils {
         }
 
         // Create and target handler
-        handler = new TestVaultUpgradeableHandler(vault, mockOracle, assets, tokenHolders);
+        handler = new TestVaultHandler(vault, mockOracle, assets, tokenHolders);
         targetContract(address(handler));
     }
 
@@ -140,7 +139,7 @@ contract VaultInvariantsTest is Test, ProxyUtils {
     }
 }
 
-contract TestVaultUpgradeable is VaultUpgradeable {
+contract TestVault is Vault {
     function initialize(
         string memory _name,
         string memory _symbol,
@@ -156,10 +155,10 @@ contract TestVaultUpgradeable is VaultUpgradeable {
  * @notice This is a helper contract to test the vault invariants in a meaningful way
  */
 
-contract TestVaultUpgradeableHandler is StdUtils {
+contract TestVaultHandler is StdUtils {
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-    VaultUpgradeable public vault;
+    Vault public vault;
     MockOracle public mockOracle;
 
     address[] public assets;
@@ -241,7 +240,7 @@ contract TestVaultUpgradeableHandler is StdUtils {
         return false;
     }
 
-    constructor(VaultUpgradeable _vault, MockOracle _mockOracle, address[] memory _assets, address[] memory _actors) {
+    constructor(Vault _vault, MockOracle _mockOracle, address[] memory _assets, address[] memory _actors) {
         vault = _vault;
         mockOracle = _mockOracle;
         assets = _assets;

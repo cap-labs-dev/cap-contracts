@@ -8,7 +8,7 @@ import { Lender } from "../../lendingPool/Lender.sol";
 import { Oracle } from "../../oracle/Oracle.sol";
 
 import { L2Token } from "../../token/L2Token.sol";
-import { VaultUpgradeable } from "../../vault/VaultUpgradeable.sol";
+import { Vault } from "../../vault/Vault.sol";
 
 import { PreMainnetVault } from "../../testnetCampaign/PreMainnetVault.sol";
 import {
@@ -61,12 +61,12 @@ contract DeployInfra is ProxyUtils {
         string memory symbol;
         address delegate = users.vault_config_admin;
 
-        name = VaultUpgradeable(l1Vault.capToken).name();
-        symbol = VaultUpgradeable(l1Vault.capToken).symbol();
+        name = Vault(l1Vault.capToken).name();
+        symbol = Vault(l1Vault.capToken).symbol();
         d.bridgedCapToken = address(new L2Token(name, symbol, lzEndpoint, delegate));
 
-        name = VaultUpgradeable(l1Vault.stakedCapToken).name();
-        symbol = VaultUpgradeable(l1Vault.stakedCapToken).symbol();
+        name = Vault(l1Vault.stakedCapToken).name();
+        symbol = Vault(l1Vault.stakedCapToken).symbol();
         d.bridgedStakedCapToken = address(new L2Token(name, symbol, lzEndpoint, delegate));
     }
 }

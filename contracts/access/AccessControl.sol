@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { IAccessControl } from "../interfaces/IAccessControl.sol";
 import { AccessControlEnumerableUpgradeable } from
     "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -8,7 +9,7 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 /// @title AccessControl
 /// @author kexley, @capLabs
 /// @notice Granular access control for each function on each contract
-contract AccessControl is UUPSUpgradeable, AccessControlEnumerableUpgradeable {
+contract AccessControl is IAccessControl, UUPSUpgradeable, AccessControlEnumerableUpgradeable {
     /// @notice Initialize the default admin
     /// @param _admin Default admin address
     function initialize(address _admin) external initializer {

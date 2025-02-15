@@ -3,10 +3,11 @@ pragma solidity ^0.8.28;
 
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
-import { BorrowLogic } from "./libraries/BorrowLogic.sol";
+import { Access } from "../access/Access.sol";
 
-import { LenderStorage } from "./libraries/LenderStorage.sol";
+import { ILender } from "../interfaces/ILender.sol";
+import { LenderStorageUtils } from "../storage/LenderStorageUtils.sol";
+import { BorrowLogic } from "./libraries/BorrowLogic.sol";
 import { LiquidationLogic } from "./libraries/LiquidationLogic.sol";
 import { ReserveLogic } from "./libraries/ReserveLogic.sol";
 import { ViewLogic } from "./libraries/ViewLogic.sol";
@@ -17,10 +18,7 @@ import { DataTypes } from "./libraries/types/DataTypes.sol";
 /// @notice Whitelisted tokens are borrowed and repaid from this contract by covered agents.
 /// @dev Borrow interest rates are calculated from the underlying utilization rates of the assets
 /// in the vaults.
-contract Lender is UUPSUpgradeable, AccessUpgradeable {
-    /// @dev Zero address not valid
-    error ZeroAddressNotValid();
-
+contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -51,7 +49,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         if (_delegation == address(0) || _oracle == address(0)) revert ZeroAddressNotValid();
 
         // TODO: remove this
-        DataTypes.LenderStorage storage $ = LenderStorage.get();
+        LenderStorage storage $ = getLenderStorage();
         $.delegation = _delegation;
         $.oracle = _oracle;
         $.targetHealth = _targetHealth;
@@ -67,7 +65,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @param _receiver Receiver of the borrowed asset
     function borrow(address _asset, uint256 _amount, address _receiver) external {
         BorrowLogic.borrow(
-            LenderStorage.get(),
+            getLenderStorage(),
             DataTypes.BorrowParams({ agent: msg.sender, asset: _asset, amount: _amount, receiver: _receiver })
         );
     }
@@ -79,9 +77,9 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @return repaid Actual amount repaid
     function repay(address _asset, uint256 _amount, address _agent) external returns (uint256 repaid) {
         if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();
-        DataTypes.LenderStorage storage $ = LenderStorage.get();
         repaid = BorrowLogic.repay(
-            $, DataTypes.RepayParams({ agent: _agent, asset: _asset, amount: _amount, caller: msg.sender })
+            getLenderStorage(),
+            DataTypes.RepayParams({ agent: _agent, asset: _asset, amount: _amount, caller: msg.sender })
         );
     }
 
@@ -91,20 +89,20 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @return actualRealized Actual amount realized
     function realizeInterest(address _asset, uint256 _amount) external returns (uint256 actualRealized) {
         actualRealized = BorrowLogic.realizeInterest(
-            LenderStorage.get(), DataTypes.RealizeInterestParams({ asset: _asset, amount: _amount })
+            getLenderStorage(), DataTypes.RealizeInterestParams({ asset: _asset, amount: _amount })
         );
     }
 
     /// @notice Initiate liquidation of an agent when the health is below 1
     /// @param _agent Agent address
     function initiateLiquidation(address _agent) external {
-        LiquidationLogic.initiateLiquidation(LenderStorage.get(), _agent);
+        LiquidationLogic.initiateLiquidation(getLenderStorage(), _agent);
     }
 
     /// @notice Cancel liquidation of an agent when the health is above 1
     /// @param _agent Agent address
     function cancelLiquidation(address _agent) external {
-        LiquidationLogic.cancelLiquidation(LenderStorage.get(), _agent);
+        LiquidationLogic.cancelLiquidation(getLenderStorage(), _agent);
     }
 
     /// @notice Liquidate an agent when the health is below 1
@@ -115,7 +113,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     function liquidate(address _agent, address _asset, uint256 _amount) external returns (uint256 liquidatedValue) {
         if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();
         liquidatedValue = LiquidationLogic.liquidate(
-            LenderStorage.get(),
+            getLenderStorage(),
             DataTypes.RepayParams({ agent: _agent, asset: _asset, amount: _amount, caller: msg.sender })
         );
     }
@@ -132,7 +130,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         view
         returns (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health)
     {
-        (totalDelegation, totalDebt, ltv, liquidationThreshold, health) = ViewLogic.agent(LenderStorage.get(), _agent);
+        (totalDelegation, totalDebt, ltv, liquidationThreshold, health) = ViewLogic.agent(getLenderStorage(), _agent);
     }
 
     /// @notice Calculate the maximum amount that can be borrowed for a given asset
@@ -141,7 +139,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @return maxBorrowableAmount Maximum amount that can be borrowed in asset decimals
     function maxBorrowable(address _agent, address _asset) external view returns (uint256 maxBorrowableAmount) {
         if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();
-        maxBorrowableAmount = ViewLogic.maxBorrowable(LenderStorage.get(), _agent, _asset);
+        maxBorrowableAmount = ViewLogic.maxBorrowable(getLenderStorage(), _agent, _asset);
     }
 
     /// @notice Get the current debt balances for an agent for a specific asset
@@ -156,13 +154,13 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
         returns (uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt)
     {
         if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();
-        (principalDebt, interestDebt, restakerDebt) = ViewLogic.debt(LenderStorage.get(), _agent, _asset);
+        (principalDebt, interestDebt, restakerDebt) = ViewLogic.debt(getLenderStorage(), _agent, _asset);
     }
 
     /// @notice Add an asset to the Lender
     /// @param _params Parameters to add an asset
     function addAsset(DataTypes.AddAssetParams calldata _params) external checkAccess(this.addAsset.selector) {
-        DataTypes.LenderStorage storage $ = LenderStorage.get();
+        LenderStorage storage $ = getLenderStorage();
         if (!ReserveLogic.addAsset($, _params)) ++$.reservesCount;
     }
 
@@ -170,7 +168,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @param _asset Asset address
     function removeAsset(address _asset) external checkAccess(this.removeAsset.selector) {
         if (_asset == address(0)) revert ZeroAddressNotValid();
-        ReserveLogic.removeAsset(LenderStorage.get(), _asset);
+        ReserveLogic.removeAsset(getLenderStorage(), _asset);
     }
 
     /// @notice Pause an asset from being borrowed
@@ -178,44 +176,50 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
     /// @param _pause True if pausing or false if unpausing
     function pauseAsset(address _asset, bool _pause) external checkAccess(this.pauseAsset.selector) {
         if (_asset == address(0)) revert ZeroAddressNotValid();
-        ReserveLogic.pauseAsset(LenderStorage.get(), _asset, _pause);
+        ReserveLogic.pauseAsset(getLenderStorage(), _asset, _pause);
     }
 
     /// @notice The total number of reserves
     /// @return count Number of reserves
     function reservesCount() external view returns (uint256 count) {
-        count = LenderStorage.get().reservesCount;
+        count = getLenderStorage().reservesCount;
     }
 
     /// @notice The grace period duration
     /// @return gracePeriod Grace period in seconds
     function grace() external view returns (uint256 gracePeriod) {
-        gracePeriod = LenderStorage.get().grace;
+        gracePeriod = getLenderStorage().grace;
     }
 
     /// @notice The expiry period duration
     /// @return expiryPeriod Expiry period in seconds
     function expiry() external view returns (uint256 expiryPeriod) {
-        expiryPeriod = LenderStorage.get().expiry;
+        expiryPeriod = getLenderStorage().expiry;
     }
 
     /// @notice The target health factor
     /// @return target Target health factor scaled to 1e27
     function targetHealth() external view returns (uint256 target) {
-        target = LenderStorage.get().targetHealth;
+        target = getLenderStorage().targetHealth;
     }
 
     /// @notice The liquidation bonus cap
     /// @return cap Bonus cap scaled to 1e27
     function bonusCap() external view returns (uint256 cap) {
-        cap = LenderStorage.get().bonusCap;
+        cap = getLenderStorage().bonusCap;
+    }
+
+    /// @notice The emergency liquidation threshold
+    /// @return threshold Threshold scaled to 1e27
+    function emergencyLiquidationThreshold() external view returns (uint256 threshold) {
+        threshold = getLenderStorage().emergencyLiquidationThreshold;
     }
 
     /// @notice The liquidation start time for an agent
     /// @param _agent Address of the agent
     /// @return startTime Timestamp when liquidation was initiated
     function liquidationStart(address _agent) external view returns (uint256 startTime) {
-        startTime = LenderStorage.get().liquidationStart[_agent];
+        startTime = getLenderStorage().liquidationStart[_agent];
     }
 
     /// @notice The reserve data for an asset
@@ -244,7 +248,7 @@ contract Lender is UUPSUpgradeable, AccessUpgradeable {
             uint256 realizedInterest
         )
     {
-        DataTypes.ReserveData storage reserve = LenderStorage.get().reservesData[_asset];
+        DataTypes.ReserveData storage reserve = getLenderStorage().reservesData[_asset];
         id = reserve.id;
         vault = reserve.vault;
         principalDebtToken = reserve.principalDebtToken;

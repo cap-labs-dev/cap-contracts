@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { Delegation } from "../../contracts/delegation/Delegation.sol";
+import { IDelegation } from "../../contracts/interfaces/IDelegation.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 
 import { console } from "forge-std/console.sol";
@@ -57,7 +57,7 @@ contract DelegationSlashTest is TestDeployer {
         address new_agent = makeAddr("new_agent");
         delegation.addAgent(new_agent, 0.8e18, 0.7e18);
 
-        vm.expectRevert(Delegation.DuplicateAgent.selector);
+        vm.expectRevert(IDelegation.DuplicateAgent.selector);
         delegation.addAgent(new_agent, 0.9e18, 0.8e18);
 
         delegation.modifyAgent(new_agent, 0.9e18, 0.8e18);

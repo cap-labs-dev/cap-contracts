@@ -1,59 +1,25 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
+import { Access } from "../access/Access.sol";
 
 import { IAuctionCallback } from "../interfaces/IAuctionCallback.sol";
+
+import { IFeeAuction } from "../interfaces/IFeeAuction.sol";
+import { FeeAuctionStorageUtils } from "../storage/FeeAuctionStorageUtils.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title Fee Auction
 /// @author kexley, @capLabs
 /// @notice Fees are sold via a dutch auction
-contract FeeAuction is UUPSUpgradeable, AccessUpgradeable {
+contract FeeAuction is IFeeAuction, UUPSUpgradeable, Access, FeeAuctionStorageUtils {
     using SafeERC20 for IERC20;
-
-    /// @custom:storage-location erc7201:cap.storage.FeeAuction
-    struct FeeAuctionStorage {
-        address paymentToken;
-        address paymentRecipient;
-        uint256 startPrice;
-        uint256 startTimestamp;
-        uint256 duration;
-        uint256 minStartPrice;
-    }
-
-    /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.FeeAuction")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant FeeAuctionStorageLocation =
-        0xbbabf7dab1936c7afe15748adafbe56186d0b57f14b5bc3e6f8d57aad0236100;
-
-    /// @dev Get this contract storage pointer
-    /// @return $ Storage pointer
-    function _getFeeAuctionStorage() private pure returns (FeeAuctionStorage storage $) {
-        assembly {
-            $.slot := FeeAuctionStorageLocation
-        }
-    }
 
     /// @dev Disable initializers on the implementation
     constructor() {
         _disableInitializers();
     }
-
-    /// @dev Duration must be set
-    error NoDuration();
-
-    /// @dev Buy fees
-    event Buy(address buyer, uint256 price, address[] assets, uint256[] balances);
-
-    /// @dev Set start price
-    event SetStartPrice(uint256 startPrice);
-
-    /// @dev Set duration
-    event SetDuration(uint256 duration);
-
-    /// @dev Set minimum start price
-    event SetMinStartPrice(uint256 minStartPrice);
 
     /// @notice Initialize the fee auction
     /// @param _accessControl Access control address
@@ -71,7 +37,7 @@ contract FeeAuction is UUPSUpgradeable, AccessUpgradeable {
         __Access_init(_accessControl);
         __UUPSUpgradeable_init();
 
-        FeeAuctionStorage storage $ = _getFeeAuctionStorage();
+        FeeAuctionStorage storage $ = get();
         $.paymentToken = _paymentToken;
         $.paymentRecipient = _paymentRecipient;
         $.startPrice = _minStartPrice;
@@ -84,7 +50,7 @@ contract FeeAuction is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Current price in the payment token, linearly decays toward 0 over time
     /// @return price Current price
     function currentPrice() public view returns (uint256 price) {
-        FeeAuctionStorage storage $ = _getFeeAuctionStorage();
+        FeeAuctionStorage storage $ = get();
         uint256 elapsed = block.timestamp - $.startTimestamp;
         if (elapsed > $.duration) elapsed = $.duration;
         price = $.startPrice * (1e27 - (elapsed * 1e27 / $.duration)) / 1e27;
@@ -97,7 +63,7 @@ contract FeeAuction is UUPSUpgradeable, AccessUpgradeable {
     /// @param _callback Optional callback data
     function buy(address[] calldata _assets, address _receiver, bytes calldata _callback) external {
         uint256 price = currentPrice();
-        FeeAuctionStorage storage $ = _getFeeAuctionStorage();
+        FeeAuctionStorage storage $ = get();
         $.startTimestamp = block.timestamp;
 
         uint256 newStartPrice = price * 2;
@@ -117,7 +83,7 @@ contract FeeAuction is UUPSUpgradeable, AccessUpgradeable {
     /// @dev This will affect the current price, use with caution
     /// @param _startPrice New start price
     function setStartPrice(uint256 _startPrice) external checkAccess(this.setStartPrice.selector) {
-        FeeAuctionStorage storage $ = _getFeeAuctionStorage();
+        FeeAuctionStorage storage $ = get();
         $.startPrice = _startPrice;
         emit SetStartPrice(_startPrice);
     }
@@ -127,7 +93,7 @@ contract FeeAuction is UUPSUpgradeable, AccessUpgradeable {
     /// @param _duration New duration in seconds
     function setDuration(uint256 _duration) external checkAccess(this.setDuration.selector) {
         if (_duration == 0) revert NoDuration();
-        FeeAuctionStorage storage $ = _getFeeAuctionStorage();
+        FeeAuctionStorage storage $ = get();
         $.duration = _duration;
         emit SetDuration(_duration);
     }
@@ -135,7 +101,7 @@ contract FeeAuction is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Set minimum start price
     /// @param _minStartPrice New minimum start price
     function setMinStartPrice(uint256 _minStartPrice) external checkAccess(this.setMinStartPrice.selector) {
-        FeeAuctionStorage storage $ = _getFeeAuctionStorage();
+        FeeAuctionStorage storage $ = get();
         $.minStartPrice = _minStartPrice;
         emit SetMinStartPrice(_minStartPrice);
     }
@@ -160,37 +126,37 @@ contract FeeAuction is UUPSUpgradeable, AccessUpgradeable {
     /// @notice Get the payment token address
     /// @return token Address of the token used for payments
     function paymentToken() external view returns (address token) {
-        token = _getFeeAuctionStorage().paymentToken;
+        token = get().paymentToken;
     }
 
     /// @notice Get the payment recipient address
     /// @return recipient Address that receives the payments
     function paymentRecipient() external view returns (address recipient) {
-        recipient = _getFeeAuctionStorage().paymentRecipient;
+        recipient = get().paymentRecipient;
     }
 
     /// @notice Get the current start price
     /// @return price Current start price in payment token decimals
     function startPrice() external view returns (uint256 price) {
-        price = _getFeeAuctionStorage().startPrice;
+        price = get().startPrice;
     }
 
     /// @notice Get the start timestamp of the current auction
     /// @return timestamp Timestamp when the current auction started
     function startTimestamp() external view returns (uint256 timestamp) {
-        timestamp = _getFeeAuctionStorage().startTimestamp;
+        timestamp = get().startTimestamp;
     }
 
     /// @notice Get the auction duration
     /// @return auctionDuration Duration in seconds
     function duration() external view returns (uint256 auctionDuration) {
-        auctionDuration = _getFeeAuctionStorage().duration;
+        auctionDuration = get().duration;
     }
 
     /// @notice Get the minimum start price
     /// @return price Minimum start price in payment token decimals
     function minStartPrice() external view returns (uint256 price) {
-        price = _getFeeAuctionStorage().minStartPrice;
+        price = get().minStartPrice;
     }
 
     /// @dev Only admin can upgrade

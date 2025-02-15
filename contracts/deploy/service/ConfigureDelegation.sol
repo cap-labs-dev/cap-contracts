@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import { Delegation } from "../../delegation/Delegation.sol";
-import { DataTypes } from "../../delegation/libraries/types/DataTypes.sol";
 import { InfraConfig } from "../interfaces/DeployConfigs.sol";
 
 contract ConfigureDelegation {

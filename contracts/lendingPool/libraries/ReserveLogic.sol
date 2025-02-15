@@ -5,6 +5,7 @@ import { IDebtToken } from "../../interfaces/IDebtToken.sol";
 import { IPrincipalDebtToken } from "../../interfaces/IPrincipalDebtToken.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+import { ILender } from "../../interfaces/ILender.sol";
 import { ValidationLogic } from "./ValidationLogic.sol";
 import { DataTypes } from "./types/DataTypes.sol";
 
@@ -19,7 +20,7 @@ library ReserveLogic {
     /// @param $ Lender storage
     /// @param params Parameters for adding an asset
     /// @return filled True if filling in empty space or false if appended
-    function addAsset(DataTypes.LenderStorage storage $, DataTypes.AddAssetParams memory params)
+    function addAsset(ILender.LenderStorage storage $, DataTypes.AddAssetParams memory params)
         external
         returns (bool filled)
     {
@@ -60,7 +61,7 @@ library ReserveLogic {
     /// @notice Remove asset from lending when there is no borrows
     /// @param $ Lender storage
     /// @param _asset Asset address
-    function removeAsset(DataTypes.LenderStorage storage $, address _asset) external {
+    function removeAsset(ILender.LenderStorage storage $, address _asset) external {
         ValidationLogic.validateRemoveAsset($, _asset);
 
         $.reservesList[$.reservesData[_asset].id] = address(0);
@@ -71,7 +72,7 @@ library ReserveLogic {
     /// @param $ Lender storage
     /// @param _asset Asset address
     /// @param _pause True if pausing or false if unpausing
-    function pauseAsset(DataTypes.LenderStorage storage $, address _asset, bool _pause) external {
+    function pauseAsset(ILender.LenderStorage storage $, address _asset, bool _pause) external {
         ValidationLogic.validatePauseAsset($, _asset);
         $.reservesData[_asset].paused = _pause;
     }

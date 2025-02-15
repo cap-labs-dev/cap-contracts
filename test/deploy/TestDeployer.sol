@@ -27,7 +27,7 @@ import { DeployCapNetworkAdapter } from "../../contracts/deploy/service/provider
 import { DeploySymbioticVault } from "../../contracts/deploy/service/providers/symbiotic/DeploySymbioticVault.sol";
 import { ProxyUtils } from "../../contracts/deploy/utils/ProxyUtils.sol";
 import { SymbioticAddressbook, SymbioticUtils } from "../../contracts/deploy/utils/SymbioticUtils.sol";
-import { FeeAuction } from "../../contracts/lendingPool/FeeAuction.sol";
+import { FeeAuction } from "../../contracts/feeAuction/FeeAuction.sol";
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
 import { CapToken } from "../../contracts/token/CapToken.sol";
 import { StakedCap } from "../../contracts/token/StakedCap.sol";

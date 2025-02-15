@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import { FractionalReserve } from "../../contracts/vault/FractionalReserve.sol";
-import { DataTypes } from "../../contracts/vault/libraries/types/DataTypes.sol";
 
 import { MockAccessControl } from "../mocks/MockAccessControl.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";

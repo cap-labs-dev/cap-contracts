@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
+import { Access } from "../access/Access.sol";
+
+import { IMinter } from "../interfaces/IMinter.sol";
+import { MinterStorageUtils } from "../storage/MinterStorageUtils.sol";
 import { MinterLogic } from "./libraries/MinterLogic.sol";
-import { MinterStorage } from "./libraries/MinterStorage.sol";
-import { DataTypes } from "./libraries/types/DataTypes.sol";
 
 /// @title Minter/burner for cap tokens
 /// @author kexley, @capLabs
@@ -12,13 +13,7 @@ import { DataTypes } from "./libraries/types/DataTypes.sol";
 /// @dev Dynamic fees are applied according to the allocation of assets in the basket. Increasing
 /// the supply of a excessive asset or burning for an scarce asset will charge fees on a kinked
 /// slope. Redeem can be used to avoid these fees by burning for the current ratio of assets.
-contract MinterUpgradeable is AccessUpgradeable {
-    /// @dev Fee data set for an asset in a vault
-    event SetFeeData(address asset, DataTypes.FeeData feeData);
-
-    /// @dev Redeem fee set
-    event SetRedeemFee(uint256 redeemFee);
-
+contract Minter is IMinter, Access, MinterStorageUtils {
     /// @dev Initialize the minter
     /// @param _accessControl Access control address
     /// @param _oracle Oracle address
@@ -30,8 +25,7 @@ contract MinterUpgradeable is AccessUpgradeable {
     /// @dev Initialize unchained
     /// @param _oracle Oracle address
     function __Minter_init_unchained(address _oracle) internal onlyInitializing {
-        DataTypes.MinterStorage storage $ = MinterStorage.get();
-        $.oracle = _oracle;
+        getMinterStorage().oracle = _oracle;
     }
 
     /// @notice Get the mint amount for a given asset
@@ -39,15 +33,8 @@ contract MinterUpgradeable is AccessUpgradeable {
     /// @param _amountIn Amount of asset to use
     /// @return amountOut Amount minted
     function getMintAmount(address _asset, uint256 _amountIn) public view returns (uint256 amountOut) {
-        DataTypes.MinterStorage storage $ = MinterStorage.get();
-        amountOut = MinterLogic.amountOut(
-            $,
-            DataTypes.AmountOutParams({
-                mint: true,
-                asset: _asset,
-                amount: _amountIn
-            })
-        );
+        amountOut =
+            MinterLogic.amountOut(getMinterStorage(), AmountOutParams({ mint: true, asset: _asset, amount: _amountIn }));
     }
 
     /// @notice Get the burn amount for a given asset
@@ -55,14 +42,8 @@ contract MinterUpgradeable is AccessUpgradeable {
     /// @param _amountIn Amount of cap token to burn
     /// @return amountOut Amount of the asset withdrawn
     function getBurnAmount(address _asset, uint256 _amountIn) public view returns (uint256 amountOut) {
-        DataTypes.MinterStorage storage $ = MinterStorage.get();
         amountOut = MinterLogic.amountOut(
-            $,
-            DataTypes.AmountOutParams({
-                mint: false,
-                asset: _asset,
-                amount: _amountIn
-            })
+            getMinterStorage(), AmountOutParams({ mint: false, asset: _asset, amount: _amountIn })
         );
     }
 
@@ -70,30 +51,21 @@ contract MinterUpgradeable is AccessUpgradeable {
     /// @param _amountIn Amount of cap token to burn
     /// @return amountsOut Amounts of assets to be withdrawn
     function getRedeemAmount(uint256 _amountIn) public view returns (uint256[] memory amountsOut) {
-        DataTypes.MinterStorage storage $ = MinterStorage.get();
-        amountsOut = MinterLogic.redeemAmountOut(
-            $,
-            DataTypes.RedeemAmountOutParams({amount: _amountIn})
-        );
+        amountsOut = MinterLogic.redeemAmountOut(getMinterStorage(), RedeemAmountOutParams({ amount: _amountIn }));
     }
 
     /// @notice Set the allocation slopes and ratios for an asset
     /// @param _asset Asset address
     /// @param _feeData Fee slopes and ratios for the asset in the vault
-    function setFeeData(address _asset, DataTypes.FeeData calldata _feeData)
-        external
-        checkAccess(this.setFeeData.selector)
-    {
-        DataTypes.MinterStorage storage $ = MinterStorage.get();
-        $.fees[_asset] = _feeData;
+    function setFeeData(address _asset, FeeData calldata _feeData) external checkAccess(this.setFeeData.selector) {
+        getMinterStorage().fees[_asset] = _feeData;
         emit SetFeeData(_asset, _feeData);
     }
 
     /// @notice Set the redeem fee
     /// @param _redeemFee Redeem fee amount
     function setRedeemFee(uint256 _redeemFee) external checkAccess(this.setRedeemFee.selector) {
-        DataTypes.MinterStorage storage $ = MinterStorage.get();
-        $.redeemFee = _redeemFee;
+        getMinterStorage().redeemFee = _redeemFee;
         emit SetRedeemFee(_redeemFee);
     }
 }

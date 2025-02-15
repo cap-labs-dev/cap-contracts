@@ -5,6 +5,7 @@ import { IDelegation } from "../../interfaces/IDelegation.sol";
 import { IOracle } from "../../interfaces/IOracle.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import { ILender } from "../../interfaces/ILender.sol";
 import { ViewLogic } from "./ViewLogic.sol";
 import { DataTypes } from "./types/DataTypes.sol";
 
@@ -56,7 +57,7 @@ library ValidationLogic {
     /// borrow.
     /// @param $ Lender storage
     /// @param params Validation parameters
-    function validateBorrow(DataTypes.LenderStorage storage $, DataTypes.BorrowParams memory params) external {
+    function validateBorrow(ILender.LenderStorage storage $, DataTypes.BorrowParams memory params) external {
         if (params.receiver == address(0) || params.asset == address(0)) revert ZeroAddressNotValid();
 
         DataTypes.ReserveData memory reserve = $.reservesData[params.asset];
@@ -115,10 +116,7 @@ library ValidationLogic {
     /// @notice Validate adding an asset as a reserve
     /// @param $ Lender storage
     /// @param params Parameters for adding an asset
-    function validateAddAsset(DataTypes.LenderStorage storage $, DataTypes.AddAssetParams memory params)
-        external
-        view
-    {
+    function validateAddAsset(ILender.LenderStorage storage $, DataTypes.AddAssetParams memory params) external view {
         if (params.asset == address(0) || params.vault == address(0)) revert ZeroAddressNotValid();
         if (params.interestReceiver == address(0)) revert InterestReceiverNotSet();
         if (params.restakerInterestReceiver == address(0)) revert RestakerInterestReceiverNotSet();
@@ -129,14 +127,14 @@ library ValidationLogic {
     /// @dev All principal borrows must be repaid, interest is ignored
     /// @param $ Lender storage
     /// @param _asset Asset to remove
-    function validateRemoveAsset(DataTypes.LenderStorage storage $, address _asset) external view {
+    function validateRemoveAsset(ILender.LenderStorage storage $, address _asset) external view {
         if (IERC20($.reservesData[_asset].principalDebtToken).totalSupply() != 0) revert VariableDebtSupplyNotZero();
     }
 
     /// @notice Validate pausing a reserve
     /// @param $ Lender storage
     /// @param _asset Asset to pause
-    function validatePauseAsset(DataTypes.LenderStorage storage $, address _asset) external view {
+    function validatePauseAsset(ILender.LenderStorage storage $, address _asset) external view {
         if ($.reservesData[_asset].vault == address(0)) revert AssetNotListed();
     }
 }

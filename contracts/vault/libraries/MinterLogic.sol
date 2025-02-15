@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { IMinter } from "../../interfaces/IMinter.sol";
 import { IOracle } from "../../interfaces/IOracle.sol";
-import { IVaultUpgradeable } from "../../interfaces/IVaultUpgradeable.sol";
-import { DataTypes } from "./types/DataTypes.sol";
+import { IVault } from "../../interfaces/IVault.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
@@ -15,7 +15,7 @@ library MinterLogic {
     /// @param $ Storage pointer
     /// @param params Parameters for a swap
     /// @return amount Amount out from a swap
-    function amountOut(DataTypes.MinterStorage storage $, DataTypes.AmountOutParams memory params)
+    function amountOut(IMinter.MinterStorage storage $, IMinter.AmountOutParams memory params)
         external
         view
         returns (uint256 amount)
@@ -24,7 +24,7 @@ library MinterLogic {
 
         amount = _applyFeeSlopes(
             $.fees[params.asset],
-            DataTypes.FeeSlopeParams({ mint: params.mint, amount: amountOutBeforeFee, ratio: newRatio })
+            IMinter.FeeSlopeParams({ mint: params.mint, amount: amountOutBeforeFee, ratio: newRatio })
         );
     }
 
@@ -32,18 +32,18 @@ library MinterLogic {
     /// @param $ Storage pointer
     /// @param params Parameters for redeeming
     /// @return amounts Amount of underlying assets withdrawn
-    function redeemAmountOut(DataTypes.MinterStorage storage $, DataTypes.RedeemAmountOutParams memory params)
+    function redeemAmountOut(IMinter.MinterStorage storage $, IMinter.RedeemAmountOutParams memory params)
         external
         view
         returns (uint256[] memory amounts)
     {
         uint256 redeemFee = $.redeemFee;
         uint256 shares = params.amount * 1e27 / IERC20(address(this)).totalSupply();
-        address[] memory assets = IVaultUpgradeable(address(this)).assets();
+        address[] memory assets = IVault(address(this)).assets();
         uint256 assetLength = assets.length;
         for (uint256 i; i < assetLength; ++i) {
             address asset = assets[i];
-            uint256 withdrawAmount = IVaultUpgradeable(address(this)).totalSupplies(asset) * shares / 1e27;
+            uint256 withdrawAmount = IVault(address(this)).totalSupplies(asset) * shares / 1e27;
 
             amounts[i] = withdrawAmount - (withdrawAmount * redeemFee / 1e27);
         }
@@ -54,7 +54,7 @@ library MinterLogic {
     /// @param params Parameters for a swap
     /// @return amount Amount out from a swap before fees
     /// @return newRatio New ratio of an asset to the overall basket after swap
-    function _amountOutBeforeFee(address _oracle, DataTypes.AmountOutParams memory params)
+    function _amountOutBeforeFee(address _oracle, IMinter.AmountOutParams memory params)
         internal
         view
         returns (uint256 amount, uint256 newRatio)
@@ -67,8 +67,7 @@ library MinterLogic {
 
         uint256 capSupply = IERC20(address(this)).totalSupply();
         uint256 capValue = capSupply * capPrice / capDecimalsPow;
-        uint256 allocationValue =
-            IVaultUpgradeable(address(this)).totalSupplies(params.asset) * assetPrice / assetDecimalsPow;
+        uint256 allocationValue = IVault(address(this)).totalSupplies(params.asset) * assetPrice / assetDecimalsPow;
 
         uint256 assetValue;
         if (params.mint) {
@@ -101,7 +100,7 @@ library MinterLogic {
     /// @param fees Fee slopes and ratio kinks
     /// @param params Fee slope parameters
     /// @return amount Remaining amount after fee applied
-    function _applyFeeSlopes(DataTypes.FeeData memory fees, DataTypes.FeeSlopeParams memory params)
+    function _applyFeeSlopes(IMinter.FeeData memory fees, IMinter.FeeSlopeParams memory params)
         internal
         pure
         returns (uint256 amount)

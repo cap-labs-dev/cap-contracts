@@ -3,8 +3,10 @@ pragma solidity ^0.8.28;
 
 import { IDebtToken } from "../../interfaces/IDebtToken.sol";
 import { IDelegation } from "../../interfaces/IDelegation.sol";
+
+import { ILender } from "../../interfaces/ILender.sol";
 import { IOracle } from "../../interfaces/IOracle.sol";
-import { IVaultUpgradeable } from "../../interfaces/IVaultUpgradeable.sol";
+import { IVault } from "../../interfaces/IVault.sol";
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
 import { DataTypes } from "./types/DataTypes.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -23,7 +25,7 @@ library ViewLogic {
     /// @return ltv Loan to value ratio, encoded in ray (1e27)
     /// @return liquidationThreshold Liquidation ratio of an agent, encoded in ray (1e27)
     /// @return health Health status of an agent, encoded in ray (1e27)
-    function agent(DataTypes.LenderStorage storage $, address _agent)
+    function agent(ILender.LenderStorage storage $, address _agent)
         public
         view
         returns (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health)
@@ -54,7 +56,7 @@ library ViewLogic {
     /// @param _agent Agent address
     /// @param _asset Asset to borrow
     /// @return maxBorrowableAmount Maximum amount that can be borrowed in asset decimals
-    function maxBorrowable(DataTypes.LenderStorage storage $, address _agent, address _asset)
+    function maxBorrowable(ILender.LenderStorage storage $, address _agent, address _asset)
         external
         view
         returns (uint256 maxBorrowableAmount)
@@ -81,7 +83,7 @@ library ViewLogic {
         maxBorrowableAmount = remainingCapacity * (10 ** assetDecimals) / assetPrice;
 
         // Get total available assets using the vault's availableBalance function
-        uint256 totalAvailable = IVaultUpgradeable($.reservesData[_asset].vault).availableBalance(_asset);
+        uint256 totalAvailable = IVault($.reservesData[_asset].vault).availableBalance(_asset);
 
         // Limit maxBorrowableAmount by total available assets
         if (totalAvailable < maxBorrowableAmount) {
@@ -96,7 +98,7 @@ library ViewLogic {
     /// @return principalDebt Principal debt amount in asset decimals
     /// @return interestDebt Interest debt amount in asset decimals
     /// @return restakerDebt Restaker debt amount in asset decimals
-    function debt(DataTypes.LenderStorage storage $, address _agent, address _asset)
+    function debt(ILender.LenderStorage storage $, address _agent, address _asset)
         external
         view
         returns (uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt)

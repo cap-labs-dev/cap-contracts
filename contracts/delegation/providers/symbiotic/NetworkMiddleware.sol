@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { AccessUpgradeable } from "../../../access/AccessUpgradeable.sol";
+import { Access } from "../../../access/Access.sol";
 import { IOracle } from "../../../interfaces/IOracle.sol";
-import { IStakerRewards } from "./interfaces/IStakerRewards.sol";
-import { NetworkMiddlewareStorage } from "./libraries/NetworkMiddlewareStorage.sol";
-import { DataTypes } from "./libraries/types/DataTypes.sol";
+import { IStakerRewards } from "../../../interfaces/IStakerRewards.sol";
 
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -13,9 +11,10 @@ import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/Saf
 
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 
-import { INetwork } from "../../../delegation/interfaces/INetwork.sol";
+import { IMiddleware } from "../../../interfaces/IMiddleware.sol";
 
-import { IMiddleware } from "./interfaces/IMiddleware.sol";
+import { INetworkMiddleware } from "../../../interfaces/INetworkMiddleware.sol";
+import { NetworkMiddlewareStorageUtils } from "../../../storage/NetworkMiddlewareStorageUtils.sol";
 import { Subnetwork } from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
 import { IEntity } from "@symbioticfi/core/src/interfaces/common/IEntity.sol";
 import { IRegistry } from "@symbioticfi/core/src/interfaces/common/IRegistry.sol";
@@ -26,34 +25,8 @@ import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 /// @title Cap Symbiotic Network Middleware Contract
 /// @author Cap Labs
 /// @notice This contract manages the symbiotic collateral and slashing.
-contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMiddleware {
+contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, NetworkMiddlewareStorageUtils {
     using SafeERC20 for IERC20;
-
-    /// @dev Vault registered
-    event VaultRegistered(address vault);
-    /// @dev Slash event
-    event Slash(address indexed agent, address recipient, uint256 amount);
-
-    /// @dev Invalid slasher
-    error InvalidSlasher();
-    /// @dev Invalid delegator
-    error InvalidDelegator();
-    /// @dev Not a vault
-    error NotVault();
-    /// @dev No slasher
-    error NoSlasher();
-    /// @dev No burner
-    error NoBurner();
-    /// @dev Invalid burner router
-    error InvalidBurnerRouter();
-    /// @dev No staker rewarder
-    error NoStakerRewarder();
-    /// @dev Vault not initialized
-    error VaultNotInitialized();
-    /// @dev Invalid epoch duration
-    error InvalidEpochDuration(uint48 required, uint48 actual);
-    /// @dev No slashable collateral
-    error NoSlashableCollateral();
 
     /// @notice Initialize
     /// @param _accessControl Access control address
@@ -71,7 +44,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
         uint256 _feeAllowed
     ) external initializer {
         __Access_init(_accessControl);
-        DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
+        NetworkMiddlewareStorage storage $ = getNetworkMiddlewareStorage();
         $.network = _network;
         $.vaultRegistry = _vaultRegistry;
         $.oracle = _oracle;
@@ -87,7 +60,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
         checkAccess(this.registerVault.selector)
     {
         _verifyVault(_vault);
-        DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
+        NetworkMiddlewareStorage storage $ = getNetworkMiddlewareStorage();
         $.stakerRewarders[_vault] = _stakerRewarder;
         for (uint256 i; i < _agents.length; ++i) {
             $.vaults[_agents[i]].push(_vault);
@@ -98,8 +71,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     /// @notice Set fee allowed
     /// @param _feeAllowed Fee allowed to be charged on rewards by restakers
     function setFeeAllowed(uint256 _feeAllowed) external checkAccess(this.setFeeAllowed.selector) {
-        DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
-        $.feeAllowed = _feeAllowed;
+        getNetworkMiddlewareStorage().feeAllowed = _feeAllowed;
     }
 
     /// @notice Slash delegation and send to recipient
@@ -111,7 +83,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
         external
         checkAccess(this.slash.selector)
     {
-        DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
+        NetworkMiddlewareStorage storage $ = getNetworkMiddlewareStorage();
 
         for (uint256 i; i < $.vaults[_agent].length; ++i) {
             IVault vault = IVault($.vaults[_agent][i]);
@@ -221,7 +193,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     /// @param _agent Agent address
     /// @return delegation Delegation amount in USD (8 decimals)
     function coverage(address _agent) public view returns (uint256 delegation) {
-        DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
+        NetworkMiddlewareStorage storage $ = getNetworkMiddlewareStorage();
         address[] memory _vaults = $.vaults[_agent];
         address _network = $.network;
         address _oracle = $.oracle;
@@ -241,7 +213,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
         view
         returns (uint256 _slashableCollateral)
     {
-        DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
+        NetworkMiddlewareStorage storage $ = getNetworkMiddlewareStorage();
         address[] memory _vaults = $.vaults[_agent];
         address _network = $.network;
         address _oracle = $.oracle;
@@ -265,22 +237,20 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
     /// @notice Subnetwork id concatenated with network address
     /// @return id Subnetwork id
     function subnetwork(address _agent) public view returns (bytes32 id) {
-        DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
-        id = Subnetwork.subnetwork($.network, subnetworkIdentifier(_agent));
+        id = Subnetwork.subnetwork(getNetworkMiddlewareStorage().network, subnetworkIdentifier(_agent));
     }
 
     /// @notice Registered vaults for an agent
     /// @param _agent Agent address
     /// @return vaultAddresses Vault addresses
     function vaults(address _agent) external view returns (address[] memory vaultAddresses) {
-        DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
-        vaultAddresses = $.vaults[_agent];
+        vaultAddresses = getNetworkMiddlewareStorage().vaults[_agent];
     }
 
     /// @dev Verify a vault has the required specifications
     /// @param _vault Vault address
     function _verifyVault(address _vault) internal view {
-        DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
+        NetworkMiddlewareStorage storage $ = getNetworkMiddlewareStorage();
 
         if (!IRegistry($.vaultRegistry).isEntity(_vault)) {
             revert NotVault();
@@ -294,7 +264,7 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
         address slasher = IVault(_vault).slasher();
         uint64 slasherType = IEntity(slasher).TYPE();
         if (slasher == address(0)) revert NoSlasher();
-        if (slasherType != uint64(DataTypes.SlasherType.INSTANT)) revert InvalidSlasher();
+        if (slasherType != uint64(INetworkMiddleware.SlasherType.INSTANT)) revert InvalidSlasher();
 
         address burner = IVault(_vault).burner();
         if (burner == address(0)) revert NoBurner();
@@ -303,14 +273,14 @@ contract NetworkMiddleware is UUPSUpgradeable, AccessUpgradeable, INetwork, IMid
 
         address delegator = IVault(_vault).delegator();
         uint64 delegatorType = IEntity(delegator).TYPE();
-        if (delegatorType != uint64(DataTypes.DelegatorType.NETWORK_RESTAKE)) revert InvalidDelegator();
+        if (delegatorType != uint64(INetworkMiddleware.DelegatorType.NETWORK_RESTAKE)) revert InvalidDelegator();
     }
 
     /// @notice Distribute rewards accumulated by the agent borrowing
     /// @param _agent Agent address
     /// @param _token Token address
     function distributeRewards(address _agent, address _token) external checkAccess(this.distributeRewards.selector) {
-        DataTypes.NetworkMiddlewareStorage storage $ = NetworkMiddlewareStorage.get();
+        NetworkMiddlewareStorage storage $ = getNetworkMiddlewareStorage();
         uint256 totalCollateralValue = coverage(_agent);
         uint256 _amount = IERC20(_token).balanceOf(address(this));
 

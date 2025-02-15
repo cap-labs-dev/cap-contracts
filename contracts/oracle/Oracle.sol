@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { AccessUpgradeable } from "../access/AccessUpgradeable.sol";
-
+import { Access } from "../access/Access.sol";
+import { IOracle } from "../interfaces/IOracle.sol";
 import { PriceOracle } from "./PriceOracle.sol";
 import { RateOracle } from "./RateOracle.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -10,7 +10,7 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 /// @title Oracle
 /// @author kexley, @capLabs
 /// @notice Price and Rate oracles are unified
-contract Oracle is UUPSUpgradeable, AccessUpgradeable, PriceOracle, RateOracle {
+contract Oracle is IOracle, UUPSUpgradeable, Access, PriceOracle, RateOracle {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();

@@ -6,7 +6,7 @@ import { AccessControl } from "../../access/AccessControl.sol";
 import { Delegation } from "../../delegation/Delegation.sol";
 import { NetworkMiddleware } from "../../delegation/providers/symbiotic/NetworkMiddleware.sol";
 
-import { FeeAuction } from "../../lendingPool/FeeAuction.sol";
+import { FeeAuction } from "../../feeAuction/FeeAuction.sol";
 import { Lender } from "../../lendingPool/Lender.sol";
 import { DataTypes } from "../../lendingPool/libraries/types/DataTypes.sol";
 import { InterestDebtToken } from "../../lendingPool/tokens/InterestDebtToken.sol";
@@ -16,7 +16,7 @@ import { RestakerDebtToken } from "../../lendingPool/tokens/RestakerDebtToken.so
 import { CapToken } from "../../token/CapToken.sol";
 import { OFTLockbox } from "../../token/OFTLockbox.sol";
 import { StakedCap } from "../../token/StakedCap.sol";
-import { VaultUpgradeable } from "../../vault/VaultUpgradeable.sol";
+import { Vault } from "../../vault/Vault.sol";
 import { ZapOFTComposer } from "../../zap/ZapOFTComposer.sol";
 import {
     ImplementationsConfig,
@@ -111,8 +111,8 @@ contract DeployVault is ProxyUtils {
         internal
     {
         AccessControl accessControl = AccessControl(infra.accessControl);
-        accessControl.grantAccess(VaultUpgradeable.borrow.selector, vault.capToken, infra.lender);
-        accessControl.grantAccess(VaultUpgradeable.repay.selector, vault.capToken, infra.lender);
+        accessControl.grantAccess(Vault.borrow.selector, vault.capToken, infra.lender);
+        accessControl.grantAccess(Vault.repay.selector, vault.capToken, infra.lender);
 
         // Configure FeeAuction access control
         accessControl.grantAccess(FeeAuction.setStartPrice.selector, vault.feeAuction, infra.lender);

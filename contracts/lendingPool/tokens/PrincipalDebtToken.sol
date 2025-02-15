@@ -5,32 +5,20 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 import { ERC20Upgradeable, IERC20 } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import { AccessUpgradeable } from "../../access/AccessUpgradeable.sol";
+import { Access } from "../../access/Access.sol";
+import { IPrincipalDebtToken } from "../../interfaces/IPrincipalDebtToken.sol";
+import { PrincipalDebtTokenStorageUtils } from "../../storage/PrincipalDebtTokenStorageUtils.sol";
 
 /// @title Principal debt token for a market on the Lender
 /// @author kexley, @capLabs
 /// @notice Principal debt tokens are minted 1:1 with the principal loan amount
-contract PrincipalDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradeable {
-    /// @dev Operation not supported
-    error OperationNotSupported();
-
-    /// @custom:storage-location erc7201:cap.storage.PrincipalDebt
-    struct PrincipalDebtStorage {
-        address asset;
-        uint8 decimals;
-    }
-
-    /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.PrincipalDebt")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant PrincipalDebtStorageLocation = 0xfe61eb39a03fa9d2a68f7a98d61b3fb035d91299516f39d49c66c6d5d3d0c100;
-
-    /// @dev Get this contract storage pointer
-    /// @return $ Storage pointer
-    function _getPrincipalDebtStorage() private pure returns (PrincipalDebtStorage storage $) {
-        assembly {
-            $.slot := PrincipalDebtStorageLocation
-        }
-    }
-
+contract PrincipalDebtToken is
+    IPrincipalDebtToken,
+    UUPSUpgradeable,
+    ERC20Upgradeable,
+    Access,
+    PrincipalDebtTokenStorageUtils
+{
     /// @dev Disable initializers on the implementation
     constructor() {
         _disableInitializers();
@@ -40,7 +28,7 @@ contract PrincipalDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradea
     /// @param _accessControl Access control
     /// @param _asset Asset address
     function initialize(address _accessControl, address _asset) external initializer {
-        PrincipalDebtStorage storage $ = _getPrincipalDebtStorage();
+        PrincipalDebtTokenStorage storage $ = getPrincipalDebtTokenStorage();
         $.asset = _asset;
         $.decimals = IERC20Metadata(_asset).decimals();
 
@@ -49,13 +37,13 @@ contract PrincipalDebtToken is UUPSUpgradeable, ERC20Upgradeable, AccessUpgradea
 
         __ERC20_init(_name, _symbol);
         __Access_init(_accessControl);
+        __UUPSUpgradeable_init();
     }
 
     /// @notice Match decimals with underlying asset
     /// @return decimals
     function decimals() public view override returns (uint8) {
-        PrincipalDebtStorage storage $ = _getPrincipalDebtStorage();
-        return $.decimals;
+        return getPrincipalDebtTokenStorage().decimals;
     }
 
     /// @notice Lender will mint debt tokens to match the amount borrowed by an agent. Interest and

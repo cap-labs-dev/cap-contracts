@@ -5,7 +5,7 @@ import { AccessControl } from "../../access/AccessControl.sol";
 
 import { Delegation } from "../../delegation/Delegation.sol";
 
-import { FeeAuction } from "../../lendingPool/FeeAuction.sol";
+import { FeeAuction } from "../../feeAuction/FeeAuction.sol";
 import { Lender } from "../../lendingPool/Lender.sol";
 import { InterestDebtToken } from "../../lendingPool/tokens/InterestDebtToken.sol";
 import { PrincipalDebtToken } from "../../lendingPool/tokens/PrincipalDebtToken.sol";
