@@ -15,6 +15,7 @@ contract AccessControl is UUPSUpgradeable, AccessControlEnumerableUpgradeable {
         __UUPSUpgradeable_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(role(this.grantAccess.selector, address(this)), _admin);
+        _grantRole(role(this.revokeAccess.selector, address(this)), _admin);
     }
 
     /// @notice Check a specific method access is granted to an address
@@ -25,13 +26,22 @@ contract AccessControl is UUPSUpgradeable, AccessControlEnumerableUpgradeable {
         _checkRole(role(_selector, _contract), _caller);
     }
 
-    /// @dev Grant access to a specific method on a contract
+    /// @notice Grant access to a specific method on a contract
     /// @param _selector Function selector
     /// @param _contract Contract being called
     /// @param _address Address to grant role to
-    function grantAccess(bytes4 _selector, address _contract, address _address) public {
+    function grantAccess(bytes4 _selector, address _contract, address _address) external {
         _checkRole(role(this.grantAccess.selector, address(this)), msg.sender);
         _grantRole(role(_selector, _contract), _address);
+    }
+
+    /// @notice Revoke access to a specific method on a contract
+    /// @param _selector Function selector
+    /// @param _contract Contract being called
+    /// @param _address Address to revoke role from
+    function revokeAccess(bytes4 _selector, address _contract, address _address) external {
+        _checkRole(role(this.revokeAccess.selector, address(this)), msg.sender);
+        _revokeRole(role(_selector, _contract), _address);
     }
 
     /// @notice Fetch role id for a function selector on a contract
