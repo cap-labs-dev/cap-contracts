@@ -34,7 +34,7 @@ interface IRateOracle {
     /// @dev Rate value is encoded in ray (27 decimals) and encodes rate per second
     /// @param _agent Agent address
     /// @return rate Restaker rate
-    function restakerRate(address _agent) external view returns (uint256 interestPerSecond);
+    function restakerRate(address _agent) external view returns (uint256 rate);
 
     /// @notice View the market oracle data for an asset
     /// @param _asset Asset address
