@@ -105,7 +105,6 @@ library ViewLogic {
 
         uint256 assetPrice = IOracle($.oracle).getPrice(_asset);
 
-        // TODO: e was just (a - b), but Lender invariant tests made it underflow. is this ok?
         uint256 decPow = 10 ** $.reservesData[_asset].decimals;
         uint256 a = ($.targetHealth * totalDebt);
         uint256 b = (totalDelegation * liquidationThreshold);
