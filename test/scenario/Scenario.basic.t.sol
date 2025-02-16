@@ -6,6 +6,7 @@ import { Delegation } from "../../contracts/delegation/Delegation.sol";
 import { IInterestDebtToken } from "../../contracts/interfaces/IInterestDebtToken.sol";
 import { IOracle } from "../../contracts/interfaces/IOracle.sol";
 import { IRestakerDebtToken } from "../../contracts/interfaces/IRestakerDebtToken.sol";
+import { IMinter } from "../../contracts/interfaces/IMinter.sol";
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
@@ -24,6 +25,24 @@ contract ScenarioBasicTest is TestDeployer {
         vm.startPrank(env.symbiotic.users.vault_admin);
         _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e18);
         _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, user_agent, 1000e6);
+        vm.stopPrank();
+
+        vm.startPrank(env.users.lender_admin);
+
+        IMinter.FeeData memory feeData = IMinter.FeeData({
+            slope0: 0.0001e27,
+            slope1: 0.1e27,
+            mintKinkRatio: 0.85e27,
+            burnKinkRatio: 0.15e27,
+            optimalRatio: 0.33e27
+        });
+
+        cUSD.setFeeData(address(usdt), feeData);
+        cUSD.setFeeData(address(usdc), feeData);
+        cUSD.setFeeData(address(usdx), feeData);
+
+        cUSD.setRedeemFee(0.001e27); // 0.1%
+
         vm.stopPrank();
 
         _setAssetOraclePrice(address(usdc), 0.99985e8);
@@ -63,11 +82,17 @@ contract ScenarioBasicTest is TestDeployer {
             uint256 usdx_total_supplies = cUSD.totalSupplies(address(usdx));
             console.log("USDX total supplies", usdx_total_supplies);
 
-            usdt.approve(address(cUSD), 10000e6);
-            cUSD.mint(address(usdt), 2000e6, 9998e6, alice, block.timestamp + 1 hours);
+            uint256 cUSD_price = IOracle(env.infra.oracle).getPrice(address(cUSD));
+            console.log("cUSD price", cUSD_price);
+
+            uint256 cap_token_supply = cUSD.totalSupply();
+            console.log("cUSD total supply", cap_token_supply);
 
             /// Alice is deposting 2000 USDT but since USDC is off peg she gets more than 2000 cUSD
+            usdt.approve(address(cUSD), 2000e6);
+            cUSD.mint(address(usdt), 2000e6, 9998e6, alice, block.timestamp + 1 hours);
             assertGt(cUSD.balanceOf(alice), 2000e18);
+
             vm.stopPrank();
 
             vm.startPrank(bob);
@@ -276,7 +301,7 @@ contract ScenarioBasicTest is TestDeployer {
             assertEq(cUSD.balanceOf(alice), 0);
             assertGt(usdt.balanceOf(alice), alice_usdt_balance_after);
 
-            assertGt(usdt.balanceOf(alice) + usdc.balanceOf(alice) + (usdx.balanceOf(alice)) / 1e12, 10000e6);
+            assertGt(usdt.balanceOf(alice) + usdc.balanceOf(alice) + (usdx.balanceOf(alice)) / 1e12, (10000e6 * 0.999e27 / 1e27)); // Less redeem fee
 
             /// USDC goes over peg now
             console.log("");

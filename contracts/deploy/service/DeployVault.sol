@@ -119,6 +119,7 @@ contract DeployVault is ProxyUtils {
         accessControl.grantAccess(Vault.borrow.selector, vault.capToken, infra.lender);
         accessControl.grantAccess(Vault.repay.selector, vault.capToken, infra.lender);
         accessControl.grantAccess(Minter.setFeeData.selector, vault.capToken, users.lender_admin);
+        accessControl.grantAccess(Minter.setRedeemFee.selector, vault.capToken, users.lender_admin);
 
         accessControl.grantAccess(FractionalReserve.setReserve.selector, vault.capToken, users.vault_config_admin);
         accessControl.grantAccess(

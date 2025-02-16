@@ -172,11 +172,11 @@ contract TestDeployer is
         vm.startPrank(env.users.lender_admin);
 
         FeeConfig memory fee = FeeConfig({
-            slope0: 0.01e27,
-            slope1: 0.1e27,
-            mintKinkRatio: 0.75e27,
-            burnKinkRatio: 0.25e27,
-            optimalRatio: 0.33e27
+            slope0: 0, // allow liquidity to be added without fee
+            slope1: 0, // allow liquidity to be added without fee to start with
+            mintKinkRatio: 0.85e27, 
+            burnKinkRatio: 0.15e27, 
+            optimalRatio: 0.33e27 
         });
 
         _initVaultLender(env.usdVault, env.infra, fee);
