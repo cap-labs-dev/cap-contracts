@@ -69,3 +69,11 @@ struct VaultLzPeriphery {
     address capZapComposer;
     address stakedCapZapComposer;
 }
+
+struct FeeConfig {
+    uint256 slope0;
+    uint256 slope1;
+    uint256 mintKinkRatio;
+    uint256 burnKinkRatio;
+    uint256 optimalRatio;
+}

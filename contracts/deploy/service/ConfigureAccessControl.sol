@@ -6,7 +6,6 @@ import { AccessControl } from "../../access/AccessControl.sol";
 import { Delegation } from "../../delegation/Delegation.sol";
 import { IPriceOracle } from "../../interfaces/IPriceOracle.sol";
 import { IRateOracle } from "../../interfaces/IRateOracle.sol";
-
 import { Lender } from "../../lendingPool/Lender.sol";
 import { InfraConfig, UsersConfig } from "../interfaces/DeployConfigs.sol";
 

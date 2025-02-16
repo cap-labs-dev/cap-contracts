@@ -56,6 +56,13 @@ contract ScenarioBasicTest is TestDeployer {
 
             vm.startPrank(alice);
 
+            uint256 usdt_total_supplies = cUSD.totalSupplies(address(usdt));
+            console.log("USDT total supplies", usdt_total_supplies);
+            uint256 usdc_total_supplies = cUSD.totalSupplies(address(usdc));
+            console.log("USDC total supplies", usdc_total_supplies);
+            uint256 usdx_total_supplies = cUSD.totalSupplies(address(usdx));
+            console.log("USDX total supplies", usdx_total_supplies);
+
             usdt.approve(address(cUSD), 10000e6);
             cUSD.mint(address(usdt), 2000e6, 9998e6, alice, block.timestamp + 1 hours);
 

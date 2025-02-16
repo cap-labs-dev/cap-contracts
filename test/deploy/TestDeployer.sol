@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
 import { NetworkMiddleware } from "../../contracts/delegation/providers/symbiotic/NetworkMiddleware.sol";
-import { VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
+import { VaultConfig, FeeConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
 
@@ -134,6 +134,7 @@ contract TestDeployer is
         vm.startPrank(env.users.access_control_admin);
         _initInfraAccessControl(env.infra, env.users);
         _initVaultAccessControl(env.infra, env.usdVault, env.users);
+        _initVaultAccessControl(env.infra, env.ethVault, env.users);
 
         /// ORACLE
         console.log("deploying oracle");
@@ -169,9 +170,17 @@ contract TestDeployer is
         /// LENDER
         console.log("deploying lender");
         vm.startPrank(env.users.lender_admin);
-        _initVaultLender(env.usdVault, env.infra);
-        _initVaultLender(env.ethVault, env.infra);
-        vm.stopPrank();
+
+        FeeConfig memory fee = FeeConfig({
+            slope0: 0.01e27,
+            slope1: 0.1e27,
+            mintKinkRatio: 0.75e27,
+            burnKinkRatio: 0.25e27,
+            optimalRatio: 0.33e27
+        });
+
+        _initVaultLender(env.usdVault, env.infra, fee);
+        _initVaultLender(env.ethVault, env.infra, fee);
 
         if (useMockBackingNetwork()) {
             vm.startPrank(env.users.middleware_admin);

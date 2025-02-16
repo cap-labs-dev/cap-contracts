@@ -9,6 +9,8 @@ import { NetworkMiddleware } from "../../delegation/providers/symbiotic/NetworkM
 import { FeeAuction } from "../../feeAuction/FeeAuction.sol";
 
 import { ILender } from "../../interfaces/ILender.sol";
+import { IMinter } from "../../interfaces/IMinter.sol";
+import { Minter } from "../../vault/Minter.sol";
 import { Lender } from "../../lendingPool/Lender.sol";
 import { InterestDebtToken } from "../../lendingPool/tokens/InterestDebtToken.sol";
 import { PrincipalDebtToken } from "../../lendingPool/tokens/PrincipalDebtToken.sol";
@@ -25,6 +27,7 @@ import {
     InfraConfig,
     UsersConfig,
     VaultConfig,
+    FeeConfig,
     VaultLzPeriphery
 } from "../interfaces/DeployConfigs.sol";
 
@@ -115,6 +118,7 @@ contract DeployVault is ProxyUtils {
         AccessControl accessControl = AccessControl(infra.accessControl);
         accessControl.grantAccess(Vault.borrow.selector, vault.capToken, infra.lender);
         accessControl.grantAccess(Vault.repay.selector, vault.capToken, infra.lender);
+        accessControl.grantAccess(Minter.setFeeData.selector, vault.capToken, users.lender_admin);
 
         accessControl.grantAccess(FractionalReserve.setReserve.selector, vault.capToken, users.vault_config_admin);
         accessControl.grantAccess(
@@ -141,7 +145,7 @@ contract DeployVault is ProxyUtils {
         accessControl.grantAccess(FeeAuction.setStartPrice.selector, vault.feeAuction, users.fee_auction_admin);
     }
 
-    function _initVaultLender(VaultConfig memory d, InfraConfig memory infra) internal {
+    function _initVaultLender(VaultConfig memory d, InfraConfig memory infra,  FeeConfig memory fee) internal {
         for (uint256 i = 0; i < d.assets.length; i++) {
             Lender(infra.lender).addAsset(
                 ILender.AddAssetParams({
@@ -157,6 +161,14 @@ contract DeployVault is ProxyUtils {
             );
 
             Lender(infra.lender).pauseAsset(d.assets[i], false);
+
+            Minter(d.capToken).setFeeData(d.assets[i], IMinter.FeeData({
+                slope0: fee.slope0,
+                slope1: fee.slope1,
+                mintKinkRatio: fee.mintKinkRatio,
+                burnKinkRatio: fee.burnKinkRatio,
+                optimalRatio: fee.optimalRatio
+            }));
         }
     }
 }
