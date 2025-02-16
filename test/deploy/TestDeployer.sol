@@ -7,6 +7,7 @@ import { VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol
 
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
 
+import { AccessControl } from "../../contracts/access/AccessControl.sol";
 import { SymbioticVaultParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 import { SymbioticNetworkAdapterParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 import {
@@ -142,7 +143,7 @@ contract TestDeployer is
         }
         for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
             uint256 increment = (i + 1) * 0.01e27; // Vary the restakers rate by 1% each
-            _initRestakerRateForAgent(env.infra, env.testUsers.agents[i], uint256(0.05e27 + increment)); // Restakers rate is per second in ray 
+            _initRestakerRateForAgent(env.infra, env.testUsers.agents[i], uint256(0.05e27 + increment)); // Restakers rate is per second in ray
         }
 
         /// LENDER
@@ -398,6 +399,7 @@ contract TestDeployer is
 
     Lender lender;
     Delegation delegation;
+    AccessControl accessControl;
 
     function _unwrapEnvToMakeTestsReadable() internal {
         usdVault = env.usdVault;
@@ -421,6 +423,7 @@ contract TestDeployer is
 
         lender = Lender(env.infra.lender);
         delegation = Delegation(env.infra.delegation);
+        accessControl = AccessControl(env.infra.accessControl);
     }
 
     // helpers
@@ -451,5 +454,11 @@ contract TestDeployer is
         }
 
         revert("Asset not found");
+    }
+
+    function _grantAccess(bytes4 _selector, address _contract, address _account) internal {
+        vm.startPrank(env.users.access_control_admin);
+        accessControl.grantAccess(_selector, _contract, _account);
+        vm.stopPrank();
     }
 }
