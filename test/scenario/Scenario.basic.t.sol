@@ -11,7 +11,7 @@ import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
 import { console } from "forge-std/console.sol";
 
-contract MainEverydayTest is TestDeployer {
+contract ScenarioBasicTest is TestDeployer {
     address user_agent;
 
     function setUp() public {
