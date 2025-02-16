@@ -109,12 +109,6 @@ contract LenderInvariantsTest is TestDeployer {
             }
         }
     }
-
-    // /// forge-config: default.invariant.depth = 50
-    // function invariant_nothing() public pure {
-    //     uint256 a = 0;
-    //     assertEq(a, 0);
-    // }
 }
 
 /**
