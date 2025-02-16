@@ -5,7 +5,7 @@ import { FractionalReserve } from "../../contracts/vault/FractionalReserve.sol";
 
 import { MockAccessControl } from "../mocks/MockAccessControl.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
-import { MockFractionalReserveVault } from "../mocks/MockFractionalReserveVault.sol";
+import { MockERC4626 } from "../mocks/MockERC4626.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -31,7 +31,7 @@ contract FractionalReserveInvariantsTest is Test {
 
     // Mock tokens and vaults
     MockERC20[] private mockTokens;
-    MockFractionalReserveVault[] private mockVaults;
+    MockERC4626[] private mockVaults;
 
     function setUp() public {
         // Deploy and initialize mock access control
@@ -39,7 +39,7 @@ contract FractionalReserveInvariantsTest is Test {
 
         // Setup mock assets
         mockTokens = new MockERC20[](3);
-        mockVaults = new MockFractionalReserveVault[](3);
+        mockVaults = new MockERC4626[](3);
         assets = new address[](3);
 
         // Create mock tokens with different decimals
@@ -50,7 +50,7 @@ contract FractionalReserveInvariantsTest is Test {
         // Create mock vaults with different interest rates
         for (uint256 i = 0; i < 3; i++) {
             assets[i] = address(mockTokens[i]);
-            mockVaults[i] = new MockFractionalReserveVault(
+            mockVaults[i] = new MockERC4626(
                 assets[i],
                 0.1e18, // 10% interest rate
                 string(abi.encodePacked("Mock Vault ", vm.toString(i))),
@@ -130,7 +130,7 @@ contract TestFractionalReserveHandler is StdUtils {
     TestFractionalReserve public reserve;
     MockAccessControl public accessControl;
     address[] public assets;
-    mapping(address => MockFractionalReserveVault) public vaults;
+    mapping(address => MockERC4626) public vaults;
     uint256 private constant MAX_RESERVE = 1_000_000e18;
 
     // Ghost variables for tracking state
@@ -151,7 +151,7 @@ contract TestFractionalReserveHandler is StdUtils {
         TestFractionalReserve _reserve,
         MockAccessControl _accessControl,
         address[] memory _assets,
-        MockFractionalReserveVault[] memory _vaults
+        MockERC4626[] memory _vaults
     ) {
         reserve = _reserve;
         accessControl = _accessControl;

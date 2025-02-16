@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { IAccessControl } from "../../contracts/interfaces/IAccessControl.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
-import { MockFractionalReserveVault } from "../mocks/MockFractionalReserveVault.sol";
+import { MockERC4626 } from "../mocks/MockERC4626.sol";
 import { console } from "forge-std/console.sol";
 
 contract VaultFractionalTest is TestDeployer {
@@ -12,9 +12,9 @@ contract VaultFractionalTest is TestDeployer {
     uint256 constant USDT_RESERVE_AMOUNT = 10_000e6;
     uint256 constant INTEREST_RATE = 0.1e18; // 10% annual interest rate
 
-    MockFractionalReserveVault mockFRVault;
-    MockFractionalReserveVault oldFRVault;
-    MockFractionalReserveVault newFRVault;
+    MockERC4626 mockFRVault;
+    MockERC4626 oldFRVault;
+    MockERC4626 newFRVault;
 
     function setUp() public {
         _deployCapTestEnvironment();
@@ -36,11 +36,9 @@ contract VaultFractionalTest is TestDeployer {
         cUSD.setReserve(address(usdt), USDT_RESERVE_AMOUNT);
 
         // Initialize mock vaults
-        mockFRVault = new MockFractionalReserveVault(address(usdt), INTEREST_RATE, "Mock FR USDT Vault", "mfrUSDT");
-        oldFRVault =
-            new MockFractionalReserveVault(address(usdt), INTEREST_RATE, "Old Mock FR USDT Vault", "oldMfrUSDT");
-        newFRVault =
-            new MockFractionalReserveVault(address(usdt), INTEREST_RATE, "New Mock FR USDT Vault", "newMfrUSDT");
+        mockFRVault = new MockERC4626(address(usdt), INTEREST_RATE, "Mock FR USDT Vault", "mfrUSDT");
+        oldFRVault = new MockERC4626(address(usdt), INTEREST_RATE, "Old Mock FR USDT Vault", "oldMfrUSDT");
+        newFRVault = new MockERC4626(address(usdt), INTEREST_RATE, "New Mock FR USDT Vault", "newMfrUSDT");
     }
 
     function test_set_reserve() public {

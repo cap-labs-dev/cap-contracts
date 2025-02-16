@@ -4,36 +4,38 @@ pragma solidity ^0.8.28;
 import { PreMainnetVault } from "../contracts/testnetCampaign/PreMainnetVault.sol";
 
 import { ProxyUtils } from "../contracts/deploy/utils/ProxyUtils.sol";
-import { L2Token } from "../contracts/token/L2Token.sol";
-import { MockERC20 } from "./mocks/MockERC20.sol";
 
-import { MessagingFee } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
+import { L2Token } from "../contracts/token/L2Token.sol";
+import { PermitUtils } from "./deploy/utils/PermitUtils.sol";
+
+import { TimeUtils } from "./deploy/utils/TimeUtils.sol";
+import { MockERC20 } from "./mocks/MockERC20.sol";
+import { MockERC4626 } from "./mocks/MockERC4626.sol";
+import { MessagingFee, SendParam } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import { TestHelperOz5 } from "@layerzerolabs/test-devtools-evm-foundry/contracts/TestHelperOz5.sol";
 import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
 
-contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils {
+contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, TimeUtils {
     L2Token public dstOFT;
     PreMainnetVault public vault;
     MockERC20 public asset;
-    address public owner;
-    address public user;
-    address public holder;
-    address public recipient;
+    address public owner; // admin
+    address public user; // user not holding yet
+    address public l2user; // user not holding yet but on L2
+    uint256 public l2userPk;
+    address public holder; // user holding
     uint256 public initialBalance;
     uint32 public srcEid = 1;
     uint32 public dstEid = 2;
     uint48 public constant MAX_CAMPAIGN_LENGTH = 7 days;
-
-    event Deposit(address indexed user, uint256 amount);
-    event Withdraw(address indexed user, uint256 amount);
-    event TransferEnabled();
+    MockERC4626 public dstTokenVault;
 
     function setUp() public override {
         // initialize users
         owner = address(this);
         user = makeAddr("user");
-        recipient = makeAddr("recipient");
+        (l2user, l2userPk) = makeAddrAndKey("l2user");
         holder = makeAddr("holder");
 
         // Deploy mock asset
@@ -53,6 +55,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils {
         dstOFT = L2Token(
             _deployOApp(type(L2Token).creationCode, abi.encode("bOFT", "bOFT", address(endpoints[dstEid]), owner))
         );
+        dstTokenVault = new MockERC4626(address(dstOFT), 1e18, "Mock Token Vault", "MTKV");
 
         // Wire OApps
         address[] memory oapps = new address[](2);
@@ -62,6 +65,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils {
 
         // Give user some ETH for LZ fees
         vm.deal(user, 100 ether);
+        vm.deal(l2user, 100 ether);
         vm.deal(holder, 100 ether);
 
         // make a holder hold some vault tokens
@@ -81,7 +85,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils {
         assertEq(vault.sharedDecimals(), 6); // Default shared decimals
     }
 
-    function test_deposit_success() public {
+    function test_deposit_bridges_to_l2_and_back() public {
         uint256 amount = 100e18;
         vm.startPrank(user);
 
@@ -93,20 +97,73 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils {
 
         // Expect Deposit event
         vm.expectEmit(true, true, true, true);
-        emit Deposit(user, amount);
+        emit PreMainnetVault.Deposit(user, amount);
 
         // Deposit with some ETH for LZ fees
-        vault.deposit{ value: fee.nativeFee }(amount, recipient);
+        vault.deposit{ value: fee.nativeFee }(amount, l2user);
 
         assertEq(vault.balanceOf(user), amount);
         assertEq(asset.balanceOf(address(vault)), initialBalance + amount);
         assertEq(asset.balanceOf(user), initialBalance - amount);
 
         // Verify that the dst operation was successful
+        _timeTravel(100);
         verifyPackets(dstEid, addressToBytes32(address(dstOFT)));
-        assertEq(dstOFT.balanceOf(recipient), amount);
+        assertEq(dstOFT.balanceOf(l2user), amount);
 
-        vm.stopPrank();
+        // Generate permit signature
+        uint256 deadline = type(uint256).max;
+        (uint8 v, bytes32 r, bytes32 s) =
+            getPermitSignature(l2user, l2userPk, address(dstTokenVault), amount, deadline, address(dstOFT));
+
+        // we can permit2 approve dstOFT
+        dstOFT.permit(l2user, address(dstTokenVault), amount, deadline, v, r, s);
+
+        {
+            vm.startPrank(l2user);
+            dstTokenVault.deposit(amount, l2user);
+            vm.stopPrank();
+        }
+        assertEq(dstOFT.balanceOf(address(dstTokenVault)), amount);
+        assertEq(dstOFT.balanceOf(l2user), 0);
+
+        // and we can withdraw dstOFT from the vault
+        {
+            vm.startPrank(l2user);
+            dstTokenVault.withdraw(amount, l2user, l2user);
+            vm.stopPrank();
+        }
+        assertEq(dstOFT.balanceOf(l2user), amount);
+
+        // and we CANNOT bridge back to L1
+        {
+            vm.startPrank(l2user);
+            SendParam memory sendParam = SendParam({
+                dstEid: srcEid,
+                to: addressToBytes32(address(user)),
+                amountLD: amount,
+                minAmountLD: amount,
+                extraOptions: "",
+                composeMsg: "",
+                oftCmd: ""
+            });
+            fee = dstOFT.quoteSend(sendParam, false);
+            dstOFT.send{ value: fee.nativeFee }(sendParam, fee, user /* refund address */ );
+
+            _timeTravel(100);
+            vm.expectRevert();
+            this.externalVerifyPackets(srcEid, addressToBytes32(address(vault)));
+
+            // verify that our balances are unchanged
+            assertEq(vault.balanceOf(user), amount);
+            assertEq(asset.balanceOf(address(vault)), initialBalance + amount);
+            assertEq(asset.balanceOf(user), initialBalance - amount);
+
+            // the l2user did send the tokens to the dstOFT
+            assertEq(dstOFT.balanceOf(l2user), 0);
+
+            vm.stopPrank();
+        }
     }
 
     function test_revert_deposit_zero_amount() public {
@@ -163,27 +220,27 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils {
             vm.startPrank(owner);
 
             vm.expectEmit(false, false, false, true);
-            emit TransferEnabled();
+            emit PreMainnetVault.TransferEnabled();
             vault.enableTransfer();
 
             vm.stopPrank();
         }
 
         assertEq(vault.balanceOf(holder), initialBalance);
-        assertEq(vault.balanceOf(recipient), 0);
+        assertEq(vault.balanceOf(l2user), 0);
 
         // Now withdrawals should work
         uint256 amount = 10e18;
         {
             vm.startPrank(holder);
 
-            vault.transfer(recipient, amount);
+            vault.transfer(l2user, amount);
 
             vm.stopPrank();
         }
 
         assertEq(vault.balanceOf(holder), initialBalance - amount);
-        assertEq(vault.balanceOf(recipient), amount);
+        assertEq(vault.balanceOf(l2user), amount);
     }
 
     function test_admin_can_enable_withdrawals_before_campaign_end() public {
@@ -192,7 +249,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils {
             vm.startPrank(owner);
 
             vm.expectEmit(false, false, false, true);
-            emit TransferEnabled();
+            emit PreMainnetVault.TransferEnabled();
             vault.enableTransfer();
 
             vm.stopPrank();
@@ -220,20 +277,20 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils {
         vm.warp(block.timestamp + MAX_CAMPAIGN_LENGTH + 1);
 
         assertEq(vault.balanceOf(holder), initialBalance);
-        assertEq(vault.balanceOf(recipient), 0);
+        assertEq(vault.balanceOf(l2user), 0);
 
         // Now withdrawals should work
         uint256 amount = 10e18;
         {
             vm.startPrank(holder);
 
-            vault.transfer(recipient, amount);
+            vault.transfer(l2user, amount);
 
             vm.stopPrank();
         }
 
         assertEq(vault.balanceOf(holder), initialBalance - amount);
-        assertEq(vault.balanceOf(recipient), amount);
+        assertEq(vault.balanceOf(l2user), amount);
     }
 
     function test_withdraw_after_campaign_end() public {
@@ -275,5 +332,10 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils {
 
             vm.stopPrank();
         }
+    }
+
+    // allow vm.expectRevert() on verifyPackets
+    function externalVerifyPackets(uint32 _eid, bytes32 _to) external {
+        verifyPackets(_eid, _to);
     }
 }

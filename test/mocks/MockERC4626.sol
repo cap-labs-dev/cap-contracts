@@ -11,7 +11,7 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import { StdCheats } from "forge-std/StdCheats.sol";
 
-contract MockFractionalReserveVault is ERC4626, StdCheats {
+contract MockERC4626 is ERC4626, StdCheats {
     using SafeERC20 for IERC20;
     using Math for uint256;
 

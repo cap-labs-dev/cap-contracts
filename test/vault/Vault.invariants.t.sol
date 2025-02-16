@@ -10,7 +10,7 @@ import { Vault } from "../../contracts/vault/Vault.sol";
 import { MockAccessControl } from "../mocks/MockAccessControl.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
 
-import { MockFractionalReserveVault } from "../mocks/MockFractionalReserveVault.sol";
+import { MockERC4626 } from "../mocks/MockERC4626.sol";
 import { MockOracle } from "../mocks/MockOracle.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -90,7 +90,7 @@ contract VaultInvariantsTest is Test, ProxyUtils {
         fractionalReserveVaults = new address[](3);
         for (uint256 i = 0; i < 3; i++) {
             address asset = assets[i];
-            address frVault = address(new MockFractionalReserveVault(asset, 1e18, "Fractional Reserve Vault", "FRV"));
+            address frVault = address(new MockERC4626(asset, 1e18, "Fractional Reserve Vault", "FRV"));
             fractionalReserveVaults[i] = frVault;
             vault.setFractionalReserveVault(asset, frVault);
         }
