@@ -19,7 +19,7 @@ library ValidationLogic {
     error HealthFactorNotBelowThreshold();
 
     /// @dev Health factor lower than liquidation threshold
-    error HealthFactorLowerThanLiquidationThreshold();
+    error HealthFactorLowerThanLiquidationThreshold(uint256 health);
 
     /// @dev Already initiated
     error AlreadyInitiated();
@@ -64,7 +64,7 @@ library ValidationLogic {
 
         (uint256 totalDelegation, uint256 totalDebt,,, uint256 health) = ViewLogic.agent($, params.agent);
 
-        if (health < 1e27) revert HealthFactorLowerThanLiquidationThreshold();
+        if (health < 1e27) revert HealthFactorLowerThanLiquidationThreshold(health);
 
         uint256 ltv = IDelegation($.delegation).ltv(params.agent);
         uint256 assetPrice = IOracle($.oracle).getPrice(params.asset);
@@ -90,7 +90,7 @@ library ValidationLogic {
     /// @dev Health of above 1e27 is healthy, below is liquidatable
     /// @param health Health of an agent's position
     function validateCancelLiquidation(uint256 health) external pure {
-        if (health < 1e27) revert HealthFactorLowerThanLiquidationThreshold();
+        if (health < 1e27) revert HealthFactorLowerThanLiquidationThreshold(health);
     }
 
     /// @notice Validate the liquidation of an agent
