@@ -14,4 +14,8 @@ contract RandomAssetUtils is StdUtils, StdCheats {
     function randomAsset(uint256 assetIndexSeed) public view returns (address) {
         return assets[bound(assetIndexSeed, 0, assets.length - 1)];
     }
+
+    function allAssets() public view returns (address[] memory) {
+        return assets;
+    }
 }

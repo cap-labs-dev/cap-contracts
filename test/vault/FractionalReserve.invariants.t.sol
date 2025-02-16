@@ -10,6 +10,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import { RandomAssetUtils } from "../deploy/utils/RandomAssetUtils.sol";
 import { StdCheats } from "forge-std/StdCheats.sol";
 import { StdUtils } from "forge-std/StdUtils.sol";
 import { Test } from "forge-std/Test.sol";
@@ -63,7 +64,11 @@ contract FractionalReserveInvariantsTest is Test {
         reserve.initialize(address(accessControl), MOCK_FEE_AUCTION);
 
         // Create and target handler
-        handler = new TestFractionalReserveHandler(reserve, accessControl, assets, mockVaults);
+        uint256[] memory maxReserves = new uint256[](3);
+        maxReserves[0] = 1000e18;
+        maxReserves[1] = 1000e6;
+        maxReserves[2] = 1000e8;
+        handler = new TestFractionalReserveHandler(reserve, assets, maxReserves, mockVaults);
         targetContract(address(handler));
 
         // Label contracts for better traces
@@ -124,14 +129,11 @@ contract FractionalReserveInvariantsTest is Test {
 /**
  * @notice Handler contract for testing FractionalReserve invariants
  */
-contract TestFractionalReserveHandler is StdUtils {
+contract TestFractionalReserveHandler is StdUtils, RandomAssetUtils {
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     TestFractionalReserve public reserve;
-    MockAccessControl public accessControl;
-    address[] public assets;
     mapping(address => MockERC4626) public vaults;
-    uint256 private constant MAX_RESERVE = 1_000_000e18;
 
     // Ghost variables for tracking state
     mapping(address => uint256) public maxReserves;
@@ -139,97 +141,103 @@ contract TestFractionalReserveHandler is StdUtils {
     mapping(address => uint256) public lastInterestUpdate;
     mapping(address => uint256) public accumulatedInterest;
 
-    // Asset management
-    address internal currentAsset;
-
-    modifier useAsset(uint256 assetSeed) {
-        currentAsset = assets[bound(assetSeed, 0, assets.length - 1)];
-        _;
-    }
-
     constructor(
         TestFractionalReserve _reserve,
-        MockAccessControl _accessControl,
         address[] memory _assets,
+        uint256[] memory _max_reserves,
         MockERC4626[] memory _vaults
-    ) {
+    ) RandomAssetUtils(_assets) {
         reserve = _reserve;
-        accessControl = _accessControl;
-        assets = _assets;
 
         // Initialize vaults and max reserves
+        address[] memory assets = allAssets();
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i];
             vaults[asset] = _vaults[i];
-            maxReserves[asset] = MAX_RESERVE;
+            maxReserves[asset] = _max_reserves[i];
 
             // Setup initial state
-            vm.prank(address(accessControl));
             reserve.setFractionalReserveVault(asset, address(_vaults[i]));
-            vm.prank(address(accessControl));
-            reserve.setReserve(asset, maxReserves[asset]);
+            reserve.setReserve(asset, _max_reserves[i]);
         }
     }
 
-    function invest(uint256 assetSeed) external useAsset(assetSeed) {
-        uint256 available = IERC20(currentAsset).balanceOf(address(reserve));
+    function depositMockToken(uint256 assetSeed, uint256 amount) external {
+        amount = bound(amount, 0, 1e50);
+        address asset = randomAsset(assetSeed);
+
+        MockERC20(asset).mint(address(this), amount);
+        IERC20(asset).transfer(address(reserve), amount);
+    }
+
+    function withdrawMockToken(uint256 assetSeed, uint256 amount) external {
+        address asset = randomAsset(assetSeed);
+        uint256 balance = MockERC20(asset).balanceOf(address(this));
+        amount = bound(amount, 0, balance);
+        vm.prank(address(reserve));
+        IERC20(asset).transfer(address(this), amount);
+    }
+
+    function invest(uint256 assetSeed) external {
+        address asset = randomAsset(assetSeed);
+        uint256 available = IERC20(asset).balanceOf(address(reserve));
         if (available == 0) return;
 
-        vm.prank(address(accessControl));
-        reserve.investAll(currentAsset);
+        reserve.investAll(asset);
 
         // Update ghost variables
-        totalInvested[currentAsset] += available;
-        lastInterestUpdate[currentAsset] = block.timestamp;
+        totalInvested[asset] += available;
+        lastInterestUpdate[asset] = block.timestamp;
     }
 
-    function divest(uint256 assetSeed) external useAsset(assetSeed) {
-        uint256 invested = getInvestedAmount(currentAsset);
+    function divest(uint256 assetSeed) external {
+        address asset = randomAsset(assetSeed);
+        uint256 invested = getInvestedAmount(asset);
         if (invested == 0) return;
 
-        vm.prank(address(accessControl));
-        reserve.divestAll(currentAsset);
+        reserve.divestAll(asset);
 
         // Update ghost variables
-        totalInvested[currentAsset] -= invested;
-        lastInterestUpdate[currentAsset] = block.timestamp;
+        totalInvested[asset] -= invested;
+        lastInterestUpdate[asset] = block.timestamp;
     }
 
-    function investAll(uint256 assetSeed) external useAsset(assetSeed) {
-        vm.prank(address(accessControl));
-        reserve.investAll(currentAsset);
+    function investAll(uint256 assetSeed) external {
+        address asset = randomAsset(assetSeed);
+        reserve.investAll(asset);
 
         // Update ghost variables
-        uint256 newInvested = IERC20(currentAsset).balanceOf(address(vaults[currentAsset]));
-        totalInvested[currentAsset] = newInvested;
-        lastInterestUpdate[currentAsset] = block.timestamp;
+        uint256 newInvested = IERC20(asset).balanceOf(address(vaults[asset]));
+        totalInvested[asset] = newInvested;
+        lastInterestUpdate[asset] = block.timestamp;
     }
 
-    function divestAll(uint256 assetSeed) external useAsset(assetSeed) {
-        vm.prank(address(accessControl));
-        reserve.divestAll(currentAsset);
+    function divestAll(uint256 assetSeed) external {
+        address asset = randomAsset(assetSeed);
+        reserve.divestAll(asset);
 
         // Update ghost variables
-        totalInvested[currentAsset] = 0;
+        totalInvested[asset] = 0;
     }
 
-    function realizeInterest(uint256 assetSeed) external useAsset(assetSeed) {
-        uint256 interest = reserve.claimableInterest(currentAsset);
-        reserve.realizeInterest(currentAsset);
+    function realizeInterest(uint256 assetSeed) external {
+        address asset = randomAsset(assetSeed);
+        uint256 interest = reserve.claimableInterest(asset);
+        reserve.realizeInterest(asset);
 
         // Update ghost variables
-        accumulatedInterest[currentAsset] += interest;
-        lastInterestUpdate[currentAsset] = block.timestamp;
+        accumulatedInterest[asset] += interest;
+        lastInterestUpdate[asset] = block.timestamp;
     }
 
-    function setReserve(uint256 assetSeed, uint256 amount) external useAsset(assetSeed) {
-        amount = bound(amount, 0, MAX_RESERVE);
+    function setReserve(uint256 assetSeed, uint256 amount) external {
+        address asset = randomAsset(assetSeed);
+        amount = bound(amount, 0, maxReserves[asset]);
 
-        vm.prank(address(accessControl));
-        reserve.setReserve(currentAsset, amount);
+        reserve.setReserve(asset, amount);
 
         // Update ghost variables
-        maxReserves[currentAsset] = amount;
+        maxReserves[asset] = amount;
     }
 
     // View functions for invariant testing
