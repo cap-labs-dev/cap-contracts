@@ -14,16 +14,16 @@ import { console } from "forge-std/console.sol";
 contract LenderBorrowTest is TestDeployer {
     address user_agent;
 
-    function useMockBackingNetwork() internal pure override returns (bool) {
-        return true;
-    }
-
     function setUp() public {
         _deployCapTestEnvironment();
         _initTestVaultLiquidity(usdVault);
+        _initSymbioticVaultsLiquidity(env);
 
         user_agent = _getRandomAgent();
-        MockNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).setMockCoverage(user_agent, 1e50);
+
+        vm.startPrank(env.symbiotic.users.vault_admin);
+        _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2_000e18);
+        _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, user_agent, 1_000_000e6);
 
         // have something to repay
         vm.startPrank(user_agent);
