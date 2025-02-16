@@ -8,6 +8,9 @@ contract RandomActorUtils is StdUtils, StdCheats {
     address[] private actors;
 
     constructor(address[] memory _actors) {
+        if (_actors.length == 0) {
+            revert("No actors provided");
+        }
         actors = _actors;
     }
 

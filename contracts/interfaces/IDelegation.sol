@@ -62,9 +62,6 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @notice Duplicate network
     error DuplicateNetwork();
 
-    /// @notice No coverage for agent
-    error NoCoverageForAgent(address agent);
-
     /// @notice Initialize the contract
     /// @param _accessControl Access control address
     /// @param _oracle Oracle address

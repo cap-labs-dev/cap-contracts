@@ -90,6 +90,34 @@ library ViewLogic {
         }
     }
 
+    /// @notice Calculate the maximum amount that can be liquidated for a given asset
+    /// @param $ Lender storage
+    /// @param _agent Agent address
+    /// @param _asset Asset to liquidate
+    /// @return maxLiquidatableAmount Maximum amount that can be liquidated in asset decimals
+    function maxLiquidatable(ILender.LenderStorage storage $, address _agent, address _asset)
+        external
+        view
+        returns (uint256 maxLiquidatableAmount)
+    {
+        (uint256 totalDelegation, uint256 totalDebt,, uint256 liquidationThreshold, uint256 health) = agent($, _agent);
+        if (health >= 1e27) return 0;
+
+        uint256 assetPrice = IOracle($.oracle).getPrice(_asset);
+
+        // TODO: e was just (a - b), but Lender invariant tests made it underflow. is this ok?
+        uint256 decPow = 10 ** $.reservesData[_asset].decimals;
+        uint256 a = ($.targetHealth * totalDebt);
+        uint256 b = (totalDelegation * liquidationThreshold);
+        uint256 c = ($.targetHealth - liquidationThreshold);
+        uint256 d = assetPrice;
+        uint256 e = b > a ? 0 : (a - b);
+        uint256 f = (c * d);
+        uint256 g = e * decPow;
+
+        maxLiquidatableAmount = g / f;
+    }
+
     /// @notice Get the current debt balances for an agent for a specific asset
     /// @param $ Lender storage
     /// @param _agent Agent address to check debt for

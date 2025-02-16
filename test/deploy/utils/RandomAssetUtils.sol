@@ -8,6 +8,9 @@ contract RandomAssetUtils is StdUtils, StdCheats {
     address[] private assets;
 
     constructor(address[] memory _assets) {
+        if (_assets.length == 0) {
+            revert("No assets provided");
+        }
         assets = _assets;
     }
 

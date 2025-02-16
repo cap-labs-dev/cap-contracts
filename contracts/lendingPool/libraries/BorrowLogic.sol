@@ -43,6 +43,9 @@ library BorrowLogic {
     /// @dev Realize interest before it is repaid by agents
     event RealizeInterest(address indexed asset, uint256 realizedInterest, address interestReceiver);
 
+    /// @dev Trying to realize zero interest
+    error ZeroRealization();
+
     /// @notice Borrow an asset from the Lender, minting a debt token which must be repaid
     /// @dev Interest debt token is updated before principal token is minted to bring index up to date.
     /// Restaker debt token is updated after so the new principal debt can be used in calculations
@@ -160,12 +163,30 @@ library BorrowLogic {
         returns (uint256 realizedInterest)
     {
         ILender.ReserveData memory reserve = $.reservesData[params.asset];
-        uint256 totalInterest = IERC20(reserve.interestDebtToken).totalSupply();
-        uint256 maxRealization = totalInterest > reserve.realizedInterest ? totalInterest - reserve.realizedInterest : 0;
-        realizedInterest = params.amount > maxRealization ? maxRealization : params.amount;
+        uint256 _maxRealization = maxRealization($, params.asset);
+        if (_maxRealization == 0) revert ZeroRealization();
 
+        realizedInterest = params.amount > _maxRealization ? _maxRealization : params.amount;
         $.reservesData[params.asset].realizedInterest += realizedInterest;
         IVault(reserve.vault).borrow(params.asset, realizedInterest, reserve.interestReceiver);
         emit RealizeInterest(params.asset, realizedInterest, reserve.interestReceiver);
+    }
+
+    /// @notice Calculate the maximum interest that can be realized
+    /// @param $ Lender storage
+    /// @param _asset Asset to calculate max realization for
+    /// @return maxRealization Maximum interest that can be realized
+    function maxRealization(ILender.LenderStorage storage $, address _asset) internal view returns (uint256) {
+        ILender.ReserveData memory reserve = $.reservesData[_asset];
+        uint256 totalInterest = IERC20(reserve.interestDebtToken).totalSupply();
+        uint256 reserves = IVault(reserve.vault).availableBalance(_asset);
+        uint256 _maxRealization = 0;
+        if (totalInterest > reserve.realizedInterest) {
+            _maxRealization = totalInterest - reserve.realizedInterest;
+        }
+        if (reserves < _maxRealization) {
+            _maxRealization = reserves;
+        }
+        return _maxRealization;
     }
 }

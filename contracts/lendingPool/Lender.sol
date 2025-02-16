@@ -89,6 +89,13 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
             BorrowLogic.realizeInterest(getLenderStorage(), RealizeInterestParams({ asset: _asset, amount: _amount }));
     }
 
+    /// @notice Calculate the maximum interest that can be realized
+    /// @param _asset Asset to calculate max realization for
+    /// @return _maxRealization Maximum interest that can be realized
+    function maxRealization(address _asset) external view returns (uint256 _maxRealization) {
+        _maxRealization = BorrowLogic.maxRealization(getLenderStorage(), _asset);
+    }
+
     /// @notice Initiate liquidation of an agent when the health is below 1
     /// @param _agent Agent address
     function initiateLiquidation(address _agent) external {
@@ -135,6 +142,15 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     function maxBorrowable(address _agent, address _asset) external view returns (uint256 maxBorrowableAmount) {
         if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();
         maxBorrowableAmount = ViewLogic.maxBorrowable(getLenderStorage(), _agent, _asset);
+    }
+
+    /// @notice Calculate the maximum amount that can be liquidated for a given asset
+    /// @param _agent Agent address
+    /// @param _asset Asset to liquidate
+    /// @return maxLiquidatableAmount Maximum amount that can be liquidated in asset decimals
+    function maxLiquidatable(address _agent, address _asset) external view returns (uint256 maxLiquidatableAmount) {
+        if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();
+        maxLiquidatableAmount = ViewLogic.maxLiquidatable(getLenderStorage(), _agent, _asset);
     }
 
     /// @notice Get the current debt balances for an agent for a specific asset

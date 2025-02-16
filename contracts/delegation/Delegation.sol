@@ -20,6 +20,9 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUtils {
     using SafeERC20 for IERC20;
 
+    /// @notice Invalid liquidation threshold
+    error InvalidLiquidationThreshold();
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -169,7 +172,9 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         uint256 _amount = IERC20(_asset).balanceOf(address(this));
 
         uint256 totalCoverage = coverage(_agent);
-        if (totalCoverage == 0) revert NoCoverageForAgent(_agent);
+        // here we cannot revert because the agent might not have any coverage
+        // in case we are liquidating the current agent due to 0 coverage
+        if (totalCoverage == 0) return;
 
         // Distribute to each network based on their coverage proportion
         for (uint i; i < $.networks[_agent].length; ++i) {
@@ -201,6 +206,10 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         external
         checkAccess(this.addAgent.selector)
     {
+        // if liquidation threshold is greater than 100%, agent
+        // could borrow more than they are collateralized for
+        if (_liquidationThreshold > 1e27) revert InvalidLiquidationThreshold();
+
         DelegationStorage storage $ = getDelegationStorage();
 
         // If the agent already exists, we revert
