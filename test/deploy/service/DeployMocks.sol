@@ -3,8 +3,11 @@ pragma solidity ^0.8.0;
 
 import { MockAaveDataProvider } from "../../mocks/MockAaveDataProvider.sol";
 import { MockChainlinkPriceFeed } from "../../mocks/MockChainlinkPriceFeed.sol";
+import { TestEnvConfig } from "../interfaces/TestDeployConfig.sol";
 
+import { IDelegation } from "../../../contracts/interfaces/IDelegation.sol";
 import { MockERC20 } from "../../mocks/MockERC20.sol";
+import { MockNetworkMiddleware } from "../../mocks/MockNetworkMiddleware.sol";
 import { OracleMocksConfig, TestUsersConfig } from "../interfaces/TestDeployConfig.sol";
 
 contract DeployMocks {
@@ -37,5 +40,21 @@ contract DeployMocks {
     function _deployEthMocks() internal returns (address[] memory ethMocks) {
         ethMocks = new address[](1);
         ethMocks[0] = address(new MockERC20("WETH", "WETH", 18));
+    }
+
+    function _deployDelegationNetworkMock() internal returns (address delegationNetwork) {
+        delegationNetwork = address(new MockNetworkMiddleware());
+    }
+
+    function _configureMockNetworkMiddleware(TestEnvConfig memory env, address delegationNetwork, address agent)
+        internal
+    {
+        IDelegation(env.infra.delegation).registerNetwork(agent, delegationNetwork);
+    }
+
+    function _setMockNetworkMiddlewareAgentCoverage(TestEnvConfig memory env, address agent, uint256 coverage)
+        internal
+    {
+        MockNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).setMockCoverage(agent, coverage);
     }
 }

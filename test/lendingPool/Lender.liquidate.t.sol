@@ -188,8 +188,7 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("");
             //     assertEq(coverage, 0);
 
-            (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health) =
-                lender.agent(user_agent);
+            (uint256 totalDelegation, uint256 totalDebt,,, uint256 health) = lender.agent(user_agent);
 
             console.log("Total debt after liquidations", totalDebt);
             console.log("Total delegation after liquidations", totalDelegation);

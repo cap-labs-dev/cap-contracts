@@ -63,22 +63,6 @@ interface INetworkMiddleware {
     /// @dev No slashable collateral
     error NoSlashableCollateral();
 
-    /// @notice Initialize
-    /// @param _accessControl Access control address
-    /// @param _network Network address
-    /// @param _vaultRegistry Vault registry address
-    /// @param _oracle Oracle address
-    /// @param _requiredEpochDuration Required epoch duration in seconds
-    /// @param _feeAllowed Fee allowed to be charged on rewards by restakers
-    function initialize(
-        address _accessControl,
-        address _network,
-        address _vaultRegistry,
-        address _oracle,
-        uint48 _requiredEpochDuration,
-        uint256 _feeAllowed
-    ) external;
-
     /// @notice Register vault to be used as collateral within the CAP system
     /// @param _vault Vault address
     /// @param _agents Agents supported by the vault
@@ -136,17 +120,6 @@ interface INetworkMiddleware {
         external
         view
         returns (uint256 _slashableCollateral);
-
-    /// @notice Subnetwork id
-    /// @dev Creates a collision resistant uint96 identifier by taking keccak256 hash of agent address
-    /// and using the first 96 bits of the hash
-    /// @param _agent Agent address
-    /// @return id Subnetwork identifier (first 96 bits of keccak256 hash of agent address)
-    function subnetworkIdentifier(address _agent) external pure returns (uint96 id);
-
-    /// @notice Subnetwork id concatenated with network address
-    /// @return id Subnetwork id
-    function subnetwork(address _agent) external view returns (bytes32 id);
 
     /// @notice Registered vaults for an agent
     /// @param _agent Agent address

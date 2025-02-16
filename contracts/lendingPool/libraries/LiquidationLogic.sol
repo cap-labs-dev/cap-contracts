@@ -64,8 +64,7 @@ library LiquidationLogic {
         external
         returns (uint256 liquidatedValue)
     {
-        (uint256 totalDelegation, uint256 totalDebt,, uint256 liquidationThreshold, uint256 health) =
-            ViewLogic.agent($, params.agent);
+        (uint256 totalDelegation, uint256 totalDebt,,, uint256 health) = ViewLogic.agent($, params.agent);
 
         ValidationLogic.validateLiquidation(
             health,
@@ -76,8 +75,7 @@ library LiquidationLogic {
         );
 
         uint256 assetPrice = IOracle($.oracle).getPrice(params.asset);
-        uint256 maxLiquidation = (($.targetHealth * totalDebt) - (totalDelegation * liquidationThreshold))
-            * (10 ** $.reservesData[params.asset].decimals) / (($.targetHealth - liquidationThreshold) * assetPrice);
+        uint256 maxLiquidation = ViewLogic.maxLiquidatable($, params.agent, params.asset);
         uint256 liquidated = params.amount > maxLiquidation ? maxLiquidation : params.amount;
 
         liquidated = BorrowLogic.repay(

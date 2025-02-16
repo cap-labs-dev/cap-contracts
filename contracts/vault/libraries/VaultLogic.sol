@@ -34,6 +34,9 @@ library VaultLogic {
     /// @dev Invalid min amounts out as they dont match the number of assets
     error InvalidMinAmountsOut();
 
+    /// @dev Insufficient reserves
+    error InsufficientReserves(address asset, uint256 balanceBefore, uint256 amount);
+
     /// @dev Cap token minted
     event Mint(address indexed minter, address receiver, address indexed asset, uint256 amountIn, uint256 amountOut);
 
@@ -151,6 +154,9 @@ library VaultLogic {
         whenNotPaused($, params.asset)
         updateIndex($, params.asset)
     {
+        uint256 balanceBefore = IERC20(params.asset).balanceOf(address(this));
+        if (balanceBefore < params.amount) revert InsufficientReserves(params.asset, balanceBefore, params.amount);
+
         $.totalBorrows[params.asset] += params.amount;
         IERC20(params.asset).safeTransfer(params.receiver, params.amount);
 
