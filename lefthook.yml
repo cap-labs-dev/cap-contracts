@@ -4,3 +4,7 @@ pre-commit:
     forge-fmt:
       glob: "*.sol"
       run: forge fmt {staged_files} 
+
+    generate-full-gas-report:
+      glob: "*.sol"
+      run: yarn test:gas
