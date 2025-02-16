@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
+import { ILender } from "../../contracts/interfaces/ILender.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
 import { console } from "forge-std/console.sol";
@@ -20,6 +21,24 @@ contract LenderLiquidateTest is TestDeployer {
         vm.startPrank(env.symbiotic.users.vault_admin);
         _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e18);
         _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, user_agent, 1000e6);
+        vm.stopPrank();
+
+        vm.startPrank(env.users.lender_admin);
+          // Try removing and re-adding the asset 
+        lender.removeAsset(address(usdt));
+        lender.addAsset(
+                ILender.AddAssetParams({
+                    asset: address(usdt),
+                    vault: address(cUSD),
+                    principalDebtToken: env.usdVault.principalDebtTokens[0],
+                    restakerDebtToken: env.usdVault.restakerDebtTokens[0],
+                    interestDebtToken: env.usdVault.interestDebtTokens[0],
+                    interestReceiver: env.usdVault.feeAuction,
+                    restakerInterestReceiver: env.infra.delegation,
+                    bonusCap: 0.1e27
+                })
+            );
+        lender.pauseAsset(address(usdt), false);
         vm.stopPrank();
     }
 
