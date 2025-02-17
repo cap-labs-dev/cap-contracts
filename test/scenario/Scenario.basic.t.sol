@@ -89,8 +89,13 @@ contract ScenarioBasicTest is TestDeployer {
             console.log("cUSD total supply", cap_token_supply);
 
             /// Alice is deposting 2000 USDT but since USDC is off peg she gets more than 2000 cUSD
-            usdt.approve(address(cUSD), 2000e6);
-            cUSD.mint(address(usdt), 2000e6, 9998e6, alice, block.timestamp + 1 hours);
+            usdt.approve(address(cUSD), 10000e6);
+
+            vm.expectRevert(); /// Slippage
+            cUSD.mint(address(usdt), 2000e6, 3000e18, alice, block.timestamp + 1 hours);
+            vm.expectRevert(); /// Time
+            cUSD.mint(address(usdt), 2000e6, 1998e18, alice, block.timestamp - 1);
+            cUSD.mint(address(usdt), 2000e6, 1998e18, alice, block.timestamp + 1 hours);
             assertGt(cUSD.balanceOf(alice), 2000e18);
 
             vm.stopPrank();
@@ -134,11 +139,23 @@ contract ScenarioBasicTest is TestDeployer {
         assets[0] = address(usdt);
 
         {
+            vm.startPrank(env.users.vault_config_admin);
+            cUSD.pause(address(usdt));
+            vm.stopPrank();
+        
             /// An Operater comes to borrow USDT
             vm.startPrank(user_agent);
 
             /// Start with 1000 USDT in the operator's wallet
             deal(address(usdt), user_agent, 1000e6);
+            vm.expectRevert();
+            lender.borrow(address(usdt), 1000e6, user_agent);
+
+            vm.startPrank(env.users.vault_config_admin);
+            cUSD.unpause(address(usdt));
+            vm.stopPrank();
+        
+            vm.startPrank(user_agent);
             lender.borrow(address(usdt), 1000e6, user_agent);
             assertEq(usdt.balanceOf(user_agent), 2000e6);
 
@@ -253,33 +270,39 @@ contract ScenarioBasicTest is TestDeployer {
 
             vm.stopPrank();
         }
-
+         uint256[] memory minAmountsOut = new uint256[](3);
+         uint256 alice_usdt_balance_after;
         {
             /// Alice redeems and burns her cUSD
             vm.startPrank(bob);
             cUSD.approve(address(scUSD), cUSD.balanceOf(bob));
             scUSD.deposit(cUSD.balanceOf(bob), bob);
             vm.stopPrank();
-
+        
             vm.startPrank(alice);
 
             /// Alice trying to borrow USDT but shes not allowed to
             vm.expectRevert();
             lender.borrow(address(usdt), 1000e6, alice);
 
-            uint256[] memory minAmountsOut = new uint256[](3);
             minAmountsOut[0] = 0;
-            minAmountsOut[1] = 0;
+            minAmountsOut[1] = 10000000000e18;
             minAmountsOut[2] = 0;
 
             console.log("minAmountsOut length", minAmountsOut.length);
             uint256 alice_usdc_balance_before = usdc.balanceOf(alice);
             uint256 alice_usdt_balance_before = usdt.balanceOf(alice);
             /// Alice wants to redeem half her cUSD
-            cUSD.redeem(cUSD.balanceOf(alice) / 2, minAmountsOut, alice, block.timestamp + 1 hours);
+            uint256 redeemBal = cUSD.balanceOf(alice) / 2;
+            vm.expectRevert(); /// Slippage
+            cUSD.redeem(redeemBal, minAmountsOut, alice, block.timestamp + 1 hours);
+            minAmountsOut[1] = 0;
+            vm.expectRevert(); /// Time
+            cUSD.redeem(redeemBal, minAmountsOut, alice, block.timestamp - 1);
+            cUSD.redeem(redeemBal, minAmountsOut, alice, block.timestamp + 1 hours); 
 
             uint256 alice_usdc_balance_after = usdc.balanceOf(alice);
-            uint256 alice_usdt_balance_after = usdt.balanceOf(alice);
+            alice_usdt_balance_after = usdt.balanceOf(alice);
             uint256 alice_usdx_balance_after = usdx.balanceOf(alice);
 
             assertGt(alice_usdc_balance_after, alice_usdc_balance_before);
@@ -288,9 +311,20 @@ contract ScenarioBasicTest is TestDeployer {
             console.log("Alice's USDC balance after redeeming half her cUSD", alice_usdc_balance_after);
             console.log("Alice's USDT balance after redeeming half her cUSD", alice_usdt_balance_after);
             console.log("Alice's USDx balance after redeeming half her cUSD", alice_usdx_balance_after);
-
+        
+            vm.stopPrank();
+        }
+        {
             /// Alice decides to burn the rest of her cUSD
-            cUSD.burn(address(usdt), cUSD.balanceOf(alice), 0, alice, block.timestamp + 1 hours);
+            vm.startPrank(alice);
+       
+            uint256 withdrawBal = cUSD.balanceOf(alice);
+            vm.expectRevert(); /// Slippage
+            cUSD.burn(address(usdt), withdrawBal, 10000000000e18, alice, block.timestamp + 1 hours);
+            vm.expectRevert(); /// Time
+            cUSD.burn(address(usdt), withdrawBal, 0, alice, block.timestamp - 1);
+
+            cUSD.burn(address(usdt), withdrawBal, 0, alice, block.timestamp + 1 hours);
 
             console.log("Alice's USDT balance after burning the rest of her cUSD", usdt.balanceOf(alice));
             console.log(
@@ -308,7 +342,8 @@ contract ScenarioBasicTest is TestDeployer {
             console.log("USDC is over peg now", uint256(1.01e8));
             console.log("");
             _setAssetOraclePrice(address(usdc), 1.01e8);
-
+        }
+        {
             vm.startPrank(alice);
             usdt.approve(address(cUSD), 1000e6);
             cUSD.mint(address(usdt), 1000e6, 0, alice, block.timestamp + 1 hours);
