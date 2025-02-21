@@ -49,8 +49,8 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
         super.setUp();
         setUpEndpoints(2, LibraryType.SimpleMessageLib);
 
-        // Deploy vault implementation
-        vault = new PreMainnetVault(endpoints[srcEid]);
+        // Deploy proxy for vault
+        vault = PreMainnetVault(_proxy(address(new PreMainnetVault(endpoints[srcEid]))));
         vault.initialize(address(asset), dstEid, MAX_CAMPAIGN_LENGTH);
 
         // Setup mock dst oapp

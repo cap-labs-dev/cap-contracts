@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {
     ERC20PermitUpgradeable,
     ERC20Upgradeable
@@ -19,18 +20,27 @@ import { OAppCoreUpgradeable, OAppMessenger } from "./OAppMessenger.sol";
 /// @dev Underlying asset is deposited on this contract and LayerZero is used to bridge across a
 /// minting message to the testnet. The campaign has a maximum timestamp after which transfers are
 /// enabled to prevent the owner from unduly locking assets.
-contract PreMainnetVault is IPreMainnetVault, ERC20PermitUpgradeable, OAppMessenger, PreMainnetVaultStorageUtils {
+contract PreMainnetVault is
+    UUPSUpgradeable,
+    IPreMainnetVault,
+    ERC20PermitUpgradeable,
+    OAppMessenger,
+    PreMainnetVaultStorageUtils
+{
     using SafeERC20 for IERC20Metadata;
 
     /// @dev Initialize the token with the LayerZero endpoint
     /// @param _lzEndpoint LayerZero endpoint
-    constructor(address _lzEndpoint) OAppMessenger(_lzEndpoint) { }
+    constructor(address _lzEndpoint) OAppMessenger(_lzEndpoint) {
+        _disableInitializers();
+    }
 
     /// @notice Initialize the token with the underlying asset and bridge info
     /// @param _asset Underlying asset
     /// @param _dstEid Destination lz EID
     /// @param _maxCampaignLength Max campaign length in seconds
     function initialize(address _asset, uint32 _dstEid, uint256 _maxCampaignLength) external initializer {
+        __UUPSUpgradeable_init();
         __ERC20_init("Boosted cUSD", "bcUSD");
         __ERC20Permit_init("Boosted cUSD");
         __Ownable_init(msg.sender);
@@ -95,4 +105,7 @@ contract PreMainnetVault is IPreMainnetVault, ERC20PermitUpgradeable, OAppMessen
         if (!transferEnabled() && _from != address(0)) revert TransferNotEnabled();
         super._update(_from, _to, _value);
     }
+
+    /// @dev Only admin can upgrade
+    function _authorizeUpgrade(address) internal view override onlyOwner { }
 }
