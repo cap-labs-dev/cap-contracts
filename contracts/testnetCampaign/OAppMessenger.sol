@@ -1,30 +1,33 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { OAppSender, OAppCore } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppSender.sol";
+import { OAppCoreUpgradeable } from "@layerzerolabs/oapp-evm-upgradeable/contracts/oapp/OAppCoreUpgradeable.sol";
+import { OAppSenderUpgradeable } from "@layerzerolabs/oapp-evm-upgradeable/contracts/oapp/OAppSenderUpgradeable.sol";
 import { OptionsBuilder } from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 import { MessagingFee, OFTReceipt } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import { OFTMsgCodec } from "@layerzerolabs/oft-evm/contracts/libs/OFTMsgCodec.sol";
 
+import { IOAppMessenger } from "../interfaces/IOAppMessenger.sol";
+import { OAppMessengerStorageUtils } from "../storage/OAppMessengerStorageUtils.sol";
+
 /// @title OAppMessenger
 /// @notice Messenger logic for the LayerZero bridge
-abstract contract OAppMessenger is OAppSender {
+contract OAppMessenger is IOAppMessenger, OAppSenderUpgradeable, OAppMessengerStorageUtils {
     using OptionsBuilder for bytes;
+
+    constructor(address _lzEndpoint) OAppCoreUpgradeable(_lzEndpoint) { }
 
     /// @dev Gas limit for the LayerZero bridge
     uint128 private constant lzReceiveGas = 100_000;
 
-    /// @dev Destination EID for the LayerZero bridge
-    uint32 private immutable dstEid;
-
-    /// @dev Decimals of the token
-    uint8 private immutable decimals;
-
-    /// @dev OAppCore sets the endpoint as an immutable variable
-    /// @param _lzEndpoint Local layerzero endpoint
-    constructor(address _lzEndpoint, uint32 _dstEid, uint8 _decimals) OAppCore(_lzEndpoint, msg.sender) {
-        dstEid = _dstEid;
-        decimals = _decimals;
+    /// @dev Initialize the OAppMessenger
+    /// @param _dstEid Destination EID
+    /// @param _decimals Decimals of the token
+    function __OAppMessenger_init(uint32 _dstEid, uint8 _decimals) internal onlyInitializing {
+        __OAppSender_init(msg.sender);
+        OAppMessengerStorage storage $ = getOAppMessengerStorage();
+        $.dstEid = _dstEid;
+        $.decimals = _decimals;
     }
 
     /// @notice Quote the fee for depositing via the LayerZero bridge
@@ -33,7 +36,7 @@ abstract contract OAppMessenger is OAppSender {
     /// @return fee Fee for the LayerZero bridge
     function quote(uint256 _amountLD, address _destReceiver) external view returns (MessagingFee memory fee) {
         (bytes memory message, bytes memory options) = _buildMsgAndOptions(lzReceiveGas, _amountLD, _destReceiver);
-        fee = _quote(dstEid, message, options, false);
+        fee = _quote(getOAppMessengerStorage().dstEid, message, options, false);
     }
 
     /// @dev Message using layer zero. Fee overpays are refunded to caller
@@ -42,7 +45,7 @@ abstract contract OAppMessenger is OAppSender {
     function _sendMessage(address _destReceiver, uint256 _amountLD) internal {
         MessagingFee memory _fee = MessagingFee({ nativeFee: msg.value, lzTokenFee: 0 });
         (bytes memory message, bytes memory options) = _buildMsgAndOptions(lzReceiveGas, _amountLD, _destReceiver);
-        _lzSend(dstEid, message, options, _fee, msg.sender);
+        _lzSend(getOAppMessengerStorage().dstEid, message, options, _fee, msg.sender);
     }
 
     /// @dev Build the message and options for the LayerZero bridge
@@ -64,7 +67,7 @@ abstract contract OAppMessenger is OAppSender {
     /// @param _amountLD Amount in local decimals
     /// @return amountSD Amount in shared decimals
     function _toSD(uint256 _amountLD) internal view virtual returns (uint64 amountSD) {
-        return uint64(_amountLD / (10 ** (decimals - sharedDecimals())));
+        return uint64(_amountLD / (10 ** (getOAppMessengerStorage().decimals - sharedDecimals())));
     }
 
     /// @notice Retrieves the shared decimals of the OFT.

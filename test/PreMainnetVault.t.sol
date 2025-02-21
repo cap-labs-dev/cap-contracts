@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { IPreMainnetVault } from "../contracts/interfaces/IPreMainnetVault.sol";
 import { PreMainnetVault } from "../contracts/testnetCampaign/PreMainnetVault.sol";
 
 import { ProxyUtils } from "../contracts/deploy/utils/ProxyUtils.sol";
@@ -49,7 +50,8 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
         setUpEndpoints(2, LibraryType.SimpleMessageLib);
 
         // Deploy vault implementation
-        vault = new PreMainnetVault(address(asset), endpoints[srcEid], dstEid, MAX_CAMPAIGN_LENGTH);
+        vault = new PreMainnetVault(endpoints[srcEid]);
+        vault.initialize(address(asset), dstEid, MAX_CAMPAIGN_LENGTH);
 
         // Setup mock dst oapp
         dstOFT = L2Token(
@@ -97,7 +99,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
 
         // Expect Deposit event
         vm.expectEmit(true, true, true, true);
-        emit PreMainnetVault.Deposit(user, amount);
+        emit IPreMainnetVault.Deposit(user, amount);
 
         // Deposit with some ETH for LZ fees
         vault.deposit{ value: fee.nativeFee }(amount, l2user);
@@ -173,7 +175,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
 
         MessagingFee memory fee = vault.quote(1, user);
 
-        vm.expectRevert(PreMainnetVault.ZeroAmount.selector);
+        vm.expectRevert(IPreMainnetVault.ZeroAmount.selector);
         vault.deposit{ value: fee.nativeFee }(0, user);
 
         vm.stopPrank();
@@ -200,7 +202,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
         // Try to transfer before campaign ends
         {
             vm.startPrank(holder);
-            vm.expectRevert(PreMainnetVault.TransferNotEnabled.selector);
+            vm.expectRevert(IPreMainnetVault.TransferNotEnabled.selector);
             vault.transfer(holder, amount);
             vm.stopPrank();
         }
@@ -208,7 +210,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
         // try withdrawing before campaign ends
         {
             vm.startPrank(holder);
-            vm.expectRevert(PreMainnetVault.TransferNotEnabled.selector);
+            vm.expectRevert(IPreMainnetVault.TransferNotEnabled.selector);
             vault.withdraw(amount, holder);
             vm.stopPrank();
         }
@@ -220,7 +222,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
             vm.startPrank(owner);
 
             vm.expectEmit(false, false, false, true);
-            emit PreMainnetVault.TransferEnabled();
+            emit IPreMainnetVault.TransferEnabled();
             vault.enableTransfer();
 
             vm.stopPrank();
@@ -249,7 +251,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
             vm.startPrank(owner);
 
             vm.expectEmit(false, false, false, true);
-            emit PreMainnetVault.TransferEnabled();
+            emit IPreMainnetVault.TransferEnabled();
             vault.enableTransfer();
 
             vm.stopPrank();

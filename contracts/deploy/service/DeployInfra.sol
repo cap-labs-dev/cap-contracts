@@ -10,6 +10,7 @@ import { Oracle } from "../../oracle/Oracle.sol";
 import { L2Token } from "../../token/L2Token.sol";
 import { Vault } from "../../vault/Vault.sol";
 
+import { IPreMainnetVault } from "../../interfaces/IPreMainnetVault.sol";
 import { PreMainnetVault } from "../../testnetCampaign/PreMainnetVault.sol";
 import {
     ImplementationsConfig,
@@ -46,9 +47,8 @@ contract DeployInfra is ProxyUtils {
         address asset,
         uint48 maxCampaignLength
     ) internal returns (PreMainnetInfraConfig memory d) {
-        d.preMainnetVault = address(
-            new PreMainnetVault(asset, address(srcAddressbook.endpointV2), dstAddressbook.eid, maxCampaignLength)
-        );
+        d.preMainnetVault = address(new PreMainnetVault(address(srcAddressbook.endpointV2)));
+        IPreMainnetVault(d.preMainnetVault).initialize(asset, dstAddressbook.eid, maxCampaignLength);
     }
 
     function _deployL2InfraForVault(
