@@ -205,7 +205,7 @@ contract TestDeployer is
                 env.infra,
                 symbioticAb,
                 env.symbiotic.networkAdapterImplems,
-                SymbioticNetworkAdapterParams({ vaultEpochDuration: 7 days, feeAllowed: 1000, staleness: 365 days })
+                SymbioticNetworkAdapterParams({ vaultEpochDuration: 7 days, feeAllowed: 1000, staleness: 1 hours })
             );
 
             console.log("deploying symbiotic WETH vault");
@@ -319,7 +319,7 @@ contract TestDeployer is
         }
 
         // change  epoch
-        _timeTravel(366 days);
+        _timeTravel(28 days);
 
         _unwrapEnvToMakeTestsReadable();
         _applyTestnetLabels();
