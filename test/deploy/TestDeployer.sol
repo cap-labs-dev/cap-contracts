@@ -191,7 +191,7 @@ contract TestDeployer is
             vm.startPrank(env.users.delegation_admin);
             for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
                 _configureMockNetworkMiddleware(env, networkMock, env.testUsers.agents[i]);
-                _setMockNetworkMiddlewareAgentCoverage(env, env.testUsers.agents[i], 1e8);
+                _setMockNetworkMiddlewareAgentCoverage(env, env.testUsers.agents[i], 1_000_000e8);
             }
         } else {
             /// SYMBIOTIC NETWORK ADAPTER
