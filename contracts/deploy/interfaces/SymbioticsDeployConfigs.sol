@@ -19,6 +19,7 @@ struct SymbioticNetworkRewardsConfig {
 struct SymbioticNetworkAdapterParams {
     uint48 vaultEpochDuration;
     uint256 feeAllowed;
+    uint256 staleness;
 }
 
 struct SymbioticUsersConfig {

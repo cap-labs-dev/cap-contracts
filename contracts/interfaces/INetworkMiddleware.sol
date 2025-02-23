@@ -12,6 +12,7 @@ interface INetworkMiddleware {
         address oracle;
         uint48 requiredEpochDuration;
         uint256 feeAllowed;
+        uint256 staleness;
         mapping(address => address) stakerRewarders; // vault => stakerRewarder
         mapping(address => address[]) vaults; // agent => vault[]
     }
@@ -85,12 +86,17 @@ interface INetworkMiddleware {
     /// @param _vault Vault address
     /// @param _oracle Oracle address
     /// @param _timestamp Timestamp to check coverage at
+    /// @param _staleness Staleness period in seconds for asset prices
     /// @return collateralValue Coverage value in USD (8 decimals)
     /// @return collateral Coverage amount in the vault's collateral token decimals
-    function coverageByVault(address _network, address _agent, address _vault, address _oracle, uint48 _timestamp)
-        external
-        view
-        returns (uint256 collateralValue, uint256 collateral);
+    function coverageByVault(
+        address _network,
+        address _agent,
+        address _vault,
+        address _oracle,
+        uint48 _timestamp,
+        uint256 _staleness
+    ) external view returns (uint256 collateralValue, uint256 collateral);
 
     /// @notice Slashable collateral of an agent by a specific vault at a given timestamp
     /// @param _network Network address
@@ -98,13 +104,15 @@ interface INetworkMiddleware {
     /// @param _vault Vault address
     /// @param _oracle Oracle address
     /// @param _timestamp Timestamp to check slashable collateral at
+    /// @param _staleness Staleness period in seconds for asset prices
     /// @return collateralValue Slashable collateral value in USD (8 decimals)
     function slashableCollateralByVault(
         address _network,
         address _agent,
         address _vault,
         address _oracle,
-        uint48 _timestamp
+        uint48 _timestamp,
+        uint256 _staleness
     ) external view returns (uint256 collateralValue, uint256 collateral);
 
     /// @notice Coverage of an agent by Symbiotic vaults

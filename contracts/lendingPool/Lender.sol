@@ -32,6 +32,7 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     /// @param _expiry Expiry period in seconds after which an agent cannot be liquidated until called again
     /// @param _bonusCap Bonus cap for liquidations (scaled by 1e27)
     /// @param _emergencyLiquidationThreshold Liquidation threshold below which grace periods are voided (scaled by 1e27)
+    /// @param _staleness Staleness period in seconds for asset prices (0 for live prices)
     function initialize(
         address _accessControl,
         address _delegation,
@@ -40,7 +41,8 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
         uint256 _grace,
         uint256 _expiry,
         uint256 _bonusCap,
-        uint256 _emergencyLiquidationThreshold
+        uint256 _emergencyLiquidationThreshold,
+        uint256 _staleness
     ) external initializer {
         __Access_init(_accessControl);
         __UUPSUpgradeable_init();
@@ -56,6 +58,7 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
         $.expiry = _expiry;
         $.bonusCap = _bonusCap;
         $.emergencyLiquidationThreshold = _emergencyLiquidationThreshold;
+        $.staleness = _staleness;
     }
 
     /// @notice Borrow an asset
@@ -224,6 +227,12 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     /// @return threshold Threshold scaled to 1e27
     function emergencyLiquidationThreshold() external view returns (uint256 threshold) {
         threshold = getLenderStorage().emergencyLiquidationThreshold;
+    }
+
+    /// @notice The staleness period for asset prices
+    /// @return stalenessPeriod Staleness period in seconds
+    function staleness() external view returns (uint256 stalenessPeriod) {
+        stalenessPeriod = getLenderStorage().staleness;
     }
 
     /// @notice The liquidation start time for an agent

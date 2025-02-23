@@ -13,7 +13,8 @@ interface IPriceOracle {
     /// @notice Get the price for an asset
     /// @param _asset Asset address to get price for
     /// @return price Current price of the asset
-    function getPrice(address _asset) external view returns (uint256 price);
+    /// @return lastUpdated Latest timestamp of the price
+    function getPrice(address _asset) external view returns (uint256 price, uint256 lastUpdated);
 
     /// @notice View the oracle data for an asset
     /// @param _asset Asset address to get oracle data for

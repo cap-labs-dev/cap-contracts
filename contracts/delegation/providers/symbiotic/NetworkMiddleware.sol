@@ -35,13 +35,15 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
     /// @param _oracle Oracle address
     /// @param _requiredEpochDuration Required epoch duration in seconds
     /// @param _feeAllowed Fee allowed to be charged on rewards by restakers
+    /// @param _staleness Staleness period in seconds for asset prices
     function initialize(
         address _accessControl,
         address _network,
         address _vaultRegistry,
         address _oracle,
         uint48 _requiredEpochDuration,
-        uint256 _feeAllowed
+        uint256 _feeAllowed,
+        uint256 _staleness
     ) external initializer {
         __Access_init(_accessControl);
         NetworkMiddlewareStorage storage $ = getNetworkMiddlewareStorage();
@@ -50,6 +52,7 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
         $.oracle = _oracle;
         $.requiredEpochDuration = _requiredEpochDuration;
         $.feeAllowed = _feeAllowed;
+        $.staleness = _staleness;
     }
 
     /// @notice Register vault to be used as collateral within the CAP system
@@ -89,7 +92,7 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
             IVault vault = IVault($.vaults[_agent][i]);
 
             (, uint256 totalSlashableCollateral) =
-                slashableCollateralByVault($.network, _agent, address(vault), $.oracle, _timestamp);
+                slashableCollateralByVault($.network, _agent, address(vault), $.oracle, _timestamp, $.staleness);
             if (totalSlashableCollateral == 0) continue;
 
             // Round up in favor of the liquidator
@@ -112,15 +115,16 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
         }
     }
 
-    /// @dev get vault info
+    /// @dev Get vault info
     /// @param _network Network address
     /// @param _agent Agent address
     /// @param _vault Vault address
     /// @param _oracle Oracle address
+    /// @param _staleness Staleness period in seconds for asset prices
     /// @return burnerRouter The burner router contract
     /// @return decimals The collateral token decimals
     /// @return collateralPrice The collateral token price
-    function _getVaultInfo(address _network, address _agent, address _vault, address _oracle)
+    function _getVaultInfo(address _network, address _agent, address _vault, address _oracle, uint256 _staleness)
         private
         view
         returns (IBurnerRouter burnerRouter, uint8 decimals, uint256 collateralPrice)
@@ -140,7 +144,11 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
 
         address collateralAddress = IVault(_vault).collateral();
         decimals = IERC20Metadata(collateralAddress).decimals();
-        collateralPrice = IOracle(_oracle).getPrice(collateralAddress);
+        uint256 lastUpdated;
+        (collateralPrice, lastUpdated) = IOracle(_oracle).getPrice(collateralAddress);
+        if (lastUpdated < block.timestamp - _staleness) {
+            return (IBurnerRouter(address(0)), 0, 0);
+        }
     }
 
     /// @notice Coverage of an agent by a specific vault at a given timestamp
@@ -149,15 +157,19 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
     /// @param _vault Vault address
     /// @param _oracle Oracle address
     /// @param _timestamp Timestamp to check coverage at
+    /// @param _staleness Staleness period in seconds for asset prices
     /// @return collateralValue Coverage value in USD (8 decimals)
     /// @return collateral Coverage amount in the vault's collateral token decimals
-    function coverageByVault(address _network, address _agent, address _vault, address _oracle, uint48 _timestamp)
-        public
-        view
-        returns (uint256 collateralValue, uint256 collateral)
-    {
+    function coverageByVault(
+        address _network,
+        address _agent,
+        address _vault,
+        address _oracle,
+        uint48 _timestamp,
+        uint256 _staleness
+    ) public view returns (uint256 collateralValue, uint256 collateral) {
         (IBurnerRouter burnerRouter, uint8 decimals, uint256 collateralPrice) =
-            _getVaultInfo(_network, _agent, _vault, _oracle);
+            _getVaultInfo(_network, _agent, _vault, _oracle, _staleness);
 
         if (address(burnerRouter) == address(0)) return (0, 0);
 
@@ -171,16 +183,18 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
     /// @param _vault Vault address
     /// @param _oracle Oracle address
     /// @param _timestamp Timestamp to check slashable collateral at
+    /// @param _staleness Staleness period in seconds for asset prices
     /// @return collateralValue Slashable collateral value in USD (8 decimals)
     function slashableCollateralByVault(
         address _network,
         address _agent,
         address _vault,
         address _oracle,
-        uint48 _timestamp
+        uint48 _timestamp,
+        uint256 _staleness
     ) public view returns (uint256 collateralValue, uint256 collateral) {
         (IBurnerRouter burnerRouter, uint8 decimals, uint256 collateralPrice) =
-            _getVaultInfo(_network, _agent, _vault, _oracle);
+            _getVaultInfo(_network, _agent, _vault, _oracle, _staleness);
 
         if (address(burnerRouter) == address(0)) return (0, 0);
 
@@ -197,9 +211,11 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
         address[] memory _vaults = $.vaults[_agent];
         address _network = $.network;
         address _oracle = $.oracle;
+        uint256 _staleness = $.staleness;
+        uint48 _timestamp = uint48(block.timestamp);
 
         for (uint256 i = 0; i < _vaults.length; i++) {
-            (uint256 value,) = coverageByVault(_network, _agent, _vaults[i], _oracle, uint48(block.timestamp));
+            (uint256 value,) = coverageByVault(_network, _agent, _vaults[i], _oracle, _timestamp, _staleness);
             delegation += value;
         }
     }
@@ -217,9 +233,10 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
         address[] memory _vaults = $.vaults[_agent];
         address _network = $.network;
         address _oracle = $.oracle;
+        uint256 _staleness = $.staleness;
 
         for (uint256 i = 0; i < _vaults.length; i++) {
-            (uint256 value,) = slashableCollateralByVault(_network, _agent, _vaults[i], _oracle, _timestamp);
+            (uint256 value,) = slashableCollateralByVault(_network, _agent, _vaults[i], _oracle, _timestamp, _staleness);
             _slashableCollateral += value;
         }
     }
@@ -288,7 +305,8 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
         address[] memory _vaults = $.vaults[_agent];
         for (uint256 i = 0; i < _vaults.length; i++) {
             address vault = _vaults[i];
-            (uint256 collateralValue,) = coverageByVault($.network, _agent, vault, $.oracle, uint48(block.timestamp));
+            (uint256 collateralValue,) =
+                coverageByVault($.network, _agent, vault, $.oracle, uint48(block.timestamp), $.staleness);
             uint256 reward = _amount * collateralValue / totalCollateralValue;
             address stakerRewarder = $.stakerRewarders[vault];
             if (stakerRewarder == address(0)) revert NoStakerRewarder();

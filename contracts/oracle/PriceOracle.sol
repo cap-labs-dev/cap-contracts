@@ -24,15 +24,16 @@ contract PriceOracle is IPriceOracle, Access, PriceOracleStorageUtils {
     /// @dev If initial price fetch fails then a backup source is used, never reverts
     /// @param _asset Asset address
     /// @return price Price of the asset
-    function getPrice(address _asset) external view returns (uint256 price) {
+    /// @return lastUpdated Latest timestamp of the price
+    function getPrice(address _asset) external view returns (uint256 price, uint256 lastUpdated) {
         PriceOracleStorage storage $ = getPriceOracleStorage();
         IOracle.OracleData memory data = $.oracleData[_asset];
 
-        price = _getPrice(data.adapter, data.payload);
+        (price, lastUpdated) = _getPrice(data.adapter, data.payload);
 
         if (price == 0) {
             data = $.backupOracleData[_asset];
-            price = _getPrice(data.adapter, data.payload);
+            (price, lastUpdated) = _getPrice(data.adapter, data.payload);
         }
     }
 
@@ -76,8 +77,12 @@ contract PriceOracle is IPriceOracle, Access, PriceOracleStorageUtils {
     /// @param _adapter Adapter for calculation logic
     /// @param _payload Encoded call to adapter with all required data
     /// @return price Calculated price
-    function _getPrice(address _adapter, bytes memory _payload) private view returns (uint256 price) {
+    function _getPrice(address _adapter, bytes memory _payload)
+        private
+        view
+        returns (uint256 price, uint256 lastUpdated)
+    {
         (bool success, bytes memory returnedData) = _adapter.staticcall(_payload);
-        if (success) price = abi.decode(returnedData, (uint256));
+        if (success) (price, lastUpdated) = abi.decode(returnedData, (uint256, uint256));
     }
 }

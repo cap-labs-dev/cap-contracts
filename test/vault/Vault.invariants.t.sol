@@ -75,7 +75,7 @@ contract VaultInvariantsTest is Test, ProxyUtils {
         // Deploy and initialize vault
         vault = new TestVault();
         vault.initialize(
-            "Test Vault", "tVAULT", address(accessControl), address(feeAuction), address(mockOracle), assets
+            "Test Vault", "tVAULT", address(accessControl), address(feeAuction), address(mockOracle), 365 days, assets
         );
         mockOracle.setPrice(address(vault), 1e18);
 
@@ -146,9 +146,10 @@ contract TestVault is Vault {
         address _accessControl,
         address _feeAuction,
         address _oracle,
+        uint256 _staleness,
         address[] calldata _assets
     ) external initializer {
-        __Vault_init(_name, _symbol, _accessControl, _feeAuction, _oracle, _assets);
+        __Vault_init(_name, _symbol, _accessControl, _feeAuction, _oracle, _staleness, _assets);
     }
 }
 /**

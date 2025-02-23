@@ -37,7 +37,7 @@ contract MockNetworkMiddleware is INetworkMiddleware {
         emit Slash(_agent, _recipient, _slashShare);
     }
 
-    function coverageByVault(address, address _agent, address _vault, address, uint48)
+    function coverageByVault(address, address _agent, address _vault, address, uint48, uint256)
         external
         view
         returns (uint256 collateralValue, uint256 collateral)
@@ -45,7 +45,7 @@ contract MockNetworkMiddleware is INetworkMiddleware {
         return (mockCollateralByVault[_agent][_vault], mockCollateralByVault[_agent][_vault]);
     }
 
-    function slashableCollateralByVault(address, address _agent, address _vault, address, uint48)
+    function slashableCollateralByVault(address, address _agent, address _vault, address, uint48, uint256)
         external
         view
         returns (uint256 collateralValue, uint256 collateral)

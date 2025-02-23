@@ -9,6 +9,7 @@ interface IMinter {
     struct MinterStorage {
         address oracle;
         uint256 redeemFee;
+        uint256 staleness;
         mapping(address => FeeData) fees;
     }
 

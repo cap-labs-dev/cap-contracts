@@ -10,12 +10,13 @@ import { FeeAuction } from "../../feeAuction/FeeAuction.sol";
 
 import { ILender } from "../../interfaces/ILender.sol";
 import { IMinter } from "../../interfaces/IMinter.sol";
-import { Minter } from "../../vault/Minter.sol";
+
 import { Lender } from "../../lendingPool/Lender.sol";
 import { InterestDebtToken } from "../../lendingPool/tokens/InterestDebtToken.sol";
 import { PrincipalDebtToken } from "../../lendingPool/tokens/PrincipalDebtToken.sol";
 import { RestakerDebtToken } from "../../lendingPool/tokens/RestakerDebtToken.sol";
 import { FractionalReserve } from "../../vault/FractionalReserve.sol";
+import { Minter } from "../../vault/Minter.sol";
 
 import { CapToken } from "../../token/CapToken.sol";
 import { OFTLockbox } from "../../token/OFTLockbox.sol";
@@ -23,11 +24,11 @@ import { StakedCap } from "../../token/StakedCap.sol";
 import { Vault } from "../../vault/Vault.sol";
 import { ZapOFTComposer } from "../../zap/ZapOFTComposer.sol";
 import {
+    FeeConfig,
     ImplementationsConfig,
     InfraConfig,
     UsersConfig,
     VaultConfig,
-    FeeConfig,
     VaultLzPeriphery
 } from "../interfaces/DeployConfigs.sol";
 
@@ -57,7 +58,7 @@ contract DeployVault is ProxyUtils {
             1e18 // min price of 1 token
         );
 
-        CapToken(d.capToken).initialize(name, symbol, infra.accessControl, d.feeAuction, infra.oracle, assets);
+        CapToken(d.capToken).initialize(name, symbol, infra.accessControl, d.feeAuction, infra.oracle, 365 days, assets);
         StakedCap(d.stakedCapToken).initialize(infra.accessControl, d.capToken, 24 hours);
 
         // deploy and init debt tokens
@@ -148,7 +149,7 @@ contract DeployVault is ProxyUtils {
         accessControl.grantAccess(FeeAuction.setStartPrice.selector, vault.feeAuction, users.fee_auction_admin);
     }
 
-    function _initVaultLender(VaultConfig memory d, InfraConfig memory infra,  FeeConfig memory fee) internal {
+    function _initVaultLender(VaultConfig memory d, InfraConfig memory infra, FeeConfig memory fee) internal {
         for (uint256 i = 0; i < d.assets.length; i++) {
             Lender(infra.lender).addAsset(
                 ILender.AddAssetParams({
@@ -165,13 +166,16 @@ contract DeployVault is ProxyUtils {
 
             Lender(infra.lender).pauseAsset(d.assets[i], false);
 
-            Minter(d.capToken).setFeeData(d.assets[i], IMinter.FeeData({
-                slope0: fee.slope0,
-                slope1: fee.slope1,
-                mintKinkRatio: fee.mintKinkRatio,
-                burnKinkRatio: fee.burnKinkRatio,
-                optimalRatio: fee.optimalRatio
-            }));
+            Minter(d.capToken).setFeeData(
+                d.assets[i],
+                IMinter.FeeData({
+                    slope0: fee.slope0,
+                    slope1: fee.slope1,
+                    mintKinkRatio: fee.mintKinkRatio,
+                    burnKinkRatio: fee.burnKinkRatio,
+                    optimalRatio: fee.optimalRatio
+                })
+            );
         }
     }
 }

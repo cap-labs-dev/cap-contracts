@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
 import { NetworkMiddleware } from "../../contracts/delegation/providers/symbiotic/NetworkMiddleware.sol";
-import { VaultConfig, FeeConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
+import { FeeConfig, VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
 
@@ -174,9 +174,9 @@ contract TestDeployer is
         FeeConfig memory fee = FeeConfig({
             slope0: 0, // allow liquidity to be added without fee
             slope1: 0, // allow liquidity to be added without fee to start with
-            mintKinkRatio: 0.85e27, 
-            burnKinkRatio: 0.15e27, 
-            optimalRatio: 0.33e27 
+            mintKinkRatio: 0.85e27,
+            burnKinkRatio: 0.15e27,
+            optimalRatio: 0.33e27
         });
 
         _initVaultLender(env.usdVault, env.infra, fee);
@@ -205,7 +205,7 @@ contract TestDeployer is
                 env.infra,
                 symbioticAb,
                 env.symbiotic.networkAdapterImplems,
-                SymbioticNetworkAdapterParams({ vaultEpochDuration: 7 days, feeAllowed: 1000 })
+                SymbioticNetworkAdapterParams({ vaultEpochDuration: 7 days, feeAllowed: 1000, staleness: 365 days })
             );
 
             console.log("deploying symbiotic WETH vault");
@@ -319,7 +319,7 @@ contract TestDeployer is
         }
 
         // change  epoch
-        _timeTravel(28 days);
+        _timeTravel(366 days);
 
         _unwrapEnvToMakeTestsReadable();
         _applyTestnetLabels();

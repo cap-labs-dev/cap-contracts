@@ -18,6 +18,7 @@ interface ILender {
     /// @param expiry Period in seconds after which liquidation rights expire
     /// @param bonusCap Maximum bonus percentage for liquidators (scaled by 1e27)
     /// @param emergencyLiquidationThreshold Health threshold below which grace periods are ignored
+    /// @param staleness Staleness period in seconds for asset prices (0 for live prices)
     struct LenderStorage {
         // Addresses
         address delegation;
@@ -35,6 +36,8 @@ interface ILender {
         uint256 expiry;
         uint256 bonusCap;
         uint256 emergencyLiquidationThreshold;
+        // Price parameters
+        uint256 staleness;
     }
 
     /// @dev Reserve data
@@ -122,6 +125,7 @@ interface ILender {
     /// @param _expiry Expiry period after which an agent cannot be liquidated until called again
     /// @param _bonusCap Bonus cap for liquidations
     /// @param _emergencyLiquidationThreshold Liquidation threshold below which grace periods are voided
+    /// @param _staleness Staleness period in seconds for asset prices
     function initialize(
         address _accessControl,
         address _delegation,
@@ -130,7 +134,8 @@ interface ILender {
         uint256 _grace,
         uint256 _expiry,
         uint256 _bonusCap,
-        uint256 _emergencyLiquidationThreshold
+        uint256 _emergencyLiquidationThreshold,
+        uint256 _staleness
     ) external;
 
     /// @notice Borrow an asset

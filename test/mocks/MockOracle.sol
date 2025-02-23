@@ -16,7 +16,8 @@ contract MockOracle {
 
     function getPrice(address asset) external view returns (uint256, uint256) {
         require(prices[asset] > 0, "Price not set");
-        return (prices[asset], lastUpdate[asset]);
+        /// @dev lastUpdate is not used in the mock oracle
+        return (prices[asset], block.timestamp);
     }
 
     function simulatePriceChange(address asset, int256 percentChange) external {
