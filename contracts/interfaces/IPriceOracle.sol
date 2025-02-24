@@ -8,6 +8,7 @@ interface IPriceOracle {
     struct PriceOracleStorage {
         mapping(address => IOracle.OracleData) oracleData;
         mapping(address => IOracle.OracleData) backupOracleData;
+        uint256 staleness;
     }
 
     /// @notice Get the price for an asset
@@ -27,7 +28,6 @@ interface IPriceOracle {
     function priceBackupOracleData(address _asset) external view returns (IOracle.OracleData memory data);
 
     /// @notice Set the oracle data for an asset
-    /// @notice Set the oracle data for an asset
     /// @param _asset Asset address to set oracle data for
     /// @param _oracleData Oracle data configuration to set for the asset
     function setPriceOracleData(address _asset, IOracle.OracleData calldata _oracleData) external;
@@ -37,9 +37,19 @@ interface IPriceOracle {
     /// @param _oracleData Backup oracle data configuration to set for the asset
     function setPriceBackupOracleData(address _asset, IOracle.OracleData calldata _oracleData) external;
 
+    /// @notice Set the staleness period for asset prices
+    /// @param _staleness Staleness period in seconds for asset prices
+    function setStaleness(uint256 _staleness) external;
+
     /// @dev Set oracle data
     event SetPriceOracleData(address asset, IOracle.OracleData data);
 
     /// @dev Set backup oracle data
     event SetPriceBackupOracleData(address asset, IOracle.OracleData data);
+
+    /// @dev Set the staleness period for asset prices
+    event SetStaleness(uint256 staleness);
+
+    /// @dev Stale price event
+    error StalePrice(uint256 lastUpdated);
 }

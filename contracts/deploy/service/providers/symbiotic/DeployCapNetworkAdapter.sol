@@ -51,8 +51,7 @@ contract DeployCapNetworkAdapter is ProxyUtils {
             addressbook.registries.vaultRegistry,
             infra.oracle,
             params.vaultEpochDuration,
-            params.feeAllowed,
-            params.staleness
+            params.feeAllowed
         );
     }
 
