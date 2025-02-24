@@ -20,9 +20,6 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUtils {
     using SafeERC20 for IERC20;
 
-    /// @notice Invalid liquidation threshold
-    error InvalidLiquidationThreshold();
-
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -206,20 +203,20 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         external
         checkAccess(this.addAgent.selector)
     {
-        // if liquidation threshold is greater than 100%, agent
+        // if liquidation threshold or ltv is greater than 100%, agent
         // could borrow more than they are collateralized for
         if (_liquidationThreshold > 1e27) revert InvalidLiquidationThreshold();
+        if (_ltv > 1e27) revert InvalidLtv();
 
         DelegationStorage storage $ = getDelegationStorage();
 
         // If the agent already exists, we revert
-        for (uint i; i < $.agents.length; ++i) {
-            if ($.agents[i] == _agent) revert DuplicateAgent();
-        }
+        if ($.agentData[_agent].exists) revert DuplicateAgent();
 
         $.agents.push(_agent);
         $.agentData[_agent].ltv = _ltv;
         $.agentData[_agent].liquidationThreshold = _liquidationThreshold;
+        $.agentData[_agent].exists = true;
         emit AddAgent(_agent, _ltv, _liquidationThreshold);
     }
 
@@ -231,18 +228,40 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         external
         checkAccess(this.modifyAgent.selector)
     {
+        // if liquidation threshold or ltv is greater than 100%, agent
+        // could borrow more than they are collateralized for
+        if (_liquidationThreshold > 1e27) revert InvalidLiquidationThreshold();
+        if (_ltv > 1e27) revert InvalidLtv();
+
         DelegationStorage storage $ = getDelegationStorage();
 
         // Check that the agent exists
-        for (uint i; i < $.agents.length; ++i) {
+        if (!$.agentData[_agent].exists) revert AgentDoesNotExist();
+
+        $.agentData[_agent].ltv = _ltv;
+        $.agentData[_agent].liquidationThreshold = _liquidationThreshold;
+        emit ModifyAgent(_agent, _ltv, _liquidationThreshold);
+    }
+
+    /// @notice Revoke an agent
+    /// @param _agent Agent address
+    function revokeAgent(address _agent) external checkAccess(this.revokeAgent.selector) {
+        DelegationStorage storage $ = getDelegationStorage();
+
+        // Check that the agent exists
+        if (!$.agentData[_agent].exists) revert AgentDoesNotExist();
+
+        uint256 length = $.agents.length;
+        for (uint256 i; i < length; ++i) {
             if ($.agents[i] == _agent) {
-                $.agentData[_agent].ltv = _ltv;
-                $.agentData[_agent].liquidationThreshold = _liquidationThreshold;
-                emit ModifyAgent(_agent, _ltv, _liquidationThreshold);
-                return;
+                $.agents[i] = $.agents[length - 1];
+                $.agents.pop();
+                break;
             }
         }
-        revert AgentDoesNotExist();
+
+        $.agentData[_agent].exists = false;
+        emit RevokeAgent(_agent);
     }
 
     /// @notice Register a new network
@@ -252,13 +271,33 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         DelegationStorage storage $ = getDelegationStorage();
 
         // Check for duplicates
-        for (uint i; i < $.networks[_agent].length; ++i) {
-            if ($.networks[_agent][i] == _network) revert DuplicateNetwork();
-        }
+        if ($.networkExistsForAgent[_agent][_network]) revert DuplicateNetwork();
 
         $.networks[_agent].push(_network);
-
+        $.networkExistsForAgent[_agent][_network] = true;
         emit RegisterNetwork(_agent, _network);
+    }
+
+    /// @notice Revoke a network
+    /// @param _agent Agent address
+    /// @param _network Network address
+    function revokeNetwork(address _agent, address _network) external checkAccess(this.revokeNetwork.selector) {
+        DelegationStorage storage $ = getDelegationStorage();
+
+        // Check that the network exists
+        if (!$.networkExistsForAgent[_agent][_network]) revert NetworkDoesNotExist();
+
+        uint256 length = $.networks[_agent].length;
+        for (uint256 i; i < length; ++i) {
+            if ($.networks[_agent][i] == _network) {
+                $.networks[_agent][i] = $.networks[_agent][length - 1];
+                $.networks[_agent].pop();
+                break;
+            }
+        }
+
+        $.networkExistsForAgent[_agent][_network] = false;
+        emit RevokeNetwork(_agent, _network);
     }
 
     /// @dev Only admin can upgrade
