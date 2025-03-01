@@ -77,8 +77,8 @@ library ViewLogic {
         uint256 remainingCapacity = borrowCapacity - totalDebt;
 
         // Convert to asset amount using price and decimals
-        (uint256 assetPrice, uint256 lastUpdated) = IOracle($.oracle).getPrice(_asset);
-        if (assetPrice == 0 || lastUpdated < block.timestamp - $.staleness) return 0;
+        (uint256 assetPrice,) = IOracle($.oracle).getPrice(_asset);
+        if (assetPrice == 0) return 0;
 
         uint256 assetDecimals = $.reservesData[_asset].decimals;
         maxBorrowableAmount = remainingCapacity * (10 ** assetDecimals) / assetPrice;
@@ -105,8 +105,8 @@ library ViewLogic {
         (uint256 totalDelegation, uint256 totalDebt,, uint256 liquidationThreshold, uint256 health) = agent($, _agent);
         if (health >= 1e27) return 0;
 
-        (uint256 assetPrice, uint256 lastUpdated) = IOracle($.oracle).getPrice(_asset);
-        if (assetPrice == 0 || lastUpdated < block.timestamp - $.staleness) return 0;
+        (uint256 assetPrice,) = IOracle($.oracle).getPrice(_asset);
+        if (assetPrice == 0) return 0;
 
         uint256 decPow = 10 ** $.reservesData[_asset].decimals;
         uint256 a = ($.targetHealth * totalDebt);

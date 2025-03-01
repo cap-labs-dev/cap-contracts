@@ -19,7 +19,6 @@ contract CapToken is UUPSUpgradeable, Vault {
     /// @param _accessControl Access controller
     /// @param _feeAuction Fee auction address
     /// @param _oracle Oracle address
-    /// @param _staleness Staleness period in seconds for asset prices
     /// @param _assets Asset addresses to mint Cap token with
     function initialize(
         string memory _name,
@@ -27,10 +26,9 @@ contract CapToken is UUPSUpgradeable, Vault {
         address _accessControl,
         address _feeAuction,
         address _oracle,
-        uint256 _staleness,
         address[] calldata _assets
     ) external initializer {
-        __Vault_init(_name, _symbol, _accessControl, _feeAuction, _oracle, _staleness, _assets);
+        __Vault_init(_name, _symbol, _accessControl, _feeAuction, _oracle, _assets);
         __UUPSUpgradeable_init();
     }
 

@@ -23,7 +23,6 @@ contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, FractionalRese
     /// @param _accessControl Access control address
     /// @param _feeAuction Fee auction address
     /// @param _oracle Oracle address
-    /// @param _staleness Staleness period in seconds for asset prices
     /// @param _assets Asset addresses
     function __Vault_init(
         string memory _name,
@@ -31,14 +30,13 @@ contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, FractionalRese
         address _accessControl,
         address _feeAuction,
         address _oracle,
-        uint256 _staleness,
         address[] calldata _assets
     ) internal onlyInitializing {
         __ERC20_init(_name, _symbol);
         __ERC20Permit_init(_name);
         __Access_init(_accessControl);
         __FractionalReserve_init_unchained(_feeAuction);
-        __Minter_init_unchained(_oracle, _staleness);
+        __Minter_init_unchained(_oracle);
         __Vault_init_unchained(_assets);
     }
 

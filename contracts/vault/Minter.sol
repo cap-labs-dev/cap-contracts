@@ -17,18 +17,15 @@ contract Minter is IMinter, Access, MinterStorageUtils {
     /// @dev Initialize the minter
     /// @param _accessControl Access control address
     /// @param _oracle Oracle address
-    /// @param _staleness Staleness period in seconds for asset prices
-    function __Minter_init(address _accessControl, address _oracle, uint256 _staleness) internal onlyInitializing {
+    function __Minter_init(address _accessControl, address _oracle) internal onlyInitializing {
         __Access_init(_accessControl);
-        __Minter_init_unchained(_oracle, _staleness);
+        __Minter_init_unchained(_oracle);
     }
 
     /// @dev Initialize unchained
     /// @param _oracle Oracle address
-    /// @param _staleness Staleness period in seconds for asset prices
-    function __Minter_init_unchained(address _oracle, uint256 _staleness) internal onlyInitializing {
+    function __Minter_init_unchained(address _oracle) internal onlyInitializing {
         getMinterStorage().oracle = _oracle;
-        getMinterStorage().staleness = _staleness;
     }
 
     /// @notice Get the mint amount for a given asset
@@ -70,11 +67,5 @@ contract Minter is IMinter, Access, MinterStorageUtils {
     function setRedeemFee(uint256 _redeemFee) external checkAccess(this.setRedeemFee.selector) {
         getMinterStorage().redeemFee = _redeemFee;
         emit SetRedeemFee(_redeemFee);
-    }
-
-    /// @notice Set the staleness period for asset prices
-    /// @param _staleness Staleness period in seconds for asset prices
-    function setStaleness(uint256 _staleness) external checkAccess(this.setStaleness.selector) {
-        getMinterStorage().staleness = _staleness;
     }
 }

@@ -11,9 +11,6 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 /// @author kexley, @capLabs
 /// @notice Amount out logic for exchanging underlying assets with cap tokens
 library MinterLogic {
-    /// @notice Stale price error
-    error StalePrice();
-
     /// @notice Calculate the amount out from a swap including fees
     /// @param $ Storage pointer
     /// @param params Parameters for a swap
@@ -23,7 +20,7 @@ library MinterLogic {
         view
         returns (uint256 amount)
     {
-        (uint256 amountOutBeforeFee, uint256 newRatio) = _amountOutBeforeFee($.oracle, $.staleness, params);
+        (uint256 amountOutBeforeFee, uint256 newRatio) = _amountOutBeforeFee($.oracle, params);
 
         amount = _applyFeeSlopes(
             $.fees[params.asset],
@@ -55,21 +52,16 @@ library MinterLogic {
 
     /// @notice Calculate the amount out for a swap before fees
     /// @param _oracle Oracle address
-    /// @param _staleness Staleness period in seconds for asset prices
     /// @param params Parameters for a swap
     /// @return amount Amount out from a swap before fees
     /// @return newRatio New ratio of an asset to the overall basket after swap
-    function _amountOutBeforeFee(address _oracle, uint256 _staleness, IMinter.AmountOutParams memory params)
+    function _amountOutBeforeFee(address _oracle, IMinter.AmountOutParams memory params)
         internal
         view
         returns (uint256 amount, uint256 newRatio)
     {
-        (uint256 assetPrice, uint256 assetLastUpdated) = IOracle(_oracle).getPrice(params.asset);
-        (uint256 capPrice, uint256 capLastUpdated) = IOracle(_oracle).getPrice(address(this));
-
-        if (assetLastUpdated < block.timestamp - _staleness || capLastUpdated < block.timestamp - _staleness) {
-            revert StalePrice();
-        }
+        (uint256 assetPrice,) = IOracle(_oracle).getPrice(params.asset);
+        (uint256 capPrice,) = IOracle(_oracle).getPrice(address(this));
 
         uint256 assetDecimalsPow = 10 ** IERC20Metadata(params.asset).decimals();
         uint256 capDecimalsPow = 10 ** IERC20Metadata(address(this)).decimals();
