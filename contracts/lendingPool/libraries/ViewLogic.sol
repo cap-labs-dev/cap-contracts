@@ -38,8 +38,8 @@ library ViewLogic {
             }
 
             address asset = $.reservesList[i];
-            /// Use price even if stale
             (uint256 assetPrice,) = IOracle($.oracle).getPrice(asset);
+            if (assetPrice == 0) continue;
 
             totalDebt += (
                 IERC20($.reservesData[asset].principalDebtToken).balanceOf(_agent)
