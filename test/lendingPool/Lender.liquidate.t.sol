@@ -56,7 +56,7 @@ contract LenderLiquidateTest is TestDeployer {
         // Modify the agent to have 0.01 liquidation threshold
         {
             vm.startPrank(env.users.delegation_admin);
-            Delegation(env.infra.delegation).modifyAgent(user_agent, 0.01e27, 0.01e27);
+            Delegation(env.infra.delegation).modifyAgent(user_agent, 0, 0.01e27);
             vm.stopPrank();
         }
 
@@ -137,7 +137,7 @@ contract LenderLiquidateTest is TestDeployer {
         // Modify the agent to have 0.01 liquidation threshold
         {
             vm.startPrank(env.users.delegation_admin);
-            Delegation(env.infra.delegation).modifyAgent(user_agent, 0.01e27, 0.01e27);
+            Delegation(env.infra.delegation).modifyAgent(user_agent, 0, 0.01e27);
             vm.stopPrank();
         }
 
@@ -218,7 +218,7 @@ contract LenderLiquidateTest is TestDeployer {
         // Modify the agent to have 0.01 liquidation threshold
         {
             vm.startPrank(env.users.delegation_admin);
-            Delegation(env.infra.delegation).modifyAgent(user_agent, 0.01e27, 0.01e27);
+            Delegation(env.infra.delegation).modifyAgent(user_agent, 0, 0.01e27);
             vm.stopPrank();
         }
 
