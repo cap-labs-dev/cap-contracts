@@ -56,14 +56,14 @@ contract DelegationSlashTest is TestDeployer {
 
         address new_agent = makeAddr("new_agent");
         vm.expectRevert(IDelegation.AgentDoesNotExist.selector);
-        delegation.modifyAgent(new_agent, 0.9e18, 0.8e18);
+        delegation.modifyAgent(new_agent, 0.8e18, 0.8e18);
 
-        delegation.addAgent(new_agent, 0.9e18, 0.8e18);
+        delegation.addAgent(new_agent, 0.8e18, 0.8e18);
 
         vm.expectRevert(IDelegation.DuplicateAgent.selector);
-        delegation.addAgent(new_agent, 0.9e18, 0.8e18);
+        delegation.addAgent(new_agent, 0.8e18, 0.8e18);
 
-        assertEq(delegation.ltv(new_agent), 0.9e18);
+        assertEq(delegation.ltv(new_agent), 0.8e18);
         assertEq(delegation.liquidationThreshold(new_agent), 0.8e18);
 
         delegation.registerNetwork(new_agent, env.symbiotic.networkAdapter.networkMiddleware);
@@ -75,10 +75,10 @@ contract DelegationSlashTest is TestDeployer {
         vm.startPrank(env.infra.lender);
         address fake_agent = makeAddr("fake_agent");
         vm.expectRevert();
-        delegation.modifyAgent(fake_agent, 0.9e18, 0.8e18);
+        delegation.modifyAgent(fake_agent, 0.8e18, 0.8e18);
 
         vm.expectRevert();
-        delegation.addAgent(fake_agent, 0.9e18, 0.8e18);
+        delegation.addAgent(fake_agent, 0.8e18, 0.8e18);
 
         vm.stopPrank();
     }

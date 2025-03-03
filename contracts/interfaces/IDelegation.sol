@@ -67,8 +67,8 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @notice Invalid liquidation threshold
     error InvalidLiquidationThreshold();
 
-    /// @notice Invalid ltv
-    error InvalidLtv();
+    /// @notice Liquidation threshold lower than ltv
+    error LiquidationThresholdLowerThanLtv();
 
     /// @notice Initialize the contract
     /// @param _accessControl Access control address

@@ -203,10 +203,9 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         external
         checkAccess(this.addAgent.selector)
     {
-        // if liquidation threshold or ltv is greater than 100%, agent
-        // could borrow more than they are collateralized for
+        // if ltv is greater than 100% then agent could borrow more than they are collateralized for
         if (_liquidationThreshold > 1e27) revert InvalidLiquidationThreshold();
-        if (_ltv > 1e27) revert InvalidLtv();
+        if (_liquidationThreshold < _ltv) revert LiquidationThresholdLowerThanLtv();
 
         DelegationStorage storage $ = getDelegationStorage();
 
@@ -228,10 +227,9 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         external
         checkAccess(this.modifyAgent.selector)
     {
-        // if liquidation threshold or ltv is greater than 100%, agent
-        // could borrow more than they are collateralized for
+        // if ltv is greater than 100% then agent could borrow more than they are collateralized for
         if (_liquidationThreshold > 1e27) revert InvalidLiquidationThreshold();
-        if (_ltv > 1e27) revert InvalidLtv();
+        if (_liquidationThreshold < _ltv) revert LiquidationThresholdLowerThanLtv();
 
         DelegationStorage storage $ = getDelegationStorage();
 

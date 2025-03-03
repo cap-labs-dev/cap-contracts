@@ -2,8 +2,9 @@
 pragma solidity ^0.8.28;
 
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
-import { Lender } from "../../contracts/lendingPool/Lender.sol";
+
 import { ILender } from "../../contracts/interfaces/ILender.sol";
+import { Lender } from "../../contracts/lendingPool/Lender.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
 import { console } from "forge-std/console.sol";
@@ -24,20 +25,20 @@ contract LenderLiquidateTest is TestDeployer {
         vm.stopPrank();
 
         vm.startPrank(env.users.lender_admin);
-          // Try removing and re-adding the asset 
+        // Try removing and re-adding the asset
         lender.removeAsset(address(usdt));
         lender.addAsset(
-                ILender.AddAssetParams({
-                    asset: address(usdt),
-                    vault: address(cUSD),
-                    principalDebtToken: env.usdVault.principalDebtTokens[0],
-                    restakerDebtToken: env.usdVault.restakerDebtTokens[0],
-                    interestDebtToken: env.usdVault.interestDebtTokens[0],
-                    interestReceiver: env.usdVault.feeAuction,
-                    restakerInterestReceiver: env.infra.delegation,
-                    bonusCap: 0.1e27
-                })
-            );
+            ILender.AddAssetParams({
+                asset: address(usdt),
+                vault: address(cUSD),
+                principalDebtToken: env.usdVault.principalDebtTokens[0],
+                restakerDebtToken: env.usdVault.restakerDebtTokens[0],
+                interestDebtToken: env.usdVault.interestDebtTokens[0],
+                interestReceiver: env.usdVault.feeAuction,
+                restakerInterestReceiver: env.infra.delegation,
+                bonusCap: 0.1e27
+            })
+        );
         lender.pauseAsset(address(usdt), false);
         vm.stopPrank();
     }
@@ -55,7 +56,7 @@ contract LenderLiquidateTest is TestDeployer {
         // Modify the agent to have 0.01 liquidation threshold
         {
             vm.startPrank(env.users.delegation_admin);
-            Delegation(env.infra.delegation).modifyAgent(user_agent, 0.5e27, 0.01e27);
+            Delegation(env.infra.delegation).modifyAgent(user_agent, 0.01e27, 0.01e27);
             vm.stopPrank();
         }
 
@@ -136,7 +137,7 @@ contract LenderLiquidateTest is TestDeployer {
         // Modify the agent to have 0.01 liquidation threshold
         {
             vm.startPrank(env.users.delegation_admin);
-            Delegation(env.infra.delegation).modifyAgent(user_agent, 0.5e27, 0.01e27);
+            Delegation(env.infra.delegation).modifyAgent(user_agent, 0.01e27, 0.01e27);
             vm.stopPrank();
         }
 
@@ -217,7 +218,7 @@ contract LenderLiquidateTest is TestDeployer {
         // Modify the agent to have 0.01 liquidation threshold
         {
             vm.startPrank(env.users.delegation_admin);
-            Delegation(env.infra.delegation).modifyAgent(user_agent, 0.5e27, 0.01e27);
+            Delegation(env.infra.delegation).modifyAgent(user_agent, 0.01e27, 0.01e27);
             vm.stopPrank();
         }
 
