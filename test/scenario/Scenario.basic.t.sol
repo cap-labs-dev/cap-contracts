@@ -4,9 +4,10 @@ pragma solidity ^0.8.28;
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
 
 import { IInterestDebtToken } from "../../contracts/interfaces/IInterestDebtToken.sol";
+
+import { IMinter } from "../../contracts/interfaces/IMinter.sol";
 import { IOracle } from "../../contracts/interfaces/IOracle.sol";
 import { IRestakerDebtToken } from "../../contracts/interfaces/IRestakerDebtToken.sol";
-import { IMinter } from "../../contracts/interfaces/IMinter.sol";
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
@@ -82,7 +83,7 @@ contract ScenarioBasicTest is TestDeployer {
             uint256 usdx_total_supplies = cUSD.totalSupplies(address(usdx));
             console.log("USDX total supplies", usdx_total_supplies);
 
-            uint256 cUSD_price = IOracle(env.infra.oracle).getPrice(address(cUSD));
+            (uint256 cUSD_price,) = IOracle(env.infra.oracle).getPrice(address(cUSD));
             console.log("cUSD price", cUSD_price);
 
             uint256 cap_token_supply = cUSD.totalSupply();
@@ -91,9 +92,12 @@ contract ScenarioBasicTest is TestDeployer {
             /// Alice is deposting 2000 USDT but since USDC is off peg she gets more than 2000 cUSD
             usdt.approve(address(cUSD), 10000e6);
 
-            vm.expectRevert(); /// Slippage
+            vm.expectRevert();
+
+            /// Slippage
             cUSD.mint(address(usdt), 2000e6, 3000e18, alice, block.timestamp + 1 hours);
-            vm.expectRevert(); /// Time
+            vm.expectRevert();
+            /// Time
             cUSD.mint(address(usdt), 2000e6, 1998e18, alice, block.timestamp - 1);
             cUSD.mint(address(usdt), 2000e6, 1998e18, alice, block.timestamp + 1 hours);
             assertGt(cUSD.balanceOf(alice), 2000e18);
@@ -142,7 +146,7 @@ contract ScenarioBasicTest is TestDeployer {
             vm.startPrank(env.users.vault_config_admin);
             cUSD.pause(address(usdt));
             vm.stopPrank();
-        
+
             /// An Operater comes to borrow USDT
             vm.startPrank(user_agent);
 
@@ -154,7 +158,7 @@ contract ScenarioBasicTest is TestDeployer {
             vm.startPrank(env.users.vault_config_admin);
             cUSD.unpause(address(usdt));
             vm.stopPrank();
-        
+
             vm.startPrank(user_agent);
             lender.borrow(address(usdt), 1000e6, user_agent);
             assertEq(usdt.balanceOf(user_agent), 2000e6);
@@ -270,15 +274,15 @@ contract ScenarioBasicTest is TestDeployer {
 
             vm.stopPrank();
         }
-         uint256[] memory minAmountsOut = new uint256[](3);
-         uint256 alice_usdt_balance_after;
+        uint256[] memory minAmountsOut = new uint256[](3);
+        uint256 alice_usdt_balance_after;
         {
             /// Alice redeems and burns her cUSD
             vm.startPrank(bob);
             cUSD.approve(address(scUSD), cUSD.balanceOf(bob));
             scUSD.deposit(cUSD.balanceOf(bob), bob);
             vm.stopPrank();
-        
+
             vm.startPrank(alice);
 
             /// Alice trying to borrow USDT but shes not allowed to
@@ -294,12 +298,14 @@ contract ScenarioBasicTest is TestDeployer {
             uint256 alice_usdt_balance_before = usdt.balanceOf(alice);
             /// Alice wants to redeem half her cUSD
             uint256 redeemBal = cUSD.balanceOf(alice) / 2;
-            vm.expectRevert(); /// Slippage
+            vm.expectRevert();
+            /// Slippage
             cUSD.redeem(redeemBal, minAmountsOut, alice, block.timestamp + 1 hours);
             minAmountsOut[1] = 0;
-            vm.expectRevert(); /// Time
+            vm.expectRevert();
+            /// Time
             cUSD.redeem(redeemBal, minAmountsOut, alice, block.timestamp - 1);
-            cUSD.redeem(redeemBal, minAmountsOut, alice, block.timestamp + 1 hours); 
+            cUSD.redeem(redeemBal, minAmountsOut, alice, block.timestamp + 1 hours);
 
             uint256 alice_usdc_balance_after = usdc.balanceOf(alice);
             alice_usdt_balance_after = usdt.balanceOf(alice);
@@ -311,17 +317,19 @@ contract ScenarioBasicTest is TestDeployer {
             console.log("Alice's USDC balance after redeeming half her cUSD", alice_usdc_balance_after);
             console.log("Alice's USDT balance after redeeming half her cUSD", alice_usdt_balance_after);
             console.log("Alice's USDx balance after redeeming half her cUSD", alice_usdx_balance_after);
-        
+
             vm.stopPrank();
         }
         {
             /// Alice decides to burn the rest of her cUSD
             vm.startPrank(alice);
-       
+
             uint256 withdrawBal = cUSD.balanceOf(alice);
-            vm.expectRevert(); /// Slippage
+            vm.expectRevert();
+            /// Slippage
             cUSD.burn(address(usdt), withdrawBal, 10000000000e18, alice, block.timestamp + 1 hours);
-            vm.expectRevert(); /// Time
+            vm.expectRevert();
+            /// Time
             cUSD.burn(address(usdt), withdrawBal, 0, alice, block.timestamp - 1);
 
             cUSD.burn(address(usdt), withdrawBal, 0, alice, block.timestamp + 1 hours);
@@ -335,7 +343,10 @@ contract ScenarioBasicTest is TestDeployer {
             assertEq(cUSD.balanceOf(alice), 0);
             assertGt(usdt.balanceOf(alice), alice_usdt_balance_after);
 
-            assertGt(usdt.balanceOf(alice) + usdc.balanceOf(alice) + (usdx.balanceOf(alice)) / 1e12, (10000e6 * 0.999e27 / 1e27)); // Less redeem fee
+            assertGt(
+                usdt.balanceOf(alice) + usdc.balanceOf(alice) + (usdx.balanceOf(alice)) / 1e12,
+                (10000e6 * 0.999e27 / 1e27)
+            ); // Less redeem fee
 
             /// USDC goes over peg now
             console.log("");

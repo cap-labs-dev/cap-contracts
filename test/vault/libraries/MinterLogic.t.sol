@@ -46,13 +46,15 @@ contract MockVault is MockERC20, MinterStorageUtils {
 
 contract MockOracle {
     mapping(address => uint256) public _prices;
+    mapping(address => uint256) public _lastUpdate;
 
     function setPrice(address _asset, uint256 _price) external {
         _prices[_asset] = _price;
+        _lastUpdate[_asset] = block.timestamp;
     }
 
-    function getPrice(address _asset) external view returns (uint256) {
-        return _prices[_asset];
+    function getPrice(address _asset) external view returns (uint256, uint256) {
+        return (_prices[_asset], _lastUpdate[_asset]);
     }
 }
 
