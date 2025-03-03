@@ -38,19 +38,10 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @param liquidationThreshold Liquidation threshold
     event ModifyAgent(address agent, uint256 ltv, uint256 liquidationThreshold);
 
-    /// @notice Revoke an agent
-    /// @param agent Agent address
-    event RevokeAgent(address agent);
-
     /// @notice Register a network
     /// @param agent Agent address
     /// @param network Network address
     event RegisterNetwork(address agent, address network);
-
-    /// @notice Revoke a network
-    /// @param agent Agent address
-    /// @param network Network address
-    event RevokeNetwork(address agent, address network);
 
     /// @notice Distribute a reward
     /// @param agent Agent address
@@ -73,20 +64,11 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @notice Duplicate network
     error DuplicateNetwork();
 
-    /// @notice Network does not exist
-    error NetworkDoesNotExist();
-
     /// @notice Invalid liquidation threshold
     error InvalidLiquidationThreshold();
 
     /// @notice Invalid ltv
     error InvalidLtv();
-
-    /// @notice Network has coverage
-    error NetworkHasCoverage();
-
-    /// @notice Agent has coverage
-    error AgentHasCoverage();
 
     /// @notice Initialize the contract
     /// @param _accessControl Access control address
@@ -183,17 +165,8 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @param _liquidationThreshold Liquidation threshold
     function modifyAgent(address _agent, uint256 _ltv, uint256 _liquidationThreshold) external;
 
-    /// @notice Revoke an agent
-    /// @param _agent Agent address
-    function revokeAgent(address _agent) external;
-
     /// @notice Register a new network
     /// @param _agent Agent address
     /// @param _network Network address
     function registerNetwork(address _agent, address _network) external;
-
-    /// @notice Revoke a network
-    /// @param _agent Agent address
-    /// @param _network Network address
-    function revokeNetwork(address _agent, address _network) external;
 }
