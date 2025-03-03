@@ -9,6 +9,7 @@ interface IDelegation is IRestakerRewardReceiver {
         address[] agents;
         mapping(address => AgentData) agentData;
         mapping(address => address[]) networks;
+        mapping(address => mapping(address => bool)) networkExistsForAgent;
         address oracle;
         uint256 epochDuration;
     }
@@ -17,6 +18,7 @@ interface IDelegation is IRestakerRewardReceiver {
         uint256 ltv;
         uint256 liquidationThreshold;
         uint256 lastBorrow;
+        bool exists;
     }
 
     /// @notice Slash a network
@@ -61,6 +63,12 @@ interface IDelegation is IRestakerRewardReceiver {
 
     /// @notice Duplicate network
     error DuplicateNetwork();
+
+    /// @notice Invalid liquidation threshold
+    error InvalidLiquidationThreshold();
+
+    /// @notice Invalid ltv
+    error InvalidLtv();
 
     /// @notice Initialize the contract
     /// @param _accessControl Access control address
