@@ -82,6 +82,12 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @notice Invalid ltv
     error InvalidLtv();
 
+    /// @notice Network has coverage
+    error NetworkHasCoverage();
+
+    /// @notice Agent has coverage
+    error AgentHasCoverage();
+
     /// @notice Initialize the contract
     /// @param _accessControl Access control address
     /// @param _oracle Oracle address

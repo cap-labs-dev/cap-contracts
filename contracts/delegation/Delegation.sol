@@ -254,6 +254,7 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         uint256 length = $.agents.length;
         for (uint256 i; i < length; ++i) {
             if ($.agents[i] == _agent) {
+                if (coverage(_agent) > 0) revert AgentHasCoverage();
                 $.agents[i] = $.agents[length - 1];
                 $.agents.pop();
                 break;
@@ -290,6 +291,7 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         uint256 length = $.networks[_agent].length;
         for (uint256 i; i < length; ++i) {
             if ($.networks[_agent][i] == _network) {
+                if (coverageByNetwork(_agent, _network) > 0) revert NetworkHasCoverage();
                 $.networks[_agent][i] = $.networks[_agent][length - 1];
                 $.networks[_agent].pop();
                 break;
