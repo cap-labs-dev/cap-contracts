@@ -98,6 +98,11 @@ contract VaultInvariantsTest is Test, ProxyUtils {
         // Create and target handler
         handler = new TestVaultHandler(vault, mockOracle, assets, tokenHolders);
         targetContract(address(handler));
+
+        // we need to set an appropriate block.number and block.timestamp for the tests
+        // otherwise they will default to 0 and the tests will fail trying to subtract staleness from 0
+        vm.roll(block.number + 1_000_000);
+        vm.warp(block.timestamp + 1_000_000);
     }
 
     /// @dev Test that total assets >= total borrowed

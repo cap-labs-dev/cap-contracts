@@ -58,20 +58,11 @@ library ValidationLogic {
     /// @param params Validation parameters
     function validateBorrow(ILender.LenderStorage storage $, ILender.BorrowParams memory params) external {
         if (params.receiver == address(0) || params.asset == address(0)) revert ZeroAddressNotValid();
+        if ($.reservesData[params.asset].paused) revert ReservePaused();
 
-        ILender.ReserveData memory reserve = $.reservesData[params.asset];
-        if (reserve.paused) revert ReservePaused();
+        uint256 borrowCapacity = ViewLogic.maxBorrowable($, params.agent, params.asset);
 
-        (uint256 totalDelegation, uint256 totalDebt,,, uint256 health) = ViewLogic.agent($, params.agent);
-
-        if (health < 1e27) revert HealthFactorLowerThanLiquidationThreshold(health);
-
-        uint256 ltv = IDelegation($.delegation).ltv(params.agent);
-        uint256 assetPrice = IOracle($.oracle).getPrice(params.asset);
-        uint256 newTotalDebt = totalDebt + (params.amount * assetPrice / (10 ** reserve.decimals));
-        uint256 borrowCapacity = totalDelegation * ltv;
-
-        if (newTotalDebt > borrowCapacity) revert CollateralCannotCoverNewBorrow();
+        if (params.amount > borrowCapacity) revert CollateralCannotCoverNewBorrow();
 
         IDelegation($.delegation).setLastBorrow(params.agent);
     }

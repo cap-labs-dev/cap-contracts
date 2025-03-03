@@ -74,7 +74,7 @@ library LiquidationLogic {
             $.expiry
         );
 
-        uint256 assetPrice = IOracle($.oracle).getPrice(params.asset);
+        (uint256 assetPrice,) = IOracle($.oracle).getPrice(params.asset);
         uint256 maxLiquidation = ViewLogic.maxLiquidatable($, params.agent, params.asset);
         uint256 liquidated = params.amount > maxLiquidation ? maxLiquidation : params.amount;
 

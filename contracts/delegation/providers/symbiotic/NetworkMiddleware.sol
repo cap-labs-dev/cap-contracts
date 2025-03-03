@@ -112,7 +112,7 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
         }
     }
 
-    /// @dev get vault info
+    /// @dev Get vault info
     /// @param _network Network address
     /// @param _agent Agent address
     /// @param _vault Vault address
@@ -140,7 +140,7 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
 
         address collateralAddress = IVault(_vault).collateral();
         decimals = IERC20Metadata(collateralAddress).decimals();
-        collateralPrice = IOracle(_oracle).getPrice(collateralAddress);
+        (collateralPrice,) = IOracle(_oracle).getPrice(collateralAddress);
     }
 
     /// @notice Coverage of an agent by a specific vault at a given timestamp
@@ -197,9 +197,10 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
         address[] memory _vaults = $.vaults[_agent];
         address _network = $.network;
         address _oracle = $.oracle;
+        uint48 _timestamp = uint48(block.timestamp);
 
         for (uint256 i = 0; i < _vaults.length; i++) {
-            (uint256 value,) = coverageByVault(_network, _agent, _vaults[i], _oracle, uint48(block.timestamp));
+            (uint256 value,) = coverageByVault(_network, _agent, _vaults[i], _oracle, _timestamp);
             delegation += value;
         }
     }
