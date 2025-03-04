@@ -19,6 +19,9 @@ library VaultLogic {
     /// @dev Amount out is less than required
     error Slippage(address asset, uint256 amountOut, uint256 minAmountOut);
 
+    /// @dev Amount out is 0
+    error InvalidAmount();
+
     /// @dev Paused assets cannot be supplied or borrowed
     error AssetPaused(address asset);
 
@@ -96,6 +99,7 @@ library VaultLogic {
         if (params.amountOut < params.minAmountOut) {
             revert Slippage(address(this), params.amountOut, params.minAmountOut);
         }
+        if (params.amountOut == 0) revert InvalidAmount();
 
         $.totalSupplies[params.asset] += params.amountIn;
 
@@ -116,6 +120,7 @@ library VaultLogic {
         if (params.amountOut < params.minAmountOut) {
             revert Slippage(params.asset, params.amountOut, params.minAmountOut);
         }
+        if (params.amountOut == 0) revert InvalidAmount();
 
         $.totalSupplies[params.asset] -= params.amountOut;
 
@@ -137,6 +142,7 @@ library VaultLogic {
             if (params.amountsOut[i] < params.minAmountsOut[i]) {
                 revert Slippage(cachedAssets[i], params.amountsOut[i], params.minAmountsOut[i]);
             }
+            if (params.amountsOut[i] == 0) revert InvalidAmount();
             _updateIndex($, cachedAssets[i]);
             $.totalSupplies[cachedAssets[i]] -= params.amountsOut[i];
             IERC20(cachedAssets[i]).safeTransfer(params.receiver, params.amountsOut[i]);
