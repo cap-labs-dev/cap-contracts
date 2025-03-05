@@ -39,7 +39,7 @@ abstract contract OAppMessenger is OAppSender {
     /// @dev Message using layer zero. Fee overpays are refunded to caller
     /// @param _destReceiver Receiver of assets on destination chain
     /// @param _amountLD Amount of asset in local decimals
-    /// @param _refundAddress The address to receive any excess fee values sent to the endpoint.
+    /// @param _refundAddress The address to receive any excess fee values sent to the endpoint if the call fails on the destination chain
     function _sendMessage(address _destReceiver, uint256 _amountLD, address _refundAddress) internal {
         MessagingFee memory _fee = MessagingFee({ nativeFee: msg.value, lzTokenFee: 0 });
         (bytes memory message, bytes memory options) = _buildMsgAndOptions(lzReceiveGas, _amountLD, _destReceiver);
