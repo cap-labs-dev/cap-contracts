@@ -59,6 +59,7 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     /// @notice Deposit underlying asset to mint cUSD on MegaETH Testnet
     /// @param _amount Amount of underlying asset to deposit
     /// @param _destReceiver Receiver of the assets on MegaETH Testnet
+    /// @param _refundAddress The address to receive any excess fee values sent to the endpoint.
     function deposit(uint256 _amount, address _destReceiver, address _refundAddress) external payable {
         if (_amount == 0) revert ZeroAmount();
 
