@@ -100,12 +100,25 @@ contract LenderInvariantsTest is TestDeployer {
         for (uint256 i = 0; i < agents.length; i++) {
             address agent = agents[i];
             (uint256 totalDelegation, uint256 totalDebt,,,) = lender.agent(agent);
-            uint256 maxLiquidatable = lender.maxLiquidatable(agent, address(usdc));
-            console.log("totalDelegation", totalDelegation);
-            console.log("totalDebt", totalDebt);
-            console.log("maxLiquidatable", maxLiquidatable);
-            if (maxLiquidatable == 0) {
-                assertGe(totalDelegation, totalDebt, "User borrow must not exceed delegation");
+
+            bool hasLiquidatableAssets = false;
+            address liquidatableAsset = address(0);
+            for (uint256 j = 0; j < usdVault.assets.length; j++) {
+                address asset = usdVault.assets[j];
+                uint256 maxLiquidatable = lender.maxLiquidatable(agent, asset);
+                if (maxLiquidatable > 0) {
+                    hasLiquidatableAssets = true;
+                    liquidatableAsset = asset;
+                    break;
+                }
+            }
+
+            // if the debt is above the delegation, the user must have liquidatable assets
+            // if the debt is below the delegation, the user must not have liquidatable assets
+            if (totalDebt > totalDelegation) {
+                assertTrue(hasLiquidatableAssets, "User must have liquidatable assets");
+            } else {
+                assertFalse(hasLiquidatableAssets, "User must not have liquidatable assets");
             }
         }
     }
@@ -228,6 +241,9 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         if (maxRealization == 0) return;
 
         amount = bound(amount, 0, maxRealization);
+        // skip small amounts as they will result in no interest
+        // realized due to price conversion to usd (8 decimals)
+        if (amount <= 1e10) return;
 
         // deal some cUSD to the realizer
         address realizer = randomActor(assetSeed);

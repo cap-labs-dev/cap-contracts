@@ -164,9 +164,9 @@ library BorrowLogic {
     {
         ILender.ReserveData memory reserve = $.reservesData[params.asset];
         uint256 _maxRealization = maxRealization($, params.asset);
-        if (_maxRealization == 0) revert ZeroRealization();
-
         realizedInterest = params.amount > _maxRealization ? _maxRealization : params.amount;
+        if (realizedInterest == 0) revert ZeroRealization();
+
         $.reservesData[params.asset].realizedInterest += realizedInterest;
         IVault(reserve.vault).borrow(params.asset, realizedInterest, reserve.interestReceiver);
         emit RealizeInterest(params.asset, realizedInterest, reserve.interestReceiver);

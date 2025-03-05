@@ -6,7 +6,7 @@ import { VaultConfig } from "../../../contracts/deploy/interfaces/DeployConfigs.
 import { CapToken } from "../../../contracts/token/CapToken.sol";
 import { StakedCap } from "../../../contracts/token/StakedCap.sol";
 import { MockERC20 } from "../../mocks/MockERC20.sol";
-
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { StdCheats } from "forge-std/StdCheats.sol";
 import { StdUtils } from "forge-std/StdUtils.sol";
 import { Vm } from "forge-std/Vm.sol";
@@ -30,11 +30,13 @@ contract InitTestVaultLiquidity is StdCheats {
 
         for (uint256 i = 0; i < vault.assets.length; i++) {
             MockERC20 asset = MockERC20(vault.assets[i]);
-            uint256 amount = capTokenAmount * 10 ** asset.decimals() / 10 ** capToken.decimals();
+            uint256 amount = Math.mulDiv(capTokenAmount, 10 ** asset.decimals(), 10 ** capToken.decimals());
 
-            MockERC20(asset).mint(randomUser, amount);
-            asset.approve(address(capToken), amount);
-            capToken.mint(address(asset), amount, 0, randomUser, block.timestamp + 1 hours);
+            if (amount > 0) {
+                MockERC20(asset).mint(randomUser, amount);
+                asset.approve(address(capToken), amount);
+                capToken.mint(address(asset), amount, 1, randomUser, block.timestamp + 1 hours);
+            }
         }
 
         capToken.transfer(sendTo, capTokenAmount);

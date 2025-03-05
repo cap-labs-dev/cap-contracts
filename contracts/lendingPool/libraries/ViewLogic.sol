@@ -9,6 +9,7 @@ import { IOracle } from "../../interfaces/IOracle.sol";
 import { IVault } from "../../interfaces/IVault.sol";
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title View Logic
 /// @author kexley, @capLabs
@@ -109,15 +110,14 @@ library ViewLogic {
         if (assetPrice == 0) return 0;
 
         uint256 decPow = 10 ** $.reservesData[_asset].decimals;
-        uint256 a = ($.targetHealth * totalDebt);
-        uint256 b = (totalDelegation * liquidationThreshold);
-        uint256 c = ($.targetHealth - liquidationThreshold);
-        uint256 d = assetPrice;
-        uint256 e = b > a ? 0 : (a - b);
-        uint256 f = (c * d);
-        uint256 g = e * decPow;
+        uint256 targetHealth = $.targetHealth;
 
-        maxLiquidatableAmount = g / f;
+        uint256 a = targetHealth * totalDebt;
+        uint256 b = totalDelegation * liquidationThreshold;
+        uint256 c = targetHealth - liquidationThreshold;
+        uint256 e = b > a ? 0 : (a - b);
+        uint256 f = c * assetPrice;
+        maxLiquidatableAmount = Math.mulDiv(e, decPow, f);
     }
 
     /// @notice Get the current debt balances for an agent for a specific asset
