@@ -334,6 +334,23 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
         }
     }
 
+    function test_setLzReceiveGas() public {
+        assertEq(vault.lzReceiveGas(), 100_000);
+
+        vm.startPrank(owner);
+        vault.setLzReceiveGas(200_000);
+        vm.stopPrank();
+
+        assertEq(vault.lzReceiveGas(), 200_000);
+
+        vm.startPrank(user);
+        vm.expectRevert();
+        vault.setLzReceiveGas(300_000);
+        vm.stopPrank();
+
+        assertEq(vault.lzReceiveGas(), 200_000);
+    }
+
     // allow vm.expectRevert() on verifyPackets
     function externalVerifyPackets(uint32 _eid, bytes32 _to) external {
         verifyPackets(_eid, _to);

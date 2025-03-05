@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { OAppSender, OAppCore } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppSender.sol";
+import { OAppCore, OAppSender } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppSender.sol";
 import { OptionsBuilder } from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 import { MessagingFee, OFTReceipt } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import { OFTMsgCodec } from "@layerzerolabs/oft-evm/contracts/libs/OFTMsgCodec.sol";
@@ -12,7 +12,7 @@ abstract contract OAppMessenger is OAppSender {
     using OptionsBuilder for bytes;
 
     /// @dev Gas limit for the LayerZero bridge
-    uint128 private constant lzReceiveGas = 100_000;
+    uint128 public lzReceiveGas = 100_000;
 
     /// @dev Destination EID for the LayerZero bridge
     uint32 private immutable dstEid;
@@ -71,5 +71,11 @@ abstract contract OAppMessenger is OAppSender {
     /// @return The shared decimals of the OFT.
     function sharedDecimals() public view virtual returns (uint8) {
         return 6;
+    }
+
+    /// @notice Set the receive gas parameter for the LayerZero message
+    /// @param _lzReceiveGas New receive gas parameter
+    function setLzReceiveGas(uint128 _lzReceiveGas) external onlyOwner {
+        lzReceiveGas = _lzReceiveGas;
     }
 }
