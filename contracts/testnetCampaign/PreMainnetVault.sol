@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ERC20, ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 import { OAppMessenger } from "./OAppMessenger.sol";
 
@@ -12,7 +12,7 @@ import { OAppMessenger } from "./OAppMessenger.sol";
 /// @author @capLabs
 /// @notice Vault for pre-mainnet campaign
 /// @dev Underlying asset is deposited on this contract and LayerZero is used to bridge across a
-/// minting message to the testnet. The campaign has a maximum timestamp after which transfers are 
+/// minting message to the testnet. The campaign has a maximum timestamp after which transfers are
 /// enabled to prevent the owner from unduly locking assets.
 contract PreMainnetVault is ERC20Permit, OAppMessenger {
     using SafeERC20 for IERC20Metadata;
@@ -46,12 +46,7 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     /// @param _lzEndpoint Local layerzero endpoint
     /// @param _dstEid Destination lz EID
     /// @param _maxCampaignLength Max campaign length in seconds
-    constructor(
-        address _asset,
-        address _lzEndpoint,
-        uint32 _dstEid,
-        uint256 _maxCampaignLength
-    )
+    constructor(address _asset, address _lzEndpoint, uint32 _dstEid, uint256 _maxCampaignLength)
         ERC20("Boosted cUSD", "bcUSD")
         ERC20Permit("Boosted cUSD")
         OAppMessenger(_lzEndpoint, _dstEid, IERC20Metadata(_asset).decimals())
@@ -64,14 +59,14 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     /// @notice Deposit underlying asset to mint cUSD on MegaETH Testnet
     /// @param _amount Amount of underlying asset to deposit
     /// @param _destReceiver Receiver of the assets on MegaETH Testnet
-    function deposit(uint256 _amount, address _destReceiver) external payable {
+    function deposit(uint256 _amount, address _destReceiver, address _refundAddress) external payable {
         if (_amount == 0) revert ZeroAmount();
 
         asset.safeTransferFrom(msg.sender, address(this), _amount);
 
         _mint(msg.sender, _amount);
 
-        _sendMessage(_destReceiver, _amount);
+        _sendMessage(_destReceiver, _amount, _refundAddress);
 
         emit Deposit(msg.sender, _amount);
     }
