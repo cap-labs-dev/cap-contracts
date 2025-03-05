@@ -334,6 +334,28 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
         }
     }
 
+    function test_revert_deposit_or_withdraw_zero_address_or_amount() public {
+        vm.startPrank(user);
+
+        asset.approve(address(vault), 1);
+
+        MessagingFee memory fee = vault.quote(1, address(0));
+
+        vm.expectRevert(PreMainnetVault.ZeroAddress.selector);
+        vault.deposit{ value: fee.nativeFee }(1, address(0));
+
+        vm.expectRevert(PreMainnetVault.ZeroAmount.selector);
+        vault.deposit{ value: fee.nativeFee }(0, address(0));
+
+        vm.expectRevert(PreMainnetVault.ZeroAddress.selector);
+        vault.withdraw(1, address(0));
+
+        vm.expectRevert(PreMainnetVault.ZeroAmount.selector);
+        vault.withdraw(0, address(0));
+
+        vm.stopPrank();
+    }
+
     // allow vm.expectRevert() on verifyPackets
     function externalVerifyPackets(uint32 _eid, bytes32 _to) external {
         verifyPackets(_eid, _to);
