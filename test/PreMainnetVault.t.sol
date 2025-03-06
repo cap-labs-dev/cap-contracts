@@ -74,7 +74,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
 
             asset.approve(address(vault), initialBalance);
             MessagingFee memory fee = vault.quote(initialBalance, holder);
-            vault.deposit{ value: fee.nativeFee }(initialBalance, holder);
+            vault.deposit{ value: fee.nativeFee }(initialBalance, holder, holder);
 
             vm.stopPrank();
         }
@@ -100,7 +100,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
         emit PreMainnetVault.Deposit(user, amount);
 
         // Deposit with some ETH for LZ fees
-        vault.deposit{ value: fee.nativeFee }(amount, l2user);
+        vault.deposit{ value: fee.nativeFee }(amount, l2user, user);
 
         assertEq(vault.balanceOf(user), amount);
         assertEq(asset.balanceOf(address(vault)), initialBalance + amount);
@@ -174,7 +174,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
         MessagingFee memory fee = vault.quote(1, user);
 
         vm.expectRevert(PreMainnetVault.ZeroAmount.selector);
-        vault.deposit{ value: fee.nativeFee }(0, user);
+        vault.deposit{ value: fee.nativeFee }(0, user, user);
 
         vm.stopPrank();
     }
@@ -189,7 +189,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
         MessagingFee memory fee = vault.quote(amount, user);
 
         vm.expectRevert();
-        vault.deposit{ value: fee.nativeFee - 1 }(amount, user);
+        vault.deposit{ value: fee.nativeFee - 1 }(amount, user, user);
 
         vm.stopPrank();
     }
