@@ -35,6 +35,9 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     /// @dev Transfers not yet enabled
     error TransferNotEnabled();
 
+    /// @dev The campaign has ended
+    error CampaignEnded();
+
     /// @dev Deposit underlying asset
     event Deposit(address indexed user, uint256 amount);
 
@@ -66,6 +69,8 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     function deposit(uint256 _amount, address _destReceiver, address _refundAddress) external payable {
         if (_amount == 0) revert ZeroAmount();
         if (_destReceiver == address(0)) revert ZeroAddress();
+
+        if (transferEnabled()) revert CampaignEnded();
 
         asset.safeTransferFrom(msg.sender, address(this), _amount);
 
