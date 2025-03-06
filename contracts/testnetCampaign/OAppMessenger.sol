@@ -32,7 +32,7 @@ abstract contract OAppMessenger is OAppSender {
     /// @param _destReceiver Receiver of the assets on MegaETH Testnet
     /// @return fee Fee for the LayerZero bridge
     function quote(uint256 _amountLD, address _destReceiver) external view returns (MessagingFee memory fee) {
-        (bytes memory message, bytes memory options) = _buildMsgAndOptions(lzReceiveGas, _amountLD, _destReceiver);
+        (bytes memory message, bytes memory options) = _buildMsgAndOptions(_amountLD, _destReceiver);
         fee = _quote(dstEid, message, options, false);
     }
 
@@ -47,18 +47,17 @@ abstract contract OAppMessenger is OAppSender {
     }
 
     /// @dev Build the message and options for the LayerZero bridge
-    /// @param _gas Gas fee
     /// @param _amountLD Amount in local decimals
     /// @param _destReceiver Receiver of the assets on MegaETH Testnet
     /// @return message Message for the LayerZero bridge
     /// @return options Options for the LayerZero bridge
-    function _buildMsgAndOptions(uint128 _gas, uint256 _amountLD, address _destReceiver)
+    function _buildMsgAndOptions(uint256 _amountLD, address _destReceiver)
         internal
         view
         returns (bytes memory message, bytes memory options)
     {
         (message,) = OFTMsgCodec.encode(OFTMsgCodec.addressToBytes32(_destReceiver), _toSD(_amountLD), "");
-        options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(_gas, 0);
+        options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(lzReceiveGas, 0);
     }
 
     /// @dev Convert amount in local decimals to amount in shared decimals
