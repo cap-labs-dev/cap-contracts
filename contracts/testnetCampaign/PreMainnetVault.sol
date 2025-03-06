@@ -18,10 +18,13 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     using SafeERC20 for IERC20Metadata;
 
     /// @notice Underlying asset
-    IERC20Metadata public asset;
+    IERC20Metadata public immutable asset;
+
+    /// @notice Underlying asset decimals
+    uint8 private immutable assetDecimals;
 
     /// @notice Maximum end timestamp for the campaign after which transfers are enabled
-    uint256 public maxCampaignEnd;
+    uint256 public immutable maxCampaignEnd;
 
     /// @dev Bool for if the transfers are unlocked before the campaign ends
     bool private unlocked;
@@ -59,6 +62,7 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
         Ownable(msg.sender)
     {
         asset = IERC20Metadata(_asset);
+        assetDecimals = asset.decimals();
         maxCampaignEnd = block.timestamp + _maxCampaignLength;
     }
 
@@ -98,7 +102,7 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     /// @notice Override decimals to return decimals of underlying asset
     /// @return decimals Asset decimals
     function decimals() public view override returns (uint8) {
-        return asset.decimals();
+        return assetDecimals;
     }
 
     /// @notice Transfers enabled
