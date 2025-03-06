@@ -29,6 +29,9 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     /// @dev Zero amounts are not allowed for minting
     error ZeroAmount();
 
+    /// @dev Zero addresses are not allowed for minting
+    error ZeroAddress();
+
     /// @dev Transfers not yet enabled
     error TransferNotEnabled();
 
@@ -62,6 +65,7 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     /// @param _refundAddress The address to receive any excess fee values sent to the endpoint if the call fails on the destination chain
     function deposit(uint256 _amount, address _destReceiver, address _refundAddress) external payable {
         if (_amount == 0) revert ZeroAmount();
+        if (_destReceiver == address(0)) revert ZeroAddress();
 
         asset.safeTransferFrom(msg.sender, address(this), _amount);
 
@@ -76,6 +80,9 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     /// @param _amount Amount of underlying asset to withdraw
     /// @param _receiver Receiver of the withdrawn underlying assets
     function withdraw(uint256 _amount, address _receiver) external {
+        if (_amount == 0) revert ZeroAmount();
+        if (_receiver == address(0)) revert ZeroAddress();
+
         _burn(msg.sender, _amount);
 
         asset.safeTransfer(_receiver, _amount);
