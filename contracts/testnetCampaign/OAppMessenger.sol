@@ -61,7 +61,7 @@ abstract contract OAppMessenger is OAppSender {
         options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(_gas, 0);
     }
 
-    /// @dev Convert amount in shared decimals to amount in local decimals
+    /// @dev Convert amount in local decimals to amount in shared decimals
     /// @param _amountLD Amount in local decimals
     /// @return amountSD Amount in shared decimals
     function _toSD(uint256 _amountLD) internal view virtual returns (uint64 amountSD) {
