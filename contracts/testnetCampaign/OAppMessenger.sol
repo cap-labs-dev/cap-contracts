@@ -17,14 +17,14 @@ abstract contract OAppMessenger is OAppSender {
     /// @dev Destination EID for the LayerZero bridge
     uint32 private immutable dstEid;
 
-    /// @dev Decimals of the token
-    uint8 private immutable decimals;
+    /// @dev Decimal conversion rate
+    uint256 private immutable decimalConversionRate;
 
     /// @dev OAppCore sets the endpoint as an immutable variable
     /// @param _lzEndpoint Local layerzero endpoint
     constructor(address _lzEndpoint, uint32 _dstEid, uint8 _decimals) OAppCore(_lzEndpoint, msg.sender) {
         dstEid = _dstEid;
-        decimals = _decimals;
+        decimalConversionRate = 10 ** (_decimals - sharedDecimals());
     }
 
     /// @notice Quote the fee for depositing via the LayerZero bridge
@@ -64,7 +64,7 @@ abstract contract OAppMessenger is OAppSender {
     /// @param _amountLD Amount in local decimals
     /// @return amountSD Amount in shared decimals
     function _toSD(uint256 _amountLD) internal view virtual returns (uint64 amountSD) {
-        return uint64(_amountLD / (10 ** (decimals - sharedDecimals())));
+        return uint64(_amountLD / decimalConversionRate);
     }
 
     /// @notice Retrieves the shared decimals of the OFT.
