@@ -334,6 +334,23 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
         }
     }
 
+    function test_setLzReceiveGas() public {
+        assertEq(vault.lzReceiveGas(), 100_000);
+
+        vm.startPrank(owner);
+        vault.setLzReceiveGas(200_000);
+        vm.stopPrank();
+
+        assertEq(vault.lzReceiveGas(), 200_000);
+
+        vm.startPrank(user);
+        vm.expectRevert();
+        vault.setLzReceiveGas(300_000);
+        vm.stopPrank();
+
+        assertEq(vault.lzReceiveGas(), 200_000);
+    }
+    
     function test_revert_deposit_or_withdraw_zero_address_or_amount() public {
         vm.startPrank(user);
 
