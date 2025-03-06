@@ -359,10 +359,10 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
         MessagingFee memory fee = vault.quote(1, address(0));
 
         vm.expectRevert(PreMainnetVault.ZeroAddress.selector);
-        vault.deposit{ value: fee.nativeFee }(1, address(0));
+        vault.deposit{ value: fee.nativeFee }(1, address(0), address(0));
 
         vm.expectRevert(PreMainnetVault.ZeroAmount.selector);
-        vault.deposit{ value: fee.nativeFee }(0, address(0));
+        vault.deposit{ value: fee.nativeFee }(0, address(0), address(0));
 
         vm.expectRevert(PreMainnetVault.ZeroAddress.selector);
         vault.withdraw(1, address(0));
