@@ -39,10 +39,11 @@ abstract contract OAppMessenger is OAppSender {
     /// @dev Message using layer zero. Fee overpays are refunded to caller
     /// @param _destReceiver Receiver of assets on destination chain
     /// @param _amountLD Amount of asset in local decimals
-    function _sendMessage(address _destReceiver, uint256 _amountLD) internal {
+    /// @param _refundAddress The address to receive any excess fee values sent to the endpoint if the call fails on the destination chain
+    function _sendMessage(address _destReceiver, uint256 _amountLD, address _refundAddress) internal {
         MessagingFee memory _fee = MessagingFee({ nativeFee: msg.value, lzTokenFee: 0 });
-        (bytes memory message, bytes memory options) = _buildMsgAndOptions(_amountLD, _destReceiver);
-        _lzSend(dstEid, message, options, _fee, msg.sender);
+        (bytes memory message, bytes memory options) = _buildMsgAndOptions(lzReceiveGas, _amountLD, _destReceiver);
+        _lzSend(dstEid, message, options, _fee, _refundAddress);
     }
 
     /// @dev Build the message and options for the LayerZero bridge
@@ -59,7 +60,7 @@ abstract contract OAppMessenger is OAppSender {
         options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(lzReceiveGas, 0);
     }
 
-    /// @dev Convert amount in shared decimals to amount in local decimals
+    /// @dev Convert amount in local decimals to amount in shared decimals
     /// @param _amountLD Amount in local decimals
     /// @return amountSD Amount in shared decimals
     function _toSD(uint256 _amountLD) internal view virtual returns (uint64 amountSD) {
