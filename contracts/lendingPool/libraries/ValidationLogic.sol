@@ -67,7 +67,7 @@ library ValidationLogic {
         if (health < 1e27) revert HealthFactorLowerThanLiquidationThreshold(health);
 
         uint256 ltv = IDelegation($.delegation).ltv(params.agent);
-        uint256 assetPrice = IOracle($.oracle).getPrice(params.asset);
+        (uint256 assetPrice,) = IOracle($.oracle).getPrice(params.asset);
         uint256 newTotalDebt = totalDebt + (params.amount * assetPrice / (10 ** reserve.decimals));
         uint256 borrowCapacity = totalDelegation * ltv;
 

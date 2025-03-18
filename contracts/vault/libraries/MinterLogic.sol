@@ -60,8 +60,8 @@ library MinterLogic {
         view
         returns (uint256 amount, uint256 newRatio)
     {
-        uint256 assetPrice = IOracle(_oracle).getPrice(params.asset);
-        uint256 capPrice = IOracle(_oracle).getPrice(address(this));
+        (uint256 assetPrice,) = IOracle(_oracle).getPrice(params.asset);
+        (uint256 capPrice,) = IOracle(_oracle).getPrice(address(this));
 
         uint256 assetDecimalsPow = 10 ** IERC20Metadata(params.asset).decimals();
         uint256 capDecimalsPow = 10 ** IERC20Metadata(address(this)).decimals();

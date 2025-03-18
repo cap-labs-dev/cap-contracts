@@ -38,12 +38,13 @@ library ViewLogic {
             }
 
             address asset = $.reservesList[i];
+            (uint256 assetPrice,) = IOracle($.oracle).getPrice(asset);
 
             totalDebt += (
                 IERC20($.reservesData[asset].principalDebtToken).balanceOf(_agent)
                     + IERC20($.reservesData[asset].interestDebtToken).balanceOf(_agent)
                     + IERC20($.reservesData[asset].restakerDebtToken).balanceOf(_agent)
-            ) * IOracle($.oracle).getPrice(asset) / (10 ** $.reservesData[asset].decimals);
+            ) * assetPrice / (10 ** $.reservesData[asset].decimals);
         }
 
         ltv = totalDelegation == 0 ? 0 : (totalDebt * 1e27) / totalDelegation;
@@ -75,7 +76,7 @@ library ViewLogic {
         uint256 remainingCapacity = borrowCapacity - totalDebt;
 
         // Convert to asset amount using price and decimals
-        uint256 assetPrice = IOracle($.oracle).getPrice(_asset);
+        (uint256 assetPrice,) = IOracle($.oracle).getPrice(_asset);
         if (assetPrice == 0) return 0;
 
         uint256 assetDecimals = $.reservesData[_asset].decimals;
@@ -103,7 +104,7 @@ library ViewLogic {
         (uint256 totalDelegation, uint256 totalDebt,, uint256 liquidationThreshold, uint256 health) = agent($, _agent);
         if (health >= 1e27) return 0;
 
-        uint256 assetPrice = IOracle($.oracle).getPrice(_asset);
+        (uint256 assetPrice,) = IOracle($.oracle).getPrice(_asset);
 
         uint256 decPow = 10 ** $.reservesData[_asset].decimals;
         uint256 a = ($.targetHealth * totalDebt);
