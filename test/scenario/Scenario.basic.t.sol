@@ -83,7 +83,7 @@ contract ScenarioBasicTest is TestDeployer {
             uint256 usdx_total_supplies = cUSD.totalSupplies(address(usdx));
             console.log("USDX total supplies", usdx_total_supplies);
 
-            uint256 cUSD_price = IOracle(env.infra.oracle).getPrice(address(cUSD));
+            (uint256 cUSD_price,) = IOracle(env.infra.oracle).getPrice(address(cUSD));
             console.log("cUSD price", cUSD_price);
 
             uint256 cap_token_supply = cUSD.totalSupply();
