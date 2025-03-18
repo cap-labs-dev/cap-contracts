@@ -154,8 +154,10 @@ library VaultLogic {
         whenNotPaused($, params.asset)
         updateIndex($, params.asset)
     {
-        uint256 balanceBefore = IERC20(params.asset).balanceOf(address(this));
-        if (balanceBefore < params.amount) revert InsufficientReserves(params.asset, balanceBefore, params.amount);
+        uint256 balance = availableBalance($, params.asset);
+        if (balance < params.amount) {
+            revert InsufficientReserves(params.asset, balance, params.amount);
+        }
 
         $.totalBorrows[params.asset] += params.amount;
         IERC20(params.asset).safeTransfer(params.receiver, params.amount);
@@ -231,6 +233,14 @@ library VaultLogic {
         if (_listed($, _asset)) revert AssetNotRescuable(_asset);
         IERC20(_asset).safeTransfer(_receiver, IERC20(_asset).balanceOf(address(this)));
         emit RescueERC20(_asset, _receiver);
+    }
+
+    /// @notice Calculate the available balance of an asset
+    /// @param $ Vault storage pointer
+    /// @param _asset Asset address
+    /// @return balance Available balance
+    function availableBalance(IVault.VaultStorage storage $, address _asset) public view returns (uint256 balance) {
+        balance = $.totalSupplies[_asset] - $.totalBorrows[_asset];
     }
 
     /// @notice Calculate the utilization ratio of an asset
