@@ -213,13 +213,12 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         DelegationStorage storage $ = getDelegationStorage();
 
         // If the agent already exists, we revert
-        for (uint i; i < $.agents.length; ++i) {
-            if ($.agents[i] == _agent) revert DuplicateAgent();
-        }
+        if ($.agentData[_agent].exists) revert DuplicateAgent();
 
         $.agents.push(_agent);
         $.agentData[_agent].ltv = _ltv;
         $.agentData[_agent].liquidationThreshold = _liquidationThreshold;
+        $.agentData[_agent].exists = true;
         emit AddAgent(_agent, _ltv, _liquidationThreshold);
     }
 
@@ -234,15 +233,11 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         DelegationStorage storage $ = getDelegationStorage();
 
         // Check that the agent exists
-        for (uint i; i < $.agents.length; ++i) {
-            if ($.agents[i] == _agent) {
-                $.agentData[_agent].ltv = _ltv;
-                $.agentData[_agent].liquidationThreshold = _liquidationThreshold;
-                emit ModifyAgent(_agent, _ltv, _liquidationThreshold);
-                return;
-            }
-        }
-        revert AgentDoesNotExist();
+        if (!$.agentData[_agent].exists) revert AgentDoesNotExist();
+
+        $.agentData[_agent].ltv = _ltv;
+        $.agentData[_agent].liquidationThreshold = _liquidationThreshold;
+        emit ModifyAgent(_agent, _ltv, _liquidationThreshold);
     }
 
     /// @notice Register a new network
@@ -252,12 +247,10 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         DelegationStorage storage $ = getDelegationStorage();
 
         // Check for duplicates
-        for (uint i; i < $.networks[_agent].length; ++i) {
-            if ($.networks[_agent][i] == _network) revert DuplicateNetwork();
-        }
+        if ($.networkExistsForAgent[_agent][_network]) revert DuplicateNetwork();
 
         $.networks[_agent].push(_network);
-
+        $.networkExistsForAgent[_agent][_network] = true;
         emit RegisterNetwork(_agent, _network);
     }
 
