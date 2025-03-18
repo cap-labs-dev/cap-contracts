@@ -132,7 +132,7 @@ library VaultLogic {
     /// @param $ Vault storage pointer
     /// @param params Redeem parameters
     function redeem(IVault.VaultStorage storage $, IVault.RedeemParams memory params) external {
-        if (params.amountsOut.length != $.assets.length) revert InvalidMinAmountsOut();
+        if (params.amountsOut.length != params.minAmountsOut.length) revert InvalidMinAmountsOut();
         if (params.deadline < block.timestamp) revert PastDeadline();
 
         address[] memory cachedAssets = $.assets;
