@@ -204,8 +204,7 @@ contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, FractionalRese
     /// @param _asset Asset to borrow
     /// @return amount Amount available
     function availableBalance(address _asset) external view returns (uint256 amount) {
-        VaultStorage storage $ = getVaultStorage();
-        amount = $.totalSupplies[_asset] - $.totalBorrows[_asset];
+        amount = VaultLogic.availableBalance(getVaultStorage(), _asset);
     }
 
     /// @notice Utilization rate of an asset

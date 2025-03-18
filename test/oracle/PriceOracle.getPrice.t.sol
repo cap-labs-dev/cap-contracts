@@ -12,7 +12,7 @@ contract PriceOracleGetPriceTest is TestDeployer {
     }
 
     function test_price_oracle_get_price() public view {
-        uint256 usdtPrice = IOracle(env.infra.oracle).getPrice(address(usdt));
+        (uint256 usdtPrice,) = IOracle(env.infra.oracle).getPrice(address(usdt));
         assertEq(usdtPrice, 1e8, "USDT price should be $1");
     }
 }

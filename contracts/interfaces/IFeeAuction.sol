@@ -59,4 +59,7 @@ interface IFeeAuction {
 
     /// @dev Duration must be set
     error NoDuration();
+
+    /// @dev Minimum start price must be set
+    error NoMinStartPrice();
 }
