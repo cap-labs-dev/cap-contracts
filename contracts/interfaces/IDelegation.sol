@@ -9,14 +9,17 @@ interface IDelegation is IRestakerRewardReceiver {
         address[] agents;
         mapping(address => AgentData) agentData;
         mapping(address => address[]) networks;
+        mapping(address => mapping(address => bool)) networkExistsForAgent;
         address oracle;
         uint256 epochDuration;
+        uint256 ltvBuffer;
     }
 
     struct AgentData {
         uint256 ltv;
         uint256 liquidationThreshold;
         uint256 lastBorrow;
+        bool exists;
     }
 
     /// @notice Slash a network
@@ -53,6 +56,10 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @param amount Amount
     event NetworkReward(address network, address asset, uint256 amount);
 
+    /// @notice Set the ltv buffer
+    /// @param ltvBuffer LTV buffer
+    event SetLtvBuffer(uint256 ltvBuffer);
+
     /// @notice Agent does not exist
     error AgentDoesNotExist();
 
@@ -61,6 +68,15 @@ interface IDelegation is IRestakerRewardReceiver {
 
     /// @notice Duplicate network
     error DuplicateNetwork();
+
+    /// @notice Invalid liquidation threshold
+    error InvalidLiquidationThreshold();
+
+    /// @notice Liquidation threshold too close to ltv
+    error LiquidationThresholdTooCloseToLtv();
+
+    /// @notice Invalid ltv buffer
+    error InvalidLtvBuffer();
 
     /// @notice Initialize the contract
     /// @param _accessControl Access control address
@@ -79,6 +95,10 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @notice Get the current epoch
     /// @return currentEpoch Current epoch
     function epoch() external view returns (uint256 currentEpoch);
+
+    /// @notice Get the ltv buffer
+    /// @return buffer LTV buffer
+    function ltvBuffer() external view returns (uint256 buffer);
 
     /// @notice Get the timestamp that is most recent between the last borrow and the epoch -1
     /// @param _agent The agent address
@@ -161,4 +181,8 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @param _agent Agent address
     /// @param _network Network address
     function registerNetwork(address _agent, address _network) external;
+
+    /// @notice Set the ltv buffer
+    /// @param _ltvBuffer LTV buffer
+    function setLtvBuffer(uint256 _ltvBuffer) external;
 }
