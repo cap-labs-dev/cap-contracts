@@ -9,6 +9,7 @@ interface IDelegation is IRestakerRewardReceiver {
         address[] agents;
         mapping(address => AgentData) agentData;
         mapping(address => address[]) networks;
+        mapping(address => mapping(address => bool)) networkExistsForAgent;
         address oracle;
         uint256 epochDuration;
         uint256 ltvBuffer;
@@ -18,6 +19,7 @@ interface IDelegation is IRestakerRewardReceiver {
         uint256 ltv;
         uint256 liquidationThreshold;
         uint256 lastBorrow;
+        bool exists;
     }
 
     /// @notice Slash a network
