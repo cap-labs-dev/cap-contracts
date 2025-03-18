@@ -140,7 +140,7 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
 
         address collateralAddress = IVault(_vault).collateral();
         decimals = IERC20Metadata(collateralAddress).decimals();
-        collateralPrice = IOracle(_oracle).getPrice(collateralAddress);
+        (collateralPrice,) = IOracle(_oracle).getPrice(collateralAddress);
     }
 
     /// @notice Coverage of an agent by a specific vault at a given timestamp

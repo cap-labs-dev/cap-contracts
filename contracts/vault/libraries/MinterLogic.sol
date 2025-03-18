@@ -11,6 +11,12 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 /// @author kexley, @capLabs
 /// @notice Amount out logic for exchanging underlying assets with cap tokens
 library MinterLogic {
+    /// @dev Ray precision
+    uint256 constant RAY_PRECISION = 1e27;
+
+    /// @dev Share precision
+    uint256 constant SHARE_PRECISION = 1e33;
+
     /// @notice Calculate the amount out from a swap including fees
     /// @param $ Storage pointer
     /// @param params Parameters for a swap
@@ -38,15 +44,15 @@ library MinterLogic {
         returns (uint256[] memory amounts)
     {
         uint256 redeemFee = $.redeemFee;
-        uint256 shares = params.amount * 1e27 / IERC20(address(this)).totalSupply();
+        uint256 shares = params.amount * SHARE_PRECISION / IERC20(address(this)).totalSupply();
         address[] memory assets = IVault(address(this)).assets();
         uint256 assetLength = assets.length;
         amounts = new uint256[](assetLength);
         for (uint256 i; i < assetLength; ++i) {
             address asset = assets[i];
-            uint256 withdrawAmount = IVault(address(this)).totalSupplies(asset) * shares / 1e27;
+            uint256 withdrawAmount = IVault(address(this)).totalSupplies(asset) * shares / SHARE_PRECISION;
 
-            amounts[i] = withdrawAmount - (withdrawAmount * redeemFee / 1e27);
+            amounts[i] = withdrawAmount - (withdrawAmount * redeemFee / RAY_PRECISION);
         }
     }
 
@@ -60,8 +66,8 @@ library MinterLogic {
         view
         returns (uint256 amount, uint256 newRatio)
     {
-        uint256 assetPrice = IOracle(_oracle).getPrice(params.asset);
-        uint256 capPrice = IOracle(_oracle).getPrice(address(this));
+        (uint256 assetPrice,) = IOracle(_oracle).getPrice(params.asset);
+        (uint256 capPrice,) = IOracle(_oracle).getPrice(address(this));
 
         uint256 assetDecimalsPow = 10 ** IERC20Metadata(params.asset).decimals();
         uint256 capDecimalsPow = 10 ** IERC20Metadata(address(this)).decimals();
@@ -74,22 +80,22 @@ library MinterLogic {
         if (params.mint) {
             assetValue = params.amount * assetPrice / assetDecimalsPow;
             if (capSupply == 0) {
-                newRatio = 1e27;
+                newRatio = RAY_PRECISION;
                 amount = params.amount * capDecimalsPow / assetDecimalsPow;
             } else {
-                newRatio = (allocationValue + assetValue) * 1e27 / (capValue + assetValue);
+                newRatio = (allocationValue + assetValue) * RAY_PRECISION / (capValue + assetValue);
                 amount = assetValue * capDecimalsPow / capPrice;
             }
         } else {
             assetValue = params.amount * capPrice / capDecimalsPow;
             if (params.amount == capSupply) {
-                newRatio = 1e27;
+                newRatio = RAY_PRECISION;
                 amount = params.amount * assetDecimalsPow / capDecimalsPow;
             } else {
                 if (allocationValue < assetValue || capValue <= assetValue) {
                     newRatio = 0;
                 } else {
-                    newRatio = (allocationValue - assetValue) * 1e27 / (capValue - assetValue);
+                    newRatio = (allocationValue - assetValue) * RAY_PRECISION / (capValue - assetValue);
                 }
                 amount = assetValue * assetDecimalsPow / assetPrice;
             }
@@ -111,7 +117,7 @@ library MinterLogic {
             if (params.ratio > fees.optimalRatio) {
                 if (params.ratio > fees.mintKinkRatio) {
                     uint256 excessRatio = params.ratio - fees.mintKinkRatio;
-                    rate = fees.slope0 + (fees.slope1 * excessRatio / 1e27);
+                    rate = fees.slope0 + (fees.slope1 * excessRatio / RAY_PRECISION);
                 } else {
                     rate = fees.slope0 * params.ratio / fees.mintKinkRatio;
                 }
@@ -120,14 +126,14 @@ library MinterLogic {
             if (params.ratio < fees.optimalRatio) {
                 if (params.ratio < fees.burnKinkRatio) {
                     uint256 excessRatio = fees.burnKinkRatio - params.ratio;
-                    rate = fees.slope0 + (fees.slope1 * excessRatio / 1e27);
+                    rate = fees.slope0 + (fees.slope1 * excessRatio / RAY_PRECISION);
                 } else {
                     rate = fees.slope0 * fees.burnKinkRatio / params.ratio;
                 }
             }
         }
 
-        if (rate > 1e27) rate = 1e27;
-        amount = params.amount - (params.amount * rate / 1e27);
+        if (rate > RAY_PRECISION) rate = RAY_PRECISION;
+        amount = params.amount - (params.amount * rate / RAY_PRECISION);
     }
 }

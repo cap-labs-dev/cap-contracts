@@ -28,6 +28,9 @@ library VaultLogic {
     /// @dev Asset is already listed
     error AssetAlreadySupported(address asset);
 
+    /// @dev Asset has supplies
+    error AssetHasSupplies(address asset);
+
     /// @dev Only non-supported assets can be rescued
     error AssetNotRescuable(address asset);
 
@@ -154,8 +157,10 @@ library VaultLogic {
         whenNotPaused($, params.asset)
         updateIndex($, params.asset)
     {
-        uint256 balanceBefore = IERC20(params.asset).balanceOf(address(this));
-        if (balanceBefore < params.amount) revert InsufficientReserves(params.asset, balanceBefore, params.amount);
+        uint256 balance = availableBalance($, params.asset);
+        if (balance < params.amount) {
+            revert InsufficientReserves(params.asset, balance, params.amount);
+        }
 
         $.totalBorrows[params.asset] += params.amount;
         IERC20(params.asset).safeTransfer(params.receiver, params.amount);
@@ -190,6 +195,7 @@ library VaultLogic {
     /// @param $ Vault storage pointer
     /// @param _asset Asset address
     function removeAsset(IVault.VaultStorage storage $, address _asset) external {
+        if ($.totalSupplies[_asset] > 0) revert AssetHasSupplies(_asset);
         address[] memory cachedAssets = $.assets;
         uint256 length = cachedAssets.length;
         bool removed;
@@ -231,6 +237,14 @@ library VaultLogic {
         if (_listed($, _asset)) revert AssetNotRescuable(_asset);
         IERC20(_asset).safeTransfer(_receiver, IERC20(_asset).balanceOf(address(this)));
         emit RescueERC20(_asset, _receiver);
+    }
+
+    /// @notice Calculate the available balance of an asset
+    /// @param $ Vault storage pointer
+    /// @param _asset Asset address
+    /// @return balance Available balance
+    function availableBalance(IVault.VaultStorage storage $, address _asset) public view returns (uint256 balance) {
+        balance = $.totalSupplies[_asset] - $.totalBorrows[_asset];
     }
 
     /// @notice Calculate the utilization ratio of an asset
