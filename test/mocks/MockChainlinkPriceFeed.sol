@@ -20,4 +20,12 @@ contract MockChainlinkPriceFeed {
     function latestAnswer() external view returns (int256) {
         return _latestAnswer;
     }
+
+    function latestRoundData()
+        external
+        view
+        returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)
+    {
+        return (0, _latestAnswer, 0, block.timestamp, 0);
+    }
 }
