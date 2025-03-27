@@ -243,12 +243,12 @@ clear_results() {
 }
 
 diff_mutants() {
-    gambit summary --mutation-directory $GAMBIT_OUTDIR --mids $(list_surviving_mutants_nums)
+    gambit summary --mutation-directory $GAMBIT_OUTDIR --mids $(list_mutants_nums is_mutant_survivor)
 }
 
 print_stats() {
     local total_mutants=$(ls $MUTANT_DIR | wc -w | tr -d ' ')
-    local surviving_mutants=$(list_surviving_mutants_nums | wc -w | tr -d ' ')
+    local surviving_mutants=$(list_mutants_nums is_mutant_survivor | wc -w | tr -d ' ')
     local surviving_mutants_percentage=$(( (surviving_mutants * 100) / total_mutants ))
     local killed_mutants=$((total_mutants - surviving_mutants))
     local kill_rate=$(( (killed_mutants * 100) / total_mutants ))
