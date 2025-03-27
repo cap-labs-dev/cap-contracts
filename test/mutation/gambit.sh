@@ -62,9 +62,44 @@ build_runner_docker_image() {
     fi
 }
 
-# Check if a mutant has survived
-# Returns 1 if the mutant has survived or not found, 0 otherwise
-has_mutant_survived() {
+is_mutant_untested() {
+    local mutant_num=$1
+    local result_file="$RESULTS_DIR/$mutant_num"
+    if [ ! -f "$result_file" ]; then
+        return 0 # not found -> assume not killed
+    fi
+    return 1 # found -> assume tested
+}
+
+is_mutant_killed() {
+    local mutant_num=$1
+    local result_file="$RESULTS_DIR/$mutant_num"
+    if [ ! -f "$result_file" ]; then
+        return 1 # not found -> assume not killed
+    fi
+    result=$(<"$result_file")
+    if [[ "$result" != *"KILLED"* ]]; then
+        return 1 # not killed
+    else
+        return 0 # killed
+    fi
+}
+
+is_mutant_survivor() {
+    local mutant_num=$1
+    local result_file="$RESULTS_DIR/$mutant_num"
+    if [ ! -f "$result_file" ]; then
+        return 1 # not found -> assume survived
+    fi
+    result=$(<"$result_file")
+    if [[ "$result" != *"KILLED"* ]]; then
+        return 0 # survived
+    else
+        return 1 # killed
+    fi
+}
+
+is_mutant_survivor_or_untested() {
     local mutant_num=$1
     local result_file="$RESULTS_DIR/$mutant_num"
     if [ ! -f "$result_file" ]; then
@@ -79,26 +114,30 @@ has_mutant_survived() {
 }
 
 
-list_surviving_mutants_nums() {
-    # Find all mutant directories
-    mutant_dirs=$(ls $MUTANT_DIR)
+list_mutants_nums() {
+    local function_name=$1
+    if [ -z "$function_name" ]; then
+        echo "Error: Function name is required"
+        exit 1
+    fi
 
     # Check if any mutants exist
+    local mutant_dirs=$(ls $MUTANT_DIR)
     if [ ${#mutant_dirs[@]} -eq 0 ]; then
         echo "Error: No mutant directories found in $MUTANT_DIR"
         exit 1
     fi
 
-    # Filter out already killed mutants
     filtered_mutants=""
     for mutant in ${mutant_dirs[@]}; do
-        if has_mutant_survived "$mutant"; then
+        if $function_name "$mutant"; then
             filtered_mutants="$filtered_mutants $mutant"
         fi
     done
 
     echo "$filtered_mutants"
 }
+
 
 # Function to test a single mutant
 test_mutant() {
@@ -132,7 +171,18 @@ test_mutant() {
 export -f test_mutant
 
 execute_mutant_tests_parallel() {
-    local parallel_jobs=${1:-$DEFAULT_PARALLEL_JOBS}
+    local scope_function=$1
+    if [ -z "$scope_function" ]; then
+        echo "Error: Scope function is required"
+        exit 1
+    fi
+
+    local parallel_jobs=${2:-$DEFAULT_PARALLEL_JOBS}
+    if [ -z "$parallel_jobs" ]; then
+        echo "Error: Parallel jobs parameter is required"
+        exit 1
+    fi
+
     build_runner_docker_image
 
     # Counters for mutants
@@ -146,7 +196,7 @@ execute_mutant_tests_parallel() {
         exit 1
     fi
 
-    local filtered_mutants=$(list_surviving_mutants_nums)
+    local filtered_mutants=$(list_mutants_nums $scope_function)
     if [ -z "$filtered_mutants" ]; then
         echo "No new mutants to test - all existing mutants were already killed"
         exit 0
@@ -252,7 +302,10 @@ case $1 in
         test_baseline
         ;;
     "test")
-        execute_mutant_tests_parallel "$2"
+        execute_mutant_tests_parallel is_mutant_untested "$2"
+        ;;
+    "test_survivors")
+        execute_mutant_tests_parallel is_mutant_survivor "$2"
         ;;
     "clear_results")
         clear_results
@@ -263,8 +316,14 @@ case $1 in
     "stats")
         print_stats
         ;;
+    "killed")
+        list_mutants_nums is_mutant_killed
+        ;;
     "survivors")
-        list_surviving_mutants_nums
+        list_mutants_nums is_mutant_survivor
+        ;;
+    "untested")
+        list_mutants_nums is_mutant_untested
         ;;
     "help")
         help
