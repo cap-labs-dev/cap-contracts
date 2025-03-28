@@ -9,7 +9,7 @@ contract ConfigureDelegation {
         Delegation(infra.delegation).addAgent(agent, 0.5e27, 0.7e27);
     }
 
-    function _initDelegationAgentDelegator(InfraConfig memory infra, address agent, address delegator) internal {
-        Delegation(infra.delegation).registerNetwork(agent, delegator);
+    function _initDelegationAgentDelegator(InfraConfig memory infra, address agent, address network) internal {
+        Delegation(infra.delegation).registerNetwork(agent, network);
     }
 }

@@ -5,6 +5,7 @@ test = "test"
 libs = ["node_modules", "lib"]
 script = "scripts"
 solc_version = "0.8.28"
+ignored_warnings_from = ["node_modules", "lib"]
 remappings = [
     "@symbioticfi/core/=node_modules/@symbioticfi/core/",
     "@symbioticfi/burners/=node_modules/@symbioticfi/burners/",

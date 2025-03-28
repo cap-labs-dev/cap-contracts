@@ -305,7 +305,7 @@ contract TestDeployer is
             vm.startPrank(env.users.delegation_admin);
             for (uint256 i = 0; i < 2; i++) {
                 address agent = env.testUsers.agents[i];
-                _initDelegationAgentDelegator(env.infra, agent, _getSymbioticVaultConfig(i).delegator);
+                _initDelegationAgentDelegator(env.infra, agent, env.symbiotic.networkAdapter.networkMiddleware);
             }
             vm.stopPrank();
         }
