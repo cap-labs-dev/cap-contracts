@@ -263,13 +263,13 @@ contract TestDeployer is
                 env.symbiotic.networkAdapter,
                 _getSymbioticVaultConfig(0),
                 _getSymbioticNetworkRewardsConfig(0),
-                env.testUsers.agents
+                env.testUsers.agents[0]
             );
             _registerVaultsInNetworkMiddleware(
                 env.symbiotic.networkAdapter,
                 _getSymbioticVaultConfig(1),
                 _getSymbioticNetworkRewardsConfig(1),
-                env.testUsers.agents
+                env.testUsers.agents[1]
             );
 
             console.log("registering agents as operator");
@@ -291,7 +291,7 @@ contract TestDeployer is
 
             console.log("vaults delegating to agents");
             vm.startPrank(env.symbiotic.users.vault_admin);
-            for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
+            for (uint256 i = 0; i < 2; i++) {
                 address _agent = env.testUsers.agents[i];
                 _symbioticVaultDelegateToAgent(
                     _getSymbioticVaultConfig(0), env.symbiotic.networkAdapter, _agent, type(uint256).max
@@ -303,9 +303,9 @@ contract TestDeployer is
 
             console.log("init symbiotic delegation");
             vm.startPrank(env.users.delegation_admin);
-            for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
+            for (uint256 i = 0; i < 2; i++) {
                 address agent = env.testUsers.agents[i];
-                _initDelegationAgentDelegator(env.infra, agent, env.symbiotic.networkAdapter.networkMiddleware);
+                _initDelegationAgentDelegator(env.infra, agent, _getSymbioticVaultConfig(i).delegator);
             }
             vm.stopPrank();
         }

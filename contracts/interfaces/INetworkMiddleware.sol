@@ -13,7 +13,7 @@ interface INetworkMiddleware {
         uint48 requiredEpochDuration;
         uint256 feeAllowed;
         mapping(address => address) stakerRewarders; // vault => stakerRewarder
-        mapping(address => address[]) vaults; // agent => vault[]
+        mapping(address => address) vaults; // agent => vault
     }
 
     enum SlasherType {
@@ -65,8 +65,9 @@ interface INetworkMiddleware {
 
     /// @notice Register vault to be used as collateral within the CAP system
     /// @param _vault Vault address
-    /// @param _agents Agents supported by the vault
-    function registerVault(address _vault, address _stakerRewarder, address[] calldata _agents) external;
+    /// @param _stakerRewarder Staker rewarder address
+    /// @param _agent Agent address
+    function registerVault(address _vault, address _stakerRewarder, address _agent) external;
 
     /// @notice Set fee allowed
     /// @param _feeAllowed Fee allowed to be charged on rewards by restakers
@@ -121,10 +122,10 @@ interface INetworkMiddleware {
         view
         returns (uint256 _slashableCollateral);
 
-    /// @notice Registered vaults for an agent
+    /// @notice Registered vault for an agent
     /// @param _agent Agent address
-    /// @return vaultAddresses Vault addresses
-    function vaults(address _agent) external view returns (address[] memory vaultAddresses);
+    /// @return vault Vault address
+    function vaults(address _agent) external view returns (address vault);
 
     /// @notice Distribute rewards accumulated by the agent borrowing
     /// @param _agent Agent address

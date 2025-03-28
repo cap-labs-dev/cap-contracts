@@ -12,11 +12,9 @@ contract MockNetworkMiddleware is INetworkMiddleware {
     mapping(address => mapping(address => uint256)) public mockCollateralByVault;
     mapping(address => mapping(address => uint256)) public mockSlashableCollateralByVault;
 
-    function registerVault(address _vault, address _stakerRewarder, address[] calldata _agents) external {
+    function registerVault(address _vault, address _stakerRewarder, address _agent) external {
         _storage.stakerRewarders[_vault] = _stakerRewarder;
-        for (uint256 i = 0; i < _agents.length; i++) {
-            _storage.vaults[_agents[i]].push(_vault);
-        }
+        _storage.vaults[_agent] = _vault;
         emit VaultRegistered(_vault);
     }
 
@@ -28,12 +26,10 @@ contract MockNetworkMiddleware is INetworkMiddleware {
         mockSlashableCollateral[_agent] -= mockSlashableCollateral[_agent] * _slashShare / 1e18;
         mockCoverage[_agent] -= mockCoverage[_agent] * _slashShare / 1e18;
 
-        for (uint256 i = 0; i < _storage.vaults[_agent].length; i++) {
-            address _vault = _storage.vaults[_agent][i];
-            mockCollateralByVault[_agent][_vault] -= mockCollateralByVault[_agent][_vault] * _slashShare / 1e18;
-            mockSlashableCollateralByVault[_agent][_vault] -=
-                mockSlashableCollateralByVault[_agent][_vault] * _slashShare / 1e18;
-        }
+        address _vault = _storage.vaults[_agent];
+        mockCollateralByVault[_agent][_vault] -= mockCollateralByVault[_agent][_vault] * _slashShare / 1e18;
+        mockSlashableCollateralByVault[_agent][_vault] -=
+            mockSlashableCollateralByVault[_agent][_vault] * _slashShare / 1e18;
         emit Slash(_agent, _recipient, _slashShare);
     }
 
@@ -61,7 +57,7 @@ contract MockNetworkMiddleware is INetworkMiddleware {
         _slashableCollateral = mockSlashableCollateral[_agent];
     }
 
-    function vaults(address _agent) external view returns (address[] memory vaultAddresses) {
+    function vaults(address _agent) external view returns (address vault) {
         return _storage.vaults[_agent];
     }
 

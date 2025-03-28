@@ -8,8 +8,8 @@ interface IDelegation is IRestakerRewardReceiver {
     struct DelegationStorage {
         address[] agents;
         mapping(address => AgentData) agentData;
-        mapping(address => address[]) networks;
-        mapping(address => mapping(address => bool)) networkExistsForAgent;
+        mapping(address => address) networks;
+        mapping(address => bool) networkExists;
         address oracle;
         uint256 epochDuration;
         uint256 ltvBuffer;
@@ -50,12 +50,6 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @param amount Amount
     event DistributeReward(address agent, address asset, uint256 amount);
 
-    /// @notice Network reward
-    /// @param network Network address
-    /// @param asset Asset address
-    /// @param amount Amount
-    event NetworkReward(address network, address asset, uint256 amount);
-
     /// @notice Set the ltv buffer
     /// @param ltvBuffer LTV buffer
     event SetLtvBuffer(uint256 ltvBuffer);
@@ -68,6 +62,9 @@ interface IDelegation is IRestakerRewardReceiver {
 
     /// @notice Duplicate network
     error DuplicateNetwork();
+
+    /// @notice Network already registered
+    error NetworkAlreadyRegistered();
 
     /// @notice Invalid liquidation threshold
     error InvalidLiquidationThreshold();
@@ -115,25 +112,10 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @return _slashableCollateral Amount in USD (8 decimals) that a agent has provided as slashable collateral from the delegators
     function slashableCollateral(address _agent) external view returns (uint256 _slashableCollateral);
 
-    /// @notice How much delegation and agent has available to back their borrows
-    /// @param _agent The agent addres
-    /// @param _network The network covering the agent
-    /// @return delegation Amount in USD that a agent has as delegation from the networks, encoded with 8 decimals
-    function coverageByNetwork(address _agent, address _network) external view returns (uint256 delegation);
-
-    /// @notice Slashable collateral of an agent by a specific network
+    /// @notice Fetch active network address
     /// @param _agent Agent address
-    /// @param _network Network address
-    /// @return _slashableCollateral Slashable collateral amount in USD (8 decimals)
-    function slashableCollateralByNetwork(address _agent, address _network)
-        external
-        view
-        returns (uint256 _slashableCollateral);
-
-    /// @notice Fetch active network addresses
-    /// @param _agent Agent address
-    /// @return networkAddresses network addresses
-    function networks(address _agent) external view returns (address[] memory networkAddresses);
+    /// @return networkAddress network address
+    function networks(address _agent) external view returns (address networkAddress);
 
     /// @notice Fetch active agent addresses
     /// @return agentAddresses Agent addresses

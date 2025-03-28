@@ -89,6 +89,20 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
             BorrowLogic.realizeInterest(getLenderStorage(), RealizeInterestParams({ asset: _asset, amount: _amount }));
     }
 
+    /// @notice Realize interest for restaker debt of an agent for an asset
+    /// @param _agent Agent to realize interest for
+    /// @param _asset Asset to realize interest for
+    /// @param _amount Amount of interest to realize (type(uint).max for all available interest)
+    /// @return actualRealized Actual amount realized
+    function realizeRestakerInterest(address _agent, address _asset, uint256 _amount)
+        external
+        returns (uint256 actualRealized)
+    {
+        actualRealized = BorrowLogic.realizeRestakerInterest(
+            getLenderStorage(), RealizeRestakerInterestParams({ agent: _agent, asset: _asset, amount: _amount })
+        );
+    }
+
     /// @notice Calculate the maximum interest that can be realized
     /// @param _asset Asset to calculate max realization for
     /// @return _maxRealization Maximum interest that can be realized

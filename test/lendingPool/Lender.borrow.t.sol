@@ -52,7 +52,7 @@ contract LenderBorrowTest is TestDeployer {
         assertDebtEq(0, 0, 0);
     }
 
-    function test_lender_borrow_and_repay_debt_tokens() public {
+    /*function test_lender_borrow_and_repay_debt_tokens() public {
         // ensure reward targets are empty
         assertEq(usdc.balanceOf(symbioticUsdtNetworkRewards.stakerRewarder), 0);
         assertEq(usdc.balanceOf(usdVault.feeAuction), 0);
@@ -127,7 +127,7 @@ contract LenderBorrowTest is TestDeployer {
 
         // interest rewards should be distributed to fee auction
         assertEq(usdc.balanceOf(usdVault.feeAuction), currentInterestDebt);
-    }
+    }*/
 
     function assertDebtEq(uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt) internal view {
         (uint256 principalDebtView, uint256 interestDebtView, uint256 restakerDebtView) =

@@ -80,9 +80,7 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     /// @return delegation Amount in USD (8 decimals) that a agent has provided as delegation from the delegators
     function coverage(address _agent) public view returns (uint256 delegation) {
         DelegationStorage storage $ = getDelegationStorage();
-        for (uint i; i < $.networks[_agent].length; ++i) {
-            delegation += coverageByNetwork(_agent, $.networks[_agent][i]);
-        }
+        delegation = INetworkMiddleware($.networks[_agent]).coverage(_agent);
     }
 
     /// @notice How much slashable coverage an agent has available to back their borrows
@@ -91,38 +89,14 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     function slashableCollateral(address _agent) public view returns (uint256 _slashableCollateral) {
         DelegationStorage storage $ = getDelegationStorage();
         uint48 _slashTimestamp = slashTimestamp(_agent);
-        for (uint i; i < $.networks[_agent].length; ++i) {
-            _slashableCollateral +=
-                INetworkMiddleware($.networks[_agent][i]).slashableCollateral(_agent, _slashTimestamp);
-        }
+        _slashableCollateral = INetworkMiddleware($.networks[_agent]).slashableCollateral(_agent, _slashTimestamp);
     }
 
-    /// @notice How much delegation and agent has available to back their borrows
-    /// @param _agent The agent addres
-    /// @param _network The network covering the agent
-    /// @return delegation Amount in USD that a agent has as delegation from the networks, encoded with 8 decimals
-    function coverageByNetwork(address _agent, address _network) public view returns (uint256 delegation) {
-        delegation = INetworkMiddleware(_network).coverage(_agent);
-    }
-
-    /// @notice Slashable collateral of an agent by a specific network
+    /// @notice Fetch active network address
     /// @param _agent Agent address
-    /// @param _network Network address
-    /// @return _slashableCollateral Slashable collateral amount in USD (8 decimals)
-    function slashableCollateralByNetwork(address _agent, address _network)
-        public
-        view
-        returns (uint256 _slashableCollateral)
-    {
-        uint48 _slashTimestamp = slashTimestamp(_agent);
-        _slashableCollateral = INetworkMiddleware(_network).slashableCollateral(_agent, _slashTimestamp);
-    }
-
-    /// @notice Fetch active network addresses
-    /// @param _agent Agent address
-    /// @return networkAddresses network addresses
-    function networks(address _agent) external view returns (address[] memory networkAddresses) {
-        networkAddresses = getDelegationStorage().networks[_agent];
+    /// @return networkAddress network address
+    function networks(address _agent) external view returns (address networkAddress) {
+        networkAddress = getDelegationStorage().networks[_agent];
     }
 
     /// @notice Fetch active agent addresses
@@ -154,18 +128,13 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         DelegationStorage storage $ = getDelegationStorage();
         uint48 _slashTimestamp = slashTimestamp(_agent);
 
-        // Calculate each network's proportion of total delegation
-        for (uint i; i < $.networks[_agent].length; ++i) {
-            address network = $.networks[_agent][i];
-            uint256 networkSlashableCollateral =
-                INetworkMiddleware(network).slashableCollateral(_agent, _slashTimestamp);
-            if (networkSlashableCollateral == 0) continue;
+        address network = $.networks[_agent];
+        uint256 networkSlashableCollateral = INetworkMiddleware(network).slashableCollateral(_agent, _slashTimestamp);
+        uint256 slashShare = _amount * 1e18 / networkSlashableCollateral;
+        if (slashShare > 1e18) slashShare = 1e18;
 
-            // Calculate this network's share of the total amount to slash
-            uint256 networkSlash = _amount * 1e18 / networkSlashableCollateral;
-            INetworkMiddleware(network).slash(_agent, _liquidator, networkSlash, _slashTimestamp);
-            emit SlashNetwork(network, networkSlash);
-        }
+        INetworkMiddleware(network).slash(_agent, _liquidator, slashShare, _slashTimestamp);
+        emit SlashNetwork(network, _amount);
     }
 
     /// @notice Distribute rewards to networks covering an agent proportionally to their coverage
@@ -180,17 +149,9 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         // in case we are liquidating the current agent due to 0 coverage
         if (totalCoverage == 0) return;
 
-        // Distribute to each network based on their coverage proportion
-        for (uint i; i < $.networks[_agent].length; ++i) {
-            address network = $.networks[_agent][i];
-            uint256 networkCoverage = coverageByNetwork(_agent, network);
-            if (networkCoverage == 0) continue;
-
-            uint256 networkReward = _amount * networkCoverage / totalCoverage;
-            IERC20(_asset).safeTransfer(network, networkReward);
-            INetworkMiddleware(network).distributeRewards(_agent, _asset);
-            emit NetworkReward(network, _asset, networkReward);
-        }
+        address network = $.networks[_agent];
+        IERC20(_asset).safeTransfer(network, _amount);
+        INetworkMiddleware(network).distributeRewards(_agent, _asset);
 
         emit DistributeReward(_agent, _asset, _amount);
     }
@@ -255,10 +216,11 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         DelegationStorage storage $ = getDelegationStorage();
 
         // Check for duplicates
-        if ($.networkExistsForAgent[_agent][_network]) revert DuplicateNetwork();
+        if ($.networkExists[_network]) revert DuplicateNetwork();
+        if ($.networks[_agent] != address(0)) revert NetworkAlreadyRegistered();
 
-        $.networks[_agent].push(_network);
-        $.networkExistsForAgent[_agent][_network] = true;
+        $.networks[_agent] = _network;
+        $.networkExists[_network] = true;
         emit RegisterNetwork(_agent, _network);
     }
 

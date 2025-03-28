@@ -51,10 +51,10 @@ interface ILender {
         address restakerDebtToken;
         address interestDebtToken;
         address interestReceiver;
-        address restakerInterestReceiver;
         uint8 decimals;
         bool paused;
         uint256 realizedInterest;
+        mapping(address => uint256) realizedRestakerInterest;
     }
 
     /// @dev Agent configuration map
@@ -91,6 +91,15 @@ interface ILender {
     /// @param asset Asset to realize interest for
     /// @param amount Amount of interest to realize
     struct RealizeInterestParams {
+        address asset;
+        uint256 amount;
+    }
+
+    /// @dev Realize restaker interest parameters
+    /// @param asset Asset to realize interest for
+    /// @param amount Amount of interest to realize
+    struct RealizeRestakerInterestParams {
+        address agent;
         address asset;
         uint256 amount;
     }
@@ -151,6 +160,15 @@ interface ILender {
     /// @param _amount Amount of interest to realize (type(uint).max for all available interest)
     /// @return actualRealized Actual amount realized
     function realizeInterest(address _asset, uint256 _amount) external returns (uint256 actualRealized);
+
+    /// @notice Realize interest for restaker debt of an agent for an asset
+    /// @param _agent Agent to realize interest for
+    /// @param _asset Asset to realize interest for
+    /// @param _amount Amount of interest to realize (type(uint).max for all available interest)
+    /// @return actualRealized Actual amount realized
+    function realizeRestakerInterest(address _agent, address _asset, uint256 _amount)
+        external
+        returns (uint256 actualRealized);
 
     /// @notice Initiate liquidation of an agent when the health is below 1
     /// @param _agent Agent address

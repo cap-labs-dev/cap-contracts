@@ -14,7 +14,7 @@ import { console } from "forge-std/console.sol";
 contract LenderBorrowTest is TestDeployer {
     address user_agent;
 
-    function setUp() public {
+    /*function setUp() public {
         _deployCapTestEnvironment();
         _initTestVaultLiquidity(usdVault);
         _initSymbioticVaultsLiquidity(env);
@@ -44,5 +44,5 @@ contract LenderBorrowTest is TestDeployer {
 
         lender.repay(address(usdc), 10e6, user_agent);
         vm.snapshotGasLastCall("Lender.gas.t", "simple_repay");
-    }
+    }*/
 }

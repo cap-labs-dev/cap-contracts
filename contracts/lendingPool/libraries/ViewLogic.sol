@@ -132,9 +132,9 @@ library ViewLogic {
         view
         returns (uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt)
     {
-        ILender.ReserveData memory reserve = $.reservesData[_asset];
+        ILender.ReserveData storage reserve = $.reservesData[_asset];
         principalDebt = IERC20(reserve.principalDebtToken).balanceOf(_agent);
-        restakerDebt = IERC20(reserve.restakerDebtToken).balanceOf(_agent);
         interestDebt = IERC20(reserve.interestDebtToken).balanceOf(_agent);
+        restakerDebt = IERC20(reserve.restakerDebtToken).balanceOf(_agent);
     }
 }
