@@ -6,7 +6,7 @@ import { TestDeployer } from "../deploy/TestDeployer.sol";
 contract StakedCapWithdrawTest is TestDeployer {
     address user;
 
-    function setUp() public {
+    function _setUp() public {
         _deployCapTestEnvironment();
         _initTestVaultLiquidity(usdVault);
 
@@ -15,6 +15,8 @@ contract StakedCapWithdrawTest is TestDeployer {
     }
 
     function test_staked_cap_withdraw() public {
+        _setUp();
+
         vm.startPrank(user);
 
         uint256 outputAmount = scUSD.withdraw(100e18, user, user);

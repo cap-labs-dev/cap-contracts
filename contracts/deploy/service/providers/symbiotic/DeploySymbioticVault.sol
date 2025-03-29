@@ -42,6 +42,7 @@ contract DeploySymbioticVault is ProxyUtils {
         config.globalReceiver = address(new SimpleBurner(params.collateral));
         config.vaultEpochDuration = params.vaultEpochDuration;
         config.collateral = params.collateral;
+        config.coveredAgent = params.coveredAgent;
 
         // burner router setup
         // https://docs.symbiotic.fi/guides/vault-deployment/#1-burner-router

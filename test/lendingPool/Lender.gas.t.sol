@@ -22,8 +22,8 @@ contract LenderBorrowTest is TestDeployer {
         user_agent = _getRandomAgent();
 
         vm.startPrank(env.symbiotic.users.vault_admin);
-        _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2_000e18);
-        _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, user_agent, 1_000_000e6);
+        _symbioticVaultSetCoveredAgentDelegation(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2_000e18);
+        _symbioticVaultSetCoveredAgentDelegation(symbioticUsdtVault, env.symbiotic.networkAdapter, user_agent, 1_000_000e6);
 
         // have something to repay
         vm.startPrank(user_agent);

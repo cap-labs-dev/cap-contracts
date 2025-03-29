@@ -112,10 +112,11 @@ contract DeployCapNetworkAdapter is ProxyUtils {
     function _registerVaultsInNetworkMiddleware(
         SymbioticNetworkAdapterConfig memory adapter,
         SymbioticVaultConfig memory vault,
-        SymbioticNetworkRewardsConfig memory rewards,
-        address agent
+        SymbioticNetworkRewardsConfig memory rewards
     ) internal {
-        NetworkMiddleware(adapter.networkMiddleware).registerVault(vault.vault, rewards.stakerRewarder, agent);
+        NetworkMiddleware(adapter.networkMiddleware).registerVault(
+            vault.vault, rewards.stakerRewarder, vault.coveredAgent
+        );
     }
 
     function _agentRegisterAsOperator(SymbioticAddressbook memory addressbook) internal {

@@ -18,11 +18,8 @@ contract MiddlewareTest is TestDeployer {
         {
             vm.startPrank(env.symbiotic.users.vault_admin);
 
-            for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-                address agent = env.testUsers.agents[i];
-                _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 2e18);
-                _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 1000e6);
-            }
+            _symbioticVaultSetCoveredAgentDelegation(symbioticWethVault, env.symbiotic.networkAdapter, 2e18);
+            _symbioticVaultSetCoveredAgentDelegation(symbioticUsdtVault, env.symbiotic.networkAdapter, 1000e6);
 
             _timeTravel(symbioticUsdtVault.vaultEpochDuration + 1 days);
 
@@ -59,8 +56,8 @@ contract MiddlewareTest is TestDeployer {
             vm.startPrank(env.symbiotic.users.vault_admin);
 
             // remove all delegations to our slashable agent
-            _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 0);
-            _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 0);
+            _symbioticVaultSetCoveredAgentDelegation(symbioticUsdtVault, env.symbiotic.networkAdapter, 0);
+            _symbioticVaultSetCoveredAgentDelegation(symbioticWethVault, env.symbiotic.networkAdapter, 0);
 
             vm.stopPrank();
         }
@@ -91,8 +88,8 @@ contract MiddlewareTest is TestDeployer {
         {
             vm.startPrank(env.symbiotic.users.vault_admin);
 
-            _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 0);
-            _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 0);
+            _symbioticVaultSetCoveredAgentDelegation(symbioticUsdtVault, env.symbiotic.networkAdapter, 0);
+            _symbioticVaultSetCoveredAgentDelegation(symbioticWethVault, env.symbiotic.networkAdapter, 0);
             _timeTravel(symbioticUsdtVault.vaultEpochDuration + 1 days);
 
             vm.stopPrank();
@@ -104,8 +101,8 @@ contract MiddlewareTest is TestDeployer {
         {
             vm.startPrank(env.symbiotic.users.vault_admin);
 
-            _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 1000e6);
-            _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 2e18);
+            _symbioticVaultSetCoveredAgentDelegation(symbioticUsdtVault, env.symbiotic.networkAdapter, 1000e6);
+            _symbioticVaultSetCoveredAgentDelegation(symbioticWethVault, env.symbiotic.networkAdapter, 2e18);
 
             vm.stopPrank();
         }

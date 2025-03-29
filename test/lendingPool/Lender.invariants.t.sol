@@ -96,7 +96,7 @@ contract LenderInvariantsTest is TestDeployer {
     /// @dev Test that user borrows never exceed their delegation
     /// forge-config: default.invariant.depth = 25
     function invariant_agentDelegationLimitsDebt() public view {
-        address[] memory agents = env.testUsers.agents;
+        address[] memory agents = env.symbiotic.coveredAgents;
         for (uint256 i = 0; i < agents.length; i++) {
             address agent = agents[i];
             (uint256 totalDelegation, uint256 totalDebt,,,) = lender.agent(agent);
@@ -122,7 +122,7 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
     Lender lender;
 
     constructor(TestEnvConfig memory _env)
-        RandomActorUtils(_env.testUsers.agents)
+        RandomActorUtils(_env.symbiotic.coveredAgents)
         RandomAssetUtils(_env.usdVault.assets)
     {
         env = _env;

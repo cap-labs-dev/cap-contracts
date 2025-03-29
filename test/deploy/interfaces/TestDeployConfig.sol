@@ -44,11 +44,11 @@ struct SymbioticTestEnvConfig {
     address[] delegators;
     address[] slashers;
     address[] networkRewards;
+    address[] coveredAgents;
     uint48[] vaultEpochDurations;
 }
 
 struct TestUsersConfig {
-    address[] agents;
     address[] restakers;
     address stablecoin_minter;
     address liquidator;

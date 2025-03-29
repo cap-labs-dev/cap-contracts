@@ -28,6 +28,7 @@ struct SymbioticUsersConfig {
 struct SymbioticVaultParams {
     address vault_admin;
     address collateral;
+    address coveredAgent;
     uint48 vaultEpochDuration;
     uint48 burnerRouterDelay;
 }
@@ -39,5 +40,6 @@ struct SymbioticVaultConfig {
     address globalReceiver;
     address delegator;
     address slasher;
+    address coveredAgent;
     uint48 vaultEpochDuration;
 }

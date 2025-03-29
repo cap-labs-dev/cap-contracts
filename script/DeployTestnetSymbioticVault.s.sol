@@ -105,7 +105,7 @@ contract DeployTestnetSymbioticVault is
         console.log("registering vault to all agents");
         for (uint256 i = 0; i < agents.length; i++) {
             _networkOptInToSymbioticVault(networkAdapter, vault, agents[i]);
-            _symbioticVaultDelegateToAgent(vault, networkAdapter, agents[i], 1e42);
+            _symbioticVaultSetCoveredAgentDelegation(vault, networkAdapter, agents[i], 1e42);
         }
 
         console.log("init delegation");

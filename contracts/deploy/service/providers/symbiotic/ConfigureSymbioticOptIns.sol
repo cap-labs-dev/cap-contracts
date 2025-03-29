@@ -55,10 +55,9 @@ contract ConfigureSymbioticOptIns {
     // Networks can opt into vaults to set maximum stake limits they’re willing to accept. This is done using the setMaxNetworkLimit function of the vault’s delegator.
     function _networkOptInToSymbioticVault(
         SymbioticNetworkAdapterConfig memory networkAdapter,
-        SymbioticVaultConfig memory vault,
-        address agent
+        SymbioticVaultConfig memory vault
     ) internal {
-        Network(networkAdapter.network).registerVault(vault.vault, agent);
+        Network(networkAdapter.network).registerVault(vault.vault, vault.coveredAgent);
     }
 
     // 4. Vault to Agent Delegation
@@ -66,19 +65,18 @@ contract ConfigureSymbioticOptIns {
     // > https://docs.symbiotic.fi/modules/registries/#vault-allocation-to-networks
     // Since CAP want agent isolation we have a subnetwork per agent
     // this means that setting the network limit is the same as setting the agent delegation
-    function _symbioticVaultDelegateToAgent(
+    function _symbioticVaultSetCoveredAgentDelegation(
         SymbioticVaultConfig memory vault,
         SymbioticNetworkAdapterConfig memory networkAdapter,
-        address agent,
         uint256 amount
     ) internal {
         INetworkRestakeDelegator delegator = INetworkRestakeDelegator(vault.delegator);
         NetworkMiddleware middleware = NetworkMiddleware(networkAdapter.networkMiddleware);
-        bytes32 subnetwork = middleware.subnetwork(agent);
+        bytes32 subnetwork = middleware.subnetwork(vault.coveredAgent);
 
         delegator.setNetworkLimit(subnetwork, amount);
-        if (delegator.operatorNetworkShares(subnetwork, agent) != 1e18) {
-            delegator.setOperatorNetworkShares(subnetwork, agent, 1e18);
+        if (delegator.operatorNetworkShares(subnetwork, vault.coveredAgent) != 1e18) {
+            delegator.setOperatorNetworkShares(subnetwork, vault.coveredAgent, 1e18);
         }
     }
 }
