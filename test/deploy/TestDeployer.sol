@@ -190,7 +190,7 @@ contract TestDeployer is
 
             vm.startPrank(env.users.delegation_admin);
             for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-                _configureMockNetworkMiddleware(env, networkMock, env.testUsers.agents[i]);
+                _configureMockNetworkMiddleware(env, networkMock);
                 _setMockNetworkMiddlewareAgentCoverage(env, env.testUsers.agents[i], 1_000_000e8);
             }
         } else {
@@ -305,18 +305,18 @@ contract TestDeployer is
             vm.startPrank(env.users.delegation_admin);
             for (uint256 i = 0; i < 2; i++) {
                 address agent = env.testUsers.agents[i];
-                _initDelegationAgentDelegator(env.infra, agent, env.symbiotic.networkAdapter.networkMiddleware);
+                _initDelegationAgent(env.infra, agent, env.symbiotic.networkAdapter.networkMiddleware);
             }
             vm.stopPrank();
         }
 
         /// DELEGATION
-        console.log("init delegation");
+      /*  console.log("init delegation");
         vm.startPrank(env.users.delegation_admin);
         for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
             address agent = env.testUsers.agents[i];
-            _initDelegationAgent(env.infra, agent);
-        }
+            _initDelegationAgent(env.infra, agent, env.symbiotic.networkAdapter.networkMiddleware);
+        }*/
 
         // change  epoch
         _timeTravel(28 days);

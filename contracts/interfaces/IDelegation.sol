@@ -8,7 +8,6 @@ interface IDelegation is IRestakerRewardReceiver {
     struct DelegationStorage {
         address[] agents;
         mapping(address => AgentData) agentData;
-        mapping(address => address) networks;
         mapping(address => bool) networkExists;
         address oracle;
         uint256 epochDuration;
@@ -16,6 +15,7 @@ interface IDelegation is IRestakerRewardReceiver {
     }
 
     struct AgentData {
+        address network;
         uint256 ltv;
         uint256 liquidationThreshold;
         uint256 lastBorrow;
@@ -31,7 +31,7 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @param agent Agent address
     /// @param ltv LTV
     /// @param liquidationThreshold Liquidation threshold
-    event AddAgent(address agent, uint256 ltv, uint256 liquidationThreshold);
+    event AddAgent(address agent, address network, uint256 ltv, uint256 liquidationThreshold);
 
     /// @notice Modify an agent
     /// @param agent Agent address
@@ -40,9 +40,8 @@ interface IDelegation is IRestakerRewardReceiver {
     event ModifyAgent(address agent, uint256 ltv, uint256 liquidationThreshold);
 
     /// @notice Register a network
-    /// @param agent Agent address
     /// @param network Network address
-    event RegisterNetwork(address agent, address network);
+    event RegisterNetwork(address network);
 
     /// @notice Distribute a reward
     /// @param agent Agent address
@@ -65,6 +64,9 @@ interface IDelegation is IRestakerRewardReceiver {
 
     /// @notice Network already registered
     error NetworkAlreadyRegistered();
+
+    /// @notice Network does not exist
+    error NetworkDoesntExist();
 
     /// @notice Invalid liquidation threshold
     error InvalidLiquidationThreshold();
@@ -149,9 +151,10 @@ interface IDelegation is IRestakerRewardReceiver {
 
     /// @notice Add agent to be delegated to
     /// @param _agent Agent address
+    /// @param _network Network address
     /// @param _ltv Loan to value ratio
     /// @param _liquidationThreshold Liquidation threshold
-    function addAgent(address _agent, uint256 _ltv, uint256 _liquidationThreshold) external;
+    function addAgent(address _agent, address _network, uint256 _ltv, uint256 _liquidationThreshold) external;
 
     /// @notice Modify an agents config only callable by the operator
     /// @param _agent the agent to modify
@@ -160,9 +163,8 @@ interface IDelegation is IRestakerRewardReceiver {
     function modifyAgent(address _agent, uint256 _ltv, uint256 _liquidationThreshold) external;
 
     /// @notice Register a new network
-    /// @param _agent Agent address
     /// @param _network Network address
-    function registerNetwork(address _agent, address _network) external;
+    function registerNetwork(address _network) external;
 
     /// @notice Set the ltv buffer
     /// @param _ltvBuffer LTV buffer

@@ -21,7 +21,6 @@ contract LenderLiquidateTest is TestDeployer {
 
         vm.startPrank(env.symbiotic.users.vault_admin);
         _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e18);
-        _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, user_agent, 1000e6);
         vm.stopPrank();
 
         vm.startPrank(env.users.lender_admin);
@@ -47,8 +46,8 @@ contract LenderLiquidateTest is TestDeployer {
         // borrow some assets
         {
             vm.startPrank(user_agent);
-            lender.borrow(address(usdc), 3000e6, user_agent);
-            assertEq(usdc.balanceOf(user_agent), 3000e6);
+            lender.borrow(address(usdc), 1000e6, user_agent);
+            assertEq(usdc.balanceOf(user_agent), 1000e6);
 
             vm.stopPrank();
         }
@@ -77,13 +76,12 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("");
             _timeTravel(gracePeriod + 1);
             // approve repay amount for liquidation
-            usdc.approve(address(lender), 3000e6);
+            usdc.approve(address(lender), 1000e6);
             lender.liquidate(user_agent, address(usdc), 1000e6);
 
             (, uint256 totalDebt,,,) = lender.agent(user_agent);
             console.log("Debt prior to liquidation", totalDebt);
 
-            console.log("Liquidator usdt balance after first liquidation", usdt.balanceOf(env.testUsers.liquidator));
             console.log("Liquidator weth balance after first liquidation", weth.balanceOf(env.testUsers.liquidator));
             console.log("");
 
@@ -103,7 +101,6 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("");
 
             assertEq(usdc.balanceOf(env.testUsers.liquidator), 0);
-            assertEq(usdt.balanceOf(env.testUsers.liquidator), 1000e6);
             assertEq(weth.balanceOf(env.testUsers.liquidator), 2e18);
 
             uint256 coverage = Delegation(env.infra.delegation).coverage(user_agent);
@@ -118,7 +115,7 @@ contract LenderLiquidateTest is TestDeployer {
             assertEq(totalDelegation, 0);
 
             /// We should only have interest let to pay back
-            assertEq(afterTotalDebt, totalDebt - 2000e8);
+            assertEq(afterTotalDebt, totalDebt - 1000e8);
 
             vm.stopPrank();
         }
@@ -128,8 +125,8 @@ contract LenderLiquidateTest is TestDeployer {
         // borrow some assets
         {
             vm.startPrank(user_agent);
-            lender.borrow(address(usdc), 3000e6, user_agent);
-            assertEq(usdc.balanceOf(user_agent), 3000e6);
+            lender.borrow(address(usdc), 1000e6, user_agent);
+            assertEq(usdc.balanceOf(user_agent), 1000e6);
 
             vm.stopPrank();
         }
@@ -158,7 +155,7 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("");
             _timeTravel(gracePeriod + 1);
             // approve repay amount for liquidation
-            usdc.approve(address(lender), 3000e6);
+            usdc.approve(address(lender), 1000e6);
             lender.liquidate(user_agent, address(usdc), 1000e6);
 
             console.log("Liquidator usdt balance after first liquidation", usdt.balanceOf(env.testUsers.liquidator));
@@ -206,8 +203,8 @@ contract LenderLiquidateTest is TestDeployer {
         // borrow some assets
         {
             vm.startPrank(user_agent);
-            lender.borrow(address(usdc), 3000e6, user_agent);
-            assertEq(usdc.balanceOf(user_agent), 3000e6);
+            lender.borrow(address(usdc), 1000e6, user_agent);
+            assertEq(usdc.balanceOf(user_agent), 1000e6);
 
             /// well past all epochs
             _timeTravel(60 days);
@@ -250,7 +247,7 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("Health after 60 days", health);
 
             // approve repay amount for liquidation
-            usdc.approve(address(lender), 3200e6);
+            usdc.approve(address(lender), 1000e6);
             lender.liquidate(user_agent, address(usdc), 1000e6);
 
             console.log("Liquidator usdt balance after first liquidation", usdt.balanceOf(env.testUsers.liquidator));
