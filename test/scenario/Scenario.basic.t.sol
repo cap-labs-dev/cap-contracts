@@ -24,8 +24,7 @@ contract ScenarioBasicTest is TestDeployer {
         user_agent = _getRandomAgent();
 
         vm.startPrank(env.symbiotic.users.vault_admin);
-        _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e18);
-        _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, user_agent, 1000e6);
+        _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 3e18);
         vm.stopPrank();
 
         vm.startPrank(env.users.lender_admin);

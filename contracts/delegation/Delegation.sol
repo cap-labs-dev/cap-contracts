@@ -38,15 +38,6 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         $.ltvBuffer = 0.05e27; // 5%
     }
 
-    /// @notice How much global delegation we have in the system
-    /// @return delegation Delegation in USD
-    function globalDelegation() external view returns (uint256 delegation) {
-        DelegationStorage storage $ = getDelegationStorage();
-        for (uint i; i < $.agents.length; ++i) {
-            delegation += coverage($.agents[i]);
-        }
-    }
-
     /// @notice Get the epoch duration
     /// @return duration Epoch duration in seconds
     function epochDuration() external view returns (uint256 duration) {
@@ -89,7 +80,8 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     function slashableCollateral(address _agent) public view returns (uint256 _slashableCollateral) {
         DelegationStorage storage $ = getDelegationStorage();
         uint48 _slashTimestamp = slashTimestamp(_agent);
-        _slashableCollateral = INetworkMiddleware($.agentData[_agent].network).slashableCollateral(_agent, _slashTimestamp);
+        _slashableCollateral =
+            INetworkMiddleware($.agentData[_agent].network).slashableCollateral(_agent, _slashTimestamp);
     }
 
     /// @notice Fetch active network address

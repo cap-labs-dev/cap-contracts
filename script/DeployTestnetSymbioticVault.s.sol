@@ -93,7 +93,9 @@ contract DeployTestnetSymbioticVault is
         _registerCapNetworkInVault(networkAdapter, vault);
 
         console.log("registering vaults in network middleware");
-        _registerVaultsInNetworkMiddleware(networkAdapter, vault, rewards, agents);
+        for (uint256 i = 0; i < agents.length; i++) {
+            _registerVaultsInNetworkMiddleware(networkAdapter, vault, rewards, agents[i]);
+        }
 
         console.log("registering agents as operator");
         for (uint256 i = 0; i < agents.length; i++) {

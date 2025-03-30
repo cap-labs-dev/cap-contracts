@@ -46,9 +46,7 @@ contract DeployMocks {
         delegationNetwork = address(new MockNetworkMiddleware());
     }
 
-    function _configureMockNetworkMiddleware(TestEnvConfig memory env, address delegationNetwork)
-        internal
-    {
+    function _configureMockNetworkMiddleware(TestEnvConfig memory env, address delegationNetwork) internal {
         IDelegation(env.infra.delegation).registerNetwork(delegationNetwork);
     }
 

@@ -83,10 +83,6 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @param _epochDuration Epoch duration in seconds
     function initialize(address _accessControl, address _oracle, uint256 _epochDuration) external;
 
-    /// @notice How much global delegation we have in the system
-    /// @return delegation Delegation in USD
-    function globalDelegation() external view returns (uint256 delegation);
-
     /// @notice Get the epoch duration
     /// @return duration Epoch duration in seconds
     function epochDuration() external view returns (uint256 duration);

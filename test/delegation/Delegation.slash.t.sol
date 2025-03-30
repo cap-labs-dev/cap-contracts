@@ -18,8 +18,7 @@ contract DelegationSlashTest is TestDeployer {
 
         vm.startPrank(env.symbiotic.users.vault_admin);
         _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e18);
-        //_symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, user_agent, 1000e6);
-
+        
         _timeTravel(30 days);
         vm.stopPrank();
     }
@@ -27,8 +26,7 @@ contract DelegationSlashTest is TestDeployer {
     function test_delegation_view_functions() public view {
         assertEq(delegation.epochDuration(), 1 days);
         assertEq(delegation.epoch(), block.timestamp / 1 days);
-        assertEq(delegation.agents().length, 2);
-        assertEq(delegation.globalDelegation(), 9520000000000);
+        assertEq(delegation.agents().length, 3);
         assertEq(delegation.slashableCollateral(user_agent), 2 * 2600e8);
     }
 
@@ -37,9 +35,10 @@ contract DelegationSlashTest is TestDeployer {
 
         address liquidator = makeAddr("liquidator");
 
-        /// USD Value of 400 of delegation
+        /// USD Value of 260 of delegation
         delegation.slash(user_agent, liquidator, 260e8);
 
+        // Since WETH is worth $2600 we expect 0.1 ETH
         assertApproxEqAbs(weth.balanceOf(liquidator), 1e17, 1);
 
         vm.stopPrank();
@@ -60,10 +59,10 @@ contract DelegationSlashTest is TestDeployer {
         assertEq(delegation.ltv(new_agent), 0.8e27);
         assertEq(delegation.liquidationThreshold(new_agent), 0.85e27);
 
-        delegation.registerNetwork(new_agent);
+        delegation.registerNetwork(env.symbiotic.networkAdapter.networkMiddleware);
 
         vm.expectRevert(IDelegation.DuplicateNetwork.selector);
-        delegation.registerNetwork(new_agent);
+        delegation.registerNetwork(env.symbiotic.networkAdapter.networkMiddleware);
 
         vm.stopPrank();
         vm.startPrank(env.infra.lender);

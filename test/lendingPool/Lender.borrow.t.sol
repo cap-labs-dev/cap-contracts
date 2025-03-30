@@ -25,7 +25,6 @@ contract LenderBorrowTest is TestDeployer {
 
         vm.startPrank(env.symbiotic.users.vault_admin);
         _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e18);
-        _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, user_agent, 1000e6);
 
         uint256 assetIndex = _getAssetIndex(usdVault, address(usdc));
         principalDebtToken = PrincipalDebtToken(usdVault.principalDebtTokens[assetIndex]);
