@@ -18,7 +18,7 @@ contract DelegationSlashTest is TestDeployer {
 
         vm.startPrank(env.symbiotic.users.vault_admin);
         _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e18);
-        
+
         _timeTravel(30 days);
         vm.stopPrank();
     }
@@ -59,7 +59,8 @@ contract DelegationSlashTest is TestDeployer {
         assertEq(delegation.ltv(new_agent), 0.8e27);
         assertEq(delegation.liquidationThreshold(new_agent), 0.85e27);
 
-        delegation.registerNetwork(env.symbiotic.networkAdapter.networkMiddleware);
+        bool istrue = delegation.networkExists(env.symbiotic.networkAdapter.networkMiddleware);
+        assertEq(istrue, true);
 
         vm.expectRevert(IDelegation.DuplicateNetwork.selector);
         delegation.registerNetwork(env.symbiotic.networkAdapter.networkMiddleware);
