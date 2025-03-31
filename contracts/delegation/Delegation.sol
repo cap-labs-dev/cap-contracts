@@ -172,7 +172,7 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
 
         // If the agent already exists, we revert
         if ($.agentData[_agent].exists) revert DuplicateAgent();
-        if ($.networkExists[_network]) revert NetworkDoesntExist();
+        if (!$.networkExists[_network]) revert NetworkDoesntExist();
 
         $.agents.push(_agent);
         $.agentData[_agent].network = _network;
