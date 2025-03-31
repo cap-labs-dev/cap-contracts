@@ -424,9 +424,7 @@ contract TestDeployer is
 
     NetworkMiddleware middleware;
     SymbioticVaultConfig symbioticWethVault;
-    SymbioticVaultConfig symbioticUsdtVault;
     SymbioticNetworkRewardsConfig symbioticWethNetworkRewards;
-    SymbioticNetworkRewardsConfig symbioticUsdtNetworkRewards;
 
     Lender lender;
     Delegation delegation;

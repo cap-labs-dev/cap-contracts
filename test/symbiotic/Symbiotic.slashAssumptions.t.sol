@@ -27,7 +27,7 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
                 _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 2e18);
             }
 
-            _timeTravel(symbioticUsdtVault.vaultEpochDuration + 1 days);
+            _timeTravel(symbioticWethVault.vaultEpochDuration + 1 days);
 
             vm.stopPrank();
         }

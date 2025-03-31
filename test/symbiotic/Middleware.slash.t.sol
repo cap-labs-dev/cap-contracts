@@ -23,7 +23,7 @@ contract MiddlewareTest is TestDeployer {
                 _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 2e18);
             }
 
-            _timeTravel(symbioticUsdtVault.vaultEpochDuration + 1 days);
+            _timeTravel(symbioticWethVault.vaultEpochDuration + 1 days);
 
             vm.stopPrank();
         }
@@ -62,7 +62,7 @@ contract MiddlewareTest is TestDeployer {
             vm.stopPrank();
         }
 
-        _timeTravel(symbioticUsdtVault.vaultEpochDuration + 1);
+        _timeTravel(symbioticWethVault.vaultEpochDuration + 1);
 
         {
             vm.startPrank(env.infra.delegation);
@@ -89,7 +89,7 @@ contract MiddlewareTest is TestDeployer {
             vm.startPrank(env.symbiotic.users.vault_admin);
 
             _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 0);
-            _timeTravel(symbioticUsdtVault.vaultEpochDuration + 1 days);
+            _timeTravel(symbioticWethVault.vaultEpochDuration + 1 days);
 
             vm.stopPrank();
         }
