@@ -179,7 +179,7 @@ contract ScenarioBasicTest is TestDeployer {
             cUSD.approve(address(cUSDFeeAuction), 1000e18);
             uint256 startPrice = cUSDFeeAuction.currentPrice();
             console.log("Start price of fee auction", startPrice);
-            cUSDFeeAuction.buy(assets, mev_bot, "");
+            cUSDFeeAuction.buy(startPrice, assets, new uint256[](assets.length), mev_bot, block.timestamp, "");
 
             vm.stopPrank();
         }
@@ -230,8 +230,9 @@ contract ScenarioBasicTest is TestDeployer {
 
             uint256 startPrice = cUSDFeeAuction.startPrice();
             assertEq(startPrice, usdt_balance_before * 1e12);
+            uint256 price = cUSDFeeAuction.currentPrice();
             // console.log("Start price of fee auction", startPrice);
-            cUSDFeeAuction.buy(assets, mev_bot, "");
+            cUSDFeeAuction.buy(price, assets, new uint256[](assets.length), mev_bot, block.timestamp, "");
             uint256 usdt_balance_after = usdt.balanceOf(address(cUSDFeeAuction));
             uint256 cUSD_balance_after = cUSD.balanceOf(address(scUSD));
             console.log("USDT balance of fee auction after buy", usdt_balance_after);
