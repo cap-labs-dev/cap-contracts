@@ -52,6 +52,7 @@ contract VaultAdapter is IVaultAdapter, UUPSUpgradeable, Access, VaultAdapterSto
     /// @param _asset Asset address
     /// @param _slopes Slope data
     function setSlopes(address _asset, SlopeData memory _slopes) external checkAccess(this.setSlopes.selector) {
+        if (_slopes.kink >= 1e27 || _slopes.kink == 0) revert InvalidKink();
         getVaultAdapterStorage().slopeData[_asset] = _slopes;
     }
 
