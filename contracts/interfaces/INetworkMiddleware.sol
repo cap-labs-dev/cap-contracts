@@ -14,6 +14,7 @@ interface INetworkMiddleware {
         uint256 feeAllowed;
         mapping(address => address) stakerRewarders; // vault => stakerRewarder
         mapping(address => address[]) vaults; // agent => vault[]
+        mapping(address => bool) vaultRegistered; // vault => isRegistered
     }
 
     enum SlasherType {
@@ -53,6 +54,9 @@ interface INetworkMiddleware {
 
     /// @dev No staker rewarder
     error NoStakerRewarder();
+
+    /// @dev Vault already registered
+    error VaultAlreadyRegistered();
 
     /// @dev Vault not initialized
     error VaultNotInitialized();

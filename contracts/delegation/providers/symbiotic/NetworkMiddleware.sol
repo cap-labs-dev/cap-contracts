@@ -65,6 +65,7 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
         for (uint256 i; i < _agents.length; ++i) {
             $.vaults[_agents[i]].push(_vault);
         }
+        $.vaultRegistered[_vault] = true;
         emit VaultRegistered(_vault);
     }
 
@@ -252,6 +253,8 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
     /// @param _vault Vault address
     function _verifyVault(address _vault) internal view {
         NetworkMiddlewareStorage storage $ = getNetworkMiddlewareStorage();
+
+        if ($.vaultRegistered[_vault]) revert VaultAlreadyRegistered();
 
         if (!IRegistry($.vaultRegistry).isEntity(_vault)) {
             revert NotVault();
