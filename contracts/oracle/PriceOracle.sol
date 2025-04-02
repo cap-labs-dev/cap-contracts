@@ -12,17 +12,12 @@ import { PriceOracleStorageUtils } from "../storage/PriceOracleStorageUtils.sol"
 contract PriceOracle is IPriceOracle, Access, PriceOracleStorageUtils {
     /// @dev Initialize the price oracle
     /// @param _accessControl Access control address
-    /// @param _staleness Staleness period in seconds for asset prices
-    function __PriceOracle_init(address _accessControl, uint256 _staleness) internal onlyInitializing {
+    function __PriceOracle_init(address _accessControl) internal onlyInitializing {
         __Access_init(_accessControl);
-        __PriceOracle_init_unchained(_staleness);
     }
 
     /// @dev Initialize unchained
-    /// @param _staleness Staleness period in seconds for asset prices
-    function __PriceOracle_init_unchained(uint256 _staleness) internal onlyInitializing {
-        getPriceOracleStorage().staleness = _staleness;
-    }
+    function __PriceOracle_init_unchained() internal onlyInitializing { }
 
     /// @notice Fetch the price for an asset
     /// @dev If initial price fetch fails or is stale then a backup source is used, reverts if both fail
@@ -35,11 +30,11 @@ contract PriceOracle is IPriceOracle, Access, PriceOracleStorageUtils {
 
         (price, lastUpdated) = _getPrice(data.adapter, data.payload);
 
-        if (price == 0 || _isStale(lastUpdated)) {
+        if (price == 0 || _isStale(_asset, lastUpdated)) {
             data = $.backupOracleData[_asset];
             (price, lastUpdated) = _getPrice(data.adapter, data.payload);
 
-            if (_isStale(lastUpdated)) revert StalePrice(lastUpdated);
+            if (price == 0 || _isStale(_asset, lastUpdated)) revert PriceError(_asset);
         }
     }
 
@@ -58,9 +53,10 @@ contract PriceOracle is IPriceOracle, Access, PriceOracleStorageUtils {
     }
 
     /// @notice View the staleness period for asset prices
-    /// @return stalenessPeriod Staleness period in seconds for asset prices
-    function staleness() external view returns (uint256 stalenessPeriod) {
-        stalenessPeriod = getPriceOracleStorage().staleness;
+    /// @param _asset Asset address
+    /// @return assetStaleness Staleness period in seconds for asset prices
+    function staleness(address _asset) external view returns (uint256 assetStaleness) {
+        assetStaleness = getPriceOracleStorage().staleness[_asset];
     }
 
     /// @notice Set a price source for an asset
@@ -86,16 +82,18 @@ contract PriceOracle is IPriceOracle, Access, PriceOracleStorageUtils {
     }
 
     /// @notice Set the staleness period for asset prices
+    /// @param _asset Asset address
     /// @param _staleness Staleness period in seconds for asset prices
-    function setStaleness(uint256 _staleness) external checkAccess(this.setStaleness.selector) {
-        getPriceOracleStorage().staleness = _staleness;
-        emit SetStaleness(_staleness);
+    function setStaleness(address _asset, uint256 _staleness) external checkAccess(this.setStaleness.selector) {
+        getPriceOracleStorage().staleness[_asset] = _staleness;
+        emit SetStaleness(_asset, _staleness);
     }
 
     /// @dev Calculate price using an adapter and payload but do not revert on errors
     /// @param _adapter Adapter for calculation logic
     /// @param _payload Encoded call to adapter with all required data
     /// @return price Calculated price
+    /// @return lastUpdated Last updated timestamp
     function _getPrice(address _adapter, bytes memory _payload)
         private
         view
@@ -106,9 +104,10 @@ contract PriceOracle is IPriceOracle, Access, PriceOracleStorageUtils {
     }
 
     /// @dev Check if a price is stale
+    /// @param _asset Asset address
     /// @param _lastUpdated Last updated timestamp
     /// @return isStale True if the price is stale
-    function _isStale(uint256 _lastUpdated) internal view returns (bool isStale) {
-        isStale = block.timestamp - _lastUpdated > getPriceOracleStorage().staleness;
+    function _isStale(address _asset, uint256 _lastUpdated) internal view returns (bool isStale) {
+        isStale = block.timestamp - _lastUpdated > getPriceOracleStorage().staleness[_asset];
     }
 }

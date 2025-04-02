@@ -14,7 +14,7 @@ library CapTokenAdapter {
     /// @return lastUpdated Earliest timestamp of the price
     function price(address _asset) external view returns (uint256 latestAnswer, uint256 lastUpdated) {
         uint256 capTokenSupply = IERC20Metadata(_asset).totalSupply();
-        if (capTokenSupply == 0) return (0, block.timestamp);
+        if (capTokenSupply == 0) return (1e8, block.timestamp);
 
         address[] memory assets = IVault(_asset).assets();
         lastUpdated = block.timestamp;
