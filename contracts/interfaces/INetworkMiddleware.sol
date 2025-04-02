@@ -30,6 +30,7 @@ interface INetworkMiddleware {
 
     /// @dev Vault registered
     event VaultRegistered(address vault);
+
     /// @dev Slash event
     event Slash(address indexed agent, address recipient, uint256 amount);
 

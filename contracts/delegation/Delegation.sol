@@ -122,6 +122,7 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
 
         address network = $.agentData[_agent].network;
         uint256 networkSlashableCollateral = INetworkMiddleware(network).slashableCollateral(_agent, _slashTimestamp);
+        if (networkSlashableCollateral == 0) revert NoSlashableCollateral();
         uint256 slashShare = _amount * 1e18 / networkSlashableCollateral;
         if (slashShare > 1e18) slashShare = 1e18;
 

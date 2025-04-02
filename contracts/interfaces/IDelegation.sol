@@ -77,6 +77,9 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @notice Invalid ltv buffer
     error InvalidLtvBuffer();
 
+    /// @notice No slashable collateral
+    error NoSlashableCollateral();
+
     /// @notice Initialize the contract
     /// @param _accessControl Access control address
     /// @param _oracle Oracle address

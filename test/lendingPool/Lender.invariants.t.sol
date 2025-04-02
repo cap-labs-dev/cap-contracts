@@ -241,6 +241,9 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
 
         vm.prank(address(env.users.middleware_admin));
         MockNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).setMockCoverage(agent, coverage);
+        MockNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).setMockSlashableCollateral(
+            agent, coverage
+        );
         vm.stopPrank();
     }
 
