@@ -53,6 +53,7 @@ contract VaultAdapter is IVaultAdapter, UUPSUpgradeable, Access, VaultAdapterSto
     /// @param _slopes Slope data
     function setSlopes(address _asset, SlopeData memory _slopes) external checkAccess(this.setSlopes.selector) {
         getVaultAdapterStorage().slopeData[_asset] = _slopes;
+        emit SetSlopes(_asset, _slopes);
     }
 
     /// @notice Set limits for the utilization multiplier
@@ -67,6 +68,7 @@ contract VaultAdapter is IVaultAdapter, UUPSUpgradeable, Access, VaultAdapterSto
         $.maxMultiplier = _maxMultiplier;
         $.minMultiplier = _minMultiplier;
         $.rate = _rate;
+        emit SetLimits(_maxMultiplier, _minMultiplier, _rate);
     }
 
     /// @dev Interest is applied according to where on the slope the current utilization is and the

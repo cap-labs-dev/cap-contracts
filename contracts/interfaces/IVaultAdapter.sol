@@ -43,4 +43,15 @@ interface IVaultAdapter {
     /// @param _minMultiplier Minimum slope multiplier
     /// @param _rate Rate at which the multiplier shifts
     function setLimits(uint256 _maxMultiplier, uint256 _minMultiplier, uint256 _rate) external;
+
+    /// @notice Emitted when slopes are set
+    /// @param _asset Asset address
+    /// @param _slopes Slope data
+    event SetSlopes(address indexed _asset, SlopeData _slopes);
+
+    /// @notice Emitted when limits are set
+    /// @param _maxMultiplier Maximum slope multiplier
+    /// @param _minMultiplier Minimum slope multiplier
+    /// @param _rate Rate at which the multiplier shifts
+    event SetLimits(uint256 _maxMultiplier, uint256 _minMultiplier, uint256 _rate);
 }
