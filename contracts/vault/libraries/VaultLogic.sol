@@ -117,6 +117,8 @@ library VaultLogic {
             revert Slippage(params.asset, params.amountOut, params.minAmountOut);
         }
 
+        _verifyBalance($, params.asset, params.amountOut);
+
         $.totalSupplies[params.asset] -= params.amountOut;
 
         IERC20(params.asset).safeTransfer(params.receiver, params.amountOut);
@@ -137,6 +139,7 @@ library VaultLogic {
             if (params.amountsOut[i] < params.minAmountsOut[i]) {
                 revert Slippage(cachedAssets[i], params.amountsOut[i], params.minAmountsOut[i]);
             }
+            _verifyBalance($, cachedAssets[i], params.amountsOut[i]);
             _updateIndex($, cachedAssets[i]);
             $.totalSupplies[cachedAssets[i]] -= params.amountsOut[i];
             IERC20(cachedAssets[i]).safeTransfer(params.receiver, params.amountsOut[i]);
@@ -154,8 +157,7 @@ library VaultLogic {
         whenNotPaused($, params.asset)
         updateIndex($, params.asset)
     {
-        uint256 balanceBefore = IERC20(params.asset).balanceOf(address(this));
-        if (balanceBefore < params.amount) revert InsufficientReserves(params.asset, balanceBefore, params.amount);
+        _verifyBalance($, params.asset, params.amount);
 
         $.totalBorrows[params.asset] += params.amount;
         IERC20(params.asset).safeTransfer(params.receiver, params.amount);
@@ -233,6 +235,14 @@ library VaultLogic {
         emit RescueERC20(_asset, _receiver);
     }
 
+    /// @notice Calculate the available balance of an asset
+    /// @param $ Vault storage pointer
+    /// @param _asset Asset address
+    /// @return balance Available balance
+    function availableBalance(IVault.VaultStorage storage $, address _asset) public view returns (uint256 balance) {
+        balance = $.totalSupplies[_asset] - $.totalBorrows[_asset];
+    }
+
     /// @notice Calculate the utilization ratio of an asset
     /// @dev Returns the ratio of borrowed assets to total supply, scaled to ray (1e27)
     /// @param $ Vault storage pointer
@@ -267,6 +277,17 @@ library VaultLogic {
                 isListed = true;
                 break;
             }
+        }
+    }
+
+    /// @notice Verify that an asset has enough balance
+    /// @param $ Vault storage pointer
+    /// @param _asset Asset address
+    /// @param _amount Amount to verify
+    function _verifyBalance(IVault.VaultStorage storage $, address _asset, uint256 _amount) internal view {
+        uint256 balance = availableBalance($, _asset);
+        if (balance < _amount) {
+            revert InsufficientReserves(_asset, balance, _amount);
         }
     }
 
