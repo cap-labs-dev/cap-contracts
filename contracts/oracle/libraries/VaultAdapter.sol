@@ -24,28 +24,28 @@ contract VaultAdapter is IVaultAdapter, UUPSUpgradeable, Access, VaultAdapterSto
     /// @param _asset Asset to fetch rate for
     /// @return latestAnswer Borrow rate
     function rate(address _vault, address _asset) external returns (uint256 latestAnswer) {
-        VaultAdapterStorage storage $ = getVaultAdapterStorage();
+        UtilizationData storage utilizationData = getVaultAdapterStorage().utilizationData[_vault][_asset];
 
         uint256 elapsed;
         uint256 utilization;
-        if (block.timestamp > $.utilizationData[_asset].lastUpdate) {
+        if (block.timestamp > utilizationData.lastUpdate) {
             uint256 index = IVault(_vault).currentUtilizationIndex(_asset);
-            elapsed = block.timestamp - $.utilizationData[_asset].lastUpdate;
+            elapsed = block.timestamp - utilizationData.lastUpdate;
 
             /// Use average utilization except on the first rate update
             if (elapsed != block.timestamp) {
-                utilization = (index - $.utilizationData[_asset].index) / elapsed;
+                utilization = (index - utilizationData.index) / elapsed;
             } else {
                 utilization = IVault(_vault).utilization(_asset);
             }
 
-            $.utilizationData[_asset].index = index;
-            $.utilizationData[_asset].lastUpdate = block.timestamp;
+            utilizationData.index = index;
+            utilizationData.lastUpdate = block.timestamp;
         } else {
             utilization = IVault(_vault).utilization(_asset);
         }
 
-        latestAnswer = _applySlopes(_asset, utilization, elapsed);
+        latestAnswer = _applySlopes(_vault, _asset, utilization, elapsed);
     }
 
     /// @notice Set utilization slopes for an asset
@@ -72,37 +72,36 @@ contract VaultAdapter is IVaultAdapter, UUPSUpgradeable, Access, VaultAdapterSto
     /// @dev Interest is applied according to where on the slope the current utilization is and the
     /// multiplier depends on the duration and distance the utilization is from the kink point.
     /// All utilization values, kinks, and multipliers are in ray (1e27)
+    /// @param _vault Vault address
     /// @param _asset Asset address
     /// @param _utilization Utilization ratio in ray (1e27)
     /// @param _elapsed Length of time at the utilization
     /// @return interestRate Interest rate in ray (1e27)
-    function _applySlopes(address _asset, uint256 _utilization, uint256 _elapsed)
+    function _applySlopes(address _vault, address _asset, uint256 _utilization, uint256 _elapsed)
         internal
         returns (uint256 interestRate)
     {
         VaultAdapterStorage storage $ = getVaultAdapterStorage();
+        UtilizationData storage utilizationData = $.utilizationData[_vault][_asset];
         SlopeData memory slopes = $.slopeData[_asset];
         if (_utilization > slopes.kink) {
             uint256 excess = _utilization - slopes.kink;
-            $.utilizationData[_asset].utilizationMultiplier *=
-                (1e27 + (1e27 * excess / (1e27 - slopes.kink)) * (_elapsed * $.rate / 1e27));
+            utilizationData.multiplier *= (1e27 + (1e27 * excess / (1e27 - slopes.kink)) * (_elapsed * $.rate / 1e27));
 
-            if ($.utilizationData[_asset].utilizationMultiplier > $.maxMultiplier) {
-                $.utilizationData[_asset].utilizationMultiplier = $.maxMultiplier;
+            if (utilizationData.multiplier > $.maxMultiplier) {
+                utilizationData.multiplier = $.maxMultiplier;
             }
 
-            interestRate = (slopes.slope0 + (slopes.slope1 * excess / 1e27))
-                * $.utilizationData[_asset].utilizationMultiplier / 1e27;
+            interestRate = (slopes.slope0 + (slopes.slope1 * excess / 1e27)) * utilizationData.multiplier / 1e27;
         } else {
-            $.utilizationData[_asset].utilizationMultiplier /=
+            utilizationData.multiplier /=
                 (1e27 + (1e27 * (slopes.kink - _utilization) / slopes.kink) * (_elapsed * $.rate / 1e27));
 
-            if ($.utilizationData[_asset].utilizationMultiplier < $.minMultiplier) {
-                $.utilizationData[_asset].utilizationMultiplier = $.minMultiplier;
+            if (utilizationData.multiplier < $.minMultiplier) {
+                utilizationData.multiplier = $.minMultiplier;
             }
 
-            interestRate =
-                (slopes.slope0 * _utilization / slopes.kink) * $.utilizationData[_asset].utilizationMultiplier / 1e27;
+            interestRate = (slopes.slope0 * _utilization / slopes.kink) * utilizationData.multiplier / 1e27;
         }
     }
 

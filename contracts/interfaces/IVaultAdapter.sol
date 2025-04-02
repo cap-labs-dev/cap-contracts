@@ -6,8 +6,8 @@ import { IOracle } from "./IOracle.sol";
 interface IVaultAdapter {
     /// @custom:storage-location erc7201:cap.storage.VaultAdapter
     struct VaultAdapterStorage {
-        mapping(address => SlopeData) slopeData;
-        mapping(address => UtilizationData) utilizationData;
+        mapping(address => SlopeData) slopeData; // asset => slope data
+        mapping(address => mapping(address => UtilizationData)) utilizationData; // vault => asset => utilization data
         uint256 maxMultiplier;
         uint256 minMultiplier;
         uint256 rate;
@@ -22,7 +22,7 @@ interface IVaultAdapter {
 
     /// @dev Slope data for an asset
     struct UtilizationData {
-        uint256 utilizationMultiplier;
+        uint256 multiplier;
         uint256 index;
         uint256 lastUpdate;
     }
