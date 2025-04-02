@@ -31,6 +31,9 @@ library VaultLogic {
     /// @dev Only non-supported assets can be rescued
     error AssetNotRescuable(address asset);
 
+    /// @dev Asset has supplies
+    error AssetHasSupplies(address asset);
+
     /// @dev Invalid min amounts out as they dont match the number of assets
     error InvalidMinAmountsOut();
 
@@ -190,6 +193,7 @@ library VaultLogic {
     /// @param $ Vault storage pointer
     /// @param _asset Asset address
     function removeAsset(IVault.VaultStorage storage $, address _asset) external {
+        if ($.totalSupplies[_asset] > 0) revert AssetHasSupplies(_asset);
         address[] memory cachedAssets = $.assets;
         uint256 length = cachedAssets.length;
         bool removed;
