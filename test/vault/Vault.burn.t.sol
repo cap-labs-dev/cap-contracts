@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { TestDeployer } from "../deploy/TestDeployer.sol";
+import { MockERC20 } from "../mocks/MockERC20.sol";
 
 contract VaultBurnTest is TestDeployer {
     address user;
@@ -28,5 +29,43 @@ contract VaultBurnTest is TestDeployer {
         assertEq(cUSD.balanceOf(user), 4000e18 - burnAmount, "Should have burned their cUSD tokens");
         assertEq(outputAmount, usdt.balanceOf(user), "Should have received minOutputAmount back");
         assertGt(outputAmount, 0, "Should have received more than 0 USDT back");
+    }
+
+    function test_burn_with_invalid_asset() public {
+        vm.startPrank(user);
+
+        MockERC20 invalidAsset = new MockERC20("Invalid", "INV", 18);
+
+        // Burn cUSD with USDT
+        uint256 amountIn = 100e18;
+        uint256 minAmountOut = 95e6; // Accounting for potential fees
+        uint256 deadline = block.timestamp + 1 hours;
+
+        vm.expectRevert();
+        cUSD.burn(address(invalidAsset), amountIn, minAmountOut, user, deadline);
+    }
+
+    function test_burn_with_invalid_min_amount() public {
+        vm.startPrank(user);
+
+        // Burn cUSD with USDT
+        uint256 amountIn = 100e18;
+        uint256 minAmountOut = 105e6; // Accounting for potential fees
+        uint256 deadline = block.timestamp + 1 hours;
+
+        vm.expectRevert();
+        cUSD.burn(address(usdt), amountIn, minAmountOut, user, deadline);
+    }
+
+    function test_burn_with_invalid_deadline() public {
+        vm.startPrank(user);
+
+        // Burn cUSD with USDT
+        uint256 amountIn = 100e18;
+        uint256 minAmountOut = 95e6; // Accounting for potential fees
+        uint256 deadline = block.timestamp - 1 hours;
+
+        vm.expectRevert();
+        cUSD.burn(address(usdt), amountIn, minAmountOut, user, deadline);
     }
 }
