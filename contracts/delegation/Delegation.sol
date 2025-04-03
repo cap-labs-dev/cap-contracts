@@ -217,19 +217,19 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         emit RegisterNetwork(_network);
     }
 
+    /// @notice Check if a network is registered
+    /// @param _network Network address
+    /// @return _exists Whether the network is registered
+    function networkExists(address _network) external view returns (bool) {
+        return getDelegationStorage().networkExists[_network];
+    }
+
     /// @notice Set the ltv buffer
     /// @param _ltvBuffer LTV buffer
     function setLtvBuffer(uint256 _ltvBuffer) external checkAccess(this.setLtvBuffer.selector) {
         if (_ltvBuffer > 1e27) revert InvalidLtvBuffer();
         getDelegationStorage().ltvBuffer = _ltvBuffer;
         emit SetLtvBuffer(_ltvBuffer);
-    }
-
-    /// @notice Check if a network is registered
-    /// @param _network Network address
-    /// @return _exists Whether the network is registered
-    function networkExists(address _network) external view returns (bool) {
-        return getDelegationStorage().networkExists[_network];
     }
 
     /// @dev Only admin can upgrade

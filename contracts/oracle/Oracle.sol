@@ -18,11 +18,10 @@ contract Oracle is IOracle, UUPSUpgradeable, Access, PriceOracle, RateOracle {
 
     /// @notice Initialize the oracle with the access control
     /// @param _accessControl Access control
-    /// @param _staleness Staleness period in seconds for asset prices
-    function initialize(address _accessControl, uint256 _staleness) external initializer {
+    function initialize(address _accessControl) external initializer {
         __Access_init(_accessControl);
         __UUPSUpgradeable_init();
-        __PriceOracle_init_unchained(_staleness);
+        __PriceOracle_init_unchained();
         __RateOracle_init_unchained();
     }
 
