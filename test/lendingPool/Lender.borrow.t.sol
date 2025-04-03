@@ -2,11 +2,14 @@
 pragma solidity ^0.8.28;
 
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
+import { Vault } from "../../contracts/vault/Vault.sol";
 
 import { InterestDebtToken } from "../../contracts/lendingPool/tokens/InterestDebtToken.sol";
 import { PrincipalDebtToken } from "../../contracts/lendingPool/tokens/PrincipalDebtToken.sol";
 import { RestakerDebtToken } from "../../contracts/lendingPool/tokens/RestakerDebtToken.sol";
+
 import { TestDeployer } from "../deploy/TestDeployer.sol";
+import { MockERC20 } from "../mocks/MockERC20.sol";
 import { console } from "forge-std/console.sol";
 
 contract LenderBorrowTest is TestDeployer {
@@ -51,82 +54,171 @@ contract LenderBorrowTest is TestDeployer {
         assertDebtEq(0, 0, 0);
     }
 
-    /*function test_lender_borrow_and_repay_debt_tokens() public {
-        // ensure reward targets are empty
-        assertEq(usdc.balanceOf(symbioticUsdtNetworkRewards.stakerRewarder), 0);
-        assertEq(usdc.balanceOf(usdVault.feeAuction), 0);
-
+    function test_lender_borrow_and_repay_with_another_asset() public {
         vm.startPrank(user_agent);
 
         lender.borrow(address(usdc), 1000e6, user_agent);
-        uint256 principalDebt = principalDebtToken.balanceOf(user_agent);
         assertEq(usdc.balanceOf(user_agent), 1000e6);
 
-        // we should have some debt tokens attached to the user
-        assertDebtEq(1000e6, 0, 0);
+        // simulate yield
+        usdt.mint(user_agent, 1000e6);
 
-        // check on the view functions
-        (uint256 interestPerSecond, uint256 lastUpdate) = restakerDebtToken.agent(user_agent);
-        assertEq(lastUpdate, block.timestamp);
+        // repay the debt
+        usdt.approve(env.infra.lender, 1000e6 + 10e6);
+        lender.repay(address(usdt), 1000e6, user_agent);
+    }
 
-        (uint256 storedIndex, uint256 lastUpdateInterest) = interestDebtToken.agent(user_agent);
-        assertEq(storedIndex, 1e27);
-        assertEq(lastUpdateInterest, block.timestamp);
+    function test_lender_borrow_and_repay_more_than_borrowed() public {
+        vm.startPrank(user_agent);
 
-        _timeTravel(3 hours);
-
-        uint256 currentIndex = interestDebtToken.currentIndex();
-        uint256 indx = currentIndex - storedIndex;
-
-        uint256 interestDebt = indx * 1000e6 / 1e27;
-        console.log("Interest debt", interestDebt);
-
-        uint256 restakerDebt = interestPerSecond * 3 hours / 1e27;
-        console.log("Restaker debt", restakerDebt);
-
-        // balances should accrue interest over time
-        assertDebtEq(principalDebt, interestDebt, restakerDebt);
-
-        // check on the view functions
-        (interestPerSecond, lastUpdate) = restakerDebtToken.agent(user_agent);
-      //  assertEq(interestPerSecond, 50e27);
-        assertEq(lastUpdate, block.timestamp - 3 hours);
-
-        (storedIndex, lastUpdateInterest) = interestDebtToken.agent(user_agent);
-        assertEq(storedIndex, 1e27);
-        assertEq(lastUpdateInterest, block.timestamp - 3 hours);
+        lender.borrow(address(usdc), 1000e6, user_agent);
+        assertEq(usdc.balanceOf(user_agent), 1000e6);
 
         // simulate yield
-        usdc.mint(user_agent, 1_000_000e6);
-        usdc.approve(env.infra.lender, 1_000_000e6);
+        usdc.mint(user_agent, 1000e6);
 
-        // principal debt should be repaid first
-        lender.repay(address(usdc), 100e6, user_agent);
-        assertDebtEq(principalDebt - 100e6, interestDebt, restakerDebt);
+        // repay the debt
+        usdc.approve(env.infra.lender, 2000e6 + 10e6);
+        lender.repay(address(usdc), 2000e6, user_agent);
 
-        // restaker debt should be repaid next
-        lender.repay(address(usdc), 900e6 + restakerDebt, user_agent);
-        assertDebtEq(0, interestDebt, 0);
+        assertEq(usdc.balanceOf(user_agent), 1000e6);
+    }
 
-        // interest continue to accrue when principal debt is repaid but restaker debt is not
-        _timeTravel(10 days);
-        uint256 currentInterestDebt = interestDebtToken.balanceOf(user_agent);
-        assertGt(currentInterestDebt, interestDebt);
+    function test_borrow_an_invalid_asset() public {
+        vm.startPrank(user_agent);
 
-        // repay more than the debt just repays the debt
-        uint256 balanceBefore = usdc.balanceOf(user_agent);
-        lender.repay(address(usdc), 100e6, user_agent);
-        assertEq(usdc.balanceOf(user_agent), balanceBefore - currentInterestDebt);
+        vm.expectRevert();
+        lender.borrow(address(0), 1000e6, user_agent);
 
-        // all square now
+        MockERC20 invalidAsset = new MockERC20("InvalidAsset", "INV", 18);
+
+        invalidAsset.mint(user_agent, 1000e6);
+
+        vm.expectRevert();
+        lender.borrow(address(invalidAsset), 1000e6, user_agent);
+    }
+
+    function test_borrow_more_than_one_asset() public {
+        vm.startPrank(user_agent);
+
+        lender.borrow(address(usdc), 1000e6, user_agent);
+        assertEq(usdc.balanceOf(user_agent), 1000e6);
+
+        lender.borrow(address(usdt), 1000e6, user_agent);
+        assertEq(usdt.balanceOf(user_agent), 1000e6);
+    }
+
+    function test_lender_realize_interest() public {
+        vm.startPrank(user_agent);
+
+        lender.borrow(address(usdc), 300e6, user_agent);
+        assertEq(usdc.balanceOf(user_agent), 300e6);
+
+        _timeTravel(1 days);
+
+        uint256 interest = interestDebtToken.balanceOf(user_agent);
+        uint256 restakerInterest = restakerDebtToken.balanceOf(user_agent);
+        uint256 principal = principalDebtToken.balanceOf(user_agent);
+
+        uint256 totalInterest = interest + restakerInterest;
+        uint256 totalDebt = principal + totalInterest;
+        assertEq(totalDebt, 300e6 + totalInterest);
+
+        uint256 feeAuctionBalBefore = usdc.balanceOf(address(cUSDFeeAuction));
+
+        lender.realizeInterest(address(usdc), 1);
+
+        uint256 feeAuctionBalAfter = usdc.balanceOf(address(cUSDFeeAuction));
+
+        (,,,,,,,, uint256 realizedInterest) = lender.reservesData(address(usdc));
+        assertEq(realizedInterest, 1);
+
+        lender.realizeInterest(address(usdc), interest - 1);
+
+        feeAuctionBalAfter = usdc.balanceOf(address(cUSDFeeAuction));
+
+        assertEq(feeAuctionBalAfter - feeAuctionBalBefore, interest);
+
+        (,,,,,,,, realizedInterest) = lender.reservesData(address(usdc));
+        assertEq(realizedInterest, interest);
+
+        interest = interestDebtToken.balanceOf(user_agent);
+        restakerInterest = restakerDebtToken.balanceOf(user_agent);
+        principal = principalDebtToken.balanceOf(user_agent);
+
+        uint256 newTotalInterest = interest + restakerInterest;
+        uint256 newTotalDebt = principal + newTotalInterest;
+        assertEq(newTotalDebt, 300e6 + newTotalInterest);
+    }
+
+    function test_borrow_payback_debt_tokens() public {
+        vm.startPrank(user_agent);
+
+        lender.borrow(address(usdc), 300e6, user_agent);
+        assertEq(usdc.balanceOf(user_agent), 300e6);
+
+        _timeTravel(1 days);
+
+        uint256 interest = interestDebtToken.balanceOf(user_agent);
+        uint256 restakerInterest = restakerDebtToken.balanceOf(user_agent);
+        uint256 principal = principalDebtToken.balanceOf(user_agent);
+
+        console.log("Principal Debt tokens:", principal);
+        console.log("Restaker Debt tokens:", restakerInterest);
+        console.log("Interest Debt tokens:", interest);
+
+        uint256 totalInterest = interest + restakerInterest;
+        uint256 totalDebt = principal + totalInterest;
+        assertEq(totalDebt, 300e6 + totalInterest);
+
+        usdc.mint(user_agent, totalInterest);
+
+        // repay the debt
+        usdc.approve(address(lender), totalDebt);
+        lender.repay(address(usdc), principal, user_agent);
+
+        assertDebtEq(0, interest, restakerInterest);
+
+        lender.repay(address(usdc), restakerInterest, user_agent);
+
+        assertDebtEq(0, interest, 0);
+
+        lender.repay(address(usdc), interest, user_agent);
+
         assertDebtEq(0, 0, 0);
+    }
 
-        // restaker rewards should be distributed to the networks
-       // assertEq(usdc.balanceOf(symbioticUsdtNetworkRewards.stakerRewarder), restakerDebt);
+    function test_borrow_utilization() public {
+        vm.startPrank(env.symbiotic.users.vault_admin);
+        _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e27);
+        vm.stopPrank();
 
-        // interest rewards should be distributed to fee auction
-        assertEq(usdc.balanceOf(usdVault.feeAuction), currentInterestDebt);
-    }*/
+        vm.startPrank(user_agent);
+
+        uint256 totalSupply = cUSD.totalSupplies(address(usdt));
+
+        lender.borrow(address(usdt), totalSupply, user_agent);
+        assertEq(usdt.balanceOf(user_agent), totalSupply);
+
+        assertEq(cUSD.utilization(address(usdt)), 1e27);
+        assertEq(cUSD.totalBorrows(address(usdt)), totalSupply);
+        assertEq(cUSD.availableBalance(address(usdt)), 0);
+
+        usdt.approve(address(lender), totalSupply);
+        lender.repay(address(usdt), totalSupply, user_agent);
+
+        assertEq(cUSD.utilization(address(usdt)), 0);
+        assertEq(cUSD.totalBorrows(address(usdt)), 0);
+        assertEq(cUSD.availableBalance(address(usdt)), totalSupply);
+
+        lender.borrow(address(usdt), totalSupply / 2, user_agent);
+        assertEq(cUSD.utilization(address(usdt)), 0.5e27);
+        assertEq(cUSD.totalBorrows(address(usdt)), totalSupply / 2);
+        assertEq(cUSD.availableBalance(address(usdt)), totalSupply / 2);
+
+        // since we updated the index current should be 0
+        assertEq(cUSD.currentUtilizationIndex(address(usdt)), 0);
+    }
 
     function assertDebtEq(uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt) internal view {
         (uint256 principalDebtView, uint256 interestDebtView, uint256 restakerDebtView) =
