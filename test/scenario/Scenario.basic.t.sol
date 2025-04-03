@@ -395,7 +395,7 @@ contract ScenarioBasicTest is TestDeployer {
 
             vm.startPrank(env.users.delegation_admin);
 
-            (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health) =
+            (uint256 totalDelegation,, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health) =
                 lender.agent(user_agent);
             console.log("Total delegation of the operator", totalDelegation);
             console.log("Total debt of the operator", totalDebt);
@@ -422,7 +422,7 @@ contract ScenarioBasicTest is TestDeployer {
             lender.cancelLiquidation(user_agent);
             vm.stopPrank();
 
-            (totalDelegation, totalDebt, ltv, liquidationThreshold, health) = lender.agent(user_agent);
+            (totalDelegation,, totalDebt, ltv, liquidationThreshold, health) = lender.agent(user_agent);
             console.log("");
             console.log("Total delegation of the operator after liquidation", totalDelegation);
             console.log("Total debt of the operator after liquidation", totalDebt);

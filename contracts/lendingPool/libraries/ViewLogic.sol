@@ -9,6 +9,7 @@ import { IOracle } from "../../interfaces/IOracle.sol";
 import { IVault } from "../../interfaces/IVault.sol";
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { console } from "forge-std/console.sol";
 
 /// @title View Logic
 /// @author kexley, @capLabs
@@ -20,6 +21,7 @@ library ViewLogic {
     /// @param $ Lender storage
     /// @param _agent Agent address
     /// @return totalDelegation Total delegation of an agent in USD, encoded with 8 decimals
+    /// @return totalSlashableCollateral Total slashable collateral of an agent in USD, encoded with 8 decimals
     /// @return totalDebt Total debt of an agent in USD, encoded with 8 decimals
     /// @return ltv Loan to value ratio, encoded in ray (1e27)
     /// @return liquidationThreshold Liquidation ratio of an agent, encoded in ray (1e27)
@@ -27,9 +29,17 @@ library ViewLogic {
     function agent(ILender.LenderStorage storage $, address _agent)
         public
         view
-        returns (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health)
+        returns (
+            uint256 totalDelegation,
+            uint256 totalSlashableCollateral,
+            uint256 totalDebt,
+            uint256 ltv,
+            uint256 liquidationThreshold,
+            uint256 health
+        )
     {
         totalDelegation = IDelegation($.delegation).coverage(_agent);
+        totalSlashableCollateral = IDelegation($.delegation).slashableCollateral(_agent);
         liquidationThreshold = IDelegation($.delegation).liquidationThreshold(_agent);
 
         for (uint256 i; i < $.reservesCount; ++i) {
@@ -62,7 +72,7 @@ library ViewLogic {
         view
         returns (uint256 maxBorrowableAmount)
     {
-        (uint256 totalDelegation, uint256 totalDebt,,, uint256 health) = agent($, _agent);
+        (uint256 totalDelegation,, uint256 totalDebt,,, uint256 health) = agent($, _agent);
 
         // health is below liquidation threshold, no borrowing allowed
         if (health < 1e27) return 0;
@@ -102,7 +112,14 @@ library ViewLogic {
         view
         returns (uint256 maxLiquidatableAmount)
     {
-        (uint256 totalDelegation, uint256 totalDebt,, uint256 liquidationThreshold, uint256 health) = agent($, _agent);
+        (
+            uint256 totalDelegation,
+            uint256 totalSlashableCollateral,
+            uint256 totalDebt,
+            ,
+            uint256 liquidationThreshold,
+            uint256 health
+        ) = agent($, _agent);
         if (health >= 1e27) return 0;
 
         (uint256 assetPrice,) = IOracle($.oracle).getPrice(_asset);
@@ -118,6 +135,7 @@ library ViewLogic {
         uint256 g = e * decPow;
 
         maxLiquidatableAmount = g / f;
+        if (totalSlashableCollateral < maxLiquidatableAmount) return totalSlashableCollateral;
     }
 
     /// @notice Get the current debt balances for an agent for a specific asset

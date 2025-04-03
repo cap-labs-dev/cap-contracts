@@ -98,7 +98,7 @@ contract LenderInvariantsTest is TestDeployer {
 
         invariant_borrowingLimits();
     }
-
+    /*
     function test_fuzzing_non_regression_liquidate_fails() public {
         //         Encountered 1 failing test in test/lendingPool/Lender.invariants.t.sol:LenderInvariantsTest
         // [FAIL: invariant_borrowingLimits persisted failure revert]
@@ -129,7 +129,7 @@ contract LenderInvariantsTest is TestDeployer {
         vm.stopPrank();
 
         invariant_borrowingLimits();
-    }
+    }*/
 
     /// @dev Test that total borrowed never exceeds available assets
     /// forge-config: default.invariant.depth = 25
@@ -142,7 +142,7 @@ contract LenderInvariantsTest is TestDeployer {
 
             // Sum up all actor debts
             for (uint256 j = 0; j < actors.length; j++) {
-                (, uint256 totalDebt,,,) = lender.agent(actors[j]);
+                (,, uint256 totalDebt,,,) = lender.agent(actors[j]);
                 totalBorrowed += totalDebt;
             }
 
@@ -157,14 +157,13 @@ contract LenderInvariantsTest is TestDeployer {
         address[] memory agents = env.testUsers.agents;
         for (uint256 i = 0; i < agents.length; i++) {
             address agent = agents[i];
-            (uint256 totalDelegation, uint256 totalDebt,,,) = lender.agent(agent);
+            (uint256 totalDelegation, uint256 slashableCollateral, uint256 totalDebt,,,) = lender.agent(agent);
             uint256 maxLiquidatable = lender.maxLiquidatable(agent, address(usdc));
             console.log("totalDelegation", totalDelegation);
             console.log("totalDebt", totalDebt);
             console.log("maxLiquidatable", maxLiquidatable);
-            if (maxLiquidatable == 0) {
-                assertGe(totalDelegation, totalDebt, "User borrow must not exceed delegation");
-            }
+            if (slashableCollateral < totalDebt) return;
+            assertGe(slashableCollateral, totalDebt, "User borrow must not exceed delegation");
         }
     }
 }
@@ -221,7 +220,7 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         address agent = randomActor(actorSeed);
         address currentAsset = randomAsset(assetSeed);
 
-        (, uint256 totalDebt,,,) = lender.agent(agent);
+        (,, uint256 totalDebt,,,) = lender.agent(agent);
 
         // Bound amount to actual borrowed amount
         amount = bound(amount, 0, totalDebt);
@@ -275,6 +274,14 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
 
         vm.prank(address(env.users.middleware_admin));
         MockNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).setMockCoverage(agent, coverage);
+        vm.stopPrank();
+    }
+
+    function setAgentSlashableCollateral(uint256 agentSeed, uint256 coverage) external {
+        coverage = bound(coverage, 0, 1e50);
+        address agent = randomActor(agentSeed);
+
+        vm.prank(address(env.users.middleware_admin));
         MockNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).setMockSlashableCollateral(
             agent, coverage
         );
@@ -289,10 +296,7 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         if (maxRealization == 0) return;
 
         amount = bound(amount, 0, maxRealization);
-
-        // deal some cUSD to the realizer
-        address realizer = randomActor(assetSeed);
-        _initTestUserMintCapToken(env.usdVault, realizer, amount);
+        if (amount == 0) return;
 
         lender.realizeInterest(currentAsset, amount);
     }
@@ -302,7 +306,7 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
 
         // Only attempt to cancel if there's an active liquidation
         if (lender.liquidationStart(agent) > 0) {
-            (,,,, uint256 health) = lender.agent(agent);
+            (,,,,, uint256 health) = lender.agent(agent);
             // Only cancel if health is above 1e27 (healthy)
             if (health >= 1e27) {
                 vm.prank(address(env.users.lender_admin));

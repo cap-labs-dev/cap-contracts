@@ -137,6 +137,7 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     /// @notice Calculate the agent data
     /// @param _agent Address of agent
     /// @return totalDelegation Total delegation of an agent in USD, encoded with 8 decimals
+    /// @return totalSlashableCollateral Total slashable collateral of an agent in USD, encoded with 8 decimals
     /// @return totalDebt Total debt of an agent in USD, encoded with 8 decimals
     /// @return ltv Loan to value ratio, encoded in ray (1e27)
     /// @return liquidationThreshold Liquidation ratio of an agent, encoded in ray (1e27)
@@ -144,9 +145,17 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     function agent(address _agent)
         external
         view
-        returns (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health)
+        returns (
+            uint256 totalDelegation,
+            uint256 totalSlashableCollateral,
+            uint256 totalDebt,
+            uint256 ltv,
+            uint256 liquidationThreshold,
+            uint256 health
+        )
     {
-        (totalDelegation, totalDebt, ltv, liquidationThreshold, health) = ViewLogic.agent(getLenderStorage(), _agent);
+        (totalDelegation, totalSlashableCollateral, totalDebt, ltv, liquidationThreshold, health) =
+            ViewLogic.agent(getLenderStorage(), _agent);
     }
 
     /// @notice Calculate the maximum amount that can be borrowed for a given asset

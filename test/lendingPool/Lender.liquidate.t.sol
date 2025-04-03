@@ -79,7 +79,7 @@ contract LenderLiquidateTest is TestDeployer {
             usdc.approve(address(lender), 3000e6);
             lender.liquidate(user_agent, address(usdc), 1000e6);
 
-            (, uint256 totalDebt,,,) = lender.agent(user_agent);
+            (,, uint256 totalDebt,,,) = lender.agent(user_agent);
             console.log("Debt prior to liquidation", totalDebt);
 
             console.log("Liquidator usdt balance after first liquidation", usdt.balanceOf(env.testUsers.liquidator));
@@ -109,7 +109,7 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("");
             assertEq(coverage, 0);
 
-            (uint256 totalDelegation, uint256 afterTotalDebt,,,) = lender.agent(user_agent);
+            (uint256 totalDelegation,, uint256 afterTotalDebt,,,) = lender.agent(user_agent);
 
             console.log("Total delegation", totalDelegation);
             console.log("Total debt", afterTotalDebt);
@@ -187,7 +187,7 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("");
             //     assertEq(coverage, 0);
 
-            (uint256 totalDelegation, uint256 totalDebt,,, uint256 health) = lender.agent(user_agent);
+            (uint256 totalDelegation,, uint256 totalDebt,,, uint256 health) = lender.agent(user_agent);
 
             console.log("Total debt after liquidations", totalDebt);
             console.log("Total delegation after liquidations", totalDelegation);
@@ -238,7 +238,7 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("");
             _timeTravel(gracePeriod + 1);
 
-            (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health) =
+            (uint256 totalDelegation,, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health) =
                 lender.agent(user_agent);
 
             console.log("Total debt after 60 days", totalDebt);
@@ -279,7 +279,7 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("");
             //     assertEq(coverage, 0);
 
-            (totalDelegation, totalDebt, ltv, liquidationThreshold, health) = lender.agent(user_agent);
+            (totalDelegation,, totalDebt, ltv, liquidationThreshold, health) = lender.agent(user_agent);
 
             console.log("Health after liquidations", health);
 
