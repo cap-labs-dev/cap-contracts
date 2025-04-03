@@ -64,7 +64,8 @@ library LiquidationLogic {
         external
         returns (uint256 liquidatedValue)
     {
-        (uint256 totalDelegation,, uint256 totalDebt,,, uint256 health) = ViewLogic.agent($, params.agent);
+        (uint256 totalDelegation, uint256 totalSlashableCollateral, uint256 totalDebt,,, uint256 health) =
+            ViewLogic.agent($, params.agent);
 
         ValidationLogic.validateLiquidation(
             health,
@@ -86,9 +87,9 @@ library LiquidationLogic {
         uint256 bonus = getBonus($, totalDelegation, totalDebt, params.agent, liquidated);
 
         liquidatedValue = (liquidated + bonus) * assetPrice / (10 ** $.reservesData[params.asset].decimals);
-        if (totalDelegation < liquidatedValue) liquidatedValue = totalDelegation;
+        if (totalSlashableCollateral < liquidatedValue) liquidatedValue = totalSlashableCollateral;
 
-        IDelegation($.delegation).slash(params.agent, params.caller, liquidatedValue);
+        if (liquidatedValue > 0) IDelegation($.delegation).slash(params.agent, params.caller, liquidatedValue);
 
         emit Liquidate(params.agent, params.caller, params.asset, liquidated, liquidatedValue);
     }

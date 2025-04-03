@@ -112,14 +112,7 @@ library ViewLogic {
         view
         returns (uint256 maxLiquidatableAmount)
     {
-        (
-            uint256 totalDelegation,
-            uint256 totalSlashableCollateral,
-            uint256 totalDebt,
-            ,
-            uint256 liquidationThreshold,
-            uint256 health
-        ) = agent($, _agent);
+        (uint256 totalDelegation,, uint256 totalDebt,, uint256 liquidationThreshold, uint256 health) = agent($, _agent);
         if (health >= 1e27) return 0;
 
         (uint256 assetPrice,) = IOracle($.oracle).getPrice(_asset);
@@ -135,7 +128,6 @@ library ViewLogic {
         uint256 g = e * decPow;
 
         maxLiquidatableAmount = g / f;
-        if (totalSlashableCollateral < maxLiquidatableAmount) return totalSlashableCollateral;
     }
 
     /// @notice Get the current debt balances for an agent for a specific asset
