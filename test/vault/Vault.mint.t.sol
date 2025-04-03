@@ -121,4 +121,20 @@ contract VaultMintTest is TestDeployer {
         vm.expectRevert();
         cUSD.mint(address(usdt), amountIn, minAmountOut, user, deadline);
     }
+
+    function test_mint_with_one_wei() public {
+        vm.startPrank(user);
+
+        // Approve USDT spending
+        usdt.mint(user, 100e6);
+        usdt.approve(address(cUSD), 100e6);
+
+        // Mint cUSD with USDT
+        uint256 amountIn = 1;
+        uint256 minAmountOut = 1e12; // Accounting for potential fees
+        uint256 deadline = block.timestamp + 1 hours;
+
+        cUSD.mint(address(usdt), amountIn, minAmountOut, user, deadline);
+        assertEq(cUSD.balanceOf(user), 1e12);
+    }
 }

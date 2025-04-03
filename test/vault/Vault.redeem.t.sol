@@ -125,4 +125,24 @@ contract VaultRedeemTest is TestDeployer {
         vm.expectRevert();
         cUSD.redeem(redeemAmount, minOutputAmounts, user, deadline);
     }
+
+    function test_redeem_with_one_wei() public {
+        vm.startPrank(user);
+
+        // redeem the cUSD tokens we own
+        uint256 redeemAmount = 1;
+        uint256 minOutputAmount = 1; // Accounting for potential fees
+        uint256 deadline = block.timestamp + 1 hours;
+
+        address[] memory assets = cUSD.assets();
+        uint256 assetLength = assets.length;
+
+        uint256[] memory minOutputAmounts = new uint256[](assetLength);
+        for (uint256 i = 0; i < assetLength; i++) {
+            minOutputAmounts[i] = minOutputAmount;
+        }
+
+        vm.expectRevert();
+        cUSD.redeem(redeemAmount, minOutputAmounts, user, deadline);
+    }
 }
