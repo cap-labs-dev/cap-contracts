@@ -166,6 +166,68 @@ contract LenderInvariantsTest is TestDeployer {
             assertGe(slashableCollateral, totalDebt, "User borrow must not exceed delegation");
         }
     }
+
+    /// @dev Test that liquidatable agents always have health factor < 1
+    /// forge-config: default.invariant.depth = 25
+    function invariant_healthFactorConsistency() public view {
+        address[] memory agents = env.testUsers.agents;
+        for (uint256 i = 0; i < agents.length; i++) {
+            address agent = agents[i];
+            (, uint256 totalSlashableCollateral,,,, uint256 health) = lender.agent(agent);
+            if (totalSlashableCollateral == 0) return;
+
+            uint256 maxLiquidatable = lender.maxLiquidatable(agent, address(usdc));
+
+            // If agent is liquidatable (maxLiquidatable > 0), health should be < 1e27
+            if (maxLiquidatable > 0) {
+                assertLt(health, 1e27, "Liquidatable agents must have health < 1");
+            }
+
+            // If health < 1e27, agent should be liquidatable
+            if (health < 1e27) {
+                // Only check if liquidation hasn't started or grace period has passed
+                if (
+                    lender.liquidationStart(agent) == 0
+                        || block.timestamp > lender.liquidationStart(agent) + lender.grace()
+                ) {
+                    assertGt(maxLiquidatable, 0, "Unhealthy agents should be liquidatable");
+                }
+            }
+        }
+    }
+
+    /// @dev Test that interest accrual doesn't break system invariants
+    /// forge-config: default.invariant.depth = 25
+    function invariant_interestAccrualSafety() public {
+        // Store current values
+        address[] memory agents = env.testUsers.agents;
+        uint256[] memory previousDebts = new uint256[](agents.length);
+
+        for (uint256 i = 0; i < agents.length; i++) {
+            (,, previousDebts[i],,,) = lender.agent(agents[i]);
+        }
+
+        // Realize interest on all assets
+        address[] memory assets = usdVault.assets;
+        for (uint256 i = 0; i < assets.length; i++) {
+            uint256 maxRealization = lender.maxRealization(assets[i]);
+            if (maxRealization > 0) {
+                lender.realizeInterest(assets[i], maxRealization);
+            }
+        }
+
+        // Check that system invariants still hold
+        invariant_borrowingLimits();
+        invariant_agentDelegationLimitsDebt();
+        invariant_healthFactorConsistency();
+
+        // Verify that interest was properly accrued
+        for (uint256 i = 0; i < agents.length; i++) {
+            (,, uint256 currentDebt,,,) = lender.agent(agents[i]);
+            // Debt should not decrease from interest accrual
+            assertGe(currentDebt, previousDebts[i], "Interest accrual should not decrease debt");
+        }
+    }
 }
 
 /**
