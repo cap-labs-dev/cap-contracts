@@ -48,6 +48,8 @@ contract LenderInvariantsTest is TestDeployer {
         // Create and target handler
         handler = new TestLenderHandler(env);
         targetContract(address(handler));
+
+        vm.label(address(handler), "TestLenderHandler");
     }
 
     function test_mock_network_borrow_and_repay_with_coverage() public {
@@ -91,6 +93,38 @@ contract LenderInvariantsTest is TestDeployer {
             937481123910104941,
             61623886549693656488416079379073384034876,
             3768160486856916064340765479018069586352278996523203668143
+        );
+        vm.stopPrank();
+
+        invariant_borrowingLimits();
+    }
+
+    function test_fuzzing_non_regression_liquidate_fails() public {
+        //         Encountered 1 failing test in test/lendingPool/Lender.invariants.t.sol:LenderInvariantsTest
+        // [FAIL: invariant_borrowingLimits persisted failure revert]
+        //         [Sequence]
+        //                 sender=0x000000000000000000000000000000004DEeAad4 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[500000000000000000000000000 [5e26], 260243407 [2.602e8], 7520]
+        //                 sender=0x0000000000000000000000000000000000002834 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[4763, 5672]
+        //                 sender=0x0000000000000000000000000000000000000A2B addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256,uint256) args=[9998, 5300, 806165946075049551985264334151369441818954475481 [8.061e47], 5711]
+        //                 sender=0x00000000000000000001ddDBFa0a9CD64ECaa149 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256,uint256) args=[11056068703988633693957203172599663392891881631940881250732208 [1.105e61], 30007872054813680496550892600715668912378495406850871 [3e52], 1928259676971630563350495955946765 [1.928e33], 420729907401969 [4.207e14]]
+        //  invariant_borrowingLimits() (runs: 1, calls: 1, reverts: 1)
+
+        vm.startPrank(0x000000000000000000000000000000004DEeAad4);
+        handler.borrow(500000000000000000000000000, 260243407, 7520);
+        vm.stopPrank();
+
+        handler.setAgentCoverage(4763, 5672);
+
+        vm.startPrank(0x0000000000000000000000000000000000000A2B);
+        handler.liquidate(9998, 5300, 806165946075049551985264334151369441818954475481, 5711);
+        vm.stopPrank();
+
+        vm.startPrank(0x00000000000000000001ddDBFa0a9CD64ECaa149);
+        handler.liquidate(
+            11056068703988633693957203172599663392891881631940881250732208,
+            30007872054813680496550892600715668912378495406850871,
+            1928259676971630563350495955946765,
+            420729907401969
         );
         vm.stopPrank();
 
