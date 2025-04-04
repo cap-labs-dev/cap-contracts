@@ -1,4 +1,15 @@
 {
+    "1": {
+        "chainName": "Ethereum Mainnet",
+        "nativeChainId": 1,
+        "eid": "30101",
+        "executor": "0x173272739Bd7Aa6e4e214714048a9fE699453059",
+        "endpointV2": "0x1a44076050125825900e736c501f859c50fE728c",
+        "sendUln301": "0xD231084BfB234C107D3eE2b22F97F3346fDAF705",
+        "sendUln302": "0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1",
+        "receiveUln301": "0x245B6e8FFE9ea5Fc301e32d16F66bD4C2123eEfC",
+        "receiveUln302": "0xc02Ab410f0734EFa3F14628780e6e695156024C2"
+    },
     "421614": {
         "chainName": "Arbitrum Sepolia",
         "nativeChainId": 421614,
@@ -20,5 +31,16 @@
         "sendUln302": "0xcc1ae8Cf5D3904Cef3360A9532B477529b177cCE",
         "receiveUln301": "0x5937A5fe272fbA38699A1b75B3439389EEFDb399",
         "receiveUln302": "0xdAf00F5eE2158dD58E0d3857851c432E34A3A851"
+    },
+    "6342": {
+        "chainName": "MegaETH Testnet",
+        "nativeChainId": 6342,
+        "eid": "40370",
+        "executor": "0x9dB9Ca3305B48F196D18082e91cB64663b13d014",
+        "endpointV2": "0x6C7Ab2202C98C4227C5c46f1417D81144DA716Ff",
+        "sendUln301": "0xB0487596a0B62D1A71D0C33294bd6eB635Fc6B09",
+        "sendUln302": "0xd682ECF100f6F4284138AA925348633B0611Ae21",
+        "receiveUln301": "0x073f5b4FdF17BBC16b0980d49f6C56123477bb51",
+        "receiveUln302": "0xcF1B0F4106B0324F96fEfcC31bA9498caa80701C"
     }
 }
