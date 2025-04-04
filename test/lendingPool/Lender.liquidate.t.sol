@@ -35,7 +35,8 @@ contract LenderLiquidateTest is TestDeployer {
                     interestDebtToken: env.usdVault.interestDebtTokens[0],
                     interestReceiver: env.usdVault.feeAuction,
                     restakerInterestReceiver: env.infra.delegation,
-                    bonusCap: 0.1e27
+                    bonusCap: 0.1e27,
+                    minBorrow: 100e6
                 })
             );
         lender.pauseAsset(address(usdt), false);

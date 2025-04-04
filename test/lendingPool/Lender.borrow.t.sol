@@ -6,6 +6,7 @@ import { Lender } from "../../contracts/lendingPool/Lender.sol";
 import { InterestDebtToken } from "../../contracts/lendingPool/tokens/InterestDebtToken.sol";
 import { PrincipalDebtToken } from "../../contracts/lendingPool/tokens/PrincipalDebtToken.sol";
 import { RestakerDebtToken } from "../../contracts/lendingPool/tokens/RestakerDebtToken.sol";
+import { BorrowLogic } from "../../contracts/lendingPool/libraries/BorrowLogic.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { console } from "forge-std/console.sol";
 
@@ -37,6 +38,9 @@ contract LenderBorrowTest is TestDeployer {
         vm.startPrank(user_agent);
 
         uint256 backingBefore = usdc.balanceOf(address(cUSD));
+
+        vm.expectRevert(BorrowLogic.MinBorrowAmount.selector);
+        lender.borrow(address(usdc), 99e6, user_agent);
 
         lender.borrow(address(usdc), 1000e6, user_agent);
         assertEq(usdc.balanceOf(user_agent), 1000e6);

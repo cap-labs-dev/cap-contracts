@@ -134,7 +134,7 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         address[] memory unpausedAssets = new address[](assets.length);
         uint256 unpausedAssetCount = 0;
         for (uint256 i = 0; i < assets.length; i++) {
-            (,,,,,,, bool paused,) = lender.reservesData(assets[i]);
+            (,,,,,,, bool paused,,) = lender.reservesData(assets[i]);
             if (!paused) {
                 unpausedAssets[unpausedAssetCount++] = assets[i];
             }
@@ -152,7 +152,7 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
 
         uint256 availableToBorrow = lender.maxBorrowable(agent, currentAsset);
         amount = bound(amount, 0, availableToBorrow);
-        if (amount == 0) return;
+        if (amount < 100e6) return;
 
         vm.startPrank(agent);
         lender.borrow(currentAsset, amount, agent);

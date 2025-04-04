@@ -55,6 +55,7 @@ interface ILender {
         uint8 decimals;
         bool paused;
         uint256 realizedInterest;
+        uint256 minBorrow;
     }
 
     /// @dev Agent configuration map
@@ -111,6 +112,7 @@ interface ILender {
         address interestReceiver;
         address restakerInterestReceiver;
         uint256 bonusCap;
+        uint256 minBorrow;
     }
 
     /// @notice Initialize the lender
@@ -209,6 +211,11 @@ interface ILender {
     /// @param _pause True if pausing or false if unpausing
     function pauseAsset(address _asset, bool _pause) external;
 
+    /// @notice Set the minimum borrow amount for an asset
+    /// @param _asset Asset address
+    /// @param _minBorrow Minimum borrow amount in asset decimals
+    function setMinBorrow(address _asset, uint256 _minBorrow) external;
+
     /// @notice Get the target health ratio
     function targetHealth() external view returns (uint256 targetHealth);
 
@@ -252,7 +259,8 @@ interface ILender {
             address interestReceiver,
             uint8 decimals,
             bool paused,
-            uint256 realizedInterest
+            uint256 realizedInterest,
+            uint256 minBorrow
         );
 
     /// @notice Zero address not valid

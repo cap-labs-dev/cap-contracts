@@ -53,8 +53,18 @@ library ReserveLogic {
             restakerInterestReceiver: params.restakerInterestReceiver,
             decimals: IERC20Metadata(params.asset).decimals(),
             paused: true,
-            realizedInterest: 0
+            realizedInterest: 0,
+            minBorrow: params.minBorrow
         });
+    }
+
+    /// @notice Set the minimum borrow amount for an asset
+    /// @param $ Lender storage
+    /// @param _asset Asset address
+    /// @param _minBorrow Minimum borrow amount
+    function setMinBorrow(ILender.LenderStorage storage $, address _asset, uint256 _minBorrow) external {
+        ValidationLogic.validateSetMinBorrow($, _asset);
+        $.reservesData[_asset].minBorrow = _minBorrow;
     }
 
     /// @notice Remove asset from lending when there is no borrows

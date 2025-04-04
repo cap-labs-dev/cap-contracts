@@ -190,6 +190,14 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
         ReserveLogic.pauseAsset(getLenderStorage(), _asset, _pause);
     }
 
+    /// @notice Set the minimum borrow amount for an asset
+    /// @param _asset Asset address
+    /// @param _minBorrow Minimum borrow amount
+    function setMinBorrow(address _asset, uint256 _minBorrow) external checkAccess(this.setMinBorrow.selector) {
+        if (_asset == address(0)) revert ZeroAddressNotValid();
+        ReserveLogic.setMinBorrow(getLenderStorage(), _asset, _minBorrow);
+    }
+
     /// @notice The total number of reserves
     /// @return count Number of reserves
     function reservesCount() external view returns (uint256 count) {
@@ -256,7 +264,8 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
             address interestReceiver,
             uint8 decimals,
             bool paused,
-            uint256 realizedInterest
+            uint256 realizedInterest,
+            uint256 minBorrow
         )
     {
         ReserveData storage reserve = getLenderStorage().reservesData[_asset];
@@ -269,6 +278,7 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
         decimals = reserve.decimals;
         paused = reserve.paused;
         realizedInterest = reserve.realizedInterest;
+        minBorrow = reserve.minBorrow;
     }
 
     function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }

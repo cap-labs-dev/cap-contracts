@@ -46,6 +46,9 @@ library BorrowLogic {
     /// @dev Trying to realize zero interest
     error ZeroRealization();
 
+    /// @dev Minimum borrow amount
+    error MinBorrowAmount();
+
     /// @notice Borrow an asset from the Lender, minting a debt token which must be repaid
     /// @dev Interest debt token is updated before principal token is minted to bring index up to date.
     /// Restaker debt token is updated after so the new principal debt can be used in calculations
@@ -53,6 +56,8 @@ library BorrowLogic {
     /// @param params Parameters to borrow an asset
     function borrow(ILender.LenderStorage storage $, ILender.BorrowParams memory params) external {
         ValidationLogic.validateBorrow($, params);
+
+        if (params.amount < $.reservesData[params.asset].minBorrow) revert MinBorrowAmount();
 
         ILender.ReserveData memory reserve = $.reservesData[params.asset];
         if (!$.agentConfig[params.agent].isBorrowing(reserve.id)) {
