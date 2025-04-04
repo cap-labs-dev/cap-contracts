@@ -257,4 +257,7 @@ interface ILender {
 
     /// @notice Zero address not valid
     error ZeroAddressNotValid();
+
+    /// @notice Grace period greater than expiry
+    error GracePeriodGreaterThanExpiry();
 }

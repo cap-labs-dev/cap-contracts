@@ -46,6 +46,7 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
         __UUPSUpgradeable_init();
 
         if (_delegation == address(0) || _oracle == address(0)) revert ZeroAddressNotValid();
+        if (_grace > _expiry) revert GracePeriodGreaterThanExpiry();
 
         // TODO: remove this
         LenderStorage storage $ = getLenderStorage();
