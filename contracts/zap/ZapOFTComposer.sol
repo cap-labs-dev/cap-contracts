@@ -50,7 +50,7 @@ contract ZapOFTComposer is SafeOFTLzComposer {
         for (uint256 i = 0; i < inputLength; i++) {
             IZapRouter.Input memory input = inputs[i];
             if (input.amount > 0) {
-                IERC20(input.token).approve(zapTokenManager, input.amount);
+                IERC20(input.token).forceApprove(zapTokenManager, input.amount);
             }
         }
 
