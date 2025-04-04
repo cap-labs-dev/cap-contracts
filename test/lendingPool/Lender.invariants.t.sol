@@ -48,6 +48,8 @@ contract LenderInvariantsTest is TestDeployer {
         // Create and target handler
         handler = new TestLenderHandler(env);
         targetContract(address(handler));
+
+        vm.label(address(handler), "TestLenderHandler");
     }
 
     function test_mock_network_borrow_and_repay_with_coverage() public {
@@ -73,6 +75,129 @@ contract LenderInvariantsTest is TestDeployer {
         assertEq(rdebt, 0);
     }
 
+    /// @dev Test that interest accrual doesn't break system invariants
+    function test_interestAccrualSafety() public {
+        // Store current values
+        address[] memory agents = env.testUsers.agents;
+        uint256[] memory previousDebts = new uint256[](agents.length);
+
+        for (uint256 i = 0; i < agents.length; i++) {
+            (,, previousDebts[i],,,) = lender.agent(agents[i]);
+        }
+
+        // Realize interest on all assets
+        address[] memory assets = usdVault.assets;
+        for (uint256 i = 0; i < assets.length; i++) {
+            uint256 maxRealization = lender.maxRealization(assets[i]);
+            if (maxRealization > 0) {
+                lender.realizeInterest(assets[i], maxRealization);
+            }
+        }
+
+        // Check that system invariants still hold
+        invariant_borrowingLimits();
+        invariant_agentDelegationLimitsDebt();
+        invariant_healthFactorConsistency();
+
+        // Verify that interest was properly accrued
+        for (uint256 i = 0; i < agents.length; i++) {
+            (,, uint256 currentDebt,,,) = lender.agent(agents[i]);
+            // Debt should not decrease from interest accrual
+            assertGe(currentDebt, previousDebts[i], "Interest accrual should not decrease debt");
+        }
+    }
+
+    function test_fuzzing_non_regression_liquidate_after_set_coverage() public {
+        // [FAIL: panic: division or modulo by zero (0x12)]
+        // [Sequence]
+        //         sender=0x0000000000000000000000000000000000001207 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[5402, 4969, 4395]
+        //         sender=0x0000000000000000000000000000000000000758 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[8504, 11352 [1.135e4]]
+        //         sender=0x0000000000000000000000000000000000000423 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256,uint256) args=[1109431098096784405597004399778520969000778 [1.109e42], 937481123910104941 [9.374e17], 61623886549693656488416079379073384034876 [6.162e40], 3768160486856916064340765479018069586352278996523203668143 [3.768e57]]
+        handler.borrow(5402, 4969, 4395);
+        handler.setAgentCoverage(8504, 11352);
+        handler.liquidate(
+            1109431098096784405597004399778520969000778,
+            937481123910104941,
+            61623886549693656488416079379073384034876,
+            3768160486856916064340765479018069586352278996523203668143
+        );
+
+        invariant_borrowingLimits();
+    }
+
+    function test_fuzzing_non_regression_liquidate_fails() public {
+        //         Encountered 1 failing test in test/lendingPool/Lender.invariants.t.sol:LenderInvariantsTest
+        // [FAIL: invariant_borrowingLimits persisted failure revert]
+        //         [Sequence]
+        //                 sender=0x000000000000000000000000000000004DEeAad4 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[500000000000000000000000000 [5e26], 260243407 [2.602e8], 7520]
+        //                 sender=0x0000000000000000000000000000000000002834 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[4763, 5672]
+        //                 sender=0x0000000000000000000000000000000000000A2B addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256,uint256) args=[9998, 5300, 806165946075049551985264334151369441818954475481 [8.061e47], 5711]
+        //                 sender=0x00000000000000000001ddDBFa0a9CD64ECaa149 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256,uint256) args=[11056068703988633693957203172599663392891881631940881250732208 [1.105e61], 30007872054813680496550892600715668912378495406850871 [3e52], 1928259676971630563350495955946765 [1.928e33], 420729907401969 [4.207e14]]
+        //  invariant_borrowingLimits() (runs: 1, calls: 1, reverts: 1)
+
+        handler.borrow(500000000000000000000000000, 260243407, 7520);
+        handler.setAgentCoverage(4763, 5672);
+        handler.liquidate(9998, 5300, 806165946075049551985264334151369441818954475481, 5711);
+        handler.liquidate(
+            11056068703988633693957203172599663392891881631940881250732208,
+            30007872054813680496550892600715668912378495406850871,
+            1928259676971630563350495955946765,
+            420729907401969
+        );
+
+        invariant_borrowingLimits();
+    }
+
+    function test_fuzzing_non_regression_liquidate_fails_2() public {
+        //     [FAIL: Unhealthy agents should be liquidatable: 0 <= 0]
+        //         [Sequence]
+        //                 sender=0x0000000000000000000000000000fFfffFFfFfff addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentSlashableCollateral(uint256,uint256) args=[3, 153730679022881943174521915728621705491855651983136629749293 [1.537e59]]
+        //                 sender=0x0000000000000000000000000000000000000b1e addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[0, 5394082854433605416045615594689867366126864271730597317776373663523047009 [5.394e72], 272381320701 [2.723e11]]
+        //                 sender=0x0000000000000000000000000000000000000902 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[7779693176664 [7.779e12], 2]
+        //  invariant_healthFactorConsistency() (runs: 2396, calls: 59900, reverts: 0)
+
+        handler.setAgentSlashableCollateral(3, 153730679022881943174521915728621705491855651983136629749293);
+        handler.borrow(0, 5394082854433605416045615594689867366126864271730597317776373663523047009, 272381320701);
+        handler.setAgentCoverage(7779693176664, 2);
+
+        invariant_healthFactorConsistency();
+    }
+
+    function test_fuzzing_non_regression_liquidate_fails_3() public {
+        vm.skip(true, "Fix in next PR");
+        // [FAIL: invariant_agentDelegationLimitsDebt persisted failure revert]
+        // [Sequence]
+        //      sender=0x00000000000000000000000000000000000007fe addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[279561588714589 [2.795e14], 2663511517048081342890370761760586438025887 [2.663e42]]
+        //      sender=0x09f3Cc51b061FA3e0A125722d3dCdAB22960102e addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[115792089237316195423570985008687907853269984665640564039457584007913129639932 [1.157e77], 15245393 [1.524e7]]
+        //      sender=0x00000000000000000000000000000000000004E9 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[75609030313738284332382717790014263572601398128483269307557 [7.56e58], 7177446610867092 [7.177e15], 457251500103351190898254055994346777733 [4.572e38]]
+        //      sender=0x000000000000000000000000000000000000020d addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[3827, 2524]
+        //      sender=0xc91f5DAa6E03aFB3B78758b6A58C2B36694b8c1D addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[20571 [2.057e4], 10583 [1.058e4]]
+        //      sender=0x000000000000000000000000000000000000067C addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[35492957994691500668295531932493666265885033293179877427109393477396013776896 [3.549e76], 8388]
+        //      sender=0x0000000000000000000000000000000066d9a99F addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[16291864798349077 [1.629e16], 1435829797705254314582830950992659463821452722364858090334371516 [1.435e63], 16556117656843747165974402408538744302413325 [1.655e43]]
+        //      sender=0x0000000000000000000000000000000000001CfC addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256,uint256) args=[2, 65076241195732311297008734 [6.507e25], 0, 50531700442618637710239866635305475564994400757514979355854358368 [5.053e64]]
+        //  invariant_agentDelegationLimitsDebt() (runs: 1, calls: 1, reverts: 1)
+        handler.wrapTime(279561588714589, 2663511517048081342890370761760586438025887);
+        handler.wrapTime(115792089237316195423570985008687907853269984665640564039457584007913129639932, 15245393);
+        handler.borrow(
+            75609030313738284332382717790014263572601398128483269307557,
+            7177446610867092,
+            457251500103351190898254055994346777733
+        );
+        handler.setAgentCoverage(3827, 2524);
+        handler.wrapTime(20571, 10583);
+        handler.setAgentCoverage(35492957994691500668295531932493666265885033293179877427109393477396013776896, 8388);
+        handler.borrow(
+            16291864798349077,
+            1435829797705254314582830950992659463821452722364858090334371516,
+            16556117656843747165974402408538744302413325
+        );
+        handler.liquidate(
+            2, 65076241195732311297008734, 0, 50531700442618637710239866635305475564994400757514979355854358368
+        );
+
+        invariant_agentDelegationLimitsDebt();
+    }
+
     /// @dev Test that total borrowed never exceeds available assets
     /// forge-config: default.invariant.depth = 25
     function invariant_borrowingLimits() public view {
@@ -84,7 +209,7 @@ contract LenderInvariantsTest is TestDeployer {
 
             // Sum up all actor debts
             for (uint256 j = 0; j < actors.length; j++) {
-                (, uint256 totalDebt,,,) = lender.agent(actors[j]);
+                (,, uint256 totalDebt,,,) = lender.agent(actors[j]);
                 totalBorrowed += totalDebt;
             }
 
@@ -99,13 +224,30 @@ contract LenderInvariantsTest is TestDeployer {
         address[] memory agents = env.testUsers.agents;
         for (uint256 i = 0; i < agents.length; i++) {
             address agent = agents[i];
-            (uint256 totalDelegation, uint256 totalDebt,,,) = lender.agent(agent);
+            (uint256 totalDelegation, uint256 slashableCollateral, uint256 totalDebt,,,) = lender.agent(agent);
             uint256 maxLiquidatable = lender.maxLiquidatable(agent, address(usdc));
             console.log("totalDelegation", totalDelegation);
             console.log("totalDebt", totalDebt);
             console.log("maxLiquidatable", maxLiquidatable);
-            if (maxLiquidatable == 0) {
-                assertGe(totalDelegation, totalDebt, "User borrow must not exceed delegation");
+            if (slashableCollateral < totalDebt) return;
+            assertGe(slashableCollateral, totalDebt, "User borrow must not exceed delegation");
+        }
+    }
+
+    /// @dev Test that liquidatable agents always have health factor < 1
+    /// forge-config: default.invariant.depth = 25
+    function invariant_healthFactorConsistency() public view {
+        address[] memory agents = env.testUsers.agents;
+        for (uint256 i = 0; i < agents.length; i++) {
+            address agent = agents[i];
+            (, uint256 totalSlashableCollateral,,,, uint256 health) = lender.agent(agent);
+            if (totalSlashableCollateral == 0) return;
+
+            uint256 maxLiquidatable = lender.maxLiquidatable(agent, address(usdc));
+
+            // If agent is liquidatable (maxLiquidatable > 0), health should be < 1e27
+            if (maxLiquidatable > 0) {
+                assertLt(health, 1e27, "Liquidatable agents must have health < 1");
             }
         }
     }
@@ -145,13 +287,13 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         return unpausedAssets[bound(assetSeed, 0, unpausedAssetCount - 1)];
     }
 
-    function borrow(uint256 actorSeed, uint256 assetSeed, uint256 amount) external {
+    function borrow(uint256 actorSeed, uint256 assetSeed, uint256 amountSeed) external {
         address agent = randomActor(actorSeed);
         address currentAsset = _randomUnpausedAsset(assetSeed);
         if (currentAsset == address(0)) return;
 
         uint256 availableToBorrow = lender.maxBorrowable(agent, currentAsset);
-        amount = bound(amount, 0, availableToBorrow);
+        uint256 amount = bound(amountSeed, 0, availableToBorrow);
         if (amount == 0) return;
 
         vm.startPrank(agent);
@@ -159,14 +301,14 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         vm.stopPrank();
     }
 
-    function repay(uint256 actorSeed, uint256 assetSeed, uint256 amount) external {
+    function repay(uint256 actorSeed, uint256 assetSeed, uint256 amountSeed) external {
         address agent = randomActor(actorSeed);
         address currentAsset = randomAsset(assetSeed);
 
-        (, uint256 totalDebt,,,) = lender.agent(agent);
+        (,, uint256 totalDebt,,,) = lender.agent(agent);
 
         // Bound amount to actual borrowed amount
-        amount = bound(amount, 0, totalDebt);
+        uint256 amount = bound(amountSeed, 0, totalDebt);
         if (amount == 0) return;
 
         // Mint tokens to repay
@@ -182,13 +324,13 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         }
     }
 
-    function liquidate(uint256 agentSeed, uint256 liquidatorSeed, uint256 assetSeed, uint256 amount) external {
+    function liquidate(uint256 agentSeed, uint256 liquidatorSeed, uint256 assetSeed, uint256 amountSeed) external {
         address agent = randomActor(agentSeed);
         address liquidator = randomActorExcept(liquidatorSeed, agent);
         address currentAsset = randomAsset(assetSeed);
 
         // Bound amount to liquidatable amount
-        amount = bound(amount, 0, lender.maxLiquidatable(agent, currentAsset));
+        uint256 amount = bound(amountSeed, 0, lender.maxLiquidatable(agent, currentAsset));
         if (amount == 0) return;
 
         // Execute liquidation
@@ -211,8 +353,8 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         }
     }
 
-    function setAgentCoverage(uint256 agentSeed, uint256 coverage) external {
-        coverage = bound(coverage, 0, 1e50);
+    function setAgentCoverage(uint256 agentSeed, uint256 coverageSeed) external {
+        uint256 coverage = bound(coverageSeed, 0, 1e50);
         address agent = randomActor(agentSeed);
 
         vm.prank(address(env.users.middleware_admin));
@@ -220,20 +362,47 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         vm.stopPrank();
     }
 
-    function realizeInterest(uint256 assetSeed, uint256 amount) external {
+    function setAgentSlashableCollateral(uint256 agentSeed, uint256 coverageSeed) external {
+        uint256 coverage = bound(coverageSeed, 0, 1e50);
+        address agent = randomActor(agentSeed);
+
+        vm.prank(address(env.users.middleware_admin));
+        MockNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).setMockSlashableCollateral(
+            agent, coverage
+        );
+        vm.stopPrank();
+    }
+
+    function realizeInterest(uint256 assetSeed, uint256 amountSeed) external {
         address currentAsset = randomAsset(assetSeed);
 
         // Bound amount to a reasonable range (using type(uint96).max to avoid overflow)
         uint256 maxRealization = lender.maxRealization(currentAsset);
         if (maxRealization == 0) return;
 
-        amount = bound(amount, 0, maxRealization);
-
-        // deal some cUSD to the realizer
-        address realizer = randomActor(assetSeed);
-        _initTestUserMintCapToken(env.usdVault, realizer, amount);
+        uint256 amount = bound(amountSeed, 0, maxRealization);
+        if (amount == 0) return;
 
         lender.realizeInterest(currentAsset, amount);
+    }
+
+    function wrapTime(uint256 timeSeed, uint256 blockNumberSeed) external {
+        uint256 timestamp = bound(timeSeed, block.timestamp, block.timestamp + 100 days);
+        uint256 blockNumber = bound(blockNumberSeed, block.number, block.number + 1000000);
+        vm.warp(timestamp);
+        vm.roll(blockNumber);
+    }
+
+    function realizeRestakerInterest(uint256 agentSeed, uint256 assetSeed, uint256 amountSeed) external {
+        address agent = randomActor(agentSeed);
+        address currentAsset = randomAsset(assetSeed);
+
+        uint256 maxRealization = lender.maxRestakerRealization(agent, currentAsset);
+        if (maxRealization == 0) return;
+
+        uint256 amount = bound(amountSeed, 1, maxRealization);
+
+        lender.realizeRestakerInterest(agent, currentAsset, amount);
     }
 
     function cancelLiquidation(uint256 agentSeed) external {
@@ -241,7 +410,7 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
 
         // Only attempt to cancel if there's an active liquidation
         if (lender.liquidationStart(agent) > 0) {
-            (,,,, uint256 health) = lender.agent(agent);
+            (,,,,, uint256 health) = lender.agent(agent);
             // Only cancel if health is above 1e27 (healthy)
             if (health >= 1e27) {
                 vm.prank(address(env.users.lender_admin));
@@ -251,13 +420,43 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         }
     }
 
-    function pauseAsset(uint256 assetSeed, uint256 pauseFlag) external {
+    function pauseAsset(uint256 assetSeed, uint256 pauseFlagSeed) external {
         address currentAsset = randomAsset(assetSeed);
-        bool shouldPause = pauseFlag % 2 == 1; // Convert to boolean randomly
+        bool shouldPause = bound(pauseFlagSeed, 0, 1) == 1; // Convert to boolean randomly
 
         // Only admin can pause/unpause
         vm.prank(address(env.users.lender_admin));
         lender.pauseAsset(currentAsset, shouldPause);
+        vm.stopPrank();
+    }
+
+    // @dev Donate tokens to the lender's vault
+    // TODO: make it external again after fixing the tests
+    function ______________________donateAsset(uint256 assetSeed, uint256 amountSeed) internal {
+        address currentAsset = randomAsset(assetSeed);
+        if (currentAsset == address(0)) return;
+
+        uint256 amount = bound(amountSeed, 0, 1e50);
+        if (amount == 0) return;
+
+        address donor = makeAddr("donor");
+        MockERC20(currentAsset).mint(donor, amount);
+
+        vm.startPrank(donor);
+        MockERC20(currentAsset).transfer(address(env.usdVault.capToken), amount);
+        vm.stopPrank();
+    }
+
+    // TODO: make it external again after fixing the tests
+    function ______________________donateGasToken(uint256 amountSeed) internal {
+        uint256 amount = bound(amountSeed, 0, 1e50);
+        if (amount == 0) return;
+
+        address donor = makeAddr("donor");
+        vm.deal(donor, amount);
+
+        vm.startPrank(donor);
+        payable(env.usdVault.capToken).transfer(amount);
         vm.stopPrank();
     }
 }

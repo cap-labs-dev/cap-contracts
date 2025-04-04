@@ -5,6 +5,7 @@ test = "test"
 libs = ["node_modules", "lib"]
 script = "scripts"
 solc_version = "0.8.28"
+ignored_warnings_from = ["node_modules", "lib"]
 remappings = [
     "@symbioticfi/core/=node_modules/@symbioticfi/core/",
     "@symbioticfi/burners/=node_modules/@symbioticfi/burners/",
@@ -42,6 +43,11 @@ optimizer_runs = 200
 [invariant]
 show_metrics = true
 fail_on_revert = true
+dictionary_weight = 80
+[fuzz]
+dictionary_weight = 60
+include_storage = true
+show_metrics = true
 
 [fmt]
 bracket_spacing = true
@@ -49,6 +55,14 @@ int_types = "preserve"
 sort_imports = true
 single_line_statement_blocks = "preserve"
 contract_new_lines = false
+
+[profile.deep]
+inherit = "default"
+[profile.deep.invariant]
+runs = 5000
+depth = 200 # handler based testing doesn't need to be deep
+[profile.deep.fuzz]
+runs = 5000
 
 [profile.release]
 inherits = "default"

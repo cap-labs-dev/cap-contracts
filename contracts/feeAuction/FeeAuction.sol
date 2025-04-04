@@ -44,6 +44,7 @@ contract FeeAuction is IFeeAuction, UUPSUpgradeable, Access, FeeAuctionStorageUt
         $.startTimestamp = block.timestamp;
         if (_duration == 0) revert NoDuration();
         $.duration = _duration;
+        if (_minStartPrice == 0) revert NoMinStartPrice();
         $.minStartPrice = _minStartPrice;
     }
 
@@ -101,6 +102,7 @@ contract FeeAuction is IFeeAuction, UUPSUpgradeable, Access, FeeAuctionStorageUt
     /// @notice Set minimum start price
     /// @param _minStartPrice New minimum start price
     function setMinStartPrice(uint256 _minStartPrice) external checkAccess(this.setMinStartPrice.selector) {
+        if (_minStartPrice == 0) revert NoMinStartPrice();
         FeeAuctionStorage storage $ = get();
         $.minStartPrice = _minStartPrice;
         emit SetMinStartPrice(_minStartPrice);

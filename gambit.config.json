@@ -1,0 +1,221 @@
+[
+    {
+        "filename": "contracts/access/Access.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/access/AccessControl.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/delegation/Delegation.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/delegation/providers/symbiotic/Network.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/",
+            "@symbioticfi/=node_modules/@symbioticfi/"
+        ]
+    },
+    {
+        "filename": "contracts/delegation/providers/symbiotic/NetworkMiddleware.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/",
+            "@symbioticfi/=node_modules/@symbioticfi/"
+        ]
+    },
+    {
+        "filename": "contracts/feeAuction/FeeAuction.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/lendingPool/Lender.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/lendingPool/libraries/BorrowLogic.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/lendingPool/libraries/LiquidationLogic.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/lendingPool/libraries/ReserveLogic.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/lendingPool/libraries/ValidationLogic.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/lendingPool/libraries/ViewLogic.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/lendingPool/tokens/InterestDebtToken.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/lendingPool/tokens/PrincipalDebtToken.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/lendingPool/tokens/RestakerDebtToken.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/oracle/Oracle.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/oracle/libraries/AaveAdapter.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/oracle/libraries/CapTokenAdapter.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/oracle/libraries/ChainlinkAdapter.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/oracle/libraries/StakedCapAdapter.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/oracle/libraries/VaultAdapter.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/oracle/PriceOracle.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/oracle/RateOracle.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/token/CapToken.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/token/StakedCap.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/vault/FractionalReserve.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/vault/libraries/FractionalReserveLogic.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/vault/libraries/MinterLogic.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/vault/libraries/VaultLogic.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/vault/Minter.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    },
+    {
+        "filename": "contracts/vault/Vault.sol",
+        "outdir": ".gambit",
+        "solc_remappings": [
+            "@openzeppelin/=node_modules/@openzeppelin/"
+        ]
+    }
+]

@@ -89,11 +89,33 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
             BorrowLogic.realizeInterest(getLenderStorage(), RealizeInterestParams({ asset: _asset, amount: _amount }));
     }
 
+    /// @notice Realize interest for restaker debt of an agent for an asset
+    /// @param _agent Agent to realize interest for
+    /// @param _asset Asset to realize interest for
+    /// @param _amount Amount of interest to realize (type(uint).max for all available interest)
+    /// @return actualRealized Actual amount realized
+    function realizeRestakerInterest(address _agent, address _asset, uint256 _amount)
+        external
+        returns (uint256 actualRealized)
+    {
+        actualRealized = BorrowLogic.realizeRestakerInterest(
+            getLenderStorage(), RealizeRestakerInterestParams({ agent: _agent, asset: _asset, amount: _amount })
+        );
+    }
+
     /// @notice Calculate the maximum interest that can be realized
     /// @param _asset Asset to calculate max realization for
     /// @return _maxRealization Maximum interest that can be realized
     function maxRealization(address _asset) external view returns (uint256 _maxRealization) {
         _maxRealization = BorrowLogic.maxRealization(getLenderStorage(), _asset);
+    }
+
+    /// @notice Calculate the maximum interest that can be realized for a restaker
+    /// @param _agent Agent to calculate max realization for
+    /// @param _asset Asset to calculate max realization for
+    /// @return _maxRealization Maximum interest that can be realized
+    function maxRestakerRealization(address _agent, address _asset) external view returns (uint256 _maxRealization) {
+        _maxRealization = BorrowLogic.maxRestakerRealization(getLenderStorage(), _agent, _asset);
     }
 
     /// @notice Initiate liquidation of an agent when the health is below 1
@@ -123,6 +145,7 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     /// @notice Calculate the agent data
     /// @param _agent Address of agent
     /// @return totalDelegation Total delegation of an agent in USD, encoded with 8 decimals
+    /// @return totalSlashableCollateral Total slashable collateral of an agent in USD, encoded with 8 decimals
     /// @return totalDebt Total debt of an agent in USD, encoded with 8 decimals
     /// @return ltv Loan to value ratio, encoded in ray (1e27)
     /// @return liquidationThreshold Liquidation ratio of an agent, encoded in ray (1e27)
@@ -130,9 +153,17 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     function agent(address _agent)
         external
         view
-        returns (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health)
+        returns (
+            uint256 totalDelegation,
+            uint256 totalSlashableCollateral,
+            uint256 totalDebt,
+            uint256 ltv,
+            uint256 liquidationThreshold,
+            uint256 health
+        )
     {
-        (totalDelegation, totalDebt, ltv, liquidationThreshold, health) = ViewLogic.agent(getLenderStorage(), _agent);
+        (totalDelegation, totalSlashableCollateral, totalDebt, ltv, liquidationThreshold, health) =
+            ViewLogic.agent(getLenderStorage(), _agent);
     }
 
     /// @notice Calculate the maximum amount that can be borrowed for a given asset
@@ -269,6 +300,19 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
         decimals = reserve.decimals;
         paused = reserve.paused;
         realizedInterest = reserve.realizedInterest;
+    }
+
+    /// @notice The realized restaker interest for an agent and asset
+    /// @param _agent Address of the agent
+    /// @param _asset Address of the asset
+    /// @return _realizedRestakerInterest Realized restaker interest scaled to 1e27
+    function realizedRestakerInterest(address _agent, address _asset)
+        external
+        view
+        returns (uint256 _realizedRestakerInterest)
+    {
+        ReserveData storage reserve = getLenderStorage().reservesData[_asset];
+        _realizedRestakerInterest = reserve.realizedRestakerInterest[_agent];
     }
 
     function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }

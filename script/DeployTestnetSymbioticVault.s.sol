@@ -93,7 +93,9 @@ contract DeployTestnetSymbioticVault is
         _registerCapNetworkInVault(networkAdapter, vault);
 
         console.log("registering vaults in network middleware");
-        _registerVaultsInNetworkMiddleware(networkAdapter, vault, rewards, agents);
+        for (uint256 i = 0; i < agents.length; i++) {
+            _registerVaultsInNetworkMiddleware(networkAdapter, vault, rewards, agents[i]);
+        }
 
         console.log("registering agents as operator");
         for (uint256 i = 0; i < agents.length; i++) {
@@ -111,8 +113,7 @@ contract DeployTestnetSymbioticVault is
         console.log("init delegation");
         for (uint256 i = 0; i < agents.length; i++) {
             address agent = agents[i];
-            _initDelegationAgent(infra, agent);
-            _initDelegationAgentDelegator(infra, agent, networkAdapter.networkMiddleware);
+            _initDelegationAgent(infra, agent, networkAdapter.networkMiddleware);
         }
 
         vm.stopBroadcast();

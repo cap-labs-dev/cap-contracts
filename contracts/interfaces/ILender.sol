@@ -51,10 +51,10 @@ interface ILender {
         address restakerDebtToken;
         address interestDebtToken;
         address interestReceiver;
-        address restakerInterestReceiver;
         uint8 decimals;
         bool paused;
         uint256 realizedInterest;
+        mapping(address => uint256) realizedRestakerInterest;
     }
 
     /// @dev Agent configuration map
@@ -91,6 +91,15 @@ interface ILender {
     /// @param asset Asset to realize interest for
     /// @param amount Amount of interest to realize
     struct RealizeInterestParams {
+        address asset;
+        uint256 amount;
+    }
+
+    /// @dev Realize restaker interest parameters
+    /// @param asset Asset to realize interest for
+    /// @param amount Amount of interest to realize
+    struct RealizeRestakerInterestParams {
+        address agent;
         address asset;
         uint256 amount;
     }
@@ -152,6 +161,15 @@ interface ILender {
     /// @return actualRealized Actual amount realized
     function realizeInterest(address _asset, uint256 _amount) external returns (uint256 actualRealized);
 
+    /// @notice Realize interest for restaker debt of an agent for an asset
+    /// @param _agent Agent to realize interest for
+    /// @param _asset Asset to realize interest for
+    /// @param _amount Amount of interest to realize (type(uint).max for all available interest)
+    /// @return actualRealized Actual amount realized
+    function realizeRestakerInterest(address _agent, address _asset, uint256 _amount)
+        external
+        returns (uint256 actualRealized);
+
     /// @notice Initiate liquidation of an agent when the health is below 1
     /// @param _agent Agent address
     function initiateLiquidation(address _agent) external;
@@ -170,6 +188,7 @@ interface ILender {
     /// @notice Calculate the agent data
     /// @param _agent Address of agent
     /// @return totalDelegation Total delegation of an agent in USD, encoded with 8 decimals
+    /// @return totalSlashableCollateral Total slashable collateral of an agent in USD, encoded with 8 decimals
     /// @return totalDebt Total debt of an agent in USD, encoded with 8 decimals
     /// @return ltv Loan to value ratio, encoded in ray (1e27)
     /// @return liquidationThreshold Liquidation ratio of an agent, encoded in ray (1e27)
@@ -177,7 +196,14 @@ interface ILender {
     function agent(address _agent)
         external
         view
-        returns (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health);
+        returns (
+            uint256 totalDelegation,
+            uint256 totalSlashableCollateral,
+            uint256 totalDebt,
+            uint256 ltv,
+            uint256 liquidationThreshold,
+            uint256 health
+        );
 
     /// @notice Calculate the maximum amount that can be borrowed for a given asset
     /// @param _agent Agent address

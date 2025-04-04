@@ -188,9 +188,9 @@ contract TestDeployer is
             env.symbiotic.networkAdapter.networkMiddleware = networkMock;
             vm.stopPrank();
 
-            vm.startPrank(env.users.delegation_admin);
+            _configureMockNetworkMiddleware(env, networkMock);
+
             for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-                _configureMockNetworkMiddleware(env, networkMock, env.testUsers.agents[i]);
                 _setMockNetworkMiddlewareAgentCoverage(env, env.testUsers.agents[i], 1_000_000e8);
             }
         } else {
@@ -208,41 +208,9 @@ contract TestDeployer is
                 SymbioticNetworkAdapterParams({ vaultEpochDuration: 7 days, feeAllowed: 1000 })
             );
 
-            console.log("deploying symbiotic WETH vault");
-            vm.startPrank(env.symbiotic.users.vault_admin);
-            _symbioticVaultConfigToEnv(
-                _deploySymbioticVault(
-                    symbioticAb,
-                    SymbioticVaultParams({
-                        vault_admin: env.symbiotic.users.vault_admin,
-                        collateral: env.ethMocks[0],
-                        vaultEpochDuration: 7 days,
-                        burnerRouterDelay: 0
-                    })
-                )
-            );
-
-            console.log("deploying symbiotic USDT vault");
-            _symbioticVaultConfigToEnv(
-                _deploySymbioticVault(
-                    symbioticAb,
-                    SymbioticVaultParams({
-                        vault_admin: env.symbiotic.users.vault_admin,
-                        collateral: env.usdMocks[0],
-                        vaultEpochDuration: 14 days,
-                        burnerRouterDelay: 0
-                    })
-                )
-            );
-
-            console.log("deploying symbiotic network rewards");
-            vm.startPrank(env.users.staker_rewards_admin);
-            _symbioticNetworkRewardsConfigToEnv(
-                _deploySymbioticRestakerRewardContract(symbioticAb, env.users, _getSymbioticVaultConfig(0))
-            );
-            _symbioticNetworkRewardsConfigToEnv(
-                _deploySymbioticRestakerRewardContract(symbioticAb, env.users, _getSymbioticVaultConfig(1))
-            );
+            console.log("registering delegation network");
+            vm.startPrank(env.users.delegation_admin);
+            _registerNetworkForCapDelegation(env.infra, env.symbiotic.networkAdapter.networkMiddleware);
 
             console.log("access control mgmt");
             vm.startPrank(env.users.access_control_admin);
@@ -252,70 +220,27 @@ contract TestDeployer is
             vm.startPrank(env.users.middleware_admin);
             _registerCapNetwork(symbioticAb, env.symbiotic.networkAdapter);
 
-            console.log("registering symbiotic network in vaults");
-            vm.startPrank(env.symbiotic.users.vault_admin);
-            _registerCapNetworkInVault(env.symbiotic.networkAdapter, _getSymbioticVaultConfig(0));
-            _registerCapNetworkInVault(env.symbiotic.networkAdapter, _getSymbioticVaultConfig(1));
-
-            console.log("registering vaults in network middleware");
-            vm.startPrank(env.users.middleware_admin);
-            _registerVaultsInNetworkMiddleware(
-                env.symbiotic.networkAdapter,
-                _getSymbioticVaultConfig(0),
-                _getSymbioticNetworkRewardsConfig(0),
-                env.testUsers.agents
-            );
-            _registerVaultsInNetworkMiddleware(
-                env.symbiotic.networkAdapter,
-                _getSymbioticVaultConfig(1),
-                _getSymbioticNetworkRewardsConfig(1),
-                env.testUsers.agents
-            );
-
             console.log("registering agents as operator");
             for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
                 vm.startPrank(env.testUsers.agents[i]);
                 _agentRegisterAsOperator(symbioticAb);
-                _agentOptInToSymbioticVault(symbioticAb, _getSymbioticVaultConfig(0));
-                _agentOptInToSymbioticVault(symbioticAb, _getSymbioticVaultConfig(1));
                 _agentOptInToSymbioticNetwork(symbioticAb, env.symbiotic.networkAdapter);
             }
 
-            console.log("registering network in vaults");
-            vm.startPrank(env.users.middleware_admin);
-            for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-                address _agent = env.testUsers.agents[i];
-                _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, _getSymbioticVaultConfig(0), _agent);
-                _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, _getSymbioticVaultConfig(1), _agent);
-            }
-
-            console.log("vaults delegating to agents");
-            vm.startPrank(env.symbiotic.users.vault_admin);
-            for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-                address _agent = env.testUsers.agents[i];
-                _symbioticVaultDelegateToAgent(
-                    _getSymbioticVaultConfig(0), env.symbiotic.networkAdapter, _agent, type(uint256).max
-                );
-                _symbioticVaultDelegateToAgent(
-                    _getSymbioticVaultConfig(1), env.symbiotic.networkAdapter, _agent, type(uint256).max
-                );
-            }
-
-            console.log("init symbiotic delegation");
+            console.log("init agent delegation for symbiotic network");
             vm.startPrank(env.users.delegation_admin);
             for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
                 address agent = env.testUsers.agents[i];
-                _initDelegationAgentDelegator(env.infra, agent, env.symbiotic.networkAdapter.networkMiddleware);
+                _initDelegationAgent(env.infra, agent, env.symbiotic.networkAdapter.networkMiddleware);
             }
-            vm.stopPrank();
-        }
 
-        /// DELEGATION
-        console.log("init delegation");
-        vm.startPrank(env.users.delegation_admin);
-        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            address agent = env.testUsers.agents[i];
-            _initDelegationAgent(env.infra, agent);
+            console.log("deploying symbiotic WETH vault");
+            (SymbioticVaultConfig memory _vault, SymbioticNetworkRewardsConfig memory _rewards) =
+                _deployAndConfigureTestnetSymbioticVault(env.ethMocks[0], "WETH");
+            _symbioticVaultConfigToEnv(_vault);
+            _symbioticNetworkRewardsConfigToEnv(_rewards);
+
+            vm.stopPrank();
         }
 
         // change  epoch
@@ -325,6 +250,60 @@ contract TestDeployer is
         _applyTestnetLabels();
 
         vm.stopPrank();
+    }
+
+    function _deployAndConfigureTestnetSymbioticVault(address collateral, string memory assetSymbol)
+        internal
+        returns (SymbioticVaultConfig memory _vault, SymbioticNetworkRewardsConfig memory _rewards)
+    {
+        console.log(string.concat("deploying symbiotic vault ", assetSymbol));
+        vm.startPrank(env.symbiotic.users.vault_admin);
+
+        _vault = _deploySymbioticVault(
+            symbioticAb,
+            SymbioticVaultParams({
+                vault_admin: env.symbiotic.users.vault_admin,
+                collateral: collateral,
+                vaultEpochDuration: 7 days,
+                burnerRouterDelay: 0
+            })
+        );
+
+        console.log("deploying symbiotic network rewards");
+        vm.startPrank(env.users.staker_rewards_admin);
+
+        _rewards = _deploySymbioticRestakerRewardContract(symbioticAb, env.users, _vault);
+
+        console.log("registering symbiotic network in vaults");
+        vm.startPrank(env.symbiotic.users.vault_admin);
+        _registerCapNetworkInVault(env.symbiotic.networkAdapter, _vault);
+
+        console.log("registering vaults in network middleware");
+        vm.startPrank(env.users.middleware_admin);
+        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
+            _registerVaultsInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, _rewards, env.testUsers.agents[i]);
+        }
+
+        console.log("registering agents as operator");
+        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
+            vm.startPrank(env.testUsers.agents[i]);
+            _agentOptInToSymbioticVault(symbioticAb, _vault);
+        }
+
+        console.log("registering network in vaults");
+        vm.startPrank(env.users.middleware_admin);
+        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
+            address _agent = env.testUsers.agents[i];
+            console.log("count", i);
+            _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, _vault, _agent);
+        }
+
+        console.log("vaults delegating to agents");
+        vm.startPrank(env.symbiotic.users.vault_admin);
+        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
+            address _agent = env.testUsers.agents[i];
+            _symbioticVaultDelegateToAgent(_vault, env.symbiotic.networkAdapter, _agent, type(uint256).max);
+        }
     }
 
     function _applyTestnetLabels() internal {
@@ -445,9 +424,7 @@ contract TestDeployer is
 
     NetworkMiddleware middleware;
     SymbioticVaultConfig symbioticWethVault;
-    SymbioticVaultConfig symbioticUsdtVault;
     SymbioticNetworkRewardsConfig symbioticWethNetworkRewards;
-    SymbioticNetworkRewardsConfig symbioticUsdtNetworkRewards;
 
     Lender lender;
     Delegation delegation;
@@ -470,9 +447,7 @@ contract TestDeployer is
         if (!useMockBackingNetwork()) {
             middleware = NetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
             symbioticWethVault = _getSymbioticVaultConfig(0);
-            symbioticUsdtVault = _getSymbioticVaultConfig(1);
             symbioticWethNetworkRewards = _getSymbioticNetworkRewardsConfig(0);
-            symbioticUsdtNetworkRewards = _getSymbioticNetworkRewardsConfig(1);
         }
 
         lender = Lender(env.infra.lender);

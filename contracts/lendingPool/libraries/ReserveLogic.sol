@@ -43,18 +43,15 @@ library ReserveLogic {
             $.reservesList[$.reservesCount] = params.asset;
         }
 
-        $.reservesData[params.asset] = ILender.ReserveData({
-            id: id,
-            vault: params.vault,
-            principalDebtToken: params.principalDebtToken,
-            restakerDebtToken: params.restakerDebtToken,
-            interestDebtToken: params.interestDebtToken,
-            interestReceiver: params.interestReceiver,
-            restakerInterestReceiver: params.restakerInterestReceiver,
-            decimals: IERC20Metadata(params.asset).decimals(),
-            paused: true,
-            realizedInterest: 0
-        });
+        ILender.ReserveData storage reserve = $.reservesData[params.asset];
+        reserve.id = id;
+        reserve.vault = params.vault;
+        reserve.principalDebtToken = params.principalDebtToken;
+        reserve.restakerDebtToken = params.restakerDebtToken;
+        reserve.interestDebtToken = params.interestDebtToken;
+        reserve.interestReceiver = params.interestReceiver;
+        reserve.decimals = IERC20Metadata(params.asset).decimals();
+        reserve.paused = true;
     }
 
     /// @notice Remove asset from lending when there is no borrows

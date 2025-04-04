@@ -24,8 +24,7 @@ contract ScenarioBasicTest is TestDeployer {
         user_agent = _getRandomAgent();
 
         vm.startPrank(env.symbiotic.users.vault_admin);
-        _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e18);
-        _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, user_agent, 1000e6);
+        _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 3e18);
         vm.stopPrank();
 
         vm.startPrank(env.users.lender_admin);
@@ -396,7 +395,7 @@ contract ScenarioBasicTest is TestDeployer {
 
             vm.startPrank(env.users.delegation_admin);
 
-            (uint256 totalDelegation, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health) =
+            (uint256 totalDelegation,, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health) =
                 lender.agent(user_agent);
             console.log("Total delegation of the operator", totalDelegation);
             console.log("Total debt of the operator", totalDebt);
@@ -423,7 +422,7 @@ contract ScenarioBasicTest is TestDeployer {
             lender.cancelLiquidation(user_agent);
             vm.stopPrank();
 
-            (totalDelegation, totalDebt, ltv, liquidationThreshold, health) = lender.agent(user_agent);
+            (totalDelegation,, totalDebt, ltv, liquidationThreshold, health) = lender.agent(user_agent);
             console.log("");
             console.log("Total delegation of the operator after liquidation", totalDelegation);
             console.log("Total debt of the operator after liquidation", totalDebt);
