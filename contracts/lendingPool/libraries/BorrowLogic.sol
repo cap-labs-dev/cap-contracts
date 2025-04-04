@@ -227,6 +227,11 @@ library BorrowLogic {
         return _maxRealization;
     }
 
+    /// @notice Calculate the maximum interest that can be realized for a restaker
+    /// @param $ Lender storage
+    /// @param _agent Address of the restaker
+    /// @param _asset Asset to calculate max realization for
+    /// @return maxRealization Maximum interest that can be realized
     function maxRestakerRealization(ILender.LenderStorage storage $, address _agent, address _asset)
         internal
         view

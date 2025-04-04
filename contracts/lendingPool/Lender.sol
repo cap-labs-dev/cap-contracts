@@ -110,6 +110,14 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
         _maxRealization = BorrowLogic.maxRealization(getLenderStorage(), _asset);
     }
 
+    /// @notice Calculate the maximum interest that can be realized for a restaker
+    /// @param _agent Agent to calculate max realization for
+    /// @param _asset Asset to calculate max realization for
+    /// @return _maxRealization Maximum interest that can be realized
+    function maxRestakerRealization(address _agent, address _asset) external view returns (uint256 _maxRealization) {
+        _maxRealization = BorrowLogic.maxRestakerRealization(getLenderStorage(), _agent, _asset);
+    }
+
     /// @notice Initiate liquidation of an agent when the health is below 1
     /// @param _agent Agent address
     function initiateLiquidation(address _agent) external {
