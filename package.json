@@ -18,7 +18,10 @@
     "test:invariants": "forge test --match-path 'test/**/*.invariants.t.sol'",
     "test:invariants:deep": "FOUNDRY_PROFILE=deep forge test --match-path 'test/**/*.invariants.t.sol'",
     "test:gas": "forge test --match-path 'test/**/*.gas.t.sol'",
-    "test:slither": "FOUNDRY_PROFILE=slither slither . --include-paths 'contracts'",
+    "test:slither": "FOUNDRY_PROFILE=slither slither . --config slither.config.json",
+    "test:gambit:gen": "./test/mutation/gambit.sh generate",
+    "test:gambit:run": "./test/mutation/gambit.sh test 8",
+    "test:sumo": "sumo test",
     "test:build": "forge build ./contracts ./test ./script --via-ir",
     "gas:flamegraph": "forge test --flamegraph --match-path 'test/**/*.gas.t.sol'",
     "coverage:forge": "forge coverage --report summary --ir-minimum",
@@ -38,6 +41,7 @@
     "@openzeppelin/contracts": "^5.2.0"
   },
   "dependencies": {
+    "@morenabarboni/sumo": "^2.5.4",
     "@openzeppelin/foundry-upgrades": "^0.3.7",
     "eigenlayer": "^2.1.5"
   }
