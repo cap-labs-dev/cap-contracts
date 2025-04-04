@@ -59,7 +59,9 @@ contract DeployVault is ProxyUtils {
             1e18 // min price of 1 token
         );
 
-        CapToken(d.capToken).initialize(name, symbol, infra.accessControl, d.feeAuction, infra.oracle, assets, insuranceFund);
+        CapToken(d.capToken).initialize(
+            name, symbol, infra.accessControl, d.feeAuction, infra.oracle, assets, insuranceFund
+        );
         StakedCap(d.stakedCapToken).initialize(infra.accessControl, d.capToken, 24 hours);
 
         // deploy and init debt tokens

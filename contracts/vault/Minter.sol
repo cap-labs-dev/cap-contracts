@@ -34,9 +34,8 @@ contract Minter is IMinter, Access, MinterStorageUtils {
     /// @return amountOut Amount minted
     /// @return fee Fee applied
     function getMintAmount(address _asset, uint256 _amountIn) public view returns (uint256 amountOut, uint256 fee) {
-        (amountOut, fee) = MinterLogic.amountOut(
-            getMinterStorage(), AmountOutParams({ mint: true, asset: _asset, amount: _amountIn })
-        );
+        (amountOut, fee) =
+            MinterLogic.amountOut(getMinterStorage(), AmountOutParams({ mint: true, asset: _asset, amount: _amountIn }));
     }
 
     /// @notice Get the burn amount for a given asset
@@ -54,8 +53,13 @@ contract Minter is IMinter, Access, MinterStorageUtils {
     /// @param _amountIn Amount of cap token to burn
     /// @return amountsOut Amounts of assets to be withdrawn
     /// @return fees Amounts of fees to be applied
-    function getRedeemAmount(uint256 _amountIn) public view returns (uint256[] memory amountsOut, uint256[] memory fees) {
-        (amountsOut, fees) = MinterLogic.redeemAmountOut(getMinterStorage(), RedeemAmountOutParams({ amount: _amountIn }));
+    function getRedeemAmount(uint256 _amountIn)
+        public
+        view
+        returns (uint256[] memory amountsOut, uint256[] memory fees)
+    {
+        (amountsOut, fees) =
+            MinterLogic.redeemAmountOut(getMinterStorage(), RedeemAmountOutParams({ amount: _amountIn }));
     }
 
     /// @notice Set the allocation slopes and ratios for an asset

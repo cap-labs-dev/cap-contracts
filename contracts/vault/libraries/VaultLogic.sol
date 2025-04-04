@@ -38,10 +38,24 @@ library VaultLogic {
     error InsufficientReserves(address asset, uint256 balanceBefore, uint256 amount);
 
     /// @dev Cap token minted
-    event Mint(address indexed minter, address receiver, address indexed asset, uint256 amountIn, uint256 amountOut, uint256 fee);
+    event Mint(
+        address indexed minter,
+        address receiver,
+        address indexed asset,
+        uint256 amountIn,
+        uint256 amountOut,
+        uint256 fee
+    );
 
     /// @dev Cap token burned
-    event Burn(address indexed burner, address receiver, address indexed asset, uint256 amountIn, uint256 amountOut, uint256 fee);
+    event Burn(
+        address indexed burner,
+        address receiver,
+        address indexed asset,
+        uint256 amountIn,
+        uint256 amountOut,
+        uint256 fee
+    );
 
     /// @dev Cap token redeemed
     event Redeem(address indexed redeemer, address receiver, uint256 amountIn, uint256[] amountsOut, uint256[] fees);

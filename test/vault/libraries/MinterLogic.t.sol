@@ -40,7 +40,7 @@ contract MockVault is MockERC20, MinterStorageUtils {
 
     function minter_getAmountOut(IMinter.AmountOutParams memory params) external view returns (uint256 amountOut) {
         IMinter.MinterStorage storage $ = getMinterStorage();
-        (amountOut, ) = MinterLogic.amountOut($, params);
+        (amountOut,) = MinterLogic.amountOut($, params);
     }
 }
 

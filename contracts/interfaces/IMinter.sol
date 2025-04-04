@@ -74,7 +74,10 @@ interface IMinter {
     /// @param _amountIn Amount of cap token to burn
     /// @return amountsOut Amounts of assets to be withdrawn
     /// @return redeemFees Amounts of redeem fees to be applied
-    function getRedeemAmount(uint256 _amountIn) external view returns (uint256[] memory amountsOut, uint256[] memory redeemFees);
+    function getRedeemAmount(uint256 _amountIn)
+        external
+        view
+        returns (uint256[] memory amountsOut, uint256[] memory redeemFees);
 
     /// @notice Set the allocation slopes and ratios for an asset
     /// @param _asset Asset address

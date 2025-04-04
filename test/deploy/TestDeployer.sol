@@ -116,10 +116,12 @@ contract TestDeployer is
         env.ethOracleMocks = _deployOracleMocks(env.ethMocks);
 
         console.log("deploying usdVault");
-        env.usdVault = _deployVault(env.implems, env.infra, "Cap USD", "cUSD", env.usdOracleMocks.assets, env.users.insurance_fund);
+        env.usdVault =
+            _deployVault(env.implems, env.infra, "Cap USD", "cUSD", env.usdOracleMocks.assets, env.users.insurance_fund);
 
         console.log("deploying ethVault");
-        env.ethVault = _deployVault(env.implems, env.infra, "Cap ETH", "cETH", env.ethOracleMocks.assets, env.users.insurance_fund);
+        env.ethVault =
+            _deployVault(env.implems, env.infra, "Cap ETH", "cETH", env.ethOracleMocks.assets, env.users.insurance_fund);
 
         if (useMockBackingNetwork()) {
             console.log("skipping lzperiphery");
