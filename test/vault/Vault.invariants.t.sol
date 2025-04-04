@@ -29,6 +29,7 @@ contract VaultInvariantsTest is Test, ProxyUtils {
     TestVault public vault;
     FeeAuction public feeAuction;
     address[] public assets;
+    address public insuranceFund;
 
     MockOracle public mockOracle;
     MockAccessControl public accessControl;
@@ -72,10 +73,13 @@ contract VaultInvariantsTest is Test, ProxyUtils {
         feeAuction = FeeAuction(proxy);
         feeAuction.initialize(address(accessControl), address(mockTokens[0]), address(this), 1 days, 1e18);
 
+        // Deploy insurance fund
+        insuranceFund = makeAddr("insurance_fund");
+
         // Deploy and initialize vault
         vault = new TestVault();
         vault.initialize(
-            "Test Vault", "tVAULT", address(accessControl), address(feeAuction), address(mockOracle), assets
+            "Test Vault", "tVAULT", address(accessControl), address(feeAuction), address(mockOracle), assets, address(insuranceFund)
         );
         mockOracle.setPrice(address(vault), 1e18);
 
@@ -151,9 +155,10 @@ contract TestVault is Vault {
         address _accessControl,
         address _feeAuction,
         address _oracle,
-        address[] calldata _assets
+        address[] calldata _assets,
+        address _insuranceFund
     ) external initializer {
-        __Vault_init(_name, _symbol, _accessControl, _feeAuction, _oracle, _assets);
+        __Vault_init(_name, _symbol, _accessControl, _feeAuction, _oracle, _assets, _insuranceFund);
     }
 }
 /**

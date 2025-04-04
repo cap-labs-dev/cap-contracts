@@ -49,6 +49,7 @@ struct UsersConfig {
     address vault_config_admin;
     address middleware_admin;
     address staker_rewards_admin;
+    address insurance_fund;
 }
 
 struct VaultConfig {
@@ -71,6 +72,7 @@ struct VaultLzPeriphery {
 }
 
 struct FeeConfig {
+    uint256 minMintFee;
     uint256 slope0;
     uint256 slope1;
     uint256 mintKinkRatio;

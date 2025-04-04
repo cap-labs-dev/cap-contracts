@@ -38,13 +38,13 @@ library VaultLogic {
     error InsufficientReserves(address asset, uint256 balanceBefore, uint256 amount);
 
     /// @dev Cap token minted
-    event Mint(address indexed minter, address receiver, address indexed asset, uint256 amountIn, uint256 amountOut);
+    event Mint(address indexed minter, address receiver, address indexed asset, uint256 amountIn, uint256 amountOut, uint256 fee);
 
     /// @dev Cap token burned
-    event Burn(address indexed burner, address receiver, address indexed asset, uint256 amountIn, uint256 amountOut);
+    event Burn(address indexed burner, address receiver, address indexed asset, uint256 amountIn, uint256 amountOut, uint256 fee);
 
     /// @dev Cap token redeemed
-    event Redeem(address indexed redeemer, address receiver, uint256 amountIn, uint256[] amountsOut);
+    event Redeem(address indexed redeemer, address receiver, uint256 amountIn, uint256[] amountsOut, uint256[] fees);
 
     /// @dev Borrow made
     event Borrow(address indexed borrower, address indexed asset, uint256 amount);
@@ -101,7 +101,7 @@ library VaultLogic {
 
         IERC20(params.asset).safeTransferFrom(msg.sender, address(this), params.amountIn);
 
-        emit Mint(msg.sender, params.receiver, params.asset, params.amountIn, params.amountOut);
+        emit Mint(msg.sender, params.receiver, params.asset, params.amountIn, params.amountOut, params.fee);
     }
 
     /// @notice Burn the cap token for an asset
@@ -117,11 +117,12 @@ library VaultLogic {
             revert Slippage(params.asset, params.amountOut, params.minAmountOut);
         }
 
-        $.totalSupplies[params.asset] -= params.amountOut;
+        $.totalSupplies[params.asset] -= params.amountOut + params.fee;
 
         IERC20(params.asset).safeTransfer(params.receiver, params.amountOut);
+        IERC20(params.asset).safeTransfer($.insuranceFund, params.fee);
 
-        emit Burn(msg.sender, params.receiver, params.asset, params.amountIn, params.amountOut);
+        emit Burn(msg.sender, params.receiver, params.asset, params.amountIn, params.amountOut, params.fee);
     }
 
     /// @notice Redeem the Cap token for a bundle of assets
@@ -138,11 +139,12 @@ library VaultLogic {
                 revert Slippage(cachedAssets[i], params.amountsOut[i], params.minAmountsOut[i]);
             }
             _updateIndex($, cachedAssets[i]);
-            $.totalSupplies[cachedAssets[i]] -= params.amountsOut[i];
+            $.totalSupplies[cachedAssets[i]] -= params.amountsOut[i] + params.fees[i];
             IERC20(cachedAssets[i]).safeTransfer(params.receiver, params.amountsOut[i]);
+            IERC20(cachedAssets[i]).safeTransfer($.insuranceFund, params.fees[i]);
         }
 
-        emit Redeem(msg.sender, params.receiver, params.amountIn, params.amountsOut);
+        emit Redeem(msg.sender, params.receiver, params.amountIn, params.amountsOut, params.fees);
     }
 
     /// @notice Borrow an asset

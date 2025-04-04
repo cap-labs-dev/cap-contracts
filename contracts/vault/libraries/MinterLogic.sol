@@ -15,14 +15,15 @@ library MinterLogic {
     /// @param $ Storage pointer
     /// @param params Parameters for a swap
     /// @return amount Amount out from a swap
+    /// @return fee Fee applied
     function amountOut(IMinter.MinterStorage storage $, IMinter.AmountOutParams memory params)
         external
         view
-        returns (uint256 amount)
+        returns (uint256 amount, uint256 fee)
     {
         (uint256 amountOutBeforeFee, uint256 newRatio) = _amountOutBeforeFee($.oracle, params);
 
-        amount = _applyFeeSlopes(
+        (amount, fee) = _applyFeeSlopes(
             $.fees[params.asset],
             IMinter.FeeSlopeParams({ mint: params.mint, amount: amountOutBeforeFee, ratio: newRatio })
         );
@@ -32,21 +33,24 @@ library MinterLogic {
     /// @param $ Storage pointer
     /// @param params Parameters for redeeming
     /// @return amounts Amount of underlying assets withdrawn
+    /// @return fees Amount of fees applied
     function redeemAmountOut(IMinter.MinterStorage storage $, IMinter.RedeemAmountOutParams memory params)
         external
         view
-        returns (uint256[] memory amounts)
+        returns (uint256[] memory amounts, uint256[] memory fees)
     {
         uint256 redeemFee = $.redeemFee;
         uint256 shares = params.amount * 1e27 / IERC20(address(this)).totalSupply();
         address[] memory assets = IVault(address(this)).assets();
         uint256 assetLength = assets.length;
         amounts = new uint256[](assetLength);
+        fees = new uint256[](assetLength);
         for (uint256 i; i < assetLength; ++i) {
             address asset = assets[i];
             uint256 withdrawAmount = IVault(address(this)).totalSupplies(asset) * shares / 1e27;
 
-            amounts[i] = withdrawAmount - (withdrawAmount * redeemFee / 1e27);
+            fees[i] = withdrawAmount * redeemFee / 1e27;
+            amounts[i] = withdrawAmount - fees[i];
         }
     }
 
@@ -101,26 +105,28 @@ library MinterLogic {
     /// @param fees Fee slopes and ratio kinks
     /// @param params Fee slope parameters
     /// @return amount Remaining amount after fee applied
+    /// @return fee Fee applied
     function _applyFeeSlopes(IMinter.FeeData memory fees, IMinter.FeeSlopeParams memory params)
         internal
         pure
-        returns (uint256 amount)
+        returns (uint256 amount, uint256 fee)
     {
         uint256 rate;
         if (params.mint) {
+            rate = fees.minMintFee;
             if (params.ratio > fees.optimalRatio) {
                 if (params.ratio > fees.mintKinkRatio) {
                     uint256 excessRatio = params.ratio - fees.mintKinkRatio;
-                    rate = fees.slope0 + (fees.slope1 * excessRatio / 1e27);
+                    rate += fees.slope0 + (fees.slope1 * excessRatio / (1e27 - fees.mintKinkRatio));
                 } else {
-                    rate = fees.slope0 * params.ratio / fees.mintKinkRatio;
+                    rate += fees.slope0 * params.ratio / fees.mintKinkRatio;
                 }
             }
         } else {
             if (params.ratio < fees.optimalRatio) {
                 if (params.ratio < fees.burnKinkRatio) {
                     uint256 excessRatio = fees.burnKinkRatio - params.ratio;
-                    rate = fees.slope0 + (fees.slope1 * excessRatio / 1e27);
+                    rate = fees.slope0 + (fees.slope1 * excessRatio / (1e27 - fees.burnKinkRatio));
                 } else {
                     rate = fees.slope0 * fees.burnKinkRatio / params.ratio;
                 }
@@ -128,6 +134,7 @@ library MinterLogic {
         }
 
         if (rate > 1e27) rate = 1e27;
-        amount = params.amount - (params.amount * rate / 1e27);
+        fee = params.amount * rate / 1e27;
+        amount = params.amount - fee;
     }
 }

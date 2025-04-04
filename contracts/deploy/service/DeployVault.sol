@@ -42,7 +42,8 @@ contract DeployVault is ProxyUtils {
         InfraConfig memory infra,
         string memory name,
         string memory symbol,
-        address[] memory assets
+        address[] memory assets,
+        address insuranceFund
     ) internal returns (VaultConfig memory d) {
         // deploy and init cap instances
         d.capToken = _proxy(implementations.capToken);
@@ -58,7 +59,7 @@ contract DeployVault is ProxyUtils {
             1e18 // min price of 1 token
         );
 
-        CapToken(d.capToken).initialize(name, symbol, infra.accessControl, d.feeAuction, infra.oracle, assets);
+        CapToken(d.capToken).initialize(name, symbol, infra.accessControl, d.feeAuction, infra.oracle, assets, insuranceFund);
         StakedCap(d.stakedCapToken).initialize(infra.accessControl, d.capToken, 24 hours);
 
         // deploy and init debt tokens
@@ -169,6 +170,7 @@ contract DeployVault is ProxyUtils {
             Minter(d.capToken).setFeeData(
                 d.assets[i],
                 IMinter.FeeData({
+                    minMintFee: fee.minMintFee,
                     slope0: fee.slope0,
                     slope1: fee.slope1,
                     mintKinkRatio: fee.mintKinkRatio,

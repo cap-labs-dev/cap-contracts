@@ -13,6 +13,7 @@ interface IVault {
         mapping(address => uint256) utilizationIndex;
         mapping(address => uint256) lastUpdate;
         mapping(address => bool) paused;
+        address insuranceFund;
     }
 
     /// @dev Parameters for minting or burning
@@ -23,6 +24,7 @@ interface IVault {
         uint256 minAmountOut;
         address receiver;
         uint256 deadline;
+        uint256 fee;
     }
 
     /// @dev Parameters for redeeming
@@ -32,6 +34,7 @@ interface IVault {
         uint256[] minAmountsOut;
         address receiver;
         uint256 deadline;
+        uint256[] fees;
     }
 
     /// @dev Parameters for borrowing
@@ -148,4 +151,8 @@ interface IVault {
     /// @param _asset Utilized asset
     /// @return index Utilization ratio index
     function currentUtilizationIndex(address _asset) external view returns (uint256 index);
+
+    /// @notice Get the insurance fund
+    /// @return insuranceFund Insurance fund
+    function insuranceFund() external view returns (address);
 }
