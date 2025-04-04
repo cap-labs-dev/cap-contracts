@@ -151,6 +151,50 @@ contract LenderBorrowTest is TestDeployer {
         assertEq(newTotalDebt, 300e6 + newTotalInterest);
     }
 
+    function test_realize_restaker_interest() public {
+        vm.startPrank(user_agent);
+
+        lender.borrow(address(usdc), 300e6, user_agent);
+        assertEq(usdc.balanceOf(user_agent), 300e6);
+
+        _timeTravel(1 days);
+
+        address networkRewards = env.symbiotic.networkRewards[0];
+
+        uint256 restakerInterestBefore = restakerDebtToken.balanceOf(user_agent);
+
+        lender.realizeRestakerInterest(user_agent, address(usdc), 1);
+
+        uint256 rewardsBalance = usdc.balanceOf(networkRewards);
+        assertEq(rewardsBalance, 1);
+
+        lender.realizeRestakerInterest(user_agent, address(usdc), restakerInterestBefore - 1);
+
+        rewardsBalance = usdc.balanceOf(networkRewards);
+        assertEq(rewardsBalance, restakerInterestBefore);
+
+        uint256 realizedRestakerInterest = lender.realizedRestakerInterest(address(user_agent), address(usdc));
+        assertEq(realizedRestakerInterest, restakerInterestBefore);
+
+        (uint principal, uint interest, uint restaker) = lender.debt(address(user_agent), address(usdc));
+        uint256 totalDebt = principal + interest + restaker;
+
+        usdc.mint(user_agent, totalDebt - principal);
+        usdc.approve(address(lender), totalDebt);
+        lender.repay(address(usdc), totalDebt, user_agent);
+
+        uint256 restakerInterest = restakerDebtToken.balanceOf(user_agent);
+        realizedRestakerInterest = lender.realizedRestakerInterest(address(user_agent), address(usdc));
+        rewardsBalance = usdc.balanceOf(networkRewards);
+
+        /// There should be no restaker interest left
+        assertEq(restakerInterest, 0);
+        /// There should be no realized restaker interest
+        assertEq(realizedRestakerInterest, 0);
+        /// Rewards should not have increased
+        assertEq(rewardsBalance, restakerInterestBefore);
+    }
+
     function test_borrow_payback_debt_tokens() public {
         vm.startPrank(user_agent);
 

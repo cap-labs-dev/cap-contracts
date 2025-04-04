@@ -294,5 +294,18 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
         realizedInterest = reserve.realizedInterest;
     }
 
+    /// @notice The realized restaker interest for an agent and asset
+    /// @param _agent Address of the agent
+    /// @param _asset Address of the asset
+    /// @return _realizedRestakerInterest Realized restaker interest scaled to 1e27
+    function realizedRestakerInterest(address _agent, address _asset)
+        external
+        view
+        returns (uint256 _realizedRestakerInterest)
+    {
+        ReserveData storage reserve = getLenderStorage().reservesData[_asset];
+        _realizedRestakerInterest = reserve.realizedRestakerInterest[_agent];
+    }
+
     function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }
 }
