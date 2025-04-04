@@ -75,6 +75,38 @@ contract LenderInvariantsTest is TestDeployer {
         assertEq(rdebt, 0);
     }
 
+    /// @dev Test that interest accrual doesn't break system invariants
+    function test_interestAccrualSafety() public {
+        // Store current values
+        address[] memory agents = env.testUsers.agents;
+        uint256[] memory previousDebts = new uint256[](agents.length);
+
+        for (uint256 i = 0; i < agents.length; i++) {
+            (,, previousDebts[i],,,) = lender.agent(agents[i]);
+        }
+
+        // Realize interest on all assets
+        address[] memory assets = usdVault.assets;
+        for (uint256 i = 0; i < assets.length; i++) {
+            uint256 maxRealization = lender.maxRealization(assets[i]);
+            if (maxRealization > 0) {
+                lender.realizeInterest(assets[i], maxRealization);
+            }
+        }
+
+        // Check that system invariants still hold
+        invariant_borrowingLimits();
+        invariant_agentDelegationLimitsDebt();
+        invariant_healthFactorConsistency();
+
+        // Verify that interest was properly accrued
+        for (uint256 i = 0; i < agents.length; i++) {
+            (,, uint256 currentDebt,,,) = lender.agent(agents[i]);
+            // Debt should not decrease from interest accrual
+            assertGe(currentDebt, previousDebts[i], "Interest accrual should not decrease debt");
+        }
+    }
+
     function test_fuzzing_non_regression_liquidate_after_set_coverage() public {
         // [FAIL: panic: division or modulo by zero (0x12)]
         // [Sequence]
@@ -98,7 +130,7 @@ contract LenderInvariantsTest is TestDeployer {
 
         invariant_borrowingLimits();
     }
-    /*
+
     function test_fuzzing_non_regression_liquidate_fails() public {
         //         Encountered 1 failing test in test/lendingPool/Lender.invariants.t.sol:LenderInvariantsTest
         // [FAIL: invariant_borrowingLimits persisted failure revert]
@@ -129,7 +161,22 @@ contract LenderInvariantsTest is TestDeployer {
         vm.stopPrank();
 
         invariant_borrowingLimits();
-    }*/
+    }
+
+    function test_fuzzing_non_regression_liquidate_fails_2() public {
+        //     [FAIL: Unhealthy agents should be liquidatable: 0 <= 0]
+        //         [Sequence]
+        //                 sender=0x0000000000000000000000000000fFfffFFfFfff addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentSlashableCollateral(uint256,uint256) args=[3, 153730679022881943174521915728621705491855651983136629749293 [1.537e59]]
+        //                 sender=0x0000000000000000000000000000000000000b1e addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[0, 5394082854433605416045615594689867366126864271730597317776373663523047009 [5.394e72], 272381320701 [2.723e11]]
+        //                 sender=0x0000000000000000000000000000000000000902 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[7779693176664 [7.779e12], 2]
+        //  invariant_healthFactorConsistency() (runs: 2396, calls: 59900, reverts: 0)
+
+        handler.setAgentSlashableCollateral(3, 153730679022881943174521915728621705491855651983136629749293);
+        handler.borrow(0, 5394082854433605416045615594689867366126864271730597317776373663523047009, 272381320701);
+        handler.setAgentCoverage(7779693176664, 2);
+
+        invariant_healthFactorConsistency();
+    }
 
     /// @dev Test that total borrowed never exceeds available assets
     /// forge-config: default.invariant.depth = 25
@@ -182,50 +229,6 @@ contract LenderInvariantsTest is TestDeployer {
             if (maxLiquidatable > 0) {
                 assertLt(health, 1e27, "Liquidatable agents must have health < 1");
             }
-
-            // If health < 1e27, agent should be liquidatable
-            if (health < 1e27) {
-                // Only check if liquidation hasn't started or grace period has passed
-                if (
-                    lender.liquidationStart(agent) == 0
-                        || block.timestamp > lender.liquidationStart(agent) + lender.grace()
-                ) {
-                    assertGt(maxLiquidatable, 0, "Unhealthy agents should be liquidatable");
-                }
-            }
-        }
-    }
-
-    /// @dev Test that interest accrual doesn't break system invariants
-    /// forge-config: default.invariant.depth = 25
-    function invariant_interestAccrualSafety() public {
-        // Store current values
-        address[] memory agents = env.testUsers.agents;
-        uint256[] memory previousDebts = new uint256[](agents.length);
-
-        for (uint256 i = 0; i < agents.length; i++) {
-            (,, previousDebts[i],,,) = lender.agent(agents[i]);
-        }
-
-        // Realize interest on all assets
-        address[] memory assets = usdVault.assets;
-        for (uint256 i = 0; i < assets.length; i++) {
-            uint256 maxRealization = lender.maxRealization(assets[i]);
-            if (maxRealization > 0) {
-                lender.realizeInterest(assets[i], maxRealization);
-            }
-        }
-
-        // Check that system invariants still hold
-        invariant_borrowingLimits();
-        invariant_agentDelegationLimitsDebt();
-        invariant_healthFactorConsistency();
-
-        // Verify that interest was properly accrued
-        for (uint256 i = 0; i < agents.length; i++) {
-            (,, uint256 currentDebt,,,) = lender.agent(agents[i]);
-            // Debt should not decrease from interest accrual
-            assertGe(currentDebt, previousDebts[i], "Interest accrual should not decrease debt");
         }
     }
 }

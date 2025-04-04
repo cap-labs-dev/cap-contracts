@@ -16,6 +16,7 @@
     "test": "forge test",
     "test:unit": "forge test --no-match-path 'test/**/*.invariants.t.sol'",
     "test:invariants": "forge test --match-path 'test/**/*.invariants.t.sol'",
+    "test:invariants:deep": "FOUNDRY_PROFILE=deep forge test --match-path 'test/**/*.invariants.t.sol'",
     "test:gas": "forge test --match-path 'test/**/*.gas.t.sol'",
     "test:slither": "FOUNDRY_PROFILE=slither slither . --include-paths 'contracts'",
     "test:build": "forge build ./contracts ./test ./script --via-ir",
