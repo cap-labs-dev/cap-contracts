@@ -451,29 +451,16 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
     }
 
     // @dev Donate tokens to the lender's vault
-    // TODO: make it external again after fixing the tests
-    function ______________________donateAsset(IERC20 asset, uint256 amountSeed) internal {
-        uint256 amount = bound(amountSeed, 0, 1e50);
-        if (amount == 0) return;
+    function donateAsset(uint256 assetSeed, uint256 amountSeed) external {
+        address currentAsset = randomAsset(assetSeed);
+        if (currentAsset == address(0)) return;
 
-        address donor = makeAddr("donor");
-        MockERC20(address(asset)).mint(donor, amount);
-
-        vm.startPrank(donor);
-        asset.transfer(address(vault), amount);
-        vm.stopPrank();
+        uint256 amount = bound(amountSeed, 1, 1e50);
+        MockERC20(currentAsset).mint(address(vault), amount);
     }
 
-    // TODO: make it external again after fixing the tests
-    function ______________________donateGasToken(uint256 amountSeed) internal {
-        uint256 amount = bound(amountSeed, 0, 1e50);
-        if (amount == 0) return;
-
-        address donor = makeAddr("donor");
-        vm.deal(donor, amount);
-
-        vm.startPrank(donor);
-        payable(address(vault)).transfer(amount);
-        vm.stopPrank();
+    function donateGasToken(uint256 amountSeed) external {
+        uint256 amount = bound(amountSeed, 1, 1e50);
+        vm.deal(address(vault), amount /* we need gas to send gas */ );
     }
 }

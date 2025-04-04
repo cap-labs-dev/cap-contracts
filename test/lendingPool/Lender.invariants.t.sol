@@ -198,6 +198,38 @@ contract LenderInvariantsTest is TestDeployer {
         invariant_agentDelegationLimitsDebt();
     }
 
+    function test_fuzzing_non_regression_multiple_liquidate_in_a_row() public {
+        vm.skip(true, "Fix in next PR");
+
+        // [FAIL: custom error 0xa07063cb]
+        // [Sequence]
+        //       sender=0xc2Da903096EDff875f8792E4c580eAb71599af1f addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[38595992670061585487715391781788036416022974650 [3.859e46], 2635581861308878760827543746708756291372490928484070615832091 [2.635e60], 3976785946 [3.976e9]]
+        //       sender=0x0000000000000000000000000000000000000797 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[357488141490035838117936306281844024533269064 [3.574e44], 538480132746 [5.384e11]]
+        //       sender=0x2959A0678E9a84493Abb75A3825d90DF05346204 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256,uint256) args=[3719, 233753826492419412621632272325435016278641195558965513326631137659032961025 [2.337e74], 31, 3657006336 [3.657e9]]
+        //       sender=0x0000000000000000000000000000000000000986 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[3813, 115792089237316195423570985008687907853269984665640564039457584007913129639935 [1.157e77]]
+        //       sender=0x00000000000000000000000000000000000004Fe addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256,uint256) args=[447476674474384566432265375184409868117415385167 [4.474e47], 12200385529572857376284667427148142565967213 [1.22e43], 1592138495042354847337191 [1.592e24], 160014459991216075558486690339731 [1.6e32]]
+        // invariant_healthFactorConsistency() (runs: 240, calls: 6000, reverts: 1)
+
+        handler.borrow(
+            38595992670061585487715391781788036416022974650,
+            2635581861308878760827543746708756291372490928484070615832091,
+            3976785946
+        );
+        handler.setAgentCoverage(357488141490035838117936306281844024533269064, 538480132746);
+        handler.liquidate(
+            3719, 233753826492419412621632272325435016278641195558965513326631137659032961025, 31, 3657006336
+        );
+        handler.wrapTime(3813, 115792089237316195423570985008687907853269984665640564039457584007913129639935);
+        handler.liquidate(
+            447476674474384566432265375184409868117415385167,
+            12200385529572857376284667427148142565967213,
+            1592138495042354847337191,
+            160014459991216075558486690339731
+        );
+
+        invariant_healthFactorConsistency();
+    }
+
     /// @dev Test that total borrowed never exceeds available assets
     /// forge-config: default.invariant.depth = 25
     function invariant_borrowingLimits() public view {
@@ -431,32 +463,20 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
     }
 
     // @dev Donate tokens to the lender's vault
-    // TODO: make it external again after fixing the tests
-    function ______________________donateAsset(uint256 assetSeed, uint256 amountSeed) internal {
+    function donateAsset(uint256 assetSeed, uint256 amountSeed, uint256 targetSeed) external {
         address currentAsset = randomAsset(assetSeed);
         if (currentAsset == address(0)) return;
 
-        uint256 amount = bound(amountSeed, 0, 1e50);
-        if (amount == 0) return;
+        address target = randomActor(targetSeed, address(env.usdVault.capToken), address(lender));
 
-        address donor = makeAddr("donor");
-        MockERC20(currentAsset).mint(donor, amount);
-
-        vm.startPrank(donor);
-        MockERC20(currentAsset).transfer(address(env.usdVault.capToken), amount);
-        vm.stopPrank();
+        uint256 amount = bound(amountSeed, 1, 1e50);
+        MockERC20(currentAsset).mint(target, amount);
     }
 
-    // TODO: make it external again after fixing the tests
-    function ______________________donateGasToken(uint256 amountSeed) internal {
-        uint256 amount = bound(amountSeed, 0, 1e50);
-        if (amount == 0) return;
+    function donateGasToken(uint256 amountSeed, uint256 targetSeed) external {
+        uint256 amount = bound(amountSeed, 1, 1e50);
+        address target = randomActor(targetSeed, address(env.usdVault.capToken), address(lender));
 
-        address donor = makeAddr("donor");
-        vm.deal(donor, amount);
-
-        vm.startPrank(donor);
-        payable(env.usdVault.capToken).transfer(amount);
-        vm.stopPrank();
+        vm.deal(target, amount /* we need gas to send gas */ );
     }
 }
