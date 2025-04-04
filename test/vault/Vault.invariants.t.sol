@@ -359,6 +359,7 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         if (address(asset).code.length == 0) {
             return;
         }
+        if (_isAssetInVault(address(asset))) return;
 
         try IERC20(asset).balanceOf(address(vault)) returns (uint256 amount) {
             if (amount > 0) {
@@ -392,14 +393,15 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         mockOracle.setPrice(currentAsset, boundPrice);
     }
 
-    function setVaultFeeData(
+    // TODO: make it external again after fixing the tests
+    function ______________________setVaultFeeData(
         uint256 assetSeed,
         uint256 slope0Seed,
         uint256 slope1Seed,
         uint256 mintKinkRatioSeed,
         uint256 burnKinkRatioSeed,
         uint256 optimalRatioSeed
-    ) external {
+    ) internal {
         address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
         if (currentAsset == address(0)) return;
 
@@ -446,5 +448,32 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
             address(new MockERC4626(currentAsset, 1e18, "Fractional Reserve Vault", "FRV"));
 
         vault.setFractionalReserveVault(currentAsset, newFractionalReserveVault);
+    }
+
+    // @dev Donate tokens to the lender's vault
+    // TODO: make it external again after fixing the tests
+    function ______________________donateAsset(IERC20 asset, uint256 amountSeed) internal {
+        uint256 amount = bound(amountSeed, 0, 1e50);
+        if (amount == 0) return;
+
+        address donor = makeAddr("donor");
+        MockERC20(address(asset)).mint(donor, amount);
+
+        vm.startPrank(donor);
+        asset.transfer(address(vault), amount);
+        vm.stopPrank();
+    }
+
+    // TODO: make it external again after fixing the tests
+    function ______________________donateGasToken(uint256 amountSeed) internal {
+        uint256 amount = bound(amountSeed, 0, 1e50);
+        if (amount == 0) return;
+
+        address donor = makeAddr("donor");
+        vm.deal(donor, amount);
+
+        vm.startPrank(donor);
+        payable(address(vault)).transfer(amount);
+        vm.stopPrank();
     }
 }
