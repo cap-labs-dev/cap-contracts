@@ -5,8 +5,9 @@ import { AccessControl } from "../../contracts/access/AccessControl.sol";
 
 import { ProxyUtils } from "../../contracts/deploy/utils/ProxyUtils.sol";
 import { FeeAuction } from "../../contracts/feeAuction/FeeAuction.sol";
-import { Vault } from "../../contracts/vault/Vault.sol";
 
+import { IMinter } from "../../contracts/interfaces/IMinter.sol";
+import { Vault } from "../../contracts/vault/Vault.sol";
 import { MockAccessControl } from "../mocks/MockAccessControl.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
 
@@ -23,6 +24,9 @@ import { Test } from "forge-std/Test.sol";
 
 import { Vm } from "forge-std/Vm.sol";
 import { console } from "forge-std/console.sol";
+
+import { RandomActorUtils } from "../deploy/utils/RandomActorUtils.sol";
+import { RandomAssetUtils } from "../deploy/utils/RandomAssetUtils.sol";
 
 contract VaultInvariantsTest is Test, ProxyUtils {
     TestVaultHandler public handler;
@@ -117,12 +121,13 @@ contract VaultInvariantsTest is Test, ProxyUtils {
 
     /// @dev Test that minting increases asset balance correctly
     function invariant_mintingIncreaseBalance() public {
-        address[] memory unpausedAssets = handler.getUnpausedAssets();
+        address[] memory unpausedAssets = handler.getVaultUnpausedAssets();
 
         for (uint256 i = 0; i < unpausedAssets.length; i++) {
             address asset = unpausedAssets[i];
 
             uint256 amount = 1000 * (10 ** IERC20Metadata(asset).decimals());
+            if (amount == 0) continue;
 
             uint256 balanceBefore = IERC20(asset).balanceOf(address(vault));
             uint256 supplyBefore = vault.totalSupplies(asset);
@@ -160,7 +165,7 @@ contract TestVault is Vault {
  * @notice This is a helper contract to test the vault invariants in a meaningful way
  */
 
-contract TestVaultHandler is StdUtils {
+contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     Vault public vault;
@@ -170,72 +175,35 @@ contract TestVaultHandler is StdUtils {
     address[] public actors;
     uint256 private constant MAX_ASSETS = 10;
 
-    address[] private addyArr; // working var
-
-    // Ghost variables for tracking state
-    mapping(address => uint256) public sumDeposits;
-    mapping(address => mapping(address => uint256)) public sumBorrows;
-    uint256 public sumBalanceOf;
-
-    // Actor management
-    address internal currentActor;
-    address internal currentAsset;
-    address internal currentSpender;
-
-    // Ghost variables for tracking state
-    address[] public tokenHolders;
-
-    modifier useActor(uint256 actorIndexSeed) {
-        currentActor = actors[bound(actorIndexSeed, 0, actors.length - 1)];
-        vm.startPrank(currentActor);
-        _;
-        vm.stopPrank();
+    constructor(Vault _vault, MockOracle _mockOracle, address[] memory _assets, address[] memory _actors)
+        RandomActorUtils(_actors)
+        RandomAssetUtils(_assets)
+    {
+        vault = _vault;
+        mockOracle = _mockOracle;
+        assets = _assets;
+        actors = _actors;
     }
 
-    modifier useAsset(uint256 assetSeed) {
-        currentAsset = assets[bound(assetSeed, 0, assets.length - 1)];
-        _;
-    }
-
-    modifier useAssetInVault(uint256 assetSeed) {
+    function getVaultUnpausedAssets() public view returns (address[] memory) {
         address[] memory vaultAssets = vault.assets();
-        if (vaultAssets.length == 0) return;
-        currentAsset = vaultAssets[bound(assetSeed, 0, vaultAssets.length - 1)];
-        _;
-    }
-
-    modifier useUnpausedAssetInVault(uint256 assetSeed) {
-        address[] memory _unpausedAssets = getUnpausedAssets();
-        if (_unpausedAssets.length == 0) return;
-
-        currentAsset = _unpausedAssets[bound(assetSeed, 0, _unpausedAssets.length - 1)];
-        _;
-    }
-
-    function getUnpausedAssets() public returns (address[] memory) {
-        address[] memory vaultAssets = vault.assets();
-
-        delete addyArr;
-
+        address[] memory tmp = new address[](vaultAssets.length);
+        uint256 tmpIndex = 0;
         for (uint256 i = 0; i < vaultAssets.length; i++) {
             address asset = vaultAssets[i];
             if (!vault.paused(asset)) {
-                addyArr.push(asset);
+                tmp[tmpIndex++] = asset;
             }
         }
 
-        return addyArr;
-    }
-
-    modifier useSpender(uint256 spenderSeed) {
-        currentSpender = actors[bound(spenderSeed, 0, actors.length - 1)];
-        if (currentSpender == currentActor) {
-            currentSpender = actors[(bound(spenderSeed, 0, actors.length - 1) + 1) % actors.length];
+        address[] memory result = new address[](tmpIndex);
+        for (uint256 i = 0; i < tmpIndex; i++) {
+            result[i] = tmp[i];
         }
-        _;
+        return result;
     }
 
-    function isAssetInVault(address asset) public view returns (bool) {
+    function _isAssetInVault(address asset) internal view returns (bool) {
         address[] memory vaultAssets = vault.assets();
         for (uint256 i = 0; i < vaultAssets.length; i++) {
             if (vaultAssets[i] == asset) {
@@ -245,96 +213,108 @@ contract TestVaultHandler is StdUtils {
         return false;
     }
 
-    constructor(Vault _vault, MockOracle _mockOracle, address[] memory _assets, address[] memory _actors) {
-        vault = _vault;
-        mockOracle = _mockOracle;
-        assets = _assets;
-        actors = _actors;
+    function wrapTime(uint256 timeSeed, uint256 blockNumberSeed) external returns (uint256) {
+        uint256 timestamp = bound(timeSeed, block.timestamp, block.timestamp + 100 days);
+        vm.warp(timestamp);
+
+        uint256 blockNumber = bound(blockNumberSeed, block.number, block.number + 1000000);
+        vm.roll(blockNumber);
+
+        return timestamp;
     }
 
-    function addAsset(uint256 assetSeed) external useAsset(assetSeed) {
-        if (assets.length >= MAX_ASSETS) return;
-        if (isAssetInVault(currentAsset)) return;
+    function addAsset(uint256 assetSeed) external {
+        address currentAsset = randomAsset(assets, assetSeed);
+        if (currentAsset == address(0)) return;
+        if (_isAssetInVault(currentAsset)) return;
+
+        address[] memory unpausedAssets = getVaultUnpausedAssets();
+        if (unpausedAssets.length >= MAX_ASSETS) return;
 
         vault.addAsset(currentAsset);
     }
 
-    function approve(uint256 actorSeed, uint256 spenderSeed, uint256 amount)
-        external
-        useActor(actorSeed)
-        useSpender(spenderSeed)
-    {
+    function approve(uint256 actorSeed, uint256 spenderSeed, uint256 amount) external {
+        address currentSpender = randomActor(spenderSeed);
+        if (currentSpender == address(0)) return;
+        address currentActor = randomActor(actorSeed);
+        if (currentActor == address(0)) return;
         amount = bound(amount, 0, type(uint96).max); // Reasonable bound for approval
+        if (amount == 0) return;
+
+        vm.startPrank(currentActor);
         vault.approve(currentSpender, amount);
+        vm.stopPrank();
     }
 
-    function borrow(uint256 actorSeed, uint256 assetSeed, uint256 amount)
-        external
-        useActor(actorSeed)
-        useUnpausedAssetInVault(assetSeed)
-    {
+    function borrow(uint256 actorSeed, uint256 assetSeed, uint256 amount) external {
+        address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
+        if (currentAsset == address(0)) return;
+
+        address currentActor = randomActor(actorSeed);
+        if (currentActor == address(0)) return;
+
         uint256 maxBorrow = vault.availableBalance(currentAsset);
         amount = bound(amount, 0, Math.min(maxBorrow, type(uint96).max)); // Reasonable bound for borrow
 
-        uint256 beforeBalance = IERC20(currentAsset).balanceOf(currentActor);
+        vm.startPrank(currentActor);
         vault.borrow(currentAsset, amount, currentActor);
-        uint256 afterBalance = IERC20(currentAsset).balanceOf(currentActor);
-
-        uint256 borrowed = afterBalance - beforeBalance;
-        sumBorrows[currentActor][currentAsset] += borrowed;
+        vm.stopPrank();
     }
 
-    function burn(uint256 actorSeed, uint256 assetSeed, uint256 amount)
-        external
-        useActor(actorSeed)
-        useUnpausedAssetInVault(assetSeed)
-    {
+    function burn(uint256 actorSeed, uint256 assetSeed, uint256 amount) external {
+        address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
+        if (currentAsset == address(0)) return;
+
+        address currentActor = randomActor(actorSeed);
+        if (currentActor == address(0)) return;
+
         uint256 maxBurn = vault.balanceOf(currentActor);
         if (maxBurn == 0) return;
 
         amount = bound(amount, 1, Math.min(maxBurn, type(uint96).max)); // Reasonable bound for burn
 
-        uint256 beforeBalance = vault.balanceOf(currentActor);
+        vm.startPrank(currentActor);
         vault.burn(currentAsset, amount, 0, currentActor, block.timestamp);
-        uint256 afterBalance = vault.balanceOf(currentActor);
-
-        sumBalanceOf -= (beforeBalance - afterBalance);
+        vm.stopPrank();
     }
 
-    function divestAll(uint256 assetSeed) external useUnpausedAssetInVault(assetSeed) {
+    function divestAll(uint256 assetSeed) external {
+        address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
+        if (currentAsset == address(0)) return;
         vault.divestAll(currentAsset);
     }
 
-    function investAll(uint256 assetSeed) external useUnpausedAssetInVault(assetSeed) {
+    function investAll(uint256 assetSeed) external {
+        address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
+        if (currentAsset == address(0)) return;
         vault.investAll(currentAsset);
     }
 
-    function mint(uint256 actorSeed, uint256 assetSeed, uint256 amount)
-        external
-        useActor(actorSeed)
-        useUnpausedAssetInVault(assetSeed)
-    {
+    function mint(uint256 actorSeed, uint256 assetSeed, uint256 amountSeed) external {
+        address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
+        if (currentAsset == address(0)) return;
+
+        address currentActor = randomActor(actorSeed);
+        if (currentActor == address(0)) return;
+
         uint256 maxMint = vault.availableBalance(currentAsset);
         if (maxMint == 0) return;
-        amount = bound(amount, 1, Math.min(maxMint, type(uint96).max)); // Reasonable bound for mint
+        uint256 amount = bound(amountSeed, 1, Math.min(maxMint, type(uint96).max)); // Reasonable bound for mint
 
+        vm.startPrank(currentActor);
         // Mint tokens to the actor first
         MockERC20(currentAsset).mint(currentActor, amount);
 
-        uint256 beforeBalance = vault.balanceOf(currentActor);
         IERC20(currentAsset).approve(address(vault), amount);
         vault.mint(currentAsset, amount, 0, currentActor, block.timestamp);
-        uint256 afterBalance = vault.balanceOf(currentActor);
-
-        sumDeposits[currentActor] += amount;
-        sumBalanceOf += (afterBalance - beforeBalance);
+        vm.stopPrank();
     }
 
-    function redeem(uint256 actorSeed, uint256 assetSeed, uint256 amount)
-        external
-        useActor(actorSeed)
-        useUnpausedAssetInVault(assetSeed)
-    {
+    function redeem(uint256 actorSeed, uint256 amount) external {
+        address currentActor = randomActor(actorSeed);
+        if (currentActor == address(0)) return;
+
         uint256 maxRedeem = vault.balanceOf(currentActor);
         if (maxRedeem == 0) return;
 
@@ -343,30 +323,39 @@ contract TestVaultHandler is StdUtils {
         uint256[] memory amountsOut = new uint256[](1);
         amountsOut[0] = 0;
 
+        vm.startPrank(currentActor);
         vault.redeem(amount, amountsOut, currentActor, block.timestamp);
+        vm.stopPrank();
     }
 
-    function removeAsset(uint256 assetSeed) external useUnpausedAssetInVault(assetSeed) {
+    function removeAsset(uint256 assetSeed) external {
+        address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
+        if (currentAsset == address(0)) return;
+
         vault.removeAsset(currentAsset);
     }
 
-    function repay(uint256 actorSeed, uint256 assetSeed, uint256 amount)
-        external
-        useActor(actorSeed)
-        useUnpausedAssetInVault(assetSeed)
-    {
-        amount = bound(amount, 0, sumBorrows[currentActor][currentAsset]);
+    function repay(uint256 actorSeed, uint256 assetSeed, uint256 amount) external {
+        address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
+        if (currentAsset == address(0)) return;
 
+        address currentActor = randomActor(actorSeed);
+        if (currentActor == address(0)) return;
+
+        uint256 maxRepay = vault.availableBalance(currentAsset);
+        amount = bound(amount, 0, Math.min(maxRepay, type(uint96).max)); // Reasonable bound for repay
+
+        vm.startPrank(currentActor);
         // Mint tokens to the actor first
         MockERC20(currentAsset).mint(currentActor, amount);
 
         IERC20(currentAsset).approve(address(vault), amount);
         vault.repay(currentAsset, amount);
-
-        sumBorrows[currentActor][currentAsset] -= amount;
     }
 
-    function rescueERC20(IERC20 asset, uint256 receiverSeed) external useActor(receiverSeed) {
+    function rescueERC20(IERC20 asset, uint256 receiverSeed) external {
+        address currentActor = randomActor(receiverSeed);
+        if (currentActor == address(0)) return;
         if (address(asset).code.length == 0) {
             return;
         }
@@ -380,17 +369,82 @@ contract TestVaultHandler is StdUtils {
         }
     }
 
-    function pause(uint256 assetSeed) external useUnpausedAssetInVault(assetSeed) {
+    function pause(uint256 assetSeed) external {
+        address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
+        if (currentAsset == address(0)) return;
+
         vault.pause(currentAsset);
     }
 
-    function unpause(uint256 assetSeed) external useAssetInVault(assetSeed) {
+    function unpause(uint256 assetSeed) external {
+        address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
+        if (currentAsset == address(0)) return;
+
         vault.unpause(currentAsset);
     }
 
-    function setAssetOraclePrice(uint256 assetSeed, uint256 price) external useAsset(assetSeed) {
+    function setAssetOraclePrice(uint256 assetSeed, uint256 price) external {
+        address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
+        if (currentAsset == address(0)) return;
+
         uint256 decimals = IERC20Metadata(currentAsset).decimals();
         uint256 boundPrice = bound(price, 10 ** (decimals - 1), 10 ** decimals);
         mockOracle.setPrice(currentAsset, boundPrice);
+    }
+
+    function setVaultFeeData(
+        uint256 assetSeed,
+        uint256 slope0Seed,
+        uint256 slope1Seed,
+        uint256 mintKinkRatioSeed,
+        uint256 burnKinkRatioSeed,
+        uint256 optimalRatioSeed
+    ) external {
+        address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
+        if (currentAsset == address(0)) return;
+
+        uint256 slope0 = bound(slope0Seed, 0.0000000000001e27, 100000001e27);
+        uint256 slope1 = bound(slope1Seed, slope0, 100000001e27);
+        uint256 mintKinkRatio = bound(mintKinkRatioSeed, 0.0000000000001e27, 100000001e27);
+        uint256 burnKinkRatio = bound(burnKinkRatioSeed, 0.0000000000001e27, 100000001e27);
+        uint256 optimalRatio = bound(optimalRatioSeed, 0.0000000000001e27, 100000001e27);
+
+        vault.setFeeData(
+            currentAsset,
+            IMinter.FeeData({
+                slope0: slope0,
+                slope1: slope1,
+                mintKinkRatio: mintKinkRatio,
+                burnKinkRatio: burnKinkRatio,
+                optimalRatio: optimalRatio
+            })
+        );
+    }
+
+    function setVaultRedeemFee(uint256 redeemFeeSeed) external {
+        uint256 redeemFee = bound(redeemFeeSeed, 0, type(uint256).max);
+        vault.setRedeemFee(redeemFee);
+    }
+
+    function setVaultReserve(uint256 assetSeed, uint256 reserve) external {
+        address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
+        if (currentAsset == address(0)) return;
+        vault.setReserve(currentAsset, reserve);
+    }
+
+    function realizeInterest(uint256 assetSeed) external {
+        address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
+        if (currentAsset == address(0)) return;
+        vault.realizeInterest(currentAsset);
+    }
+
+    function setFractionalReserveVault(uint256 assetSeed) external {
+        address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
+        if (currentAsset == address(0)) return;
+
+        address newFractionalReserveVault =
+            address(new MockERC4626(currentAsset, 1e18, "Fractional Reserve Vault", "FRV"));
+
+        vault.setFractionalReserveVault(currentAsset, newFractionalReserveVault);
     }
 }
