@@ -105,12 +105,14 @@ contract VaultInvariantsTest is Test, ProxyUtils {
         for (uint256 i = 0; i < 3; i++) {
             address asset = assets[i];
             address frVault = address(new MockERC4626(asset, 1e18, "Fractional Reserve Vault", "FRV"));
+            MockERC4626(frVault).setInterestRate(uint256(0.1e18) / 365 days);
+
             fractionalReserveVaults[i] = frVault;
             vault.setFractionalReserveVault(asset, frVault);
         }
 
         // Create and target handler
-        handler = new TestVaultHandler(vault, mockOracle, assets, tokenHolders);
+        handler = new TestVaultHandler(vault, mockOracle, assets, tokenHolders, fractionalReserveVaults);
         targetContract(address(handler));
 
         // we need to set an appropriate block.number and block.timestamp for the tests
@@ -153,9 +155,7 @@ contract VaultInvariantsTest is Test, ProxyUtils {
             uint256 balanceAfter = IERC20(asset).balanceOf(address(vault));
             uint256 supplyAfter = vault.totalSupplies(asset);
 
-            assertEq(
-                balanceAfter - balanceBefore, amount * 0.995e18 / 1e18, "Asset balance should increase by exact amount"
-            );
+            assertEq(balanceAfter - balanceBefore, amount, "Asset balance should increase by exact amount");
             assertTrue(supplyAfter > supplyBefore, "Total supply should increase");
         }
     }
@@ -186,16 +186,26 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
 
     address[] public assets;
     address[] public actors;
+    address[] public fractionalReserveVaults;
     uint256 private constant MAX_ASSETS = 10;
 
-    constructor(Vault _vault, MockOracle _mockOracle, address[] memory _assets, address[] memory _actors)
-        RandomActorUtils(_actors)
-        RandomAssetUtils(_assets)
-    {
+    constructor(
+        Vault _vault,
+        MockOracle _mockOracle,
+        address[] memory _assets,
+        address[] memory _actors,
+        address[] memory _fractionalReserveVaults
+    ) RandomActorUtils(_actors) RandomAssetUtils(_assets) {
         vault = _vault;
         mockOracle = _mockOracle;
         assets = _assets;
         actors = _actors;
+        fractionalReserveVaults = _fractionalReserveVaults;
+
+        for (uint256 i = 0; i < _fractionalReserveVaults.length; i++) {
+            MockERC4626(_fractionalReserveVaults[i]).setInterestRate(uint256(0.1e18) / 365 days);
+            MockERC4626(_fractionalReserveVaults[i]).__mockYield();
+        }
     }
 
     function getVaultUnpausedAssets() public view returns (address[] memory) {
@@ -295,6 +305,7 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
     function divestAll(uint256 assetSeed) external {
         address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
         if (currentAsset == address(0)) return;
+        vm.warp(block.timestamp + 1);
         vault.divestAll(currentAsset);
     }
 
@@ -460,6 +471,8 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
 
         address newFractionalReserveVault =
             address(new MockERC4626(currentAsset, 1e18, "Fractional Reserve Vault", "FRV"));
+
+        vm.warp(block.timestamp + 1 minutes);
 
         vault.setFractionalReserveVault(currentAsset, newFractionalReserveVault);
     }

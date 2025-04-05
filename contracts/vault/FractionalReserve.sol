@@ -101,4 +101,11 @@ contract FractionalReserve is IFractionalReserve, Access, FractionalReserveStora
     function reserve(address _asset) external view returns (uint256 reserveAmount) {
         reserveAmount = getFractionalReserveStorage().reserve[_asset];
     }
+
+    /// @notice Loaned amount for an asset
+    /// @param _asset Asset address
+    /// @return loanedAmount Loaned amount
+    function loaned(address _asset) external view returns (uint256 loanedAmount) {
+        loanedAmount = getFractionalReserveStorage().loaned[_asset];
+    }
 }

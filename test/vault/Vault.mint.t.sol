@@ -131,11 +131,11 @@ contract VaultMintTest is TestDeployer {
 
         // Mint cUSD with USDT
         uint256 amountIn = 1;
-        uint256 minAmountOut = 1e12; // Accounting for potential fees
+        uint256 minAmountOut = 0.995e12; // Accounting for potential fees
         uint256 deadline = block.timestamp + 1 hours;
 
         cUSD.mint(address(usdt), amountIn, minAmountOut, user, deadline);
         // We have .5% less because of fees
-        assertEq(cUSD.balanceOf(user), 0.95e12);
+        assertEq(cUSD.balanceOf(user), 0.995e12);
     }
 }
