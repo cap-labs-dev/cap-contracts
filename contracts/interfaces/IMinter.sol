@@ -14,6 +14,7 @@ interface IMinter {
 
     /// @dev Fee data set for an asset in a vault
     struct FeeData {
+        uint256 minMintFee;
         uint256 slope0;
         uint256 slope1;
         uint256 mintKinkRatio;
@@ -46,22 +47,37 @@ interface IMinter {
     /// @dev Redeem fee set
     event SetRedeemFee(uint256 redeemFee);
 
+    /// @dev Invalid minimum mint fee
+    error InvalidMinMintFee();
+
+    /// @dev Invalid mint kink ratio
+    error InvalidMintKinkRatio();
+
+    /// @dev Invalid burn kink ratio
+    error InvalidBurnKinkRatio();
+
     /// @notice Get the mint amount for a given asset
     /// @param _asset Asset address
     /// @param _amountIn Amount of asset to use
     /// @return amountOut Amount minted
-    function getMintAmount(address _asset, uint256 _amountIn) external view returns (uint256 amountOut);
+    /// @return fee Fee applied
+    function getMintAmount(address _asset, uint256 _amountIn) external view returns (uint256 amountOut, uint256 fee);
 
     /// @notice Get the burn amount for a given asset
     /// @param _asset Asset address to withdraw
     /// @param _amountIn Amount of cap token to burn
     /// @return amountOut Amount of the asset withdrawn
-    function getBurnAmount(address _asset, uint256 _amountIn) external view returns (uint256 amountOut);
+    /// @return fee Fee applied
+    function getBurnAmount(address _asset, uint256 _amountIn) external view returns (uint256 amountOut, uint256 fee);
 
     /// @notice Get the redeem amount
     /// @param _amountIn Amount of cap token to burn
     /// @return amountsOut Amounts of assets to be withdrawn
-    function getRedeemAmount(uint256 _amountIn) external view returns (uint256[] memory amountsOut);
+    /// @return redeemFees Amounts of redeem fees to be applied
+    function getRedeemAmount(uint256 _amountIn)
+        external
+        view
+        returns (uint256[] memory amountsOut, uint256[] memory redeemFees);
 
     /// @notice Set the allocation slopes and ratios for an asset
     /// @param _asset Asset address

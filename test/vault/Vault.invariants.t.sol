@@ -33,6 +33,7 @@ contract VaultInvariantsTest is Test, ProxyUtils {
     TestVault public vault;
     FeeAuction public feeAuction;
     address[] public assets;
+    address public insuranceFund;
 
     MockOracle public mockOracle;
     MockAccessControl public accessControl;
@@ -76,10 +77,19 @@ contract VaultInvariantsTest is Test, ProxyUtils {
         feeAuction = FeeAuction(proxy);
         feeAuction.initialize(address(accessControl), address(mockTokens[0]), address(this), 1 days, 1e18);
 
+        // Deploy insurance fund
+        insuranceFund = makeAddr("insurance_fund");
+
         // Deploy and initialize vault
         vault = new TestVault();
         vault.initialize(
-            "Test Vault", "tVAULT", address(accessControl), address(feeAuction), address(mockOracle), assets
+            "Test Vault",
+            "tVAULT",
+            address(accessControl),
+            address(feeAuction),
+            address(mockOracle),
+            assets,
+            address(insuranceFund)
         );
         mockOracle.setPrice(address(vault), 1e18);
 
@@ -143,7 +153,9 @@ contract VaultInvariantsTest is Test, ProxyUtils {
             uint256 balanceAfter = IERC20(asset).balanceOf(address(vault));
             uint256 supplyAfter = vault.totalSupplies(asset);
 
-            assertEq(balanceAfter - balanceBefore, amount, "Asset balance should increase by exact amount");
+            assertEq(
+                balanceAfter - balanceBefore, amount * 0.995e18 / 1e18, "Asset balance should increase by exact amount"
+            );
             assertTrue(supplyAfter > supplyBefore, "Total supply should increase");
         }
     }
@@ -156,9 +168,10 @@ contract TestVault is Vault {
         address _accessControl,
         address _feeAuction,
         address _oracle,
-        address[] calldata _assets
+        address[] calldata _assets,
+        address _insuranceFund
     ) external initializer {
-        __Vault_init(_name, _symbol, _accessControl, _feeAuction, _oracle, _assets);
+        __Vault_init(_name, _symbol, _accessControl, _feeAuction, _oracle, _assets, _insuranceFund);
     }
 }
 /**
@@ -414,6 +427,7 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         vault.setFeeData(
             currentAsset,
             IMinter.FeeData({
+                minMintFee: 0.005e27,
                 slope0: slope0,
                 slope1: slope1,
                 mintKinkRatio: mintKinkRatio,

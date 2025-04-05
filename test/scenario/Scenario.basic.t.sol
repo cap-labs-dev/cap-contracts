@@ -30,6 +30,7 @@ contract ScenarioBasicTest is TestDeployer {
         vm.startPrank(env.users.lender_admin);
 
         IMinter.FeeData memory feeData = IMinter.FeeData({
+            minMintFee: 0.005e27,
             slope0: 0.0001e27,
             slope1: 0.1e27,
             mintKinkRatio: 0.85e27,
@@ -97,16 +98,16 @@ contract ScenarioBasicTest is TestDeployer {
             cUSD.mint(address(usdt), 2000e6, 3000e18, alice, block.timestamp + 1 hours);
             vm.expectRevert();
             /// Time
-            cUSD.mint(address(usdt), 2000e6, 1998e18, alice, block.timestamp - 1);
-            cUSD.mint(address(usdt), 2000e6, 1998e18, alice, block.timestamp + 1 hours);
-            assertGt(cUSD.balanceOf(alice), 2000e18);
+            cUSD.mint(address(usdt), 2000e6, 1990e18, alice, block.timestamp - 1);
+            cUSD.mint(address(usdt), 2000e6, 1990e18, alice, block.timestamp + 1 hours);
+            assertGt(cUSD.balanceOf(alice), 1990e18);
 
             vm.stopPrank();
 
             vm.startPrank(bob);
 
             usdc.approve(address(cUSD), 10000e6);
-            cUSD.mint(address(usdc), 2000e6, 1998e6, bob, block.timestamp + 1 hours);
+            cUSD.mint(address(usdc), 2000e6, 1990e6, bob, block.timestamp + 1 hours);
 
             assertLt(cUSD.balanceOf(bob), 2000e18);
 
@@ -345,7 +346,7 @@ contract ScenarioBasicTest is TestDeployer {
 
             assertGt(
                 usdt.balanceOf(alice) + usdc.balanceOf(alice) + (usdx.balanceOf(alice)) / 1e12,
-                (10000e6 * 0.999e27 / 1e27)
+                (10000e6 * 0.998e27 / 1e27)
             ); // Less redeem fee
 
             /// USDC goes over peg now

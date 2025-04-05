@@ -24,26 +24,30 @@ contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, FractionalRese
     /// @param _feeAuction Fee auction address
     /// @param _oracle Oracle address
     /// @param _assets Asset addresses
+    /// @param _insuranceFund Insurance fund
     function __Vault_init(
         string memory _name,
         string memory _symbol,
         address _accessControl,
         address _feeAuction,
         address _oracle,
-        address[] calldata _assets
+        address[] calldata _assets,
+        address _insuranceFund
     ) internal onlyInitializing {
         __ERC20_init(_name, _symbol);
         __ERC20Permit_init(_name);
         __Access_init(_accessControl);
         __FractionalReserve_init_unchained(_feeAuction);
         __Minter_init_unchained(_oracle);
-        __Vault_init_unchained(_assets);
+        __Vault_init_unchained(_assets, _insuranceFund);
     }
 
     /// @dev Initialize unchained
     /// @param _assets Asset addresses
-    function __Vault_init_unchained(address[] calldata _assets) internal onlyInitializing {
+    /// @param _insuranceFund Insurance fund
+    function __Vault_init_unchained(address[] calldata _assets, address _insuranceFund) internal onlyInitializing {
         getVaultStorage().assets = _assets;
+        getVaultStorage().insuranceFund = _insuranceFund;
     }
 
     /// @notice Mint the cap token using an asset
@@ -57,7 +61,8 @@ contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, FractionalRese
         external
         returns (uint256 amountOut)
     {
-        amountOut = getMintAmount(_asset, _amountIn);
+        uint256 fee;
+        (amountOut, fee) = getMintAmount(_asset, _amountIn);
         VaultLogic.mint(
             getVaultStorage(),
             MintBurnParams({
@@ -66,10 +71,12 @@ contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, FractionalRese
                 amountOut: amountOut,
                 minAmountOut: _minAmountOut,
                 receiver: _receiver,
-                deadline: _deadline
+                deadline: _deadline,
+                fee: fee
             })
         );
         _mint(_receiver, amountOut);
+        _mint(getVaultStorage().insuranceFund, fee);
     }
 
     /// @notice Burn the cap token for an asset
@@ -83,7 +90,8 @@ contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, FractionalRese
         external
         returns (uint256 amountOut)
     {
-        amountOut = getBurnAmount(_asset, _amountIn);
+        uint256 fee;
+        (amountOut, fee) = getBurnAmount(_asset, _amountIn);
         divest(_asset, amountOut);
         VaultLogic.burn(
             getVaultStorage(),
@@ -93,7 +101,8 @@ contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, FractionalRese
                 amountOut: amountOut,
                 minAmountOut: _minAmountOut,
                 receiver: _receiver,
-                deadline: _deadline
+                deadline: _deadline,
+                fee: fee
             })
         );
         _burn(msg.sender, _amountIn);
@@ -110,7 +119,8 @@ contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, FractionalRese
         external
         returns (uint256[] memory amountsOut)
     {
-        amountsOut = getRedeemAmount(_amountIn);
+        uint256[] memory fees;
+        (amountsOut, fees) = getRedeemAmount(_amountIn);
         divestMany(assets(), amountsOut);
         VaultLogic.redeem(
             getVaultStorage(),
@@ -119,7 +129,8 @@ contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, FractionalRese
                 amountsOut: amountsOut,
                 minAmountsOut: _minAmountsOut,
                 receiver: _receiver,
-                deadline: _deadline
+                deadline: _deadline,
+                fees: fees
             })
         );
         _burn(msg.sender, _amountIn);
@@ -221,5 +232,11 @@ contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, FractionalRese
     /// @return index Utilization ratio index
     function currentUtilizationIndex(address _asset) external view returns (uint256 index) {
         index = VaultLogic.currentUtilizationIndex(getVaultStorage(), _asset);
+    }
+
+    /// @notice Get the insurance fund
+    /// @return insuranceFund Insurance fund
+    function insuranceFund() external view returns (address) {
+        return getVaultStorage().insuranceFund;
     }
 }

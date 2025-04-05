@@ -135,6 +135,7 @@ contract VaultMintTest is TestDeployer {
         uint256 deadline = block.timestamp + 1 hours;
 
         cUSD.mint(address(usdt), amountIn, minAmountOut, user, deadline);
-        assertEq(cUSD.balanceOf(user), 1e12);
+        // We have .5% less because of fees
+        assertEq(cUSD.balanceOf(user), 0.95e12);
     }
 }

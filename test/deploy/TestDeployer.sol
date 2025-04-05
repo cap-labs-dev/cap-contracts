@@ -116,10 +116,12 @@ contract TestDeployer is
         env.ethOracleMocks = _deployOracleMocks(env.ethMocks);
 
         console.log("deploying usdVault");
-        env.usdVault = _deployVault(env.implems, env.infra, "Cap USD", "cUSD", env.usdOracleMocks.assets);
+        env.usdVault =
+            _deployVault(env.implems, env.infra, "Cap USD", "cUSD", env.usdOracleMocks.assets, env.users.insurance_fund);
 
         console.log("deploying ethVault");
-        env.ethVault = _deployVault(env.implems, env.infra, "Cap ETH", "cETH", env.ethOracleMocks.assets);
+        env.ethVault =
+            _deployVault(env.implems, env.infra, "Cap ETH", "cETH", env.ethOracleMocks.assets, env.users.insurance_fund);
 
         if (useMockBackingNetwork()) {
             console.log("skipping lzperiphery");
@@ -172,6 +174,7 @@ contract TestDeployer is
         vm.startPrank(env.users.lender_admin);
 
         FeeConfig memory fee = FeeConfig({
+            minMintFee: 0.005e27, // 0.5% minimum mint fee
             slope0: 0, // allow liquidity to be added without fee
             slope1: 0, // allow liquidity to be added without fee to start with
             mintKinkRatio: 0.85e27,
