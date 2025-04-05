@@ -15,9 +15,7 @@ struct ImplementationsConfig {
     address capToken;
     address stakedCap;
     address oracle;
-    address principalDebtToken;
-    address interestDebtToken;
-    address restakerDebtToken;
+    address debtToken;
     address feeAuction;
 }
 
@@ -59,9 +57,7 @@ struct VaultConfig {
     address restakerInterestReceiver;
     VaultLzPeriphery lzperiphery;
     address[] assets;
-    address[] principalDebtTokens;
-    address[] restakerDebtTokens;
-    address[] interestDebtTokens;
+    address[] debtTokens;
 }
 
 struct VaultLzPeriphery {

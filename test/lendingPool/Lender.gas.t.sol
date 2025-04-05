@@ -3,9 +3,7 @@ pragma solidity ^0.8.28;
 
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
 
-import { InterestDebtToken } from "../../contracts/lendingPool/tokens/InterestDebtToken.sol";
-import { PrincipalDebtToken } from "../../contracts/lendingPool/tokens/PrincipalDebtToken.sol";
-import { RestakerDebtToken } from "../../contracts/lendingPool/tokens/RestakerDebtToken.sol";
+import { DebtToken } from "../../contracts/lendingPool/tokens/DebtToken.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 
 import { MockNetworkMiddleware } from "../mocks/MockNetworkMiddleware.sol";

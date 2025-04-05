@@ -16,9 +16,9 @@ interface IScaledToken is IERC20 {
         uint256 scaledTotalSupply;
     }
 
-    /// @dev Operation not supported
-    error OperationNotSupported();
+    /// @dev Invalid mint amount
+    error InvalidMintAmount();
 
-    /// @dev Address zero
-    error AddressZero();
+    /// @dev Invalid burn amount
+    error InvalidBurnAmount();
 }

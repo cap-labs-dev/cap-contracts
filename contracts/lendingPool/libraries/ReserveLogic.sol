@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import { IDebtToken } from "../../interfaces/IDebtToken.sol";
-import { IPrincipalDebtToken } from "../../interfaces/IPrincipalDebtToken.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import { ILender } from "../../interfaces/ILender.sol";
@@ -46,9 +45,7 @@ library ReserveLogic {
         ILender.ReserveData storage reserve = $.reservesData[params.asset];
         reserve.id = id;
         reserve.vault = params.vault;
-        reserve.principalDebtToken = params.principalDebtToken;
-        reserve.restakerDebtToken = params.restakerDebtToken;
-        reserve.interestDebtToken = params.interestDebtToken;
+        reserve.debtToken = params.debtToken;
         reserve.interestReceiver = params.interestReceiver;
         reserve.decimals = IERC20Metadata(params.asset).decimals();
         reserve.paused = true;

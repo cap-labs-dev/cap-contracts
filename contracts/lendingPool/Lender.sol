@@ -83,25 +83,17 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
 
     /// @notice Realize interest for an asset
     /// @param _asset Asset to realize interest for
-    /// @param _amount Amount of interest to realize (type(uint).max for all available interest)
     /// @return actualRealized Actual amount realized
-    function realizeInterest(address _asset, uint256 _amount) external returns (uint256 actualRealized) {
-        actualRealized =
-            BorrowLogic.realizeInterest(getLenderStorage(), RealizeInterestParams({ asset: _asset, amount: _amount }));
+    function realizeInterest(address _asset) external returns (uint256 actualRealized) {
+        actualRealized = BorrowLogic.realizeInterest(getLenderStorage(), _asset);
     }
 
     /// @notice Realize interest for restaker debt of an agent for an asset
     /// @param _agent Agent to realize interest for
     /// @param _asset Asset to realize interest for
-    /// @param _amount Amount of interest to realize (type(uint).max for all available interest)
     /// @return actualRealized Actual amount realized
-    function realizeRestakerInterest(address _agent, address _asset, uint256 _amount)
-        external
-        returns (uint256 actualRealized)
-    {
-        actualRealized = BorrowLogic.realizeRestakerInterest(
-            getLenderStorage(), RealizeRestakerInterestParams({ agent: _agent, asset: _asset, amount: _amount })
-        );
+    function realizeRestakerInterest(address _agent, address _asset) external returns (uint256 actualRealized) {
+        actualRealized = BorrowLogic.realizeRestakerInterest(getLenderStorage(), _agent, _asset);
     }
 
     /// @notice Calculate the maximum interest that can be realized
@@ -114,9 +106,15 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     /// @notice Calculate the maximum interest that can be realized for a restaker
     /// @param _agent Agent to calculate max realization for
     /// @param _asset Asset to calculate max realization for
-    /// @return _maxRealization Maximum interest that can be realized
-    function maxRestakerRealization(address _agent, address _asset) external view returns (uint256 _maxRealization) {
-        _maxRealization = BorrowLogic.maxRestakerRealization(getLenderStorage(), _agent, _asset);
+    /// @return newRealizedInterest Maximum interest that can be realized
+    /// @return newUnrealizedInterest Unrealized interest that will be added to the debt
+    function maxRestakerRealization(address _agent, address _asset)
+        external
+        view
+        returns (uint256 newRealizedInterest, uint256 newUnrealizedInterest)
+    {
+        (newRealizedInterest, newUnrealizedInterest) =
+            BorrowLogic.maxRestakerRealization(getLenderStorage(), _agent, _asset);
     }
 
     /// @notice Initiate liquidation of an agent when the health is below 1
@@ -188,16 +186,19 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     /// @notice Get the current debt balances for an agent for a specific asset
     /// @param _agent Agent address to check debt for
     /// @param _asset Asset to check debt for
-    /// @return principalDebt Principal debt amount in asset decimals
-    /// @return interestDebt Interest debt amount in asset decimals
-    /// @return restakerDebt Restaker debt amount in asset decimals
-    function debt(address _agent, address _asset)
-        external
-        view
-        returns (uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt)
-    {
+    /// @return totalDebt Total debt amount in asset decimals
+    function debt(address _agent, address _asset) external view returns (uint256 totalDebt) {
         if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();
-        (principalDebt, interestDebt, restakerDebt) = ViewLogic.debt(getLenderStorage(), _agent, _asset);
+        totalDebt = ViewLogic.debt(getLenderStorage(), _agent, _asset);
+    }
+
+    /// @notice Get the accrued restaker interest for an agent for a specific asset
+    /// @param _agent Agent address to check accrued restaker interest for
+    /// @param _asset Asset to check accrued restaker interest for
+    /// @return accruedInterest Accrued restaker interest in asset decimals
+    function accruedRestakerInterest(address _agent, address _asset) external view returns (uint256 accruedInterest) {
+        if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();
+        accruedInterest = ViewLogic.accruedRestakerInterest(getLenderStorage(), _agent, _asset);
     }
 
     /// @notice Add an asset to the Lender
@@ -277,53 +278,40 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     /// @param _asset Address of the asset
     /// @return id Id of the reserve
     /// @return vault Address of the vault
-    /// @return principalDebtToken Address of the principal debt token
-    /// @return restakerDebtToken Address of the restaker debt token
-    /// @return interestDebtToken Address of the interest debt token
+    /// @return debtToken Address of the debt token
     /// @return interestReceiver Address of the interest receiver
     /// @return decimals Decimals of the asset
     /// @return paused True if the asset is paused, false otherwise
-    /// @return realizedInterest Realized interest of the asset
     function reservesData(address _asset)
         external
         view
         returns (
             uint256 id,
             address vault,
-            address principalDebtToken,
-            address restakerDebtToken,
-            address interestDebtToken,
+            address debtToken,
             address interestReceiver,
             uint8 decimals,
             bool paused,
-            uint256 realizedInterest,
             uint256 minBorrow
         )
     {
         ReserveData storage reserve = getLenderStorage().reservesData[_asset];
         id = reserve.id;
         vault = reserve.vault;
-        principalDebtToken = reserve.principalDebtToken;
-        restakerDebtToken = reserve.restakerDebtToken;
-        interestDebtToken = reserve.interestDebtToken;
+        debtToken = reserve.debtToken;
         interestReceiver = reserve.interestReceiver;
         decimals = reserve.decimals;
         paused = reserve.paused;
-        realizedInterest = reserve.realizedInterest;
         minBorrow = reserve.minBorrow;
     }
 
-    /// @notice The realized restaker interest for an agent and asset
+    /// @notice The unrealized restaker interest for an agent and asset
     /// @param _agent Address of the agent
     /// @param _asset Address of the asset
-    /// @return _realizedRestakerInterest Realized restaker interest scaled to 1e27
-    function realizedRestakerInterest(address _agent, address _asset)
-        external
-        view
-        returns (uint256 _realizedRestakerInterest)
-    {
+    /// @return _unrealizedInterest Unrealized interest scaled to 1e27
+    function unrealizedInterest(address _agent, address _asset) external view returns (uint256 _unrealizedInterest) {
         ReserveData storage reserve = getLenderStorage().reservesData[_asset];
-        _realizedRestakerInterest = reserve.realizedRestakerInterest[_agent];
+        _unrealizedInterest = reserve.unrealizedInterest[_agent];
     }
 
     function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }

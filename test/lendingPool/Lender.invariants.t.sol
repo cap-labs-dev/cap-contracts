@@ -69,10 +69,8 @@ contract LenderInvariantsTest is TestDeployer {
         lender.repay(address(usdc), 1000e6, user_agent);
         assertGe(usdc.balanceOf(address(cUSD)), backingBefore);
 
-        (uint256 pdebt, uint256 idebt, uint256 rdebt) = lender.debt(user_agent, address(usdc));
-        assertEq(pdebt, 0);
-        assertEq(idebt, 0);
-        assertEq(rdebt, 0);
+        uint256 debt = lender.debt(user_agent, address(usdc));
+        assertEq(debt, 0);
     }
 
     /// @dev Test that interest accrual doesn't break system invariants
@@ -90,7 +88,7 @@ contract LenderInvariantsTest is TestDeployer {
         for (uint256 i = 0; i < assets.length; i++) {
             uint256 maxRealization = lender.maxRealization(assets[i]);
             if (maxRealization > 0) {
-                lender.realizeInterest(assets[i], maxRealization);
+                lender.realizeInterest(assets[i]);
             }
         }
 
@@ -308,7 +306,7 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         address[] memory unpausedAssets = new address[](assets.length);
         uint256 unpausedAssetCount = 0;
         for (uint256 i = 0; i < assets.length; i++) {
-            (,,,,,,, bool paused,,) = lender.reservesData(assets[i]);
+            (,,,,, bool paused,) = lender.reservesData(assets[i]);
             if (!paused) {
                 unpausedAssets[unpausedAssetCount++] = assets[i];
             }
@@ -405,17 +403,14 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         vm.stopPrank();
     }
 
-    function realizeInterest(uint256 assetSeed, uint256 amountSeed) external {
+    function realizeInterest(uint256 assetSeed) external {
         address currentAsset = randomAsset(assetSeed);
 
         // Bound amount to a reasonable range (using type(uint96).max to avoid overflow)
         uint256 maxRealization = lender.maxRealization(currentAsset);
         if (maxRealization == 0) return;
 
-        uint256 amount = bound(amountSeed, 0, maxRealization);
-        if (amount == 0) return;
-
-        lender.realizeInterest(currentAsset, amount);
+        lender.realizeInterest(currentAsset);
     }
 
     function wrapTime(uint256 timeSeed, uint256 blockNumberSeed) external {
@@ -425,16 +420,14 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         vm.roll(blockNumber);
     }
 
-    function realizeRestakerInterest(uint256 agentSeed, uint256 assetSeed, uint256 amountSeed) external {
+    function realizeRestakerInterest(uint256 agentSeed, uint256 assetSeed) external {
         address agent = randomActor(agentSeed);
         address currentAsset = randomAsset(assetSeed);
 
-        uint256 maxRealization = lender.maxRestakerRealization(agent, currentAsset);
-        if (maxRealization == 0) return;
+        (uint256 maxRealizedInterest,) = lender.maxRestakerRealization(agent, currentAsset);
+        if (maxRealizedInterest == 0) return;
 
-        uint256 amount = bound(amountSeed, 1, maxRealization);
-
-        lender.realizeRestakerInterest(agent, currentAsset, amount);
+        lender.realizeRestakerInterest(agent, currentAsset);
     }
 
     function cancelLiquidation(uint256 agentSeed) external {

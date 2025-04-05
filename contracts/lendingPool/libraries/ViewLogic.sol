@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { IDebtToken } from "../../interfaces/IDebtToken.sol";
 import { IDelegation } from "../../interfaces/IDelegation.sol";
 
 import { ILender } from "../../interfaces/ILender.sol";
@@ -9,7 +8,6 @@ import { IOracle } from "../../interfaces/IOracle.sol";
 import { IVault } from "../../interfaces/IVault.sol";
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { console } from "forge-std/console.sol";
 
 /// @title View Logic
 /// @author kexley, @capLabs
@@ -51,11 +49,10 @@ library ViewLogic {
             (uint256 assetPrice,) = IOracle($.oracle).getPrice(asset);
             if (assetPrice == 0) continue;
 
-            totalDebt += (
-                IERC20($.reservesData[asset].principalDebtToken).balanceOf(_agent)
-                    + IERC20($.reservesData[asset].interestDebtToken).balanceOf(_agent)
-                    + IERC20($.reservesData[asset].restakerDebtToken).balanceOf(_agent)
-            ) * assetPrice / (10 ** $.reservesData[asset].decimals);
+            ILender.ReserveData storage reserve = $.reservesData[asset];
+
+            totalDebt += (IERC20(reserve.debtToken).balanceOf(_agent) + accruedRestakerInterest($, _agent, asset))
+                * assetPrice / (10 ** reserve.decimals);
         }
 
         ltv = totalDelegation == 0 ? 0 : (totalDebt * 1e27) / totalDelegation;
@@ -134,17 +131,31 @@ library ViewLogic {
     /// @param $ Lender storage
     /// @param _agent Agent address to check debt for
     /// @param _asset Asset to check debt for
-    /// @return principalDebt Principal debt amount in asset decimals
-    /// @return interestDebt Interest debt amount in asset decimals
-    /// @return restakerDebt Restaker debt amount in asset decimals
+    /// @return totalDebt Total debt amount in asset decimals
     function debt(ILender.LenderStorage storage $, address _agent, address _asset)
         external
         view
-        returns (uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt)
+        returns (uint256 totalDebt)
+    {
+        totalDebt =
+            IERC20($.reservesData[_asset].debtToken).balanceOf(_agent) + accruedRestakerInterest($, _agent, _asset);
+    }
+
+    /// @notice Calculate the accrued restaker interest for an agent for a specific asset
+    /// @param $ Lender storage
+    /// @param _agent Agent address
+    /// @param _asset Asset to calculate accrued interest for
+    /// @return accruedInterest Accrued restaker interest in asset decimals
+    function accruedRestakerInterest(ILender.LenderStorage storage $, address _agent, address _asset)
+        public
+        view
+        returns (uint256 accruedInterest)
     {
         ILender.ReserveData storage reserve = $.reservesData[_asset];
-        principalDebt = IERC20(reserve.principalDebtToken).balanceOf(_agent);
-        interestDebt = IERC20(reserve.interestDebtToken).balanceOf(_agent);
-        restakerDebt = IERC20(reserve.restakerDebtToken).balanceOf(_agent);
+        uint256 totalInterest = IERC20(reserve.debtToken).balanceOf(_agent);
+        uint256 rate = IOracle($.oracle).restakerRate(_agent);
+        uint256 elapsedTime = block.timestamp - reserve.lastRealizationTime[_agent];
+
+        accruedInterest = totalInterest * rate * elapsedTime / 1e27;
     }
 }

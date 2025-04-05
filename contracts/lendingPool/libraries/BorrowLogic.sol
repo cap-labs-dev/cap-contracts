@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { IDebtToken } from "../../interfaces/IDebtToken.sol";
-import { IPrincipalDebtToken } from "../../interfaces/IPrincipalDebtToken.sol";
-
-import { IDelegation } from "../../interfaces/IDelegation.sol";
-import { IVault } from "../../interfaces/IVault.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import { IDebtToken } from "../../interfaces/IDebtToken.sol";
+import { IDelegation } from "../../interfaces/IDelegation.sol";
 import { ILender } from "../../interfaces/ILender.sol";
+import { IVault } from "../../interfaces/IVault.sol";
 import { ValidationLogic } from "./ValidationLogic.sol";
+import { ViewLogic } from "./ViewLogic.sol";
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
 
 /// @title BorrowLogic
@@ -29,13 +29,7 @@ library BorrowLogic {
     event Borrow(address indexed asset, address indexed agent, uint256 amount);
 
     /// @dev An agent, or someone on behalf of an agent, has repaid
-    event Repay(
-        address indexed asset,
-        address indexed agent,
-        uint256 principalRepaid,
-        uint256 interestRepaid,
-        uint256 restakerRepaid
-    );
+    event Repay(address indexed asset, address indexed agent, uint256 repaid);
 
     /// @dev An agent has totally repaid their debt of an asset including all interests
     event TotalRepayment(address indexed agent, address indexed asset);
@@ -52,6 +46,9 @@ library BorrowLogic {
     /// @param $ Lender storage
     /// @param params Parameters to borrow an asset
     function borrow(ILender.LenderStorage storage $, ILender.BorrowParams memory params) external {
+        /// Realize restaker interest before borrowing
+        realizeRestakerInterest($, params.agent, params.asset);
+
         ValidationLogic.validateBorrow($, params);
 
         ILender.ReserveData storage reserve = $.reservesData[params.asset];
@@ -61,9 +58,9 @@ library BorrowLogic {
 
         IVault(reserve.vault).borrow(params.asset, params.amount, params.receiver);
 
-        IPrincipalDebtToken(reserve.principalDebtToken).mint(params.agent, params.amount);
-        IDebtToken(reserve.interestDebtToken).update(params.agent);
-        IDebtToken(reserve.restakerDebtToken).update(params.agent);
+        IDebtToken(reserve.debtToken).mint(params.agent, params.amount);
+
+        reserve.debt += params.amount;
 
         emit Borrow(params.agent, params.asset, params.amount);
     }
@@ -74,179 +71,144 @@ library BorrowLogic {
     /// debt is paid last as the future rate is calculated based on the resulting principal debt.
     /// @param $ Lender storage
     /// @param params Parameters to repay a debt
-    /// @return _repaid Actual amount repaid
+    /// @return repaid Actual amount repaid
     function repay(ILender.LenderStorage storage $, ILender.RepayParams memory params)
         external
-        returns (uint256 _repaid)
+        returns (uint256 repaid)
     {
+        /// Realize restaker interest before repaying
+        realizeRestakerInterest($, params.agent, params.asset);
+
         ILender.ReserveData storage reserve = $.reservesData[params.asset];
-        uint256 principalDebt = IERC20(reserve.principalDebtToken).balanceOf(params.agent);
-        uint256 restakerDebt = IERC20(reserve.restakerDebtToken).balanceOf(params.agent);
-        uint256 interestDebt = IERC20(reserve.interestDebtToken).balanceOf(params.agent);
-        uint256 principalRepaid;
-        uint256 restakerRepaid;
+        uint256 debtRepaid;
         uint256 interestRepaid;
 
-        /// Maturity order of repayment is principal, restaker, then interest
-        if (params.amount > principalDebt) {
-            principalRepaid = principalDebt;
-            if (params.amount > principalDebt + restakerDebt) {
-                restakerRepaid = restakerDebt;
-                if (params.amount > principalDebt + restakerDebt + interestDebt) {
-                    interestRepaid = interestDebt;
-                } else {
-                    interestRepaid = params.amount - principalDebt - restakerDebt;
-                }
-            } else {
-                restakerRepaid = params.amount - principalDebt;
-            }
-        } else {
-            principalRepaid = params.amount;
-        }
+        /// Can only repay up to the amount owed
+        repaid = Math.min(params.amount, IERC20(reserve.debtToken).balanceOf(params.agent));
 
-        if (principalRepaid > 0) {
-            IPrincipalDebtToken(reserve.principalDebtToken).burn(params.agent, principalRepaid);
-            IERC20(params.asset).safeTransferFrom(params.caller, address(this), principalRepaid);
-            IERC20(params.asset).forceApprove(reserve.vault, principalRepaid);
-            IVault(reserve.vault).repay(params.asset, principalRepaid);
+        IDebtToken(reserve.debtToken).burn(params.agent, repaid);
+        IERC20(params.asset).safeTransferFrom(params.caller, address(this), repaid);
 
-            IDebtToken(reserve.interestDebtToken).update(params.agent);
-            IDebtToken(reserve.restakerDebtToken).update(params.agent);
-        }
-
-        if (restakerRepaid > 0) {
-            uint256 realizedRestakerRepaid;
-            if (reserve.realizedRestakerInterest[params.agent] > 0) {
-                /// Repay realized interest directly back to vault instead of to restaker
-                realizedRestakerRepaid = restakerRepaid < reserve.realizedRestakerInterest[params.agent]
-                    ? restakerRepaid
-                    : reserve.realizedRestakerInterest[params.agent];
-
-                reserve.realizedRestakerInterest[params.agent] -= realizedRestakerRepaid;
-                IERC20(params.asset).safeTransferFrom(params.caller, address(this), realizedRestakerRepaid);
-                IERC20(params.asset).forceApprove(reserve.vault, realizedRestakerRepaid);
-                IVault(reserve.vault).repay(params.asset, realizedRestakerRepaid);
-            }
-
-            IDebtToken(reserve.restakerDebtToken).burn(params.agent, restakerRepaid);
-            if (restakerRepaid > realizedRestakerRepaid) {
-                IERC20(params.asset).safeTransferFrom(
-                    params.caller, $.delegation, restakerRepaid - realizedRestakerRepaid
-                );
-                IDelegation($.delegation).distributeRewards(params.agent, params.asset);
-            }
-        }
-
-        if (interestRepaid > 0) {
-            uint256 realizedInterestRepaid;
-            if (reserve.realizedInterest > 0) {
-                /// Repay realized interest directly back to vault instead of to fee auction
-                realizedInterestRepaid =
-                    interestRepaid < reserve.realizedInterest ? interestRepaid : reserve.realizedInterest;
-
-                $.reservesData[params.asset].realizedInterest -= realizedInterestRepaid;
-                IERC20(params.asset).safeTransferFrom(params.caller, address(this), realizedInterestRepaid);
-                IERC20(params.asset).forceApprove(reserve.vault, realizedInterestRepaid);
-                IVault(reserve.vault).repay(params.asset, realizedInterestRepaid);
-            }
-
-            IDebtToken(reserve.interestDebtToken).burn(params.agent, interestRepaid);
-            if (interestRepaid > realizedInterestRepaid) {
-                IERC20(params.asset).safeTransferFrom(
-                    params.caller, reserve.interestReceiver, interestRepaid - realizedInterestRepaid
-                );
-            }
-        }
-
-        if (
-            IERC20(reserve.principalDebtToken).balanceOf(params.agent) == 0
-                && IERC20(reserve.restakerDebtToken).balanceOf(params.agent) == 0
-                && IERC20(reserve.interestDebtToken).balanceOf(params.agent) == 0
-        ) {
+        if (IERC20(reserve.debtToken).balanceOf(params.agent) == 0) {
             $.agentConfig[params.agent].setBorrowing(reserve.id, false);
             emit TotalRepayment(params.agent, params.asset);
         }
 
-        _repaid = principalRepaid + interestRepaid + restakerRepaid;
+        /// Realized interest has already been added to vault debt, so pay down vault debt first
+        if (repaid > reserve.debt) {
+            debtRepaid = reserve.debt;
+            interestRepaid = repaid - reserve.debt;
+        } else {
+            debtRepaid = repaid;
+        }
 
-        emit Repay(params.agent, params.asset, principalRepaid, interestRepaid, restakerRepaid);
+        /// Pay down unrealized restaker interest before paying vault
+        uint256 restakerRepaid = Math.min(debtRepaid, reserve.unrealizedInterest[params.agent]);
+        uint256 vaultRepaid = debtRepaid - restakerRepaid;
+
+        if (debtRepaid > 0) {
+            reserve.debt -= debtRepaid;
+
+            if (restakerRepaid > 0) {
+                reserve.unrealizedInterest[params.agent] -= restakerRepaid;
+                IERC20(params.asset).safeTransfer($.delegation, restakerRepaid);
+                IDelegation($.delegation).distributeRewards(params.agent, params.asset);
+            }
+
+            if (vaultRepaid > 0) {
+                IERC20(params.asset).forceApprove(reserve.vault, vaultRepaid);
+                IVault(reserve.vault).repay(params.asset, vaultRepaid);
+            }
+        }
+
+        if (interestRepaid > 0) {
+            IERC20(params.asset).safeTransfer(reserve.interestReceiver, interestRepaid);
+        }
+
+        emit Repay(params.agent, params.asset, repaid);
     }
 
     /// @notice Realize the interest before it is repaid by borrowing from the vault
     /// @param $ Lender storage
-    /// @param params Parameters for realizing interest
+    /// @param _asset Asset to realize interest for
     /// @return realizedInterest Actual realized interest
-    function realizeInterest(ILender.LenderStorage storage $, ILender.RealizeInterestParams memory params)
+    function realizeInterest(ILender.LenderStorage storage $, address _asset)
         external
         returns (uint256 realizedInterest)
     {
-        ILender.ReserveData storage reserve = $.reservesData[params.asset];
-        uint256 _maxRealization = maxRealization($, params.asset);
-        if (_maxRealization == 0) revert ZeroRealization();
+        ILender.ReserveData storage reserve = $.reservesData[_asset];
+        realizedInterest = maxRealization($, _asset);
+        if (realizedInterest == 0) revert ZeroRealization();
 
-        realizedInterest = params.amount > _maxRealization ? _maxRealization : params.amount;
-        reserve.realizedInterest += realizedInterest;
-        IVault(reserve.vault).borrow(params.asset, realizedInterest, reserve.interestReceiver);
-        emit RealizeInterest(params.asset, realizedInterest, reserve.interestReceiver);
+        reserve.debt += realizedInterest;
+        IVault(reserve.vault).borrow(_asset, realizedInterest, reserve.interestReceiver);
+        emit RealizeInterest(_asset, realizedInterest, reserve.interestReceiver);
     }
 
     /// @notice Realize the restaker interest before it is repaid by borrowing from the vault
     /// @param $ Lender storage
-    /// @param params Parameters for realizing restaker interest
+    /// @param _agent Address of the restaker
+    /// @param _asset Asset to realize restaker interest for
     /// @return realizedInterest Actual realized restaker interest
-    function realizeRestakerInterest(
-        ILender.LenderStorage storage $,
-        ILender.RealizeRestakerInterestParams memory params
-    ) external returns (uint256 realizedInterest) {
-        ILender.ReserveData storage reserve = $.reservesData[params.asset];
-        uint256 _maxRealization = maxRestakerRealization($, params.agent, params.asset);
-        if (_maxRealization == 0) revert ZeroRealization();
+    function realizeRestakerInterest(ILender.LenderStorage storage $, address _agent, address _asset)
+        public
+        returns (uint256 realizedInterest)
+    {
+        ILender.ReserveData storage reserve = $.reservesData[_asset];
+        uint256 unrealizedInterest;
+        (realizedInterest, unrealizedInterest) = maxRestakerRealization($, _agent, _asset);
+        reserve.lastRealizationTime[_agent] = block.timestamp;
 
-        realizedInterest = params.amount > _maxRealization ? _maxRealization : params.amount;
-        reserve.realizedRestakerInterest[params.agent] += realizedInterest;
-        IVault(reserve.vault).borrow(params.asset, realizedInterest, $.delegation);
-        IDelegation($.delegation).distributeRewards(params.agent, params.asset);
-        emit RealizeInterest(params.asset, realizedInterest, $.delegation);
+        if (realizedInterest == 0 && unrealizedInterest == 0) return 0;
+
+        reserve.debt += realizedInterest + unrealizedInterest;
+        reserve.unrealizedInterest[_agent] += unrealizedInterest;
+
+        IDebtToken(reserve.debtToken).mint(_agent, realizedInterest + unrealizedInterest);
+        IVault(reserve.vault).borrow(_asset, realizedInterest, $.delegation);
+        IDelegation($.delegation).distributeRewards(_agent, _asset);
+        emit RealizeInterest(_asset, realizedInterest, $.delegation);
     }
 
     /// @notice Calculate the maximum interest that can be realized
     /// @param $ Lender storage
     /// @param _asset Asset to calculate max realization for
-    /// @return maxRealization Maximum interest that can be realized
-    function maxRealization(ILender.LenderStorage storage $, address _asset) internal view returns (uint256) {
+    /// @return realization Maximum interest that can be realized
+    function maxRealization(ILender.LenderStorage storage $, address _asset)
+        internal
+        view
+        returns (uint256 realization)
+    {
         ILender.ReserveData storage reserve = $.reservesData[_asset];
-        uint256 totalInterest = IERC20(reserve.interestDebtToken).totalSupply();
+        uint256 totalDebt = IERC20(reserve.debtToken).totalSupply();
         uint256 reserves = IVault(reserve.vault).availableBalance(_asset);
-        uint256 _maxRealization = 0;
-        if (totalInterest > reserve.realizedInterest) {
-            _maxRealization = totalInterest - reserve.realizedInterest;
+
+        if (totalDebt > reserve.debt) {
+            realization = totalDebt - reserve.debt;
         }
-        if (reserves < _maxRealization) {
-            _maxRealization = reserves;
+        if (reserves < realization) {
+            realization = reserves;
         }
-        return _maxRealization;
     }
 
     /// @notice Calculate the maximum interest that can be realized for a restaker
     /// @param $ Lender storage
     /// @param _agent Address of the restaker
     /// @param _asset Asset to calculate max realization for
-    /// @return maxRealization Maximum interest that can be realized
+    /// @return realization Maximum interest that can be realized
+    /// @return unrealizedInterest Unrealized interest that can be realized
     function maxRestakerRealization(ILender.LenderStorage storage $, address _agent, address _asset)
         internal
         view
-        returns (uint256)
+        returns (uint256 realization, uint256 unrealizedInterest)
     {
-        ILender.ReserveData storage reserve = $.reservesData[_asset];
-        uint256 totalInterest = IERC20(reserve.restakerDebtToken).balanceOf(_agent);
-        uint256 reserves = IVault(reserve.vault).availableBalance(_asset);
-        uint256 _maxRealization = 0;
-        if (totalInterest > reserve.realizedRestakerInterest[_agent]) {
-            _maxRealization = totalInterest - reserve.realizedRestakerInterest[_agent];
+        uint256 accruedInterest = ViewLogic.accruedRestakerInterest($, _agent, _asset);
+        uint256 reserves = IVault($.reservesData[_asset].vault).availableBalance(_asset);
+
+        realization = accruedInterest;
+        if (realization > reserves) {
+            unrealizedInterest = realization - reserves;
+            realization = reserves;
         }
-        if (reserves < _maxRealization) {
-            _maxRealization = reserves;
-        }
-        return _maxRealization;
     }
 }

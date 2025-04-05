@@ -3,11 +3,8 @@ pragma solidity ^0.8.28;
 
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
 
-import { IInterestDebtToken } from "../../contracts/interfaces/IInterestDebtToken.sol";
-
 import { IMinter } from "../../contracts/interfaces/IMinter.sol";
 import { IOracle } from "../../contracts/interfaces/IOracle.sol";
-import { IRestakerDebtToken } from "../../contracts/interfaces/IRestakerDebtToken.sol";
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
@@ -174,7 +171,7 @@ contract ScenarioBasicTest is TestDeployer {
             usdt.approve(address(cUSD), 4000e6);
             cUSD.mint(address(usdt), 1000e6, 0, mev_bot, block.timestamp + 1 hours);
 
-            lender.realizeInterest(address(usdt), 1);
+            lender.realizeInterest(address(usdt));
 
             cUSD.approve(address(cUSDFeeAuction), 1000e18);
             uint256 startPrice = cUSDFeeAuction.currentPrice();
@@ -187,12 +184,10 @@ contract ScenarioBasicTest is TestDeployer {
         {
             /// The operator repays the debt
             vm.startPrank(user_agent);
-            (uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt) = lender.debt(user_agent, address(usdt));
+            uint256 debt = lender.debt(user_agent, address(usdt));
             console.log("Debt in USDT 6 Decimals");
-            console.log("Principal Debt", principalDebt);
-            console.log("Interest Debt", interestDebt);
-            console.log("Restaker Debt", restakerDebt);
-            uint256 debt = principalDebt + interestDebt + restakerDebt;
+            console.log("Total Debt", debt);
+            console.log("Agent balance of USDT", usdt.balanceOf(user_agent));
             console.log("");
 
             usdt.approve(address(lender), debt);
@@ -201,10 +196,8 @@ contract ScenarioBasicTest is TestDeployer {
             lender.repay(address(usdt), debt, user_agent);
             console.log("");
 
-            (principalDebt, interestDebt, restakerDebt) = lender.debt(user_agent, address(usdt));
-            assertEq(principalDebt, 0);
-            assertEq(interestDebt, 0);
-            assertEq(restakerDebt, 0);
+            debt = lender.debt(user_agent, address(usdt));
+            assertEq(debt, 0);
             vm.stopPrank();
         }
 
@@ -223,13 +216,14 @@ contract ScenarioBasicTest is TestDeployer {
 
             // Cheat a bit and get the price to match the assets in the auction
             vm.startPrank(env.users.fee_auction_admin);
-            cUSDFeeAuction.setStartPrice(usdt_balance_before * 1e12);
+            uint256 minStartPrice = cUSDFeeAuction.minStartPrice();
+            cUSDFeeAuction.setStartPrice(minStartPrice * 10);
             vm.stopPrank();
 
             vm.startPrank(mev_bot);
 
             uint256 startPrice = cUSDFeeAuction.startPrice();
-            assertEq(startPrice, usdt_balance_before * 1e12);
+            assertEq(startPrice, minStartPrice * 10);
             uint256 price = cUSDFeeAuction.currentPrice();
             // console.log("Start price of fee auction", startPrice);
             cUSDFeeAuction.buy(price, assets, new uint256[](assets.length), mev_bot, block.timestamp, "");

@@ -4,9 +4,7 @@ pragma solidity ^0.8.28;
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
 import { Vault } from "../../contracts/vault/Vault.sol";
 
-import { InterestDebtToken } from "../../contracts/lendingPool/tokens/InterestDebtToken.sol";
-import { PrincipalDebtToken } from "../../contracts/lendingPool/tokens/PrincipalDebtToken.sol";
-import { RestakerDebtToken } from "../../contracts/lendingPool/tokens/RestakerDebtToken.sol";
+import { DebtToken } from "../../contracts/lendingPool/tokens/DebtToken.sol";
 
 import { ValidationLogic } from "../../contracts/lendingPool/libraries/ValidationLogic.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
@@ -16,9 +14,7 @@ import { console } from "forge-std/console.sol";
 contract LenderBorrowTest is TestDeployer {
     address user_agent;
 
-    PrincipalDebtToken principalDebtToken;
-    RestakerDebtToken restakerDebtToken;
-    InterestDebtToken interestDebtToken;
+    DebtToken debtToken;
 
     function setUp() public {
         _deployCapTestEnvironment();
@@ -31,9 +27,7 @@ contract LenderBorrowTest is TestDeployer {
         _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e18);
 
         uint256 assetIndex = _getAssetIndex(usdVault, address(usdc));
-        principalDebtToken = PrincipalDebtToken(usdVault.principalDebtTokens[assetIndex]);
-        restakerDebtToken = RestakerDebtToken(usdVault.restakerDebtTokens[assetIndex]);
-        interestDebtToken = InterestDebtToken(usdVault.interestDebtTokens[assetIndex]);
+        debtToken = DebtToken(usdVault.debtTokens[assetIndex]);
     }
 
     function test_lender_borrow_and_repay() public {
@@ -55,7 +49,7 @@ contract LenderBorrowTest is TestDeployer {
         lender.repay(address(usdc), 1000e6, user_agent);
         assertGe(usdc.balanceOf(address(cUSD)), backingBefore);
 
-        assertDebtEq(0, 0, 0);
+        assertDebtEq(0);
     }
 
     function test_lender_borrow_and_repay_with_another_asset() public {
@@ -69,6 +63,7 @@ contract LenderBorrowTest is TestDeployer {
 
         // repay the debt
         usdt.approve(env.infra.lender, 1000e6 + 10e6);
+        vm.expectRevert();
         lender.repay(address(usdt), 1000e6, user_agent);
     }
 
@@ -120,39 +115,16 @@ contract LenderBorrowTest is TestDeployer {
 
         _timeTravel(1 days);
 
-        uint256 interest = interestDebtToken.balanceOf(user_agent);
-        uint256 restakerInterest = restakerDebtToken.balanceOf(user_agent);
-        uint256 principal = principalDebtToken.balanceOf(user_agent);
-
-        uint256 totalInterest = interest + restakerInterest;
-        uint256 totalDebt = principal + totalInterest;
-        assertEq(totalDebt, 300e6 + totalInterest);
+        uint256 debt = debtToken.balanceOf(user_agent);
+        assertGt(debt, 300e6);
 
         uint256 feeAuctionBalBefore = usdc.balanceOf(address(cUSDFeeAuction));
 
-        lender.realizeInterest(address(usdc), 1);
+        lender.realizeInterest(address(usdc));
 
         uint256 feeAuctionBalAfter = usdc.balanceOf(address(cUSDFeeAuction));
 
-        (,,,,,,,, uint256 realizedInterest,) = lender.reservesData(address(usdc));
-        assertEq(realizedInterest, 1);
-
-        lender.realizeInterest(address(usdc), interest - 1);
-
-        feeAuctionBalAfter = usdc.balanceOf(address(cUSDFeeAuction));
-
-        assertEq(feeAuctionBalAfter - feeAuctionBalBefore, interest);
-
-        (,,,,,,,, realizedInterest,) = lender.reservesData(address(usdc));
-        assertEq(realizedInterest, interest);
-
-        interest = interestDebtToken.balanceOf(user_agent);
-        restakerInterest = restakerDebtToken.balanceOf(user_agent);
-        principal = principalDebtToken.balanceOf(user_agent);
-
-        uint256 newTotalInterest = interest + restakerInterest;
-        uint256 newTotalDebt = principal + newTotalInterest;
-        assertEq(newTotalDebt, 300e6 + newTotalInterest);
+        assertEq(feeAuctionBalAfter - feeAuctionBalBefore, debt - 300e6);
     }
 
     function test_realize_restaker_interest() public {
@@ -165,36 +137,26 @@ contract LenderBorrowTest is TestDeployer {
 
         address networkRewards = env.symbiotic.networkRewards[0];
 
-        uint256 restakerInterestBefore = restakerDebtToken.balanceOf(user_agent);
+        uint256 restakerInterestBefore = lender.accruedRestakerInterest(user_agent, address(usdc));
 
-        lender.realizeRestakerInterest(user_agent, address(usdc), 1);
+        lender.realizeRestakerInterest(user_agent, address(usdc));
 
         uint256 rewardsBalance = usdc.balanceOf(networkRewards);
-        assertEq(rewardsBalance, 1);
-
-        lender.realizeRestakerInterest(user_agent, address(usdc), restakerInterestBefore - 1);
-
-        rewardsBalance = usdc.balanceOf(networkRewards);
         assertEq(rewardsBalance, restakerInterestBefore);
 
-        uint256 realizedRestakerInterest = lender.realizedRestakerInterest(address(user_agent), address(usdc));
-        assertEq(realizedRestakerInterest, restakerInterestBefore);
+        uint256 totalDebt = debtToken.balanceOf(user_agent) + restakerInterestBefore;
 
-        (uint principal, uint interest, uint restaker) = lender.debt(address(user_agent), address(usdc));
-        uint256 totalDebt = principal + interest + restaker;
-
-        usdc.mint(user_agent, totalDebt - principal);
+        usdc.mint(user_agent, totalDebt);
         usdc.approve(address(lender), totalDebt);
         lender.repay(address(usdc), totalDebt, user_agent);
 
-        uint256 restakerInterest = restakerDebtToken.balanceOf(user_agent);
-        realizedRestakerInterest = lender.realizedRestakerInterest(address(user_agent), address(usdc));
-        rewardsBalance = usdc.balanceOf(networkRewards);
+        uint256 restakerInterest = lender.accruedRestakerInterest(user_agent, address(usdc));
+        uint256 unrealizedInterest = lender.unrealizedInterest(user_agent, address(usdc));
 
         /// There should be no restaker interest left
         assertEq(restakerInterest, 0);
-        /// There should be no realized restaker interest
-        assertEq(realizedRestakerInterest, 0);
+        /// There should be no unrealized interest left
+        assertEq(unrealizedInterest, 0);
         /// Rewards should not have increased
         assertEq(rewardsBalance, restakerInterestBefore);
     }
@@ -207,33 +169,24 @@ contract LenderBorrowTest is TestDeployer {
 
         _timeTravel(1 days);
 
-        uint256 interest = interestDebtToken.balanceOf(user_agent);
-        uint256 restakerInterest = restakerDebtToken.balanceOf(user_agent);
-        uint256 principal = principalDebtToken.balanceOf(user_agent);
+        uint256 totalDebt = lender.debt(address(user_agent), address(usdc));
+        uint256 debt = debtToken.balanceOf(user_agent);
+        uint256 restakerInterest = lender.accruedRestakerInterest(user_agent, address(usdc));
 
-        console.log("Principal Debt tokens:", principal);
+        console.log("Principal Debt tokens:", debt);
         console.log("Restaker Debt tokens:", restakerInterest);
-        console.log("Interest Debt tokens:", interest);
 
-        uint256 totalInterest = interest + restakerInterest;
-        uint256 totalDebt = principal + totalInterest;
-        assertEq(totalDebt, 300e6 + totalInterest);
+        assertEq(totalDebt, debt + restakerInterest);
 
-        usdc.mint(user_agent, totalInterest);
+        usdc.mint(user_agent, totalDebt);
 
         // repay the debt
         usdc.approve(address(lender), totalDebt);
-        lender.repay(address(usdc), principal, user_agent);
-
-        assertDebtEq(0, interest, restakerInterest);
+        lender.repay(address(usdc), debt, user_agent);
 
         lender.repay(address(usdc), restakerInterest, user_agent);
 
-        assertDebtEq(0, interest, 0);
-
-        lender.repay(address(usdc), interest, user_agent);
-
-        assertDebtEq(0, 0, 0);
+        assertDebtEq(0);
     }
 
     function test_borrow_utilization() public {
@@ -268,15 +221,7 @@ contract LenderBorrowTest is TestDeployer {
         assertEq(cUSD.currentUtilizationIndex(address(usdt)), 0);
     }
 
-    function assertDebtEq(uint256 principalDebt, uint256 interestDebt, uint256 restakerDebt) internal view {
-        (uint256 principalDebtView, uint256 interestDebtView, uint256 restakerDebtView) =
-            lender.debt(user_agent, address(usdc));
-        assertEq(principalDebtView, principalDebt);
-        assertEq(interestDebtView, interestDebt);
-        assertEq(restakerDebtView, restakerDebt);
-
-        assertEq(principalDebtToken.balanceOf(user_agent), principalDebt);
-        assertEq(interestDebtToken.balanceOf(user_agent), interestDebt);
-        assertEq(restakerDebtToken.balanceOf(user_agent), restakerDebt);
+    function assertDebtEq(uint256 totalDebt) internal view {
+        assertEq(debtToken.balanceOf(user_agent) + lender.accruedRestakerInterest(user_agent, address(usdc)), totalDebt);
     }
 }

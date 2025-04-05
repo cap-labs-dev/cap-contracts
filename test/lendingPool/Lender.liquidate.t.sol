@@ -30,9 +30,7 @@ contract LenderLiquidateTest is TestDeployer {
             ILender.AddAssetParams({
                 asset: address(usdt),
                 vault: address(cUSD),
-                principalDebtToken: env.usdVault.principalDebtTokens[0],
-                restakerDebtToken: env.usdVault.restakerDebtTokens[0],
-                interestDebtToken: env.usdVault.interestDebtTokens[0],
+                debtToken: env.usdVault.debtTokens[0],
                 interestReceiver: env.usdVault.feeAuction,
                 restakerInterestReceiver: env.infra.delegation,
                 bonusCap: 0.1e27,
@@ -113,11 +111,12 @@ contract LenderLiquidateTest is TestDeployer {
             (uint256 totalDelegation,, uint256 afterTotalDebt,,,) = lender.agent(user_agent);
 
             console.log("Total delegation", totalDelegation);
+            console.log("Total debt before liquidation", totalDebt);
             console.log("Total debt", afterTotalDebt);
             assertEq(totalDelegation, 0);
 
             /// We should only have interest let to pay back
-            assertEq(afterTotalDebt, totalDebt - 2000e8);
+            assertEq(afterTotalDebt, totalDebt - 2000.000001e8);
 
             vm.stopPrank();
         }

@@ -122,11 +122,7 @@ library ValidationLogic {
     /// @param $ Lender storage
     /// @param _asset Asset to remove
     function validateRemoveAsset(ILender.LenderStorage storage $, address _asset) external view {
-        if (
-            IERC20($.reservesData[_asset].principalDebtToken).totalSupply() != 0
-                || IERC20($.reservesData[_asset].interestDebtToken).totalSupply() != 0
-                || IERC20($.reservesData[_asset].restakerDebtToken).balanceOf(address(this)) != 0
-        ) revert VariableDebtSupplyNotZero();
+        if (IERC20($.reservesData[_asset].debtToken).totalSupply() != 0) revert VariableDebtSupplyNotZero();
     }
 
     /// @notice Validate pausing a reserve

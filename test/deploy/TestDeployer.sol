@@ -165,8 +165,9 @@ contract TestDeployer is
             _initAaveRateOracle(env.libs, env.infra, env.ethVault.assets[i], env.ethOracleMocks.aaveDataProviders[i]);
         }
         for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            uint256 increment = (i + 1) * 0.01e27; // Vary the restakers rate by 1% each
-            _initRestakerRateForAgent(env.infra, env.testUsers.agents[i], uint256(0.05e27 + increment)); // Restakers rate is per second in ray
+            /// 1.585e18 is 5% per year
+            uint256 increment = (i + 1) * 0.01585e18; // Vary the restakers rate by 1% each
+            _initRestakerRateForAgent(env.infra, env.testUsers.agents[i], uint256(1.585e18 + increment)); // Restakers rate is per second in ray
         }
 
         /// LENDER
@@ -325,24 +326,16 @@ contract TestDeployer is
 
         for (uint256 i = 0; i < env.usdVault.assets.length; i++) {
             IERC20Metadata asset = IERC20Metadata(env.usdVault.assets[i]);
-            IERC20Metadata principalDebtToken = IERC20Metadata(env.usdVault.principalDebtTokens[i]);
-            IERC20Metadata restakerDebtToken = IERC20Metadata(env.usdVault.restakerDebtTokens[i]);
-            IERC20Metadata interestDebtToken = IERC20Metadata(env.usdVault.interestDebtTokens[i]);
+            IERC20Metadata debtToken = IERC20Metadata(env.usdVault.debtTokens[i]);
             vm.label(address(asset), asset.symbol());
-            vm.label(address(principalDebtToken), principalDebtToken.symbol());
-            vm.label(address(restakerDebtToken), restakerDebtToken.symbol());
-            vm.label(address(interestDebtToken), interestDebtToken.symbol());
+            vm.label(address(debtToken), debtToken.symbol());
         }
 
         for (uint256 i = 0; i < env.ethVault.assets.length; i++) {
             IERC20Metadata asset = IERC20Metadata(env.ethVault.assets[i]);
-            IERC20Metadata principalDebtToken = IERC20Metadata(env.ethVault.principalDebtTokens[i]);
-            IERC20Metadata restakerDebtToken = IERC20Metadata(env.ethVault.restakerDebtTokens[i]);
-            IERC20Metadata interestDebtToken = IERC20Metadata(env.ethVault.interestDebtTokens[i]);
+            IERC20Metadata debtToken = IERC20Metadata(env.ethVault.debtTokens[i]);
             vm.label(address(asset), asset.symbol());
-            vm.label(address(principalDebtToken), principalDebtToken.symbol());
-            vm.label(address(restakerDebtToken), restakerDebtToken.symbol());
-            vm.label(address(interestDebtToken), interestDebtToken.symbol());
+            vm.label(address(debtToken), debtToken.symbol());
         }
 
         // Label vault contracts

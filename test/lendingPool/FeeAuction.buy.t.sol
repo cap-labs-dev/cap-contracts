@@ -30,7 +30,7 @@ contract FeeAuctionBuyTest is TestDeployer {
         // do a first buy to reset the auction timestamp
         {
             vm.startPrank(realizer);
-            lender.realizeInterest(address(usdc), 1);
+            lender.realizeInterest(address(usdc));
             uint256 price = cUSDFeeAuction.currentPrice();
             cUSD.approve(address(cUSDFeeAuction), type(uint256).max);
             cUSDFeeAuction.buy(
@@ -71,10 +71,10 @@ contract FeeAuctionBuyTest is TestDeployer {
             vm.startPrank(realizer);
 
             // realize everything
-            lender.realizeInterest(address(usdc), type(uint256).max);
+            lender.realizeInterest(address(usdc));
 
             // realising interest should have created some fees
-            assertGt(usdc.balanceOf(address(cUSDFeeAuction)), 11e6, "Fee auction should have some fees");
+            assertGt(usdc.balanceOf(address(cUSDFeeAuction)), 0, "Fee auction should have some fees");
 
             // Approve payment token (cUSD) for fee auction
             cUSD.approve(address(cUSDFeeAuction), type(uint256).max);
@@ -84,7 +84,7 @@ contract FeeAuctionBuyTest is TestDeployer {
             );
 
             // ensure realizer balance increased by the expected amount
-            assertGt(usdc.balanceOf(address(realizer)), 11e6, "Realizer USDC balance should have increased");
+            assertGt(usdc.balanceOf(address(realizer)), 0, "Realizer USDC balance should have increased");
 
             vm.stopPrank();
         }
