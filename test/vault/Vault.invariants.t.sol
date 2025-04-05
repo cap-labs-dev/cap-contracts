@@ -305,7 +305,16 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
     function divestAll(uint256 assetSeed) external {
         address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
         if (currentAsset == address(0)) return;
-        vm.warp(block.timestamp + 1);
+
+        for (uint256 i = 0; i < fractionalReserveVaults.length; i++) {
+            MockERC4626(fractionalReserveVaults[i]).__mockYield();
+        }
+        vm.warp(block.timestamp + 1 minutes);
+
+        for (uint256 i = 0; i < fractionalReserveVaults.length; i++) {
+            MockERC4626(fractionalReserveVaults[i]).__mockYield();
+        }
+
         vault.divestAll(currentAsset);
     }
 
@@ -469,10 +478,18 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
         if (currentAsset == address(0)) return;
 
+        for (uint256 i = 0; i < fractionalReserveVaults.length; i++) {
+            MockERC4626(fractionalReserveVaults[i]).__mockYield();
+        }
+
         address newFractionalReserveVault =
             address(new MockERC4626(currentAsset, 1e18, "Fractional Reserve Vault", "FRV"));
 
         vm.warp(block.timestamp + 1 minutes);
+
+        for (uint256 i = 0; i < fractionalReserveVaults.length; i++) {
+            MockERC4626(fractionalReserveVaults[i]).__mockYield();
+        }
 
         vault.setFractionalReserveVault(currentAsset, newFractionalReserveVault);
     }
