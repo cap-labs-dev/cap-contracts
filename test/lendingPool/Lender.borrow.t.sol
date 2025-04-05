@@ -8,6 +8,7 @@ import { InterestDebtToken } from "../../contracts/lendingPool/tokens/InterestDe
 import { PrincipalDebtToken } from "../../contracts/lendingPool/tokens/PrincipalDebtToken.sol";
 import { RestakerDebtToken } from "../../contracts/lendingPool/tokens/RestakerDebtToken.sol";
 
+import { ValidationLogic } from "../../contracts/lendingPool/libraries/ValidationLogic.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
 import { console } from "forge-std/console.sol";
@@ -39,6 +40,9 @@ contract LenderBorrowTest is TestDeployer {
         vm.startPrank(user_agent);
 
         uint256 backingBefore = usdc.balanceOf(address(cUSD));
+
+        vm.expectRevert(ValidationLogic.MinBorrowAmount.selector);
+        lender.borrow(address(usdc), 99e6, user_agent);
 
         lender.borrow(address(usdc), 1000e6, user_agent);
         assertEq(usdc.balanceOf(user_agent), 1000e6);
@@ -130,7 +134,7 @@ contract LenderBorrowTest is TestDeployer {
 
         uint256 feeAuctionBalAfter = usdc.balanceOf(address(cUSDFeeAuction));
 
-        (,,,,,,,, uint256 realizedInterest) = lender.reservesData(address(usdc));
+        (,,,,,,,, uint256 realizedInterest,) = lender.reservesData(address(usdc));
         assertEq(realizedInterest, 1);
 
         lender.realizeInterest(address(usdc), interest - 1);
@@ -139,7 +143,7 @@ contract LenderBorrowTest is TestDeployer {
 
         assertEq(feeAuctionBalAfter - feeAuctionBalBefore, interest);
 
-        (,,,,,,,, realizedInterest) = lender.reservesData(address(usdc));
+        (,,,,,,,, realizedInterest,) = lender.reservesData(address(usdc));
         assertEq(realizedInterest, interest);
 
         interest = interestDebtToken.balanceOf(user_agent);
