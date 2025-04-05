@@ -35,6 +35,7 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         DelegationStorage storage $ = getDelegationStorage();
         $.oracle = _oracle;
         $.epochDuration = _epochDuration;
+        $.ltvBuffer = 0.05e27; // 5%
     }
 
     /// @notice How much global delegation we have in the system
@@ -58,6 +59,12 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     function epoch() public view returns (uint256 currentEpoch) {
         DelegationStorage storage $ = getDelegationStorage();
         currentEpoch = block.timestamp / $.epochDuration;
+    }
+
+    /// @notice Get the ltv buffer
+    /// @return buffer LTV buffer
+    function ltvBuffer() external view returns (uint256 buffer) {
+        buffer = getDelegationStorage().ltvBuffer;
     }
 
     /// @notice Get the timestamp that is most recent between the last borrow and the epoch -1
@@ -203,12 +210,11 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         external
         checkAccess(this.addAgent.selector)
     {
-        // if liquidation threshold or ltv is greater than 100%, agent
-        // could borrow more than they are collateralized for
-        if (_liquidationThreshold > 1e27) revert InvalidLiquidationThreshold();
-        if (_ltv > 1e27) revert InvalidLtv();
-
         DelegationStorage storage $ = getDelegationStorage();
+
+        // if ltv is greater than 100% then agent could borrow more than they are collateralized for
+        if (_liquidationThreshold > 1e27) revert InvalidLiquidationThreshold();
+        if (_ltv != 0 && _liquidationThreshold < _ltv + $.ltvBuffer) revert LiquidationThresholdTooCloseToLtv();
 
         // If the agent already exists, we revert
         if ($.agentData[_agent].exists) revert DuplicateAgent();
@@ -228,12 +234,11 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         external
         checkAccess(this.modifyAgent.selector)
     {
-        // if liquidation threshold or ltv is greater than 100%, agent
-        // could borrow more than they are collateralized for
-        if (_liquidationThreshold > 1e27) revert InvalidLiquidationThreshold();
-        if (_ltv > 1e27) revert InvalidLtv();
-
         DelegationStorage storage $ = getDelegationStorage();
+
+        // if ltv is greater than 100% then agent could borrow more than they are collateralized for
+        if (_liquidationThreshold > 1e27) revert InvalidLiquidationThreshold();
+        if (_ltv != 0 && _liquidationThreshold < _ltv + $.ltvBuffer) revert LiquidationThresholdTooCloseToLtv();
 
         // Check that the agent exists
         if (!$.agentData[_agent].exists) revert AgentDoesNotExist();
@@ -255,6 +260,14 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         $.networks[_agent].push(_network);
         $.networkExistsForAgent[_agent][_network] = true;
         emit RegisterNetwork(_agent, _network);
+    }
+
+    /// @notice Set the ltv buffer
+    /// @param _ltvBuffer LTV buffer
+    function setLtvBuffer(uint256 _ltvBuffer) external checkAccess(this.setLtvBuffer.selector) {
+        if (_ltvBuffer > 1e27) revert InvalidLtvBuffer();
+        getDelegationStorage().ltvBuffer = _ltvBuffer;
+        emit SetLtvBuffer(_ltvBuffer);
     }
 
     /// @dev Only admin can upgrade
