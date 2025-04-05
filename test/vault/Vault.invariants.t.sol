@@ -105,7 +105,7 @@ contract VaultInvariantsTest is Test, ProxyUtils {
         for (uint256 i = 0; i < 3; i++) {
             address asset = assets[i];
             address frVault = address(new MockERC4626(asset, 1e18, "Fractional Reserve Vault", "FRV"));
-            MockERC4626(frVault).setInterestRate(uint256(0.1e18) / 365 days);
+            MockERC4626(frVault).setInterestRate(uint256(0.1e18));
 
             fractionalReserveVaults[i] = frVault;
             vault.setFractionalReserveVault(asset, frVault);
@@ -306,14 +306,7 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
         if (currentAsset == address(0)) return;
 
-        for (uint256 i = 0; i < fractionalReserveVaults.length; i++) {
-            MockERC4626(fractionalReserveVaults[i]).__mockYield();
-        }
         vm.warp(block.timestamp + 1 minutes);
-
-        for (uint256 i = 0; i < fractionalReserveVaults.length; i++) {
-            MockERC4626(fractionalReserveVaults[i]).__mockYield();
-        }
 
         vault.divestAll(currentAsset);
     }
@@ -478,18 +471,10 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
         if (currentAsset == address(0)) return;
 
-        for (uint256 i = 0; i < fractionalReserveVaults.length; i++) {
-            MockERC4626(fractionalReserveVaults[i]).__mockYield();
-        }
-
         address newFractionalReserveVault =
             address(new MockERC4626(currentAsset, 1e18, "Fractional Reserve Vault", "FRV"));
 
         vm.warp(block.timestamp + 1 minutes);
-
-        for (uint256 i = 0; i < fractionalReserveVaults.length; i++) {
-            MockERC4626(fractionalReserveVaults[i]).__mockYield();
-        }
 
         vault.setFractionalReserveVault(currentAsset, newFractionalReserveVault);
     }
