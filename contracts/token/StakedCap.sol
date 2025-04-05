@@ -56,11 +56,14 @@ contract StakedCap is
 
     /// @notice Notify the yield to start vesting
     function notify() external {
-        uint256 total = IERC20(asset()).balanceOf(address(this));
         StakedCapStorage storage $ = getStakedCapStorage();
+        if ($.lastNotify + $.lockDuration > block.timestamp) revert StillVesting();
+
+        uint256 total = IERC20(asset()).balanceOf(address(this));
         if (total > $.storedTotal) {
             uint256 diff = total - $.storedTotal;
-            $.totalLocked = lockedProfit() + diff;
+
+            $.totalLocked = diff;
             $.storedTotal = total;
             $.lastNotify = block.timestamp;
 
