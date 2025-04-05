@@ -33,6 +33,7 @@ contract FractionalReserve is IFractionalReserve, Access, FractionalReserveStora
     }
 
     /// @notice Divest all of an asset from a fractional reserve vault and send any profit to fee auction
+    /// @dev If the vault has just been invested and no interest has been earned there could be a 1 wei revert since redemption wont equal loaned
     /// @param _asset Asset address
     function divestAll(address _asset) external checkAccess(this.divestAll.selector) {
         FractionalReserveLogic.divest(getFractionalReserveStorage(), _asset);
