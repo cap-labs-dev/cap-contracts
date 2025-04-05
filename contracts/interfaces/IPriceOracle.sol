@@ -37,9 +37,9 @@ interface IPriceOracle {
     /// @param _oracleData Backup oracle data configuration to set for the asset
     function setPriceBackupOracleData(address _asset, IOracle.OracleData calldata _oracleData) external;
 
-    /// @notice Set the staleness period for an asset
+    /// @notice Set the staleness period for asset prices
     /// @param _asset Asset address to set staleness period for
-    /// @param _staleness Staleness period in seconds for the asset
+    /// @param _staleness Staleness period in seconds for asset prices
     function setStaleness(address _asset, uint256 _staleness) external;
 
     /// @dev Set oracle data
@@ -48,7 +48,7 @@ interface IPriceOracle {
     /// @dev Set backup oracle data
     event SetPriceBackupOracleData(address asset, IOracle.OracleData data);
 
-    /// @dev Set staleness period
+    /// @dev Set the staleness period for asset prices
     event SetStaleness(address asset, uint256 staleness);
 
     /// @dev Price error

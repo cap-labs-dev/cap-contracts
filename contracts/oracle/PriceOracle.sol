@@ -52,9 +52,9 @@ contract PriceOracle is IPriceOracle, Access, PriceOracleStorageUtils {
         data = getPriceOracleStorage().backupOracleData[_asset];
     }
 
-    /// @notice View the staleness period for an asset
+    /// @notice View the staleness period for asset prices
     /// @param _asset Asset address
-    /// @return assetStaleness Staleness period for an asset
+    /// @return assetStaleness Staleness period in seconds for asset prices
     function staleness(address _asset) external view returns (uint256 assetStaleness) {
         assetStaleness = getPriceOracleStorage().staleness[_asset];
     }
