@@ -125,6 +125,8 @@ library VaultLogic {
         }
         if (params.amountOut == 0) revert InvalidAmount();
 
+        _verifyBalance($, params.asset, params.amountOut);
+
         $.totalSupplies[params.asset] -= params.amountOut;
 
         IERC20(params.asset).safeTransfer(params.receiver, params.amountOut);
@@ -146,6 +148,7 @@ library VaultLogic {
                 revert Slippage(cachedAssets[i], params.amountsOut[i], params.minAmountsOut[i]);
             }
             if (params.amountsOut[i] == 0) revert InvalidAmount();
+            _verifyBalance($, cachedAssets[i], params.amountsOut[i]);
             _updateIndex($, cachedAssets[i]);
             $.totalSupplies[cachedAssets[i]] -= params.amountsOut[i];
             IERC20(cachedAssets[i]).safeTransfer(params.receiver, params.amountsOut[i]);
@@ -163,10 +166,7 @@ library VaultLogic {
         whenNotPaused($, params.asset)
         updateIndex($, params.asset)
     {
-        uint256 balance = availableBalance($, params.asset);
-        if (balance < params.amount) {
-            revert InsufficientReserves(params.asset, balance, params.amount);
-        }
+        _verifyBalance($, params.asset, params.amount);
 
         $.totalBorrows[params.asset] += params.amount;
         IERC20(params.asset).safeTransfer(params.receiver, params.amount);
@@ -287,6 +287,17 @@ library VaultLogic {
                 isListed = true;
                 break;
             }
+        }
+    }
+
+    /// @notice Verify that an asset has enough balance
+    /// @param $ Vault storage pointer
+    /// @param _asset Asset address
+    /// @param _amount Amount to verify
+    function _verifyBalance(IVault.VaultStorage storage $, address _asset, uint256 _amount) internal view {
+        uint256 balance = availableBalance($, _asset);
+        if (balance < _amount) {
+            revert InsufficientReserves(_asset, balance, _amount);
         }
     }
 
