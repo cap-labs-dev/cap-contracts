@@ -123,6 +123,54 @@ contract VaultInvariantsTest is Test, ProxyUtils {
         vm.warp(block.timestamp + 1_000_000);
     }
 
+    function test_fuzzing_non_regression_loss_from_fractional_reserve_1() public {
+        //[FAIL: custom error 0x95969727: 0000000000000000000000002e234dae75c793f67a35089c9d99245e1c58470b000000000000000000000000d6bbde9174b1cdaa358d2cf4d57d1a9f7178fbff0000000000000000000000000000000000000000000000000000000000000001]
+        //[Sequence]
+        //        sender=0x8d8C714C6790785D0cD4C75935622498F1A76184 addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=pause(uint256) args=[7675797 [7.675e6]]
+        //        sender=0x00000000000000000000000000000000dcD713EE addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=removeAsset(uint256) args=[14837635802857839438797466 [1.483e25]]
+        //        sender=0x00000000000000000000000000000000F6A916fd addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=donateAsset(uint256,uint256) args=[9745, 3022]
+        //        sender=0x0000000000000000000000000000000000001C71 addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=pause(uint256) args=[9929]
+        //        sender=0x0000000000000000000000000000000000000EA1 addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=addAsset(uint256) args=[76715587 [7.671e7]]
+        //        sender=0x3C9425bc7770077e68f6a1477D31a938683C316C addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=investAll(uint256) args=[15078001 [1.507e7]]
+        //        sender=0x000000000000000000000000000000000000249E addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=setVaultReserve(uint256,uint256) args=[115792089237316195423570985008687907853269984665640564039457584007913129639934 [1.157e77], 11]
+        //        sender=0x0000000000000000000000000000000352e302E2 addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=divestAll(uint256) args=[725553526815472735717947576826637183330969562685975748313 [7.255e56]]
+        //        sender=0x0000000000000000000000000000000000000435 addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=investAll(uint256) args=[13690861936455249355276266665598585 [1.369e34]]
+        //        sender=0x00000000000000000000000000000000000005d9 addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=setFractionalReserveVault(uint256) args=[44123055 [4.412e7]]
+        // invariant_mintingIncreaseBalance() (runs: 749, calls: 149800, reverts: 1)
+
+        handler.pause(7675797);
+        handler.removeAsset(14837635802857839438797466);
+        handler.donateAsset(9745, 3022);
+        handler.pause(9929);
+        handler.addAsset(76715587);
+        handler.investAll(15078001);
+        handler.setVaultReserve(115792089237316195423570985008687907853269984665640564039457584007913129639934, 11);
+        handler.divestAll(725553526815472735717947576826637183330969562685975748313);
+        handler.investAll(13690861936455249355276266665598585);
+        handler.setFractionalReserveVault(44123055);
+    }
+
+    function test_fuzzing_non_regression_loss_from_fractional_reserve_2() public {
+        //[FAIL: custom error 0x95969727: 0000000000000000000000002e234dae75c793f67a35089c9d99245e1c58470b00000000000000000000000082dce515b19ca6c2b03060d7da1a9670fc6ee0740000000000000000000000000000000000000000000000000000000000000001]
+        //[Sequence]
+        //        sender=0xc7CdCe7CC669d77218fC42e5CC422ea19412eA2D addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=donateAsset(uint256,uint256) args=[3157, 2799]
+        //        sender=0x000000000000000000000000000000000000137B addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=pause(uint256) args=[3]
+        //        sender=0x0000000000000000000000000000000000000763 addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=investAll(uint256) args=[4154]
+        //        sender=0x0000000000000000000000000000000000000FbB addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=pause(uint256) args=[197286539840145 [1.972e14]]
+        //        sender=0x000000000000000000000000000000000000045A addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=divestAll(uint256) args=[210304242682445377544489621833662242505594976 [2.103e44]]
+        //        sender=0x000000000000000000000000000000000000059a addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=investAll(uint256) args=[30284156 [3.028e7]]
+        //        sender=0x0000000000000000000000000000000000000C79 addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=setFractionalReserveVault(uint256) args=[124512733235148509670984850249661524172173354937 [1.245e47]]
+        // invariant_totalAssetsExceedBorrowed() (runs: 1180, calls: 236000, reverts: 1)
+
+        handler.donateAsset(3157, 2799);
+        handler.pause(3);
+        handler.investAll(4154);
+        handler.pause(197286539840145);
+        handler.divestAll(210304242682445377544489621833662242505594976);
+        handler.investAll(30284156);
+        handler.setFractionalReserveVault(124512733235148509670984850249661524172173354937);
+    }
+
     /// @dev Test that total assets >= total borrowed
     function invariant_totalAssetsExceedBorrowed() public view {
         for (uint256 i = 0; i < assets.length; i++) {
