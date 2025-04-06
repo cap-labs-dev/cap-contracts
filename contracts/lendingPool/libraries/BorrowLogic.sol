@@ -67,8 +67,8 @@ library BorrowLogic {
 
     /// @notice Repay an asset, burning the debt token and/or paying down interest
     /// @dev Only the amount owed or specified will be taken from the repayer, whichever is lower.
-    /// Interest debt is paid first as the amount accrued is based on current principal debt, restaker
-    /// debt is paid last as the future rate is calculated based on the resulting principal debt.
+    /// Interest is expected to have been realized so is included in the reserve debt. Once reserve
+    /// debt is paid down the remaining amount is sent to the fee auction.
     /// @param $ Lender storage
     /// @param params Parameters to repay a debt
     /// @return repaid Actual amount repaid
@@ -146,6 +146,8 @@ library BorrowLogic {
     }
 
     /// @notice Realize the restaker interest before it is repaid by borrowing from the vault
+    /// @dev If more interest is owed than available in the vault then some portion is unrealized
+    /// and added to the agent's debt to be paid during repayments.
     /// @param $ Lender storage
     /// @param _agent Address of the restaker
     /// @param _asset Asset to realize restaker interest for
