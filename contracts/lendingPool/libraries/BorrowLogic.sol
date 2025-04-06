@@ -135,7 +135,7 @@ library BorrowLogic {
     /// @param _asset Asset to realize interest for
     /// @return realizedInterest Actual realized interest
     function realizeInterest(ILender.LenderStorage storage $, address _asset)
-        public
+        external
         returns (uint256 realizedInterest)
     {
         ILender.ReserveData storage reserve = $.reservesData[_asset];

@@ -4,7 +4,6 @@ pragma solidity ^0.8.28;
 import { IVault } from "../../interfaces/IVault.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { console } from "forge-std/console.sol";
 
 /// @title Vault for storing the backing for cTokens
 /// @author kexley, @capLabs
@@ -198,7 +197,6 @@ library VaultLogic {
         external
         updateIndex($, params.asset)
     {
-        console.log("Repaying", params.amount, $.totalBorrows[params.asset]);
         $.totalBorrows[params.asset] -= params.amount;
         IERC20(params.asset).safeTransferFrom(msg.sender, address(this), params.amount);
 
