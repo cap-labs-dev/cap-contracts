@@ -7,7 +7,6 @@ import { ILender } from "../../interfaces/ILender.sol";
 import { IOracle } from "../../interfaces/IOracle.sol";
 import { IVault } from "../../interfaces/IVault.sol";
 
-import { BorrowLogic } from "./BorrowLogic.sol";
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
