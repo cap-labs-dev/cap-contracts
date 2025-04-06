@@ -25,9 +25,10 @@ contract ZapOFTComposer is SafeOFTLzComposer {
     address public immutable zapTokenManager;
 
     /// @notice Constructs the contract.
-    /// @dev Initializes the contract.
+    /// @param _endpoint The address of the LayerZero endpoint.
     /// @param _oApp The address of the OApp that is sending the composed message.
     /// @param _zapRouter The address of the ZapRouter to use for Zap capabilities.
+    /// @param _zapTokenManager The address of the ZapTokenManager to use for token permissions.
     constructor(address _endpoint, address _oApp, address _zapRouter, address _zapTokenManager)
         SafeOFTLzComposer(_oApp, _endpoint)
     {
