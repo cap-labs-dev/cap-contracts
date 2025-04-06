@@ -2,13 +2,14 @@
 pragma solidity ^0.8.28;
 
 import { IRestakerRewardReceiver } from "./IRestakerRewardReceiver.sol";
+import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 interface IDelegation is IRestakerRewardReceiver {
     /// @custom:storage-location erc7201:cap.storage.Delegation
     struct DelegationStorage {
-        address[] agents;
+        EnumerableSet.AddressSet agents;
         mapping(address => AgentData) agentData;
-        mapping(address => bool) networkExists;
+        EnumerableSet.AddressSet networks;
         address oracle;
         uint256 epochDuration;
         uint256 ltvBuffer;
@@ -19,7 +20,6 @@ interface IDelegation is IRestakerRewardReceiver {
         uint256 ltv;
         uint256 liquidationThreshold;
         uint256 lastBorrow;
-        bool exists;
     }
 
     /// @notice Slash a network

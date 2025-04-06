@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+
 /// @title Vault interface for storing the backing for cTokens
 /// @author kexley, @capLabs
 /// @notice Interface for the Vault contract which handles supplies, borrows and utilization tracking
 interface IVault {
     /// @custom:storage-location erc7201:cap.storage.Vault
     struct VaultStorage {
-        address[] assets;
+        EnumerableSet.AddressSet assets;
         mapping(address => uint256) totalSupplies;
         mapping(address => uint256) totalBorrows;
         mapping(address => uint256) utilizationIndex;

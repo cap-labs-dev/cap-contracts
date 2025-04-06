@@ -11,12 +11,14 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title Cap Delegation Contract
 /// @author Cap Labs
 /// @notice This contract manages delegation and slashing.
 contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUtils {
     using SafeERC20 for IERC20;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -92,7 +94,7 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     /// @notice Fetch active agent addresses
     /// @return agentAddresses Agent addresses
     function agents() external view returns (address[] memory agentAddresses) {
-        agentAddresses = getDelegationStorage().agents;
+        agentAddresses = getDelegationStorage().agents.values();
     }
 
     /// @notice The LTV of a specific agent
@@ -170,14 +172,13 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         if (_ltv != 0 && _liquidationThreshold < _ltv + $.ltvBuffer) revert LiquidationThresholdTooCloseToLtv();
 
         // If the agent already exists, we revert
-        if ($.agentData[_agent].exists) revert DuplicateAgent();
-        if (!$.networkExists[_network]) revert NetworkDoesntExist();
+        if ($.agents.contains(_agent)) revert DuplicateAgent();
+        if (!$.networks.contains(_network)) revert NetworkDoesntExist();
 
-        $.agents.push(_agent);
+        $.agents.add(_agent);
         $.agentData[_agent].network = _network;
         $.agentData[_agent].ltv = _ltv;
         $.agentData[_agent].liquidationThreshold = _liquidationThreshold;
-        $.agentData[_agent].exists = true;
         emit AddAgent(_agent, _network, _ltv, _liquidationThreshold);
     }
 
@@ -196,7 +197,7 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         if (_ltv != 0 && _liquidationThreshold < _ltv + $.ltvBuffer) revert LiquidationThresholdTooCloseToLtv();
 
         // Check that the agent exists
-        if (!$.agentData[_agent].exists) revert AgentDoesNotExist();
+        if (!$.agents.contains(_agent)) revert AgentDoesNotExist();
 
         $.agentData[_agent].ltv = _ltv;
         $.agentData[_agent].liquidationThreshold = _liquidationThreshold;
@@ -209,9 +210,9 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         DelegationStorage storage $ = getDelegationStorage();
 
         // Check for duplicates
-        if ($.networkExists[_network]) revert DuplicateNetwork();
+        if ($.networks.contains(_network)) revert DuplicateNetwork();
 
-        $.networkExists[_network] = true;
+        $.networks.add(_network);
         emit RegisterNetwork(_network);
     }
 
@@ -219,7 +220,7 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     /// @param _network Network address
     /// @return _exists Whether the network is registered
     function networkExists(address _network) external view returns (bool) {
-        return getDelegationStorage().networkExists[_network];
+        return getDelegationStorage().networks.contains(_network);
     }
 
     /// @notice Set the ltv buffer

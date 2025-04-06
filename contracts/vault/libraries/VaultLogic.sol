@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import { IVault } from "../../interfaces/IVault.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title Vault for storing the backing for cTokens
 /// @author kexley, @capLabs
@@ -12,6 +13,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 /// charged on the external contracts, only the principle amount is counted on this contract.
 library VaultLogic {
     using SafeERC20 for IERC20;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @dev Timestamp is past the deadline
     error PastDeadline();
@@ -157,17 +159,18 @@ library VaultLogic {
         if (params.amountsOut.length != params.minAmountsOut.length) revert InvalidMinAmountsOut();
         if (params.deadline < block.timestamp) revert PastDeadline();
 
-        address[] memory cachedAssets = $.assets;
-        for (uint256 i; i < cachedAssets.length; ++i) {
+        uint256 length = $.assets.length();
+        for (uint256 i; i < length; ++i) {
+            address asset = $.assets.at(i);
             if (params.amountsOut[i] < params.minAmountsOut[i]) {
-                revert Slippage(cachedAssets[i], params.amountsOut[i], params.minAmountsOut[i]);
+                revert Slippage(asset, params.amountsOut[i], params.minAmountsOut[i]);
             }
             if (params.amountsOut[i] == 0) revert InvalidAmount();
-            _verifyBalance($, cachedAssets[i], params.amountsOut[i]);
-            _updateIndex($, cachedAssets[i]);
-            $.totalSupplies[cachedAssets[i]] -= params.amountsOut[i] + params.fees[i];
-            IERC20(cachedAssets[i]).safeTransfer(params.receiver, params.amountsOut[i]);
-            IERC20(cachedAssets[i]).safeTransfer($.insuranceFund, params.fees[i]);
+            _verifyBalance($, asset, params.amountsOut[i]);
+            _updateIndex($, asset);
+            $.totalSupplies[asset] -= params.amountsOut[i] + params.fees[i];
+            IERC20(asset).safeTransfer(params.receiver, params.amountsOut[i]);
+            IERC20(asset).safeTransfer($.insuranceFund, params.fees[i]);
         }
 
         emit Redeem(msg.sender, params.receiver, params.amountIn, params.amountsOut, params.fees);
@@ -207,9 +210,7 @@ library VaultLogic {
     /// @param $ Vault storage pointer
     /// @param _asset Asset address
     function addAsset(IVault.VaultStorage storage $, address _asset) external {
-        if (_listed($, _asset)) revert AssetAlreadySupported(_asset);
-
-        $.assets.push(_asset);
+        if (!$.assets.add(_asset)) revert AssetNotSupported(_asset);
         emit AddAsset(_asset);
     }
 
@@ -218,20 +219,7 @@ library VaultLogic {
     /// @param _asset Asset address
     function removeAsset(IVault.VaultStorage storage $, address _asset) external {
         if ($.totalSupplies[_asset] > 0) revert AssetHasSupplies(_asset);
-        address[] memory cachedAssets = $.assets;
-        uint256 length = cachedAssets.length;
-        bool removed;
-        for (uint256 i; i < length; ++i) {
-            if (_asset == cachedAssets[i]) {
-                $.assets[i] = cachedAssets[length - 1];
-                $.assets.pop();
-                removed = true;
-                break;
-            }
-        }
-
-        if (!removed) revert AssetNotSupported(_asset);
-
+        if (!$.assets.remove(_asset)) revert AssetNotSupported(_asset);
         emit RemoveAsset(_asset);
     }
 
@@ -296,14 +284,7 @@ library VaultLogic {
     /// @param _asset Asset to check
     /// @return isListed Asset is listed or not
     function _listed(IVault.VaultStorage storage $, address _asset) internal view returns (bool isListed) {
-        address[] memory cachedAssets = $.assets;
-        uint256 length = cachedAssets.length;
-        for (uint256 i; i < length; ++i) {
-            if (_asset == cachedAssets[i]) {
-                isListed = true;
-                break;
-            }
-        }
+        isListed = $.assets.contains(_asset);
     }
 
     /// @notice Verify that an asset has enough balance

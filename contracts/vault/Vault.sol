@@ -10,6 +10,7 @@ import { Minter } from "./Minter.sol";
 import { VaultLogic } from "./libraries/VaultLogic.sol";
 import { ERC20PermitUpgradeable } from
     "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
+import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title Vault for storing the backing for cTokens
 /// @author kexley, @capLabs
@@ -17,6 +18,8 @@ import { ERC20PermitUpgradeable } from
 /// @dev Supplies, borrows and utilization rates are tracked. Interest rates should be computed and
 /// charged on the external contracts, only the principle amount is counted on this contract.
 abstract contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, FractionalReserve, VaultStorageUtils {
+    using EnumerableSet for EnumerableSet.AddressSet;
+
     /// @dev Initialize the assets
     /// @param _name Name of the cap token
     /// @param _symbol Symbol of the cap token
@@ -46,8 +49,12 @@ abstract contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, Fract
     /// @param _assets Asset addresses
     /// @param _insuranceFund Insurance fund
     function __Vault_init_unchained(address[] calldata _assets, address _insuranceFund) internal onlyInitializing {
-        getVaultStorage().assets = _assets;
-        getVaultStorage().insuranceFund = _insuranceFund;
+        VaultStorage storage $ = getVaultStorage();
+        uint256 length = _assets.length;
+        for (uint256 i; i < length; ++i) {
+            $.assets.add(_assets[i]);
+        }
+        $.insuranceFund = _insuranceFund;
     }
 
     /// @notice Mint the cap token using an asset
@@ -187,7 +194,7 @@ abstract contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, Fract
     /// @notice Get the list of assets supported by the vault
     /// @return assetList List of assets
     function assets() public view returns (address[] memory assetList) {
-        assetList = getVaultStorage().assets;
+        assetList = getVaultStorage().assets.values();
     }
 
     /// @notice Get the total supplies of an asset
