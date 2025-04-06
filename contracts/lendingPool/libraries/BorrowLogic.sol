@@ -12,6 +12,7 @@ import { IVault } from "../../interfaces/IVault.sol";
 import { ValidationLogic } from "./ValidationLogic.sol";
 import { ViewLogic } from "./ViewLogic.sol";
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
+import { console } from "forge-std/console.sol";
 
 /// @title BorrowLogic
 /// @author kexley, @capLabs
@@ -77,14 +78,24 @@ library BorrowLogic {
         returns (uint256 repaid)
     {
         /// Realize restaker interest before repaying
-        realizeRestakerInterest($, params.agent, params.asset);
-
         ILender.ReserveData storage reserve = $.reservesData[params.asset];
+        uint256 unrealizedInterestBefore = reserve.unrealizedInterest[params.agent];
+        console.log("unrealizedInterestBefore", unrealizedInterestBefore);
+        uint256 debtBefore = $.reservesData[params.asset].debt;
+        console.log("debtBefore", debtBefore);
+        realizeRestakerInterest($, params.agent, params.asset);
+        uint256 debtAfter = $.reservesData[params.asset].debt;
+        console.log("debtAfter", debtAfter - debtBefore);
+        uint256 unrealizedInterestAfter = reserve.unrealizedInterest[params.agent];
+        console.log("unrealizedInterestAfter", unrealizedInterestAfter - unrealizedInterestBefore);
         uint256 debtRepaid;
         uint256 interestRepaid;
 
         /// Can only repay up to the amount owed
         repaid = Math.min(params.amount, IERC20(reserve.debtToken).balanceOf(params.agent));
+
+        console.log("Repaid", repaid);
+        console.log("reserve.debt", reserve.debt);
 
         IDebtToken(reserve.debtToken).burn(params.agent, repaid);
         IERC20(params.asset).safeTransferFrom(params.caller, address(this), repaid);
@@ -102,9 +113,20 @@ library BorrowLogic {
             debtRepaid = repaid;
         }
 
+        console.log("Debt Repaid", debtRepaid);
+        console.log("Interest Repaid", interestRepaid);
+
         /// Pay down unrealized restaker interest before paying vault
         uint256 restakerRepaid = Math.min(debtRepaid, reserve.unrealizedInterest[params.agent]);
         uint256 vaultRepaid = debtRepaid - restakerRepaid;
+
+        console.log("Restaker Repaid", restakerRepaid);
+        console.log("Vault Repaid", vaultRepaid);
+
+        uint256 totalBorrows = IVault(reserve.vault).totalBorrows(params.asset);
+        uint256 availableBalance = IVault(reserve.vault).availableBalance(params.asset);
+        console.log("Total Borrows", totalBorrows);
+        console.log("Available Balance", availableBalance);
 
         if (debtRepaid > 0) {
             reserve.debt -= debtRepaid;
@@ -133,7 +155,7 @@ library BorrowLogic {
     /// @param _asset Asset to realize interest for
     /// @return realizedInterest Actual realized interest
     function realizeInterest(ILender.LenderStorage storage $, address _asset)
-        external
+        public
         returns (uint256 realizedInterest)
     {
         ILender.ReserveData storage reserve = $.reservesData[_asset];
@@ -159,6 +181,9 @@ library BorrowLogic {
         ILender.ReserveData storage reserve = $.reservesData[_asset];
         uint256 unrealizedInterest;
         (realizedInterest, unrealizedInterest) = maxRestakerRealization($, _agent, _asset);
+        console.log("unrealizedInterestBefore0", reserve.unrealizedInterest[_agent]);
+        console.log("realizedInterest", realizedInterest);
+        console.log("unrealizedInterest", unrealizedInterest);
         reserve.lastRealizationTime[_agent] = block.timestamp;
 
         if (realizedInterest == 0 && unrealizedInterest == 0) return 0;
