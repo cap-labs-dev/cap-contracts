@@ -12,9 +12,13 @@ contract MockNetworkMiddleware is INetworkMiddleware {
     mapping(address => mapping(address => uint256)) public mockCollateralByVault;
     mapping(address => mapping(address => uint256)) public mockSlashableCollateralByVault;
 
-    function registerVault(address _vault, address _stakerRewarder, address _agent) external {
-        _storage.stakerRewarders[_vault] = _stakerRewarder;
-        _storage.vaults[_agent] = _vault;
+    function registerAgent(address _agent, address _vault) external {
+        _storage.agentsToVault[_agent] = _vault;
+        emit AgentRegistered(_agent);
+    }
+
+    function registerVault(address _vault, address _stakerRewarder) external {
+        _storage.vaults[_vault] = Vault({ stakerRewarder: _stakerRewarder, exists: true });
         emit VaultRegistered(_vault);
     }
 
@@ -26,7 +30,7 @@ contract MockNetworkMiddleware is INetworkMiddleware {
         mockSlashableCollateral[_agent] -= mockSlashableCollateral[_agent] * _slashShare / 1e18;
         mockCoverage[_agent] -= mockCoverage[_agent] * _slashShare / 1e18;
 
-        address _vault = _storage.vaults[_agent];
+        address _vault = _storage.agentsToVault[_agent];
         mockCollateralByVault[_agent][_vault] -= mockCollateralByVault[_agent][_vault] * _slashShare / 1e18;
         mockSlashableCollateralByVault[_agent][_vault] -=
             mockSlashableCollateralByVault[_agent][_vault] * _slashShare / 1e18;
@@ -58,7 +62,7 @@ contract MockNetworkMiddleware is INetworkMiddleware {
     }
 
     function vaults(address _agent) external view returns (address vault) {
-        return _storage.vaults[_agent];
+        return _storage.agentsToVault[_agent];
     }
 
     function distributeRewards(address _agent, address _token) external {

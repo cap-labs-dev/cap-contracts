@@ -55,18 +55,29 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
         $.feeAllowed = _feeAllowed;
     }
 
+    /// @notice Register agent to be used as collateral within the CAP system
+    /// @param _vault Vault address
+    /// @param _agent Agent address
+    function registerAgent(address _vault, address _agent) external checkAccess(this.registerAgent.selector) {
+        _verifyVault(_vault);
+        NetworkMiddlewareStorage storage $ = getNetworkMiddlewareStorage();
+        if (_agent == address(0)) revert InvalidAgent();
+        if ($.agentsToVault[_agent] != address(0)) revert ExistingCoverage();
+        if (!$.vaults[_vault].exists) revert VaultDoesNotExist();
+        $.agentsToVault[_agent] = _vault;
+        emit AgentRegistered(_agent);
+    }
+
     /// @notice Register vault to be used as collateral within the CAP system
     /// @param _vault Vault address
     /// @param _stakerRewarder Staker rewarder address
-    /// @param _agent Agent address
-    function registerVault(address _vault, address _stakerRewarder, address _agent)
-        external
-        checkAccess(this.registerVault.selector)
-    {
+    function registerVault(address _vault, address _stakerRewarder) external checkAccess(this.registerVault.selector) {
         _verifyVault(_vault);
         NetworkMiddlewareStorage storage $ = getNetworkMiddlewareStorage();
-        $.stakerRewarders[_vault] = _stakerRewarder;
-        $.vaults[_agent] = _vault;
+        Vault storage vault = $.vaults[_vault];
+        if (vault.exists) revert VaultExists();
+        vault.stakerRewarder = _stakerRewarder;
+        vault.exists = true;
         emit VaultRegistered(_vault);
     }
 
@@ -87,7 +98,7 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
     {
         NetworkMiddlewareStorage storage $ = getNetworkMiddlewareStorage();
 
-        IVault vault = IVault($.vaults[_agent]);
+        IVault vault = IVault($.agentsToVault[_agent]);
 
         (, uint256 totalSlashableCollateral) =
             slashableCollateralByVault($.network, _agent, address(vault), $.oracle, _timestamp);
@@ -190,7 +201,8 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
     /// @return delegation Delegation amount in USD (8 decimals)
     function coverage(address _agent) public view returns (uint256 delegation) {
         NetworkMiddlewareStorage storage $ = getNetworkMiddlewareStorage();
-        address _vault = $.vaults[_agent];
+        address _vault = $.agentsToVault[_agent];
+        if (_vault == address(0)) revert InvalidAgent();
         address _network = $.network;
         address _oracle = $.oracle;
         uint48 _timestamp = uint48(block.timestamp);
@@ -203,12 +215,12 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
     /// @param _timestamp Timestamp to check slashable collateral at
     /// @return _slashableCollateral Slashable collateral amount in USD (8 decimals)
     function slashableCollateral(address _agent, uint48 _timestamp)
-        external
+        public
         view
         returns (uint256 _slashableCollateral)
     {
         NetworkMiddlewareStorage storage $ = getNetworkMiddlewareStorage();
-        address _vault = $.vaults[_agent];
+        address _vault = $.agentsToVault[_agent];
         address _network = $.network;
         address _oracle = $.oracle;
 
@@ -235,7 +247,7 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
     /// @param _agent Agent address
     /// @return vaultAddress Vault address
     function vaults(address _agent) external view returns (address vaultAddress) {
-        vaultAddress = getNetworkMiddlewareStorage().vaults[_agent];
+        vaultAddress = getNetworkMiddlewareStorage().agentsToVault[_agent];
     }
 
     /// @dev Verify a vault has the required specifications
@@ -274,8 +286,8 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
         NetworkMiddlewareStorage storage $ = getNetworkMiddlewareStorage();
         uint256 _amount = IERC20(_token).balanceOf(address(this));
 
-        address _vault = $.vaults[_agent];
-        address stakerRewarder = $.stakerRewarders[_vault];
+        address _vault = $.agentsToVault[_agent];
+        address stakerRewarder = $.vaults[_vault].stakerRewarder;
         if (stakerRewarder == address(0)) revert NoStakerRewarder();
 
         IERC20(_token).forceApprove(address(IStakerRewards(stakerRewarder)), _amount);

@@ -83,6 +83,7 @@ contract DeployCapNetworkAdapter is ProxyUtils {
         AccessControl accessControl = AccessControl(infra.accessControl);
 
         accessControl.grantAccess(middleware.registerVault.selector, address(middleware), users.middleware_admin);
+        accessControl.grantAccess(middleware.registerAgent.selector, address(middleware), users.middleware_admin);
         accessControl.grantAccess(middleware.slash.selector, address(middleware), infra.delegation);
         accessControl.grantAccess(middleware.distributeRewards.selector, address(middleware), infra.delegation);
 
@@ -110,10 +111,9 @@ contract DeployCapNetworkAdapter is ProxyUtils {
     function _registerVaultsInNetworkMiddleware(
         SymbioticNetworkAdapterConfig memory adapter,
         SymbioticVaultConfig memory vault,
-        SymbioticNetworkRewardsConfig memory rewards,
         address agent
     ) internal {
-        NetworkMiddleware(adapter.networkMiddleware).registerVault(vault.vault, rewards.stakerRewarder, agent);
+        NetworkMiddleware(adapter.networkMiddleware).registerAgent(vault.vault, agent);
     }
 
     function _agentRegisterAsOperator(SymbioticAddressbook memory addressbook) internal {
