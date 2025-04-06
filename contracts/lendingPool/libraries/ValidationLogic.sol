@@ -106,7 +106,6 @@ library ValidationLogic {
         }
     }
 
-    /// TODO Check that the asset is borrowable from the vault
     /// @notice Validate adding an asset as a reserve
     /// @param $ Lender storage
     /// @param params Parameters for adding an asset
