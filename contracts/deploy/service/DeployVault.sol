@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 import { AccessControl } from "../../access/AccessControl.sol";
 
 import { Delegation } from "../../delegation/Delegation.sol";
-import { NetworkMiddleware } from "../../delegation/providers/symbiotic/NetworkMiddleware.sol";
 
 import { FeeAuction } from "../../feeAuction/FeeAuction.sol";
 

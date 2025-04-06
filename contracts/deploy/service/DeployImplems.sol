@@ -10,10 +10,7 @@ import { Lender } from "../../lendingPool/Lender.sol";
 import { DebtToken } from "../../lendingPool/tokens/DebtToken.sol";
 
 import { Oracle } from "../../oracle/Oracle.sol";
-import { PreMainnetVault } from "../../testnetCampaign/PreMainnetVault.sol";
 import { CapToken } from "../../token/CapToken.sol";
-import { L2Token } from "../../token/L2Token.sol";
-import { OFTLockbox } from "../../token/OFTLockbox.sol";
 import { StakedCap } from "../../token/StakedCap.sol";
 import { ImplementationsConfig } from "../interfaces/DeployConfigs.sol";
 

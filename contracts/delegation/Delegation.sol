@@ -6,8 +6,6 @@ import { Access } from "../access/Access.sol";
 import { IDelegation } from "../interfaces/IDelegation.sol";
 import { INetworkMiddleware } from "../interfaces/INetworkMiddleware.sol";
 
-import { IRestakerRewardReceiver } from "../interfaces/IRestakerRewardReceiver.sol";
-
 import { DelegationStorageUtils } from "../storage/DelegationStorageUtils.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";

@@ -14,13 +14,11 @@ import {
     SymbioticVaultConfig
 } from "../../../interfaces/SymbioticsDeployConfigs.sol";
 import { ProxyUtils } from "../../../utils/ProxyUtils.sol";
-import { SymbioticAddressbook, SymbioticUtils } from "../../../utils/SymbioticUtils.sol";
+import { SymbioticAddressbook } from "../../../utils/SymbioticUtils.sol";
 
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 
-import { INetworkRegistry } from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
 import { IOperatorRegistry } from "@symbioticfi/core/src/interfaces/IOperatorRegistry.sol";
-import { INetworkMiddlewareService } from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
 import { IDefaultStakerRewards } from
     "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewards.sol";
 import { IDefaultStakerRewardsFactory } from

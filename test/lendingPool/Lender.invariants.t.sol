@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { ProxyUtils } from "../../contracts/deploy/utils/ProxyUtils.sol";
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
 
 import { TestDeployer } from "../deploy/TestDeployer.sol";
@@ -10,17 +9,13 @@ import { InitTestVaultLiquidity } from "../deploy/service/InitTestVaultLiquidity
 
 import { MockNetworkMiddleware } from "../mocks/MockNetworkMiddleware.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import { RandomActorUtils } from "../deploy/utils/RandomActorUtils.sol";
 import { RandomAssetUtils } from "../deploy/utils/RandomAssetUtils.sol";
 import { TimeUtils } from "../deploy/utils/TimeUtils.sol";
 
 import { MockERC20 } from "../mocks/MockERC20.sol";
-import { MockOracle } from "../mocks/MockOracle.sol";
 
-import { StdCheats } from "forge-std/StdCheats.sol";
 import { StdUtils } from "forge-std/StdUtils.sol";
 import { Test } from "forge-std/Test.sol";
 import { Vm } from "forge-std/Vm.sol";

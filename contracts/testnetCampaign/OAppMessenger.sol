@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { OAppCore, OAppSender } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppSender.sol";
 import { OptionsBuilder } from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
-import { MessagingFee, OFTReceipt } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
+import { MessagingFee } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import { OFTMsgCodec } from "@layerzerolabs/oft-evm/contracts/libs/OFTMsgCodec.sol";
 
 /// @title OAppMessenger

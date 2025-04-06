@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import { IDelegation } from "../../interfaces/IDelegation.sol";
-import { IOracle } from "../../interfaces/IOracle.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import { ILender } from "../../interfaces/ILender.sol";

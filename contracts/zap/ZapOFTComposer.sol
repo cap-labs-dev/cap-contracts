@@ -5,8 +5,6 @@ import { IZapRouter } from "../interfaces/IZapRouter.sol";
 
 import { IZapOFTComposer } from "../interfaces/IZapOFTComposer.sol";
 import { SafeOFTLzComposer } from "./SafeOFTLzComposer.sol";
-import { IOAppCore } from "@layerzerolabs/oapp-evm/contracts/oapp/interfaces/IOAppCore.sol";
-import { IOFT } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import { OFTComposeMsgCodec } from "@layerzerolabs/oft-evm/contracts/libs/OFTComposeMsgCodec.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";

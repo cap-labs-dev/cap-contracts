@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { IOracle } from "./IOracle.sol";
-
 interface IVaultAdapter {
     /// @custom:storage-location erc7201:cap.storage.VaultAdapter
     struct VaultAdapterStorage {

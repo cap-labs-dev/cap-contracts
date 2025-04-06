@@ -11,8 +11,6 @@ import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/Saf
 
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 
-import { IMiddleware } from "../../../interfaces/IMiddleware.sol";
-
 import { INetworkMiddleware } from "../../../interfaces/INetworkMiddleware.sol";
 import { NetworkMiddlewareStorageUtils } from "../../../storage/NetworkMiddlewareStorageUtils.sol";
 import { Subnetwork } from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
