@@ -109,6 +109,8 @@ contract VaultInvariantsTest is Test, ProxyUtils {
 
             fractionalReserveVaults[i] = frVault;
             vault.setFractionalReserveVault(asset, frVault);
+
+            MockERC4626(frVault).__mockYield();
         }
 
         // Create and target handler
@@ -203,7 +205,7 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         fractionalReserveVaults = _fractionalReserveVaults;
 
         for (uint256 i = 0; i < _fractionalReserveVaults.length; i++) {
-            MockERC4626(_fractionalReserveVaults[i]).setInterestRate(uint256(0.1e18) / 365 days);
+            MockERC4626(_fractionalReserveVaults[i]).setInterestRate(uint256(0.1e18));
             MockERC4626(_fractionalReserveVaults[i]).__mockYield();
         }
     }
