@@ -162,7 +162,6 @@ contract LenderInvariantsTest is TestDeployer {
     }
 
     function test_fuzzing_non_regression_liquidate_fails_3() public {
-        vm.skip(true, "Fix in next PR");
         // [FAIL: invariant_agentDelegationLimitsDebt persisted failure revert]
         // [Sequence]
         //      sender=0x00000000000000000000000000000000000007fe addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[279561588714589 [2.795e14], 2663511517048081342890370761760586438025887 [2.663e42]]
@@ -197,8 +196,6 @@ contract LenderInvariantsTest is TestDeployer {
     }
 
     function test_fuzzing_non_regression_multiple_liquidate_in_a_row() public {
-        vm.skip(true, "Fix in next PR");
-
         // [FAIL: custom error 0xa07063cb]
         // [Sequence]
         //       sender=0xc2Da903096EDff875f8792E4c580eAb71599af1f addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[38595992670061585487715391781788036416022974650 [3.859e46], 2635581861308878760827543746708756291372490928484070615832091 [2.635e60], 3976785946 [3.976e9]]
