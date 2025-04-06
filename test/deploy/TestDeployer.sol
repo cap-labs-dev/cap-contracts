@@ -273,7 +273,7 @@ contract TestDeployer is
             })
         );
 
-        console.log("deploying symbiotic network rewards");
+        console.log("deploying symbiotic network rewards 0");
         vm.startPrank(env.users.staker_rewards_admin);
 
         _rewards = _deploySymbioticRestakerRewardContract(symbioticAb, env.users, _vault);
@@ -284,8 +284,13 @@ contract TestDeployer is
 
         console.log("registering vaults in network middleware");
         vm.startPrank(env.users.middleware_admin);
+
+        NetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).registerVault(
+            _vault.vault, _rewards.stakerRewarder
+        );
+
         for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            _registerVaultsInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, _rewards, env.testUsers.agents[i]);
+            _registerVaultsInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, env.testUsers.agents[i]);
         }
 
         console.log("registering agents as operator");
