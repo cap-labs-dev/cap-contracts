@@ -9,7 +9,7 @@ import { PriceOracleStorageUtils } from "../storage/PriceOracleStorageUtils.sol"
 /// @title Oracle for fetching prices
 /// @author kexley, @capLabs
 /// @dev Payloads are stored on this contract and calculation logic is hosted on external libraries
-contract PriceOracle is IPriceOracle, Access, PriceOracleStorageUtils {
+abstract contract PriceOracle is IPriceOracle, Access, PriceOracleStorageUtils {
     /// @dev Initialize the price oracle
     /// @param _accessControl Access control address
     function __PriceOracle_init(address _accessControl) internal onlyInitializing {
