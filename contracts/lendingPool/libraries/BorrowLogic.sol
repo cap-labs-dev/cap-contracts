@@ -80,8 +80,6 @@ library BorrowLogic {
         realizeRestakerInterest($, params.agent, params.asset);
 
         ILender.ReserveData storage reserve = $.reservesData[params.asset];
-        uint256 debtRepaid;
-        uint256 interestRepaid;
 
         /// Can only repay up to the amount owed
         repaid = Math.min(params.amount, IERC20(reserve.debtToken).balanceOf(params.agent));
@@ -94,31 +92,35 @@ library BorrowLogic {
             emit TotalRepayment(params.agent, params.asset);
         }
 
-        /// Realized interest has already been added to vault debt, so pay down vault debt first
-        if (repaid > reserve.debt) {
-            debtRepaid = reserve.debt;
-            interestRepaid = repaid - reserve.debt;
-        } else {
-            debtRepaid = repaid;
+        uint256 remaining = repaid;
+        uint256 interestRepaid;
+        uint256 restakerRepaid;
+
+        if (repaid > reserve.unrealizedInterest[params.agent] + reserve.debt) {
+            interestRepaid = repaid - (reserve.debt + reserve.unrealizedInterest[params.agent]);
+            remaining -= interestRepaid;
         }
 
-        /// Pay down unrealized restaker interest before paying vault
-        uint256 restakerRepaid = Math.min(debtRepaid, reserve.unrealizedInterest[params.agent]);
-        uint256 vaultRepaid = debtRepaid - restakerRepaid;
+        if (remaining > reserve.unrealizedInterest[params.agent]) {
+            restakerRepaid = reserve.unrealizedInterest[params.agent];
+            remaining -= restakerRepaid;
+        } else {
+            restakerRepaid = remaining;
+            remaining = 0;
+        }
 
-        if (debtRepaid > 0) {
-            reserve.debt -= debtRepaid;
+        uint256 vaultRepaid = Math.min(remaining, reserve.debt);
 
-            if (restakerRepaid > 0) {
-                reserve.unrealizedInterest[params.agent] -= restakerRepaid;
-                IERC20(params.asset).safeTransfer($.delegation, restakerRepaid);
-                IDelegation($.delegation).distributeRewards(params.agent, params.asset);
-            }
+        if (restakerRepaid > 0) {
+            reserve.unrealizedInterest[params.agent] -= restakerRepaid;
+            IERC20(params.asset).safeTransfer($.delegation, restakerRepaid);
+            IDelegation($.delegation).distributeRewards(params.agent, params.asset);
+        }
 
-            if (vaultRepaid > 0) {
-                IERC20(params.asset).forceApprove(reserve.vault, vaultRepaid);
-                IVault(reserve.vault).repay(params.asset, vaultRepaid);
-            }
+        if (vaultRepaid > 0) {
+            reserve.debt -= vaultRepaid;
+            IERC20(params.asset).forceApprove(reserve.vault, vaultRepaid);
+            IVault(reserve.vault).repay(params.asset, vaultRepaid);
         }
 
         if (interestRepaid > 0) {
@@ -163,7 +165,7 @@ library BorrowLogic {
 
         if (realizedInterest == 0 && unrealizedInterest == 0) return 0;
 
-        reserve.debt += realizedInterest + unrealizedInterest;
+        reserve.debt += realizedInterest;
         reserve.unrealizedInterest[_agent] += unrealizedInterest;
 
         IDebtToken(reserve.debtToken).mint(_agent, realizedInterest + unrealizedInterest);
