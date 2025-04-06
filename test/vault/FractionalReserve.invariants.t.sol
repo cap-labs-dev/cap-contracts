@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { FractionalReserve } from "../../contracts/vault/FractionalReserve.sol";
-
+import { Vault } from "../../contracts/vault/Vault.sol";
 import { MockAccessControl } from "../mocks/MockAccessControl.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
 import { MockERC4626 } from "../mocks/MockERC4626.sol";
@@ -17,15 +16,23 @@ import { Test } from "forge-std/Test.sol";
 import { Vm } from "forge-std/Vm.sol";
 import { console } from "forge-std/console.sol";
 
-contract TestFractionalReserve is FractionalReserve {
-    function initialize(address accessControl, address feeAuction) external initializer {
-        __FractionalReserve_init(accessControl, feeAuction);
+contract TestVault is Vault {
+    function initialize(
+        string memory _name,
+        string memory _symbol,
+        address _accessControl,
+        address _feeAuction,
+        address _oracle,
+        address[] calldata _assets,
+        address _insuranceFund
+    ) external initializer {
+        __Vault_init(_name, _symbol, _accessControl, _feeAuction, _oracle, _assets, _insuranceFund);
     }
 }
 
-contract FractionalReserveInvariantsTest is Test {
-    TestFractionalReserveHandler public handler;
-    TestFractionalReserve public reserve;
+contract VaultInvariantsTest is Test {
+    TestVaultHandler public handler;
+    TestVault public vault;
     address[] public assets;
     MockAccessControl public accessControl;
     address public constant MOCK_FEE_AUCTION = address(2);
@@ -59,20 +66,28 @@ contract FractionalReserveInvariantsTest is Test {
             );
         }
 
-        // Deploy and initialize reserve
-        reserve = new TestFractionalReserve();
-        reserve.initialize(address(accessControl), MOCK_FEE_AUCTION);
+        // Deploy and initialize vault
+        vault = new TestVault();
+        vault.initialize(
+            "Test Vault",
+            "TV",
+            address(accessControl),
+            MOCK_FEE_AUCTION,
+            address(3), // Mock oracle
+            assets,
+            address(4) // Mock insurance fund
+        );
 
         // Create and target handler
         uint256[] memory maxReserves = new uint256[](3);
         maxReserves[0] = 1000e18;
         maxReserves[1] = 1000e6;
         maxReserves[2] = 1000e8;
-        handler = new TestFractionalReserveHandler(reserve, assets, maxReserves, mockVaults);
+        handler = new TestVaultHandler(vault, assets, maxReserves, mockVaults);
         targetContract(address(handler));
 
         // Label contracts for better traces
-        vm.label(address(reserve), "RESERVE");
+        vm.label(address(vault), "VAULT");
         vm.label(address(handler), "HANDLER");
         vm.label(address(accessControl), "ACCESS_CONTROL");
     }
@@ -81,7 +96,7 @@ contract FractionalReserveInvariantsTest is Test {
     function invariant_reserveLimits() public view {
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i];
-            uint256 currentReserve = reserve.reserve(asset);
+            uint256 currentReserve = vault.reserve(asset);
             uint256 maxReserve = handler.maxReserves(asset);
             assertLe(currentReserve, maxReserve, "Current reserve must not exceed max reserve");
         }
@@ -92,7 +107,7 @@ contract FractionalReserveInvariantsTest is Test {
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i];
             uint256 invested = handler.getInvestedAmount(asset);
-            uint256 currentReserve = reserve.reserve(asset);
+            uint256 currentReserve = vault.reserve(asset);
             uint256 totalAssets = handler.getTotalAssets(asset);
 
             assertEq(invested + currentReserve, totalAssets, "Invested + reserve must equal total assets");
@@ -103,7 +118,7 @@ contract FractionalReserveInvariantsTest is Test {
     function invariant_interestAccuracy() public view {
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i];
-            uint256 actualInterest = reserve.claimableInterest(asset);
+            uint256 actualInterest = vault.claimableInterest(asset);
             uint256 expectedInterest = mockVaults[i].__estimateMockErc4626Yield();
 
             // Allow for small rounding error (1 wei)
@@ -127,12 +142,12 @@ contract FractionalReserveInvariantsTest is Test {
 }
 
 /**
- * @notice Handler contract for testing FractionalReserve invariants
+ * @notice Handler contract for testing Vault invariants
  */
-contract TestFractionalReserveHandler is StdUtils, RandomAssetUtils {
+contract TestVaultHandler is StdUtils, RandomAssetUtils {
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-    TestFractionalReserve public reserve;
+    TestVault public vault;
     mapping(address => MockERC4626) public vaults;
 
     // Ghost variables for tracking state
@@ -142,12 +157,12 @@ contract TestFractionalReserveHandler is StdUtils, RandomAssetUtils {
     mapping(address => uint256) public accumulatedInterest;
 
     constructor(
-        TestFractionalReserve _reserve,
+        TestVault _vault,
         address[] memory _assets,
         uint256[] memory _max_reserves,
         MockERC4626[] memory _vaults
     ) RandomAssetUtils(_assets) {
-        reserve = _reserve;
+        vault = _vault;
 
         // Initialize vaults and max reserves
         address[] memory assets = allAssets();
@@ -157,8 +172,8 @@ contract TestFractionalReserveHandler is StdUtils, RandomAssetUtils {
             maxReserves[asset] = _max_reserves[i];
 
             // Setup initial state
-            reserve.setFractionalReserveVault(asset, address(_vaults[i]));
-            reserve.setReserve(asset, _max_reserves[i]);
+            vault.setFractionalReserveVault(asset, address(_vaults[i]));
+            vault.setReserve(asset, _max_reserves[i]);
         }
     }
 
@@ -167,23 +182,23 @@ contract TestFractionalReserveHandler is StdUtils, RandomAssetUtils {
         address asset = randomAsset(assetSeed);
 
         MockERC20(asset).mint(address(this), amount);
-        IERC20(asset).transfer(address(reserve), amount);
+        IERC20(asset).transfer(address(vault), amount);
     }
 
     function withdrawMockToken(uint256 assetSeed, uint256 amount) external {
         address asset = randomAsset(assetSeed);
         uint256 balance = MockERC20(asset).balanceOf(address(this));
         amount = bound(amount, 0, balance);
-        vm.prank(address(reserve));
+        vm.prank(address(vault));
         IERC20(asset).transfer(address(this), amount);
     }
 
     function invest(uint256 assetSeed) external {
         address asset = randomAsset(assetSeed);
-        uint256 available = IERC20(asset).balanceOf(address(reserve));
+        uint256 available = IERC20(asset).balanceOf(address(vault));
         if (available == 0) return;
 
-        reserve.investAll(asset);
+        vault.investAll(asset);
 
         // Update ghost variables
         totalInvested[asset] += available;
@@ -195,7 +210,7 @@ contract TestFractionalReserveHandler is StdUtils, RandomAssetUtils {
         uint256 invested = getInvestedAmount(asset);
         if (invested == 0) return;
 
-        reserve.divestAll(asset);
+        vault.divestAll(asset);
 
         // Update ghost variables
         totalInvested[asset] -= invested;
@@ -204,7 +219,7 @@ contract TestFractionalReserveHandler is StdUtils, RandomAssetUtils {
 
     function investAll(uint256 assetSeed) external {
         address asset = randomAsset(assetSeed);
-        reserve.investAll(asset);
+        vault.investAll(asset);
 
         // Update ghost variables
         uint256 newInvested = IERC20(asset).balanceOf(address(vaults[asset]));
@@ -214,7 +229,7 @@ contract TestFractionalReserveHandler is StdUtils, RandomAssetUtils {
 
     function divestAll(uint256 assetSeed) external {
         address asset = randomAsset(assetSeed);
-        reserve.divestAll(asset);
+        vault.divestAll(asset);
 
         // Update ghost variables
         totalInvested[asset] = 0;
@@ -222,8 +237,8 @@ contract TestFractionalReserveHandler is StdUtils, RandomAssetUtils {
 
     function realizeInterest(uint256 assetSeed) external {
         address asset = randomAsset(assetSeed);
-        uint256 interest = reserve.claimableInterest(asset);
-        reserve.realizeInterest(asset);
+        uint256 interest = vault.claimableInterest(asset);
+        vault.realizeInterest(asset);
 
         // Update ghost variables
         accumulatedInterest[asset] += interest;
@@ -234,7 +249,7 @@ contract TestFractionalReserveHandler is StdUtils, RandomAssetUtils {
         address asset = randomAsset(assetSeed);
         amount = bound(amount, 0, maxReserves[asset]);
 
-        reserve.setReserve(asset, amount);
+        vault.setReserve(asset, amount);
 
         // Update ghost variables
         maxReserves[asset] = amount;
@@ -246,14 +261,14 @@ contract TestFractionalReserveHandler is StdUtils, RandomAssetUtils {
     }
 
     function getTotalAssets(address asset) public view returns (uint256) {
-        return getInvestedAmount(asset) + reserve.reserve(asset);
+        return getInvestedAmount(asset) + vault.reserve(asset);
     }
 
     function getMaxDivestableAmount(address asset) public view returns (uint256) {
         uint256 invested = getInvestedAmount(asset);
         if (invested == 0) return 0;
 
-        uint256 currentReserve = reserve.reserve(asset);
+        uint256 currentReserve = vault.reserve(asset);
         uint256 maxReserve = maxReserves[asset];
 
         if (currentReserve >= maxReserve) {

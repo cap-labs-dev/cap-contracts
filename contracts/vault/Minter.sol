@@ -13,18 +13,10 @@ import { MinterLogic } from "./libraries/MinterLogic.sol";
 /// @dev Dynamic fees are applied according to the allocation of assets in the basket. Increasing
 /// the supply of a excessive asset or burning for an scarce asset will charge fees on a kinked
 /// slope. Redeem can be used to avoid these fees by burning for the current ratio of assets.
-contract Minter is IMinter, Access, MinterStorageUtils {
-    /// @dev Initialize the minter
-    /// @param _accessControl Access control address
-    /// @param _oracle Oracle address
-    function __Minter_init(address _accessControl, address _oracle) internal onlyInitializing {
-        __Access_init(_accessControl);
-        __Minter_init_unchained(_oracle);
-    }
-
+abstract contract Minter is IMinter, Access, MinterStorageUtils {
     /// @dev Initialize unchained
     /// @param _oracle Oracle address
-    function __Minter_init_unchained(address _oracle) internal onlyInitializing {
+    function __Minter_init(address _oracle) internal onlyInitializing {
         getMinterStorage().oracle = _oracle;
     }
 

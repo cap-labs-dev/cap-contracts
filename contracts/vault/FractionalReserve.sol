@@ -11,18 +11,10 @@ import { FractionalReserveLogic } from "./libraries/FractionalReserveLogic.sol";
 /// @author kexley, @capLabs
 /// @notice Idle capital is put to work in fractional reserve vaults and can be recalled when
 /// withdrawing, redeeming or borrowing.
-contract FractionalReserve is IFractionalReserve, Access, FractionalReserveStorageUtils {
-    /// @dev Initialize the fractional reserve
-    /// @param _accessControl Access control address
-    /// @param _feeAuction Fee auction address
-    function __FractionalReserve_init(address _accessControl, address _feeAuction) internal onlyInitializing {
-        __Access_init(_accessControl);
-        __FractionalReserve_init_unchained(_feeAuction);
-    }
-
+abstract contract FractionalReserve is IFractionalReserve, Access, FractionalReserveStorageUtils {
     /// @dev Initialize unchained
     /// @param _feeAuction Fee auction address
-    function __FractionalReserve_init_unchained(address _feeAuction) internal onlyInitializing {
+    function __FractionalReserve_init(address _feeAuction) internal onlyInitializing {
         getFractionalReserveStorage().feeAuction = _feeAuction;
     }
 

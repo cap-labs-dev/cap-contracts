@@ -37,8 +37,8 @@ contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, FractionalRese
         __ERC20_init(_name, _symbol);
         __ERC20Permit_init(_name);
         __Access_init(_accessControl);
-        __FractionalReserve_init_unchained(_feeAuction);
-        __Minter_init_unchained(_oracle);
+        __FractionalReserve_init(_feeAuction);
+        __Minter_init(_oracle);
         __Vault_init_unchained(_assets, _insuranceFund);
     }
 
