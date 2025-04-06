@@ -228,6 +228,21 @@ contract LenderInvariantsTest is TestDeployer {
         invariant_healthFactorConsistency();
     }
 
+    function test_fuzzing_non_regression_borrow_repay_fail_1() public {
+        // [FAIL: custom error 0x2075cc10]
+        // [Sequence]
+        //        sender=0x0000000000000000000000000000000053C655a8 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[2, 7479559856413359341840092452890241277881269258401416057474579782773715 [7.479e69], 1186621296757860739 [1.186e18]]
+        //        sender=0x0000000000000000000000000000000000001279 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=repay(uint256,uint256,uint256) args=[238124013308466196191737395961291420492833249786121552 [2.381e53], 1, 115792089237316195423570985008687907853269984665640564039457584007913129639935 [1.157e77]]
+        // invariant_healthFactorConsistency() (runs: 4, calls: 100, reverts: 1)
+
+        handler.borrow(2, 7479559856413359341840092452890241277881269258401416057474579782773715, 1186621296757860739);
+        handler.repay(
+            238124013308466196191737395961291420492833249786121552,
+            1,
+            115792089237316195423570985008687907853269984665640564039457584007913129639935
+        );
+    }
+
     /// @dev Test that total borrowed never exceeds available assets
     /// forge-config: default.invariant.depth = 25
     function invariant_borrowingLimits() public view {
@@ -335,10 +350,9 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         address agent = randomActor(actorSeed);
         address currentAsset = randomAsset(assetSeed);
 
-        (,, uint256 totalDebt,,,) = lender.agent(agent);
-
         // Bound amount to actual borrowed amount
-        uint256 amount = bound(amountSeed, 0, totalDebt);
+        uint256 debt = lender.debt(agent, currentAsset);
+        uint256 amount = bound(amountSeed, 0, debt);
         if (amount == 0) return;
 
         // Mint tokens to repay
