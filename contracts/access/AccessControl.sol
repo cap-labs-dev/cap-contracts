@@ -46,8 +46,13 @@ contract AccessControl is IAccessControl, UUPSUpgradeable, AccessControlEnumerab
     /// @param _contract Contract being called
     /// @param _address Address to revoke role from
     function revokeAccess(bytes4 _selector, address _contract, address _address) external {
-        _checkRole(role(this.revokeAccess.selector, address(this)), msg.sender);
-        _revokeRole(role(_selector, _contract), _address);
+        bytes32 roleId = role(this.revokeAccess.selector, address(this));
+        _checkRole(roleId, msg.sender);
+
+        bytes32 roleIdToRevoke = role(_selector, _contract);
+        if (_address == msg.sender && roleIdToRevoke == roleId) revert CannotRevokeSelf();
+
+        _revokeRole(roleIdToRevoke, _address);
     }
 
     /// @notice Fetch role id for a function selector on a contract
