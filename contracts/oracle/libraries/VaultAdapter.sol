@@ -12,6 +12,11 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 /// @author kexley, @capLabs
 /// @notice Market rates are sourced from the Vault
 contract VaultAdapter is IVaultAdapter, UUPSUpgradeable, Access, VaultAdapterStorageUtils {
+    /// @dev Disable initializers on the implementation
+    constructor() {
+        _disableInitializers();
+    }
+
     /// @notice Initialize the vault adapter with the access control
     /// @param _accessControl Access control
     function initialize(address _accessControl) external initializer {

@@ -26,6 +26,11 @@ import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, NetworkMiddlewareStorageUtils {
     using SafeERC20 for IERC20;
 
+    /// @dev Disable initializers on the implementation
+    constructor() {
+        _disableInitializers();
+    }
+
     /// @notice Initialize
     /// @param _accessControl Access control address
     /// @param _network Network address

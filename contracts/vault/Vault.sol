@@ -16,7 +16,7 @@ import { ERC20PermitUpgradeable } from
 /// @notice Tokens are supplied by cToken minters and borrowed by covered agents
 /// @dev Supplies, borrows and utilization rates are tracked. Interest rates should be computed and
 /// charged on the external contracts, only the principle amount is counted on this contract.
-contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, FractionalReserve, VaultStorageUtils {
+abstract contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, FractionalReserve, VaultStorageUtils {
     /// @dev Initialize the assets
     /// @param _name Name of the cap token
     /// @param _symbol Symbol of the cap token

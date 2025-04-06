@@ -10,6 +10,11 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 /// @author kexley, @capLabs
 /// @notice Granular access control for each function on each contract
 contract AccessControl is IAccessControl, UUPSUpgradeable, AccessControlEnumerableUpgradeable {
+    /// @dev Disable initializers on the implementation
+    constructor() {
+        _disableInitializers();
+    }
+
     /// @notice Initialize the default admin
     /// @param _admin Default admin address
     function initialize(address _admin) external initializer {
