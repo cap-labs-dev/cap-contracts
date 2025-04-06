@@ -33,14 +33,12 @@ interface IFeeAuction {
     /// @param _minAmounts Minimum amounts to buy
     /// @param _receiver Receiver address for the assets
     /// @param _deadline Deadline for the auction
-    /// @param _callback Optional callback data
     function buy(
         uint256 _maxPrice,
         address[] calldata _assets,
         uint256[] calldata _minAmounts,
         address _receiver,
-        uint256 _deadline,
-        bytes calldata _callback
+        uint256 _deadline
     ) external;
 
     /// @notice Set the start price of the current auction

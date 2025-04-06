@@ -33,9 +33,7 @@ contract FeeAuctionBuyTest is TestDeployer {
             lender.realizeInterest(address(usdc));
             uint256 price = cUSDFeeAuction.currentPrice();
             cUSD.approve(address(cUSDFeeAuction), type(uint256).max);
-            cUSDFeeAuction.buy(
-                price, usdVault.assets, new uint256[](usdVault.assets.length), realizer, block.timestamp, ""
-            );
+            cUSDFeeAuction.buy(price, usdVault.assets, new uint256[](usdVault.assets.length), realizer, block.timestamp);
             usdc.transfer(makeAddr("burn"), usdc.balanceOf(address(realizer)));
             vm.stopPrank();
         }
@@ -79,9 +77,7 @@ contract FeeAuctionBuyTest is TestDeployer {
             // Approve payment token (cUSD) for fee auction
             cUSD.approve(address(cUSDFeeAuction), type(uint256).max);
             uint256 price = cUSDFeeAuction.currentPrice();
-            cUSDFeeAuction.buy(
-                price, usdVault.assets, new uint256[](usdVault.assets.length), realizer, block.timestamp, ""
-            );
+            cUSDFeeAuction.buy(price, usdVault.assets, new uint256[](usdVault.assets.length), realizer, block.timestamp);
 
             // ensure realizer balance increased by the expected amount
             assertGt(usdc.balanceOf(address(realizer)), 0, "Realizer USDC balance should have increased");

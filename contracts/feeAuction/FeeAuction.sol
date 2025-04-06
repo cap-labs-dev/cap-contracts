@@ -3,8 +3,6 @@ pragma solidity ^0.8.28;
 
 import { Access } from "../access/Access.sol";
 
-import { IAuctionCallback } from "../interfaces/IAuctionCallback.sol";
-
 import { IFeeAuction } from "../interfaces/IFeeAuction.sol";
 import { FeeAuctionStorageUtils } from "../storage/FeeAuctionStorageUtils.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -64,14 +62,12 @@ contract FeeAuction is IFeeAuction, UUPSUpgradeable, Access, FeeAuctionStorageUt
     /// @param _minAmounts Minimum amounts to buy
     /// @param _receiver Receiver address for the assets
     /// @param _deadline Deadline for the auction
-    /// @param _callback Optional callback data
     function buy(
         uint256 _maxPrice,
         address[] calldata _assets,
         uint256[] calldata _minAmounts,
         address _receiver,
-        uint256 _deadline,
-        bytes calldata _callback
+        uint256 _deadline
     ) external {
         uint256 price = currentPrice();
         if (price > _maxPrice) revert InvalidPrice();
@@ -87,8 +83,6 @@ contract FeeAuction is IFeeAuction, UUPSUpgradeable, Access, FeeAuctionStorageUt
         $.startPrice = newStartPrice;
 
         uint256[] memory balances = _transferOutAssets(_assets, _minAmounts, _receiver);
-
-        if (_callback.length > 0) IAuctionCallback(msg.sender).auctionCallback(_assets, balances, price, _callback);
 
         IERC20($.paymentToken).safeTransferFrom(msg.sender, $.paymentRecipient, price);
 
