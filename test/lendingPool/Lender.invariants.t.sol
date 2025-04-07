@@ -14,6 +14,8 @@ import { RandomActorUtils } from "../deploy/utils/RandomActorUtils.sol";
 import { RandomAssetUtils } from "../deploy/utils/RandomAssetUtils.sol";
 import { TimeUtils } from "../deploy/utils/TimeUtils.sol";
 
+import { MockAaveDataProvider } from "../mocks/MockAaveDataProvider.sol";
+import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
 
 import { StdUtils } from "forge-std/StdUtils.sol";
@@ -620,5 +622,28 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         address target = randomActor(targetSeed, address(env.usdVault.capToken), address(lender));
 
         vm.deal(target, amount /* we need gas to send gas */ );
+    }
+
+    function setAssetOraclePrice(uint256 assetSeed, uint256 priceSeed) external {
+        address currentAsset = randomAsset(assetSeed);
+        uint256 decimals = MockERC20(currentAsset).decimals();
+        int256 price = int256(bound(priceSeed, 0.001e8, 10_000e8));
+
+        for (uint256 i = 0; i < env.usdOracleMocks.assets.length; i++) {
+            if (env.usdOracleMocks.assets[i] == currentAsset) {
+                MockChainlinkPriceFeed(env.usdOracleMocks.chainlinkPriceFeeds[i]).setLatestAnswer(price);
+            }
+        }
+    }
+
+    function setAssetOracleRate(uint256 assetSeed, uint256 rateSeed) external {
+        address currentAsset = randomAsset(assetSeed);
+        uint256 rate = bound(rateSeed, 0, 1e50);
+
+        for (uint256 i = 0; i < env.usdOracleMocks.assets.length; i++) {
+            if (env.usdOracleMocks.assets[i] == currentAsset) {
+                MockAaveDataProvider(env.usdOracleMocks.aaveDataProviders[i]).setVariableBorrowRate(rate);
+            }
+        }
     }
 }

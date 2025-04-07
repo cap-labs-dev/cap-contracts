@@ -484,15 +484,6 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         vault.unpause(currentAsset);
     }
 
-    function setAssetOraclePrice(uint256 assetSeed, uint256 price) external {
-        address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
-        if (currentAsset == address(0)) return;
-
-        uint256 decimals = IERC20Metadata(currentAsset).decimals();
-        uint256 boundPrice = bound(price, 10 ** (decimals - 1), 10 ** decimals);
-        mockOracle.setPrice(currentAsset, boundPrice);
-    }
-
     // TODO: make it external again after fixing the tests
     function setVaultFeeData(
         uint256 assetSeed,
@@ -570,5 +561,13 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
     function donateGasToken(uint256 amountSeed) external {
         uint256 amount = bound(amountSeed, 1, 1e50);
         vm.deal(address(vault), amount /* we need gas to send gas */ );
+    }
+
+    function setAssetOraclePrice(uint256 assetSeed, uint256 priceSeed) external {
+        address currentAsset = randomAsset(assetSeed);
+        uint256 decimals = MockERC20(currentAsset).decimals();
+        uint256 price = bound(priceSeed, 0.001e8, 10_000e8);
+
+        mockOracle.setPrice(currentAsset, price);
     }
 }
