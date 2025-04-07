@@ -521,8 +521,8 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
             } else if (block.timestamp <= canLiquidateFrom) {
                 _timeTravel(canLiquidateFrom - block.timestamp);
             } else if (block.timestamp >= canLiquidateUntil) {
-                lender.cancelLiquidation(agent);
-                _timeTravel(1);
+                // lender.cancelLiquidation(agent);
+                //  _timeTravel(1);
                 lender.initiateLiquidation(agent);
                 _timeTravel(lender.grace() + 1);
             }
