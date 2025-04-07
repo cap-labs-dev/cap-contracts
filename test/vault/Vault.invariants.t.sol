@@ -171,6 +171,27 @@ contract VaultInvariantsTest is Test, ProxyUtils {
         handler.setFractionalReserveVault(124512733235148509670984850249661524172173354937);
     }
 
+    function test_fuzzing_non_regression_invalid_amount_setting_vault_fee_data() public {
+        // [FAIL: custom error 0x2c5211c6]
+        // [Sequence]
+        //         sender=0x3A9735f2548D84664a5f37800d7276e28cE6b61D addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=setVaultFeeData(uint256,uint256,uint256,uint256,uint256,uint256,uint256) args=[10988485037497200875084020765099393902196672947656269175405269761049140055 [1.098e73], 7115516 [7.115e6], 56343 [5.634e4], 74038908784756852090429431026493935983895091012196197241577015 [7.403e61], 115792089237316195423570985008687907853269984665640564039457584007913129639933 [1.157e77], 506009342943959784505361877030056180922240920414 [5.06e47], 496750841805056183586392187843918370141070053616157214932020700319511113 [4.967e71]]
+        //         sender=0x00000000000000000000000000000000000002DF addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=pause(uint256) args=[2361486 [2.361e6]]
+        // invariant_mintingIncreaseBalance() (runs: 1, calls: 500, reverts: 0)
+
+        handler.setVaultFeeData(
+            10988485037497200875084020765099393902196672947656269175405269761049140055,
+            7115516,
+            56343,
+            74038908784756852090429431026493935983895091012196197241577015,
+            115792089237316195423570985008687907853269984665640564039457584007913129639933,
+            506009342943959784505361877030056180922240920414,
+            496750841805056183586392187843918370141070053616157214932020700319511113
+        );
+        handler.pause(2361486);
+
+        invariant_mintingIncreaseBalance();
+    }
+
     /// @dev Test that total assets >= total borrowed
     function invariant_totalAssetsExceedBorrowed() public view {
         for (uint256 i = 0; i < assets.length; i++) {
@@ -473,27 +494,29 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
     }
 
     // TODO: make it external again after fixing the tests
-    function ______________________setVaultFeeData(
+    function setVaultFeeData(
         uint256 assetSeed,
+        uint256 minMintFeeSeed,
         uint256 slope0Seed,
         uint256 slope1Seed,
         uint256 mintKinkRatioSeed,
         uint256 burnKinkRatioSeed,
         uint256 optimalRatioSeed
-    ) internal {
+    ) public {
         address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
         if (currentAsset == address(0)) return;
 
+        uint256 minMintFee = bound(minMintFeeSeed, 0.0000000000001e27, 0.05e27);
         uint256 slope0 = bound(slope0Seed, 0.0000000000001e27, 100000001e27);
-        uint256 slope1 = bound(slope1Seed, slope0, 100000001e27);
-        uint256 mintKinkRatio = bound(mintKinkRatioSeed, 0.0000000000001e27, 100000001e27);
-        uint256 burnKinkRatio = bound(burnKinkRatioSeed, 0.0000000000001e27, 100000001e27);
-        uint256 optimalRatio = bound(optimalRatioSeed, 0.0000000000001e27, 100000001e27);
+        uint256 slope1 = bound(slope1Seed, 0.0000000000001e27, 100000001e27);
+        uint256 mintKinkRatio = bound(mintKinkRatioSeed, 0.0000000000001e27, 1e27);
+        uint256 burnKinkRatio = bound(burnKinkRatioSeed, 0.0000000000001e27, 1e27);
+        uint256 optimalRatio = bound(optimalRatioSeed, 0.0000000000001e27, 1e27);
 
         vault.setFeeData(
             currentAsset,
             IMinter.FeeData({
-                minMintFee: 0.005e27,
+                minMintFee: minMintFee,
                 slope0: slope0,
                 slope1: slope1,
                 mintKinkRatio: mintKinkRatio,
