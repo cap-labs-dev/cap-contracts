@@ -110,7 +110,15 @@ library LiquidationLogic {
         uint256 liquidated
     ) internal view returns (uint256 bonus) {
         if (totalDelegation > totalDebt) {
-            uint256 elapsed = block.timestamp - ($.liquidationStart[agent] + $.grace);
+            uint256 elapsed;
+
+            // This would only happen if liquidation is called when its emergencyLiquidationThreshold is below 1e27 and before the grace period ends
+            if (block.timestamp < $.liquidationStart[agent] + $.grace) {
+                elapsed = block.timestamp - $.liquidationStart[agent];
+            } else {
+                elapsed = block.timestamp - ($.liquidationStart[agent] + $.grace);
+            }
+
             uint256 duration = $.expiry - $.grace;
             if (elapsed > duration) elapsed = duration;
 

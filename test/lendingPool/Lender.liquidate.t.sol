@@ -5,6 +5,7 @@ import { Delegation } from "../../contracts/delegation/Delegation.sol";
 
 import { ILender } from "../../contracts/interfaces/ILender.sol";
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
+import { ValidationLogic } from "../../contracts/lendingPool/libraries/ValidationLogic.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
 import { console } from "forge-std/console.sol";
@@ -132,6 +133,18 @@ contract LenderLiquidateTest is TestDeployer {
             vm.stopPrank();
         }
 
+        {
+            vm.startPrank(env.testUsers.liquidator);
+
+            deal(address(usdc), env.testUsers.liquidator, 3000e6);
+
+            usdc.approve(address(lender), 1000e6);
+
+            vm.expectRevert();
+            lender.liquidate(user_agent, address(usdc), 1000e6);
+            vm.stopPrank();
+        }
+
         // Modify the agent to have 0.01 liquidation threshold
         {
             vm.startPrank(env.users.delegation_admin);
@@ -151,6 +164,7 @@ contract LenderLiquidateTest is TestDeployer {
             // start the first liquidation
             lender.initiateLiquidation(user_agent);
             uint256 gracePeriod = lender.grace();
+            uint256 expiry = lender.expiry();
 
             console.log("Starting Liquidations");
             console.log("");
@@ -163,13 +177,31 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("Liquidator weth balance after first liquidation", weth.balanceOf(env.testUsers.liquidator));
             console.log("");
 
+            _timeTravel(expiry + 1);
+
             // start the second liquidation
+            vm.expectRevert(ValidationLogic.LiquidationExpired.selector);
+            lender.liquidate(user_agent, address(usdc), 1000e6);
+
+            lender.initiateLiquidation(user_agent);
+
+            _timeTravel(gracePeriod + 1);
+
             lender.liquidate(user_agent, address(usdc), 1000e6);
 
             console.log("Liquidator usdt balance after second liquidation", usdt.balanceOf(env.testUsers.liquidator));
             console.log("Liquidator weth balance after second liquidation", weth.balanceOf(env.testUsers.liquidator));
             console.log("");
+
+            _setAssetOraclePrice(address(weth), 1032e8);
+
             // start the third liquidation
+
+            _timeTravel(expiry + 1);
+
+            vm.startPrank(env.testUsers.liquidator);
+
+            lender.initiateLiquidation(user_agent);
             lender.liquidate(user_agent, address(usdc), 1000e6);
 
             console.log("Liquidator usdt balance after third liquidation", usdt.balanceOf(env.testUsers.liquidator));
