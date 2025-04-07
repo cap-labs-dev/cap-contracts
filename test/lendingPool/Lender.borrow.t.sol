@@ -103,6 +103,8 @@ contract LenderBorrowTest is TestDeployer {
         lender.borrow(address(usdc), 1000e6, user_agent);
         assertEq(usdc.balanceOf(user_agent), 1000e6);
 
+        _timeTravel(10);
+
         lender.borrow(address(usdt), 1000e6, user_agent);
         assertEq(usdt.balanceOf(user_agent), 1000e6);
     }

@@ -63,5 +63,8 @@ contract DeployMocks {
         internal
     {
         MockNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).setMockCoverage(agent, coverage);
+        MockNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).setMockSlashableCollateral(
+            agent, coverage
+        );
     }
 }
