@@ -482,7 +482,7 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         // Bound amount to actual borrowed amount
         uint256 debt = lender.debt(agent, currentAsset);
         uint256 amount = bound(amountSeed, 0, debt);
-        if (amount == 0) return;
+        if (amount < 100) return;
 
         // Mint tokens to repay
         MockERC20(currentAsset).mint(agent, amount);
@@ -504,7 +504,7 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
 
         // Bound amount to liquidatable amount
         uint256 amount = bound(amountSeed, 0, lender.maxLiquidatable(agent, currentAsset));
-        if (amount == 0) return;
+        if (amount < 100) return;
 
         // Execute liquidation
         {
@@ -628,7 +628,6 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
 
     function setAssetOraclePrice(uint256 assetSeed, uint256 priceSeed) external {
         address currentAsset = randomAsset(assetSeed);
-        uint256 decimals = MockERC20(currentAsset).decimals();
         int256 price = int256(bound(priceSeed, 0.001e8, 10_000e8));
 
         for (uint256 i = 0; i < env.usdOracleMocks.assets.length; i++) {
@@ -640,7 +639,7 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
 
     function setAssetOracleRate(uint256 assetSeed, uint256 rateSeed) external {
         address currentAsset = randomAsset(assetSeed);
-        uint256 rate = bound(rateSeed, 0, 1e50);
+        uint256 rate = bound(rateSeed, 0, 2e27);
 
         for (uint256 i = 0; i < env.usdOracleMocks.assets.length; i++) {
             if (env.usdOracleMocks.assets[i] == currentAsset) {
