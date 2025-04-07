@@ -63,8 +63,7 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     /// @return _slashTimestamp Timestamp that is most recent between the last borrow and the epoch -1
     function slashTimestamp(address _agent) public view returns (uint48 _slashTimestamp) {
         DelegationStorage storage $ = getDelegationStorage();
-        uint256 lastBorrow = $.agentData[_agent].lastBorrow;
-        _slashTimestamp = uint48(Math.max((epoch() - 1) * $.epochDuration, lastBorrow));
+        _slashTimestamp = uint48(Math.max((epoch() - 1) * $.epochDuration, $.agentData[_agent].lastBorrow));
         if (_slashTimestamp == block.timestamp) _slashTimestamp -= 1;
     }
 
