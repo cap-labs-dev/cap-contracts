@@ -63,7 +63,9 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     /// @return _slashTimestamp Timestamp that is most recent between the last borrow and the epoch -1
     function slashTimestamp(address _agent) public view returns (uint48 _slashTimestamp) {
         DelegationStorage storage $ = getDelegationStorage();
-        _slashTimestamp = uint48(Math.max((epoch() - 1) * $.epochDuration, $.agentData[_agent].lastBorrow));
+        uint256 lastBorrow = $.agentData[_agent].lastBorrow;
+        _slashTimestamp = uint48(Math.max((epoch() - 1) * $.epochDuration, lastBorrow));
+        if (_slashTimestamp == block.timestamp) _slashTimestamp -= 1;
     }
 
     /// @notice How much delegation and agent has available to back their borrows
@@ -71,7 +73,9 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     /// @return delegation Amount in USD (8 decimals) that a agent has provided as delegation from the delegators
     function coverage(address _agent) public view returns (uint256 delegation) {
         DelegationStorage storage $ = getDelegationStorage();
-        delegation = INetworkMiddleware($.agentData[_agent].network).coverage(_agent);
+        uint256 _slashableCollateral = slashableCollateral(_agent);
+        uint256 currentdelegation = INetworkMiddleware($.agentData[_agent].network).coverage(_agent);
+        delegation = Math.min(_slashableCollateral, currentdelegation);
     }
 
     /// @notice How much slashable coverage an agent has available to back their borrows

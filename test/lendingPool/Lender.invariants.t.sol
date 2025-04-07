@@ -53,6 +53,8 @@ contract LenderInvariantsTest is TestDeployer {
 
         uint256 backingBefore = usdc.balanceOf(address(cUSD));
 
+        _timeTravel(delegation.epochDuration());
+
         lender.borrow(address(usdc), 1000e6, user_agent);
         assertEq(usdc.balanceOf(user_agent), 1000e6);
 
