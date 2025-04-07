@@ -507,8 +507,8 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         if (currentAsset == address(0)) return;
 
         uint256 minMintFee = bound(minMintFeeSeed, 0.0000000000001e27, 0.05e27);
-        uint256 slope0 = bound(slope0Seed, 0.0000000000001e27, 100000001e27);
-        uint256 slope1 = bound(slope1Seed, 0.0000000000001e27, 100000001e27);
+        uint256 slope0 = bound(slope0Seed, 0.0000000000001e27, 0.5e27);
+        uint256 slope1 = bound(slope1Seed, 0.0000000000001e27, 0.5e27);
         uint256 mintKinkRatio = bound(mintKinkRatioSeed, 0.0000000000001e27, 1e27);
         uint256 burnKinkRatio = bound(burnKinkRatioSeed, 0.0000000000001e27, 1e27);
         uint256 optimalRatio = bound(optimalRatioSeed, 0.0000000000001e27, 1e27);
