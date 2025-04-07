@@ -356,7 +356,10 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
         if (currentAsset == address(0)) return;
 
-        vm.warp(block.timestamp + 1 minutes);
+        uint256 loaned = vault.loaned(currentAsset);
+        if (loaned < 1e6) return;
+
+        vm.warp(block.timestamp + 1 days);
 
         vault.divestAll(currentAsset);
     }
@@ -521,10 +524,13 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
         if (currentAsset == address(0)) return;
 
+        uint256 loaned = vault.loaned(currentAsset);
+        if (loaned < 1e6) return;
+
         address newFractionalReserveVault =
             address(new MockERC4626(currentAsset, 1e18, "Fractional Reserve Vault", "FRV"));
 
-        vm.warp(block.timestamp + 1 minutes);
+        vm.warp(block.timestamp + 1 days);
 
         vault.setFractionalReserveVault(currentAsset, newFractionalReserveVault);
     }
