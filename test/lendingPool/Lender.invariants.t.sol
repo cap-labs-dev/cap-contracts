@@ -110,7 +110,6 @@ contract LenderInvariantsTest is TestDeployer {
         handler.setAgentCoverage(8504, 11352);
         handler.liquidate(
             1109431098096784405597004399778520969000778,
-            937481123910104941,
             61623886549693656488416079379073384034876,
             3768160486856916064340765479018069586352278996523203668143
         );
@@ -130,10 +129,9 @@ contract LenderInvariantsTest is TestDeployer {
 
         handler.borrow(500000000000000000000000000, 260243407, 7520);
         handler.setAgentCoverage(4763, 5672);
-        handler.liquidate(9998, 5300, 806165946075049551985264334151369441818954475481, 5711);
+        handler.liquidate(9998, 806165946075049551985264334151369441818954475481, 5711);
         handler.liquidate(
             11056068703988633693957203172599663392891881631940881250732208,
-            30007872054813680496550892600715668912378495406850871,
             1928259676971630563350495955946765,
             420729907401969
         );
@@ -183,9 +181,7 @@ contract LenderInvariantsTest is TestDeployer {
             1435829797705254314582830950992659463821452722364858090334371516,
             16556117656843747165974402408538744302413325
         );
-        handler.liquidate(
-            2, 65076241195732311297008734, 0, 50531700442618637710239866635305475564994400757514979355854358368
-        );
+        handler.liquidate(2, 0, 50531700442618637710239866635305475564994400757514979355854358368);
 
         invariant_agentDelegationLimitsDebt();
     }
@@ -206,13 +202,10 @@ contract LenderInvariantsTest is TestDeployer {
             3976785946
         );
         handler.setAgentCoverage(357488141490035838117936306281844024533269064, 538480132746);
-        handler.liquidate(
-            3719, 233753826492419412621632272325435016278641195558965513326631137659032961025, 31, 3657006336
-        );
+        handler.liquidate(3719, 31, 3657006336);
         handler.wrapTime(3813, 115792089237316195423570985008687907853269984665640564039457584007913129639935);
         handler.liquidate(
             447476674474384566432265375184409868117415385167,
-            12200385529572857376284667427148142565967213,
             1592138495042354847337191,
             160014459991216075558486690339731
         );
@@ -258,13 +251,10 @@ contract LenderInvariantsTest is TestDeployer {
         handler.setAgentCoverage(3815805612345849549, 24);
         handler.liquidate(
             4384111672497386370926446843835048693075376601076141923258490801118068118,
-            3933082584912572630848841962,
             1889696467241238879898734678892508869767419186805053341936739,
             20963255265907651992196302519907651810368859
         );
-        handler.liquidate(
-            30, 188974967785013252, 41, 115792089237316195423570985008687907853269984665640564039457584007913129639935
-        );
+        handler.liquidate(30, 41, 115792089237316195423570985008687907853269984665640564039457584007913129639935);
 
         invariant_agentDelegationLimitsDebt();
     }
@@ -297,9 +287,7 @@ contract LenderInvariantsTest is TestDeployer {
         handler.wrapTime(4731, 58497332399337429344593767924947750742310842768357091268046542597167793274721);
         handler.setAgentCoverage(5993, 3422038890);
         handler.setAgentCoverage(1041, 10285);
-        handler.liquidate(
-            62627094929811953151701008153803527665735819222075294185262633895705808075657, 3718, 9821, 5177
-        );
+        handler.liquidate(62627094929811953151701008153803527665735819222075294185262633895705808075657, 9821, 5177);
         handler.repay(
             993049411386801934099525205354452135258011966824937131273,
             1017358909473853652244212260128938582116004,
@@ -311,14 +299,12 @@ contract LenderInvariantsTest is TestDeployer {
         );
         handler.liquidate(
             29225223478516705340959411323663244701423210690063694749575843356889,
-            2737837594918667271395199048650270487578827384063849774189,
             2112286922687066306261364466892322503874597257722575518124547228233356078,
             233311085789197653343518
         );
         handler.wrapTime(117070713718, 1006540295783534163945056590553234562247379189028725719525632051813);
         handler.liquidate(
             89315578922122892679333885041649008773726263756587365749819829555208549250188,
-            6446,
             767,
             68105926446125771809405178487174168028959056521217564930724487598009997264166
         );
@@ -371,7 +357,7 @@ contract LenderInvariantsTest is TestDeployer {
         handler.setAgentCoverage(5415319662477480108092514012249780312523474260177048431428694681044564049920, 9694);
         handler.realizeRestakerInterest(88817841970012523233890533447265625, 1718);
         handler.repay(2024, 13241, 9613);
-        handler.liquidate(1, 2248555321168870210062882036951, 2949686183, 7032555);
+        handler.liquidate(1, 2949686183, 7032555);
         handler.wrapTime(318284390023772899530867194944432, 343765214748883997984555);
         handler.repay(
             2300272910690880168785711543248788602439053704,
@@ -507,10 +493,10 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         }
     }
 
-    function liquidate(uint256 agentSeed, uint256 liquidatorSeed, uint256 assetSeed, uint256 amountSeed) external {
+    function liquidate(uint256 agentSeed, uint256 assetSeed, uint256 amountSeed) external {
         address agent = randomActor(agentSeed);
-        address liquidator = randomActorExcept(liquidatorSeed, agent);
         address currentAsset = randomAsset(assetSeed);
+        address liquidator = makeAddr("liquidator");
 
         // Bound amount to liquidatable amount
         uint256 amount = bound(amountSeed, 0, lender.maxLiquidatable(agent, currentAsset));
@@ -526,7 +512,17 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
             // Execute liquidation
             IERC20(currentAsset).approve(address(lender), amount);
 
-            if (lender.liquidationStart(agent) == 0) {
+            uint256 liquidationStart = lender.liquidationStart(agent);
+            uint256 canLiquidateFrom = liquidationStart + lender.grace();
+            uint256 canLiquidateUntil = canLiquidateFrom + lender.expiry();
+            if (liquidationStart == 0) {
+                lender.initiateLiquidation(agent);
+                _timeTravel(lender.grace() + 1);
+            } else if (block.timestamp <= canLiquidateFrom) {
+                _timeTravel(canLiquidateFrom - block.timestamp);
+            } else if (block.timestamp >= canLiquidateUntil) {
+                lender.cancelLiquidation(agent);
+                _timeTravel(1);
                 lender.initiateLiquidation(agent);
                 _timeTravel(lender.grace() + 1);
             }
