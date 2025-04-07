@@ -77,6 +77,9 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @notice Invalid ltv buffer
     error InvalidLtvBuffer();
 
+    /// @notice Invalid network
+    error InvalidNetwork();
+
     /// @notice No slashable collateral
     error NoSlashableCollateral();
 

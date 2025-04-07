@@ -208,6 +208,7 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     /// @param _network Network address
     function registerNetwork(address _network) external checkAccess(this.registerNetwork.selector) {
         DelegationStorage storage $ = getDelegationStorage();
+        if (_network == address(0)) revert InvalidNetwork();
 
         // Check for duplicates
         if ($.networks.contains(_network)) revert DuplicateNetwork();
