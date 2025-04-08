@@ -83,6 +83,51 @@ contract LenderBorrowTest is TestDeployer {
         assertEq(usdc.balanceOf(user_agent), 1000e6);
     }
 
+    function test_borrow_paused_asset() public {
+        vm.startPrank(env.users.lender_admin);
+
+        lender.pauseAsset(address(usdc), true);
+        vm.stopPrank();
+
+        vm.startPrank(user_agent);
+
+        vm.expectRevert();
+        lender.borrow(address(usdc), 1000e6, user_agent);
+        vm.stopPrank();
+
+        vm.startPrank(env.users.lender_admin);
+        lender.pauseAsset(address(usdc), false);
+        vm.stopPrank();
+
+        vm.startPrank(user_agent);
+
+        vm.expectRevert();
+        lender.borrow(address(usdc), 1000e6, address(0));
+
+        vm.expectRevert();
+        lender.borrow(address(0), 1000e6, user_agent);
+        vm.stopPrank();
+    }
+
+    function test_set_min_borrow() public {
+        vm.startPrank(env.users.lender_admin);
+
+        vm.expectRevert();
+        lender.setMinBorrow(address(0), 150e6);
+
+        lender.setMinBorrow(address(usdc), 150e6);
+        vm.stopPrank();
+
+        vm.startPrank(user_agent);
+
+        vm.expectRevert();
+        lender.borrow(address(usdc), 100e6, user_agent);
+
+        lender.borrow(address(usdc), 150e6, user_agent);
+        assertEq(usdc.balanceOf(user_agent), 150e6);
+        vm.stopPrank();
+    }
+
     function test_borrow_an_invalid_asset() public {
         vm.startPrank(user_agent);
 

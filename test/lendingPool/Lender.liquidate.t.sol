@@ -27,6 +27,72 @@ contract LenderLiquidateTest is TestDeployer {
         vm.startPrank(env.users.lender_admin);
         // Try removing and re-adding the asset
         lender.removeAsset(address(usdt));
+
+        vm.expectRevert();
+        lender.addAsset(
+            ILender.AddAssetParams({
+                asset: address(0),
+                vault: address(cUSD),
+                debtToken: env.usdVault.debtTokens[0],
+                interestReceiver: env.usdVault.feeAuction,
+                restakerInterestReceiver: env.infra.delegation,
+                bonusCap: 0.1e27,
+                minBorrow: 100e6
+            })
+        );
+
+        vm.expectRevert();
+        lender.addAsset(
+            ILender.AddAssetParams({
+                asset: address(usdt),
+                vault: address(0),
+                debtToken: env.usdVault.debtTokens[0],
+                interestReceiver: env.usdVault.feeAuction,
+                restakerInterestReceiver: env.infra.delegation,
+                bonusCap: 0.1e27,
+                minBorrow: 100e6
+            })
+        );
+
+        vm.expectRevert();
+        lender.addAsset(
+            ILender.AddAssetParams({
+                asset: address(usdt),
+                vault: address(cUSD),
+                debtToken: address(0),
+                interestReceiver: env.usdVault.feeAuction,
+                restakerInterestReceiver: env.infra.delegation,
+                bonusCap: 0.1e27,
+                minBorrow: 100e6
+            })
+        );
+
+        vm.expectRevert();
+        lender.addAsset(
+            ILender.AddAssetParams({
+                asset: address(usdt),
+                vault: address(cUSD),
+                debtToken: env.usdVault.debtTokens[0],
+                interestReceiver: address(0),
+                restakerInterestReceiver: env.infra.delegation,
+                bonusCap: 0.1e27,
+                minBorrow: 100e6
+            })
+        );
+
+        vm.expectRevert();
+        lender.addAsset(
+            ILender.AddAssetParams({
+                asset: address(usdt),
+                vault: address(cUSD),
+                debtToken: env.usdVault.debtTokens[0],
+                interestReceiver: env.usdVault.feeAuction,
+                restakerInterestReceiver: address(0),
+                bonusCap: 0.1e27,
+                minBorrow: 100e6
+            })
+        );
+
         lender.addAsset(
             ILender.AddAssetParams({
                 asset: address(usdt),
@@ -51,6 +117,13 @@ contract LenderLiquidateTest is TestDeployer {
 
             vm.stopPrank();
         }
+
+        vm.startPrank(env.testUsers.liquidator);
+
+        vm.expectRevert();
+        lender.initiateLiquidation(user_agent);
+
+        vm.stopPrank();
 
         // Modify the agent to have 0.01 liquidation threshold
         {

@@ -47,6 +47,9 @@ library ValidationLogic {
     /// @dev Interest receiver not set
     error InterestReceiverNotSet();
 
+    /// @dev Debt token not set
+    error DebtTokenNotSet();
+
     /// @dev Restaker interest receiver not set
     error RestakerInterestReceiverNotSet();
 
@@ -112,6 +115,7 @@ library ValidationLogic {
         if (params.asset == address(0) || params.vault == address(0)) revert ZeroAddressNotValid();
         if (params.interestReceiver == address(0)) revert InterestReceiverNotSet();
         if (params.restakerInterestReceiver == address(0)) revert RestakerInterestReceiverNotSet();
+        if (params.debtToken == address(0)) revert DebtTokenNotSet();
         if ($.reservesData[params.asset].vault != address(0)) revert ReserveAlreadyInitialized();
     }
 

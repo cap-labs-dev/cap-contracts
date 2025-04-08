@@ -21,6 +21,7 @@ contract ConfigureAccessControl {
         accessControl.grantAccess(IRateOracle.setUtilizationOracleData.selector, infra.oracle, users.rate_oracle_admin);
 
         accessControl.grantAccess(Lender.addAsset.selector, infra.lender, users.lender_admin);
+        accessControl.grantAccess(Lender.setMinBorrow.selector, infra.lender, users.lender_admin);
         accessControl.grantAccess(Lender.removeAsset.selector, infra.lender, users.lender_admin);
         accessControl.grantAccess(Lender.pauseAsset.selector, infra.lender, users.lender_admin);
 
