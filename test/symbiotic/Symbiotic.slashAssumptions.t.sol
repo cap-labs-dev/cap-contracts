@@ -31,6 +31,11 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
 
             vm.stopPrank();
         }
+
+        vm.startPrank(env.users.middleware_admin);
+
+        NetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).setFeeAllowed(0.09e18);
+        vm.stopPrank();
     }
 
     function _get_stake_at(SymbioticVaultConfig memory _vault, address _agent, uint256 _timestamp)
@@ -41,6 +46,24 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
         IBaseDelegator delegator = IBaseDelegator(_vault.delegator);
         NetworkMiddleware networkMiddleware = NetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
         return delegator.stakeAt(networkMiddleware.subnetwork(_agent), _agent, uint48(_timestamp), "");
+    }
+
+    function test_add_agent() public {
+        vm.startPrank(env.users.middleware_admin);
+        address agent = makeAddr("agent");
+
+        vm.expectRevert();
+        NetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).registerAgent(address(0), agent);
+
+        vm.expectRevert();
+        NetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).registerAgent(
+            symbioticWethVault.vault, address(0)
+        );
+
+        NetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).registerAgent(symbioticWethVault.vault, agent);
+        address vault = NetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).vaults(agent);
+        assertEq(vault, symbioticWethVault.vault);
+        vm.stopPrank();
     }
 
     function _set_delegation_amount(SymbioticVaultConfig memory _vault, address _agent, uint256 _amount) internal {

@@ -76,6 +76,7 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
         NetworkMiddlewareStorage storage $ = getNetworkMiddlewareStorage();
         Vault storage vault = $.vaults[_vault];
         if (vault.exists) revert VaultExists();
+        if (_stakerRewarder == address(0)) revert NoStakerRewarder();
         vault.stakerRewarder = _stakerRewarder;
         vault.exists = true;
         emit VaultRegistered(_vault);
@@ -288,7 +289,6 @@ contract NetworkMiddleware is INetworkMiddleware, UUPSUpgradeable, Access, Netwo
 
         address _vault = $.agentsToVault[_agent];
         address stakerRewarder = $.vaults[_vault].stakerRewarder;
-        if (stakerRewarder == address(0)) revert NoStakerRewarder();
 
         IERC20(_token).forceApprove(address(IStakerRewards(stakerRewarder)), _amount);
         IStakerRewards(stakerRewarder).distributeRewards(

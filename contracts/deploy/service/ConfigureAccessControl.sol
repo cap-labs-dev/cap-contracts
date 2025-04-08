@@ -13,6 +13,8 @@ contract ConfigureAccessControl {
     function _initInfraAccessControl(InfraConfig memory infra, UsersConfig memory users) internal {
         AccessControl accessControl = AccessControl(infra.accessControl);
         accessControl.grantAccess(IPriceOracle.setPriceOracleData.selector, infra.oracle, users.oracle_admin);
+        accessControl.revokeAccess(IPriceOracle.setPriceOracleData.selector, infra.oracle, users.oracle_admin);
+        accessControl.grantAccess(IPriceOracle.setPriceOracleData.selector, infra.oracle, users.oracle_admin);
         accessControl.grantAccess(IPriceOracle.setPriceBackupOracleData.selector, infra.oracle, users.oracle_admin);
 
         accessControl.grantAccess(IRateOracle.setBenchmarkRate.selector, infra.oracle, users.rate_oracle_admin);
@@ -36,5 +38,6 @@ contract ConfigureAccessControl {
         accessControl.grantAccess(Delegation.registerNetwork.selector, infra.delegation, users.delegation_admin);
         accessControl.grantAccess(Delegation.setLastBorrow.selector, infra.delegation, infra.lender);
         accessControl.grantAccess(Delegation.slash.selector, infra.delegation, infra.lender);
+        accessControl.grantAccess(Delegation.setLtvBuffer.selector, infra.delegation, users.delegation_admin);
     }
 }

@@ -7,7 +7,9 @@ import { IRegistryCoordinator } from "eigenlayer/src/interfaces/IRegistryCoordin
 import { IStakeRegistry } from "eigenlayer/src/interfaces/IStakeRegistry.sol";
 
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import { ServiceManagerBase } from "eigenlayer/src/ServiceManagerBase.sol";
+import { ServiceManagerBase } from "eigenlayer/src/ServiceManagerBase.sol";\
+
+/////////// IN PROGRESS ///////////
 
 contract EigenServiceManager is ServiceManagerBase {
     constructor(

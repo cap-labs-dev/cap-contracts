@@ -84,6 +84,7 @@ contract DeployCapNetworkAdapter is ProxyUtils {
 
         accessControl.grantAccess(middleware.registerVault.selector, address(middleware), users.middleware_admin);
         accessControl.grantAccess(middleware.registerAgent.selector, address(middleware), users.middleware_admin);
+        accessControl.grantAccess(middleware.setFeeAllowed.selector, address(middleware), users.middleware_admin);
         accessControl.grantAccess(middleware.slash.selector, address(middleware), infra.delegation);
         accessControl.grantAccess(middleware.distributeRewards.selector, address(middleware), infra.delegation);
 

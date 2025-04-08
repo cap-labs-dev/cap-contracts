@@ -211,6 +211,12 @@ contract LenderBorrowTest is TestDeployer {
     function test_borrow_payback_debt_tokens() public {
         vm.startPrank(user_agent);
 
+        vm.expectRevert();
+        lender.maxBorrowable(address(0), address(usdc));
+
+        vm.expectRevert();
+        lender.maxBorrowable(user_agent, address(0));
+
         lender.borrow(address(usdc), 300e6, user_agent);
         assertEq(usdc.balanceOf(user_agent), 300e6);
 
@@ -229,6 +235,13 @@ contract LenderBorrowTest is TestDeployer {
 
         // repay the debt
         usdc.approve(address(lender), totalDebt);
+
+        vm.expectRevert();
+        lender.repay(address(0), debt, user_agent);
+
+        vm.expectRevert();
+        lender.repay(address(usdc), debt, address(0));
+
         lender.repay(address(usdc), debt, user_agent);
 
         lender.repay(address(usdc), restakerInterest, user_agent);

@@ -51,6 +51,8 @@ contract DeployMocks {
         Vm vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
         vm.startPrank(env.users.delegation_admin);
+        vm.expectRevert();
+        IDelegation(env.infra.delegation).registerNetwork(address(0));
         IDelegation(env.infra.delegation).registerNetwork(delegationNetwork);
 
         for (uint256 i = 0; i < env.testUsers.agents.length; i++) {

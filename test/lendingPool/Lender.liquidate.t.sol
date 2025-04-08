@@ -104,6 +104,13 @@ contract LenderLiquidateTest is TestDeployer {
                 minBorrow: 100e6
             })
         );
+
+        uint256 reservesCount = lender.reservesCount();
+        console.log("Reserves Count", reservesCount);
+
+        vm.expectRevert();
+        lender.pauseAsset(address(0), false);
+
         lender.pauseAsset(address(usdt), false);
         vm.stopPrank();
     }
@@ -150,6 +157,28 @@ contract LenderLiquidateTest is TestDeployer {
             _timeTravel(gracePeriod + 1);
             // approve repay amount for liquidation
             usdc.approve(address(lender), 3000e6);
+
+            vm.expectRevert();
+            lender.maxLiquidatable(address(0), address(usdc));
+
+            vm.expectRevert();
+            lender.maxLiquidatable(user_agent, address(0));
+
+            vm.expectRevert();
+            lender.liquidate(address(0), address(usdc), 1000e6);
+
+            vm.expectRevert();
+            lender.liquidate(user_agent, address(0), 1000e6);
+
+            uint256 emergencyLiquidationThreshold = lender.emergencyLiquidationThreshold();
+            console.log("Emergency Liquidation Threshold", emergencyLiquidationThreshold);
+
+            uint256 bonusCap = lender.bonusCap();
+            console.log("Bonus Cap", bonusCap);
+
+            uint256 targetHealth = lender.targetHealth();
+            console.log("Target Health", targetHealth);
+
             lender.liquidate(user_agent, address(usdc), 1000e6);
 
             (,, uint256 totalDebt,,,) = lender.agent(user_agent);
