@@ -16,6 +16,7 @@ contract ConfigureAccessControl {
         accessControl.revokeAccess(IPriceOracle.setPriceOracleData.selector, infra.oracle, users.oracle_admin);
         accessControl.grantAccess(IPriceOracle.setPriceOracleData.selector, infra.oracle, users.oracle_admin);
         accessControl.grantAccess(IPriceOracle.setPriceBackupOracleData.selector, infra.oracle, users.oracle_admin);
+        accessControl.grantAccess(bytes4(0), infra.oracle, users.access_control_admin);
 
         accessControl.grantAccess(IRateOracle.setBenchmarkRate.selector, infra.oracle, users.rate_oracle_admin);
         accessControl.grantAccess(IRateOracle.setRestakerRate.selector, infra.oracle, users.rate_oracle_admin);
@@ -26,6 +27,7 @@ contract ConfigureAccessControl {
         accessControl.grantAccess(Lender.setMinBorrow.selector, infra.lender, users.lender_admin);
         accessControl.grantAccess(Lender.removeAsset.selector, infra.lender, users.lender_admin);
         accessControl.grantAccess(Lender.pauseAsset.selector, infra.lender, users.lender_admin);
+        accessControl.grantAccess(bytes4(0), infra.lender, users.access_control_admin);
 
         accessControl.grantAccess(Lender.borrow.selector, infra.lender, users.lender_admin);
         accessControl.grantAccess(Lender.repay.selector, infra.lender, users.lender_admin);
@@ -39,5 +41,6 @@ contract ConfigureAccessControl {
         accessControl.grantAccess(Delegation.setLastBorrow.selector, infra.delegation, infra.lender);
         accessControl.grantAccess(Delegation.slash.selector, infra.delegation, infra.lender);
         accessControl.grantAccess(Delegation.setLtvBuffer.selector, infra.delegation, users.delegation_admin);
+        accessControl.grantAccess(bytes4(0), infra.delegation, users.access_control_admin);
     }
 }

@@ -22,6 +22,7 @@ import { DeployImplems } from "../../contracts/deploy/service/DeployImplems.sol"
 import { DeployInfra } from "../../contracts/deploy/service/DeployInfra.sol";
 import { DeployLibs } from "../../contracts/deploy/service/DeployLibs.sol";
 import { DeployVault } from "../../contracts/deploy/service/DeployVault.sol";
+import { UpgradeToAndCall } from "../../contracts/deploy/service/UpgradeToAndCall.sol";
 import { ConfigureSymbioticOptIns } from
     "../../contracts/deploy/service/providers/symbiotic/ConfigureSymbioticOptIns.sol";
 import { DeployCapNetworkAdapter } from "../../contracts/deploy/service/providers/symbiotic/DeployCapNetworkAdapter.sol";
@@ -58,6 +59,7 @@ contract TestDeployer is
     DeployMocks,
     DeployInfra,
     DeployVault,
+    UpgradeToAndCall,
     DeployImplems,
     DeployLibs,
     ConfigureOracle,
@@ -137,6 +139,10 @@ contract TestDeployer is
         _initInfraAccessControl(env.infra, env.users);
         _initVaultAccessControl(env.infra, env.usdVault, env.users);
         _initVaultAccessControl(env.infra, env.ethVault, env.users);
+
+        /// UPGRADE
+        vm.startPrank(env.users.access_control_admin);
+        _upgradeImplementations(env.implems, env.infra, env.usdVault);
 
         /// ORACLE
         console.log("deploying oracle");

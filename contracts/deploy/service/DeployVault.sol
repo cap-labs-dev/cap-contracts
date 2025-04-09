@@ -113,6 +113,7 @@ contract DeployVault is ProxyUtils {
         accessControl.grantAccess(Minter.setRedeemFee.selector, vault.capToken, users.lender_admin);
         accessControl.grantAccess(Vault.pause.selector, vault.capToken, users.vault_config_admin);
         accessControl.grantAccess(Vault.unpause.selector, vault.capToken, users.vault_config_admin);
+        accessControl.grantAccess(bytes4(0), vault.capToken, users.access_control_admin);
 
         accessControl.grantAccess(FractionalReserve.setReserve.selector, vault.capToken, users.vault_config_admin);
         accessControl.grantAccess(
@@ -126,15 +127,19 @@ contract DeployVault is ProxyUtils {
         accessControl.grantAccess(FeeAuction.setStartPrice.selector, vault.feeAuction, infra.lender);
         accessControl.grantAccess(FeeAuction.setDuration.selector, vault.feeAuction, infra.lender);
         accessControl.grantAccess(FeeAuction.setMinStartPrice.selector, vault.feeAuction, infra.lender);
+        accessControl.grantAccess(bytes4(0), vault.feeAuction, users.access_control_admin);
 
         for (uint256 i = 0; i < vault.assets.length; i++) {
             accessControl.grantAccess(DebtToken.mint.selector, vault.debtTokens[i], infra.lender);
             accessControl.grantAccess(DebtToken.burn.selector, vault.debtTokens[i], infra.lender);
+            accessControl.grantAccess(bytes4(0), vault.debtTokens[i], users.access_control_admin);
         }
 
         accessControl.grantAccess(FeeAuction.setMinStartPrice.selector, vault.feeAuction, users.fee_auction_admin);
         accessControl.grantAccess(FeeAuction.setDuration.selector, vault.feeAuction, users.fee_auction_admin);
         accessControl.grantAccess(FeeAuction.setStartPrice.selector, vault.feeAuction, users.fee_auction_admin);
+
+        AccessControl(infra.accessControl).grantAccess(bytes4(0), vault.stakedCapToken, users.access_control_admin);
     }
 
     function _initVaultLender(VaultConfig memory d, InfraConfig memory infra, FeeConfig memory fee) internal {

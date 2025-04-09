@@ -24,5 +24,14 @@ contract DeployImplems {
         d.oracle = address(new Oracle());
         d.debtToken = address(new DebtToken());
         d.feeAuction = address(new FeeAuction());
+
+        d.accessControl2 = address(new AccessControl());
+        d.lender2 = address(new Lender());
+        d.delegation2 = address(new Delegation());
+        d.capToken2 = address(new CapToken());
+        d.stakedCap2 = address(new StakedCap());
+        d.oracle2 = address(new Oracle());
+        d.debtToken2 = address(new DebtToken());
+        d.feeAuction2 = address(new FeeAuction());
     }
 }
