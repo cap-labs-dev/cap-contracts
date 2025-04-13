@@ -17,14 +17,6 @@ struct ImplementationsConfig {
     address oracle;
     address debtToken;
     address feeAuction;
-    address accessControl2;
-    address lender2;
-    address delegation2;
-    address capToken2;
-    address stakedCap2;
-    address oracle2;
-    address debtToken2;
-    address feeAuction2;
 }
 
 struct InfraConfig {
