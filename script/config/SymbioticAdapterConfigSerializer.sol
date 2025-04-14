@@ -30,7 +30,7 @@ contract SymbioticAdapterConfigSerializer {
         string memory adapterJson = "adapter";
         adapterJson.serialize("network", adapter.network);
         adapterJson.serialize("networkMiddleware", adapter.networkMiddleware);
-        adapterJson = adapterJson.serialize("slashDuration", adapter.slashDuration);
+        adapterJson = adapterJson.serialize("feeAllowed", adapter.feeAllowed);
         console.log(adapterJson);
 
         string memory chainJson = "chain";
@@ -68,7 +68,7 @@ contract SymbioticAdapterConfigSerializer {
         adapter = SymbioticNetworkAdapterConfig({
             network: json.readAddress(string.concat(adapterPrefix, "network")),
             networkMiddleware: json.readAddress(string.concat(adapterPrefix, "networkMiddleware")),
-            slashDuration: uint48(json.readUint(string.concat(adapterPrefix, "slashDuration")))
+            feeAllowed: json.readUint(string.concat(adapterPrefix, "feeAllowed"))
         });
     }
 }
