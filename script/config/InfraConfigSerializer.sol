@@ -25,9 +25,8 @@ contract InfraConfigSerializer {
         implemsJson.serialize("capToken", implems.capToken);
         implemsJson.serialize("stakedCap", implems.stakedCap);
         implemsJson.serialize("oracle", implems.oracle);
-        implemsJson.serialize("principalDebtToken", implems.principalDebtToken);
-        implemsJson.serialize("interestDebtToken", implems.interestDebtToken);
-        implemsJson = implemsJson.serialize("restakerDebtToken", implems.restakerDebtToken);
+        implemsJson.serialize("debtToken", implems.debtToken);
+        implemsJson = implemsJson.serialize("feeAuction", implems.feeAuction);
         console.log(implemsJson);
 
         string memory libsJson = "libs";
@@ -75,9 +74,8 @@ contract InfraConfigSerializer {
             capToken: json.readAddress(string.concat(implemsPrefix, "capToken")),
             stakedCap: json.readAddress(string.concat(implemsPrefix, "stakedCap")),
             oracle: json.readAddress(string.concat(implemsPrefix, "oracle")),
-            principalDebtToken: json.readAddress(string.concat(implemsPrefix, "principalDebtToken")),
-            interestDebtToken: json.readAddress(string.concat(implemsPrefix, "interestDebtToken")),
-            restakerDebtToken: json.readAddress(string.concat(implemsPrefix, "restakerDebtToken"))
+            debtToken: json.readAddress(string.concat(implemsPrefix, "debtToken")),
+            feeAuction: json.readAddress(string.concat(implemsPrefix, "feeAuction"))
         });
 
         string memory libsPrefix = string.concat(chainPrefix, "libs.");

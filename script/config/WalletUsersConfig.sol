@@ -17,7 +17,8 @@ contract WalletUsersConfig is WalletUtils {
             fee_auction_admin: getWalletAddress(),
             delegation_admin: getWalletAddress(),
             middleware_admin: getWalletAddress(),
-            staker_rewards_admin: getWalletAddress()
+            staker_rewards_admin: getWalletAddress(),
+            insurance_fund: getWalletAddress()
         });
     }
 }

@@ -32,6 +32,17 @@
         "receiveUln301": "0x5937A5fe272fbA38699A1b75B3439389EEFDb399",
         "receiveUln302": "0xdAf00F5eE2158dD58E0d3857851c432E34A3A851"
     },
+    "17000": {
+        "chainName": "Ethereum Holesky Testnet",
+        "nativeChainId": 17000,
+        "eid": "40217",
+        "executor": "0xBc0C24E6f24eC2F1fd7E859B8322A1277F80aaD5",
+        "endpointV2": "0x6EDCE65403992e310A62460808c4b910D972f10f",
+        "sendUln301": "0xDD066F8c7592bf7235F314028E5e01a66F9835F0",
+        "sendUln302": "0x21F33EcF7F65D61f77e554B4B4380829908cD076",
+        "receiveUln301": "0x8d00218390E52B30d755882E09B2418eD08dCa7d",
+        "receiveUln302": "0xbAe52D605770aD2f0D17533ce56D146c7C964A0d"
+    },
     "6342": {
         "chainName": "MegaETH Testnet",
         "nativeChainId": 6342,

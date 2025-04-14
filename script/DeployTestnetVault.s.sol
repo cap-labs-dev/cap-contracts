@@ -11,6 +11,7 @@ import { OracleMocksConfig } from "../test/deploy/interfaces/TestDeployConfig.so
 import { DeployMocks } from "../test/deploy/service/DeployMocks.sol";
 
 import {
+    FeeConfig,
     ImplementationsConfig,
     InfraConfig,
     LibsConfig,
@@ -57,30 +58,37 @@ contract DeployTestnetVault is
         zapAb = _getZapAddressbook();
         (implems, libs, infra) = _readInfraConfig();
 
-        assetMocks = new address[](3);
-        assetMocks[0] = address(new MockERC20("USDT", "USDT", 6));
-        assetMocks[1] = address(new MockERC20("USDC", "USDC", 6));
-        assetMocks[2] = address(new MockERC20("USDx", "USDx", 18));
+        assetMocks = _deployUSDMocks();
         oracleMocks = _deployOracleMocks(assetMocks);
 
-        vault = _deployVault(implems, infra, "Cap USD", "cUSD", oracleMocks.assets);
+        vault = _deployVault(implems, infra, "Cap USD", "cUSD", oracleMocks.assets, users.insurance_fund);
         vault.lzperiphery = _deployVaultLzPeriphery(lzAb, zapAb, vault, users);
 
         /// ACCESS CONTROL
-        _initVaultAccessControl(infra, vault, env.users);
+        _initVaultAccessControl(infra, vault, users);
 
         /// VAULT ORACLE
+        _initOracleMocks(oracleMocks, 1e8, uint256(0.1e27));
         _initVaultOracle(libs, infra, vault);
-
-        /// ORACLE mocks configuration
-        _initOracleMocks(oracleMocks);
         for (uint256 i = 0; i < oracleMocks.assets.length; i++) {
-            _initChainlinkPriceOracle(libs, infra, oracleMocks.assets[i], oracleMocks.chainlinkPriceFeeds[i]);
-            _initAaveRateOracle(libs, infra, oracleMocks.assets[i], oracleMocks.aaveDataProviders[i]);
+            address asset = oracleMocks.assets[i];
+            address priceFeed = oracleMocks.chainlinkPriceFeeds[i];
+            address aaveDataProvider = oracleMocks.aaveDataProviders[i];
+            _initChainlinkPriceOracle(libs, infra, asset, priceFeed);
+            _initAaveRateOracle(libs, infra, asset, aaveDataProvider);
         }
 
+        FeeConfig memory fee = FeeConfig({
+            minMintFee: 0.005e27, // 0.5% minimum mint fee
+            slope0: 0, // allow liquidity to be added without fee
+            slope1: 0, // allow liquidity to be added without fee to start with
+            mintKinkRatio: 0.85e27,
+            burnKinkRatio: 0.15e27,
+            optimalRatio: 0.33e27
+        });
+
         /// LENDER
-        _initVaultLender(vault, infra);
+        _initVaultLender(vault, infra, fee);
 
         _saveVaultConfig(vault);
         vm.stopBroadcast();
