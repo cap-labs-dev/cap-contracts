@@ -35,7 +35,6 @@ contract LenderLiquidateTest is TestDeployer {
                 vault: address(cUSD),
                 debtToken: env.usdVault.debtTokens[0],
                 interestReceiver: env.usdVault.feeAuction,
-                restakerInterestReceiver: env.infra.delegation,
                 bonusCap: 0.1e27,
                 minBorrow: 100e6
             })
@@ -48,7 +47,6 @@ contract LenderLiquidateTest is TestDeployer {
                 vault: address(0),
                 debtToken: env.usdVault.debtTokens[0],
                 interestReceiver: env.usdVault.feeAuction,
-                restakerInterestReceiver: env.infra.delegation,
                 bonusCap: 0.1e27,
                 minBorrow: 100e6
             })
@@ -61,7 +59,6 @@ contract LenderLiquidateTest is TestDeployer {
                 vault: address(cUSD),
                 debtToken: address(0),
                 interestReceiver: env.usdVault.feeAuction,
-                restakerInterestReceiver: env.infra.delegation,
                 bonusCap: 0.1e27,
                 minBorrow: 100e6
             })
@@ -74,7 +71,6 @@ contract LenderLiquidateTest is TestDeployer {
                 vault: address(cUSD),
                 debtToken: env.usdVault.debtTokens[0],
                 interestReceiver: address(0),
-                restakerInterestReceiver: env.infra.delegation,
                 bonusCap: 0.1e27,
                 minBorrow: 100e6
             })
@@ -87,7 +83,6 @@ contract LenderLiquidateTest is TestDeployer {
                 vault: address(cUSD),
                 debtToken: env.usdVault.debtTokens[0],
                 interestReceiver: env.usdVault.feeAuction,
-                restakerInterestReceiver: address(0),
                 bonusCap: 0.1e27,
                 minBorrow: 100e6
             })
@@ -99,7 +94,6 @@ contract LenderLiquidateTest is TestDeployer {
                 vault: address(cUSD),
                 debtToken: env.usdVault.debtTokens[0],
                 interestReceiver: env.usdVault.feeAuction,
-                restakerInterestReceiver: env.infra.delegation,
                 bonusCap: 0.1e27,
                 minBorrow: 100e6
             })

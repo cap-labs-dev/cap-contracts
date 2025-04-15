@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { IDelegation } from "../../interfaces/IDelegation.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 import { ILender } from "../../interfaces/ILender.sol";
 import { ViewLogic } from "./ViewLogic.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title Validation Logic
 /// @author kexley, @capLabs
@@ -50,9 +48,6 @@ library ValidationLogic {
     /// @dev Debt token not set
     error DebtTokenNotSet();
 
-    /// @dev Restaker interest receiver not set
-    error RestakerInterestReceiverNotSet();
-
     /// @dev Minimum borrow amount
     error MinBorrowAmount();
 
@@ -69,8 +64,6 @@ library ValidationLogic {
         uint256 borrowCapacity = ViewLogic.maxBorrowable($, params.agent, params.asset);
 
         if (params.amount > borrowCapacity) revert CollateralCannotCoverNewBorrow();
-
-        IDelegation($.delegation).setLastBorrow(params.agent);
     }
 
     /// @notice Validate the initialization of the liquidation of an agent
@@ -114,7 +107,6 @@ library ValidationLogic {
     function validateAddAsset(ILender.LenderStorage storage $, ILender.AddAssetParams memory params) external view {
         if (params.asset == address(0) || params.vault == address(0)) revert ZeroAddressNotValid();
         if (params.interestReceiver == address(0)) revert InterestReceiverNotSet();
-        if (params.restakerInterestReceiver == address(0)) revert RestakerInterestReceiverNotSet();
         if (params.debtToken == address(0)) revert DebtTokenNotSet();
         if ($.reservesData[params.asset].vault != address(0)) revert ReserveAlreadyInitialized();
     }

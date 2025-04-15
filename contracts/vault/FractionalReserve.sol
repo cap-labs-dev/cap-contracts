@@ -103,8 +103,8 @@ abstract contract FractionalReserve is IFractionalReserve, Access, FractionalRes
     }
 
     /// @notice Interest receiver address
-    /// @return interestReceiver Interest receiver address
-    function interestReceiver() external view returns (address interestReceiver) {
-        interestReceiver = getFractionalReserveStorage().interestReceiver;
+    /// @return _interestReceiver Interest receiver address
+    function interestReceiver() external view returns (address _interestReceiver) {
+        _interestReceiver = getFractionalReserveStorage().interestReceiver;
     }
 }

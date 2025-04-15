@@ -63,7 +63,6 @@ contract DeployVault is ProxyUtils {
 
         // deploy and init debt tokens
         d.assets = assets;
-        d.restakerInterestReceiver = infra.delegation;
         d.debtTokens = new address[](assets.length);
         for (uint256 i = 0; i < assets.length; i++) {
             d.debtTokens[i] = _proxy(implementations.debtToken);
@@ -150,7 +149,6 @@ contract DeployVault is ProxyUtils {
                     vault: d.capToken,
                     debtToken: d.debtTokens[i],
                     interestReceiver: d.feeAuction,
-                    restakerInterestReceiver: d.restakerInterestReceiver,
                     bonusCap: 0.1e27,
                     minBorrow: 100e6
                 })
