@@ -1,26 +1,26 @@
 {
     "17000": {
         "implems": {
-            "accessControl": "0x8BC89D0BC47e61263587ABe02CC2dC9194064747",
-            "lender": "0x04eAafF238008dD867cFEBA290e23a2660C813c2",
-            "delegation": "0xfB716e4FBAEbf332C1242086Ff1A4f828EF03eA3",
-            "capToken": "0x4dbEEA695E2167A9112AeaE80F473E789E5692f8",
-            "stakedCap": "0x216466572B621302c8b6771B96D0bb4697F79554",
-            "oracle": "0x9c0897B7d647D36620b43585de3F57eF596C94BB",
-            "debtToken": "0x2BAf9C8f97165FCDb7D6a56079C7c348EEb6dB8c",
-            "feeAuction": "0xfE84D26264280dD3DC9BFCc9E2034AED9712B3eb"
+            "accessControl": "0x0aB937E2871b36dB879Fd4aaDEb92aa8DD59117d",
+            "capToken": "0x39fCAf610fdd8E97dD77F1dEe4f46691cd3b48Eb",
+            "debtToken": "0x7758a18f965F5bd22953A8784Ae2307b9514EDBc",
+            "delegation": "0x149D130FFFD86f9C78cD615F12139B89a5B8bd6E",
+            "feeAuction": "0xBdD577223a6953ec3bBED54b82698567F894B8FD",
+            "lender": "0x92Dac2D721bc68Fec543255b2cE34388c5Ec82E1",
+            "oracle": "0xceee54B8C27e6c9F5B3301d0791DD47FEEc83fE2",
+            "stakedCap": "0x2Bc76508C1aE269caace933A3089104523681f3a"
         },
         "infra": {
-            "accessControl": "0x99311fB0B00a17Bd748c76a884bB8223E62e1591",
-            "delegation": "0x8E6112d494da56011b5d1424A91D2d6AC83cedBC",
-            "lender": "0x10A81f0F2386Bbf8DFfdeeb404cf7332ac9A05a7",
-            "oracle": "0xc5A34A200830632B5e1750368a781983B1D77231"
+            "accessControl": "0xF62cD9F54fF43384aa0033061196E5855CC09C88",
+            "delegation": "0x9303B828D62FFCF576f5959E9e552640FD52Fe54",
+            "lender": "0xF46370C2612ede06515469c334489B1a1e56a870",
+            "oracle": "0x0e771D65FD3c1b87a9e71abb057b981A22459a26"
         },
         "libs": {
-            "aaveAdapter": "0xaafec81Bc533b7005D065f94AEE62970cC73CC81",
-            "capTokenAdapter": "0xE2fA10B4826c5fabD7D8DCab275144Af66B3E366",
-            "chainlinkAdapter": "0x3C3F0C85D0CDd3A1486976EF7fBA7dA873a96D1d",
-            "stakedCapAdapter": "0xFccA85674d0672E4DDf8589760A79D3d53bc81c2"
+            "aaveAdapter": "0xE519A2875DC266bf96eB9b7Fa4DE32D9EB5C8623",
+            "capTokenAdapter": "0x0F46E2d7D80966CB819Ce0C5687C91C944dd86A9",
+            "chainlinkAdapter": "0x8d1347316b0dFAD60F144a5F3D841A86cB81De76",
+            "stakedCapAdapter": "0x5B4CB48aF23d6E7C594AC240BD076dAbDdEbC67F"
         }
     }
 }

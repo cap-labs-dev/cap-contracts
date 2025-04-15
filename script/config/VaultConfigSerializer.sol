@@ -43,7 +43,6 @@ contract VaultConfigSerializer is TokenSerializer {
         vaultJson.serialize("capToken", _serializeToken(vault.capToken));
         vaultJson.serialize("stakedCapToken", _serializeToken(vault.stakedCapToken));
         vaultJson.serialize("feeAuction", vault.feeAuction);
-        vaultJson.serialize("restakerInterestReceiver", vault.restakerInterestReceiver);
         vaultJson.serialize("capOFTLockbox", vault.lzperiphery.capOFTLockbox);
         vaultJson.serialize("capZapComposer", vault.lzperiphery.capZapComposer);
         vaultJson.serialize("stakedCapOFTLockbox", vault.lzperiphery.stakedCapOFTLockbox);
@@ -117,7 +116,6 @@ contract VaultConfigSerializer is TokenSerializer {
         vault = VaultConfig({
             capToken: json.readAddress(string.concat(tokenPrefix, "['capToken'].address")),
             stakedCapToken: json.readAddress(string.concat(tokenPrefix, "['stakedCapToken'].address")),
-            restakerInterestReceiver: json.readAddress(string.concat(tokenPrefix, "restakerInterestReceiver")),
             feeAuction: json.readAddress(string.concat(tokenPrefix, "feeAuction")),
             lzperiphery: VaultLzPeriphery({
                 capOFTLockbox: json.readAddress(string.concat(tokenPrefix, "capOFTLockbox")),

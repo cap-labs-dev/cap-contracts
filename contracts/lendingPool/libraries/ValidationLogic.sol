@@ -56,7 +56,7 @@ library ValidationLogic {
     /// borrow.
     /// @param $ Lender storage
     /// @param params Validation parameters
-    function validateBorrow(ILender.LenderStorage storage $, ILender.BorrowParams memory params) external {
+    function validateBorrow(ILender.LenderStorage storage $, ILender.BorrowParams memory params) external view {
         if (params.amount < $.reservesData[params.asset].minBorrow) revert MinBorrowAmount();
         if (params.receiver == address(0) || params.asset == address(0)) revert ZeroAddressNotValid();
         if ($.reservesData[params.asset].paused) revert ReservePaused();

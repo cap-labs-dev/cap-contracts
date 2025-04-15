@@ -95,9 +95,3 @@ yul = true                                    # default true
 [profile.slither]
 inherit = "default"
 via_ir = true
-
-[rpc_endpoints]
-sepolia = "https://eth-sepolia.api.onfinality.io/public"
-
-[etherscan]
-sepolia = { key = "9MVYU76XFSJ66YUQV3U89QVBR6YIGRGU5Y", url = "https://api-sepolia.etherscan.io/api" }
