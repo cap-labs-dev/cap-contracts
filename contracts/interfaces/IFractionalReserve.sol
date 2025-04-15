@@ -7,7 +7,7 @@ pragma solidity ^0.8.28;
 interface IFractionalReserve {
     /// @custom:storage-location erc7201:cap.storage.FractionalReserve
     struct FractionalReserveStorage {
-        address feeAuction;
+        address interestReceiver;
         mapping(address => uint256) loaned;
         mapping(address => uint256) reserve;
         mapping(address => address) vault;

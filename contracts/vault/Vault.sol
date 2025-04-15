@@ -199,9 +199,9 @@ abstract contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, Fract
 
     /// @notice Get the total supplies of an asset
     /// @param _asset Asset address
-    /// @return totalSupply Total supply
-    function totalSupplies(address _asset) external view returns (uint256 totalSupply) {
-        totalSupply = getVaultStorage().totalSupplies[_asset];
+    /// @return _totalSupply Total supply
+    function totalSupplies(address _asset) external view returns (uint256 _totalSupply) {
+        _totalSupply = getVaultStorage().totalSupplies[_asset];
     }
 
     /// @notice Get the total borrows of an asset

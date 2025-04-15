@@ -16,6 +16,21 @@ library FractionalReserveLogic {
     /// @dev Loss not allowed from fractional reserve
     error LossFromFractionalReserve(address asset, address vault, uint256 loss);
 
+    /// @dev Fractional reserve invested event
+    event FractionalReserveInvested(address indexed asset, uint256 amount);
+
+    /// @dev Fractional reserve divested event
+    event FractionalReserveDivested(address indexed asset, uint256 amount);
+
+    /// @dev Fractional reserve vault updated event
+    event FractionalReserveVaultUpdated(address indexed asset, address vault);
+
+    /// @dev Fractional reserve reserve updated event
+    event FractionalReserveReserveUpdated(address indexed asset, uint256 reserve);
+
+    /// @dev Fractional reserve interest realized event
+    event FractionalReserveInterestRealized(address indexed asset);
+
     /// @notice Invest unborrowed capital in a fractional reserve vault
     /// @param $ Storage pointer
     /// @param _asset Asset address
@@ -28,6 +43,8 @@ library FractionalReserveLogic {
             $.loaned[_asset] += investAmount;
             IERC20(_asset).forceApprove($.vault[_asset], investAmount);
             IERC4626($.vault[_asset]).deposit(investAmount, address(this));
+
+            emit FractionalReserveInvested(_asset, investAmount);
         }
     }
 
@@ -43,10 +60,12 @@ library FractionalReserveLogic {
             if (vaultBalance > 0) {
                 uint256 redeemedAssets = IERC4626($.vault[_asset]).redeem(vaultBalance, address(this), address(this));
                 if (redeemedAssets > loanedAssets) {
-                    IERC20(_asset).safeTransfer($.feeAuction, redeemedAssets - loanedAssets);
+                    IERC20(_asset).safeTransfer($.interestReceiver, redeemedAssets - loanedAssets);
                 } else if (redeemedAssets < loanedAssets) {
                     revert LossFromFractionalReserve(_asset, $.vault[_asset], loanedAssets - redeemedAssets);
                 }
+
+                emit FractionalReserveDivested(_asset, loanedAssets);
             }
         }
     }
@@ -75,6 +94,8 @@ library FractionalReserveLogic {
                         revert LossFromFractionalReserve(_asset, $.vault[_asset], loss);
                     }
                 }
+
+                emit FractionalReserveDivested(_asset, divestAmount);
             }
         }
     }
@@ -89,6 +110,8 @@ library FractionalReserveLogic {
         address _vault
     ) external {
         $.vault[_asset] = _vault;
+
+        emit FractionalReserveVaultUpdated(_asset, _vault);
     }
 
     /// @notice Set the reserve level for an asset
@@ -99,13 +122,17 @@ library FractionalReserveLogic {
         external
     {
         $.reserve[_asset] = _reserve;
+
+        emit FractionalReserveReserveUpdated(_asset, _reserve);
     }
 
     /// @notice Realize interest from a fractional reserve vault
     /// @param $ Storage pointer
     /// @param _asset Asset address
     function realizeInterest(IFractionalReserve.FractionalReserveStorage storage $, address _asset) external {
-        IERC4626($.vault[_asset]).withdraw(claimableInterest($, _asset), $.feeAuction, address(this));
+        IERC4626($.vault[_asset]).withdraw(claimableInterest($, _asset), $.interestReceiver, address(this));
+
+        emit FractionalReserveInterestRealized(_asset);
     }
 
     /// @notice Interest from a fractional reserve vault
