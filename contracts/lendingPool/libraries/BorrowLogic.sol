@@ -51,6 +51,8 @@ library BorrowLogic {
 
         ValidationLogic.validateBorrow($, params);
 
+        IDelegation($.delegation).setLastBorrow(params.agent);
+
         ILender.ReserveData storage reserve = $.reservesData[params.asset];
         if (!$.agentConfig[params.agent].isBorrowing(reserve.id)) {
             $.agentConfig[params.agent].setBorrowing(reserve.id, true);

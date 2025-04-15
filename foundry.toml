@@ -34,8 +34,10 @@ fs_permissions = [
     { access = "read-write", path = "./config/cap-infra.json" },
     { access = "read-write", path = "./config/cap-symbiotic.json" },
     { access = "read-write", path = "./config/cap-vaults-11155111.json" },
+    { access = "read-write", path = "./config/cap-vaults-17000.json" },
     { access = "read-write", path = "./config/cap-l2tokens-421614.json" },
     { access = "read-write", path = "./config/cap-symbiotic-vaults-11155111.json" },
+    { access = "read-write", path = "./config/cap-symbiotic-vaults-17000.json" },
 ]
 optimizer = true
 optimizer_runs = 200
@@ -93,9 +95,3 @@ yul = true                                    # default true
 [profile.slither]
 inherit = "default"
 via_ir = true
-
-[rpc_endpoints]
-sepolia = "https://eth-sepolia.api.onfinality.io/public"
-
-[etherscan]
-sepolia = { key = "9MVYU76XFSJ66YUQV3U89QVBR6YIGRGU5Y", url = "https://api-sepolia.etherscan.io/api" }

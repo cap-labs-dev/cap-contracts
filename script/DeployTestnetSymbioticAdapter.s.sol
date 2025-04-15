@@ -18,8 +18,9 @@ import {
     SymbioticNetworkAdapterConfig,
     SymbioticNetworkAdapterImplementationsConfig
 } from "../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
-import { DeploySymbioticVault } from "../contracts/deploy/service/providers/symbiotic/DeploySymbioticVault.sol";
 
+import { ConfigureDelegation } from "../contracts/deploy/service/ConfigureDelegation.sol";
+import { DeploySymbioticVault } from "../contracts/deploy/service/providers/symbiotic/DeploySymbioticVault.sol";
 import { InfraConfigSerializer } from "./config/InfraConfigSerializer.sol";
 import { SymbioticAdapterConfigSerializer } from "./config/SymbioticAdapterConfigSerializer.sol";
 import { WalletUsersConfig } from "./config/WalletUsersConfig.sol";
@@ -32,6 +33,7 @@ contract DeployTestnetSymbioticAdapter is
     WalletUtils,
     DeploySymbioticVault,
     DeployCapNetworkAdapter,
+    ConfigureDelegation,
     SymbioticAdapterConfigSerializer,
     WalletUsersConfig,
     InfraConfigSerializer
@@ -60,9 +62,10 @@ contract DeployTestnetSymbioticAdapter is
             infra,
             symbioticAb,
             networkAdapterImplems,
-            SymbioticNetworkAdapterParams({ vaultEpochDuration: 1 hours, slashDuration: 50 minutes })
+            SymbioticNetworkAdapterParams({ vaultEpochDuration: 7 days, feeAllowed: 1000 })
         );
 
+        _registerNetworkForCapDelegation(infra, networkAdapter.networkMiddleware);
         _initSymbioticNetworkAdapterAccessControl(infra, networkAdapter, users);
         _registerCapNetwork(symbioticAb, networkAdapter);
 

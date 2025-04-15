@@ -27,21 +27,25 @@ contract VaultConfigSerializer is TokenSerializer {
         string[] memory assetsJson = new string[](vault.assets.length);
         for (uint256 i = 0; i < vault.assets.length; i++) {
             string memory assetJson = string.concat("assets[", Strings.toString(i), "]");
-            assetJson.serialize("asset", _serializeToken(vault.assets[i]));
-            assetJson.serialize("principalDebtToken", _serializeToken(vault.principalDebtTokens[i]));
-            assetJson.serialize("restakerDebtToken", _serializeToken(vault.restakerDebtTokens[i]));
-            assetJson = assetJson.serialize("interestDebtToken", _serializeToken(vault.interestDebtTokens[i]));
+            assetJson = assetJson.serialize("asset", _serializeToken(vault.assets[i]));
             console.log(assetJson);
             assetsJson[i] = assetJson;
         }
+        string[] memory debtTokensJson = new string[](vault.debtTokens.length);
+        for (uint256 i = 0; i < vault.debtTokens.length; i++) {
+            string memory debtTokenJson = string.concat("debtTokens[", Strings.toString(i), "]");
+            debtTokenJson = debtTokenJson.serialize("debtToken", _serializeToken(vault.debtTokens[i]));
+            debtTokensJson[i] = debtTokenJson;
+        }
 
         vaultJson.serialize("assets", assetsJson);
+        vaultJson.serialize("debtTokens", debtTokensJson);
         vaultJson.serialize("capToken", _serializeToken(vault.capToken));
-        vaultJson.serialize("restakerInterestReceiver", vault.restakerInterestReceiver);
+        vaultJson.serialize("stakedCapToken", _serializeToken(vault.stakedCapToken));
+        vaultJson.serialize("feeAuction", vault.feeAuction);
         vaultJson.serialize("capOFTLockbox", vault.lzperiphery.capOFTLockbox);
         vaultJson.serialize("capZapComposer", vault.lzperiphery.capZapComposer);
-        vaultJson.serialize("stakedCapToken", _serializeToken(vault.stakedCapToken));
-        vaultJson = vaultJson.serialize("stakedCapOFTLockbox", vault.lzperiphery.stakedCapOFTLockbox);
+        vaultJson.serialize("stakedCapOFTLockbox", vault.lzperiphery.stakedCapOFTLockbox);
         vaultJson = vaultJson.serialize("stakedCapZapComposer", vault.lzperiphery.stakedCapZapComposer);
         console.log(vaultJson);
 
@@ -80,38 +84,39 @@ contract VaultConfigSerializer is TokenSerializer {
         //        https://crates.io/crates/jsonpath-rust
 
         address[] memory assets = new address[](100);
-        address[] memory principalDebtTokens = new address[](100);
-        address[] memory restakerDebtTokens = new address[](100);
-        address[] memory interestDebtTokens = new address[](100);
         uint256 count = 0;
-        for (uint256 i = 0; i < 100; i++) {
-            string memory prefix = string.concat(tokenPrefix, "assets[", Strings.toString(i), "].");
+        for (; count < 100; count++) {
+            string memory prefix = string.concat(tokenPrefix, "assets[", Strings.toString(count), "].");
             address asset = json.readAddressOr(string.concat(prefix, "asset.address"), address(0));
             if (asset == address(0)) {
                 break;
             }
-            assets[i] = asset;
-            principalDebtTokens[i] = json.readAddress(string.concat(prefix, "principalDebtToken.address"));
-            restakerDebtTokens[i] = json.readAddress(string.concat(prefix, "restakerDebtToken.address"));
-            interestDebtTokens[i] = json.readAddress(string.concat(prefix, "interestDebtToken.address"));
-            count = count + 1;
+            assets[count] = asset;
         }
-
         address[] memory trueAssets = new address[](count);
-        address[] memory truePrincipalDebtTokens = new address[](count);
-        address[] memory trueRestakerDebtTokens = new address[](count);
-        address[] memory trueInterestDebtTokens = new address[](count);
         for (uint256 i = 0; i < count; i++) {
             trueAssets[i] = assets[i];
-            truePrincipalDebtTokens[i] = principalDebtTokens[i];
-            trueRestakerDebtTokens[i] = restakerDebtTokens[i];
-            trueInterestDebtTokens[i] = interestDebtTokens[i];
+        }
+
+        address[] memory debtTokens = new address[](100);
+        count = 0;
+        for (; count < 100; count++) {
+            string memory prefix = string.concat(tokenPrefix, "debtTokens[", Strings.toString(count), "].");
+            address debtToken = json.readAddressOr(string.concat(prefix, "debtToken.address"), address(0));
+            if (debtToken == address(0)) {
+                break;
+            }
+            debtTokens[count] = debtToken;
+        }
+        address[] memory trueDebtTokens = new address[](count);
+        for (uint256 i = 0; i < count; i++) {
+            trueDebtTokens[i] = debtTokens[i];
         }
 
         vault = VaultConfig({
             capToken: json.readAddress(string.concat(tokenPrefix, "['capToken'].address")),
             stakedCapToken: json.readAddress(string.concat(tokenPrefix, "['stakedCapToken'].address")),
-            restakerInterestReceiver: json.readAddress(string.concat(tokenPrefix, "restakerInterestReceiver")),
+            feeAuction: json.readAddress(string.concat(tokenPrefix, "feeAuction")),
             lzperiphery: VaultLzPeriphery({
                 capOFTLockbox: json.readAddress(string.concat(tokenPrefix, "capOFTLockbox")),
                 stakedCapOFTLockbox: json.readAddress(string.concat(tokenPrefix, "stakedCapOFTLockbox")),
@@ -119,9 +124,7 @@ contract VaultConfigSerializer is TokenSerializer {
                 stakedCapZapComposer: json.readAddress(string.concat(tokenPrefix, "stakedCapZapComposer"))
             }),
             assets: trueAssets,
-            principalDebtTokens: truePrincipalDebtTokens,
-            restakerDebtTokens: trueRestakerDebtTokens,
-            interestDebtTokens: trueInterestDebtTokens
+            debtTokens: trueDebtTokens
         });
     }
 }

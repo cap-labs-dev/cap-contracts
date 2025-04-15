@@ -23,8 +23,8 @@ contract DeployInfra is
     Script,
     WalletUsersConfig,
     InfraConfigSerializer,
-    DeployInfraService,
     DeployImplems,
+    DeployInfraService,
     DeployLibs,
     ConfigureAccessControl
 {

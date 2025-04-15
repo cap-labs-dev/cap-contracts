@@ -13,9 +13,9 @@ import { FractionalReserveLogic } from "./libraries/FractionalReserveLogic.sol";
 /// withdrawing, redeeming or borrowing.
 abstract contract FractionalReserve is IFractionalReserve, Access, FractionalReserveStorageUtils {
     /// @dev Initialize unchained
-    /// @param _feeAuction Fee auction address
-    function __FractionalReserve_init(address _feeAuction) internal onlyInitializing {
-        getFractionalReserveStorage().feeAuction = _feeAuction;
+    /// @param _interestReceiver Interest receiver address
+    function __FractionalReserve_init(address _interestReceiver) internal onlyInitializing {
+        getFractionalReserveStorage().interestReceiver = _interestReceiver;
     }
 
     /// @notice Invest unborrowed capital in a fractional reserve vault (up to the reserve)
@@ -100,5 +100,11 @@ abstract contract FractionalReserve is IFractionalReserve, Access, FractionalRes
     /// @return loanedAmount Loaned amount
     function loaned(address _asset) external view returns (uint256 loanedAmount) {
         loanedAmount = getFractionalReserveStorage().loaned[_asset];
+    }
+
+    /// @notice Interest receiver address
+    /// @return _interestReceiver Interest receiver address
+    function interestReceiver() external view returns (address _interestReceiver) {
+        _interestReceiver = getFractionalReserveStorage().interestReceiver;
     }
 }

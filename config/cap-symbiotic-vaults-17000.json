@@ -1,0 +1,12 @@
+{
+    "0xd88dDf98fE4d161a66FB836bee4Ca469eb0E4a75": {
+        "burnerRouter": "",
+        "collateral": "0x8d09a4502Cc8Cf1547aD300E066060D043f6982D",
+        "delegator": "0x85CF967A8DDFAf8C0DFB9c75d9E92a3C785A6532",
+        "globalReceiver": "",
+        "slasher": "0x57e5Fb61981fa1b43a074B2aeb47CCF157b19223",
+        "stakerRewarder": "",
+        "vault": "0xd88dDf98fE4d161a66FB836bee4Ca469eb0E4a75",
+        "vaultEpochDuration": 3600
+    }
+}

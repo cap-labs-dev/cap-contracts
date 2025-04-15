@@ -13,6 +13,20 @@ library ReserveLogic {
     /// @dev No more reserves allowed
     error NoMoreReservesAllowed();
 
+    /// @dev Reserve added event
+    event ReserveAssetAdded(
+        address indexed asset, address vault, address debtToken, address interestReceiver, uint256 id
+    );
+
+    /// @dev Reserve removed event
+    event ReserveAssetRemoved(address indexed asset);
+
+    /// @dev Min borrow set event
+    event ReserveMinBorrowUpdated(address indexed asset, uint256 minBorrow);
+
+    /// @dev Reserve asset pause state updated event
+    event ReserveAssetPauseStateUpdated(address indexed asset, bool paused);
+
     /// @notice Add asset to the lender
     /// @param $ Lender storage
     /// @param params Parameters for adding an asset
@@ -49,6 +63,8 @@ library ReserveLogic {
         reserve.decimals = IERC20Metadata(params.asset).decimals();
         reserve.paused = true;
         reserve.minBorrow = params.minBorrow;
+
+        emit ReserveAssetAdded(params.asset, params.vault, params.debtToken, params.interestReceiver, id);
     }
 
     /// @notice Set the minimum borrow amount for an asset
@@ -58,6 +74,8 @@ library ReserveLogic {
     function setMinBorrow(ILender.LenderStorage storage $, address _asset, uint256 _minBorrow) external {
         ValidationLogic.validateSetMinBorrow($, _asset);
         $.reservesData[_asset].minBorrow = _minBorrow;
+
+        emit ReserveMinBorrowUpdated(_asset, _minBorrow);
     }
 
     /// @notice Remove asset from lending when there is no borrows
@@ -68,6 +86,8 @@ library ReserveLogic {
 
         $.reservesList[$.reservesData[_asset].id] = address(0);
         delete $.reservesData[_asset];
+
+        emit ReserveAssetRemoved(_asset);
     }
 
     /// @notice Pause an asset from being borrowed
@@ -77,5 +97,7 @@ library ReserveLogic {
     function pauseAsset(ILender.LenderStorage storage $, address _asset, bool _pause) external {
         ValidationLogic.validatePauseAsset($, _asset);
         $.reservesData[_asset].paused = _pause;
+
+        emit ReserveAssetPauseStateUpdated(_asset, _pause);
     }
 }

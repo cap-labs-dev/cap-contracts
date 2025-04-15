@@ -565,7 +565,6 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
 
     function setAssetOraclePrice(uint256 assetSeed, uint256 priceSeed) external {
         address currentAsset = randomAsset(assetSeed);
-        uint256 decimals = MockERC20(currentAsset).decimals();
         uint256 price = bound(priceSeed, 0.001e8, 10_000e8);
 
         mockOracle.setPrice(currentAsset, price);

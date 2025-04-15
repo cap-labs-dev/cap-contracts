@@ -9,5 +9,16 @@
             "network": "0xB95E2C9d43EB886EDAb0441A6BFf2b59D7e89e5D",
             "networkMiddleware": "0xcaadd1b8dD14b1581cB3D3172359C643FaCD82D9"
         }
+    },
+    "17000": {
+        "adapter": {
+            "feeAllowed": 1000,
+            "network": "0x6975C1483AB8C67533242D7012831e72d281809D",
+            "networkMiddleware": "0x9aB537b1F1C8890f77a2971a9c695e672E249a3a"
+        },
+        "implems": {
+            "network": "0x1b4f1A170E0C5D11475ad3dc78cE578CA0c10f29",
+            "networkMiddleware": "0x6400d49F8A061bB9f2EE10a4Eabaa73bADea3043"
+        }
     }
 }

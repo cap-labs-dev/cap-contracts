@@ -103,14 +103,12 @@ interface ILender {
     /// @param vault Address of the vault
     /// @param debtToken Address of the debt token
     /// @param interestReceiver Address of the interest receiver
-    /// @param restakerInterestReceiver Address of the restaker interest receiver
     /// @param bonusCap Bonus cap for liquidations
     struct AddAssetParams {
         address asset;
         address vault;
         address debtToken;
         address interestReceiver;
-        address restakerInterestReceiver;
         uint256 bonusCap;
         uint256 minBorrow;
     }
