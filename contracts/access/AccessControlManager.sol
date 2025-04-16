@@ -23,6 +23,7 @@ contract AccessControlManager is UUPSUpgradeable, AccessControlManagerStorageUti
     string internal constant ROLE_MANAGER_ADMIN = "ROLE_MANAGER_ADMIN";
 
     /// @dev Custom errors for permission checks
+    error RoleAlreadyExists();
     error NoRemainingAdmins();
     error CriticalPermissionRemoved();
     error CriticalRoleAccessRemoved();
@@ -261,7 +262,9 @@ contract AccessControlManager is UUPSUpgradeable, AccessControlManagerStorageUti
         bytes32 roleHash = _roleToHash(_role);
 
         // Check if role already exists
-        require(!s.roleNames.contains(roleHash), "Role already exists");
+        if (s.roleNames.contains(roleHash)) {
+            revert RoleAlreadyExists();
+        }
 
         // Add role to storage
         s.roleNames.add(roleHash);
