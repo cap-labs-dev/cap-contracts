@@ -12,6 +12,11 @@ contract MockAccessControl is IAccessControl {
         // Always ok
     }
 
+    function hasAccess(bytes4 _selector, address _contract, address _caller) external pure returns (bool) {
+        // Always true
+        return true;
+    }
+
     function grantAccess(bytes4 _selector, address _contract, address _caller) external {
         // Do nothing, access is always granted
     }

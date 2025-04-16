@@ -12,11 +12,17 @@ interface IAccessControl {
     /// @param _admin Default admin address
     function initialize(address _admin) external;
 
-    /// @notice Check a specific method access is granted to an address
+    /// @notice Check a specific method access is granted to an address, reverts if not
     /// @param _selector Function selector
     /// @param _contract Contract being called
     /// @param _caller Address to check role for
     function checkAccess(bytes4 _selector, address _contract, address _caller) external view;
+
+    /// @notice Fetch if an address has access to a specific method on a contract
+    /// @param _selector Function selector
+    /// @param _contract Contract being called
+    /// @param _caller Address to check role for
+    function hasAccess(bytes4 _selector, address _contract, address _caller) external view returns (bool);
 
     /// @notice Grant access to a specific method on a contract
     /// @param _selector Function selector
