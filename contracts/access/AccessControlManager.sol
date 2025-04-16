@@ -40,13 +40,14 @@ contract AccessControlManager is UUPSUpgradeable, AccessControlManagerStorageUti
     /// @notice Initialize the access control manager
     /// @param _accessControl The access control contract address
     /// @param _admin The admin address
-    function initialize(address _accessControl, address _admin) external onlyInitializing {
+    function initialize(address _accessControl, address _admin) external initializer {
         __Access_init(_accessControl);
 
         IAccessControl ac = IAccessControl(_accessControl);
         // require this contract to be able grant and revoke access
-        ac.checkAccess(ac.grantAccess.selector, address(this), _accessControl);
-        ac.checkAccess(ac.revokeAccess.selector, address(this), _accessControl);
+        ac.checkAccess(bytes4(0), address(0), address(this)); // DEFAULT_ADMIN_ROLE from openzeppelin
+        ac.checkAccess(ac.grantAccess.selector, _accessControl, address(this));
+        ac.checkAccess(ac.revokeAccess.selector, _accessControl, address(this));
 
         // Store access control address
         AccessControlManagerStorage storage s = getAccessControlManagerStorage();
@@ -54,8 +55,8 @@ contract AccessControlManager is UUPSUpgradeable, AccessControlManagerStorageUti
 
         // Grant role management access to self
         RoleAccess[] memory access = _roleManagerAdminMinimalAccesses();
-        _createRole("ROLE_MANAGER_ADMIN", access);
-        _grantRole("ROLE_MANAGER_ADMIN", _admin);
+        _createRole(ROLE_MANAGER_ADMIN, access);
+        _grantRole(ROLE_MANAGER_ADMIN, _admin);
 
         _checkCriticalPermissions();
     }
@@ -336,11 +337,15 @@ contract AccessControlManager is UUPSUpgradeable, AccessControlManagerStorageUti
         IAccessControl ac = IAccessControl(s.accessControl);
 
         // Check if this contract has grant and revoke permissions
-        if (!ac.hasAccess(ac.grantAccess.selector, address(this), address(ac))) {
+        if (!ac.hasAccess(bytes4(0), address(0), address(this))) {
             revert CriticalPermissionRemoved();
         }
 
-        if (!ac.hasAccess(ac.revokeAccess.selector, address(this), address(ac))) {
+        if (!ac.hasAccess(ac.grantAccess.selector, address(ac), address(this))) {
+            revert CriticalPermissionRemoved();
+        }
+
+        if (!ac.hasAccess(ac.revokeAccess.selector, address(ac), address(this))) {
             revert CriticalPermissionRemoved();
         }
 
@@ -383,6 +388,8 @@ contract AccessControlManager is UUPSUpgradeable, AccessControlManagerStorageUti
         criticalAccessIds[2] = RoleAccess({ selector: this.addRoleAccess.selector, contractAddress: address(this) });
         criticalAccessIds[3] = RoleAccess({ selector: this.removeRoleAccess.selector, contractAddress: address(this) });
         criticalAccessIds[4] = RoleAccess({ selector: this.createRole.selector, contractAddress: address(this) });
+        criticalAccessIds[5] = RoleAccess({ selector: this.upgradeToAndCall.selector, contractAddress: address(this) });
+        criticalAccessIds[6] = RoleAccess({ selector: bytes4(0), contractAddress: address(this) });
         return criticalAccessIds;
     }
 

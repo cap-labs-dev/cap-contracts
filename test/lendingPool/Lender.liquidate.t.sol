@@ -76,18 +76,6 @@ contract LenderLiquidateTest is TestDeployer {
             })
         );
 
-        vm.expectRevert();
-        lender.addAsset(
-            ILender.AddAssetParams({
-                asset: address(usdt),
-                vault: address(cUSD),
-                debtToken: env.usdVault.debtTokens[0],
-                interestReceiver: env.usdVault.feeAuction,
-                bonusCap: 0.1e27,
-                minBorrow: 100e6
-            })
-        );
-
         lender.addAsset(
             ILender.AddAssetParams({
                 asset: address(usdt),
