@@ -17,10 +17,10 @@ contract DeployL2Token is Script, WalletUtils, LzUtils, L2TokenConfigSerializer 
     function run() public {
         LzAddressbook memory config = _getLzAddressbook(block.chainid);
 
-        string memory cTokenSymbol = "cETH";
-        string memory cTokenName = "Cap ETH";
-        string memory stcTokenSymbol = "stcETH";
-        string memory stcTokenName = "Staked Cap ETH";
+        string memory cTokenSymbol = "cUSD";
+        string memory cTokenName = "Cap USD";
+        string memory stcTokenSymbol = "stcUSD";
+        string memory stcTokenName = "Staked Cap USD";
 
         address owner = getWalletAddress();
         console.log("owner", owner);

@@ -4,11 +4,38 @@
 
 ACCOUNT=cap-dev
 
-SOURCE_CHAIN=sepolia
-TARGET_CHAIN=arbitrum-sepolia
+SOURCE_CHAIN=$1
+SOURCE_LOCKBOX=$2
 
-SOURCE_LOCKBOX=0x75279C6Dd77bFF08DcE9E4CD4EAc7162c4f38039
-TARGET_TOKEN=0xB196Add2013311ad29755A537369F74978Fb7477
+TARGET_CHAIN=$3
+TARGET_TOKEN=$4
+
+# Define allowed chains
+ALLOWED_CHAINS=("sepolia" "holesky" "arbitrum-sepolia" "megaeth-testnet")
+
+# Validate chain names
+if ! printf '%s\n' "${ALLOWED_CHAINS[@]}" | grep -q "^$SOURCE_CHAIN$"; then
+    echo "Error: Source chain must be one of: ${ALLOWED_CHAINS[*]}"
+    exit 1
+fi
+
+if ! printf '%s\n' "${ALLOWED_CHAINS[@]}" | grep -q "^$TARGET_CHAIN$"; then
+    echo "Error: Target chain must be one of: ${ALLOWED_CHAINS[*]}"
+    exit 1
+fi
+
+# Validate addresses are hex
+if ! [[ $SOURCE_LOCKBOX =~ ^0x[0-9a-fA-F]{40}$ ]]; then
+    echo "Error: Source lockbox must be a valid hex address"
+    exit 1
+fi
+
+if ! [[ $TARGET_TOKEN =~ ^0x[0-9a-fA-F]{40}$ ]]; then
+    echo "Error: Target token must be a valid hex address"
+    exit 1
+fi
+
+
 
 # ------------------
 
