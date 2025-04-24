@@ -109,7 +109,15 @@ contract DeployCapNetworkAdapter is ProxyUtils {
         IBurnerRouter(vault.burnerRouter).acceptNetworkReceiver(adapter.network);
     }
 
-    function _registerVaultsInNetworkMiddleware(
+    function _registerVaultInNetworkMiddleware(
+        SymbioticNetworkAdapterConfig memory adapter,
+        SymbioticVaultConfig memory vault,
+        SymbioticNetworkRewardsConfig memory rewards
+    ) internal {
+        NetworkMiddleware(adapter.networkMiddleware).registerVault(vault.vault, rewards.stakerRewarder);
+    }
+
+    function _registerAgentInNetworkMiddleware(
         SymbioticNetworkAdapterConfig memory adapter,
         SymbioticVaultConfig memory vault,
         address agent

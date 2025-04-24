@@ -67,12 +67,12 @@ contract DeployTestnetSymbioticVault is
         symbioticAb = _getSymbioticAddressbook();
         (networkAdapterImplems, networkAdapter) = _readSymbioticConfig();
 
-        address collateral = vm.envAddress("COLLATERAL");
-
         address[] memory agents = new address[](1);
         agents[0] = getWalletAddress();
 
         vm.startBroadcast();
+
+        address collateral = vm.envAddress("COLLATERAL");
 
         console.log("deploying symbiotic vault");
         vault = _deploySymbioticVault(
@@ -80,21 +80,22 @@ contract DeployTestnetSymbioticVault is
             SymbioticVaultParams({
                 vault_admin: vault_admin,
                 collateral: collateral,
-                vaultEpochDuration: 1 hours,
+                vaultEpochDuration: 14 days,
                 burnerRouterDelay: 0
             })
         );
 
         console.log("deploying symbiotic network rewards");
         rewards = _deploySymbioticRestakerRewardContract(symbioticAb, users, vault);
-        _saveSymbioticConfig(vault, rewards);
+        _saveSymbioticVaultConfig(vault, rewards);
 
         console.log("registering symbiotic network in vaults");
         _registerCapNetworkInVault(networkAdapter, vault);
 
         console.log("registering vaults in network middleware");
+        _registerVaultInNetworkMiddleware(networkAdapter, vault, rewards);
         for (uint256 i = 0; i < agents.length; i++) {
-            _registerVaultsInNetworkMiddleware(networkAdapter, vault, rewards, agents[i]);
+            _registerAgentInNetworkMiddleware(networkAdapter, vault, agents[i]);
         }
 
         console.log("registering agents as operator");

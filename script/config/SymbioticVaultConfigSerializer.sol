@@ -19,7 +19,7 @@ contract SymbioticVaultConfigSerializer {
             string.concat(vm.projectRoot(), "/config/cap-symbiotic-vaults-", Strings.toString(block.chainid), ".json");
     }
 
-    function _saveSymbioticConfig(SymbioticVaultConfig memory vault, SymbioticNetworkRewardsConfig memory rewards)
+    function _saveSymbioticVaultConfig(SymbioticVaultConfig memory vault, SymbioticNetworkRewardsConfig memory rewards)
         internal
     {
         string memory vaultJson = "vault";
@@ -40,25 +40,27 @@ contract SymbioticVaultConfigSerializer {
         vm.writeFile(_symbioticVaultsFilePath(), mergedJson);
     }
 
-    function _readSymbioticConfig(address vaultAddress)
+    function _readSymbioticVaultConfig(address vaultAddress)
         internal
         view
         returns (SymbioticVaultConfig memory vault, SymbioticNetworkRewardsConfig memory rewards)
     {
         Vm vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
         string memory json = vm.readFile(_symbioticVaultsFilePath());
-        string memory vaultJson = json.readString(string.concat(".", Strings.toHexString(vaultAddress)));
+        string memory vaultPrefix = string.concat("$['", Strings.toHexString(vaultAddress), "'].");
 
         vault = SymbioticVaultConfig({
-            vault: vaultJson.readAddress("vault"),
-            collateral: vaultJson.readAddress("collateral"),
-            burnerRouter: vaultJson.readAddress("burnerRouter"),
-            globalReceiver: vaultJson.readAddress("globalReceiver"),
-            delegator: vaultJson.readAddress("delegator"),
-            slasher: vaultJson.readAddress("slasher"),
-            vaultEpochDuration: uint48(vaultJson.readUint("vaultEpochDuration"))
+            vault: json.readAddress(string.concat(vaultPrefix, "vault")),
+            collateral: json.readAddress(string.concat(vaultPrefix, "collateral")),
+            burnerRouter: json.readAddress(string.concat(vaultPrefix, "burnerRouter")),
+            globalReceiver: json.readAddress(string.concat(vaultPrefix, "globalReceiver")),
+            delegator: json.readAddress(string.concat(vaultPrefix, "delegator")),
+            slasher: json.readAddress(string.concat(vaultPrefix, "slasher")),
+            vaultEpochDuration: uint48(json.readUint(string.concat(vaultPrefix, "vaultEpochDuration")))
         });
 
-        rewards = SymbioticNetworkRewardsConfig({ stakerRewarder: vaultJson.readAddress("stakerRewarder") });
+        rewards = SymbioticNetworkRewardsConfig({
+            stakerRewarder: json.readAddress(string.concat(vaultPrefix, "stakerRewarder"))
+        });
     }
 }
