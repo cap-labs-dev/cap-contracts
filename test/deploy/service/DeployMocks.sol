@@ -19,7 +19,7 @@ contract DeployMocks {
 
         for (uint256 i = 0; i < assets.length; i++) {
             d.aaveDataProviders[i] = address(new MockAaveDataProvider());
-            d.chainlinkPriceFeeds[i] = address(new MockChainlinkPriceFeed());
+            d.chainlinkPriceFeeds[i] = address(new MockChainlinkPriceFeed(1e8));
         }
     }
 

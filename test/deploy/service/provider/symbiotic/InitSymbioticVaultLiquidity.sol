@@ -38,9 +38,20 @@ contract InitSymbioticVaultLiquidity is Test, SymbioticUtils, TimeUtils {
         for (uint256 i = 0; i < testUsers.restakers.length; i++) {
             address restaker = testUsers.restakers[i];
             vm.startPrank(restaker);
-            MockERC20(collateral).mint(restaker, amount);
-            MockERC20(collateral).approve(address(vault), amount);
-            (depositedAmount, mintedShares) = IVault(vault).deposit(restaker, amount);
+            (uint256 restakerDepositedAmount, uint256 restakerMintedShares) =
+                _symbioticStakeInVault(vault, restaker, amount);
+            depositedAmount += restakerDepositedAmount;
+            mintedShares += restakerMintedShares;
         }
+    }
+
+    function _symbioticStakeInVault(address vault, address restaker, uint256 amount)
+        internal
+        returns (uint256 depositedAmount, uint256 mintedShares)
+    {
+        address collateral = IVault(vault).collateral();
+        MockERC20(collateral).mint(restaker, amount);
+        MockERC20(collateral).approve(address(vault), amount);
+        (depositedAmount, mintedShares) = IVault(vault).deposit(restaker, amount);
     }
 }

@@ -114,7 +114,7 @@ contract DeployTestnetSymbioticVault is
         console.log("init delegation");
         for (uint256 i = 0; i < agents.length; i++) {
             address agent = agents[i];
-            _initDelegationAgent(infra, agent, networkAdapter.networkMiddleware);
+            _addAgentToDelegationContract(infra, agent, networkAdapter.networkMiddleware);
         }
 
         vm.stopBroadcast();

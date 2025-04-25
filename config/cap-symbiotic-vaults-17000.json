@@ -1,12 +1,12 @@
 {
-    "0xffe7f810b413a255f6259444ea0849a6384b8bbd": {
-        "burnerRouter": "0xA6942bDb7845B8D686f19906B5b50072d4AA765A",
-        "collateral": "0xC7f2Cf4845C6db0e1a1e91ED41Bcd0FcC1b0E141",
-        "delegator": "0x142C634A56C5B67Cb1aa0e23C7c243B642069fE8",
-        "globalReceiver": "0x6f62588E388D8ceaB9C259B1706EC19F614F75E8",
-        "slasher": "0x47f18E529526006889C2F5982bE1618DCD2dc779",
-        "stakerRewarder": "0x98134e96BD1C1a91460b7b8Fa573595B2b40eEBd",
-        "vault": "0xfFE7f810b413a255F6259444Ea0849A6384b8bBD",
+    "0xa42b018c004d23fa06b0228d8f878d0c180446fc": {
+        "burnerRouter": "0x87C020b7de405EecB2d8E9432E924D1412388aE7",
+        "collateral": "0xe6833396B845A82CD17D9F0554794549c346D6FB",
+        "delegator": "0xbcf5F7da7574851c565338DADb570786f2Ee2178",
+        "globalReceiver": "0xB51622Af4fE3a7633Bad7243FDb4FC4193AEf07C",
+        "slasher": "0xc8564109803D7E7FecB8B02331065169E196624c",
+        "stakerRewarder": "0xAC54B3a3Be5d1F6DDF53f67e63496a343f6e8272",
+        "vault": "0xa42b018c004d23fa06b0228D8F878D0C180446Fc",
         "vaultEpochDuration": 1209600
     }
 }

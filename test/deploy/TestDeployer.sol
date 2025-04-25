@@ -235,7 +235,7 @@ contract TestDeployer is
             vm.startPrank(env.users.delegation_admin);
             for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
                 address agent = env.testUsers.agents[i];
-                _initDelegationAgent(env.infra, agent, env.symbiotic.networkAdapter.networkMiddleware);
+                _addAgentToDelegationContract(env.infra, agent, env.symbiotic.networkAdapter.networkMiddleware);
             }
 
             console.log("deploying symbiotic WETH vault");
