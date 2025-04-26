@@ -62,7 +62,7 @@ contract DeployTestnetSymbioticAdapter is
             infra,
             symbioticAb,
             networkAdapterImplems,
-            SymbioticNetworkAdapterParams({ vaultEpochDuration: 7 days, feeAllowed: 1000 })
+            SymbioticNetworkAdapterParams({ vaultEpochDuration: 1 hours, feeAllowed: 1000 })
         );
 
         _registerNetworkForCapDelegation(infra, networkAdapter.networkMiddleware);

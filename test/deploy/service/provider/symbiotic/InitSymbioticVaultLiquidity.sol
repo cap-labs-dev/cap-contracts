@@ -39,13 +39,13 @@ contract InitSymbioticVaultLiquidity is Test, SymbioticUtils, TimeUtils {
             address restaker = testUsers.restakers[i];
             vm.startPrank(restaker);
             (uint256 restakerDepositedAmount, uint256 restakerMintedShares) =
-                _symbioticStakeInVault(vault, restaker, amount);
+                _symbioticMintAndStakeInVault(vault, restaker, amount);
             depositedAmount += restakerDepositedAmount;
             mintedShares += restakerMintedShares;
         }
     }
 
-    function _symbioticStakeInVault(address vault, address restaker, uint256 amount)
+    function _symbioticMintAndStakeInVault(address vault, address restaker, uint256 amount)
         internal
         returns (uint256 depositedAmount, uint256 mintedShares)
     {

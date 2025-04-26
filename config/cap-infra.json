@@ -1,20 +1,20 @@
 {
     "17000": {
         "implems": {
-            "accessControl": "0x0aB937E2871b36dB879Fd4aaDEb92aa8DD59117d",
-            "capToken": "0x39fCAf610fdd8E97dD77F1dEe4f46691cd3b48Eb",
-            "debtToken": "0x7758a18f965F5bd22953A8784Ae2307b9514EDBc",
-            "delegation": "0x149D130FFFD86f9C78cD615F12139B89a5B8bd6E",
-            "feeAuction": "0xBdD577223a6953ec3bBED54b82698567F894B8FD",
-            "lender": "0x92Dac2D721bc68Fec543255b2cE34388c5Ec82E1",
-            "oracle": "0xceee54B8C27e6c9F5B3301d0791DD47FEEc83fE2",
-            "stakedCap": "0x2Bc76508C1aE269caace933A3089104523681f3a"
+            "accessControl": "0x312D5bc7b5DEa0E8EaEcBE694eAc26325281DfFF",
+            "capToken": "0x8a7971Dc4928680906e6E1D9715aF22C85eed349",
+            "debtToken": "0x3c2e3E80d6b792C2DAd763716217f16a2f528b88",
+            "delegation": "0xBE59A58f68e0B111bC7C23675c9D257522ecdBdc",
+            "feeAuction": "0xde52aa15fDCeDDb3C51bE5837a6F505B981252a1",
+            "lender": "0xa03a80E36Fa44e096e18e0829735ad299eF7D5AD",
+            "oracle": "0x6b972cab6Bb108EFCa2E1997F0775BC811d0cAF6",
+            "stakedCap": "0xfe23e2818D2789c3C1A240B1BBd14763b9A7b183"
         },
         "infra": {
-            "accessControl": "0xF62cD9F54fF43384aa0033061196E5855CC09C88",
-            "delegation": "0x9303B828D62FFCF576f5959E9e552640FD52Fe54",
-            "lender": "0xF46370C2612ede06515469c334489B1a1e56a870",
-            "oracle": "0x0e771D65FD3c1b87a9e71abb057b981A22459a26"
+            "accessControl": "0x317da82Ebc563B04fd016f1a186a96c449f60a52",
+            "delegation": "0x9d553533cd58237EaCeCB0b1b41D40beF862e115",
+            "lender": "0x4c8F6a2f00d0C67c705C9D4a6C2d129C9bB14b5a",
+            "oracle": "0xb438a0C7A8925f7fb21D2F2dbf6ca02A41eCA5Ec"
         },
         "libs": {
             "aaveAdapter": "0xE519A2875DC266bf96eB9b7Fa4DE32D9EB5C8623",

@@ -35,7 +35,7 @@ contract SymbioticStake is
 
         vm.startBroadcast();
 
-        _symbioticStakeInVault(vault.vault, restaker, amount);
+        _symbioticMintAndStakeInVault(vault.vault, restaker, amount);
 
         vm.stopBroadcast();
     }

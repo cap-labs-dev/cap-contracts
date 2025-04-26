@@ -54,7 +54,7 @@ contract SymbioticCreateVault is
             SymbioticVaultParams({
                 vault_admin: vault_admin,
                 collateral: collateral,
-                vaultEpochDuration: 14 days,
+                vaultEpochDuration: 1 days,
                 burnerRouterDelay: 0
             })
         );
