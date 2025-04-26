@@ -43,6 +43,15 @@ contract InitTestVaultLiquidity is StdCheats {
         // assert(capToken.balanceOf(sendTo) == capTokenAmount);
     }
 
+    function _initTestUserMintCapToken(VaultConfig memory vault, address asset, address sendTo, uint256 amount)
+        internal
+    {
+        CapToken capToken = CapToken(vault.capToken);
+        MockERC20(asset).mint(sendTo, amount);
+        MockERC20(asset).approve(address(capToken), amount);
+        capToken.mint(address(asset), amount, 0, sendTo, block.timestamp + 1 hours);
+    }
+
     /// @dev Give the user some staked cap tokens
     function _initTestUserStakedCapToken(VaultConfig memory vault, address sendTo, uint256 stakedCapTokenAmount)
         internal
@@ -67,5 +76,15 @@ contract InitTestVaultLiquidity is StdCheats {
         vm.stopPrank();
 
         // assert(stakedCapToken.balanceOf(sendTo) == stakedCapTokenAmount);
+    }
+
+    function _initTestUserMintStakedCapToken(VaultConfig memory vault, address asset, address sendTo, uint256 amount)
+        internal
+    {
+        CapToken capToken = CapToken(vault.capToken);
+        StakedCap stakedCapToken = StakedCap(vault.stakedCapToken);
+        _initTestUserMintCapToken(vault, asset, sendTo, amount);
+        capToken.approve(vault.stakedCapToken, amount);
+        stakedCapToken.deposit(amount, sendTo);
     }
 }

@@ -37,7 +37,7 @@ contract DeployInfra is ProxyUtils {
         AccessControl(d.accessControl).initialize(users.access_control_admin);
         Lender(d.lender).initialize(d.accessControl, d.delegation, d.oracle, 1.33e27, 1 hours, 1 days, 0.1e27, 0.7e27);
         Oracle(d.oracle).initialize(d.accessControl);
-        Delegation(d.delegation).initialize(d.accessControl, d.oracle, 1 hours);
+        Delegation(d.delegation).initialize(d.accessControl, d.oracle, 15 minutes);
     }
 
     function _deployPreMainnetInfra(

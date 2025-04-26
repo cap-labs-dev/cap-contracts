@@ -104,7 +104,7 @@ contract DeployTestnetSymbioticVault is
         _registerAgentInNetworkMiddleware(networkAdapter, vault, agent);
 
         console.log("registering agents as operator");
-        _agentRegisterAsOperator(symbioticAb);
+        // _agentRegisterAsOperator(symbioticAb);
         _agentOptInToSymbioticVault(symbioticAb, vault);
         _agentOptInToSymbioticNetwork(symbioticAb, networkAdapter);
 

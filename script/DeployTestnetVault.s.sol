@@ -1,15 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { ConfigureDelegation } from "../contracts/deploy/service/ConfigureDelegation.sol";
-import { ConfigureOracle } from "../contracts/deploy/service/ConfigureOracle.sol";
-
-import { DeployVault } from "../contracts/deploy/service/DeployVault.sol";
-import { LzAddressbook, LzUtils } from "../contracts/deploy/utils/LzUtils.sol";
-import { ZapAddressbook, ZapUtils } from "../contracts/deploy/utils/ZapUtils.sol";
-import { OracleMocksConfig } from "../test/deploy/interfaces/TestDeployConfig.sol";
-import { DeployMocks } from "../test/deploy/service/DeployMocks.sol";
-
 import {
     FeeConfig,
     ImplementationsConfig,
@@ -18,12 +9,18 @@ import {
     UsersConfig,
     VaultConfig
 } from "../contracts/deploy/interfaces/DeployConfigs.sol";
-
-import { MockERC20 } from "../test/mocks/MockERC20.sol";
+import { ConfigureDelegation } from "../contracts/deploy/service/ConfigureDelegation.sol";
+import { ConfigureOracle } from "../contracts/deploy/service/ConfigureOracle.sol";
+import { DeployVault } from "../contracts/deploy/service/DeployVault.sol";
+import { LzAddressbook, LzUtils } from "../contracts/deploy/utils/LzUtils.sol";
+import { ZapAddressbook, ZapUtils } from "../contracts/deploy/utils/ZapUtils.sol";
+import { OracleMocksConfig } from "../test/deploy/interfaces/TestDeployConfig.sol";
+import { DeployMocks } from "../test/deploy/service/DeployMocks.sol";
+import { InitTestVaultLiquidity } from "../test/deploy/service/InitTestVaultLiquidity.sol";
 import { InfraConfigSerializer } from "./config/InfraConfigSerializer.sol";
-
 import { VaultConfigSerializer } from "./config/VaultConfigSerializer.sol";
 import { WalletUsersConfig } from "./config/WalletUsersConfig.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { Script } from "forge-std/Script.sol";
 import { stdJson } from "forge-std/StdJson.sol";
 import { console } from "forge-std/console.sol";
@@ -37,7 +34,8 @@ contract DeployTestnetVault is
     ZapUtils,
     DeployMocks,
     DeployVault,
-    ConfigureOracle
+    ConfigureOracle,
+    InitTestVaultLiquidity
 {
     LzAddressbook lzAb;
     ZapAddressbook zapAb;
@@ -91,6 +89,16 @@ contract DeployTestnetVault is
         _initVaultLender(vault, infra, fee);
 
         _saveVaultConfig(vault);
+
+        // deposit into vault
+        for (uint256 i = 0; i < vault.assets.length; i++) {
+            address asset = vault.assets[i];
+            address sendTo = getWalletAddress();
+            uint256 amount = 10_000 * 10 ** IERC20Metadata(asset).decimals();
+            _initTestUserMintCapToken(vault, asset, sendTo, amount);
+            _initTestUserMintStakedCapToken(vault, asset, sendTo, amount);
+        }
+
         vm.stopBroadcast();
     }
 }
