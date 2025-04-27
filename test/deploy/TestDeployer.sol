@@ -107,7 +107,7 @@ contract TestDeployer is
 
         env.implems = _deployImplementations();
         env.libs = _deployLibs();
-        env.infra = _deployInfra(env.implems, env.users);
+        env.infra = _deployInfra(env.implems, env.users, 1 days);
 
         env.usdMocks = _deployUSDMocks();
         env.ethMocks = _deployEthMocks();
