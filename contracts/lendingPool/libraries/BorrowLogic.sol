@@ -64,7 +64,7 @@ library BorrowLogic {
 
         reserve.debt += params.amount;
 
-        emit Borrow(params.agent, params.asset, params.amount);
+        emit Borrow(params.asset, params.agent, params.amount);
     }
 
     /// @notice Repay an asset, burning the debt token and/or paying down interest
@@ -129,7 +129,7 @@ library BorrowLogic {
             IERC20(params.asset).safeTransfer(reserve.interestReceiver, interestRepaid);
         }
 
-        emit Repay(params.agent, params.asset, repaid);
+        emit Repay(params.asset, params.agent, repaid);
     }
 
     /// @notice Realize the interest before it is repaid by borrowing from the vault
