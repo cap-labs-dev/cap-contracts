@@ -49,7 +49,8 @@ contract DeployTestnetSymbioticAdapter is
     SymbioticNetworkAdapterConfig networkAdapter;
 
     function run() external {
-        uint256 vaultEpochDuration = 7 days;
+        uint48 vaultEpochDuration = 7 days; // mainnet & unit tests
+        //uint48 vaultEpochDuration = 5 minutes; // testnet
 
         vm.startBroadcast();
 

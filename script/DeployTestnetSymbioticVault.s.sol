@@ -61,6 +61,9 @@ contract DeployTestnetSymbioticVault is
     SymbioticNetworkRewardsConfig rewards;
 
     function run() external {
+        uint48 vaultEpochDuration = 7 days; // mainnet & unit tests
+        //uint48 vaultEpochDuration = 5 minutes; // testnet
+
         users = _getUsersConfig();
         (implems, libs, infra) = _readInfraConfig();
         address vault_admin = getWalletAddress();
@@ -84,7 +87,7 @@ contract DeployTestnetSymbioticVault is
             SymbioticVaultParams({
                 vault_admin: vault_admin,
                 collateral: address(stETH),
-                vaultEpochDuration: 1 hours,
+                vaultEpochDuration: vaultEpochDuration,
                 burnerRouterDelay: 0
             })
         );

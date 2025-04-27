@@ -36,7 +36,8 @@ contract DeployInfra is
     InfraConfig infra;
 
     function run() external {
-        uint256 delegationEpochDuration = 1 days;
+        uint256 delegationEpochDuration = 1 days; // mainnet & unit tests
+        //uint256 delegationEpochDuration = 1 minutes; // testnet
 
         vm.startBroadcast();
 
