@@ -49,6 +49,9 @@ contract DeployTestnetSymbioticAdapter is
     SymbioticNetworkAdapterConfig networkAdapter;
 
     function run() external {
+        uint48 vaultEpochDuration = 7 days; // mainnet & unit tests
+        //uint48 vaultEpochDuration = 5 minutes; // testnet
+
         vm.startBroadcast();
 
         // Get the broadcast address (deployer's address)
@@ -62,7 +65,7 @@ contract DeployTestnetSymbioticAdapter is
             infra,
             symbioticAb,
             networkAdapterImplems,
-            SymbioticNetworkAdapterParams({ vaultEpochDuration: 7 days, feeAllowed: 1000 })
+            SymbioticNetworkAdapterParams({ vaultEpochDuration: vaultEpochDuration, feeAllowed: 1000 })
         );
 
         _registerNetworkForCapDelegation(infra, networkAdapter.networkMiddleware);

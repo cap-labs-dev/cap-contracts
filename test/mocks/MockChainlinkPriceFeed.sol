@@ -6,6 +6,12 @@ contract MockChainlinkPriceFeed {
     int256 private _latestAnswer;
     uint256 private _staleness;
 
+    constructor(int256 latestAnswer_) {
+        _decimals = 8;
+        _latestAnswer = latestAnswer_;
+        _staleness = 0;
+    }
+
     function setDecimals(uint8 decimals_) external {
         _decimals = decimals_;
     }

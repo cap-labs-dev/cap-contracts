@@ -3,7 +3,7 @@
         "assets": [
             {
                 "asset": {
-                    "address": "0xfb82F07F1BA8a253bc4E53c2F8C02D7d9a49AFFf",
+                    "address": "0xC710996324340C5991d24978A91FE9a4F40c69d4",
                     "decimals": 6,
                     "name": "USDT",
                     "symbol": "USDT"
@@ -11,7 +11,7 @@
             },
             {
                 "asset": {
-                    "address": "0x8D92104271e7440c9Eb3Ef967C0cb6909e0de097",
+                    "address": "0x5Abac2E89D4d4bd18F4137971D7893B700285Cea",
                     "decimals": 6,
                     "name": "USDC",
                     "symbol": "USDC"
@@ -19,25 +19,25 @@
             },
             {
                 "asset": {
-                    "address": "0xD1Db73b1d7523B8CB728daD1B3d6C8D456b1511D",
+                    "address": "0x5662DE33083f1672880f17019302C13A3bEeAaAc",
                     "decimals": 18,
                     "name": "USDx",
                     "symbol": "USDx"
                 }
             }
         ],
-        "capOFTLockbox": "0xeA3b182ece22D4B5545B2A43fEFBd62F2BFd1D4a",
+        "capOFTLockbox": "0x5739DAA66A068EA74567bA9F0b67fF9DF3d515cd",
         "capToken": {
-            "address": "0x7E5f93b6Ca045aBB14358D7967075c05e28d9ff6",
+            "address": "0x2292BB8ae9AAa6e254FA6cCb73430E25d33E050F",
             "decimals": 18,
             "name": "Cap USD",
             "symbol": "cUSD"
         },
-        "capZapComposer": "0xB0C93C155C613C11737EA57fadD075150689c7bb",
+        "capZapComposer": "0x6b4Fe3007289882e294836131Ea111bCc53bC539",
         "debtTokens": [
             {
                 "debtToken": {
-                    "address": "0xD8f44C57Ce22A4D03f0592AACB996ac088196767",
+                    "address": "0xC48226829860d4E5B0d3b180d0849a6b641cF5B0",
                     "decimals": 6,
                     "name": "debtUSDT",
                     "symbol": "debtUSDT"
@@ -45,7 +45,7 @@
             },
             {
                 "debtToken": {
-                    "address": "0x83B8607EedC445Bef7AA0B5D8EC38816fB2b898A",
+                    "address": "0x4aDE517c55f07406c7012CDd472dAA5841c30ee6",
                     "decimals": 6,
                     "name": "debtUSDC",
                     "symbol": "debtUSDC"
@@ -53,21 +53,21 @@
             },
             {
                 "debtToken": {
-                    "address": "0x951Bc44e4084BC9Fc17F6B614540Fa67CF480780",
+                    "address": "0x8e892ADBf814a15523a93Bee90f3823A8890f736",
                     "decimals": 18,
                     "name": "debtUSDx",
                     "symbol": "debtUSDx"
                 }
             }
         ],
-        "feeAuction": "0x5ADdAB89eeC9c2358e7E36509017f26CB78734CA",
-        "stakedCapOFTLockbox": "0x70CD294E71F3872B9D5687Eb980Bc5E52c1f312c",
+        "feeAuction": "0x5eD84401140dec1AE4Da82C0331Ad86Cddc04630",
+        "stakedCapOFTLockbox": "0x86b83F31D4d09010843bEBb5903E3a965B1626ab",
         "stakedCapToken": {
-            "address": "0x6618C7daF38fc56765705219e3e9C58D97c2dFd6",
+            "address": "0xE0034bAB761CAc7431809e62A184E33f9b596618",
             "decimals": 18,
             "name": "sCap USD",
             "symbol": "scUSD"
         },
-        "stakedCapZapComposer": "0xE25107aAAF6C62a51cC9C2c45c031BEcB2C6e3fD"
+        "stakedCapZapComposer": "0x13d8d7fdCcba3f17340A0e140D8607D7Fb5f1e1c"
     }
 }

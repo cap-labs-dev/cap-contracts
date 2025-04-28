@@ -23,10 +23,11 @@ import { LzAddressbook } from "../utils/LzUtils.sol";
 import { ProxyUtils } from "../utils/ProxyUtils.sol";
 
 contract DeployInfra is ProxyUtils {
-    function _deployInfra(ImplementationsConfig memory implementations, UsersConfig memory users)
-        internal
-        returns (InfraConfig memory d)
-    {
+    function _deployInfra(
+        ImplementationsConfig memory implementations,
+        UsersConfig memory users,
+        uint256 _delegationEpochDuration
+    ) internal returns (InfraConfig memory d) {
         // deploy proxy contracts
         d.accessControl = _proxy(implementations.accessControl);
         d.lender = _proxy(implementations.lender);
@@ -37,7 +38,7 @@ contract DeployInfra is ProxyUtils {
         AccessControl(d.accessControl).initialize(users.access_control_admin);
         Lender(d.lender).initialize(d.accessControl, d.delegation, d.oracle, 1.33e27, 1 hours, 1 days, 0.1e27, 0.7e27);
         Oracle(d.oracle).initialize(d.accessControl);
-        Delegation(d.delegation).initialize(d.accessControl, d.oracle, 1 days);
+        Delegation(d.delegation).initialize(d.accessControl, d.oracle, _delegationEpochDuration);
     }
 
     function _deployPreMainnetInfra(

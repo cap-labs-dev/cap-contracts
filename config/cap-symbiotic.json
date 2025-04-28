@@ -13,12 +13,12 @@
     "17000": {
         "adapter": {
             "feeAllowed": 1000,
-            "network": "0x6975C1483AB8C67533242D7012831e72d281809D",
-            "networkMiddleware": "0x9aB537b1F1C8890f77a2971a9c695e672E249a3a"
+            "network": "0x008CDb66a44A3c8E0077061337ae2964FDdd313E",
+            "networkMiddleware": "0xBC17ceAEDC9d789cC6C43fED13E321ddD28AD9ad"
         },
         "implems": {
-            "network": "0x1b4f1A170E0C5D11475ad3dc78cE578CA0c10f29",
-            "networkMiddleware": "0x6400d49F8A061bB9f2EE10a4Eabaa73bADea3043"
+            "network": "0x290be688CC5CC060e48610Be10A43d92401E521f",
+            "networkMiddleware": "0x7f557D9945449F4221caF8C13fFc231E2B0F2892"
         }
     }
 }

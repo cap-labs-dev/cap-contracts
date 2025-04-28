@@ -36,13 +36,16 @@ contract DeployInfra is
     InfraConfig infra;
 
     function run() external {
+        uint256 delegationEpochDuration = 1 days; // mainnet & unit tests
+        //uint256 delegationEpochDuration = 1 minutes; // testnet
+
         vm.startBroadcast();
 
         // Get the broadcast address (deployer's address)
         users = _getUsersConfig();
         implems = _deployImplementations();
         libs = _deployLibs();
-        infra = _deployInfra(implems, users);
+        infra = _deployInfra(implems, users, delegationEpochDuration);
 
         _initInfraAccessControl(infra, users);
 

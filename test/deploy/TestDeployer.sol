@@ -107,7 +107,7 @@ contract TestDeployer is
 
         env.implems = _deployImplementations();
         env.libs = _deployLibs();
-        env.infra = _deployInfra(env.implems, env.users);
+        env.infra = _deployInfra(env.implems, env.users, 1 days);
 
         env.usdMocks = _deployUSDMocks();
         env.ethMocks = _deployEthMocks();
@@ -235,7 +235,7 @@ contract TestDeployer is
             vm.startPrank(env.users.delegation_admin);
             for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
                 address agent = env.testUsers.agents[i];
-                _initDelegationAgent(env.infra, agent, env.symbiotic.networkAdapter.networkMiddleware);
+                _addAgentToDelegationContract(env.infra, agent, env.symbiotic.networkAdapter.networkMiddleware);
             }
 
             console.log("deploying symbiotic WETH vault");
@@ -285,12 +285,9 @@ contract TestDeployer is
         console.log("registering vaults in network middleware");
         vm.startPrank(env.users.middleware_admin);
 
-        NetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).registerVault(
-            _vault.vault, _rewards.stakerRewarder
-        );
-
+        _registerVaultInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, _rewards);
         for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            _registerVaultsInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, env.testUsers.agents[i]);
+            _registerAgentInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, env.testUsers.agents[i]);
         }
 
         console.log("registering agents as operator");
