@@ -125,13 +125,12 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     /// @dev Deposit into staked cap
     /// @param _amount Amount of underlying asset to deposit
     /// @return shares Amount of shares minted
-    function _depositIntoStakedCap(uint256 _amount) internal returns (uint256) {
+    function _depositIntoStakedCap(uint256 _amount) internal returns (uint256 shares) {
         (uint256 mintAmount,) = IMinter(address(cap)).getMintAmount(address(asset), _amount);
         uint256 minAmountOut = mintAmount * (1e18 - slippage) / 1e18;
         uint256 amountOut = cap.mint(address(asset), _amount, minAmountOut, address(this), block.timestamp + 100);
 
-        uint256 shares = stakedCap.deposit(amountOut, address(this));
-        return shares;
+        return stakedCap.deposit(amountOut, address(this));
     }
 
     /// @notice Withdraw staked cap after campaign ends
