@@ -81,7 +81,9 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
 
             asset.approve(address(vault), initialBalance);
             MessagingFee memory fee = vault.quote(initialBalance, holder);
-            vault.deposit{ value: fee.nativeFee }(initialBalance, holder, holder);
+            vault.deposit{ value: fee.nativeFee }(
+                initialBalance, convertFrom6DecimalTo18Decimal(initialBalance), holder, holder, block.timestamp
+            );
 
             vm.stopPrank();
         }
@@ -104,10 +106,12 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
 
         // Expect Deposit event
         vm.expectEmit(true, true, true, true);
-        emit PreMainnetVault.Deposit(user, amount);
+        emit PreMainnetVault.Deposit(user, amount, convertFrom6DecimalTo18Decimal(amount));
 
         // Deposit with some ETH for LZ fees
-        vault.deposit{ value: fee.nativeFee }(amount, l2user, user);
+        vault.deposit{ value: fee.nativeFee }(
+            amount, convertFrom6DecimalTo18Decimal(amount), l2user, user, block.timestamp
+        );
 
         assertEq(vault.balanceOf(user), convertFrom6DecimalTo18Decimal(amount));
         assertEq(stakedCap.balanceOf(address(vault)), convertFrom6DecimalTo18Decimal(initialBalance + amount));
@@ -183,7 +187,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
         MessagingFee memory fee = vault.quote(1, user);
 
         vm.expectRevert(PreMainnetVault.ZeroAmount.selector);
-        vault.deposit{ value: fee.nativeFee }(0, user, user);
+        vault.deposit{ value: fee.nativeFee }(0, 0, user, user, block.timestamp);
 
         vm.stopPrank();
     }
@@ -198,7 +202,9 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
         MessagingFee memory fee = vault.quote(amount, user);
 
         vm.expectRevert();
-        vault.deposit{ value: fee.nativeFee - 1 }(amount, user, user);
+        vault.deposit{ value: fee.nativeFee - 1 }(
+            amount, convertFrom6DecimalTo18Decimal(amount), user, user, block.timestamp
+        );
 
         vm.stopPrank();
     }
@@ -368,10 +374,14 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
         MessagingFee memory fee = vault.quote(1, address(0));
 
         vm.expectRevert(PreMainnetVault.ZeroAddress.selector);
-        vault.deposit{ value: fee.nativeFee }(1, address(0), address(0));
+        vault.deposit{ value: fee.nativeFee }(
+            1, convertFrom6DecimalTo18Decimal(1), address(0), address(0), block.timestamp
+        );
 
         vm.expectRevert(PreMainnetVault.ZeroAmount.selector);
-        vault.deposit{ value: fee.nativeFee }(0, address(0), address(0));
+        vault.deposit{ value: fee.nativeFee }(
+            0, convertFrom6DecimalTo18Decimal(0), address(0), address(0), block.timestamp
+        );
 
         vm.expectRevert(PreMainnetVault.ZeroAddress.selector);
         vault.withdraw(1, address(0));

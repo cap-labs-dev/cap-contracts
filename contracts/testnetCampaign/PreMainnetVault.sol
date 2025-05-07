@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { IMinter } from "../interfaces/IMinter.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -20,6 +19,7 @@ import { OAppMessenger } from "./OAppMessenger.sol";
 /// enabled to prevent the owner from unduly locking assets.
 contract PreMainnetVault is ERC20Permit, OAppMessenger {
     using SafeERC20 for IERC20Metadata;
+    using SafeERC20 for IERC4626;
 
     /// @notice Underlying asset
     IERC20Metadata public immutable asset;
@@ -36,9 +36,6 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     /// @notice Maximum end timestamp for the campaign after which transfers are enabled
     uint256 public immutable maxCampaignEnd;
 
-    /// @notice Slippage for minting
-    uint256 public slippage;
-
     /// @dev Bool for if the transfers are unlocked before the campaign ends
     bool private unlocked;
 
@@ -54,14 +51,11 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     /// @dev The campaign has ended
     error CampaignEnded();
 
-    /// @dev Slippage too high
-    error SlippageTooHigh();
+    /// @dev Deposit underlying asset and get shares
+    event Deposit(address indexed user, uint256 underlyingAmount, uint256 shares);
 
-    /// @dev Deposit underlying asset
-    event Deposit(address indexed user, uint256 amount);
-
-    /// @dev Withdraw underlying asset
-    event Withdraw(address indexed user, uint256 amount);
+    /// @dev Withdraw redeem shares and get staked cap
+    event Withdraw(address indexed user, uint256 stakedCapAmount);
 
     /// @dev Transfers enabled
     event TransferEnabled();
@@ -91,7 +85,6 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
         stakedCap = IERC4626(_stakedCap);
         assetDecimals = asset.decimals();
         maxCampaignEnd = block.timestamp + _maxCampaignLength;
-        slippage = 1e16; // .1%
 
         IERC20Metadata(address(asset)).forceApprove(address(cap), type(uint256).max);
         IERC20Metadata(address(cap)).forceApprove(address(stakedCap), type(uint256).max);
@@ -99,13 +92,17 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
 
     /// @notice Deposit underlying asset to mint cUSD on MegaETH Testnet
     /// @param _amount Amount of underlying asset to deposit
+    /// @param _minShares Minimum amount of shares to mint
     /// @param _destReceiver Receiver of the assets on MegaETH Testnet
     /// @param _refundAddress The address to receive any excess fee values sent to the endpoint if the call fails on the destination chain
-    function deposit(uint256 _amount, address _destReceiver, address _refundAddress)
-        external
-        payable
-        returns (uint256 shares)
-    {
+    /// @param _deadline Deadline for the deposit
+    function deposit(
+        uint256 _amount,
+        uint256 _minShares,
+        address _destReceiver,
+        address _refundAddress,
+        uint256 _deadline
+    ) external payable returns (uint256 shares) {
         if (_amount == 0) revert ZeroAmount();
         if (_destReceiver == address(0)) revert ZeroAddress();
 
@@ -113,22 +110,25 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
 
         asset.safeTransferFrom(msg.sender, address(this), _amount);
 
-        shares = _depositIntoStakedCap(_amount);
+        shares = _depositIntoStakedCap(_amount, _minShares, _deadline);
 
         _mint(msg.sender, shares);
 
         _sendMessage(_destReceiver, _amount, _refundAddress);
 
-        emit Deposit(msg.sender, _amount);
+        emit Deposit(msg.sender, _amount, shares);
     }
 
     /// @dev Deposit into staked cap
     /// @param _amount Amount of underlying asset to deposit
+    /// @param _minShares Minimum amount of shares to mint
+    /// @param _deadline Deadline for the deposit
     /// @return shares Amount of shares minted
-    function _depositIntoStakedCap(uint256 _amount) internal returns (uint256 shares) {
-        (uint256 mintAmount,) = IMinter(address(cap)).getMintAmount(address(asset), _amount);
-        uint256 minAmountOut = mintAmount * (1e18 - slippage) / 1e18;
-        uint256 amountOut = cap.mint(address(asset), _amount, minAmountOut, address(this), block.timestamp + 100);
+    function _depositIntoStakedCap(uint256 _amount, uint256 _minShares, uint256 _deadline)
+        internal
+        returns (uint256 shares)
+    {
+        uint256 amountOut = cap.mint(address(asset), _amount, _minShares, address(this), _deadline);
 
         return stakedCap.deposit(amountOut, address(this));
     }
@@ -142,7 +142,7 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
 
         _burn(msg.sender, _amount);
 
-        IERC20Metadata(address(stakedCap)).safeTransfer(_receiver, _amount);
+        stakedCap.safeTransfer(_receiver, _amount);
 
         emit Withdraw(msg.sender, _amount);
     }
@@ -163,12 +163,6 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     function enableTransfer() external onlyOwner {
         unlocked = true;
         emit TransferEnabled();
-    }
-
-    function setSlippage(uint256 _slippage) external onlyOwner {
-        // Only allow slippage up to 1%
-        if (_slippage > 1e17) revert SlippageTooHigh();
-        slippage = _slippage;
     }
 
     /// @dev Override _update to disable transfer before campaign ends
