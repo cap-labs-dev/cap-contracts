@@ -141,7 +141,7 @@ library VaultLogic {
         }
         if (params.amountOut == 0) revert InvalidAmount();
 
-        _verifyBalance($, params.asset, params.amountOut);
+        _verifyBalance($, params.asset, params.amountOut + params.fee);
 
         $.totalSupplies[params.asset] -= params.amountOut + params.fee;
 
@@ -166,7 +166,7 @@ library VaultLogic {
                 revert Slippage(asset, params.amountsOut[i], params.minAmountsOut[i]);
             }
             if (params.amountsOut[i] == 0) revert InvalidAmount();
-            _verifyBalance($, asset, params.amountsOut[i]);
+            _verifyBalance($, asset, params.amountsOut[i] + params.fees[i]);
             _updateIndex($, asset);
             $.totalSupplies[asset] -= params.amountsOut[i] + params.fees[i];
             IERC20(asset).safeTransfer(params.receiver, params.amountsOut[i]);
