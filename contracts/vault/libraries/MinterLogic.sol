@@ -84,7 +84,7 @@ library MinterLogic {
         if (params.mint) {
             assetValue = params.amount * assetPrice / assetDecimalsPow;
             if (capSupply == 0) {
-                newRatio = RAY_PRECISION;
+                newRatio = 0;
                 amount = params.amount * capDecimalsPow / assetDecimalsPow;
             } else {
                 newRatio = (allocationValue + assetValue) * RAY_PRECISION / (capValue + assetValue);
