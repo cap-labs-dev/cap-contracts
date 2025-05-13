@@ -272,6 +272,12 @@ interface ILender {
     /// @notice Zero address not valid
     error ZeroAddressNotValid();
 
+    /// @notice Invalid target health
+    error InvalidTargetHealth();
+
     /// @notice Grace period greater than expiry
     error GracePeriodGreaterThanExpiry();
+
+    /// @notice Invalid bonus cap
+    error InvalidBonusCap();
 }
