@@ -125,7 +125,7 @@ library MinterLogic {
                     uint256 excessRatio = params.ratio - fees.mintKinkRatio;
                     rate += fees.slope0 + (fees.slope1 * excessRatio / (RAY_PRECISION - fees.mintKinkRatio));
                 } else {
-                    rate += fees.slope0 * params.ratio / fees.mintKinkRatio;
+                    rate += fees.slope0 * (params.ratio - fees.optimalRatio) / (fees.mintKinkRatio - fees.optimalRatio);
                 }
             }
         } else {
@@ -134,7 +134,7 @@ library MinterLogic {
                     uint256 excessRatio = fees.burnKinkRatio - params.ratio;
                     rate = fees.slope0 + (fees.slope1 * excessRatio / (RAY_PRECISION - fees.burnKinkRatio));
                 } else {
-                    rate = fees.slope0 * fees.burnKinkRatio / params.ratio;
+                    rate = fees.slope0 * (fees.optimalRatio - params.ratio) / (fees.optimalRatio - fees.burnKinkRatio);
                 }
             }
         }

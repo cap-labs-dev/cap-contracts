@@ -62,6 +62,10 @@ abstract contract Minter is IMinter, Access, MinterStorageUtils {
         if (_feeData.minMintFee >= 0.05e27) revert InvalidMinMintFee();
         if (_feeData.mintKinkRatio >= 1e27 || _feeData.mintKinkRatio == 0) revert InvalidMintKinkRatio();
         if (_feeData.burnKinkRatio >= 1e27 || _feeData.burnKinkRatio == 0) revert InvalidBurnKinkRatio();
+        if (_feeData.optimalRatio >= 1e27 || _feeData.optimalRatio == 0) revert InvalidOptimalRatio();
+        if (_feeData.optimalRatio == _feeData.mintKinkRatio || _feeData.optimalRatio == _feeData.burnKinkRatio) {
+            revert InvalidOptimalRatio();
+        }
         getMinterStorage().fees[_asset] = _feeData;
         emit SetFeeData(_asset, _feeData);
     }
