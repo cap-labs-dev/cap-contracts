@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { IFractionalReserve } from "../../interfaces/IFractionalReserve.sol";
 import { IVault } from "../../interfaces/IVault.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -241,10 +242,16 @@ library VaultLogic {
 
     /// @notice Rescue an unsupported asset
     /// @param $ Vault storage pointer
+    /// @param reserve Fractional reserve storage pointer
     /// @param _asset Asset to rescue
     /// @param _receiver Receiver of the rescue
-    function rescueERC20(IVault.VaultStorage storage $, address _asset, address _receiver) external {
-        if (_listed($, _asset)) revert AssetNotRescuable(_asset);
+    function rescueERC20(
+        IVault.VaultStorage storage $,
+        IFractionalReserve.FractionalReserveStorage storage reserve,
+        address _asset,
+        address _receiver
+    ) external {
+        if (_listed($, _asset) || reserve.vaults.contains(_asset)) revert AssetNotRescuable(_asset);
         IERC20(_asset).safeTransfer(_receiver, IERC20(_asset).balanceOf(address(this)));
         emit RescueERC20(_asset, _receiver);
     }

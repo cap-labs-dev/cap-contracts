@@ -188,7 +188,7 @@ abstract contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, Fract
     /// @param _asset Asset to rescue
     /// @param _receiver Receiver of the rescue
     function rescueERC20(address _asset, address _receiver) external checkAccess(this.rescueERC20.selector) {
-        VaultLogic.rescueERC20(getVaultStorage(), _asset, _receiver);
+        VaultLogic.rescueERC20(getVaultStorage(), getFractionalReserveStorage(), _asset, _receiver);
     }
 
     /// @notice Get the list of assets supported by the vault
