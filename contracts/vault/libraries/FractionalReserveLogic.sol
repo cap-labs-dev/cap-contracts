@@ -38,7 +38,7 @@ library FractionalReserveLogic {
         uint256 assetBalance = IERC20(_asset).balanceOf(address(this));
         uint256 reserveBalance = $.reserve[_asset];
 
-        if (assetBalance > reserveBalance) {
+        if (assetBalance > reserveBalance && $.vault[_asset] != address(0)) {
             uint256 investAmount = assetBalance - reserveBalance;
             $.loaned[_asset] += investAmount;
             IERC20(_asset).forceApprove($.vault[_asset], investAmount);
