@@ -174,11 +174,10 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         if (_liquidationThreshold > 1e27) revert InvalidLiquidationThreshold();
         if (_ltv != 0 && _liquidationThreshold < _ltv + $.ltvBuffer) revert LiquidationThresholdTooCloseToLtv();
 
-        // If the agent already exists, we revert
-        if ($.agents.contains(_agent)) revert DuplicateAgent();
         if (!$.networks.contains(_network)) revert NetworkDoesntExist();
 
-        $.agents.add(_agent);
+        // If the agent already exists, we revert
+        if (!$.agents.add(_agent)) revert DuplicateAgent();
         $.agentData[_agent].network = _network;
         $.agentData[_agent].ltv = _ltv;
         $.agentData[_agent].liquidationThreshold = _liquidationThreshold;
@@ -214,9 +213,7 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         if (_network == address(0)) revert InvalidNetwork();
 
         // Check for duplicates
-        if ($.networks.contains(_network)) revert DuplicateNetwork();
-
-        $.networks.add(_network);
+        if (!$.networks.add(_network)) revert DuplicateNetwork();
         emit RegisterNetwork(_network);
     }
 
