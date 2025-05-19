@@ -137,6 +137,32 @@ library ViewLogic {
         }
     }
 
+    /// @dev Get the bonus for a liquidation in percentage ray decimals, max for emergencies and none if health is too low
+    /// @param $ Lender storage
+    /// @param _agent Agent address
+    /// @return maxBonus Bonus percentage in ray decimals
+    function bonus(ILender.LenderStorage storage $, address _agent) internal view returns (uint256 maxBonus) {
+        (uint256 totalDelegation,, uint256 totalDebt,,,) = agent($, _agent);
+
+        if (totalDelegation > totalDebt) {
+            // Emergency liquidations get max bonus
+            if (totalDelegation * $.emergencyLiquidationThreshold / totalDebt < 1e27) {
+                maxBonus = $.bonusCap;
+            } else {
+                // Pro-rata bonus for non-emergency liquidations
+                if (block.timestamp > ($.liquidationStart[_agent] + $.grace)) {
+                    uint256 elapsed = block.timestamp - ($.liquidationStart[_agent] + $.grace);
+                    uint256 duration = $.expiry - $.grace;
+                    if (elapsed > duration) elapsed = duration;
+                    maxBonus = $.bonusCap * elapsed / duration;
+                }
+            }
+
+            uint256 maxHealthyBonus = (totalDelegation - totalDebt) * 1e27 / totalDebt;
+            if (maxBonus > maxHealthyBonus) maxBonus = maxHealthyBonus;
+        }
+    }
+
     /// @notice Get the current debt balances for an agent for a specific asset
     /// @param $ Lender storage
     /// @param _agent Agent address to check debt for

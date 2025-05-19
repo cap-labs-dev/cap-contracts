@@ -76,6 +76,7 @@ library LiquidationLogic {
         );
 
         (uint256 assetPrice,) = IOracle($.oracle).getPrice(params.asset);
+        uint256 bonus = ViewLogic.bonus($, params.agent);
         uint256 maxLiquidation = ViewLogic.maxLiquidatable($, params.agent, params.asset);
         uint256 liquidated = params.amount > maxLiquidation ? maxLiquidation : params.amount;
 
@@ -84,49 +85,12 @@ library LiquidationLogic {
             ILender.RepayParams({ agent: params.agent, asset: params.asset, amount: liquidated, caller: params.caller })
         );
 
-        uint256 bonus = getBonus($, totalDelegation, totalDebt, params.agent, liquidated);
-
-        liquidatedValue = (liquidated + bonus) * assetPrice / (10 ** $.reservesData[params.asset].decimals);
+        liquidatedValue =
+            (liquidated + (liquidated * bonus / 1e27)) * assetPrice / (10 ** $.reservesData[params.asset].decimals);
         if (totalSlashableCollateral < liquidatedValue) liquidatedValue = totalSlashableCollateral;
 
         if (liquidatedValue > 0) IDelegation($.delegation).slash(params.agent, params.caller, liquidatedValue);
 
         emit Liquidate(params.agent, params.caller, params.asset, liquidated, liquidatedValue);
-    }
-
-    /// @dev Get the bonus for a liquidation in asset decimals up to the pro-rata bonus cap or
-    /// credit ratio, whichever is smaller.
-    /// @param $ Lender storage
-    /// @param totalDelegation Total delegation of an agent
-    /// @param totalDebt Total debt of an agent
-    /// @param agent Agent address
-    /// @param liquidated Liquidated amount in asset decimals
-    /// @param bonus Bonus amount of asset
-    function getBonus(
-        ILender.LenderStorage storage $,
-        uint256 totalDelegation,
-        uint256 totalDebt,
-        address agent,
-        uint256 liquidated
-    ) internal view returns (uint256 bonus) {
-        if (totalDelegation > totalDebt) {
-            uint256 elapsed;
-
-            // This would only happen if liquidation is called when its emergencyLiquidationThreshold is below 1e27 and before the grace period ends
-            if (block.timestamp < $.liquidationStart[agent] + $.grace) {
-                elapsed = block.timestamp - $.liquidationStart[agent];
-            } else {
-                elapsed = block.timestamp - ($.liquidationStart[agent] + $.grace);
-            }
-
-            uint256 duration = $.expiry - $.grace;
-            if (elapsed > duration) elapsed = duration;
-
-            uint256 bonusPercentage = $.bonusCap * elapsed / duration;
-            uint256 maxHealthyBonusPercentage = (totalDelegation - totalDebt) * 1e27 / totalDebt;
-            if (bonusPercentage > maxHealthyBonusPercentage) bonusPercentage = maxHealthyBonusPercentage;
-
-            bonus = liquidated * bonusPercentage / 1e27;
-        }
     }
 }
