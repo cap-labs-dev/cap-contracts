@@ -88,6 +88,8 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
 
         IERC20Metadata(address(asset)).forceApprove(address(cap), type(uint256).max);
         IERC20Metadata(address(cap)).forceApprove(address(stakedCap), type(uint256).max);
+        // Need enough gas for a proxy message send
+        lzReceiveGas = 400_000;
     }
 
     /// @notice Deposit underlying asset to mint cUSD on MegaETH Testnet

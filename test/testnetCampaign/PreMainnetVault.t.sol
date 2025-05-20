@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { PreMainnetVault } from "../contracts/testnetCampaign/PreMainnetVault.sol";
+import { PreMainnetVault } from "../../contracts/testnetCampaign/PreMainnetVault.sol";
 
-import { ProxyUtils } from "../contracts/deploy/utils/ProxyUtils.sol";
+import { ProxyUtils } from "../../contracts/deploy/utils/ProxyUtils.sol";
 
-import { L2Token } from "../contracts/token/L2Token.sol";
-import { PermitUtils } from "./deploy/utils/PermitUtils.sol";
+import { L2Token } from "../../contracts/token/L2Token.sol";
+import { PermitUtils } from "../deploy/utils/PermitUtils.sol";
 
-import { TimeUtils } from "./deploy/utils/TimeUtils.sol";
-import { MockERC20 } from "./mocks/MockERC20.sol";
-import { MockERC4626 } from "./mocks/MockERC4626.sol";
-import { MockVault } from "./mocks/MockVault.sol";
+import { MockERC20 } from "../mocks/MockERC20.sol";
+import { MockERC4626 } from "../mocks/MockERC4626.sol";
+
+import { TimeUtils } from "../deploy/utils/TimeUtils.sol";
+import { MockVault } from "../mocks/MockVault.sol";
 import { MessagingFee, SendParam } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import { TestHelperOz5 } from "@layerzerolabs/test-devtools-evm-foundry/contracts/TestHelperOz5.sol";
 import { Test } from "forge-std/Test.sol";
@@ -350,7 +351,7 @@ contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, Ti
     }
 
     function test_setLzReceiveGas() public {
-        assertEq(vault.lzReceiveGas(), 100_000);
+        assertEq(vault.lzReceiveGas(), 400_000);
 
         vm.startPrank(owner);
         vault.setLzReceiveGas(200_000);
