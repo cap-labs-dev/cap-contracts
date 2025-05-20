@@ -45,10 +45,14 @@ contract DeployInfra is ProxyUtils {
         LzAddressbook memory srcAddressbook,
         LzAddressbook memory dstAddressbook,
         address asset,
+        address cap,
+        address stakedCap,
         uint48 maxCampaignLength
     ) internal returns (PreMainnetInfraConfig memory d) {
         d.preMainnetVault = address(
-            new PreMainnetVault(asset, address(srcAddressbook.endpointV2), dstAddressbook.eid, maxCampaignLength)
+            new PreMainnetVault(
+                asset, cap, stakedCap, address(srcAddressbook.endpointV2), dstAddressbook.eid, maxCampaignLength
+            )
         );
     }
 
