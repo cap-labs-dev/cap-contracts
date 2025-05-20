@@ -7,6 +7,8 @@ import { console } from "forge-std/console.sol";
 
 import { LzAddressbook, LzUtils } from "../contracts/deploy/utils/LzUtils.sol";
 import { WalletUtils } from "../contracts/deploy/utils/WalletUtils.sol";
+
+import { LzMessageProxy } from "../contracts/testnetCampaign/LzMessageProxy.sol";
 import { PreMainnetVault } from "../contracts/testnetCampaign/PreMainnetVault.sol";
 import { L2Token } from "../contracts/token/L2Token.sol";
 
@@ -14,8 +16,11 @@ contract DeployPreMainnetVaultAndL2Token is Script, LzUtils, WalletUtils {
     using stdJson for string;
 
     // Chain IDs
-    string constant SOURCE_RPC_URL = "mainnet";
-    uint256 constant SOURCE_CHAIN_ID = 1;
+    string constant SOURCE_RPC_URL = "ethereum-holesky";
+    uint256 constant SOURCE_CHAIN_ID = 17000;
+
+    string constant PROXY_RPC_URL = "ethereum-sepolia";
+    uint256 constant PROXY_CHAIN_ID = 11155111;
 
     string constant TARGET_RPC_URL = "megaeth-testnet";
     uint256 constant TARGET_CHAIN_ID = 6342;
@@ -23,63 +28,99 @@ contract DeployPreMainnetVaultAndL2Token is Script, LzUtils, WalletUtils {
     // Max campaign length (1 week)
     uint48 constant MAX_CAMPAIGN_LENGTH = 7 days;
 
-    uint256 mainnetForkId;
-    uint256 megaethTestnetForkId;
+    uint256 sourceForkId;
+    uint256 proxyForkId;
+    uint256 targetForkId;
 
     // Deployment addresses
     address public usdc;
+    address public cap;
+    address public stakedCap;
 
     // Deployed contracts
     PreMainnetVault public vault;
+    LzMessageProxy public proxy;
     L2Token public l2Token;
 
     // LayerZero configs
-    LzAddressbook public mainnetConfig;
-    LzAddressbook public megaethTestnetConfig;
+    LzAddressbook public sourceConfig;
+    LzAddressbook public proxyConfig;
+    LzAddressbook public targetConfig;
 
     function run() external {
         address deployer = getWalletAddress();
-        mainnetForkId = vm.createFork(SOURCE_RPC_URL);
-        megaethTestnetForkId = vm.createFork(TARGET_RPC_URL);
+        sourceForkId = vm.createFork(SOURCE_RPC_URL);
+        proxyForkId = vm.createFork(PROXY_RPC_URL);
+        targetForkId = vm.createFork(TARGET_RPC_URL);
 
         // Get deployment configuration
         usdc = vm.envAddress("USDC_ADDRESS");
+        cap = vm.envAddress("CAP_ADDRESS");
+        stakedCap = vm.envAddress("STAKED_CAP_ADDRESS");
 
         // Get LayerZero configuration for both chains
-        mainnetConfig = _getLzAddressbook(SOURCE_CHAIN_ID);
-        megaethTestnetConfig = _getLzAddressbook(TARGET_CHAIN_ID);
+        sourceConfig = _getLzAddressbook(SOURCE_CHAIN_ID);
+        proxyConfig = _getLzAddressbook(PROXY_CHAIN_ID);
+        targetConfig = _getLzAddressbook(TARGET_CHAIN_ID);
 
         // Deploy PreMainnetVault on Sepolia
-        vm.selectFork(mainnetForkId);
+        vm.selectFork(sourceForkId);
         vm.startBroadcast();
-        vault =
-            new PreMainnetVault(usdc, address(mainnetConfig.endpointV2), megaethTestnetConfig.eid, MAX_CAMPAIGN_LENGTH);
-        console.log("PreMainnetVault deployed on Sepolia at:", address(vault));
+        vault = new PreMainnetVault(
+            usdc, cap, stakedCap, address(sourceConfig.endpointV2), proxyConfig.eid, MAX_CAMPAIGN_LENGTH
+        );
+        console.log(string.concat("PreMainnetVault deployed on ", SOURCE_RPC_URL, " at:"), address(vault));
         vm.stopBroadcast();
 
         // Deploy L2Token on Arbitrum Sepolia
-        vm.selectFork(megaethTestnetForkId);
+        vm.selectFork(proxyForkId);
         vm.startBroadcast();
-        l2Token = new L2Token("Boosted cUSD", "bcUSD", address(megaethTestnetConfig.endpointV2), deployer);
-        console.log("L2Token deployed on Arbitrum Sepolia at:", address(l2Token));
+        proxy = new LzMessageProxy(address(proxyConfig.endpointV2));
+        console.log(string.concat("LzMessageProxy deployed on ", PROXY_RPC_URL, " at:"), address(proxy));
+        vm.stopBroadcast();
+
+        // Deploy L2Token on Arbitrum Sepolia
+        vm.selectFork(targetForkId);
+        vm.startBroadcast();
+        l2Token = new L2Token("Boosted cUSD", "bcUSD", address(targetConfig.endpointV2), deployer);
+        console.log(string.concat("L2Token deployed on ", TARGET_RPC_URL, " at:"), address(l2Token));
         vm.stopBroadcast();
 
         // Link the contracts
         bytes32 l2TokenPeer = addressToBytes32(address(l2Token));
+        bytes32 proxyPeer = addressToBytes32(address(proxy));
         bytes32 vaultPeer = addressToBytes32(address(vault));
 
-        // Set PreMainnetVault's peer to L2Token
-        vm.selectFork(mainnetForkId);
-        vm.startBroadcast();
-        vault.setPeer(megaethTestnetConfig.eid, l2TokenPeer);
-        console.log("Set PreMainnetVault's peer to L2Token");
-        vm.stopBroadcast();
+        // vault -> proxy -> l2Token
 
-        // Set L2Token's peer to PreMainnetVault
-        vm.selectFork(megaethTestnetForkId);
-        vm.startBroadcast();
-        l2Token.setPeer(mainnetConfig.eid, vaultPeer);
-        console.log("Set L2Token's peer to PreMainnetVault");
-        vm.stopBroadcast();
+        // vault <-> proxy
+        {
+            vm.selectFork(sourceForkId);
+            vm.startBroadcast();
+            vault.setPeer(proxyConfig.eid, proxyPeer);
+            console.log(string.concat("Set PreMainnetVault's peer to LzMessageProxy on ", SOURCE_RPC_URL));
+            vm.stopBroadcast();
+
+            vm.selectFork(proxyForkId);
+            vm.startBroadcast();
+            proxy.setPeer(sourceConfig.eid, vaultPeer);
+            console.log(string.concat("Set Proxy's peer to PreMainnetVault on ", PROXY_RPC_URL));
+            vm.stopBroadcast();
+        }
+
+        // proxy <-> l2Token
+        {
+            vm.selectFork(proxyForkId);
+            vm.startBroadcast();
+            proxy.setPeer(targetConfig.eid, l2TokenPeer);
+            console.log(string.concat("Set LzMessageProxy's peer to L2Token on ", PROXY_RPC_URL));
+            vm.stopBroadcast();
+
+            vm.selectFork(targetForkId);
+            vm.startBroadcast();
+            l2Token.setPeer(proxyConfig.eid, proxyPeer);
+            console.log(string.concat("Set L2Token's peer to LzMessageProxy on ", TARGET_RPC_URL));
+            vm.stopBroadcast();
+        }
     }
 }
