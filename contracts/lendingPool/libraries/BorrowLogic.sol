@@ -115,6 +115,7 @@ library BorrowLogic {
 
         if (restakerRepaid > 0) {
             reserve.unrealizedInterest[params.agent] -= restakerRepaid;
+            reserve.totalUnrealizedInterest -= restakerRepaid;
             IERC20(params.asset).safeTransfer($.delegation, restakerRepaid);
             IDelegation($.delegation).distributeRewards(params.agent, params.asset);
         }
@@ -169,6 +170,7 @@ library BorrowLogic {
 
         reserve.debt += realizedInterest;
         reserve.unrealizedInterest[_agent] += unrealizedInterest;
+        reserve.totalUnrealizedInterest += unrealizedInterest;
 
         IDebtToken(reserve.debtToken).mint(_agent, realizedInterest + unrealizedInterest);
         IVault(reserve.vault).borrow(_asset, realizedInterest, $.delegation);
@@ -188,9 +190,11 @@ library BorrowLogic {
         ILender.ReserveData storage reserve = $.reservesData[_asset];
         uint256 totalDebt = IERC20(reserve.debtToken).totalSupply();
         uint256 reserves = IVault(reserve.vault).availableBalance(_asset);
+        uint256 vaultDebt = reserve.debt;
+        uint256 totalUnrealizedInterest = reserve.totalUnrealizedInterest;
 
-        if (totalDebt > reserve.debt) {
-            realization = totalDebt - reserve.debt;
+        if (totalDebt > vaultDebt + totalUnrealizedInterest) {
+            realization = totalDebt - vaultDebt - totalUnrealizedInterest;
         }
         if (reserves < realization) {
             realization = reserves;

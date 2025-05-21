@@ -45,6 +45,7 @@ interface ILender {
     /// @param decimals Decimals of the asset
     /// @param paused True if the asset is paused, false otherwise
     /// @param debt Total debt of the asset
+    /// @param totalUnrealizedInterest Total unrealized interest for the asset
     /// @param unrealizedInterest Unrealized interest for each agent
     /// @param lastRealizationTime Last time interest was realized for each agent
     struct ReserveData {
@@ -55,6 +56,7 @@ interface ILender {
         uint8 decimals;
         bool paused;
         uint256 debt;
+        uint256 totalUnrealizedInterest;
         mapping(address => uint256) unrealizedInterest;
         mapping(address => uint256) lastRealizationTime;
         uint256 minBorrow;
