@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { IFractionalReserve } from "../../interfaces/IFractionalReserve.sol";
+import { IVault } from "../../interfaces/IVault.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -40,9 +41,17 @@ library FractionalReserveLogic {
 
         if (assetBalance > reserveBalance) {
             uint256 investAmount = assetBalance - reserveBalance;
-            $.loaned[_asset] += investAmount;
             IERC20(_asset).forceApprove($.vault[_asset], investAmount);
-            IERC4626($.vault[_asset]).deposit(investAmount, address(this));
+            uint256 shares = IERC4626($.vault[_asset]).deposit(investAmount, address(this));
+            uint256 assets = IERC4626($.vault[_asset]).convertToAssets(shares);
+
+            uint256 loss = investAmount - assets;
+            if (loss > 0) {
+                investAmount -= loss;
+                IVault(address(this)).reportLoss(_asset, loss);
+            }
+
+            $.loaned[_asset] += investAmount;
 
             emit FractionalReserveInvested(_asset, investAmount);
         }

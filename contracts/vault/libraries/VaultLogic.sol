@@ -45,6 +45,9 @@ library VaultLogic {
     /// @dev Insufficient reserves
     error InsufficientReserves(address asset, uint256 balanceBefore, uint256 amount);
 
+    /// @dev Loss is larger than the available balance
+    error LossTooGreat(address asset, uint256 amount);
+
     /// @dev Cap token minted
     event Mint(
         address indexed minter,
@@ -79,6 +82,9 @@ library VaultLogic {
 
     /// @dev Remove asset
     event RemoveAsset(address asset);
+
+    /// @dev Report loss
+    event ReportLoss(address asset, uint256 amount);
 
     /// @dev Asset paused
     event PauseAsset(address asset);
@@ -204,6 +210,23 @@ library VaultLogic {
         IERC20(params.asset).safeTransferFrom(msg.sender, address(this), params.amount);
 
         emit Repay(msg.sender, params.asset, params.amount);
+    }
+
+    /// @notice Report loss on an asset
+    /// @param $ Vault storage pointer
+    /// @param _asset Asset address
+    /// @param _amount Amount of loss
+    function reportLoss(IVault.VaultStorage storage $, address _asset, uint256 _amount)
+        external
+        updateIndex($, _asset)
+    {
+        if ($.totalSupplies[_asset] < $.totalBorrows[_asset] + _amount) {
+            revert LossTooGreat(_asset, _amount);
+        }
+
+        $.totalSupplies[_asset] -= _amount;
+
+        emit ReportLoss(_asset, _amount);
     }
 
     /// @notice Add an asset to the vault list
