@@ -132,9 +132,7 @@ library ViewLogic {
 
         // Cap at the agent's debt for this asset
         uint256 agentDebt = debt($, _agent, _asset);
-        if (agentDebt < maxLiquidatableAmount) {
-            return agentDebt;
-        }
+        if (agentDebt < maxLiquidatableAmount + reserve.minBorrow) maxLiquidatableAmount = agentDebt;
     }
 
     /// @notice Get the current debt balances for an agent for a specific asset

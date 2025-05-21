@@ -84,7 +84,14 @@ library BorrowLogic {
         ILender.ReserveData storage reserve = $.reservesData[params.asset];
 
         /// Can only repay up to the amount owed
-        repaid = Math.min(params.amount, IERC20(reserve.debtToken).balanceOf(params.agent));
+        uint256 agentDebt = IERC20(reserve.debtToken).balanceOf(params.agent);
+        repaid = Math.min(params.amount, agentDebt);
+
+        uint256 remainingDebt = agentDebt - repaid;
+        if (remainingDebt > 0 && remainingDebt < reserve.minBorrow) {
+            // Limit repayment to maintain minimum debt if not full repayment
+            repaid = agentDebt - reserve.minBorrow;
+        }
 
         IDebtToken(reserve.debtToken).burn(params.agent, repaid);
         IERC20(params.asset).safeTransferFrom(params.caller, address(this), repaid);
