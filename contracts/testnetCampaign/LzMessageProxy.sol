@@ -68,4 +68,7 @@ contract LzMessageProxy is OApp {
     function setLzReceiveGas(uint128 _lzReceiveGas) external onlyOwner {
         lzReceiveGas = _lzReceiveGas;
     }
+
+    /// @notice Allows the contract to receive native tokens
+    receive() external payable { }
 }

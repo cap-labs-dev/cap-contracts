@@ -63,7 +63,9 @@ contract PreMainnetVaultWithProxyTest is Test, TestHelperOz5, ProxyUtils, Permit
         );
 
         // setup proxy
-        proxy = LzMessageProxy(_deployOApp(type(LzMessageProxy).creationCode, abi.encode(address(endpoints[proxyEid]))));
+        proxy = LzMessageProxy(
+            payable(_deployOApp(type(LzMessageProxy).creationCode, abi.encode(address(endpoints[proxyEid]))))
+        );
 
         // Setup mock dst oapp
         dstOFT = L2Token(
