@@ -474,14 +474,14 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
         if (currentAsset == address(0)) return;
 
-        vault.pause(currentAsset);
+        vault.pauseAsset(currentAsset);
     }
 
     function unpause(uint256 assetSeed) external {
         address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
         if (currentAsset == address(0)) return;
 
-        vault.unpause(currentAsset);
+        vault.unpauseAsset(currentAsset);
     }
 
     // TODO: make it external again after fixing the tests

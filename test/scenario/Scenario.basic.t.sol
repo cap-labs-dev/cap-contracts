@@ -141,7 +141,7 @@ contract ScenarioBasicTest is TestDeployer {
 
         {
             vm.startPrank(env.users.vault_config_admin);
-            cUSD.pause(address(usdt));
+            cUSD.pauseAsset(address(usdt));
             vm.stopPrank();
 
             /// An Operater comes to borrow USDT
@@ -153,7 +153,7 @@ contract ScenarioBasicTest is TestDeployer {
             lender.borrow(address(usdt), 1000e6, user_agent);
 
             vm.startPrank(env.users.vault_config_admin);
-            cUSD.unpause(address(usdt));
+            cUSD.unpauseAsset(address(usdt));
             vm.stopPrank();
 
             vm.startPrank(user_agent);
