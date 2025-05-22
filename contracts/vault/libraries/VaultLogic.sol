@@ -146,7 +146,7 @@ library VaultLogic {
         $.totalSupplies[params.asset] -= params.amountOut + params.fee;
 
         IERC20(params.asset).safeTransfer(params.receiver, params.amountOut);
-        IERC20(params.asset).safeTransfer($.insuranceFund, params.fee);
+        if (params.fee > 0) IERC20(params.asset).safeTransfer($.insuranceFund, params.fee);
 
         emit Burn(msg.sender, params.receiver, params.asset, params.amountIn, params.amountOut, params.fee);
     }
@@ -170,7 +170,7 @@ library VaultLogic {
             _updateIndex($, asset);
             $.totalSupplies[asset] -= params.amountsOut[i] + params.fees[i];
             IERC20(asset).safeTransfer(params.receiver, params.amountsOut[i]);
-            IERC20(asset).safeTransfer($.insuranceFund, params.fees[i]);
+            if (params.fees[i] > 0) IERC20(asset).safeTransfer($.insuranceFund, params.fees[i]);
         }
 
         emit Redeem(msg.sender, params.receiver, params.amountIn, params.amountsOut, params.fees);

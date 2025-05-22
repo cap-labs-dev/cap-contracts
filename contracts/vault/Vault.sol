@@ -83,7 +83,7 @@ abstract contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, Fract
             })
         );
         _mint(_receiver, amountOut);
-        _mint(getVaultStorage().insuranceFund, fee);
+        if (fee > 0) _mint(getVaultStorage().insuranceFund, fee);
     }
 
     /// @notice Burn the cap token for an asset

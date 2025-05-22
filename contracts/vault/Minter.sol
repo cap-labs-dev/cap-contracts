@@ -54,6 +54,13 @@ abstract contract Minter is IMinter, Access, MinterStorageUtils {
             MinterLogic.redeemAmountOut(getMinterStorage(), RedeemAmountOutParams({ amount: _amountIn }));
     }
 
+    /// @notice Is user whitelisted
+    /// @param _user User address
+    /// @return isWhitelisted Whitelist state
+    function whitelisted(address _user) external view returns (bool isWhitelisted) {
+        isWhitelisted = getMinterStorage().whitelist[_user];
+    }
+
     /// @notice Set the allocation slopes and ratios for an asset
     /// @dev Starting minimum mint fee must be less than 5%
     /// @param _asset Asset address
@@ -71,5 +78,13 @@ abstract contract Minter is IMinter, Access, MinterStorageUtils {
     function setRedeemFee(uint256 _redeemFee) external checkAccess(this.setRedeemFee.selector) {
         getMinterStorage().redeemFee = _redeemFee;
         emit SetRedeemFee(_redeemFee);
+    }
+
+    /// @notice Set the whitelist for a user
+    /// @param _user User address
+    /// @param _whitelisted Whitelist state
+    function setWhitelist(address _user, bool _whitelisted) external checkAccess(this.setWhitelist.selector) {
+        getMinterStorage().whitelist[_user] = _whitelisted;
+        emit SetWhitelist(_user, _whitelisted);
     }
 }

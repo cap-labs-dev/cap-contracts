@@ -29,10 +29,14 @@ library MinterLogic {
     {
         (uint256 amountOutBeforeFee, uint256 newRatio) = _amountOutBeforeFee($.oracle, params);
 
-        (amount, fee) = _applyFeeSlopes(
-            $.fees[params.asset],
-            IMinter.FeeSlopeParams({ mint: params.mint, amount: amountOutBeforeFee, ratio: newRatio })
-        );
+        if ($.whitelist[msg.sender]) {
+            amount = amountOutBeforeFee;
+        } else {
+            (amount, fee) = _applyFeeSlopes(
+                $.fees[params.asset],
+                IMinter.FeeSlopeParams({ mint: params.mint, amount: amountOutBeforeFee, ratio: newRatio })
+            );
+        }
     }
 
     /// @notice Calculate the output amounts for redeeming a cap token for a proportional weighting
@@ -45,7 +49,7 @@ library MinterLogic {
         view
         returns (uint256[] memory amounts, uint256[] memory fees)
     {
-        uint256 redeemFee = $.redeemFee;
+        uint256 redeemFee = $.whitelist[msg.sender] ? 0 : $.redeemFee;
         uint256 shares = params.amount * SHARE_PRECISION / IERC20(address(this)).totalSupply();
         address[] memory assets = IVault(address(this)).assets();
         uint256 assetLength = assets.length;
