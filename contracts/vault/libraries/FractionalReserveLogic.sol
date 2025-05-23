@@ -92,7 +92,12 @@ library FractionalReserveLogic {
             if (_withdrawAmount > assetBalance) {
                 /// Divest both the withdrawal amount and the buffer reserve for later withdrawals
                 uint256 divestAmount = _withdrawAmount + $.reserve[_asset] - assetBalance;
-                if (divestAmount > $.loaned[_asset]) divestAmount = $.loaned[_asset];
+                // Round up the share, overestimating the amount of assets to divest
+                uint256 shares = IERC4626($.vault[_asset]).previewWithdraw(divestAmount);
+                // Round down the asset, still divesting more than requested
+                uint256 assets = IERC4626($.vault[_asset]).convertToAssets(shares);
+
+                divestAmount = assets > $.loaned[_asset] ? $.loaned[_asset] : assets;
                 if (divestAmount > 0) {
                     $.loaned[_asset] -= divestAmount;
 
@@ -154,7 +159,10 @@ library FractionalReserveLogic {
         returns (uint256 interest)
     {
         uint256 vaultShares = IERC4626($.vault[_asset]).balanceOf(address(this));
-        uint256 vaultAssets = IERC4626($.vault[_asset]).convertToAssets(vaultShares);
-        interest = vaultAssets > $.loaned[_asset] ? vaultAssets - $.loaned[_asset] : 0;
+        uint256 shares = IERC4626($.vault[_asset]).previewWithdraw($.loaned[_asset]);
+        if (vaultShares > shares) {
+            uint256 withdrawableShares = vaultShares - shares;
+            interest = IERC4626($.vault[_asset]).convertToAssets(withdrawableShares);
+        }
     }
 }
