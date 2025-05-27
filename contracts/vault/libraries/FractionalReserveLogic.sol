@@ -71,7 +71,7 @@ library FractionalReserveLogic {
                 if (redeemedAssets > loanedAssets) {
                     IERC20(_asset).safeTransfer($.interestReceiver, redeemedAssets - loanedAssets);
                 } else if (redeemedAssets < loanedAssets) {
-                    revert LossFromFractionalReserve(_asset, $.vault[_asset], loanedAssets - redeemedAssets);
+                    IVault(address(this)).reportLoss(_asset, loanedAssets - redeemedAssets);
                 }
 
                 emit FractionalReserveDivested(_asset, loanedAssets);
@@ -94,7 +94,7 @@ library FractionalReserveLogic {
                 uint256 divestAmount = _withdrawAmount + $.reserve[_asset] - assetBalance;
                 // Round up the share, overestimating the amount of assets to divest
                 uint256 shares = IERC4626($.vault[_asset]).previewWithdraw(divestAmount);
-                // Round down the asset, still divesting more than requested
+                // Divest the maximum amount of assets given the shares
                 uint256 assets = IERC4626($.vault[_asset]).convertToAssets(shares);
 
                 divestAmount = assets > $.loaned[_asset] ? $.loaned[_asset] : assets;
@@ -103,6 +103,16 @@ library FractionalReserveLogic {
 
                     IERC4626($.vault[_asset]).withdraw(divestAmount, address(this), address(this));
 
+                    // Report any rounding error loss to the protocol
+                    uint256 vaultBalance =
+                        IERC4626($.vault[_asset]).convertToAssets(IERC4626($.vault[_asset]).balanceOf(address(this)));
+                    if ($.loaned[_asset] > vaultBalance) {
+                        uint256 loss = $.loaned[_asset] - vaultBalance;
+                        IVault(address(this)).reportLoss(_asset, loss);
+                        $.loaned[_asset] -= loss;
+                    }
+
+                    // At least the requested amount must have been divested
                     if (IERC20(_asset).balanceOf(address(this)) < divestAmount + assetBalance) {
                         uint256 loss = divestAmount + assetBalance - IERC20(_asset).balanceOf(address(this));
                         revert LossFromFractionalReserve(_asset, $.vault[_asset], loss);
