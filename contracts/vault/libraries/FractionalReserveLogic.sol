@@ -42,16 +42,17 @@ library FractionalReserveLogic {
         if (assetBalance > reserveBalance) {
             uint256 investAmount = assetBalance - reserveBalance;
             IERC20(_asset).forceApprove($.vault[_asset], investAmount);
-            uint256 shares = IERC4626($.vault[_asset]).deposit(investAmount, address(this));
-            uint256 assets = IERC4626($.vault[_asset]).convertToAssets(shares);
+            IERC4626($.vault[_asset]).deposit(investAmount, address(this));
 
-            uint256 loss = investAmount - assets;
-            if (loss > 0) {
-                investAmount -= loss;
+            uint256 vaultBalance =
+                IERC4626($.vault[_asset]).convertToAssets(IERC4626($.vault[_asset]).balanceOf(address(this)));
+            if (vaultBalance < $.loaned[_asset] + investAmount) {
+                uint256 loss = $.loaned[_asset] + investAmount - vaultBalance;
                 IVault(address(this)).reportLoss(_asset, loss);
+                investAmount -= loss;
             }
 
-            $.loaned[_asset] += investAmount;
+            $.loaned[_asset] = vaultBalance;
 
             emit FractionalReserveInvested(_asset, investAmount);
         }
