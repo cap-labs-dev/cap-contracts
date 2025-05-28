@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+
 /// @title Fractional Reserve Interface
 /// @author kexley, @capLabs
 /// @notice Interface for the Fractional Reserve contract
@@ -11,6 +13,7 @@ interface IFractionalReserve {
         mapping(address => uint256) loaned;
         mapping(address => uint256) reserve;
         mapping(address => address) vault;
+        EnumerableSet.AddressSet vaults;
     }
 
     /// @notice Invest unborrowed capital in a fractional reserve vault (up to the reserve)
@@ -45,6 +48,10 @@ interface IFractionalReserve {
     /// @param _asset Asset address
     /// @return vaultAddress Vault address
     function fractionalReserveVault(address _asset) external view returns (address vaultAddress);
+
+    /// @notice Fractional reserve vaults
+    /// @return vaultAddresses Fractional reserve vaults
+    function fractionalReserveVaults() external view returns (address[] memory vaultAddresses);
 
     /// @notice Reserve amount for an asset
     /// @param _asset Asset address

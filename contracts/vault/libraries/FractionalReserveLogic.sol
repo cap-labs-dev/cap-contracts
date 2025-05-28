@@ -5,6 +5,7 @@ import { IFractionalReserve } from "../../interfaces/IFractionalReserve.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title Fractional Reserve Logic
 /// @author kexley, @capLabs
@@ -12,9 +13,13 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 /// withdrawing, redeeming or borrowing.
 library FractionalReserveLogic {
     using SafeERC20 for IERC20;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @dev Loss not allowed from fractional reserve
     error LossFromFractionalReserve(address asset, address vault, uint256 loss);
+
+    /// @dev Fractional reserve vault already set
+    error FractionalReserveVaultAlreadySet(address vault);
 
     /// @dev Fractional reserve invested event
     event FractionalReserveInvested(address indexed asset, uint256 amount);
@@ -109,6 +114,8 @@ library FractionalReserveLogic {
         address _asset,
         address _vault
     ) external {
+        if ($.vault[_asset] != address(0)) $.vaults.remove($.vault[_asset]);
+        if (!$.vaults.add(_vault)) revert FractionalReserveVaultAlreadySet(_vault);
         $.vault[_asset] = _vault;
 
         emit FractionalReserveVaultUpdated(_asset, _vault);
