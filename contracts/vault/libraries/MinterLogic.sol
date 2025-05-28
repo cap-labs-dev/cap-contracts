@@ -132,7 +132,7 @@ library MinterLogic {
             if (params.ratio < fees.optimalRatio) {
                 if (params.ratio < fees.burnKinkRatio) {
                     uint256 excessRatio = fees.burnKinkRatio - params.ratio;
-                    rate = fees.slope0 + (fees.slope1 * excessRatio / (RAY_PRECISION - fees.burnKinkRatio));
+                    rate = fees.slope0 + (fees.slope1 * excessRatio / fees.burnKinkRatio);
                 } else {
                     rate = fees.slope0 * (fees.optimalRatio - params.ratio) / (fees.optimalRatio - fees.burnKinkRatio);
                 }
