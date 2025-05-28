@@ -33,6 +33,8 @@ abstract contract Access is IAccess, Initializable, AccessStorageUtils {
     /// @dev Check caller has access to a function, revert overwise
     /// @param _selector Function selector
     function _checkAccess(bytes4 _selector) internal view {
-        IAccessControl(getAccessStorage().accessControl).checkAccess(_selector, address(this), msg.sender);
+        bool hasAccess =
+            IAccessControl(getAccessStorage().accessControl).checkAccess(_selector, address(this), msg.sender);
+        if (!hasAccess) revert AccessDenied();
     }
 }

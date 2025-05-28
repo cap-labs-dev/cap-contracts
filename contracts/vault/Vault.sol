@@ -110,7 +110,7 @@ abstract contract Vault is
     {
         uint256 fee;
         (amountOut, fee) = getBurnAmount(_asset, _amountIn);
-        divest(_asset, amountOut);
+        divest(_asset, amountOut + fee);
         VaultLogic.burn(
             getVaultStorage(),
             MintBurnParams({
@@ -139,8 +139,13 @@ abstract contract Vault is
         returns (uint256[] memory amountsOut)
     {
         uint256[] memory fees;
+        uint256[] memory totalDivestAmounts = new uint256[](amountsOut.length);
         (amountsOut, fees) = getRedeemAmount(_amountIn);
-        divestMany(assets(), amountsOut);
+        for (uint256 i; i < amountsOut.length; i++) {
+            totalDivestAmounts[i] = amountsOut[i] + fees[i];
+        }
+
+        divestMany(assets(), totalDivestAmounts);
         VaultLogic.redeem(
             getVaultStorage(),
             RedeemParams({
@@ -214,7 +219,7 @@ abstract contract Vault is
     /// @param _asset Asset to rescue
     /// @param _receiver Receiver of the rescue
     function rescueERC20(address _asset, address _receiver) external checkAccess(this.rescueERC20.selector) {
-        VaultLogic.rescueERC20(getVaultStorage(), _asset, _receiver);
+        VaultLogic.rescueERC20(getVaultStorage(), getFractionalReserveStorage(), _asset, _receiver);
     }
 
     /// @notice Get the list of assets supported by the vault

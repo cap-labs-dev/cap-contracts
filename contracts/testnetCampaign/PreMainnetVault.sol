@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { IMinter } from "../interfaces/IMinter.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -117,6 +118,14 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
         _sendMessage(_destReceiver, _amount, _refundAddress);
 
         emit Deposit(msg.sender, _amount, shares);
+    }
+
+    /// @dev Preview deposit
+    /// @param _amount Amount of underlying asset to deposit
+    /// @return shares Amount of shares minted
+    function previewDeposit(uint256 _amount) external view returns (uint256 shares) {
+        (uint256 amountOut,) = IMinter(address(cap)).getMintAmount(address(asset), _amount);
+        shares = stakedCap.previewDeposit(amountOut);
     }
 
     /// @dev Deposit into staked cap

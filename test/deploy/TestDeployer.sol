@@ -165,9 +165,9 @@ contract TestDeployer is
             _initAaveRateOracle(env.libs, env.infra, env.ethVault.assets[i], env.ethOracleMocks.aaveDataProviders[i]);
         }
         for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            /// 1.585e18 is 5% per year
-            uint256 increment = (i + 1) * 0.01585e18; // Vary the restakers rate by 1% each
-            _initRestakerRateForAgent(env.infra, env.testUsers.agents[i], uint256(1.585e18 + increment)); // Restakers rate is per second in ray
+            /// 0.05e27 is 5% per year
+            uint256 increment = (i + 1) * 0.0001e27; // Vary the restakers rate by 1% each
+            _initRestakerRateForAgent(env.infra, env.testUsers.agents[i], uint256(0.05e27 + increment)); // Restakers rate is annualized in ray
         }
 
         /// LENDER
