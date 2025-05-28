@@ -16,6 +16,8 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 library ViewLogic {
     using AgentConfiguration for ILender.AgentConfigurationMap;
 
+    uint256 constant SECONDS_IN_YEAR = 31536000;
+
     /// @notice Calculate the agent data
     /// @param $ Lender storage
     /// @param _agent Agent address
@@ -166,6 +168,6 @@ library ViewLogic {
         uint256 rate = IOracle($.oracle).restakerRate(_agent);
         uint256 elapsedTime = block.timestamp - reserve.lastRealizationTime[_agent];
 
-        accruedInterest = totalInterest * rate * elapsedTime / 1e27;
+        accruedInterest = totalInterest * rate * elapsedTime / (1e27 * SECONDS_IN_YEAR);
     }
 }
