@@ -191,6 +191,14 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
         maxLiquidatableAmount = ViewLogic.maxLiquidatable(getLenderStorage(), _agent, _asset);
     }
 
+    /// @notice Calculate the maximum bonus for a liquidation in percentage ray decimals
+    /// @param _agent Agent address
+    /// @return maxBonus Maximum bonus in percentage ray decimals
+    function bonus(address _agent) external view returns (uint256 maxBonus) {
+        if (_agent == address(0)) revert ZeroAddressNotValid();
+        maxBonus = ViewLogic.bonus(getLenderStorage(), _agent);
+    }
+
     /// @notice Get the current debt balances for an agent for a specific asset
     /// @param _agent Agent address to check debt for
     /// @param _asset Asset to check debt for
