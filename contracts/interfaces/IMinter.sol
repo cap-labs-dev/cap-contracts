@@ -60,6 +60,9 @@ interface IMinter {
     /// @dev Invalid burn kink ratio
     error InvalidBurnKinkRatio();
 
+    /// @dev Invalid optimal ratio
+    error InvalidOptimalRatio();
+
     /// @notice Get the mint amount for a given asset
     /// @param _asset Asset address
     /// @param _amountIn Amount of asset to use

@@ -88,8 +88,8 @@ library MinterLogic {
         if (params.mint) {
             assetValue = params.amount * assetPrice / assetDecimalsPow;
             if (capSupply == 0) {
-                newRatio = RAY_PRECISION;
-                amount = params.amount * capDecimalsPow / assetDecimalsPow;
+                newRatio = 0;
+                amount = assetValue * capDecimalsPow / assetPrice;
             } else {
                 newRatio = (allocationValue + assetValue) * RAY_PRECISION / (capValue + assetValue);
                 amount = assetValue * capDecimalsPow / capPrice;
@@ -98,7 +98,7 @@ library MinterLogic {
             assetValue = params.amount * capPrice / capDecimalsPow;
             if (params.amount == capSupply) {
                 newRatio = RAY_PRECISION;
-                amount = params.amount * assetDecimalsPow / capDecimalsPow;
+                amount = assetValue * assetDecimalsPow / assetPrice;
             } else {
                 if (allocationValue < assetValue || capValue <= assetValue) {
                     newRatio = 0;
@@ -129,16 +129,16 @@ library MinterLogic {
                     uint256 excessRatio = params.ratio - fees.mintKinkRatio;
                     rate += fees.slope0 + (fees.slope1 * excessRatio / (RAY_PRECISION - fees.mintKinkRatio));
                 } else {
-                    rate += fees.slope0 * params.ratio / fees.mintKinkRatio;
+                    rate += fees.slope0 * (params.ratio - fees.optimalRatio) / (fees.mintKinkRatio - fees.optimalRatio);
                 }
             }
         } else {
             if (params.ratio < fees.optimalRatio) {
                 if (params.ratio < fees.burnKinkRatio) {
                     uint256 excessRatio = fees.burnKinkRatio - params.ratio;
-                    rate = fees.slope0 + (fees.slope1 * excessRatio / (RAY_PRECISION - fees.burnKinkRatio));
+                    rate = fees.slope0 + (fees.slope1 * excessRatio / fees.burnKinkRatio);
                 } else {
-                    rate = fees.slope0 * fees.burnKinkRatio / params.ratio;
+                    rate = fees.slope0 * (fees.optimalRatio - params.ratio) / (fees.optimalRatio - fees.burnKinkRatio);
                 }
             }
         }

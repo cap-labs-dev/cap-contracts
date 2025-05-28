@@ -46,7 +46,9 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
         __UUPSUpgradeable_init();
 
         if (_delegation == address(0) || _oracle == address(0)) revert ZeroAddressNotValid();
+        if (_targetHealth < 1e27) revert InvalidTargetHealth();
         if (_grace > _expiry) revert GracePeriodGreaterThanExpiry();
+        if (_bonusCap > 1e27) revert InvalidBonusCap();
 
         LenderStorage storage $ = getLenderStorage();
         $.delegation = _delegation;
@@ -64,7 +66,14 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     /// @param _receiver Receiver of the borrowed asset
     function borrow(address _asset, uint256 _amount, address _receiver) external {
         BorrowLogic.borrow(
-            getLenderStorage(), BorrowParams({ agent: msg.sender, asset: _asset, amount: _amount, receiver: _receiver })
+            getLenderStorage(),
+            BorrowParams({
+                agent: msg.sender,
+                asset: _asset,
+                amount: _amount,
+                receiver: _receiver,
+                maxBorrow: _amount == type(uint256).max
+            })
         );
     }
 
@@ -180,6 +189,14 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     function maxLiquidatable(address _agent, address _asset) external view returns (uint256 maxLiquidatableAmount) {
         if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();
         maxLiquidatableAmount = ViewLogic.maxLiquidatable(getLenderStorage(), _agent, _asset);
+    }
+
+    /// @notice Calculate the maximum bonus for a liquidation in percentage ray decimals
+    /// @param _agent Agent address
+    /// @return maxBonus Maximum bonus in percentage ray decimals
+    function bonus(address _agent) external view returns (uint256 maxBonus) {
+        if (_agent == address(0)) revert ZeroAddressNotValid();
+        maxBonus = ViewLogic.bonus(getLenderStorage(), _agent);
     }
 
     /// @notice Get the current debt balances for an agent for a specific asset
