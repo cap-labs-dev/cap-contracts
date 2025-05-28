@@ -10,6 +10,7 @@ interface IMinter {
         address oracle;
         uint256 redeemFee;
         mapping(address => FeeData) fees;
+        mapping(address => bool) whitelist;
     }
 
     /// @dev Fee data set for an asset in a vault
@@ -47,6 +48,9 @@ interface IMinter {
     /// @dev Redeem fee set
     event SetRedeemFee(uint256 redeemFee);
 
+    /// @dev Whitelist set
+    event SetWhitelist(address user, bool whitelisted);
+
     /// @dev Invalid minimum mint fee
     error InvalidMinMintFee();
 
@@ -82,6 +86,11 @@ interface IMinter {
         view
         returns (uint256[] memory amountsOut, uint256[] memory redeemFees);
 
+    /// @notice Is user whitelisted
+    /// @param _user User address
+    /// @return isWhitelisted Whitelist state
+    function whitelisted(address _user) external view returns (bool isWhitelisted);
+
     /// @notice Set the allocation slopes and ratios for an asset
     /// @param _asset Asset address
     /// @param _feeData Fee slopes and ratios for the asset in the vault
@@ -90,4 +99,9 @@ interface IMinter {
     /// @notice Set the redeem fee
     /// @param _redeemFee Redeem fee amount
     function setRedeemFee(uint256 _redeemFee) external;
+
+    /// @notice Set the whitelist for a user
+    /// @param _user User address
+    /// @param _whitelisted Whitelist state
+    function setWhitelist(address _user, bool _whitelisted) external;
 }
