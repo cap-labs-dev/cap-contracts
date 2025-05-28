@@ -16,3 +16,9 @@
 [submodule "lib/layerzero-v1"]
 	path = lib/layerzero-v1
 	url = https://github.com/LayerZero-Labs/LayerZero-v1
+[submodule "lib/chimera"]
+	path = lib/chimera
+	url = https://github.com/Recon-Fuzz/chimera
+[submodule "lib/setup-helpers"]
+	path = lib/setup-helpers
+	url = https://github.com/Recon-Fuzz/setup-helpers

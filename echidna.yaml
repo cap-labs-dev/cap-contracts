@@ -1,0 +1,25 @@
+testMode: "assertion"
+prefix: "echidna_"
+coverage: true
+corpusDir: "echidna"
+balanceAddr: 0x1043561a8829300000
+balanceContract: 0x1043561a8829300000
+filterFunctions: []
+deployer: "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496"
+contractAddr: "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496"
+shrinkLimit: 100000
+cryticArgs: ["--compile-libraries=(StakedCapAdapter,0xf01),(ReserveLogic,0xf02),(ViewLogic,0xf03),(ChainlinkAdapter,0xf04),(VaultLogic,0xf05),(MinterLogic,0xf06),(AaveAdapter,0xf07),(LiquidationLogic,0xf08),(BorrowLogic,0xf09),(FractionalReserveLogic,0xf0a),(CapTokenAdapter,0xf0b),(ValidationLogic,0xf0c)","--foundry-compile-all"]
+deployContracts: [
+  ["0xf01", "StakedCapAdapter"],
+  ["0xf02", "ReserveLogic"],
+  ["0xf03", "ViewLogic"],
+  ["0xf04", "ChainlinkAdapter"],
+  ["0xf05", "VaultLogic"],
+  ["0xf06", "MinterLogic"],
+  ["0xf07", "AaveAdapter"],
+  ["0xf08", "LiquidationLogic"],
+  ["0xf09", "BorrowLogic"],
+  ["0xf0a", "FractionalReserveLogic"],
+  ["0xf0b", "CapTokenAdapter"],
+  ["0xf0c", "ValidationLogic"]
+]

@@ -38,3 +38,8 @@ bin
 .gambit
 .sumo*
 sumo
+
+# Coverage files
+crytic-export
+echidna
+medusa

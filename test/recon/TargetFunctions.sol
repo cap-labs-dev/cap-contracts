@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: GPL-2.0
+pragma solidity ^0.8.0;
+
+// Chimera deps
+import { vm } from "@chimera/Hevm.sol";
+
+// Helpers
+import { Panic } from "@recon/Panic.sol";
+
+// Targets
+// NOTE: Always import and apply them in alphabetical order, so much easier to debug!
+import { AccessControlTargets } from "./targets/AccessControlTargets.sol";
+import { AdminTargets } from "./targets/AdminTargets.sol";
+import { CapTokenTargets } from "./targets/CapTokenTargets.sol";
+import { DebtTokenTargets } from "./targets/DebtTokenTargets.sol";
+import { DelegationTargets } from "./targets/DelegationTargets.sol";
+import { DoomsdayTargets } from "./targets/DoomsdayTargets.sol";
+import { FeeAuctionTargets } from "./targets/FeeAuctionTargets.sol";
+import { LenderTargets } from "./targets/LenderTargets.sol";
+import { ManagersTargets } from "./targets/ManagersTargets.sol";
+import { MockAaveDataProviderTargets } from "./targets/MockAaveDataProviderTargets.sol";
+import { MockChainlinkPriceFeedTargets } from "./targets/MockChainlinkPriceFeedTargets.sol";
+import { MockNetworkMiddlewareTargets } from "./targets/MockNetworkMiddlewareTargets.sol";
+import { OracleTargets } from "./targets/OracleTargets.sol";
+import { StakedCapTargets } from "./targets/StakedCapTargets.sol";
+
+abstract contract TargetFunctions is
+    AccessControlTargets,
+    AdminTargets,
+    CapTokenTargets,
+    DebtTokenTargets,
+    DelegationTargets,
+    DoomsdayTargets,
+    FeeAuctionTargets,
+    LenderTargets,
+    ManagersTargets,
+    MockAaveDataProviderTargets,
+    MockChainlinkPriceFeedTargets,
+    MockNetworkMiddlewareTargets,
+    OracleTargets,
+    StakedCapTargets
+{
+/// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
+
+/// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
+}

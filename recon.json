@@ -1,0 +1,547 @@
+{
+  "out/AccessControl.sol/AccessControl.json": {
+    "functions": [
+      {
+        "signature": "grantAccess(bytes4,address,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "grantRole(bytes32,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "initialize(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "renounceRole(bytes32,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "revokeAccess(bytes4,address,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "revokeRole(bytes32,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "upgradeToAndCall(address,bytes)",
+        "actor": "actor",
+        "mode": "normal"
+      }
+    ],
+    "separated": true
+  },
+  "out/CapToken.sol/CapToken.json": {
+    "functions": [
+      {
+        "signature": "addAsset(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "approve(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "borrow(address,uint256,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "burn(address,uint256,uint256,address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "divestAll(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "initialize(string,string,address,address,address,address[],address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "investAll(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "mint(address,uint256,uint256,address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "pause(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "realizeInterest(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "redeem(uint256,uint256[],address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "removeAsset(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "repay(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "rescueERC20(address,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setFeeData(address,tuple)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setFractionalReserveVault(address,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setRedeemFee(uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setReserve(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "transfer(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "transferFrom(address,address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "unpause(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "upgradeToAndCall(address,bytes)",
+        "actor": "actor",
+        "mode": "normal"
+      }
+    ],
+    "separated": true
+  },
+  "out/DebtToken.sol/DebtToken.json": {
+    "functions": [
+      {
+        "signature": "burn(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "initialize(address,address,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "mint(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "upgradeToAndCall(address,bytes)",
+        "actor": "actor",
+        "mode": "normal"
+      }
+    ],
+    "separated": true
+  },
+  "out/Delegation.sol/Delegation.json": {
+    "functions": [
+      {
+        "signature": "addAgent(address,address,uint256,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "distributeRewards(address,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "initialize(address,address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "modifyAgent(address,uint256,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "registerNetwork(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setLastBorrow(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setLtvBuffer(uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "slash(address,address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "upgradeToAndCall(address,bytes)",
+        "actor": "actor",
+        "mode": "normal"
+      }
+    ],
+    "separated": true
+  },
+  "out/FeeAuction.sol/FeeAuction.json": {
+    "functions": [
+      {
+        "signature": "buy(uint256,address[],uint256[],address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "initialize(address,address,address,uint256,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setDuration(uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setMinStartPrice(uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setStartPrice(uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "upgradeToAndCall(address,bytes)",
+        "actor": "actor",
+        "mode": "normal"
+      }
+    ],
+    "separated": true
+  },
+  "out/Lender.sol/Lender.json": {
+    "functions": [
+      {
+        "signature": "addAsset(tuple)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "borrow(address,uint256,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "cancelLiquidation(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "initialize(address,address,address,uint256,uint256,uint256,uint256,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "initiateLiquidation(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "liquidate(address,address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "pauseAsset(address,bool)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "realizeInterest(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "realizeRestakerInterest(address,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "removeAsset(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "repay(address,uint256,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setMinBorrow(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "upgradeToAndCall(address,bytes)",
+        "actor": "actor",
+        "mode": "normal"
+      }
+    ],
+    "separated": true
+  },
+  "out/MockAaveDataProvider.sol/MockAaveDataProvider.json": {
+    "functions": [
+      {
+        "signature": "setVariableBorrowRate(uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      }
+    ],
+    "separated": true
+  },
+  "out/MockChainlinkPriceFeed.sol/MockChainlinkPriceFeed.json": {
+    "functions": [
+      {
+        "signature": "setDecimals(uint8)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setLatestAnswer(int256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setMockPriceStaleness(uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      }
+    ],
+    "separated": true
+  },
+  "out/MockNetworkMiddleware.sol/MockNetworkMiddleware.json": {
+    "functions": [
+      {
+        "signature": "addMockAgentCoverage(address,address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "distributeRewards(address,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "registerAgent(address,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "registerVault(address,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setFeeAllowed(uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setMockCollateralByVault(address,address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setMockCoverage(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setMockSlashableCollateral(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setMockSlashableCollateralByVault(address,address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "slash(address,address,uint256,uint48)",
+        "actor": "actor",
+        "mode": "normal"
+      }
+    ],
+    "separated": true
+  },
+  "out/Oracle.sol/Oracle.json": {
+    "functions": [
+      {
+        "signature": "initialize(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "marketRate(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setBenchmarkRate(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setMarketOracleData(address,tuple)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setPriceBackupOracleData(address,tuple)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setPriceOracleData(address,tuple)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setRestakerRate(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setStaleness(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setUtilizationOracleData(address,tuple)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "upgradeToAndCall(address,bytes)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "utilizationRate(address)",
+        "actor": "actor",
+        "mode": "normal"
+      }
+    ],
+    "separated": true
+  },
+  "out/StakedCap.sol/StakedCap.json": {
+    "functions": [
+      {
+        "signature": "approve(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "deposit(uint256,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "initialize(address,address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "mint(uint256,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "notify()",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "redeem(uint256,address,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "transfer(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "transferFrom(address,address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "upgradeToAndCall(address,bytes)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "withdraw(uint256,address,address)",
+        "actor": "actor",
+        "mode": "normal"
+      }
+    ],
+    "separated": true
+  }
+}
