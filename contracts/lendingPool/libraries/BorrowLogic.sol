@@ -49,6 +49,10 @@ library BorrowLogic {
         /// Realize restaker interest before borrowing
         realizeRestakerInterest($, params.agent, params.asset);
 
+        if (params.maxBorrow) {
+            params.amount = ViewLogic.maxBorrowable($, params.agent, params.asset);
+        }
+
         ValidationLogic.validateBorrow($, params);
 
         IDelegation($.delegation).setLastBorrow(params.agent);

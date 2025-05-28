@@ -76,6 +76,7 @@ interface ILender {
         address asset;
         uint256 amount;
         address receiver;
+        bool maxBorrow;
     }
 
     /// @dev Repay parameters

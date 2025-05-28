@@ -66,7 +66,14 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     /// @param _receiver Receiver of the borrowed asset
     function borrow(address _asset, uint256 _amount, address _receiver) external {
         BorrowLogic.borrow(
-            getLenderStorage(), BorrowParams({ agent: msg.sender, asset: _asset, amount: _amount, receiver: _receiver })
+            getLenderStorage(),
+            BorrowParams({
+                agent: msg.sender,
+                asset: _asset,
+                amount: _amount,
+                receiver: _receiver,
+                maxBorrow: _amount == type(uint256).max
+            })
         );
     }
 
