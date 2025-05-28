@@ -134,9 +134,7 @@ library ViewLogic {
 
         // Cap at the agent's debt for this asset
         uint256 agentDebt = debt($, _agent, _asset);
-        if (agentDebt < maxLiquidatableAmount) {
-            return agentDebt;
-        }
+        if (agentDebt < maxLiquidatableAmount + reserve.minBorrow) maxLiquidatableAmount = agentDebt;
     }
 
     /// @dev Get the bonus for a liquidation in percentage ray decimals, max for emergencies and none if health is too low
