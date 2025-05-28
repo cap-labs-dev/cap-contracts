@@ -200,6 +200,7 @@ library BorrowLogic {
         if (reserves < realization) {
             realization = reserves;
         }
+        if (reserve.paused) realization = 0;
     }
 
     /// @notice Calculate the maximum interest that can be realized for a restaker
@@ -213,11 +214,15 @@ library BorrowLogic {
         view
         returns (uint256 realization, uint256 unrealizedInterest)
     {
+        ILender.ReserveData storage reserve = $.reservesData[_asset];
         uint256 accruedInterest = ViewLogic.accruedRestakerInterest($, _agent, _asset);
-        uint256 reserves = IVault($.reservesData[_asset].vault).availableBalance(_asset);
+        uint256 reserves = IVault(reserve.vault).availableBalance(_asset);
 
         realization = accruedInterest;
-        if (realization > reserves) {
+        if (reserve.paused) {
+            unrealizedInterest = realization;
+            realization = 0;
+        } else if (realization > reserves) {
             unrealizedInterest = realization - reserves;
             realization = reserves;
         }
