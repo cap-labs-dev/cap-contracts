@@ -86,7 +86,6 @@ library BorrowLogic {
         /// Can only repay up to the amount owed
         repaid = Math.min(params.amount, IERC20(reserve.debtToken).balanceOf(params.agent));
 
-        IDebtToken(reserve.debtToken).burn(params.agent, repaid);
         IERC20(params.asset).safeTransferFrom(params.caller, address(this), repaid);
 
         if (IERC20(reserve.debtToken).balanceOf(params.agent) == 0) {
@@ -128,6 +127,8 @@ library BorrowLogic {
         if (interestRepaid > 0) {
             IERC20(params.asset).safeTransfer(reserve.interestReceiver, interestRepaid);
         }
+
+        IDebtToken(reserve.debtToken).burn(params.agent, repaid);
 
         emit Repay(params.asset, params.agent, repaid);
     }
