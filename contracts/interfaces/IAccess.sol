@@ -9,4 +9,7 @@ interface IAccess {
     struct AccessStorage {
         address accessControl;
     }
+
+    /// @notice Access is denied for the caller
+    error AccessDenied();
 }
