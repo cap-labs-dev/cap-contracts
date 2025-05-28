@@ -165,7 +165,6 @@ library VaultLogic {
             if (params.amountsOut[i] < params.minAmountsOut[i]) {
                 revert Slippage(asset, params.amountsOut[i], params.minAmountsOut[i]);
             }
-            if (params.amountsOut[i] == 0) revert InvalidAmount();
             _verifyBalance($, asset, params.amountsOut[i] + params.fees[i]);
             _updateIndex($, asset);
             $.totalSupplies[asset] -= params.amountsOut[i] + params.fees[i];
