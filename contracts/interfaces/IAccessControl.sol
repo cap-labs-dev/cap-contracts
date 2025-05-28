@@ -16,7 +16,8 @@ interface IAccessControl {
     /// @param _selector Function selector
     /// @param _contract Contract being called
     /// @param _caller Address to check role for
-    function checkAccess(bytes4 _selector, address _contract, address _caller) external view;
+    /// @return hasAccess True if access is granted, false otherwise
+    function checkAccess(bytes4 _selector, address _contract, address _caller) external view returns (bool hasAccess);
 
     /// @notice Grant access to a specific method on a contract
     /// @param _selector Function selector

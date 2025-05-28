@@ -28,8 +28,10 @@ contract AccessControl is IAccessControl, UUPSUpgradeable, AccessControlEnumerab
     /// @param _selector Function selector
     /// @param _contract Contract being called
     /// @param _caller Address to check role for
-    function checkAccess(bytes4 _selector, address _contract, address _caller) external view {
+    /// @return hasAccess True if access is granted
+    function checkAccess(bytes4 _selector, address _contract, address _caller) external view returns (bool hasAccess) {
         _checkRole(role(_selector, _contract), _caller);
+        hasAccess = true;
     }
 
     /// @notice Grant access to a specific method on a contract
