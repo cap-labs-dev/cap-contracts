@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { IMinter } from "../interfaces/IMinter.sol";
-import { IVault } from "../interfaces/IVault.sol";
+import { ICapToken } from "../interfaces/ICapToken.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
@@ -26,7 +25,7 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     IERC20Metadata public immutable asset;
 
     /// @notice Cap
-    IVault public immutable cap;
+    ICapToken public immutable cap;
 
     /// @notice Staked Cap
     IERC4626 public immutable stakedCap;
@@ -82,7 +81,7 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
         Ownable(msg.sender)
     {
         asset = IERC20Metadata(_asset);
-        cap = IVault(_cap);
+        cap = ICapToken(_cap);
         stakedCap = IERC4626(_stakedCap);
         assetDecimals = asset.decimals();
         maxCampaignEnd = block.timestamp + _maxCampaignLength;
@@ -124,7 +123,7 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     /// @param _amount Amount of underlying asset to deposit
     /// @return shares Amount of shares minted
     function previewDeposit(uint256 _amount) external view returns (uint256 shares) {
-        (uint256 amountOut,) = IMinter(address(cap)).getMintAmount(address(asset), _amount);
+        (uint256 amountOut,) = cap.getMintAmount(address(asset), _amount);
         shares = stakedCap.previewDeposit(amountOut);
     }
 
