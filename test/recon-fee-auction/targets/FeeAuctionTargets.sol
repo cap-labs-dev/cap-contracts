@@ -14,6 +14,13 @@ import "contracts/feeAuction/FeeAuction.sol";
 
 abstract contract FeeAuctionTargets is BaseTargetFunctions, Properties {
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
+    function feeAuction_buy_clamped(uint256 _maxPrice, uint256 _minAmount) public {
+        uint256[] memory _minAmounts = new uint256[](_getAssets().length);
+        for (uint256 i = 0; i < _getAssets().length; i++) {
+            _minAmounts[i] = _minAmount;
+        }
+        feeAuction_buy(_maxPrice, _getAssets(), _minAmounts, _getActor(), block.timestamp + 1000);
+    }
 
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
     function feeAuction_buy(

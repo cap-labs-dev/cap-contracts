@@ -7,5 +7,6 @@
   "solidity.compileUsingRemoteVersion": "v0.8.28",
   "solidity.packageDefaultDependenciesContractsDirectory": "src",
   "solidity.packageDefaultDependenciesDirectory": "lib",
-  "solidity.defaultCompiler": "remote"
+  "solidity.defaultCompiler": "remote",
+  "recon.defaultFuzzer": "echidna"
 }

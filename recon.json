@@ -239,7 +239,7 @@
       {
         "signature": "buy(uint256,address[],uint256[],address,uint256)",
         "actor": "actor",
-        "mode": "normal"
+        "mode": "catch"
       },
       {
         "signature": "initialize(address,address,address,uint256,uint256)",
