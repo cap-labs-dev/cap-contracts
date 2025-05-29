@@ -58,8 +58,12 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         capToken.mint(_asset, _amountIn, _minAmountOut, _receiver, _deadline);
     }
 
-    function capToken_pause(address _asset) public asActor {
-        capToken.pause(_asset);
+    function capToken_pauseAsset(address _asset) public asActor {
+        capToken.pauseAsset(_asset);
+    }
+
+    function capToken_pauseProtocol() public asActor {
+        capToken.pauseProtocol();
     }
 
     function capToken_permit(
@@ -121,7 +125,11 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         capToken.transferFrom(from, to, value);
     }
 
-    function capToken_unpause(address _asset) public asActor {
-        capToken.unpause(_asset);
+    function capToken_unpauseAsset(address _asset) public asActor {
+        capToken.unpauseAsset(_asset);
+    }
+
+    function capToken_unpauseProtocol() public asActor {
+        capToken.unpauseProtocol();
     }
 }

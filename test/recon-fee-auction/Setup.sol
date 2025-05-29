@@ -17,7 +17,9 @@ import { ProxyUtils } from "contracts/deploy/utils/ProxyUtils.sol";
 import "contracts/feeAuction/FeeAuction.sol";
 
 contract AccessControlMock {
-    function checkAccess(bytes4 _selector, address _contract, address _caller) external view { }
+    function checkAccess(bytes4 _selector, address _contract, address _caller) external view returns (bool) {
+        return true;
+    }
 }
 
 abstract contract Setup is BaseSetup, ActorManager, AssetManager, Utils, ProxyUtils {

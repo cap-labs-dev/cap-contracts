@@ -20,7 +20,6 @@ library CapTokenAdapter {
         lastUpdated = block.timestamp;
 
         uint256 totalUsdValue;
-        lastUpdated = block.timestamp;
 
         for (uint256 i; i < assets.length; ++i) {
             address asset = assets[i];

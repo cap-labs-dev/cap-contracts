@@ -82,7 +82,12 @@
         "mode": "normal"
       },
       {
-        "signature": "pause(address)",
+        "signature": "pauseAsset(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "pauseProtocol()",
         "actor": "actor",
         "mode": "normal"
       },
@@ -147,7 +152,12 @@
         "mode": "normal"
       },
       {
-        "signature": "unpause(address)",
+        "signature": "unpauseAsset(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "unpauseProtocol()",
         "actor": "actor",
         "mode": "normal"
       },

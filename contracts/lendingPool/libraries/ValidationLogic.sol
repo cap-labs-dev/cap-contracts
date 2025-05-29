@@ -61,9 +61,10 @@ library ValidationLogic {
         if (params.receiver == address(0) || params.asset == address(0)) revert ZeroAddressNotValid();
         if ($.reservesData[params.asset].paused) revert ReservePaused();
 
-        uint256 borrowCapacity = ViewLogic.maxBorrowable($, params.agent, params.asset);
-
-        if (params.amount > borrowCapacity) revert CollateralCannotCoverNewBorrow();
+        if (!params.maxBorrow) {
+            uint256 borrowCapacity = ViewLogic.maxBorrowable($, params.agent, params.asset);
+            if (params.amount > borrowCapacity) revert CollateralCannotCoverNewBorrow();
+        }
     }
 
     /// @notice Validate the initialization of the liquidation of an agent
