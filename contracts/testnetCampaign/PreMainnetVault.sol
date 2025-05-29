@@ -121,9 +121,11 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     }
 
     /// @notice Preview deposit of underlying asset to mint cUSD on mainnet
+    /// @dev New deposits are disabled after the campaign ends
     /// @param _amount Amount of underlying asset to deposit
     /// @return amountOut Amount of cUSD minted on mainnet
     function previewDeposit(uint256 _amount) external view returns (uint256 amountOut) {
+        if (transferEnabled()) return 0;
         (amountOut,) = cap.getMintAmount(address(asset), _amount);
     }
 
