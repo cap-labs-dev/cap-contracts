@@ -97,6 +97,7 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     /// @param _destReceiver Receiver of the cUSD on MegaETH Testnet
     /// @param _refundAddress The address to receive any excess fee values sent to the endpoint if the call fails on the destination chain
     /// @param _deadline Deadline for the deposit
+    /// @return shares Amount of staked cap minted
     function deposit(
         uint256 _amount,
         uint256 _minAmount,
