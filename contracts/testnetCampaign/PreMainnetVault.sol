@@ -92,6 +92,7 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     }
 
     /// @notice Deposit underlying asset to mint cUSD on MegaETH Testnet
+    /// @dev Minting zero amount of cUSD on mainnet is not allowed
     /// @param _amount Amount of underlying asset to deposit
     /// @param _minShares Minimum amount of shares to mint
     /// @param _destReceiver Receiver of the assets on MegaETH Testnet
