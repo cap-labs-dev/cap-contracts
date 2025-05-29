@@ -120,10 +120,11 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
         emit Deposit(msg.sender, _amount, shares);
     }
 
-    /// @dev Preview deposit
+    /// @dev New deposits are disabled after the campaign ends
     /// @param _amount Amount of underlying asset to deposit
     /// @return shares Amount of shares minted
     function previewDeposit(uint256 _amount) external view returns (uint256 shares) {
+        if (transferEnabled()) return 0;
         (uint256 amountOut,) = IMinter(address(cap)).getMintAmount(address(asset), _amount);
         shares = stakedCap.previewDeposit(amountOut);
     }
