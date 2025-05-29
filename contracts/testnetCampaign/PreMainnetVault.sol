@@ -87,8 +87,8 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
         assetDecimals = asset.decimals();
         maxCampaignEnd = block.timestamp + _maxCampaignLength;
 
-        IERC20Metadata(address(asset)).forceApprove(address(cap), type(uint256).max);
-        IERC20Metadata(address(cap)).forceApprove(address(stakedCap), type(uint256).max);
+        IERC20Metadata(_asset).forceApprove(_cap, type(uint256).max);
+        IERC20Metadata(_cap).forceApprove(_stakedCap, type(uint256).max);
     }
 
     /// @notice Deposit underlying asset to mint cUSD on MegaETH Testnet
