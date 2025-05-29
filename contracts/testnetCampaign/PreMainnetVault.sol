@@ -120,12 +120,11 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
         emit Deposit(msg.sender, _amount, shares);
     }
 
-    /// @dev Preview deposit
+    /// @notice Preview deposit of underlying asset to mint cUSD on mainnet
     /// @param _amount Amount of underlying asset to deposit
-    /// @return shares Amount of shares minted
-    function previewDeposit(uint256 _amount) external view returns (uint256 shares) {
-        (uint256 amountOut,) = IMinter(address(cap)).getMintAmount(address(asset), _amount);
-        shares = stakedCap.previewDeposit(amountOut);
+    /// @return amountOut Amount of cUSD minted on mainnet
+    function previewDeposit(uint256 _amount) external view returns (uint256 amountOut) {
+        (amountOut,) = IMinter(address(cap)).getMintAmount(address(asset), _amount);
     }
 
     /// @dev Deposit into staked cap
