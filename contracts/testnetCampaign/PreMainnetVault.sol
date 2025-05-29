@@ -93,13 +93,13 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
 
     /// @notice Deposit underlying asset to mint cUSD on MegaETH Testnet
     /// @param _amount Amount of underlying asset to deposit
-    /// @param _minShares Minimum amount of shares to mint
-    /// @param _destReceiver Receiver of the assets on MegaETH Testnet
+    /// @param _minAmount Minimum amount of cUSD to mint on mainnet
+    /// @param _destReceiver Receiver of the cUSD on MegaETH Testnet
     /// @param _refundAddress The address to receive any excess fee values sent to the endpoint if the call fails on the destination chain
     /// @param _deadline Deadline for the deposit
     function deposit(
         uint256 _amount,
-        uint256 _minShares,
+        uint256 _minAmount,
         address _destReceiver,
         address _refundAddress,
         uint256 _deadline
@@ -111,7 +111,7 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
 
         asset.safeTransferFrom(msg.sender, address(this), _amount);
 
-        shares = _depositIntoStakedCap(_amount, _minShares, _deadline);
+        shares = _depositIntoStakedCap(_amount, _minAmount, _deadline);
 
         _mint(msg.sender, shares);
 
@@ -120,24 +120,23 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
         emit Deposit(msg.sender, _amount, shares);
     }
 
-    /// @dev Preview deposit
+    /// @notice Preview deposit of underlying asset to mint cUSD on mainnet
     /// @param _amount Amount of underlying asset to deposit
-    /// @return shares Amount of shares minted
-    function previewDeposit(uint256 _amount) external view returns (uint256 shares) {
-        (uint256 amountOut,) = IMinter(address(cap)).getMintAmount(address(asset), _amount);
-        shares = stakedCap.previewDeposit(amountOut);
+    /// @return amountOut Amount of cUSD minted on mainnet
+    function previewDeposit(uint256 _amount) external view returns (uint256 amountOut) {
+        (amountOut,) = IMinter(address(cap)).getMintAmount(address(asset), _amount);
     }
 
     /// @dev Deposit into staked cap
     /// @param _amount Amount of underlying asset to deposit
-    /// @param _minShares Minimum amount of shares to mint
+    /// @param _minAmount Minimum amount of cUSD to mint on mainnet
     /// @param _deadline Deadline for the deposit
     /// @return shares Amount of shares minted
-    function _depositIntoStakedCap(uint256 _amount, uint256 _minShares, uint256 _deadline)
+    function _depositIntoStakedCap(uint256 _amount, uint256 _minAmount, uint256 _deadline)
         internal
         returns (uint256 shares)
     {
-        uint256 amountOut = cap.mint(address(asset), _amount, _minShares, address(this), _deadline);
+        uint256 amountOut = cap.mint(address(asset), _amount, _minAmount, address(this), _deadline);
 
         return stakedCap.deposit(amountOut, address(this));
     }
