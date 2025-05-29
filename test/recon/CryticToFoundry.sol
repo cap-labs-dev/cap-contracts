@@ -17,6 +17,5 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     // forge test --match-test test_crytic -vvv
     function test_crytic() public {
         // TODO: add failing property tests here for debugging
-        capToken_mint_clamped(1e18);
     }
 }

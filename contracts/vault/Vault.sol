@@ -139,8 +139,8 @@ abstract contract Vault is
         returns (uint256[] memory amountsOut)
     {
         uint256[] memory fees;
-        uint256[] memory totalDivestAmounts = new uint256[](amountsOut.length);
         (amountsOut, fees) = getRedeemAmount(_amountIn);
+        uint256[] memory totalDivestAmounts = new uint256[](amountsOut.length);
         for (uint256 i; i < amountsOut.length; i++) {
             totalDivestAmounts[i] = amountsOut[i] + fees[i];
         }

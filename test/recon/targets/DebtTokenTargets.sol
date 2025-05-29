@@ -13,15 +13,17 @@ import { Panic } from "@recon/Panic.sol";
 import "contracts/lendingPool/tokens/DebtToken.sol";
 
 abstract contract DebtTokenTargets is BaseTargetFunctions, Properties {
-    /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
+/// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
 
-    /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
+/// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
-    function debtToken_burn(address from, uint256 amount) public asActor {
-        debtToken.burn(from, amount);
-    }
+// @audit info: This function can only be called by the Lender contract to burn debt tokens.
+// function debtToken_burn(address from, uint256 amount) public asActor {
+//     debtToken.burn(from, amount);
+// }
 
-    function debtToken_mint(address to, uint256 amount) public asActor {
-        debtToken.mint(to, amount);
-    }
+// @audit info: This function can only be called by the Lender contract to mint debt tokens.
+// function debtToken_mint(address to, uint256 amount) public asActor {
+//     debtToken.mint(to, amount);
+// }
 }

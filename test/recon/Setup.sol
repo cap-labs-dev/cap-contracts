@@ -28,7 +28,6 @@ import { DeployVault } from "contracts/deploy/service/DeployVault.sol";
 import "contracts/feeAuction/FeeAuction.sol";
 import "contracts/lendingPool/Lender.sol";
 import "contracts/lendingPool/tokens/DebtToken.sol";
-
 import "contracts/oracle/Oracle.sol";
 import "contracts/token/CapToken.sol";
 import "contracts/token/StakedCap.sol";
@@ -113,7 +112,6 @@ abstract contract Setup is
 
         capToken = CapToken(env.usdVault.capToken);
         stakedCap = StakedCap(env.usdVault.stakedCapToken);
-        debtToken = DebtToken(env.usdVault.debtTokens[0]);
         feeAuction = FeeAuction(env.usdVault.feeAuction);
 
         /// ACCESS CONTROL
@@ -149,9 +147,32 @@ abstract contract Setup is
 
         /// ACTORS
         _addActor(address(0xb0b));
-        address[] memory approvalArray = new address[](1);
+        address[] memory approvalArray = new address[](2);
         approvalArray[0] = address(capToken);
-        _finalizeAssetDeployment(_getActors(), approvalArray, type(uint88).max);
+        approvalArray[1] = address(feeAuction);
+        for (uint i; i < 3; i++) {
+            _switchAsset(i);
+            _finalizeAssetDeployment(_getActors(), approvalArray, type(uint88).max);
+        }
+
+        for (uint i; i < _getActors().length; i++) {
+            vm.prank(_getActors()[i]);
+            capToken.approve(address(feeAuction), type(uint88).max);
+        }
+
+        _addLabels();
+    }
+
+    /// === INTERNAL FUNCTIONS === ///
+    function _addLabels() internal {
+        vm.label(address(accessControl), "AccessControl");
+        vm.label(address(delegation), "Delegation");
+        vm.label(address(oracle), "Oracle");
+        vm.label(address(lender), "Lender");
+        vm.label(address(capToken), "Vault(CapToken)");
+        vm.label(address(stakedCap), "StakedCap");
+        vm.label(address(feeAuction), "FeeAuction");
+        vm.label(address(debtToken), "DebtToken");
     }
 
     /// === MODIFIERS === ///

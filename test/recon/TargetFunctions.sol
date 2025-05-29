@@ -24,6 +24,7 @@ import { MockNetworkMiddlewareTargets } from "./targets/MockNetworkMiddlewareTar
 import { OracleTargets } from "./targets/OracleTargets.sol";
 import { StakedCapTargets } from "./targets/StakedCapTargets.sol";
 
+import "contracts/lendingPool/tokens/DebtToken.sol";
 import "test/mocks/MockAaveDataProvider.sol";
 import "test/mocks/MockChainlinkPriceFeed.sol";
 
@@ -52,6 +53,11 @@ abstract contract TargetFunctions is
     function switchAaveOracle(uint256 entropy) external {
         address target = env.usdOracleMocks.aaveDataProviders[entropy % env.usdOracleMocks.aaveDataProviders.length];
         mockAaveDataProvider = MockAaveDataProvider(target);
+    }
+
+    function switchDebtToken(uint256 entropy) external {
+        address target = env.usdVault.debtTokens[entropy % env.usdVault.debtTokens.length];
+        debtToken = DebtToken(target);
     }
 
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///

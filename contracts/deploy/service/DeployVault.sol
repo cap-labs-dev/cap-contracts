@@ -117,6 +117,7 @@ contract DeployVault is ProxyUtils {
         accessControl.grantAccess(Vault.addAsset.selector, vault.capToken, users.vault_config_admin);
         accessControl.grantAccess(Vault.removeAsset.selector, vault.capToken, users.vault_config_admin);
         accessControl.grantAccess(Vault.rescueERC20.selector, vault.capToken, users.vault_config_admin);
+        accessControl.grantAccess(Minter.setWhitelist.selector, vault.capToken, users.vault_config_admin);
         accessControl.grantAccess(bytes4(0), vault.capToken, users.access_control_admin);
 
         accessControl.grantAccess(FractionalReserve.setReserve.selector, vault.capToken, users.vault_config_admin);

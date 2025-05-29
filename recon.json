@@ -3,12 +3,12 @@
     "functions": [
       {
         "signature": "grantAccess(bytes4,address,address)",
-        "actor": "actor",
+        "actor": "admin",
         "mode": "normal"
       },
       {
         "signature": "grantRole(bytes32,address)",
-        "actor": "actor",
+        "actor": "admin",
         "mode": "normal"
       },
       {
@@ -18,17 +18,17 @@
       },
       {
         "signature": "renounceRole(bytes32,address)",
-        "actor": "actor",
+        "actor": "admin",
         "mode": "normal"
       },
       {
         "signature": "revokeAccess(bytes4,address,address)",
-        "actor": "actor",
+        "actor": "admin",
         "mode": "normal"
       },
       {
         "signature": "revokeRole(bytes32,address)",
-        "actor": "actor",
+        "actor": "admin",
         "mode": "normal"
       },
       {
@@ -165,6 +165,11 @@
         "signature": "upgradeToAndCall(address,bytes)",
         "actor": "actor",
         "mode": "normal"
+      },
+      {
+        "signature": "setWhitelist(address,bool)",
+        "actor": "actor",
+        "mode": "normal"
       }
     ],
     "separated": true
@@ -198,7 +203,7 @@
     "functions": [
       {
         "signature": "addAgent(address,address,uint256,uint256)",
-        "actor": "actor",
+        "actor": "admin",
         "mode": "normal"
       },
       {
@@ -249,7 +254,7 @@
       {
         "signature": "buy(uint256,address[],uint256[],address,uint256)",
         "actor": "actor",
-        "mode": "catch"
+        "mode": "normal"
       },
       {
         "signature": "initialize(address,address,address,uint256,uint256)",
@@ -283,7 +288,7 @@
     "functions": [
       {
         "signature": "addAsset(tuple)",
-        "actor": "actor",
+        "actor": "admin",
         "mode": "normal"
       },
       {
@@ -313,7 +318,7 @@
       },
       {
         "signature": "pauseAsset(address,bool)",
-        "actor": "actor",
+        "actor": "admin",
         "mode": "normal"
       },
       {
@@ -328,7 +333,7 @@
       },
       {
         "signature": "removeAsset(address)",
-        "actor": "actor",
+        "actor": "admin",
         "mode": "normal"
       },
       {
@@ -338,7 +343,7 @@
       },
       {
         "signature": "setMinBorrow(address,uint256)",
-        "actor": "actor",
+        "actor": "admin",
         "mode": "normal"
       },
       {

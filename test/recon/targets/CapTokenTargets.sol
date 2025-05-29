@@ -19,6 +19,18 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         capToken_mint(_getAsset(), _amountIn, 0, _getActor(), block.timestamp + 1 days);
     }
 
+    function capToken_burn_clamped(uint256 _amountIn) public {
+        capToken_burn(_getAsset(), _amountIn, 0, _getActor(), block.timestamp + 1 days);
+    }
+
+    function capToken_redeem_clamped(uint256 _amountIn) public {
+        uint256[] memory _minAmountsOut = new uint256[](3);
+        _minAmountsOut[0] = 0; // Set minimum amount out to 0 for clamping
+        _minAmountsOut[1] = 0; // Set minimum amount out to 0 for clamping
+        _minAmountsOut[2] = 0; // Set minimum amount out to 0 for clamping
+        capToken_redeem(_amountIn, _minAmountsOut, _getActor(), block.timestamp + 1 days);
+    }
+
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
     function capToken_addAsset(address _asset) public asActor {
@@ -43,7 +55,6 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         uint256 _deadline
     ) public asActor {
         capToken.burn(_asset, _amountIn, _minAmountOut, _receiver, _deadline);
-        t(false, "capToken_burn");
     }
 
     function capToken_divestAll(address _asset) public asActor {
@@ -93,17 +104,16 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         asActor
     {
         capToken.redeem(_amountIn, _minAmountsOut, _receiver, _deadline);
-        t(false, "capToken_redeem");
     }
 
     function capToken_removeAsset(address _asset) public asActor {
         capToken.removeAsset(_asset);
     }
 
-    function capToken_repay(address _asset, uint256 _amount) public asActor {
-        capToken.repay(_asset, _amount);
-        t(false, "capToken_repay");
-    }
+    // @audit info: This function can only be called by the Lender contract to repay assets.
+    // function capToken_repay(address _asset, uint256 _amount) public asActor {
+    //     capToken.repay(_asset, _amount);
+    // }
 
     function capToken_rescueERC20(address _asset, address _receiver) public asActor {
         capToken.rescueERC20(_asset, _receiver);
@@ -123,6 +133,10 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
 
     function capToken_setReserve(address _asset, uint256 _reserve) public asActor {
         capToken.setReserve(_asset, _reserve);
+    }
+
+    function capToken_setWhitelist(address _user, bool _whitelisted) public asActor {
+        capToken.setWhitelist(_user, _whitelisted);
     }
 
     function capToken_transfer(address to, uint256 value) public asActor {

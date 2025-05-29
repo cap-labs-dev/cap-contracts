@@ -17,7 +17,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
-    function lender_addAsset(ILender.AddAssetParams memory _params) public asActor {
+    function lender_addAsset(ILender.AddAssetParams memory _params) public asAdmin {
         lender.addAsset(_params);
     }
 
@@ -37,7 +37,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender.liquidate(_agent, _asset, _amount);
     }
 
-    function lender_pauseAsset(address _asset, bool _pause) public asActor {
+    function lender_pauseAsset(address _asset, bool _pause) public asAdmin {
         lender.pauseAsset(_asset, _pause);
     }
 
@@ -49,7 +49,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender.realizeRestakerInterest(_agent, _asset);
     }
 
-    function lender_removeAsset(address _asset) public asActor {
+    function lender_removeAsset(address _asset) public asAdmin {
         lender.removeAsset(_asset);
     }
 
@@ -57,7 +57,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender.repay(_asset, _amount, _agent);
     }
 
-    function lender_setMinBorrow(address _asset, uint256 _minBorrow) public asActor {
+    function lender_setMinBorrow(address _asset, uint256 _minBorrow) public asAdmin {
         lender.setMinBorrow(_asset, _minBorrow);
     }
 }

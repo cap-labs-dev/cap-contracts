@@ -17,9 +17,9 @@ abstract contract MockChainlinkPriceFeedTargets is BaseTargetFunctions, Properti
 
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
-    function mockChainlinkPriceFeed_setDecimals(uint8 decimals_) public asActor {
-        mockChainlinkPriceFeed.setDecimals(decimals_);
-    }
+    // function mockChainlinkPriceFeed_setDecimals(uint8 decimals_) public asActor {
+    //     mockChainlinkPriceFeed.setDecimals(decimals_);
+    // }
 
     function mockChainlinkPriceFeed_setLatestAnswer(int256 answer) public asActor {
         mockChainlinkPriceFeed.setLatestAnswer(answer);
