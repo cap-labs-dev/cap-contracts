@@ -32,7 +32,7 @@ import "contracts/lendingPool/tokens/DebtToken.sol";
 import "contracts/oracle/Oracle.sol";
 import "contracts/token/CapToken.sol";
 import "contracts/token/StakedCap.sol";
-import { TestEnvConfig } from "test/deploy/interfaces/TestDeployConfig.sol";
+import { OracleMocksConfig, TestEnvConfig } from "test/deploy/interfaces/TestDeployConfig.sol";
 import "test/mocks/MockAaveDataProvider.sol";
 import "test/mocks/MockChainlinkPriceFeed.sol";
 import "test/mocks/MockNetworkMiddleware.sol";
@@ -89,11 +89,25 @@ abstract contract Setup is
         delegation = Delegation(env.infra.delegation);
         oracle = Oracle(env.infra.oracle);
 
-        address[] memory assets = new address[](1);
+        address[] memory assets = new address[](3);
         assets[0] = _newAsset(6);
+        assets[1] = _newAsset(8);
+        assets[2] = _newAsset(18);
+        env.usdMocks = assets;
 
-        mockAaveDataProvider = new MockAaveDataProvider();
-        mockChainlinkPriceFeed = new MockChainlinkPriceFeed(1e8);
+        /// Deploy mocks
+        env.usdOracleMocks = OracleMocksConfig({
+            assets: assets,
+            aaveDataProviders: new address[](assets.length),
+            chainlinkPriceFeeds: new address[](assets.length)
+        });
+
+        for (uint256 i = 0; i < assets.length; i++) {
+            env.usdOracleMocks.aaveDataProviders[i] = address(new MockAaveDataProvider());
+            env.usdOracleMocks.chainlinkPriceFeeds[i] = address(new MockChainlinkPriceFeed(1e8));
+        }
+        mockAaveDataProvider = MockAaveDataProvider(env.usdOracleMocks.aaveDataProviders[0]);
+        mockChainlinkPriceFeed = MockChainlinkPriceFeed(env.usdOracleMocks.chainlinkPriceFeeds[0]);
 
         env.usdVault = _deployVault(env.implems, env.infra, "Cap USD", "cUSD", assets, env.users.insurance_fund);
 
@@ -108,8 +122,13 @@ abstract contract Setup is
 
         /// ORACLE
         _initVaultOracle(env.libs, env.infra, env.usdVault);
-        _initChainlinkPriceOracle(env.libs, env.infra, assets[0], address(mockChainlinkPriceFeed));
-        _initAaveRateOracle(env.libs, env.infra, assets[0], address(mockAaveDataProvider));
+        for (uint256 i = 0; i < env.usdVault.assets.length; i++) {
+            address asset = env.usdVault.assets[i];
+            address chainlinkPriceFeed = env.usdOracleMocks.chainlinkPriceFeeds[i];
+            address aavePriceFeed = env.usdOracleMocks.aaveDataProviders[i];
+            _initChainlinkPriceOracle(env.libs, env.infra, asset, chainlinkPriceFeed);
+            _initAaveRateOracle(env.libs, env.infra, asset, aavePriceFeed);
+        }
         //  oracle.setRestakerRate(address(this), uint256(1.585e18 + 0.01585e18));
 
         /// LENDER
@@ -127,6 +146,12 @@ abstract contract Setup is
         // delegation.addAgent(address(this), address(mockNetworkMiddleware), 0.5e27, 0.7e27);
         mockNetworkMiddleware.setMockCoverage(address(this), 1_000_000e8);
         mockNetworkMiddleware.setMockSlashableCollateral(address(this), 1_000_000e8);
+
+        /// ACTORS
+        _addActor(address(0xb0b));
+        address[] memory approvalArray = new address[](1);
+        approvalArray[0] = address(capToken);
+        _finalizeAssetDeployment(_getActors(), approvalArray, type(uint88).max);
     }
 
     /// === MODIFIERS === ///

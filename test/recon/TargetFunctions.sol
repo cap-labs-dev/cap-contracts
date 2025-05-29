@@ -24,6 +24,9 @@ import { MockNetworkMiddlewareTargets } from "./targets/MockNetworkMiddlewareTar
 import { OracleTargets } from "./targets/OracleTargets.sol";
 import { StakedCapTargets } from "./targets/StakedCapTargets.sol";
 
+import "test/mocks/MockAaveDataProvider.sol";
+import "test/mocks/MockChainlinkPriceFeed.sol";
+
 abstract contract TargetFunctions is
     AccessControlTargets,
     AdminTargets,
@@ -40,7 +43,16 @@ abstract contract TargetFunctions is
     OracleTargets,
     StakedCapTargets
 {
-/// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
+    /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
+    function switchChainlinkOracle(uint256 entropy) external {
+        address target = env.usdOracleMocks.chainlinkPriceFeeds[entropy % env.usdOracleMocks.chainlinkPriceFeeds.length];
+        mockChainlinkPriceFeed = MockChainlinkPriceFeed(target);
+    }
 
-/// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
+    function switchAaveOracle(uint256 entropy) external {
+        address target = env.usdOracleMocks.aaveDataProviders[entropy % env.usdOracleMocks.aaveDataProviders.length];
+        mockAaveDataProvider = MockAaveDataProvider(target);
+    }
+
+    /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 }

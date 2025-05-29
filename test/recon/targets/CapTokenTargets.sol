@@ -15,6 +15,9 @@ import "contracts/token/CapToken.sol";
 
 abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
+    function capToken_mint_clamped(uint256 _amountIn) public {
+        capToken_mint(_getAsset(), _amountIn, 0, _getActor(), block.timestamp + 1 days);
+    }
 
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
@@ -26,9 +29,11 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         capToken.approve(spender, value);
     }
 
-    function capToken_borrow(address _asset, uint256 _amount, address _receiver) public asActor {
-        capToken.borrow(_asset, _amount, _receiver);
-    }
+    // @audit info: This function can only be called by the Lender contract to borrow assets.
+    // function capToken_borrow(address _asset, uint256 _amount, address _receiver) public asActor {
+    //     capToken.borrow(_asset, _amount, _receiver);
+    //     t(false, "capToken_borrow");
+    // }
 
     function capToken_burn(
         address _asset,
@@ -38,6 +43,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         uint256 _deadline
     ) public asActor {
         capToken.burn(_asset, _amountIn, _minAmountOut, _receiver, _deadline);
+        t(false, "capToken_burn");
     }
 
     function capToken_divestAll(address _asset) public asActor {
@@ -66,17 +72,17 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         capToken.pauseProtocol();
     }
 
-    function capToken_permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) public asActor {
-        capToken.permit(owner, spender, value, deadline, v, r, s);
-    }
+    // function capToken_permit(
+    //     address owner,
+    //     address spender,
+    //     uint256 value,
+    //     uint256 deadline,
+    //     uint8 v,
+    //     bytes32 r,
+    //     bytes32 s
+    // ) public asActor {
+    //     capToken.permit(owner, spender, value, deadline, v, r, s);
+    // }
 
     function capToken_realizeInterest(address _asset) public asActor {
         capToken.realizeInterest(_asset);
@@ -87,6 +93,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         asActor
     {
         capToken.redeem(_amountIn, _minAmountsOut, _receiver, _deadline);
+        t(false, "capToken_redeem");
     }
 
     function capToken_removeAsset(address _asset) public asActor {
@@ -95,6 +102,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
 
     function capToken_repay(address _asset, uint256 _amount) public asActor {
         capToken.repay(_asset, _amount);
+        t(false, "capToken_repay");
     }
 
     function capToken_rescueERC20(address _asset, address _receiver) public asActor {
