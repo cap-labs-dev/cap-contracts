@@ -29,28 +29,6 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender.cancelLiquidation(_agent);
     }
 
-    function lender_initialize(
-        address _accessControl,
-        address _delegation,
-        address _oracle,
-        uint256 _targetHealth,
-        uint256 _grace,
-        uint256 _expiry,
-        uint256 _bonusCap,
-        uint256 _emergencyLiquidationThreshold
-    ) public asActor {
-        lender.initialize(
-            _accessControl,
-            _delegation,
-            _oracle,
-            _targetHealth,
-            _grace,
-            _expiry,
-            _bonusCap,
-            _emergencyLiquidationThreshold
-        );
-    }
-
     function lender_initiateLiquidation(address _agent) public asActor {
         lender.initiateLiquidation(_agent);
     }
@@ -81,9 +59,5 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
     function lender_setMinBorrow(address _asset, uint256 _minBorrow) public asActor {
         lender.setMinBorrow(_asset, _minBorrow);
-    }
-
-    function lender_upgradeToAndCall(address newImplementation, bytes memory data) public payable asActor {
-        lender.upgradeToAndCall{ value: msg.value }(newImplementation, data);
     }
 }

@@ -44,18 +44,6 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         capToken.divestAll(_asset);
     }
 
-    function capToken_initialize(
-        string memory _name,
-        string memory _symbol,
-        address _accessControl,
-        address _feeAuction,
-        address _oracle,
-        address[] memory _assets,
-        address _insuranceFund
-    ) public asActor {
-        capToken.initialize(_name, _symbol, _accessControl, _feeAuction, _oracle, _assets, _insuranceFund);
-    }
-
     function capToken_investAll(address _asset) public asActor {
         capToken.investAll(_asset);
     }
@@ -135,9 +123,5 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
 
     function capToken_unpause(address _asset) public asActor {
         capToken.unpause(_asset);
-    }
-
-    function capToken_upgradeToAndCall(address newImplementation, bytes memory data) public payable asActor {
-        capToken.upgradeToAndCall{ value: msg.value }(newImplementation, data);
     }
 }

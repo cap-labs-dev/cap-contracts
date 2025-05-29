@@ -21,15 +21,7 @@ abstract contract DebtTokenTargets is BaseTargetFunctions, Properties {
         debtToken.burn(from, amount);
     }
 
-    function debtToken_initialize(address _accessControl, address _asset, address _oracle) public asActor {
-        debtToken.initialize(_accessControl, _asset, _oracle);
-    }
-
     function debtToken_mint(address to, uint256 amount) public asActor {
         debtToken.mint(to, amount);
-    }
-
-    function debtToken_upgradeToAndCall(address newImplementation, bytes memory data) public payable asActor {
-        debtToken.upgradeToAndCall{ value: msg.value }(newImplementation, data);
     }
 }

@@ -25,10 +25,6 @@ abstract contract AccessControlTargets is BaseTargetFunctions, Properties {
         accessControl.grantRole(role, account);
     }
 
-    function accessControl_initialize(address _admin) public asActor {
-        accessControl.initialize(_admin);
-    }
-
     function accessControl_renounceRole(bytes32 role, address callerConfirmation) public asActor {
         accessControl.renounceRole(role, callerConfirmation);
     }
@@ -39,9 +35,5 @@ abstract contract AccessControlTargets is BaseTargetFunctions, Properties {
 
     function accessControl_revokeRole(bytes32 role, address account) public asActor {
         accessControl.revokeRole(role, account);
-    }
-
-    function accessControl_upgradeToAndCall(address newImplementation, bytes memory data) public payable asActor {
-        accessControl.upgradeToAndCall{ value: msg.value }(newImplementation, data);
     }
 }

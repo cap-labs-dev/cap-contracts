@@ -17,10 +17,6 @@ abstract contract OracleTargets is BaseTargetFunctions, Properties {
 
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
-    function oracle_initialize(address _accessControl) public asActor {
-        oracle.initialize(_accessControl);
-    }
-
     function oracle_marketRate(address _asset) public asActor {
         oracle.marketRate(_asset);
     }
@@ -51,10 +47,6 @@ abstract contract OracleTargets is BaseTargetFunctions, Properties {
 
     function oracle_setUtilizationOracleData(address _asset, IOracle.OracleData memory _oracleData) public asActor {
         oracle.setUtilizationOracleData(_asset, _oracleData);
-    }
-
-    function oracle_upgradeToAndCall(address newImplementation, bytes memory data) public payable asActor {
-        oracle.upgradeToAndCall{ value: msg.value }(newImplementation, data);
     }
 
     function oracle_utilizationRate(address _asset) public asActor {

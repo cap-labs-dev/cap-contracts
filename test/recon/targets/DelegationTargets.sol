@@ -28,10 +28,6 @@ abstract contract DelegationTargets is BaseTargetFunctions, Properties {
         delegation.distributeRewards(_agent, _asset);
     }
 
-    function delegation_initialize(address _accessControl, address _oracle, uint256 _epochDuration) public asActor {
-        delegation.initialize(_accessControl, _oracle, _epochDuration);
-    }
-
     function delegation_modifyAgent(address _agent, uint256 _ltv, uint256 _liquidationThreshold) public asActor {
         delegation.modifyAgent(_agent, _ltv, _liquidationThreshold);
     }
@@ -50,9 +46,5 @@ abstract contract DelegationTargets is BaseTargetFunctions, Properties {
 
     function delegation_slash(address _agent, address _liquidator, uint256 _amount) public asActor {
         delegation.slash(_agent, _liquidator, _amount);
-    }
-
-    function delegation_upgradeToAndCall(address newImplementation, bytes memory data) public payable asActor {
-        delegation.upgradeToAndCall{ value: msg.value }(newImplementation, data);
     }
 }

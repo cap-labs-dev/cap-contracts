@@ -90,7 +90,7 @@ abstract contract Setup is
         oracle = Oracle(env.infra.oracle);
 
         address[] memory assets = new address[](1);
-        assets[0] = _newAsset(18);
+        assets[0] = _newAsset(6);
 
         mockAaveDataProvider = new MockAaveDataProvider();
         mockChainlinkPriceFeed = new MockChainlinkPriceFeed(1e8);

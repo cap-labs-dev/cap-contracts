@@ -25,10 +25,6 @@ abstract contract StakedCapTargets is BaseTargetFunctions, Properties {
         stakedCap.deposit(assets, receiver);
     }
 
-    function stakedCap_initialize(address _accessControl, address _asset, uint256 _lockDuration) public asActor {
-        stakedCap.initialize(_accessControl, _asset, _lockDuration);
-    }
-
     function stakedCap_mint(uint256 shares, address receiver) public asActor {
         stakedCap.mint(shares, receiver);
     }
@@ -59,10 +55,6 @@ abstract contract StakedCapTargets is BaseTargetFunctions, Properties {
 
     function stakedCap_transferFrom(address from, address to, uint256 value) public asActor {
         stakedCap.transferFrom(from, to, value);
-    }
-
-    function stakedCap_upgradeToAndCall(address newImplementation, bytes memory data) public payable asActor {
-        stakedCap.upgradeToAndCall{ value: msg.value }(newImplementation, data);
     }
 
     function stakedCap_withdraw(uint256 assets, address receiver, address owner) public asActor {

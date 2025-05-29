@@ -248,17 +248,17 @@
       },
       {
         "signature": "setDuration(uint256)",
-        "actor": "actor",
+        "actor": "admin",
         "mode": "normal"
       },
       {
         "signature": "setMinStartPrice(uint256)",
-        "actor": "actor",
+        "actor": "admin",
         "mode": "normal"
       },
       {
         "signature": "setStartPrice(uint256)",
-        "actor": "actor",
+        "actor": "admin",
         "mode": "normal"
       },
       {

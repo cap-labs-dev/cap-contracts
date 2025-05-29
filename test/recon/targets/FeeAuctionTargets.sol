@@ -27,16 +27,6 @@ abstract contract FeeAuctionTargets is BaseTargetFunctions, Properties {
         feeAuction.buy(_maxPrice, _assets, _minAmounts, _receiver, _deadline);
     }
 
-    function feeAuction_initialize(
-        address _accessControl,
-        address _paymentToken,
-        address _paymentRecipient,
-        uint256 _duration,
-        uint256 _minStartPrice
-    ) public asActor {
-        feeAuction.initialize(_accessControl, _paymentToken, _paymentRecipient, _duration, _minStartPrice);
-    }
-
     function feeAuction_setDuration(uint256 _duration) public asActor {
         feeAuction.setDuration(_duration);
     }
@@ -47,9 +37,5 @@ abstract contract FeeAuctionTargets is BaseTargetFunctions, Properties {
 
     function feeAuction_setStartPrice(uint256 _startPrice) public asActor {
         feeAuction.setStartPrice(_startPrice);
-    }
-
-    function feeAuction_upgradeToAndCall(address newImplementation, bytes memory data) public payable asActor {
-        feeAuction.upgradeToAndCall{ value: msg.value }(newImplementation, data);
     }
 }
