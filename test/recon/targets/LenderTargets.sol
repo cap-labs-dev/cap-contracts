@@ -30,14 +30,6 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender_liquidate(agent, _getAsset(), _amount);
     }
 
-    function lender_realizeInterest_clamped() public {
-        lender_realizeInterest(_getAsset());
-    }
-
-    function lender_realizeRestakerInterest_clamped() public asActor {
-        lender_realizeRestakerInterest(agent, _getAsset());
-    }
-
     function lender_repay_clamped(uint256 _amount) public {
         lender_repay(_getAsset(), _amount, agent);
     }
