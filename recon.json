@@ -299,7 +299,7 @@
       {
         "signature": "cancelLiquidation(address)",
         "actor": "actor",
-        "mode": "fail"
+        "mode": "normal"
       },
       {
         "signature": "initialize(address,address,address,uint256,uint256,uint256,uint256,uint256)",
@@ -314,7 +314,7 @@
       {
         "signature": "liquidate(address,address,uint256)",
         "actor": "actor",
-        "mode": "fail"
+        "mode": "normal"
       },
       {
         "signature": "pauseAsset(address,bool)",
@@ -324,12 +324,12 @@
       {
         "signature": "realizeInterest(address)",
         "actor": "actor",
-        "mode": "fail"
+        "mode": "normal"
       },
       {
         "signature": "realizeRestakerInterest(address,address)",
         "actor": "actor",
-        "mode": "fail"
+        "mode": "normal"
       },
       {
         "signature": "removeAsset(address)",
@@ -339,7 +339,7 @@
       {
         "signature": "repay(address,uint256,address)",
         "actor": "actor",
-        "mode": "fail"
+        "mode": "normal"
       },
       {
         "signature": "setMinBorrow(address,uint256)",
