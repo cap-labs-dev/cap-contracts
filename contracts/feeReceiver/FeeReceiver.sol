@@ -79,6 +79,7 @@ contract FeeReceiver is IFeeReceiver, UUPSUpgradeable, Access, FeeReceiverStorag
         checkAccess(this.setProtocolFeeReceiver.selector)
     {
         FeeReceiverStorage storage $ = getFeeReceiverStorage();
+        if (_protocolFeeReceiver == address(0)) revert ZeroAddressNotValid();
         $.protocolFeeReceiver = _protocolFeeReceiver;
         emit ProtocolFeeReceiverSet(_protocolFeeReceiver);
     }
