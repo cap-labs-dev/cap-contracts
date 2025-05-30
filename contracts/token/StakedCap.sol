@@ -54,6 +54,18 @@ contract StakedCap is
         _decimals = ERC4626Upgradeable.decimals();
     }
 
+    /// @notice Last notify timestamp
+    /// @return Last notify timestamp
+    function lastNotify() external view returns (uint256) {
+        return getStakedCapStorage().lastNotify;
+    }
+
+    /// @notice Lock duration
+    /// @return Lock duration
+    function lockDuration() external view returns (uint256) {
+        return getStakedCapStorage().lockDuration;
+    }
+
     /// @notice Notify the yield to start vesting
     function notify() external {
         StakedCapStorage storage $ = getStakedCapStorage();

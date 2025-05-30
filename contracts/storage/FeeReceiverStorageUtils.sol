@@ -13,7 +13,7 @@ abstract contract FeeReceiverStorageUtils {
 
     /// @dev Get fee receiver storage
     /// @return $ Storage pointer
-    function get() internal pure returns (IFeeReceiver.FeeReceiverStorage storage $) {
+    function getFeeReceiverStorage() internal pure returns (IFeeReceiver.FeeReceiverStorage storage $) {
         assembly {
             $.slot := FeeReceiverStorageLocation
         }

@@ -30,19 +30,21 @@ contract FeeReceiver is IFeeReceiver, UUPSUpgradeable, Access, FeeReceiverStorag
 
         if (address(_capToken) == address(0) || address(_stakedCapToken) == address(0)) revert ZeroAddressNotValid();
 
-        IFeeReceiver.FeeReceiverStorage storage $ = get();
+        FeeReceiverStorage storage $ = getFeeReceiverStorage();
         $.capToken = IERC20(_capToken);
         $.stakedCapToken = IStakedCap(_stakedCapToken);
     }
 
     /// @notice Distribute Fees to the staked cap token
     function distribute() external {
-        IFeeReceiver.FeeReceiverStorage storage $ = get();
+        FeeReceiverStorage storage $ = getFeeReceiverStorage();
         if ($.capToken.balanceOf(address(this)) > 0) {
             if ($.protocolFeePercentage > 0) _claimProtocolFees();
             uint256 bal = $.capToken.balanceOf(address(this));
             $.capToken.safeTransfer(address($.stakedCapToken), bal);
-            $.stakedCapToken.notify();
+            if ($.stakedCapToken.lastNotify() + $.stakedCapToken.lockDuration() < block.timestamp) {
+                $.stakedCapToken.notify();
+            }
             emit Notify(bal);
         }
     }
@@ -50,9 +52,9 @@ contract FeeReceiver is IFeeReceiver, UUPSUpgradeable, Access, FeeReceiverStorag
     /// @notice Claim protocol fees
     /// @dev Transfers the protocol fee to the protocol fee receiver
     function _claimProtocolFees() private {
-        IFeeReceiver.FeeReceiverStorage storage $ = get();
+        FeeReceiverStorage storage $ = getFeeReceiverStorage();
         uint256 balance = $.capToken.balanceOf(address(this));
-        uint256 protocolFee = (balance * $.protocolFeePercentage) / 1e18;
+        uint256 protocolFee = (balance * $.protocolFeePercentage) / 1e27;
         if (protocolFee > 0) $.capToken.safeTransfer($.protocolFeeReceiver, protocolFee);
         emit ProtocolFeeClaimed(protocolFee);
     }
@@ -63,8 +65,8 @@ contract FeeReceiver is IFeeReceiver, UUPSUpgradeable, Access, FeeReceiverStorag
         external
         checkAccess(this.setProtocolFeePercentage.selector)
     {
-        IFeeReceiver.FeeReceiverStorage storage $ = get();
-        if (_protocolFeePercentage > 1e18) revert InvalidProtocolFeePercentage();
+        FeeReceiverStorage storage $ = getFeeReceiverStorage();
+        if (_protocolFeePercentage > 1e27) revert InvalidProtocolFeePercentage();
         if ($.protocolFeeReceiver == address(0)) revert NoProtocolFeeReceiverSet();
         $.protocolFeePercentage = _protocolFeePercentage;
         emit ProtocolFeePercentageSet(_protocolFeePercentage);
@@ -76,7 +78,7 @@ contract FeeReceiver is IFeeReceiver, UUPSUpgradeable, Access, FeeReceiverStorag
         external
         checkAccess(this.setProtocolFeeReceiver.selector)
     {
-        IFeeReceiver.FeeReceiverStorage storage $ = get();
+        FeeReceiverStorage storage $ = getFeeReceiverStorage();
         $.protocolFeeReceiver = _protocolFeeReceiver;
         emit ProtocolFeeReceiverSet(_protocolFeeReceiver);
     }

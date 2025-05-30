@@ -30,7 +30,7 @@ contract FeesDistributeTest is TestDeployer {
         FeeReceiver(usdVault.feeReceiver).setProtocolFeeReceiver(treasury);
 
         // 10% of fees go to treasury
-        FeeReceiver(usdVault.feeReceiver).setProtocolFeePercentage(0.1e18);
+        FeeReceiver(usdVault.feeReceiver).setProtocolFeePercentage(0.1e27);
 
         deal(address(usdVault.capToken), usdVault.feeReceiver, 100e18);
 
@@ -48,10 +48,10 @@ contract FeesDistributeTest is TestDeployer {
 
         address treasury = makeAddr("treasury");
         vm.expectRevert(IFeeReceiver.NoProtocolFeeReceiverSet.selector);
-        FeeReceiver(usdVault.feeReceiver).setProtocolFeePercentage(0.1e18);
+        FeeReceiver(usdVault.feeReceiver).setProtocolFeePercentage(0.1e27);
 
         vm.expectRevert(IFeeReceiver.InvalidProtocolFeePercentage.selector);
-        FeeReceiver(usdVault.feeReceiver).setProtocolFeePercentage(1e18 + 1);
+        FeeReceiver(usdVault.feeReceiver).setProtocolFeePercentage(1e27 + 1);
 
         vm.stopPrank();
 
