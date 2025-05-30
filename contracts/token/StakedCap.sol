@@ -55,15 +55,15 @@ contract StakedCap is
     }
 
     /// @notice Last notify timestamp
-    /// @return Last notify timestamp
-    function lastNotify() external view returns (uint256) {
-        return getStakedCapStorage().lastNotify;
+    /// @return _lastNotify Last notify timestamp
+    function lastNotify() external view returns (uint256 _lastNotify) {
+        _lastNotify = getStakedCapStorage().lastNotify;
     }
 
-    /// @notice Lock duration
-    /// @return Lock duration
-    function lockDuration() external view returns (uint256) {
-        return getStakedCapStorage().lockDuration;
+    /// @notice Lock duration in seconds
+    /// @return _lockDuration Lock duration
+    function lockDuration() external view returns (uint256 _lockDuration) {
+        _lockDuration = getStakedCapStorage().lockDuration;
     }
 
     /// @notice Notify the yield to start vesting
