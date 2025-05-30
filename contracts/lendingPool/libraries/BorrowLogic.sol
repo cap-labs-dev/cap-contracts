@@ -28,8 +28,15 @@ library BorrowLogic {
     /// @dev An agent has borrowed an asset from the Lender
     event Borrow(address indexed asset, address indexed agent, uint256 amount);
 
+    struct RepaymentDetails {
+        uint256 repaid;
+        uint256 vaultRepaid;
+        uint256 restakerRepaid;
+        uint256 interestRepaid;
+    }
+
     /// @dev An agent, or someone on behalf of an agent, has repaid
-    event Repay(address indexed asset, address indexed agent, uint256 repaid);
+    event Repay(address indexed asset, address indexed agent, RepaymentDetails details);
 
     /// @dev An agent has totally repaid their debt of an asset including all interests
     event TotalRepayment(address indexed agent, address indexed asset);
@@ -128,6 +135,7 @@ library BorrowLogic {
             reserve.totalUnrealizedInterest -= restakerRepaid;
             IERC20(params.asset).safeTransfer($.delegation, restakerRepaid);
             IDelegation($.delegation).distributeRewards(params.agent, params.asset);
+            emit RealizeInterest(params.asset, restakerRepaid, $.delegation);
         }
 
         if (vaultRepaid > 0) {
@@ -138,11 +146,21 @@ library BorrowLogic {
 
         if (interestRepaid > 0) {
             IERC20(params.asset).safeTransfer(reserve.interestReceiver, interestRepaid);
+            emit RealizeInterest(params.asset, interestRepaid, reserve.interestReceiver);
         }
 
         IDebtToken(reserve.debtToken).burn(params.agent, repaid);
 
-        emit Repay(params.asset, params.agent, repaid);
+        emit Repay(
+            params.asset,
+            params.agent,
+            RepaymentDetails({
+                repaid: repaid,
+                vaultRepaid: vaultRepaid,
+                restakerRepaid: restakerRepaid,
+                interestRepaid: interestRepaid
+            })
+        );
     }
 
     /// @notice Realize the interest before it is repaid by borrowing from the vault
