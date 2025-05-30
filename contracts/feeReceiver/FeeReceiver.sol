@@ -30,29 +30,29 @@ contract FeeReceiver is IFeeReceiver, UUPSUpgradeable, Access, FeeReceiverStorag
 
         if (address(_capToken) == address(0) || address(_stakedCapToken) == address(0)) revert ZeroAddressNotValid();
 
-        IFeeReceiver.FeeReceiverStorage storage s = get();
-        s.capToken = IERC20(_capToken);
-        s.stakedCapToken = IStakedCap(_stakedCapToken);
+        IFeeReceiver.FeeReceiverStorage storage $ = get();
+        $.capToken = IERC20(_capToken);
+        $.stakedCapToken = IStakedCap(_stakedCapToken);
     }
 
     /// @notice Distribute Fees to the staked cap token
     function distribute() external {
-        IFeeReceiver.FeeReceiverStorage storage s = get();
-        if (s.capToken.balanceOf(address(this)) > 0) {
-            if (s.protocolFeePercentage > 0) _claimProtocolFees();
-            s.capToken.safeTransfer(address(s.stakedCapToken), s.capToken.balanceOf(address(this)));
-            s.stakedCapToken.notify();
-            emit Notify(s.capToken.balanceOf(address(this)));
+        IFeeReceiver.FeeReceiverStorage storage $ = get();
+        if ($.capToken.balanceOf(address(this)) > 0) {
+            if ($.protocolFeePercentage > 0) _claimProtocolFees();
+            $.capToken.safeTransfer(address($.stakedCapToken), $.capToken.balanceOf(address(this)));
+            $.stakedCapToken.notify();
+            emit Notify($.capToken.balanceOf(address(this)));
         }
     }
 
     /// @notice Claim protocol fees
     /// @dev Transfers the protocol fee to the protocol fee receiver
     function _claimProtocolFees() private {
-        IFeeReceiver.FeeReceiverStorage storage s = get();
-        uint256 balance = s.capToken.balanceOf(address(this));
-        uint256 protocolFee = (balance * s.protocolFeePercentage) / 1e18;
-        if (protocolFee > 0) s.capToken.safeTransfer(s.protocolFeeReceiver, protocolFee);
+        IFeeReceiver.FeeReceiverStorage storage $ = get();
+        uint256 balance = $.capToken.balanceOf(address(this));
+        uint256 protocolFee = (balance * $.protocolFeePercentage) / 1e18;
+        if (protocolFee > 0) $.capToken.safeTransfer($.protocolFeeReceiver, protocolFee);
         emit ProtocolFeeClaimed(protocolFee);
     }
 
@@ -62,10 +62,10 @@ contract FeeReceiver is IFeeReceiver, UUPSUpgradeable, Access, FeeReceiverStorag
         external
         checkAccess(this.setProtocolFeePercentage.selector)
     {
-        IFeeReceiver.FeeReceiverStorage storage s = get();
+        IFeeReceiver.FeeReceiverStorage storage $ = get();
         if (_protocolFeePercentage > 1e18) revert InvalidProtocolFeePercentage();
-        if (s.protocolFeeReceiver == address(0)) revert NoProtocolFeeReceiverSet();
-        s.protocolFeePercentage = _protocolFeePercentage;
+        if ($.protocolFeeReceiver == address(0)) revert NoProtocolFeeReceiverSet();
+        $.protocolFeePercentage = _protocolFeePercentage;
         emit ProtocolFeePercentageSet(_protocolFeePercentage);
     }
 
@@ -75,8 +75,8 @@ contract FeeReceiver is IFeeReceiver, UUPSUpgradeable, Access, FeeReceiverStorag
         external
         checkAccess(this.setProtocolFeeReceiver.selector)
     {
-        IFeeReceiver.FeeReceiverStorage storage s = get();
-        s.protocolFeeReceiver = _protocolFeeReceiver;
+        IFeeReceiver.FeeReceiverStorage storage $ = get();
+        $.protocolFeeReceiver = _protocolFeeReceiver;
         emit ProtocolFeeReceiverSet(_protocolFeeReceiver);
     }
 
