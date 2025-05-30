@@ -9,9 +9,11 @@ import { FeeAuction } from "../../feeAuction/FeeAuction.sol";
 import { Lender } from "../../lendingPool/Lender.sol";
 import { DebtToken } from "../../lendingPool/tokens/DebtToken.sol";
 
+import { FeeReceiver } from "../../feeReceiver/FeeReceiver.sol";
 import { Oracle } from "../../oracle/Oracle.sol";
 import { CapToken } from "../../token/CapToken.sol";
 import { StakedCap } from "../../token/StakedCap.sol";
+
 import { ImplementationsConfig } from "../interfaces/DeployConfigs.sol";
 
 contract DeployImplems {
@@ -24,5 +26,6 @@ contract DeployImplems {
         d.oracle = address(new Oracle());
         d.debtToken = address(new DebtToken());
         d.feeAuction = address(new FeeAuction());
+        d.feeReceiver = address(new FeeReceiver());
     }
 }

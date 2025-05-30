@@ -31,4 +31,12 @@ interface IStakedCap {
     /// @notice Remaining locked profit after a notification
     /// @return locked Amount remaining to be vested
     function lockedProfit() external view returns (uint256 locked);
+
+    /// @notice Last notify timestamp
+    /// @return lastNotify Last notify timestamp
+    function lastNotify() external view returns (uint256 lastNotify);
+
+    /// @notice Lock duration
+    /// @return lockDuration Lock duration
+    function lockDuration() external view returns (uint256 lockDuration);
 }

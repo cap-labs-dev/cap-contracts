@@ -13,7 +13,7 @@ abstract contract FeeAuctionStorageUtils {
 
     /// @dev Get fee auction storage
     /// @return $ Storage pointer
-    function get() internal pure returns (IFeeAuction.FeeAuctionStorage storage $) {
+    function getFeeAuctionStorage() internal pure returns (IFeeAuction.FeeAuctionStorage storage $) {
         assembly {
             $.slot := FeeAuctionStorageLocation
         }
