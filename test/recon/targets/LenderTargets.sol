@@ -14,6 +14,33 @@ import "contracts/lendingPool/Lender.sol";
 
 abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
+    function lender_borrow_clamped(uint256 _amount) public {
+        lender_borrow(_getAsset(), _amount, agent);
+    }
+
+    function lender_initiateLiquidation_clamped() public {
+        lender_initiateLiquidation(agent);
+    }
+
+    function lender_cancelLiquidation_clamped() public {
+        lender_cancelLiquidation(agent);
+    }
+
+    function lender_liquidate_clamped(uint256 _amount) public {
+        lender_liquidate(agent, _getAsset(), _amount);
+    }
+
+    function lender_realizeInterest_clamped() public {
+        lender_realizeInterest(_getAsset());
+    }
+
+    function lender_realizeRestakerInterest_clamped() public asActor {
+        lender_realizeRestakerInterest(agent, _getAsset());
+    }
+
+    function lender_repay_clamped(uint256 _amount) public {
+        lender_repay(_getAsset(), _amount, agent);
+    }
 
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
@@ -21,7 +48,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender.addAsset(_params);
     }
 
-    function lender_borrow(address _asset, uint256 _amount, address _receiver) public asActor {
+    function lender_borrow(address _asset, uint256 _amount, address _receiver) public asAgent {
         lender.borrow(_asset, _amount, _receiver);
     }
 

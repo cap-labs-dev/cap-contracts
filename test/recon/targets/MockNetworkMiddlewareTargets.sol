@@ -14,62 +14,55 @@ import "test/mocks/MockNetworkMiddleware.sol";
 
 abstract contract MockNetworkMiddlewareTargets is BaseTargetFunctions, Properties {
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
+    function mockNetworkMiddleware_setMockSlashableCollateral_clamped(bool liquidatable) public {
+        // This function is used to prepare the state for liquidation tests
+        // It sets up the necessary conditions for a liquidation to occur
+        if (liquidatable) {
+            mockNetworkMiddleware_setMockSlashableCollateral(1e8);
+        } else {
+            mockNetworkMiddleware_setMockSlashableCollateral(1e20);
+        }
+    }
 
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
-    function mockNetworkMiddleware_addMockAgentCoverage(address _agent, address _vault, uint256 _coverage)
-        public
-        asActor
-    {
-        mockNetworkMiddleware.addMockAgentCoverage(_agent, _vault, _coverage);
+    function mockNetworkMiddleware_addMockAgentCoverage(uint256 _coverage) public asActor {
+        mockNetworkMiddleware.addMockAgentCoverage(agent, address(capToken), _coverage);
     }
 
-    function mockNetworkMiddleware_distributeRewards(address _agent, address _token) public asActor {
-        mockNetworkMiddleware.distributeRewards(_agent, _token);
+    function mockNetworkMiddleware_distributeRewards(address _token) public asActor {
+        mockNetworkMiddleware.distributeRewards(agent, _token);
     }
 
-    function mockNetworkMiddleware_registerAgent(address _agent, address _vault) public asActor {
-        mockNetworkMiddleware.registerAgent(_agent, _vault);
+    function mockNetworkMiddleware_registerAgent() public asActor {
+        mockNetworkMiddleware.registerAgent(agent, address(capToken));
     }
 
-    function mockNetworkMiddleware_registerVault(address _vault, address _stakerRewarder) public asActor {
-        mockNetworkMiddleware.registerVault(_vault, _stakerRewarder);
+    function mockNetworkMiddleware_registerVault(address _stakerRewarder) public asActor {
+        mockNetworkMiddleware.registerVault(address(capToken), _stakerRewarder);
     }
 
     function mockNetworkMiddleware_setFeeAllowed(uint256 _feeAllowed) public asActor {
         mockNetworkMiddleware.setFeeAllowed(_feeAllowed);
     }
 
-    function mockNetworkMiddleware_setMockCollateralByVault(address _agent, address _vault, uint256 _collateral)
-        public
-        asActor
-    {
-        mockNetworkMiddleware.setMockCollateralByVault(_agent, _vault, _collateral);
+    function mockNetworkMiddleware_setMockCollateralByVault(address _vault, uint256 _collateral) public asActor {
+        mockNetworkMiddleware.setMockCollateralByVault(agent, address(capToken), _collateral);
     }
 
-    function mockNetworkMiddleware_setMockCoverage(address _agent, uint256 _coverage) public asActor {
-        mockNetworkMiddleware.setMockCoverage(_agent, _coverage);
+    function mockNetworkMiddleware_setMockCoverage(uint256 _coverage) public asActor {
+        mockNetworkMiddleware.setMockCoverage(agent, _coverage);
     }
 
-    function mockNetworkMiddleware_setMockSlashableCollateral(address _agent, uint256 _slashableCollateral)
-        public
-        asActor
-    {
-        mockNetworkMiddleware.setMockSlashableCollateral(_agent, _slashableCollateral);
+    function mockNetworkMiddleware_setMockSlashableCollateral(uint256 _slashableCollateral) public asActor {
+        mockNetworkMiddleware.setMockSlashableCollateral(agent, _slashableCollateral);
     }
 
-    function mockNetworkMiddleware_setMockSlashableCollateralByVault(
-        address _agent,
-        address _vault,
-        uint256 _slashableCollateral
-    ) public asActor {
-        mockNetworkMiddleware.setMockSlashableCollateralByVault(_agent, _vault, _slashableCollateral);
+    function mockNetworkMiddleware_setMockSlashableCollateralByVault(uint256 _slashableCollateral) public asActor {
+        mockNetworkMiddleware.setMockSlashableCollateralByVault(agent, address(capToken), _slashableCollateral);
     }
 
-    function mockNetworkMiddleware_slash(address _agent, address _recipient, uint256 _slashShare, uint48)
-        public
-        asActor
-    {
-        mockNetworkMiddleware.slash(_agent, _recipient, _slashShare, 0);
+    function mockNetworkMiddleware_slash(address _recipient, uint256 _slashShare, uint48) public asActor {
+        mockNetworkMiddleware.slash(agent, _recipient, _slashShare, 0);
     }
 }

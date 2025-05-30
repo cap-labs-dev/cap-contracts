@@ -63,6 +63,8 @@ abstract contract Setup is
     Oracle oracle;
     StakedCap stakedCap;
 
+    address agent = address(0xb0b);
+
     /// === Setup === ///
     /// This contains all calls to be performed in the tester constructor, both for Echidna and Foundry
     function setup() internal virtual override {
@@ -141,15 +143,15 @@ abstract contract Setup is
         _initVaultLender(env.usdVault, env.infra, fee);
         mockNetworkMiddleware = new MockNetworkMiddleware();
         delegation.registerNetwork(address(mockNetworkMiddleware));
-        // delegation.addAgent(address(this), address(mockNetworkMiddleware), 0.5e27, 0.7e27);
         mockNetworkMiddleware.setMockCoverage(address(this), 1_000_000e8);
         mockNetworkMiddleware.setMockSlashableCollateral(address(this), 1_000_000e8);
 
-        /// ACTORS
-        _addActor(address(0xb0b));
-        address[] memory approvalArray = new address[](2);
+        /// SETUP ACTORS
+        _addActor(agent); // acts as user and agent
+        address[] memory approvalArray = new address[](3);
         approvalArray[0] = address(capToken);
         approvalArray[1] = address(feeAuction);
+        approvalArray[2] = address(lender);
         for (uint i; i < 3; i++) {
             _switchAsset(i);
             _finalizeAssetDeployment(_getActors(), approvalArray, type(uint88).max);
@@ -160,7 +162,16 @@ abstract contract Setup is
             capToken.approve(address(feeAuction), type(uint88).max);
         }
 
+        /// AGENT SETUP
+        delegation.addAgent(agent, address(mockNetworkMiddleware), 0.5e27, 0.7e27);
+        mockNetworkMiddleware.setMockSlashableCollateral(agent, 1e20);
+        mockNetworkMiddleware.setMockCoverage(agent, 1e20);
+        // @audit info: min(slashableCollateral, coverage) is needed for agent to be able to borrow
+
         _addLabels();
+
+        // help fuzzer to reach to next epoch of vault
+        vm.warp(block.timestamp + 1 days);
     }
 
     /// === INTERNAL FUNCTIONS === ///
@@ -172,7 +183,6 @@ abstract contract Setup is
         vm.label(address(capToken), "Vault(CapToken)");
         vm.label(address(stakedCap), "StakedCap");
         vm.label(address(feeAuction), "FeeAuction");
-        vm.label(address(debtToken), "DebtToken");
     }
 
     /// === MODIFIERS === ///
@@ -185,6 +195,11 @@ abstract contract Setup is
 
     modifier asActor() {
         vm.prank(address(_getActor()));
+        _;
+    }
+
+    modifier asAgent() {
+        vm.prank(agent);
         _;
     }
 }
