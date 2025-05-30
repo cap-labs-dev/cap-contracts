@@ -16,6 +16,8 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 library ViewLogic {
     using AgentConfiguration for ILender.AgentConfigurationMap;
 
+    uint256 constant SECONDS_IN_YEAR = 31536000;
+
     /// @notice Calculate the agent data
     /// @param $ Lender storage
     /// @param _agent Agent address
@@ -132,8 +134,32 @@ library ViewLogic {
 
         // Cap at the agent's debt for this asset
         uint256 agentDebt = debt($, _agent, _asset);
-        if (agentDebt < maxLiquidatableAmount) {
-            return agentDebt;
+        if (agentDebt < maxLiquidatableAmount + reserve.minBorrow) maxLiquidatableAmount = agentDebt;
+    }
+
+    /// @dev Get the bonus for a liquidation in percentage ray decimals, max for emergencies and none if health is too low
+    /// @param $ Lender storage
+    /// @param _agent Agent address
+    /// @return maxBonus Bonus percentage in ray decimals
+    function bonus(ILender.LenderStorage storage $, address _agent) internal view returns (uint256 maxBonus) {
+        (uint256 totalDelegation,, uint256 totalDebt,,,) = agent($, _agent);
+
+        if (totalDelegation > totalDebt) {
+            // Emergency liquidations get max bonus
+            if (totalDelegation * $.emergencyLiquidationThreshold / totalDebt < 1e27) {
+                maxBonus = $.bonusCap;
+            } else {
+                // Pro-rata bonus for non-emergency liquidations
+                if (block.timestamp > ($.liquidationStart[_agent] + $.grace)) {
+                    uint256 elapsed = block.timestamp - ($.liquidationStart[_agent] + $.grace);
+                    uint256 duration = $.expiry - $.grace;
+                    if (elapsed > duration) elapsed = duration;
+                    maxBonus = $.bonusCap * elapsed / duration;
+                }
+            }
+
+            uint256 maxHealthyBonus = (totalDelegation - totalDebt) * 1e27 / totalDebt;
+            if (maxBonus > maxHealthyBonus) maxBonus = maxHealthyBonus;
         }
     }
 
@@ -166,6 +192,6 @@ library ViewLogic {
         uint256 rate = IOracle($.oracle).restakerRate(_agent);
         uint256 elapsedTime = block.timestamp - reserve.lastRealizationTime[_agent];
 
-        accruedInterest = totalInterest * rate * elapsedTime / 1e27;
+        accruedInterest = totalInterest * rate * elapsedTime / (1e27 * SECONDS_IN_YEAR);
     }
 }

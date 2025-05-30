@@ -45,6 +45,7 @@ interface ILender {
     /// @param decimals Decimals of the asset
     /// @param paused True if the asset is paused, false otherwise
     /// @param debt Total debt of the asset
+    /// @param totalUnrealizedInterest Total unrealized interest for the asset
     /// @param unrealizedInterest Unrealized interest for each agent
     /// @param lastRealizationTime Last time interest was realized for each agent
     struct ReserveData {
@@ -55,6 +56,7 @@ interface ILender {
         uint8 decimals;
         bool paused;
         uint256 debt;
+        uint256 totalUnrealizedInterest;
         mapping(address => uint256) unrealizedInterest;
         mapping(address => uint256) lastRealizationTime;
         uint256 minBorrow;
@@ -76,6 +78,7 @@ interface ILender {
         address asset;
         uint256 amount;
         address receiver;
+        bool maxBorrow;
     }
 
     /// @dev Repay parameters
@@ -272,6 +275,12 @@ interface ILender {
     /// @notice Zero address not valid
     error ZeroAddressNotValid();
 
+    /// @notice Invalid target health
+    error InvalidTargetHealth();
+
     /// @notice Grace period greater than expiry
     error GracePeriodGreaterThanExpiry();
+
+    /// @notice Invalid bonus cap
+    error InvalidBonusCap();
 }

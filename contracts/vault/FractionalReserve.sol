@@ -7,11 +7,15 @@ import { IFractionalReserve } from "../interfaces/IFractionalReserve.sol";
 import { FractionalReserveStorageUtils } from "../storage/FractionalReserveStorageUtils.sol";
 import { FractionalReserveLogic } from "./libraries/FractionalReserveLogic.sol";
 
+import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+
 /// @title Fractional Reserve
 /// @author kexley, @capLabs
 /// @notice Idle capital is put to work in fractional reserve vaults and can be recalled when
 /// withdrawing, redeeming or borrowing.
 abstract contract FractionalReserve is IFractionalReserve, Access, FractionalReserveStorageUtils {
+    using EnumerableSet for EnumerableSet.AddressSet;
+
     /// @dev Initialize unchained
     /// @param _interestReceiver Interest receiver address
     function __FractionalReserve_init(address _interestReceiver) internal onlyInitializing {
@@ -86,6 +90,12 @@ abstract contract FractionalReserve is IFractionalReserve, Access, FractionalRes
     /// @return vaultAddress Vault address
     function fractionalReserveVault(address _asset) external view returns (address vaultAddress) {
         vaultAddress = getFractionalReserveStorage().vault[_asset];
+    }
+
+    /// @notice Fractional reserve vaults
+    /// @return vaultAddresses Fractional reserve vaults
+    function fractionalReserveVaults() external view returns (address[] memory vaultAddresses) {
+        vaultAddresses = getFractionalReserveStorage().vaults.values();
     }
 
     /// @notice Reserve amount for an asset

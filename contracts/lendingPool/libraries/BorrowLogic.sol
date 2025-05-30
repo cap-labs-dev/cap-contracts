@@ -56,6 +56,10 @@ library BorrowLogic {
         /// Realize restaker interest before borrowing
         realizeRestakerInterest($, params.agent, params.asset);
 
+        if (params.maxBorrow) {
+            params.amount = ViewLogic.maxBorrowable($, params.agent, params.asset);
+        }
+
         ValidationLogic.validateBorrow($, params);
 
         IDelegation($.delegation).setLastBorrow(params.agent);
@@ -91,9 +95,15 @@ library BorrowLogic {
         ILender.ReserveData storage reserve = $.reservesData[params.asset];
 
         /// Can only repay up to the amount owed
-        repaid = Math.min(params.amount, IERC20(reserve.debtToken).balanceOf(params.agent));
+        uint256 agentDebt = IERC20(reserve.debtToken).balanceOf(params.agent);
+        repaid = Math.min(params.amount, agentDebt);
 
-        IDebtToken(reserve.debtToken).burn(params.agent, repaid);
+        uint256 remainingDebt = agentDebt - repaid;
+        if (remainingDebt > 0 && remainingDebt < reserve.minBorrow) {
+            // Limit repayment to maintain minimum debt if not full repayment
+            repaid = agentDebt - reserve.minBorrow;
+        }
+
         IERC20(params.asset).safeTransferFrom(params.caller, address(this), repaid);
 
         if (IERC20(reserve.debtToken).balanceOf(params.agent) == 0) {
@@ -122,6 +132,7 @@ library BorrowLogic {
 
         if (restakerRepaid > 0) {
             reserve.unrealizedInterest[params.agent] -= restakerRepaid;
+            reserve.totalUnrealizedInterest -= restakerRepaid;
             IERC20(params.asset).safeTransfer($.delegation, restakerRepaid);
             IDelegation($.delegation).distributeRewards(params.agent, params.asset);
             emit RealizeInterest(params.asset, restakerRepaid, $.delegation);
@@ -137,6 +148,8 @@ library BorrowLogic {
             IERC20(params.asset).safeTransfer(reserve.interestReceiver, interestRepaid);
             emit RealizeInterest(params.asset, interestRepaid, reserve.interestReceiver);
         }
+
+        IDebtToken(reserve.debtToken).burn(params.agent, repaid);
 
         emit Repay(
             params.asset,
@@ -187,6 +200,7 @@ library BorrowLogic {
 
         reserve.debt += realizedInterest;
         reserve.unrealizedInterest[_agent] += unrealizedInterest;
+        reserve.totalUnrealizedInterest += unrealizedInterest;
 
         IDebtToken(reserve.debtToken).mint(_agent, realizedInterest + unrealizedInterest);
         IVault(reserve.vault).borrow(_asset, realizedInterest, $.delegation);
@@ -206,13 +220,16 @@ library BorrowLogic {
         ILender.ReserveData storage reserve = $.reservesData[_asset];
         uint256 totalDebt = IERC20(reserve.debtToken).totalSupply();
         uint256 reserves = IVault(reserve.vault).availableBalance(_asset);
+        uint256 vaultDebt = reserve.debt;
+        uint256 totalUnrealizedInterest = reserve.totalUnrealizedInterest;
 
-        if (totalDebt > reserve.debt) {
-            realization = totalDebt - reserve.debt;
+        if (totalDebt > vaultDebt + totalUnrealizedInterest) {
+            realization = totalDebt - vaultDebt - totalUnrealizedInterest;
         }
         if (reserves < realization) {
             realization = reserves;
         }
+        if (reserve.paused) realization = 0;
     }
 
     /// @notice Calculate the maximum interest that can be realized for a restaker
@@ -226,11 +243,15 @@ library BorrowLogic {
         view
         returns (uint256 realization, uint256 unrealizedInterest)
     {
+        ILender.ReserveData storage reserve = $.reservesData[_asset];
         uint256 accruedInterest = ViewLogic.accruedRestakerInterest($, _agent, _asset);
-        uint256 reserves = IVault($.reservesData[_asset].vault).availableBalance(_asset);
+        uint256 reserves = IVault(reserve.vault).availableBalance(_asset);
 
         realization = accruedInterest;
-        if (realization > reserves) {
+        if (reserve.paused) {
+            unrealizedInterest = realization;
+            realization = 0;
+        } else if (realization > reserves) {
             unrealizedInterest = realization - reserves;
             realization = reserves;
         }

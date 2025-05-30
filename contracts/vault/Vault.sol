@@ -10,6 +10,7 @@ import { Minter } from "./Minter.sol";
 import { VaultLogic } from "./libraries/VaultLogic.sol";
 import { ERC20PermitUpgradeable } from
     "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
+import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title Vault for storing the backing for cTokens
@@ -17,7 +18,15 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 /// @notice Tokens are supplied by cToken minters and borrowed by covered agents
 /// @dev Supplies, borrows and utilization rates are tracked. Interest rates should be computed and
 /// charged on the external contracts, only the principle amount is counted on this contract.
-abstract contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, FractionalReserve, VaultStorageUtils {
+abstract contract Vault is
+    IVault,
+    ERC20PermitUpgradeable,
+    PausableUpgradeable,
+    Access,
+    Minter,
+    FractionalReserve,
+    VaultStorageUtils
+{
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @dev Initialize the assets
@@ -66,6 +75,7 @@ abstract contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, Fract
     /// @param _deadline Deadline of the tx
     function mint(address _asset, uint256 _amountIn, uint256 _minAmountOut, address _receiver, uint256 _deadline)
         external
+        whenNotPaused
         returns (uint256 amountOut)
     {
         uint256 fee;
@@ -83,7 +93,7 @@ abstract contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, Fract
             })
         );
         _mint(_receiver, amountOut);
-        _mint(getVaultStorage().insuranceFund, fee);
+        if (fee > 0) _mint(getVaultStorage().insuranceFund, fee);
     }
 
     /// @notice Burn the cap token for an asset
@@ -95,11 +105,12 @@ abstract contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, Fract
     /// @param _deadline Deadline of the tx
     function burn(address _asset, uint256 _amountIn, uint256 _minAmountOut, address _receiver, uint256 _deadline)
         external
+        whenNotPaused
         returns (uint256 amountOut)
     {
         uint256 fee;
         (amountOut, fee) = getBurnAmount(_asset, _amountIn);
-        divest(_asset, amountOut);
+        divest(_asset, amountOut + fee);
         VaultLogic.burn(
             getVaultStorage(),
             MintBurnParams({
@@ -124,11 +135,17 @@ abstract contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, Fract
     /// @return amountsOut Amount of assets withdrawn
     function redeem(uint256 _amountIn, uint256[] calldata _minAmountsOut, address _receiver, uint256 _deadline)
         external
+        whenNotPaused
         returns (uint256[] memory amountsOut)
     {
         uint256[] memory fees;
+        uint256[] memory totalDivestAmounts = new uint256[](amountsOut.length);
         (amountsOut, fees) = getRedeemAmount(_amountIn);
-        divestMany(assets(), amountsOut);
+        for (uint256 i; i < amountsOut.length; i++) {
+            totalDivestAmounts[i] = amountsOut[i] + fees[i];
+        }
+
+        divestMany(assets(), totalDivestAmounts);
         VaultLogic.redeem(
             getVaultStorage(),
             RedeemParams({
@@ -148,7 +165,11 @@ abstract contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, Fract
     /// @param _asset Asset to borrow
     /// @param _amount Amount of asset to borrow
     /// @param _receiver Receiver of the borrow
-    function borrow(address _asset, uint256 _amount, address _receiver) external checkAccess(this.borrow.selector) {
+    function borrow(address _asset, uint256 _amount, address _receiver)
+        external
+        whenNotPaused
+        checkAccess(this.borrow.selector)
+    {
         divest(_asset, _amount);
         VaultLogic.borrow(getVaultStorage(), BorrowParams({ asset: _asset, amount: _amount, receiver: _receiver }));
     }
@@ -156,7 +177,7 @@ abstract contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, Fract
     /// @notice Repay an asset
     /// @param _asset Asset to repay
     /// @param _amount Amount of asset to repay
-    function repay(address _asset, uint256 _amount) external checkAccess(this.repay.selector) {
+    function repay(address _asset, uint256 _amount) external whenNotPaused checkAccess(this.repay.selector) {
         VaultLogic.repay(getVaultStorage(), RepayParams({ asset: _asset, amount: _amount }));
     }
 
@@ -174,21 +195,31 @@ abstract contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, Fract
 
     /// @notice Pause an asset
     /// @param _asset Asset address
-    function pause(address _asset) external checkAccess(this.pause.selector) {
+    function pauseAsset(address _asset) external checkAccess(this.pauseAsset.selector) {
         VaultLogic.pause(getVaultStorage(), _asset);
     }
 
     /// @notice Unpause an asset
     /// @param _asset Asset address
-    function unpause(address _asset) external checkAccess(this.unpause.selector) {
+    function unpauseAsset(address _asset) external checkAccess(this.unpauseAsset.selector) {
         VaultLogic.unpause(getVaultStorage(), _asset);
+    }
+
+    /// @notice Pause all protocol operations
+    function pauseProtocol() external checkAccess(this.pauseProtocol.selector) {
+        _pause();
+    }
+
+    /// @notice Unpause all protocol operations
+    function unpauseProtocol() external checkAccess(this.unpauseProtocol.selector) {
+        _unpause();
     }
 
     /// @notice Rescue an unsupported asset
     /// @param _asset Asset to rescue
     /// @param _receiver Receiver of the rescue
     function rescueERC20(address _asset, address _receiver) external checkAccess(this.rescueERC20.selector) {
-        VaultLogic.rescueERC20(getVaultStorage(), _asset, _receiver);
+        VaultLogic.rescueERC20(getVaultStorage(), getFractionalReserveStorage(), _asset, _receiver);
     }
 
     /// @notice Get the list of assets supported by the vault

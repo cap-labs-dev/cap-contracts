@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { ICapToken } from "../interfaces/ICapToken.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+
+import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { ERC20, ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -16,9 +19,16 @@ import { OAppMessenger } from "./OAppMessenger.sol";
 /// enabled to prevent the owner from unduly locking assets.
 contract PreMainnetVault is ERC20Permit, OAppMessenger {
     using SafeERC20 for IERC20Metadata;
+    using SafeERC20 for IERC4626;
 
     /// @notice Underlying asset
     IERC20Metadata public immutable asset;
+
+    /// @notice Cap
+    ICapToken public immutable cap;
+
+    /// @notice Staked Cap
+    IERC4626 public immutable stakedCap;
 
     /// @notice Underlying asset decimals
     uint8 private immutable assetDecimals;
@@ -41,36 +51,60 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
     /// @dev The campaign has ended
     error CampaignEnded();
 
-    /// @dev Deposit underlying asset
-    event Deposit(address indexed user, uint256 amount);
+    /// @dev Deposit underlying asset and get shares
+    event Deposit(address indexed user, uint256 underlyingAmount, uint256 shares);
 
-    /// @dev Withdraw underlying asset
-    event Withdraw(address indexed user, uint256 amount);
+    /// @dev Withdraw redeem shares and get staked cap
+    event Withdraw(address indexed user, uint256 stakedCapAmount);
 
     /// @dev Transfers enabled
     event TransferEnabled();
 
     /// @dev Initialize the token with the underlying asset and bridge info
     /// @param _asset Underlying asset
+    /// @param _cap Cap
+    /// @param _stakedCap Staked cap
     /// @param _lzEndpoint Local layerzero endpoint
     /// @param _dstEid Destination lz EID
     /// @param _maxCampaignLength Max campaign length in seconds
-    constructor(address _asset, address _lzEndpoint, uint32 _dstEid, uint256 _maxCampaignLength)
+    constructor(
+        address _asset,
+        address _cap,
+        address _stakedCap,
+        address _lzEndpoint,
+        uint32 _dstEid,
+        uint256 _maxCampaignLength
+    )
         ERC20("Boosted cUSD", "bcUSD")
         ERC20Permit("Boosted cUSD")
         OAppMessenger(_lzEndpoint, _dstEid, IERC20Metadata(_asset).decimals())
         Ownable(msg.sender)
     {
         asset = IERC20Metadata(_asset);
+        cap = ICapToken(_cap);
+        stakedCap = IERC4626(_stakedCap);
         assetDecimals = asset.decimals();
         maxCampaignEnd = block.timestamp + _maxCampaignLength;
+
+        IERC20Metadata(_asset).forceApprove(_cap, type(uint256).max);
+        IERC20Metadata(_cap).forceApprove(_stakedCap, type(uint256).max);
     }
 
     /// @notice Deposit underlying asset to mint cUSD on MegaETH Testnet
+    /// @dev Minting zero amount of cUSD on mainnet is not allowed
     /// @param _amount Amount of underlying asset to deposit
-    /// @param _destReceiver Receiver of the assets on MegaETH Testnet
+    /// @param _minAmount Minimum amount of cUSD to mint on mainnet
+    /// @param _destReceiver Receiver of the cUSD on MegaETH Testnet
     /// @param _refundAddress The address to receive any excess fee values sent to the endpoint if the call fails on the destination chain
-    function deposit(uint256 _amount, address _destReceiver, address _refundAddress) external payable {
+    /// @param _deadline Deadline for the deposit
+    /// @return shares Amount of staked cap minted
+    function deposit(
+        uint256 _amount,
+        uint256 _minAmount,
+        address _destReceiver,
+        address _refundAddress,
+        uint256 _deadline
+    ) external payable returns (uint256 shares) {
         if (_amount == 0) revert ZeroAmount();
         if (_destReceiver == address(0)) revert ZeroAddress();
 
@@ -78,15 +112,40 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
 
         asset.safeTransferFrom(msg.sender, address(this), _amount);
 
-        _mint(msg.sender, _amount);
+        shares = _depositIntoStakedCap(_amount, _minAmount, _deadline);
+
+        _mint(msg.sender, shares);
 
         _sendMessage(_destReceiver, _amount, _refundAddress);
 
-        emit Deposit(msg.sender, _amount);
+        emit Deposit(msg.sender, _amount, shares);
     }
 
-    /// @notice Withdraw underlying asset after campaign ends
-    /// @param _amount Amount of underlying asset to withdraw
+    /// @notice Preview deposit of underlying asset to mint cUSD on mainnet
+    /// @dev New deposits are disabled after the campaign ends
+    /// @param _amount Amount of underlying asset to deposit
+    /// @return amountOut Amount of cUSD minted on mainnet
+    function previewDeposit(uint256 _amount) external view returns (uint256 amountOut) {
+        if (transferEnabled()) return 0;
+        (amountOut,) = cap.getMintAmount(address(asset), _amount);
+    }
+
+    /// @dev Deposit into staked cap
+    /// @param _amount Amount of underlying asset to deposit
+    /// @param _minAmount Minimum amount of cUSD to mint on mainnet
+    /// @param _deadline Deadline for the deposit
+    /// @return shares Amount of shares minted
+    function _depositIntoStakedCap(uint256 _amount, uint256 _minAmount, uint256 _deadline)
+        internal
+        returns (uint256 shares)
+    {
+        uint256 amountOut = cap.mint(address(asset), _amount, _minAmount, address(this), _deadline);
+
+        return stakedCap.deposit(amountOut, address(this));
+    }
+
+    /// @notice Withdraw staked cap after campaign ends
+    /// @param _amount Amount of staked cap to withdraw
     /// @param _receiver Receiver of the withdrawn underlying assets
     function withdraw(uint256 _amount, address _receiver) external {
         if (_amount == 0) revert ZeroAmount();
@@ -94,7 +153,7 @@ contract PreMainnetVault is ERC20Permit, OAppMessenger {
 
         _burn(msg.sender, _amount);
 
-        asset.safeTransfer(_receiver, _amount);
+        stakedCap.safeTransfer(_receiver, _amount);
 
         emit Withdraw(msg.sender, _amount);
     }
