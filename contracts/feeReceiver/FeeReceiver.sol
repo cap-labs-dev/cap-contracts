@@ -45,7 +45,7 @@ contract FeeReceiver is IFeeReceiver, UUPSUpgradeable, Access, FeeReceiverStorag
             if ($.stakedCapToken.lastNotify() + $.stakedCapToken.lockDuration() < block.timestamp) {
                 $.stakedCapToken.notify();
             }
-            emit Notify(bal);
+            emit FeesDistributed(bal);
         }
     }
 

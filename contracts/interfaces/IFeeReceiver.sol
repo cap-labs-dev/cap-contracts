@@ -16,8 +16,8 @@ interface IFeeReceiver {
     /// @dev Emitted when the protocol fee is claimed
     event ProtocolFeeClaimed(uint256 amount);
 
-    /// @dev Emitted when the fee receiver is notified
-    event Notify(uint256 amount);
+    /// @dev Emitted when the fees are distributed
+    event FeesDistributed(uint256 amount);
 
     /// @dev Emitted when the protocol fee percentage is set
     event ProtocolFeePercentageSet(uint256 protocolFeePercentage);
