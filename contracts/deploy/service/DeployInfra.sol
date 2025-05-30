@@ -4,6 +4,8 @@ pragma solidity ^0.8.0;
 import { AccessControl } from "../../access/AccessControl.sol";
 
 import { Delegation } from "../../delegation/Delegation.sol";
+
+import { FeeReceiver } from "../../feeReceiver/FeeReceiver.sol";
 import { Lender } from "../../lendingPool/Lender.sol";
 import { Oracle } from "../../oracle/Oracle.sol";
 

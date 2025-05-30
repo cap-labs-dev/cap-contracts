@@ -316,6 +316,7 @@ contract TestDeployer is
         vm.label(address(env.implems.accessControl), "AccessControlImplem");
         vm.label(address(env.implems.delegation), "DelegationImplem");
         vm.label(address(env.implems.feeAuction), "FeeAuctionImplem");
+        vm.label(address(env.implems.feeReceiver), "FeeReceiverImplem");
         vm.label(address(env.implems.oracle), "OracleImplem");
         vm.label(address(env.implems.lender), "LenderImplem");
         vm.label(address(env.implems.stakedCap), "StakedCapImplem");
@@ -344,9 +345,11 @@ contract TestDeployer is
         vm.label(address(env.usdVault.capToken), "cUSD");
         vm.label(address(env.usdVault.stakedCapToken), "scUSD");
         vm.label(address(env.usdVault.feeAuction), "cUSD_FeeAuction");
+        vm.label(address(env.usdVault.feeReceiver), "cUSD_FeeReceiver");
         vm.label(address(env.ethVault.capToken), "cETH");
         vm.label(address(env.ethVault.stakedCapToken), "scETH");
         vm.label(address(env.ethVault.feeAuction), "cETH_FeeAuction");
+        vm.label(address(env.ethVault.feeReceiver), "cETH_FeeReceiver");
 
         // Label symbiotic contracts
         if (!useMockBackingNetwork()) {
