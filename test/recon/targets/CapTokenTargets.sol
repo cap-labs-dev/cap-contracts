@@ -31,6 +31,10 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         capToken_redeem(_amountIn, _minAmountsOut, _getActor(), block.timestamp + 1 days);
     }
 
+    function capToken_setFractionalReserveVault_clamped() public {
+        capToken_setFractionalReserveVault(_getAsset(), _getVault());
+    }
+
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
     function capToken_addAsset(address _asset) public asActor {

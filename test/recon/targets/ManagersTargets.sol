@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0
 pragma solidity ^0.8.0;
 
-import { BeforeAfter } from "../BeforeAfter.sol";
-import { Properties } from "../Properties.sol";
 import { BaseTargetFunctions } from "@chimera/BaseTargetFunctions.sol";
 import { vm } from "@chimera/Hevm.sol";
-
+import { MockERC4626Tester } from "@recon-temp-tester/MockERC4626Tester.sol";
 import { MockERC20 } from "@recon/MockERC20.sol";
+
+import { BeforeAfter } from "../BeforeAfter.sol";
+import { Properties } from "../Properties.sol";
 
 // Target functions that are effectively inherited from the Actor and AssetManagers
 // Once properly standardized, managers will expose these by default
@@ -22,6 +23,14 @@ abstract contract ManagersTargets is BaseTargetFunctions, Properties {
     /// @dev Starts using a new asset
     function switch_asset(uint256 entropy) public {
         _switchAsset(entropy);
+    }
+
+    function switch_vault(uint256 entropy) public {
+        _switchVault(entropy);
+    }
+
+    function add_new_vault() public {
+        _newVault(_getAsset());
     }
 
     /// @dev Deploy a new token and add it to the list of assets, then set it as the current asset

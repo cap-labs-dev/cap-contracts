@@ -35,11 +35,13 @@ import { OracleMocksConfig, TestEnvConfig } from "test/deploy/interfaces/TestDep
 import "test/mocks/MockAaveDataProvider.sol";
 import "test/mocks/MockChainlinkPriceFeed.sol";
 import "test/mocks/MockNetworkMiddleware.sol";
+import { VaultManager } from "test/recon/helpers/VaultManager.sol";
 
 abstract contract Setup is
     BaseSetup,
     ActorManager,
     AssetManager,
+    VaultManager,
     Utils,
     DeployInfra,
     DeployVault,
