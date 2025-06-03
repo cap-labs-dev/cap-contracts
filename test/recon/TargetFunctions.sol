@@ -20,6 +20,7 @@ import { LenderTargets } from "./targets/LenderTargets.sol";
 import { ManagersTargets } from "./targets/ManagersTargets.sol";
 import { MockAaveDataProviderTargets } from "./targets/MockAaveDataProviderTargets.sol";
 import { MockChainlinkPriceFeedTargets } from "./targets/MockChainlinkPriceFeedTargets.sol";
+import { MockERC4626TesterTargets } from "./targets/MockERC4626TesterTargets.sol";
 import { MockNetworkMiddlewareTargets } from "./targets/MockNetworkMiddlewareTargets.sol";
 import { OracleTargets } from "./targets/OracleTargets.sol";
 import { StakedCapTargets } from "./targets/StakedCapTargets.sol";
@@ -42,7 +43,8 @@ abstract contract TargetFunctions is
     MockChainlinkPriceFeedTargets,
     MockNetworkMiddlewareTargets,
     OracleTargets,
-    StakedCapTargets
+    StakedCapTargets,
+    MockERC4626TesterTargets
 {
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
     function switchChainlinkOracle(uint256 entropy) external {
