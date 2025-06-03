@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0
 pragma solidity ^0.8.0;
 
-import { BeforeAfter } from "../BeforeAfter.sol";
-import { Properties } from "../Properties.sol";
-import { BaseTargetFunctions } from "@chimera/BaseTargetFunctions.sol";
 // Chimera deps
+import { BaseTargetFunctions } from "@chimera/BaseTargetFunctions.sol";
 import { vm } from "@chimera/Hevm.sol";
 
 // Helpers
@@ -12,7 +10,11 @@ import { MockERC20 } from "@recon/MockERC20.sol";
 import { Panic } from "@recon/Panic.sol";
 
 import { IMinter } from "contracts/interfaces/IMinter.sol";
+import { IVault } from "contracts/interfaces/IVault.sol";
 import "contracts/token/CapToken.sol";
+
+import { BeforeAfter } from "../BeforeAfter.sol";
+import { Properties } from "../Properties.sol";
 
 abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
@@ -56,6 +58,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     /// @dev Property: User always receives at least the minimum amount out
     /// @dev Property: User always receives at most the expected amount out
     /// @dev Property: Total cap supply decreases by no more than the amount out
+    /// @dev Property: Fees are always nonzero when burning
     function capToken_burn(
         address _asset,
         uint256 _amountIn,
@@ -63,13 +66,16 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         address _receiver,
         uint256 _deadline
     ) public asActor {
+        IVault vault = IVault(address(env.usdVault.capToken));
         uint256 capTokenBalanceBefore = capToken.balanceOf(_getActor());
+        uint256 insuranceFundBalanceBefore = MockERC20(_asset).balanceOf(vault.insuranceFund());
         uint256 totalCapSupplyBefore = capToken.totalSupply();
         (uint256 expectedAmountOut,) = capToken.getBurnAmount(_asset, _amountIn);
 
         try capToken.burn(_asset, _amountIn, _minAmountOut, _receiver, _deadline) {
             // update variables for inlined properties
             uint256 capTokenBalanceAfter = capToken.balanceOf(_getActor());
+            uint256 insuranceFundBalanceAfter = MockERC20(_asset).balanceOf(vault.insuranceFund());
             uint256 totalCapSupplyAfter = capToken.totalSupply();
 
             // update ghosts
@@ -91,6 +97,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 capTokenBalanceBefore - capTokenBalanceAfter,
                 "total cap supply decreased by less than the amount out"
             );
+            gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when burning");
         } catch {
             lt(capTokenBalanceBefore, _amountIn, "user cannot burn with sufficient cap token balance");
         }
@@ -107,6 +114,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     /// @dev Property: User can always mint cap token if they have sufficient balance of depositing asset
     /// @dev Property: User always receives at least the minimum amount out
     /// @dev Property: User always receives at most the expected amount out
+    /// @dev Property: Fees are always nonzero when minting
     function capToken_mint(
         address _asset,
         uint256 _amountIn,
@@ -114,12 +122,15 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         address _receiver,
         uint256 _deadline
     ) public asActor {
+        IVault vault = IVault(address(env.usdVault.capToken));
         uint256 assetBalance = MockERC20(_asset).balanceOf(_getActor());
         uint256 capTokenBalanceBefore = capToken.balanceOf(_getActor());
+        uint256 insuranceFundBalanceBefore = capToken.balanceOf(vault.insuranceFund());
         (uint256 expectedAmountOut,) = capToken.getMintAmount(_asset, _amountIn);
 
         try capToken.mint(_asset, _amountIn, _minAmountOut, _receiver, _deadline) returns (uint256 amountOut) {
             uint256 capTokenBalanceAfter = capToken.balanceOf(_getActor());
+            uint256 insuranceFundBalanceAfter = capToken.balanceOf(vault.insuranceFund());
 
             gte(
                 capTokenBalanceAfter - capTokenBalanceBefore,
@@ -131,6 +142,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 capTokenBalanceBefore + expectedAmountOut,
                 "user received more than expected amount out"
             );
+            gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when minting");
         } catch {
             // if user has sufficient balance of depositing asset, they should be able to mint
             lt(assetBalance, _amountIn, "user cannot mint with sufficient asset balance");
@@ -174,11 +186,14 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         (uint256[] memory expectedAmountsOut,) = capToken.getRedeemAmount(_amountIn);
 
         try capToken.redeem(_amountIn, _minAmountsOut, _receiver, _deadline) returns (uint256[] memory amountsOut) {
+            // update variables for inlined properties
             uint256 capTokenBalanceAfter = capToken.balanceOf(_getActor());
             uint256 totalCapSupplyAfter = capToken.totalSupply();
 
+            // update ghosts
             ghostAmountOut += _amountIn;
 
+            // check inlined properties
             for (uint256 i = 0; i < _minAmountsOut.length; i++) {
                 gte(amountsOut[i], _minAmountsOut[i], "user received less than minimum amount out");
             }
