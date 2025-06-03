@@ -65,6 +65,9 @@ abstract contract Setup is
     Oracle oracle;
     StakedCap stakedCap;
 
+    /// === GHOSTS === ///
+    uint256 ghostAmountOut;
+
     address agent = address(0xb0b);
 
     /// === Setup === ///

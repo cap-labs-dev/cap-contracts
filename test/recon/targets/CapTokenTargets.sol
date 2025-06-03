@@ -8,6 +8,7 @@ import { BaseTargetFunctions } from "@chimera/BaseTargetFunctions.sol";
 import { vm } from "@chimera/Hevm.sol";
 
 // Helpers
+import { MockERC20 } from "@recon/MockERC20.sol";
 import { Panic } from "@recon/Panic.sol";
 
 import { IMinter } from "contracts/interfaces/IMinter.sol";
@@ -51,6 +52,10 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     //     t(false, "capToken_borrow");
     // }
 
+    /// @dev Property: User can always burn cap token if they have sufficient balance of cap token
+    /// @dev Property: User always receives at least the minimum amount out
+    /// @dev Property: User always receives at most the expected amount out
+    /// @dev Property: Total cap supply decreases by no more than the amount out
     function capToken_burn(
         address _asset,
         uint256 _amountIn,
@@ -58,7 +63,37 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         address _receiver,
         uint256 _deadline
     ) public asActor {
-        capToken.burn(_asset, _amountIn, _minAmountOut, _receiver, _deadline);
+        uint256 capTokenBalanceBefore = capToken.balanceOf(_getActor());
+        uint256 totalCapSupplyBefore = capToken.totalSupply();
+        (uint256 expectedAmountOut,) = capToken.getBurnAmount(_asset, _amountIn);
+
+        try capToken.burn(_asset, _amountIn, _minAmountOut, _receiver, _deadline) {
+            // update variables for inlined properties
+            uint256 capTokenBalanceAfter = capToken.balanceOf(_getActor());
+            uint256 totalCapSupplyAfter = capToken.totalSupply();
+
+            // update ghosts
+            ghostAmountOut += _amountIn;
+
+            // check inlined properties
+            gte(
+                capTokenBalanceBefore - capTokenBalanceAfter,
+                _minAmountOut,
+                "user received less than minimum amount out"
+            );
+            lte(
+                capTokenBalanceAfter,
+                capTokenBalanceBefore - expectedAmountOut,
+                "user received more than expected amount out"
+            );
+            gte(
+                totalCapSupplyBefore - totalCapSupplyAfter,
+                capTokenBalanceBefore - capTokenBalanceAfter,
+                "total cap supply decreased by less than the amount out"
+            );
+        } catch {
+            lt(capTokenBalanceBefore, _amountIn, "user cannot burn with sufficient cap token balance");
+        }
     }
 
     function capToken_divestAll(address _asset) public asActor {
@@ -69,6 +104,9 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         capToken.investAll(_asset);
     }
 
+    /// @dev Property: User can always mint cap token if they have sufficient balance of depositing asset
+    /// @dev Property: User always receives at least the minimum amount out
+    /// @dev Property: User always receives at most the expected amount out
     function capToken_mint(
         address _asset,
         uint256 _amountIn,
@@ -76,7 +114,27 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         address _receiver,
         uint256 _deadline
     ) public asActor {
-        capToken.mint(_asset, _amountIn, _minAmountOut, _receiver, _deadline);
+        uint256 assetBalance = MockERC20(_asset).balanceOf(_getActor());
+        uint256 capTokenBalanceBefore = capToken.balanceOf(_getActor());
+        (uint256 expectedAmountOut,) = capToken.getMintAmount(_asset, _amountIn);
+
+        try capToken.mint(_asset, _amountIn, _minAmountOut, _receiver, _deadline) returns (uint256 amountOut) {
+            uint256 capTokenBalanceAfter = capToken.balanceOf(_getActor());
+
+            gte(
+                capTokenBalanceAfter - capTokenBalanceBefore,
+                _minAmountOut,
+                "user received less than minimum amount out"
+            );
+            lte(
+                capTokenBalanceAfter,
+                capTokenBalanceBefore + expectedAmountOut,
+                "user received more than expected amount out"
+            );
+        } catch {
+            // if user has sufficient balance of depositing asset, they should be able to mint
+            lt(assetBalance, _amountIn, "user cannot mint with sufficient asset balance");
+        }
     }
 
     function capToken_pauseAsset(address _asset) public asActor {
@@ -103,11 +161,40 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         capToken.realizeInterest(_asset);
     }
 
+    /// @dev Property: User can always redeem cap token if they have sufficient balance of cap token
+    /// @dev Property: User always receives at least the minimum amount out
+    /// @dev Property: User always receives at most the expected amount out
+    /// @dev Property: Total cap supply decreases by no more than the amount out
     function capToken_redeem(uint256 _amountIn, uint256[] memory _minAmountsOut, address _receiver, uint256 _deadline)
         public
         asActor
     {
-        capToken.redeem(_amountIn, _minAmountsOut, _receiver, _deadline);
+        uint256 capTokenBalanceBefore = capToken.balanceOf(_getActor());
+        uint256 totalCapSupplyBefore = capToken.totalSupply();
+        (uint256[] memory expectedAmountsOut,) = capToken.getRedeemAmount(_amountIn);
+
+        try capToken.redeem(_amountIn, _minAmountsOut, _receiver, _deadline) returns (uint256[] memory amountsOut) {
+            uint256 capTokenBalanceAfter = capToken.balanceOf(_getActor());
+            uint256 totalCapSupplyAfter = capToken.totalSupply();
+
+            ghostAmountOut += _amountIn;
+
+            for (uint256 i = 0; i < _minAmountsOut.length; i++) {
+                gte(amountsOut[i], _minAmountsOut[i], "user received less than minimum amount out");
+            }
+
+            for (uint256 i = 0; i < expectedAmountsOut.length; i++) {
+                lte(amountsOut[i], expectedAmountsOut[i], "user received more than expected amount out");
+            }
+
+            gte(
+                totalCapSupplyBefore - totalCapSupplyAfter,
+                capTokenBalanceBefore - capTokenBalanceAfter,
+                "total cap supply decreased by less than the amount out"
+            );
+        } catch {
+            lt(capTokenBalanceBefore, _amountIn, "user cannot redeem with sufficient cap token balance");
+        }
     }
 
     function capToken_removeAsset(address _asset) public asActor {
