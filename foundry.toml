@@ -27,7 +27,6 @@ remappings = [
     "forge-std/=lib/forge-std/src/",
     "@openzeppelin/=node_modules/@openzeppelin/",
     "@recon/=lib/setup-helpers/src/",
-    "@recon-temp-tester/=lib/ERC4626Tester/src/",
     "@chimera/=lib/chimera/src/"
 ]
 fs_permissions = [

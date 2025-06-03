@@ -4,9 +4,10 @@ pragma solidity ^0.8.0;
 import { BaseSetup } from "@chimera/BaseSetup.sol";
 import { vm } from "@chimera/Hevm.sol";
 
-import { MockERC4626Tester } from "@recon-temp-tester/MockERC4626Tester.sol";
 import { EnumerableSet } from "@recon/EnumerableSet.sol";
 import { MockERC20 } from "@recon/MockERC20.sol";
+
+import { MockERC4626Tester } from "../mocks/MockERC4626Tester.sol";
 
 /// @dev Source of truth for the yield vaults being used in the test
 /// @notice No vaults should be used in the suite without being added here first

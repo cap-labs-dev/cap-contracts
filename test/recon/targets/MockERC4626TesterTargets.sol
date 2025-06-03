@@ -6,10 +6,10 @@ import { BaseTargetFunctions } from "@chimera/BaseTargetFunctions.sol";
 import { vm } from "@chimera/Hevm.sol";
 
 // Helpers
-import { MockERC4626Tester } from "@recon-temp-tester/MockERC4626Tester.sol";
 import { Panic } from "@recon/Panic.sol";
 
 import { Properties } from "../Properties.sol";
+import { MockERC4626Tester } from "../mocks/MockERC4626Tester.sol";
 
 abstract contract MockERC4626TesterTargets is BaseTargetFunctions, Properties {
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
@@ -56,5 +56,13 @@ abstract contract MockERC4626TesterTargets is BaseTargetFunctions, Properties {
 
     function mockERC4626Tester_withdraw(uint256 assets, address receiver, address owner) public asActor {
         MockERC4626Tester(_getVault()).withdraw(assets, receiver, owner);
+    }
+
+    function mockERC4626Tester_simulateLoss(uint256 lossAmount) public asActor {
+        MockERC4626Tester(_getVault()).simulateLoss(lossAmount);
+    }
+
+    function mockERC4626Tester_simulateGain(uint256 gainAmount) public asActor {
+        MockERC4626Tester(_getVault()).simulateGain(gainAmount);
     }
 }
