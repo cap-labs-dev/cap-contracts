@@ -8,7 +8,7 @@ import { console2 } from "forge-std/console2.sol";
 import { IFractionalReserve } from "contracts/interfaces/IFractionalReserve.sol";
 import { IVault } from "contracts/interfaces/IVault.sol";
 
-import { BeforeAfter } from "./BeforeAfter.sol";
+import { BeforeAfter, OpType } from "./BeforeAfter.sol";
 
 abstract contract Properties is BeforeAfter, Asserts {
     /// @dev Property: Sum of deposits is less than or equal to total supply
@@ -66,6 +66,39 @@ abstract contract Properties is BeforeAfter, Asserts {
             uint256 totalSupplied = vault.totalSupplies(assets[i]);
             uint256 totalBorrow = vault.totalBorrows(assets[i]);
             gte(totalSupplied, totalBorrow, "totalSupplies < totalBorrows");
+        }
+    }
+
+    /// @dev Property: Utilization index only increases
+    function property_utilization_index_only_increases() public {
+        gte(_after.utilizationIndex[_getAsset()], _before.utilizationIndex[_getAsset()], "utilization index decreased");
+    }
+
+    /// @dev Property: Utilization ratio only decreases after a borrow
+    function property_utilization_ratio() public {
+        // precondition: total borrows increases
+        if (_after.totalBorrows[_getAsset()] > _before.totalBorrows[_getAsset()]) {
+            lt(
+                _after.utilizationRatio[_getAsset()],
+                _before.utilizationRatio[_getAsset()],
+                "utilization ratio increased after a borrow"
+            );
+        } else {
+            // precondition: total borrows does not increase
+            gte(
+                _after.utilizationRatio[_getAsset()],
+                _before.utilizationRatio[_getAsset()],
+                "utilization ratio decreased without a borrow"
+            );
+        }
+    }
+
+    /// @dev Property: If the vault invests/divests it shouldn't change the redeem amounts out
+    function property_vault_balance_does_not_change_redeemAmountsOut() public {
+        if (currentOperation == OpType.INVEST || currentOperation == OpType.DIVEST) {
+            for (uint256 i; i < _after.redeemAmountsOut.length; ++i) {
+                eq(_after.redeemAmountsOut[i], _before.redeemAmountsOut[i], "redeem amounts out changed");
+            }
         }
     }
 }
