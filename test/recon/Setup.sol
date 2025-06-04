@@ -13,28 +13,29 @@ import { AssetManager } from "@recon/AssetManager.sol";
 import { Utils } from "@recon/Utils.sol";
 
 // Your deps
-import "contracts/access/AccessControl.sol";
 
-import "contracts/delegation/Delegation.sol";
-
-import { FeeConfig } from "contracts/deploy/interfaces/DeployConfigs.sol";
-import { ConfigureAccessControl } from "contracts/deploy/service/ConfigureAccessControl.sol";
+import { AccessControl } from "contracts/access/AccessControl.sol";
+import { Delegation } from "contracts/delegation/Delegation.sol";
+import { FeeConfig, InfraConfig, UsersConfig } from "contracts/deploy/interfaces/DeployConfigs.sol";
 import { ConfigureDelegation } from "contracts/deploy/service/ConfigureDelegation.sol";
 import { ConfigureOracle } from "contracts/deploy/service/ConfigureOracle.sol";
 import { DeployImplems } from "contracts/deploy/service/DeployImplems.sol";
 import { DeployInfra } from "contracts/deploy/service/DeployInfra.sol";
 import { DeployLibs } from "contracts/deploy/service/DeployLibs.sol";
 import { DeployVault } from "contracts/deploy/service/DeployVault.sol";
-import "contracts/feeAuction/FeeAuction.sol";
-import "contracts/lendingPool/Lender.sol";
-import "contracts/lendingPool/tokens/DebtToken.sol";
-import "contracts/oracle/Oracle.sol";
-import "contracts/token/CapToken.sol";
-import "contracts/token/StakedCap.sol";
+import { FeeAuction } from "contracts/feeAuction/FeeAuction.sol";
+
+import { IPriceOracle } from "contracts/interfaces/IPriceOracle.sol";
+import { IRateOracle } from "contracts/interfaces/IRateOracle.sol";
+import { Lender } from "contracts/lendingPool/Lender.sol";
+import { DebtToken } from "contracts/lendingPool/tokens/DebtToken.sol";
+import { Oracle } from "contracts/oracle/Oracle.sol";
+import { CapToken } from "contracts/token/CapToken.sol";
+import { StakedCap } from "contracts/token/StakedCap.sol";
 import { OracleMocksConfig, TestEnvConfig } from "test/deploy/interfaces/TestDeployConfig.sol";
-import "test/mocks/MockAaveDataProvider.sol";
-import "test/mocks/MockChainlinkPriceFeed.sol";
-import "test/mocks/MockNetworkMiddleware.sol";
+import { MockAaveDataProvider } from "test/mocks/MockAaveDataProvider.sol";
+import { MockChainlinkPriceFeed } from "test/mocks/MockChainlinkPriceFeed.sol";
+import { MockNetworkMiddleware } from "test/mocks/MockNetworkMiddleware.sol";
 import { VaultManager } from "test/recon/helpers/VaultManager.sol";
 
 abstract contract Setup is
@@ -48,9 +49,10 @@ abstract contract Setup is
     DeployImplems,
     DeployLibs,
     ConfigureOracle,
-    ConfigureDelegation,
-    ConfigureAccessControl
+    ConfigureDelegation
 {
+    // ConfigureAccessControl
+
     TestEnvConfig env;
 
     AccessControl accessControl;
@@ -189,6 +191,40 @@ abstract contract Setup is
         vm.label(address(capToken), "Vault(CapToken)");
         vm.label(address(stakedCap), "StakedCap");
         vm.label(address(feeAuction), "FeeAuction");
+    }
+
+    /// Copied from ConfigureAccessControl.sol to avoid circular dependency
+    function _initInfraAccessControl(InfraConfig memory infra, UsersConfig memory users) internal {
+        accessControl.grantAccess(IPriceOracle.setPriceOracleData.selector, infra.oracle, users.oracle_admin);
+        accessControl.revokeAccess(IPriceOracle.setPriceOracleData.selector, infra.oracle, users.oracle_admin);
+        accessControl.grantAccess(IPriceOracle.setPriceOracleData.selector, infra.oracle, users.oracle_admin);
+        accessControl.grantAccess(IPriceOracle.setPriceBackupOracleData.selector, infra.oracle, users.oracle_admin);
+        accessControl.grantAccess(bytes4(0), infra.oracle, users.access_control_admin);
+
+        accessControl.grantAccess(IRateOracle.setBenchmarkRate.selector, infra.oracle, users.rate_oracle_admin);
+        accessControl.grantAccess(IRateOracle.setRestakerRate.selector, infra.oracle, users.rate_oracle_admin);
+        accessControl.grantAccess(IRateOracle.setMarketOracleData.selector, infra.oracle, users.rate_oracle_admin);
+        accessControl.grantAccess(IRateOracle.setUtilizationOracleData.selector, infra.oracle, users.rate_oracle_admin);
+
+        accessControl.grantAccess(Lender.addAsset.selector, infra.lender, users.lender_admin);
+        accessControl.grantAccess(Lender.setMinBorrow.selector, infra.lender, users.lender_admin);
+        accessControl.grantAccess(Lender.removeAsset.selector, infra.lender, users.lender_admin);
+        accessControl.grantAccess(Lender.pauseAsset.selector, infra.lender, users.lender_admin);
+        accessControl.grantAccess(bytes4(0), infra.lender, users.access_control_admin);
+
+        accessControl.grantAccess(Lender.borrow.selector, infra.lender, users.lender_admin);
+        accessControl.grantAccess(Lender.repay.selector, infra.lender, users.lender_admin);
+
+        accessControl.grantAccess(Lender.liquidate.selector, infra.lender, users.lender_admin);
+        accessControl.grantAccess(Lender.pauseAsset.selector, infra.lender, users.lender_admin);
+
+        accessControl.grantAccess(Delegation.addAgent.selector, infra.delegation, users.delegation_admin);
+        accessControl.grantAccess(Delegation.modifyAgent.selector, infra.delegation, users.delegation_admin);
+        accessControl.grantAccess(Delegation.registerNetwork.selector, infra.delegation, users.delegation_admin);
+        accessControl.grantAccess(Delegation.setLastBorrow.selector, infra.delegation, infra.lender);
+        accessControl.grantAccess(Delegation.slash.selector, infra.delegation, infra.lender);
+        accessControl.grantAccess(Delegation.setLtvBuffer.selector, infra.delegation, users.delegation_admin);
+        accessControl.grantAccess(bytes4(0), infra.delegation, users.access_control_admin);
     }
 
     /// === MODIFIERS === ///
