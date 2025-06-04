@@ -66,6 +66,7 @@ abstract contract Setup is
     StakedCap stakedCap;
 
     /// === GHOSTS === ///
+    uint256 ghostAmountIn;
     uint256 ghostAmountOut;
 
     address agent = address(0xb0b);
@@ -86,7 +87,7 @@ abstract contract Setup is
         env.users.vault_config_admin = address(this);
         env.users.middleware_admin = address(this);
         env.users.staker_rewards_admin = address(this);
-        env.users.insurance_fund = address(this);
+        env.users.insurance_fund = address(0xbeef); // insuranceFund needs to be set to a non-actor address to not mess up properties
 
         env.infra = _deployInfra(env.implems, env.users, 1 days);
 

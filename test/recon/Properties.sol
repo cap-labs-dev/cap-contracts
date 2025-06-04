@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import { Asserts } from "@chimera/Asserts.sol";
 import { MockERC20 } from "@recon/MockERC20.sol";
+import { console2 } from "forge-std/console2.sol";
 
 import { IVault } from "contracts/interfaces/IVault.sol";
 
@@ -25,14 +26,18 @@ abstract contract Properties is BeforeAfter, Asserts {
         lte(sumAssets, totalSupply, "sum of deposits is > total supply");
     }
 
-    /// @dev Property: Sum of withdrawals is less than or equal to total supply
+    /// @dev Property: Sum of deposits + sum of withdrawals is less than or equal to total supply
     function property_sum_of_withdrawals() public {
         address[] memory actors = _getActors();
 
-        lte(ghostAmountOut, capToken.totalSupply(), "sum of withdrawals is > total supply");
+        lte(
+            ghostAmountIn - ghostAmountOut,
+            capToken.totalSupply(),
+            "sum of deposits + sum of withdrawals is > total supply"
+        );
     }
 
-    /// @dev Property: totalSupplies for a given asset is always <= vault balance
+    /// @dev Property: totalSupplies for a given asset is always <= vault balance + totalBorrows
     function property_vault_solvency_assets() public {
         IVault vault = IVault(address(env.usdVault.capToken));
         address[] memory assets = vault.assets();
@@ -41,8 +46,7 @@ abstract contract Properties is BeforeAfter, Asserts {
             uint256 totalSupplied = vault.totalSupplies(assets[i]);
             uint256 totalBorrow = vault.totalBorrows(assets[i]);
             uint256 vaultBalance = MockERC20(assets[i]).balanceOf(address(vault));
-            lte(totalSupplied, vaultBalance, "totalSupplies > vault balance");
-            lte(totalBorrow, vaultBalance, "totalBorrows < totalSupplies");
+            lte(totalSupplied, vaultBalance + totalBorrow, "totalSupplies > vault balance + totalBorrows");
         }
     }
 
