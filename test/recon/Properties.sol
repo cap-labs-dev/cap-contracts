@@ -5,6 +5,7 @@ import { Asserts } from "@chimera/Asserts.sol";
 import { MockERC20 } from "@recon/MockERC20.sol";
 import { console2 } from "forge-std/console2.sol";
 
+import { IFractionalReserve } from "contracts/interfaces/IFractionalReserve.sol";
 import { IVault } from "contracts/interfaces/IVault.sol";
 
 import { BeforeAfter } from "./BeforeAfter.sol";
@@ -37,7 +38,7 @@ abstract contract Properties is BeforeAfter, Asserts {
         );
     }
 
-    /// @dev Property: totalSupplies for a given asset is always <= vault balance + totalBorrows
+    /// @dev Property: totalSupplies for a given asset is always <= vault balance + totalBorrows + fractionalReserveBalance
     function property_vault_solvency_assets() public {
         IVault vault = IVault(address(env.usdVault.capToken));
         address[] memory assets = vault.assets();
@@ -46,7 +47,13 @@ abstract contract Properties is BeforeAfter, Asserts {
             uint256 totalSupplied = vault.totalSupplies(assets[i]);
             uint256 totalBorrow = vault.totalBorrows(assets[i]);
             uint256 vaultBalance = MockERC20(assets[i]).balanceOf(address(vault));
-            lte(totalSupplied, vaultBalance + totalBorrow, "totalSupplies > vault balance + totalBorrows");
+            uint256 fractionalReserveBalance =
+                MockERC20(assets[i]).balanceOf(IFractionalReserve(address(vault)).fractionalReserveVault(assets[i]));
+            lte(
+                totalSupplied,
+                vaultBalance + totalBorrow + fractionalReserveBalance,
+                "totalSupplies > vault balance + totalBorrows"
+            );
         }
     }
 

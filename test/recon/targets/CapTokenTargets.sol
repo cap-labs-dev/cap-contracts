@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 // Chimera deps
 import { BaseTargetFunctions } from "@chimera/BaseTargetFunctions.sol";
 import { vm } from "@chimera/Hevm.sol";
+import { console2 } from "forge-std/console2.sol";
 
 // Helpers
 import { MockERC20 } from "@recon/MockERC20.sol";
@@ -113,8 +114,10 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             if (!IMinter(address(vault)).whitelisted(_getActor())) {
                 gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when burning");
             }
-        } catch {
-            if (_amountIn > 0) {
+        } catch (bytes memory err) {
+            bool expectedError =
+                checkError(err, "PastDeadline()") || checkError(err, "Slippage()") || checkError(err, "InvalidAmount()");
+            if (!expectedError) {
                 lt(capTokenBalanceBefore, _amountIn, "user cannot burn with sufficient cap token balance");
             }
         }
@@ -166,10 +169,11 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             if (!IMinter(address(vault)).whitelisted(_getActor())) {
                 gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when minting");
             }
-        } catch {
-            // if user has sufficient balance of depositing asset, they should be able to mint
-            if (_amountIn > 0) {
-                lt(assetBalance, _amountIn, "user cannot mint with sufficient asset balance");
+        } catch (bytes memory err) {
+            bool expectedError =
+                checkError(err, "PastDeadline()") || checkError(err, "Slippage()") || checkError(err, "InvalidAmount()");
+            if (!expectedError) {
+                lt(assetBalance, _amountIn, "user cannot mint with insufficient asset balance");
             }
         }
     }
@@ -232,8 +236,10 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 capTokenBalanceBefore - capTokenBalanceAfter,
                 "total cap supply decreased by less than the amount out"
             );
-        } catch {
-            if (_amountIn > 0) {
+        } catch (bytes memory err) {
+            bool expectedError = checkError(err, "InvalidMinAmountsOut()") || checkError(err, "PastDeadline()")
+                || checkError(err, "Slippage()");
+            if (!expectedError && _amountIn > 0) {
                 lt(capTokenBalanceBefore, _amountIn, "user cannot redeem with sufficient cap token balance");
             }
         }
