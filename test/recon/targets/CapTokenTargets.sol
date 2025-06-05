@@ -13,6 +13,7 @@ import { Panic } from "@recon/Panic.sol";
 import { IMinter } from "contracts/interfaces/IMinter.sol";
 import { IVault } from "contracts/interfaces/IVault.sol";
 import "contracts/token/CapToken.sol";
+import { VaultLogic } from "contracts/vault/libraries/VaultLogic.sol";
 
 import { BeforeAfter, OpType } from "../BeforeAfter.sol";
 import { Properties } from "../Properties.sol";
@@ -54,6 +55,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
     function capToken_addAsset(address _asset) public updateGhosts asActor {
+        require(_asset != address(0), "asset cannot be the zero address");
         capToken.addAsset(_asset);
     }
 
@@ -121,9 +123,9 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when burning");
             }
         } catch (bytes memory err) {
-            bool expectedError =
-                checkError(err, "PastDeadline()") || checkError(err, "Slippage()") || checkError(err, "InvalidAmount()");
-            if (!expectedError) {
+            bool expectedError = checkError(err, "PastDeadline()")
+                || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()");
+            if (!expectedError && _amountIn > 0) {
                 lt(capTokenBalanceBefore, _amountIn, "user cannot burn with sufficient cap token balance");
             }
         }
@@ -182,10 +184,10 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when minting");
             }
         } catch (bytes memory err) {
-            bool expectedError =
-                checkError(err, "PastDeadline()") || checkError(err, "Slippage()") || checkError(err, "InvalidAmount()");
-            if (!expectedError) {
-                lt(assetBalance, _amountIn, "user cannot mint with insufficient asset balance");
+            bool expectedError = checkError(err, "PastDeadline()")
+                || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()");
+            if (!expectedError && _amountIn > 0) {
+                lt(assetBalance, _amountIn, "user cannot mint with sufficient asset balance");
             }
         }
     }
@@ -253,7 +255,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             );
         } catch (bytes memory err) {
             bool expectedError = checkError(err, "InvalidMinAmountsOut()") || checkError(err, "PastDeadline()")
-                || checkError(err, "Slippage()");
+                || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()");
             if (!expectedError && _amountIn > 0) {
                 lt(capTokenBalanceBefore, _amountIn, "user cannot redeem with sufficient cap token balance");
             }
