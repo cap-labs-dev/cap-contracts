@@ -23,3 +23,7 @@
 | 21 | property_utilization_index_only_increases | Utilization index only increases | |
 | 22 | property_utilization_ratio | Utilization ratio only decreases after a borrow | |
 | 23 | property_vault_balance_does_not_change_redeemAmountsOut | If the vault invests/divests it shouldn't change the redeem amounts out | |
+| 24 | property_agent_cannot_have_less_than_minBorrow_balance_of_debt_token | Agent can never have less than minBorrow balance of debt token | |
+| 25 | property_repaid_debt_equals_zero_debt | If all users have repaid their debt (have 0 DebtToken balance), reserve.debt == 0 | |
+| 26 | lender_repay | Repay should never revert due to under/overflow | |
+| 27 | lender_realizeInterest | realizeInterest should only revert with `ZeroRealization()` if paused or `totalUnrealizedInterest == 0`, otherwise should always update the realization value | |
