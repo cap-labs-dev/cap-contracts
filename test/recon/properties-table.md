@@ -1,8 +1,8 @@
 | # | Function Name | Property Description | Passing |
 |----|--------------|---------------------|----------|
 | 1 | property_sum_of_deposits | Sum of deposits is less than or equal to total supply | |
-| 2 | property_sum_of_withdrawals | Sum of withdrawals is less than or equal to total supply | |
-| 3 | property_vault_solvency_assets | totalSupplies for a given asset is always <= vault balance | |
+| 2 | property_sum_of_withdrawals | Sum of deposits + sum of withdrawals is less than or equal to total supply | |
+| 3 | property_vault_solvency_assets | totalSupplies for a given asset is always <= vault balance + totalBorrows + fractionalReserveBalance | |
 | 4 | property_vault_solvency_borrows | totalSupplies for a given asset is always >= totalBorrows | |
 | 5 | capToken_mint | User can always mint cap token if they have sufficient balance of depositing asset | |
 | 6 | capToken_mint | User always receives at least the minimum amount out | |
