@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import { Setup } from "./Setup.sol";
-import { IVault } from "contracts/interfaces/IVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 
 enum OpType {
@@ -39,21 +38,26 @@ abstract contract BeforeAfter is Setup {
         __after();
     }
 
+    function __snapshot(Vars storage vars) internal {
+        vars.utilizationIndex[_getAsset()] = capToken.currentUtilizationIndex(_getAsset());
+        vars.utilizationRatio[_getAsset()] = capToken.utilization(_getAsset());
+        vars.totalBorrows[_getAsset()] = capToken.totalBorrows(_getAsset());
+        vars.vaultAssetBalance = MockERC20(_getAsset()).balanceOf(address(capToken));
+        try capToken.getRedeemAmount(capToken.balanceOf(_getActor())) returns (
+            uint256[] memory amountsOut, uint256[] memory redeemFees
+        ) {
+            vars.redeemAmountsOut = amountsOut;
+        } catch {
+            // If the call fails, we can assume the redeem amounts are zero
+            vars.redeemAmountsOut = new uint256[](0);
+        }
+    }
+
     function __before() internal {
-        IVault vault = IVault(address(env.usdVault.capToken));
-        _before.utilizationIndex[_getAsset()] = vault.currentUtilizationIndex(_getAsset());
-        _before.utilizationRatio[_getAsset()] = vault.utilization(_getAsset());
-        _before.totalBorrows[_getAsset()] = vault.totalBorrows(_getAsset());
-        _before.vaultAssetBalance = MockERC20(_getAsset()).balanceOf(address(vault));
-        (_before.redeemAmountsOut,) = capToken.getRedeemAmount(capToken.balanceOf(_getActor()));
+        __snapshot(_before);
     }
 
     function __after() internal {
-        IVault vault = IVault(address(env.usdVault.capToken));
-        _after.utilizationIndex[_getAsset()] = vault.currentUtilizationIndex(_getAsset());
-        _after.utilizationRatio[_getAsset()] = vault.utilization(_getAsset());
-        _after.totalBorrows[_getAsset()] = vault.totalBorrows(_getAsset());
-        _after.vaultAssetBalance = MockERC20(_getAsset()).balanceOf(address(vault));
-        (_after.redeemAmountsOut,) = capToken.getRedeemAmount(capToken.balanceOf(_getActor()));
+        __snapshot(_after);
     }
 }
