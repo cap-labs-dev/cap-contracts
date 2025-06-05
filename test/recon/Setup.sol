@@ -10,10 +10,11 @@ import { ActorManager } from "@recon/ActorManager.sol";
 import { AssetManager } from "@recon/AssetManager.sol";
 
 // Helpers
+
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { Utils } from "@recon/Utils.sol";
 
 // Your deps
-
 import { AccessControl } from "contracts/access/AccessControl.sol";
 import { Delegation } from "contracts/delegation/Delegation.sol";
 import { FeeConfig, InfraConfig, UsersConfig } from "contracts/deploy/interfaces/DeployConfigs.sol";
@@ -36,6 +37,8 @@ import { OracleMocksConfig, TestEnvConfig } from "test/deploy/interfaces/TestDep
 import { MockAaveDataProvider } from "test/mocks/MockAaveDataProvider.sol";
 import { MockChainlinkPriceFeed } from "test/mocks/MockChainlinkPriceFeed.sol";
 import { MockNetworkMiddleware } from "test/mocks/MockNetworkMiddleware.sol";
+
+import { LenderWrapper } from "test/recon/helpers/LenderWrapper.sol";
 import { VaultManager } from "test/recon/helpers/VaultManager.sol";
 
 abstract contract Setup is
@@ -60,7 +63,7 @@ abstract contract Setup is
     DebtToken debtToken;
     Delegation delegation;
     FeeAuction feeAuction;
-    Lender lender;
+    LenderWrapper lender;
     MockAaveDataProvider mockAaveDataProvider;
     MockChainlinkPriceFeed mockChainlinkPriceFeed;
     MockNetworkMiddleware mockNetworkMiddleware;
@@ -94,7 +97,6 @@ abstract contract Setup is
         env.infra = _deployInfra(env.implems, env.users, 1 days);
 
         accessControl = AccessControl(env.infra.accessControl);
-        lender = Lender(env.infra.lender);
         delegation = Delegation(env.infra.delegation);
         oracle = Oracle(env.infra.oracle);
 
@@ -127,6 +129,12 @@ abstract contract Setup is
         /// ACCESS CONTROL
         _initInfraAccessControl(env.infra, env.users);
         _initVaultAccessControl(env.infra, env.usdVault, env.users);
+
+        // Lets us use the additional getters in LenderWrapper for properties without having to change their existing deployment files
+        address newLenderImplementation = address(new LenderWrapper());
+        vm.prank(env.users.access_control_admin);
+        Lender(env.infra.lender).upgradeToAndCall(newLenderImplementation, "");
+        lender = LenderWrapper(env.infra.lender);
 
         /// ORACLE
         _initVaultOracle(env.libs, env.infra, env.usdVault);
