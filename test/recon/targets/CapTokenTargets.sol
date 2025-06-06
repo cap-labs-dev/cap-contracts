@@ -162,6 +162,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         uint256 capTokenBalanceBefore = capToken.balanceOf(_receiver);
         uint256 insuranceFundBalanceBefore = capToken.balanceOf(vault.insuranceFund());
         (uint256 expectedAmountOut,) = capToken.getMintAmount(_asset, _amountIn);
+        bool isAssetPaused = capToken.paused(_asset);
 
         vm.prank(_getActor());
         try capToken.mint(_asset, _amountIn, _minAmountOut, _receiver, _deadline) returns (uint256 amountOut) {
@@ -189,12 +190,14 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             if (!IMinter(address(vault)).whitelisted(_getActor())) {
                 gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when minting");
             }
+            t(!isAssetPaused, "asset can be minted when it is paused");
         } catch (bytes memory err) {
             bool expectedError = checkError(err, "PastDeadline()")
                 || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()")
                 || checkError(err, "AssetNotSupported(address)");
-            bool isPaused = capToken.paused();
-            if (!expectedError && _amountIn > 0 && !isPaused) {
+            bool isProtocolPaused = capToken.paused();
+
+            if (!expectedError && _amountIn > 0 && !isProtocolPaused && !isAssetPaused) {
                 lt(assetBalance, _amountIn, "user cannot mint with sufficient asset balance");
             }
         }
@@ -264,8 +267,9 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         } catch (bytes memory err) {
             bool expectedError = checkError(err, "InvalidMinAmountsOut()") || checkError(err, "PastDeadline()")
                 || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()");
-            bool isPaused = capToken.paused();
-            if (!expectedError && _amountIn > 0 && !isPaused) {
+            bool isProtocolPaused = capToken.paused();
+
+            if (!expectedError && _amountIn > 0 && !isProtocolPaused) {
                 lt(capTokenBalanceBefore, _amountIn, "user cannot redeem with sufficient cap token balance");
             }
         }

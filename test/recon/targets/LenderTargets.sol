@@ -41,12 +41,17 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender.addAsset(_params);
     }
 
+    /// @dev Property: Asset cannot be borrowed when it is paused
     function lender_borrow(address _asset, uint256 _amount, address _receiver)
         public
         updateGhostsWithType(OpType.BORROW)
         asAgent
     {
-        lender.borrow(_asset, _amount, _receiver);
+        try lender.borrow(_asset, _amount, _receiver) {
+            bool isProtocolPaused = capToken.paused();
+            bool isAssetPaused = capToken.paused(_asset);
+            t(!isProtocolPaused && !isAssetPaused, "asset can be borrowed when it is paused");
+        } catch { }
     }
 
     function lender_cancelLiquidation(address _agent) public updateGhosts asActor {
