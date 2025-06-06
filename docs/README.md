@@ -7,6 +7,7 @@ This documentation provides comprehensive diagrams and schemas for the Cap Proto
 1. [Contract Architecture](./contract-architecture.md) - High-level contract categories and their interactions
 2. [Actors and Interactions](./actors-interactions.md) - System actors and their possible interactions
 3. [Code Map](./code-map.md) - Detailed code structure and organization
+4. [System Invariants](./system-invariants.md) - Critical invariants for all actors and system components
 
 ## Overview
 
@@ -33,4 +34,12 @@ The protocol follows a modular architecture with:
 - **Lender**: Credit facilities for agents
 - **Delegation**: Staking and slashing mechanics
 - **Oracle**: Price and rate discovery
-- **Fee Management**: Revenue distribution and auctions 
+- **Fee Management**: Revenue distribution and auctions
+
+## Security & Correctness
+
+The protocol maintains security through:
+- **55 Critical Invariants**: Comprehensive invariant system covering all actors and components
+- **Continuous Monitoring**: Automated checks and alert systems
+- **Economic Safeguards**: Grace periods, liquidation bonuses, and emergency controls
+- **Formal Verification**: Rigorous testing including fuzzing and invariant testing 
