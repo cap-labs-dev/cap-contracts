@@ -95,8 +95,15 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender.initiateLiquidation(_agent);
     }
 
+    /// @dev Property: agent should not be liquidatable with health > 1e27
     function lender_liquidate(address _agent, address _asset, uint256 _amount) public updateGhosts asActor {
-        lender.liquidate(_agent, _asset, _amount);
+        (,,,,, uint256 healthBefore) = ILender(address(lender)).agent(agent);
+
+        try lender.liquidate(_agent, _asset, _amount) {
+            if (healthBefore > 1e27) {
+                t(false, "agent should not be liquidatable with health > 1e27");
+            }
+        } catch { }
     }
 
     function lender_pauseAsset(address _asset, bool _pause) public updateGhosts asAdmin {
@@ -104,7 +111,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     }
 
     /// @dev Property: realizeInterest should only revert with ZeroRealization if paused or totalUnrealizedInterest == 0, otherwise should always update the realization value
-    function lender_realizeInterest(address _asset) public asActor {
+    function lender_realizeInterest(address _asset) public updateGhostsWithType(OpType.REALIZE_INTEREST) asActor {
         try lender.realizeInterest(_asset) {
             // success
         } catch (bytes memory reason) {
@@ -119,7 +126,11 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         }
     }
 
-    function lender_realizeRestakerInterest(address _agent, address _asset) public updateGhosts asActor {
+    function lender_realizeRestakerInterest(address _agent, address _asset)
+        public
+        updateGhostsWithType(OpType.REALIZE_INTEREST)
+        asActor
+    {
         lender.realizeRestakerInterest(_agent, _asset);
     }
 

@@ -8,6 +8,8 @@ import { console2 } from "forge-std/console2.sol";
 import { IDelegation } from "contracts/interfaces/IDelegation.sol";
 import { IFractionalReserve } from "contracts/interfaces/IFractionalReserve.sol";
 import { ILender } from "contracts/interfaces/ILender.sol";
+import { INetworkMiddleware } from "contracts/interfaces/INetworkMiddleware.sol";
+import { IOracle } from "contracts/interfaces/IOracle.sol";
 import { IVault } from "contracts/interfaces/IVault.sol";
 import { Lender } from "contracts/lendingPool/Lender.sol";
 
@@ -153,6 +155,78 @@ abstract contract Properties is BeforeAfter, Asserts {
             if (totalDebtTokenSupply == 0) {
                 eq(totalDebt, 0, "total debt != 0");
             }
+        }
+    }
+
+    /// @dev Property: loaned assets value < delegations value (strictly) or the position is liquidatable
+    // NOTE: will probably trivially break because the oracle price can be changed by the fuzzer
+    function property_borrowed_asset_value() public {
+        address[] memory agents = IDelegation(address(delegation)).agents();
+        for (uint256 i; i < agents.length; ++i) {
+            // Get the agent's debt for the asset
+            uint256 agentDebt = ILender(address(lender)).debt(agents[i], _getAsset());
+            // Get the asset price from the oracle to calculate value
+            (uint256 assetPrice,) = IOracle(address(oracle)).getPrice(_getAsset());
+            // Calculate the value in USD (8 decimals)
+            uint256 debtValue = agentDebt * assetPrice / (10 ** MockERC20(_getAsset()).decimals());
+
+            (uint256 coverageValue, uint256 coverage) = INetworkMiddleware(mockNetworkMiddleware).coverageByVault(
+                address(0), agents[i], env.usdVault.capToken, address(0), uint48(0)
+            );
+
+            // check if the value of the loaned amount is < the coverage value
+            if (debtValue < coverageValue) {
+                // if true, the position must be liquidatable
+                (,,,,, uint256 health) = ILender(address(lender)).agent(agents[i]);
+                // check if the position is liquidatable
+                lt(health, 1e27, "position is not liquidatable");
+            }
+        }
+    }
+
+    /// @dev Property: LTV is always <= 1e27
+    function property_ltv() public {
+        address[] memory agents = IDelegation(address(delegation)).agents();
+        for (uint256 i; i < agents.length; ++i) {
+            (,,,, uint256 ltv,) = ILender(address(lender)).agent(agents[i]);
+            lte(ltv, 1e27, "ltv > 1e27");
+        }
+    }
+
+    /// @dev Property: health should not change when interest is realized
+    function property_health_not_changed_with_realizeInterest() public {
+        if (currentOperation == OpType.REALIZE_INTEREST) {
+            eq(_after.agentHealth[_getActor()], _before.agentHealth[_getActor()], "health changed with realizeInterest");
+        }
+    }
+
+    /// @dev Property: agent'stotal debt should not change when interest is realized
+    function property_total_debt_not_changed_with_realizeInterest() public {
+        if (currentOperation == OpType.REALIZE_INTEREST) {
+            eq(
+                _after.agentTotalDebt[_getActor()],
+                _before.agentTotalDebt[_getActor()],
+                "total debt changed with realizeInterest"
+            );
+        }
+    }
+
+    /// @dev Property: The vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized
+    function property_vault_debt_increase() public {
+        if (currentOperation == OpType.REALIZE_INTEREST) {
+            uint256 debtIncrease = _after.totalVaultDebt[_getAsset()] - _before.totalVaultDebt[_getAsset()];
+            uint256 assetDecrease = _before.vaultAssetBalance - _after.vaultAssetBalance;
+            eq(debtIncrease, assetDecrease, "vault debt increase != asset decrease");
+        }
+    }
+
+    /// @dev Property: The debt token balance of the agent should increase by the same amount that the total borrows of the asset increases when interest is realized
+    function property_debt_increase_after_realizing_interest() public {
+        if (currentOperation == OpType.REALIZE_INTEREST) {
+            uint256 debtIncrease =
+                _after.debtTokenBalance[_getAsset()][_getActor()] - _before.debtTokenBalance[_getAsset()][_getActor()];
+            uint256 borrowsIncrease = _after.totalBorrows[_getAsset()] - _before.totalBorrows[_getAsset()];
+            eq(debtIncrease, borrowsIncrease, "debt increase != borrows increase");
         }
     }
 }
