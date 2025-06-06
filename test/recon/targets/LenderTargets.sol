@@ -14,9 +14,13 @@ import "contracts/lendingPool/Lender.sol";
 
 import { BeforeAfter, OpType } from "../BeforeAfter.sol";
 import { Properties } from "../Properties.sol";
+
+import { DebtToken } from "contracts/lendingPool/tokens/DebtToken.sol";
 import { LenderWrapper } from "test/recon/helpers/LenderWrapper.sol";
 
 abstract contract LenderTargets is BaseTargetFunctions, Properties {
+    uint256 constant RAY = 1e27;
+
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
     function lender_borrow_clamped(uint256 _amount) public {
         lender_borrow(_getAsset(), _amount, agent);
@@ -45,16 +49,42 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     }
 
     /// @dev Property: Asset cannot be borrowed when it is paused
+    /// @dev Property: Borrower should be healthy after borrowing (self-liquidation)
+    /// @dev Property: Borrower asset balance should increase after borrowing
+    /// @dev Property: Borrower debt should increase after borrowing
+    /// @dev Property: Total borrows should increase after borrowing
     function lender_borrow(address _asset, uint256 _amount, address _receiver)
         public
         updateGhostsWithType(OpType.BORROW)
         asAgent
     {
+        uint256 beforeAssetBalance = MockERC20(_asset).balanceOf(_receiver);
+        (,, address _debtToken,,,,) = lender.reservesData(_asset);
+        uint256 beforeBorrowerDebt = DebtToken(_debtToken).balanceOf(agent);
+        uint256 beforeTotalBorrows = capToken.totalBorrows(_asset);
+        vm.prank(agent);
         try lender.borrow(_asset, _amount, _receiver) {
             bool isProtocolPaused = capToken.paused();
             bool isAssetPaused = capToken.paused(_asset);
             t(!isProtocolPaused && !isAssetPaused, "asset can be borrowed when it is paused");
-        } catch { }
+            (,,,,, uint256 health) = lender.agent(agent);
+            gt(health, RAY, "Borrower is unhealthy after borrowing");
+            eq(
+                capToken.totalBorrows(_asset),
+                beforeTotalBorrows + _amount,
+                "Total borrows did not increase after borrowing"
+            );
+            gt(
+                DebtToken(_debtToken).balanceOf(agent),
+                beforeBorrowerDebt,
+                "Borrower debt did not increase after borrowing"
+            );
+            eq(
+                MockERC20(_asset).balanceOf(_receiver),
+                beforeAssetBalance + _amount,
+                "Borrower asset balance did not increase after borrowing"
+            );
+        } catch (bytes memory err) { }
     }
 
     function lender_cancelLiquidation(address _agent) public updateGhosts asActor {

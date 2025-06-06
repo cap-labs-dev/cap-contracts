@@ -28,3 +28,7 @@
 | 26 | lender_repay | Repay should never revert due to under/overflow | |
 | 27 | lender_realizeInterest | realizeInterest should only revert with `ZeroRealization()` if paused or `totalUnrealizedInterest == 0`, otherwise should always update the realization value | |
 | 28 | lender_borrow | Asset cannot be borrowed when it is paused | |
+| 29 | lender_borrow | Borrower should be healthy after borrowing (self-liquidation) | |
+| 30 | lender_borrow | Borrower asset balance should increase after borrowing | |
+| 31 | lender_borrow | Borrower debt should increase after borrowing | |
+| 32 | lender_borrow | Total borrows should increase after borrowing | |
