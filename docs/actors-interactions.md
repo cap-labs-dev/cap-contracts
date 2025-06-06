@@ -57,10 +57,10 @@ graph LR
     Vault --> |withdraw assets| User
     
     subgraph "User Actions"
-        A[mint() - Deposit assets for cTokens]
-        B[burn() - Redeem specific asset]
-        C[redeem() - Redeem bundle of assets]
-        D[stake() - Stake cTokens for rewards]
+        A["mint - Deposit assets for cTokens"]
+        B["burn - Redeem specific asset"]
+        C["redeem - Redeem bundle of assets"]
+        D["stake - Stake cTokens for rewards"]
     end
 ```
 

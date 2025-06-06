@@ -313,10 +313,10 @@ graph TB
         NewImpl[New Implementation]
     end
     
-    Proxy --> Implementation : delegatecall
-    Proxy --> Storage : persistent state
-    Admin --> Proxy : upgrade(newImplementation)
-    Admin --> NewImpl : deploy new version
+    Proxy --> |delegatecall| Implementation
+    Proxy --> |persistent state| Storage
+    Admin --> |upgrade newImplementation| Proxy
+    Admin --> |deploy new version| NewImpl
     
     note1[All user calls go to Proxy]
     note2[Logic in Implementation]
