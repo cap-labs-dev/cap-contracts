@@ -28,3 +28,8 @@
 | 26 | lender_repay | Repay should never revert due to under/overflow | |
 | 27 | lender_realizeInterest | realizeInterest should only revert with `ZeroRealization()` if paused or `totalUnrealizedInterest == 0`, otherwise should always update the realization value | |
 | 28 | lender_borrow | Asset cannot be borrowed when it is paused | |
+| 29 | property_borrowed_asset_value | loaned assets value < delegations value (strictly) or the position is liquidatable | |
+| 30 | property_health_not_changed_with_realizeInterest | health should not change when interest is realized | |
+| 31 | property_total_debt_not_changed_with_realizeInterest | agent's total debt should not change when interest is realized | |
+| 32 | property_vault_debt_increase | The vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized | |
+| 33 | property_debt_increase_after_realizing_interest | The debt token balance of the agent should increase by the same amount that the total borrows of the asset increases when interest is realized | |
