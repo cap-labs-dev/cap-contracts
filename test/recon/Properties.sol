@@ -74,21 +74,19 @@ abstract contract Properties is BeforeAfter, Asserts {
         gte(_after.utilizationIndex[_getAsset()], _before.utilizationIndex[_getAsset()], "utilization index decreased");
     }
 
-    /// @dev Property: Utilization ratio only decreases after a borrow
+    /// @dev Property: Utilization ratio only increases after a borrow
     function property_utilization_ratio() public {
-        // precondition: total borrows increases
-        if (_after.totalBorrows[_getAsset()] > _before.totalBorrows[_getAsset()]) {
-            lt(
+        if (currentOperation == OpType.BORROW) {
+            gt(
                 _after.utilizationRatio[_getAsset()],
                 _before.utilizationRatio[_getAsset()],
-                "utilization ratio increased after a borrow"
+                "utilization ratio decreased after a borrow"
             );
         } else {
-            // precondition: total borrows does not increase
             gte(
-                _after.utilizationRatio[_getAsset()],
                 _before.utilizationRatio[_getAsset()],
-                "utilization ratio decreased without a borrow"
+                _after.utilizationRatio[_getAsset()],
+                "utilization ratio increased without a borrow"
             );
         }
     }

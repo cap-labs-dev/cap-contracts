@@ -21,5 +21,5 @@
 | 19 | capToken_burn | Fees are always nonzero when burning | |
 | 20 | capToken_burn | Fees are always <= the amount out | |
 | 21 | property_utilization_index_only_increases | Utilization index only increases | |
-| 22 | property_utilization_ratio | Utilization ratio only decreases after a borrow | |
+| 22 | property_utilization_ratio | Utilization ratio only increases after a borrow | |
 | 23 | property_vault_balance_does_not_change_redeemAmountsOut | If the vault invests/divests it shouldn't change the redeem amounts out | |

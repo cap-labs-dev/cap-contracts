@@ -54,13 +54,17 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
 
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
-    function capToken_addAsset(address _asset) public updateGhosts asActor {
-        require(_asset != address(0), "asset cannot be the zero address");
-        capToken.addAsset(_asset);
+    function capToken_addAsset() public updateGhosts asActor {
+        capToken.addAsset(_getAsset());
     }
 
-    function capToken_approve(address spender, uint256 value) public updateGhosts asActor {
-        capToken.approve(spender, value);
+    function capToken_approve(address spender, uint256 value) public asActor {
+        bool value0;
+        try capToken.approve(spender, value) returns (bool tempValue0) {
+            value0 = tempValue0;
+        } catch {
+            t(false, "capToken_approve");
+        }
     }
 
     // @audit info: This function can only be called by the Lender contract to borrow assets.
@@ -124,8 +128,10 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             }
         } catch (bytes memory err) {
             bool expectedError = checkError(err, "PastDeadline()")
-                || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()");
-            if (!expectedError && _amountIn > 0) {
+                || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()")
+                || checkError(err, "AssetNotSupported(address)");
+            bool isPaused = capToken.paused();
+            if (!expectedError && _amountIn > 0 && !isPaused) {
                 lt(capTokenBalanceBefore, _amountIn, "user cannot burn with sufficient cap token balance");
             }
         }
@@ -185,8 +191,10 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             }
         } catch (bytes memory err) {
             bool expectedError = checkError(err, "PastDeadline()")
-                || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()");
-            if (!expectedError && _amountIn > 0) {
+                || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()")
+                || checkError(err, "AssetNotSupported(address)");
+            bool isPaused = capToken.paused();
+            if (!expectedError && _amountIn > 0 && !isPaused) {
                 lt(assetBalance, _amountIn, "user cannot mint with sufficient asset balance");
             }
         }
@@ -256,7 +264,8 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         } catch (bytes memory err) {
             bool expectedError = checkError(err, "InvalidMinAmountsOut()") || checkError(err, "PastDeadline()")
                 || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()");
-            if (!expectedError && _amountIn > 0) {
+            bool isPaused = capToken.paused();
+            if (!expectedError && _amountIn > 0 && !isPaused) {
                 lt(capTokenBalanceBefore, _amountIn, "user cannot redeem with sufficient cap token balance");
             }
         }

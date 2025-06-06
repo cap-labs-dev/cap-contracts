@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: GPL-2.0
 pragma solidity ^0.8.0;
 
-import { BeforeAfter } from "../BeforeAfter.sol";
-import { Properties } from "../Properties.sol";
-import { BaseTargetFunctions } from "@chimera/BaseTargetFunctions.sol";
 // Chimera deps
+import { BaseTargetFunctions } from "@chimera/BaseTargetFunctions.sol";
 import { vm } from "@chimera/Hevm.sol";
 
 // Helpers
 import { Panic } from "@recon/Panic.sol";
 
 import "contracts/lendingPool/Lender.sol";
+
+import { BeforeAfter, OpType } from "../BeforeAfter.sol";
+import { Properties } from "../Properties.sol";
 
 abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
@@ -36,43 +37,47 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
-    function lender_addAsset(ILender.AddAssetParams memory _params) public asAdmin {
+    function lender_addAsset(ILender.AddAssetParams memory _params) public updateGhosts asAdmin {
         lender.addAsset(_params);
     }
 
-    function lender_borrow(address _asset, uint256 _amount, address _receiver) public asAgent {
+    function lender_borrow(address _asset, uint256 _amount, address _receiver)
+        public
+        updateGhostsWithType(OpType.BORROW)
+        asAgent
+    {
         lender.borrow(_asset, _amount, _receiver);
     }
 
-    function lender_cancelLiquidation(address _agent) public asActor {
+    function lender_cancelLiquidation(address _agent) public updateGhosts asActor {
         lender.cancelLiquidation(_agent);
     }
 
-    function lender_initiateLiquidation(address _agent) public asActor {
+    function lender_initiateLiquidation(address _agent) public updateGhosts asActor {
         lender.initiateLiquidation(_agent);
     }
 
-    function lender_liquidate(address _agent, address _asset, uint256 _amount) public asActor {
+    function lender_liquidate(address _agent, address _asset, uint256 _amount) public updateGhosts asActor {
         lender.liquidate(_agent, _asset, _amount);
     }
 
-    function lender_pauseAsset(address _asset, bool _pause) public asAdmin {
+    function lender_pauseAsset(address _asset, bool _pause) public updateGhosts asAdmin {
         lender.pauseAsset(_asset, _pause);
     }
 
-    function lender_realizeInterest(address _asset) public asActor {
+    function lender_realizeInterest(address _asset) public updateGhosts asActor {
         lender.realizeInterest(_asset);
     }
 
-    function lender_realizeRestakerInterest(address _agent, address _asset) public asActor {
+    function lender_realizeRestakerInterest(address _agent, address _asset) public updateGhosts asActor {
         lender.realizeRestakerInterest(_agent, _asset);
     }
 
-    function lender_removeAsset(address _asset) public asAdmin {
+    function lender_removeAsset(address _asset) public updateGhosts asAdmin {
         lender.removeAsset(_asset);
     }
 
-    function lender_repay(address _asset, uint256 _amount, address _agent) public asActor {
+    function lender_repay(address _asset, uint256 _amount, address _agent) public updateGhosts asActor {
         lender.repay(_asset, _amount, _agent);
     }
 

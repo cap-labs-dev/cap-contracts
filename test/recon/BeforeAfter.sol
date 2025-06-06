@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0
 pragma solidity ^0.8.0;
 
+import { MockERC20 } from "@recon/MockERC20.sol";
+import { console2 } from "forge-std/console2.sol";
+
 import { Setup } from "./Setup.sol";
-import { MockERC20 } from "test/mocks/MockERC20.sol";
 
 enum OpType {
     GENERIC,
     INVEST,
-    DIVEST
+    DIVEST,
+    BORROW
 }
 
 // ghost variables for tracking state variable values before and after function calls
