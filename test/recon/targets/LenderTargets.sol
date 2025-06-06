@@ -2,16 +2,19 @@
 pragma solidity ^0.8.0;
 
 // Chimera deps
+// Chimera deps
 import { BaseTargetFunctions } from "@chimera/BaseTargetFunctions.sol";
 import { vm } from "@chimera/Hevm.sol";
 
 // Helpers
+import { MockERC20 } from "@recon/MockERC20.sol";
 import { Panic } from "@recon/Panic.sol";
 
 import "contracts/lendingPool/Lender.sol";
 
 import { BeforeAfter, OpType } from "../BeforeAfter.sol";
 import { Properties } from "../Properties.sol";
+import { LenderWrapper } from "test/recon/helpers/LenderWrapper.sol";
 
 abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
@@ -70,8 +73,20 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender.pauseAsset(_asset, _pause);
     }
 
-    function lender_realizeInterest(address _asset) public updateGhosts asActor {
-        lender.realizeInterest(_asset);
+    /// @dev Property: realizeInterest should only revert with ZeroRealization if paused or totalUnrealizedInterest == 0, otherwise should always update the realization value
+    function lender_realizeInterest(address _asset) public asActor {
+        try lender.realizeInterest(_asset) {
+            // success
+        } catch (bytes memory reason) {
+            bool zeroRealizationError = checkError(reason, "ZeroRealization()");
+
+            (,,,,, bool paused,) = ILender(address(lender)).reservesData(_asset);
+            uint256 totalUnrealizedInterest = LenderWrapper(address(lender)).getTotalUnrealizedInterest(_asset);
+
+            if (!paused && totalUnrealizedInterest != 0) {
+                t(!zeroRealizationError, "realizeInterest does not update when it should");
+            }
+        }
     }
 
     function lender_realizeRestakerInterest(address _agent, address _asset) public updateGhosts asActor {
@@ -82,8 +97,15 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender.removeAsset(_asset);
     }
 
-    function lender_repay(address _asset, uint256 _amount, address _agent) public updateGhosts asActor {
-        lender.repay(_asset, _amount, _agent);
+    /// @dev Property: Repay should never revert due to under/overflow
+    function lender_repay(address _asset, uint256 _amount, address _agent) public asActor {
+        try lender.repay(_asset, _amount, _agent) {
+            // success
+        } catch (bytes memory reason) {
+            bool underflowError = checkError(reason, Panic.arithmeticPanic);
+
+            t(!underflowError, "underflow error");
+        }
     }
 
     function lender_setMinBorrow(address _asset, uint256 _minBorrow) public asAdmin {
