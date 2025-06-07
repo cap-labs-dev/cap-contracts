@@ -207,6 +207,3 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender.setMinBorrow(_asset, _minBorrow);
     }
 }
-
-// 5000000000000000000000000
-// 500000000000000000000000000
