@@ -42,6 +42,47 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender_repay(_getAsset(), _amount, agent);
     }
 
+    /// Helper functions
+    function _verifyBorrowProperties(
+        address _asset,
+        uint256 _amount,
+        address _receiver,
+        uint256 beforeAssetBalance,
+        uint256 beforeBorrowerDebt,
+        uint256 beforeTotalBorrows
+    ) internal {
+        bool isProtocolPaused = capToken.paused();
+        bool isAssetPaused = capToken.paused(_asset);
+        t(!isProtocolPaused && !isAssetPaused, "asset can be borrowed when it is paused");
+
+        (,,,,, uint256 health) = lender.agent(agent);
+        gt(health, RAY, "Borrower is unhealthy after borrowing");
+
+        eq(
+            capToken.totalBorrows(_asset),
+            beforeTotalBorrows + _amount,
+            "Total borrows did not increase after borrowing"
+        );
+
+        (,, address _debtToken,,,,) = lender.reservesData(_asset);
+        gt(DebtToken(_debtToken).balanceOf(agent), beforeBorrowerDebt, "Borrower debt did not increase after borrowing");
+
+        eq(
+            MockERC20(_asset).balanceOf(_receiver),
+            beforeAssetBalance + _amount,
+            "Borrower asset balance did not increase after borrowing"
+        );
+
+        (uint256 assetPrice,) = oracle.getPrice(_asset);
+        (uint256 collateralValue,) = mockNetworkMiddleware.coverageByVault(address(0), agent, mockEth, address(0), 0);
+
+        lte(
+            (_amount * assetPrice / 10 ** MockERC20(_asset).decimals()) * RAY / collateralValue,
+            delegation.ltv(agent),
+            "Borrower can't borrow more than LTV"
+        );
+    }
+
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
     function lender_addAsset(
@@ -68,6 +109,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Borrower asset balance should increase after borrowing
     /// @dev Property: Borrower debt should increase after borrowing
     /// @dev Property: Total borrows should increase after borrowing
+    /// @dev Property: Borrower can't borrow more than LTV
     function lender_borrow(address _asset, uint256 _amount, address _receiver)
         public
         updateGhostsWithType(OpType.BORROW)
@@ -77,27 +119,11 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         (,, address _debtToken,,,,) = lender.reservesData(_asset);
         uint256 beforeBorrowerDebt = DebtToken(_debtToken).balanceOf(agent);
         uint256 beforeTotalBorrows = capToken.totalBorrows(_asset);
+
         vm.prank(agent);
         try lender.borrow(_asset, _amount, _receiver) {
-            bool isProtocolPaused = capToken.paused();
-            bool isAssetPaused = capToken.paused(_asset);
-            t(!isProtocolPaused && !isAssetPaused, "asset can be borrowed when it is paused");
-            (,,,,, uint256 health) = lender.agent(agent);
-            gt(health, RAY, "Borrower is unhealthy after borrowing");
-            eq(
-                capToken.totalBorrows(_asset),
-                beforeTotalBorrows + _amount,
-                "Total borrows did not increase after borrowing"
-            );
-            gt(
-                DebtToken(_debtToken).balanceOf(agent),
-                beforeBorrowerDebt,
-                "Borrower debt did not increase after borrowing"
-            );
-            eq(
-                MockERC20(_asset).balanceOf(_receiver),
-                beforeAssetBalance + _amount,
-                "Borrower asset balance did not increase after borrowing"
+            _verifyBorrowProperties(
+                _asset, _amount, _receiver, beforeAssetBalance, beforeBorrowerDebt, beforeTotalBorrows
             );
         } catch (bytes memory err) { }
     }
@@ -181,3 +207,6 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender.setMinBorrow(_asset, _minBorrow);
     }
 }
+
+// 5000000000000000000000000
+// 500000000000000000000000000

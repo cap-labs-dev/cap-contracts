@@ -19,6 +19,16 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     // forge test --match-test test_crytic -vvv
     function test_crytic() public {
         // TODO: add failing property tests here for debugging
+        switch_asset(0);
+        capToken_mint_clamped(125000e6);
+        (uint256 totalDelegation, uint256 totalSlashableCollateral, uint256 totalDebt,,, uint256 health) =
+            lender.agent(agent);
+        console2.log("totalDelegation:", totalDelegation);
+        console2.log("totalSlashableCollateral:", totalSlashableCollateral);
+        console2.log("totalDebt:", totalDebt);
+        console2.log("health:", health);
+        console2.log(lender.maxBorrowable(agent, _getAsset())); // should be 1250e18 but it is 1250e13 (in 8 decimals)
+        lender_borrow_clamped(125000000000);
     }
 
     function test_fractional_reserve_loss() public {
@@ -74,3 +84,5 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         property_vault_solvency_assets();
     }
 }
+//// 5000000000000000000000000
+//// 500000000000000000000000000

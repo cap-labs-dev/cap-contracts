@@ -12,6 +12,8 @@ import { AssetManager } from "@recon/AssetManager.sol";
 // Helpers
 
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
+import { MockERC20 } from "@recon/MockERC20.sol";
 import { Utils } from "@recon/Utils.sol";
 
 // Your deps
@@ -75,6 +77,7 @@ abstract contract Setup is
     uint256 ghostAmountOut;
 
     address agent = address(0xb0b);
+    address mockEth;
 
     /// === Setup === ///
     /// This contains all calls to be performed in the tester constructor, both for Echidna and Foundry
@@ -109,14 +112,19 @@ abstract contract Setup is
         /// Deploy mocks
         env.usdOracleMocks = OracleMocksConfig({
             assets: assets,
-            aaveDataProviders: new address[](assets.length),
-            chainlinkPriceFeeds: new address[](assets.length)
-        });
+            aaveDataProviders: new address[](assets.length + 1), // +1 for ETH
+            chainlinkPriceFeeds: new address[](assets.length + 1) // +1 for ETH
+         });
 
         for (uint256 i = 0; i < assets.length; i++) {
             env.usdOracleMocks.aaveDataProviders[i] = address(new MockAaveDataProvider());
             env.usdOracleMocks.chainlinkPriceFeeds[i] = address(new MockChainlinkPriceFeed(1e8));
         }
+        // Add ETH oracle mocks
+        mockEth = address(new MockERC20("Mock ETH", "mETH", 18));
+        env.usdOracleMocks.aaveDataProviders[assets.length] = address(new MockAaveDataProvider());
+        env.usdOracleMocks.chainlinkPriceFeeds[assets.length] = address(new MockChainlinkPriceFeed(2500e8));
+
         mockAaveDataProvider = MockAaveDataProvider(env.usdOracleMocks.aaveDataProviders[0]);
         mockChainlinkPriceFeed = MockChainlinkPriceFeed(env.usdOracleMocks.chainlinkPriceFeeds[0]);
 
@@ -145,6 +153,10 @@ abstract contract Setup is
             _initChainlinkPriceOracle(env.libs, env.infra, asset, chainlinkPriceFeed);
             _initAaveRateOracle(env.libs, env.infra, asset, aavePriceFeed);
         }
+        address chainlinkPriceFeed = env.usdOracleMocks.chainlinkPriceFeeds[assets.length];
+        address aavePriceFeed = env.usdOracleMocks.aaveDataProviders[assets.length];
+        _initChainlinkPriceOracle(env.libs, env.infra, mockEth, chainlinkPriceFeed);
+        _initAaveRateOracle(env.libs, env.infra, mockEth, aavePriceFeed);
         //  oracle.setRestakerRate(address(this), uint256(1.585e18 + 0.01585e18));
 
         /// LENDER
@@ -157,7 +169,8 @@ abstract contract Setup is
             optimalRatio: 0.33e27
         });
         _initVaultLender(env.usdVault, env.infra, fee);
-        mockNetworkMiddleware = new MockNetworkMiddleware();
+        mockNetworkMiddleware = new MockNetworkMiddleware(address(oracle));
+        mockNetworkMiddleware.registerVault(mockEth, address(stakedCap));
         delegation.registerNetwork(address(mockNetworkMiddleware));
 
         /// SETUP ACTORS
@@ -174,11 +187,14 @@ abstract contract Setup is
         for (uint i; i < _getActors().length; i++) {
             vm.prank(_getActors()[i]);
             capToken.approve(address(feeAuction), type(uint88).max);
+            vm.prank(_getActors()[i]);
+            MockERC20(mockEth).approve(address(mockNetworkMiddleware), type(uint88).max);
         }
 
         /// AGENT SETUP
         delegation.addAgent(agent, address(mockNetworkMiddleware), 0.5e27, 0.7e27);
-        mockNetworkMiddleware.addMockAgentCoverage(agent, address(capToken), 1e20);
+        mockNetworkMiddleware.registerAgent(agent, mockEth);
+        mockNetworkMiddleware.setMockCollateralByVault(agent, mockEth, 100e18);
         // @audit info: min(slashableCollateral, coverage) is needed for agent to be able to borrow
 
         _addLabels();
