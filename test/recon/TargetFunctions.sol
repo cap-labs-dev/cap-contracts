@@ -47,17 +47,17 @@ abstract contract TargetFunctions is
     MockERC4626TesterTargets
 {
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
-    function switchChainlinkOracle(uint256 entropy) external {
+    function switchChainlinkOracle(uint256 entropy) public {
         address target = env.usdOracleMocks.chainlinkPriceFeeds[entropy % env.usdOracleMocks.chainlinkPriceFeeds.length];
         mockChainlinkPriceFeed = MockChainlinkPriceFeed(target);
     }
 
-    function switchAaveOracle(uint256 entropy) external {
+    function switchAaveOracle(uint256 entropy) public {
         address target = env.usdOracleMocks.aaveDataProviders[entropy % env.usdOracleMocks.aaveDataProviders.length];
         mockAaveDataProvider = MockAaveDataProvider(target);
     }
 
-    function switchDebtToken(uint256 entropy) external {
+    function switchDebtToken(uint256 entropy) public {
         address target = env.usdVault.debtTokens[entropy % env.usdVault.debtTokens.length];
         debtToken = DebtToken(target);
     }

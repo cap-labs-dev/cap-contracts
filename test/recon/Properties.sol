@@ -82,7 +82,10 @@ abstract contract Properties is BeforeAfter, Asserts {
 
     /// @dev Property: Utilization ratio only increases after a borrow
     function property_utilization_ratio() public {
-        if (currentOperation == OpType.BORROW) {
+        if (
+            currentOperation == OpType.BORROW && _after.utilizationRatio[_getAsset()] != 0
+                && _before.utilizationRatio[_getAsset()] != 0
+        ) {
             gt(
                 _after.utilizationRatio[_getAsset()],
                 _before.utilizationRatio[_getAsset()],

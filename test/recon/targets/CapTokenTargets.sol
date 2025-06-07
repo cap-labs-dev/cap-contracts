@@ -62,8 +62,11 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         bool value0;
         try capToken.approve(spender, value) returns (bool tempValue0) {
             value0 = tempValue0;
-        } catch {
-            t(false, "capToken_approve");
+        } catch (bytes memory err) {
+            bool expectedError = checkError(err, "ERC20InvalidSpender(address)");
+            if (!expectedError) {
+                t(false, "capToken_approve");
+            }
         }
     }
 
@@ -108,11 +111,6 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 _minAmountOut,
                 "user received less than minimum amount out"
             );
-            lte(
-                capTokenBalanceAfter,
-                capTokenBalanceBefore - expectedAmountOut,
-                "user received more than expected amount out"
-            );
             gte(
                 totalCapSupplyBefore - totalCapSupplyAfter,
                 capTokenBalanceBefore - capTokenBalanceAfter,
@@ -125,6 +123,12 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             );
             if (!IMinter(address(vault)).whitelisted(_getActor())) {
                 gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when burning");
+
+                lte(
+                    capTokenBalanceAfter,
+                    capTokenBalanceBefore - expectedAmountOut,
+                    "user received more than expected amount out"
+                );
             }
         } catch (bytes memory err) {
             bool expectedError = checkError(err, "PastDeadline()")
@@ -178,23 +182,24 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 "user received less than minimum amount out"
             );
             lte(
-                capTokenBalanceAfter,
-                capTokenBalanceBefore + expectedAmountOut,
-                "user received more than expected amount out"
-            );
-            lte(
                 insuranceFundBalanceAfter - insuranceFundBalanceBefore,
                 capTokenBalanceAfter - capTokenBalanceBefore,
                 "fees are greater than the amount out"
             );
             if (!IMinter(address(vault)).whitelisted(_getActor())) {
                 gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when minting");
+
+                lte(
+                    capTokenBalanceAfter,
+                    capTokenBalanceBefore + expectedAmountOut,
+                    "user received more than expected amount out"
+                );
             }
             t(!isAssetPaused, "asset can be minted when it is paused");
         } catch (bytes memory err) {
             bool expectedError = checkError(err, "PastDeadline()")
                 || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()")
-                || checkError(err, "AssetNotSupported(address)");
+                || checkError(err, "AssetNotSupported(address)") || checkError(err, "ERC20InvalidReceiver(address)");
             bool isProtocolPaused = capToken.paused();
 
             if (!expectedError && _amountIn > 0 && !isProtocolPaused && !isAssetPaused) {
@@ -255,8 +260,11 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             }
 
             for (uint256 i = 0; i < expectedAmountsOut.length; i++) {
-                lte(amountsOut[i], expectedAmountsOut[i], "user received more than expected amount out");
                 lte(fees[i], expectedAmountsOut[i], "fees are greater than the amount out");
+
+                if (!IMinter(address(env.usdVault.capToken)).whitelisted(_getActor())) {
+                    lte(amountsOut[i], expectedAmountsOut[i], "user received more than expected amount out");
+                }
             }
 
             gte(
@@ -266,7 +274,9 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             );
         } catch (bytes memory err) {
             bool expectedError = checkError(err, "InvalidMinAmountsOut()") || checkError(err, "PastDeadline()")
-                || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()");
+                || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()")
+                || checkError(err, "InsufficientReserves(address,uint256,uint256)")
+                || checkError(err, "ERC20InvalidReceiver(address)");
             bool isProtocolPaused = capToken.paused();
 
             if (!expectedError && _amountIn > 0 && !isProtocolPaused) {

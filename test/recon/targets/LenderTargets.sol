@@ -44,8 +44,23 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
-    function lender_addAsset(ILender.AddAssetParams memory _params) public updateGhosts asAdmin {
-        lender.addAsset(_params);
+    function lender_addAsset(
+        address asset,
+        address vault,
+        address debtToken,
+        address interestReceiver,
+        uint256 bonusCap,
+        uint256 minBorrow
+    ) public updateGhosts asAdmin {
+        ILender.AddAssetParams memory params = ILender.AddAssetParams({
+            asset: asset,
+            vault: vault,
+            debtToken: debtToken,
+            interestReceiver: interestReceiver,
+            bonusCap: bonusCap,
+            minBorrow: minBorrow
+        });
+        lender.addAsset(params);
     }
 
     /// @dev Property: Asset cannot be borrowed when it is paused
