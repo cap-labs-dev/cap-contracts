@@ -37,3 +37,7 @@
 | 35 | property_total_debt_not_changed_with_realizeInterest | agent's total debt should not change when interest is realized | |
 | 36 | property_vault_debt_increase | The vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized | |
 | 37 | property_debt_increase_after_realizing_interest | The debt token balance of the agent should increase by the same amount that the total borrows of the asset increases when interest is realized | |
+| 38 | lender_initiateLiquidation | agent should not be liquidatable with health > 1e27 | |
+| 39 | lender_initiateLiquidation | Agent should always be liquidatable if it is unhealthy | |
+| 40 | lender_liquidate | agent should not be liquidatable with health > 1e27 | |
+| 41 | lender_liquidate | Liquidations should always improve the health factor | |

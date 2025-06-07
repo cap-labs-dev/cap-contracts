@@ -159,8 +159,6 @@ abstract contract Setup is
         _initVaultLender(env.usdVault, env.infra, fee);
         mockNetworkMiddleware = new MockNetworkMiddleware();
         delegation.registerNetwork(address(mockNetworkMiddleware));
-        mockNetworkMiddleware.setMockCoverage(address(this), 1_000_000e8);
-        mockNetworkMiddleware.setMockSlashableCollateral(address(this), 1_000_000e8);
 
         /// SETUP ACTORS
         _addActor(agent); // acts as user and agent
@@ -180,8 +178,7 @@ abstract contract Setup is
 
         /// AGENT SETUP
         delegation.addAgent(agent, address(mockNetworkMiddleware), 0.5e27, 0.7e27);
-        mockNetworkMiddleware.setMockSlashableCollateral(agent, 1e20);
-        mockNetworkMiddleware.setMockCoverage(agent, 1e20);
+        mockNetworkMiddleware.addMockAgentCoverage(agent, address(capToken), 1e20);
         // @audit info: min(slashableCollateral, coverage) is needed for agent to be able to borrow
 
         _addLabels();

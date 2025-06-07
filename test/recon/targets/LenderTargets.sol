@@ -91,11 +91,22 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender.cancelLiquidation(_agent);
     }
 
+    /// @dev Property: Agent should not be liquidatable with health > 1e27
+    /// @dev Property: Agent should always be liquidatable if it is unhealthy
     function lender_initiateLiquidation(address _agent) public updateGhosts asActor {
-        lender.initiateLiquidation(_agent);
+        (,,,,, uint256 healthBefore) = ILender(address(lender)).agent(agent);
+
+        try lender.initiateLiquidation(_agent) {
+            if (healthBefore > 1e27) {
+                t(false, "agent should not be liquidatable with health > 1e27");
+            }
+        } catch (bytes memory reason) {
+            t(healthBefore <= 1e27, "Agent should always be liquidatable if it is unhealthy");
+        }
     }
 
     /// @dev Property: agent should not be liquidatable with health > 1e27
+    /// @dev Property: Liquidations should always improve the health factor
     function lender_liquidate(address _agent, address _asset, uint256 _amount) public updateGhosts asActor {
         (,,,,, uint256 healthBefore) = ILender(address(lender)).agent(agent);
 
@@ -103,6 +114,8 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             if (healthBefore > 1e27) {
                 t(false, "agent should not be liquidatable with health > 1e27");
             }
+            (,,,,, uint256 healthAfter) = ILender(address(lender)).agent(agent);
+            gt(healthAfter, healthBefore, "Liquidation did not improve health factor");
         } catch { }
     }
 
