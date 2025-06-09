@@ -17,6 +17,6 @@ abstract contract MockNetworkMiddlewareTargets is BaseTargetFunctions, Propertie
 
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
     function mockNetworkMiddleware_setMockCollateralByVault(address _vault, uint256 _collateral) public asActor {
-        mockNetworkMiddleware.setMockCollateralByVault(agent, _vault, _collateral);
+        mockNetworkMiddleware.setMockCollateralByVault(_getActor(), _vault, _collateral);
     }
 }

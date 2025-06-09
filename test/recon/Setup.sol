@@ -76,7 +76,6 @@ abstract contract Setup is
     uint256 ghostAmountIn;
     uint256 ghostAmountOut;
 
-    address agent = address(0xb0b);
     address mockEth;
 
     /// === Setup === ///
@@ -174,7 +173,7 @@ abstract contract Setup is
         delegation.registerNetwork(address(mockNetworkMiddleware));
 
         /// SETUP ACTORS
-        _addActor(agent); // acts as user and agent
+        _addActor(address(0x0001)); // acts as user and agent
         address[] memory approvalArray = new address[](3);
         approvalArray[0] = address(capToken);
         approvalArray[1] = address(feeAuction);
@@ -189,13 +188,13 @@ abstract contract Setup is
             capToken.approve(address(feeAuction), type(uint88).max);
             vm.prank(_getActors()[i]);
             MockERC20(mockEth).approve(address(mockNetworkMiddleware), type(uint88).max);
-        }
 
-        /// AGENT SETUP
-        delegation.addAgent(agent, address(mockNetworkMiddleware), 0.5e27, 0.7e27);
-        mockNetworkMiddleware.registerAgent(agent, mockEth);
-        mockNetworkMiddleware.setMockCollateralByVault(agent, mockEth, 100e18); // @audit CLAMP - we provide initial collateral to network
-        // @audit info: min(slashableCollateral, coverage) is needed for agent to be able to borrow
+            /// AGENT SETUP
+            delegation.addAgent(_getActors()[i], address(mockNetworkMiddleware), 0.5e27, 0.7e27);
+            mockNetworkMiddleware.registerAgent(_getActors()[i], mockEth);
+            mockNetworkMiddleware.setMockCollateralByVault(_getActors()[i], mockEth, 100e18); // @audit CLAMP - we provide initial collateral to network
+                // @audit info: min(slashableCollateral, coverage) is needed for actor to be able to borrow
+        }
 
         _addLabels();
 
@@ -258,11 +257,6 @@ abstract contract Setup is
 
     modifier asActor() {
         vm.prank(address(_getActor()));
-        _;
-    }
-
-    modifier asAgent() {
-        vm.prank(agent);
         _;
     }
 }

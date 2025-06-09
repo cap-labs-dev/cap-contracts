@@ -2,10 +2,13 @@
 pragma solidity ^0.8.0;
 
 import { FoundryAsserts } from "@chimera/FoundryAsserts.sol";
-
-import "forge-std/console2.sol";
+import { MockERC20 } from "@recon/MockERC20.sol";
 
 import { TargetFunctions } from "./TargetFunctions.sol";
+
+import { ILender } from "contracts/interfaces/ILender.sol";
+import { IVault } from "contracts/interfaces/IVault.sol";
+import "forge-std/console2.sol";
 
 import { MockERC4626Tester } from "./targets/MockERC4626TesterTargets.sol";
 import { Test } from "forge-std/Test.sol";
@@ -73,6 +76,51 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         property_vault_solvency_assets();
     }
+
+    // forge test --match-test test_property_borrowed_asset_value_7 -vvv
+    // NOTE: broken before, fixed with new mockNetworkMiddleware
+    function test_property_borrowed_asset_value_7() public {
+        mockNetworkMiddleware_setMockCollateralByVault(0x0000000000000000000000000000000000000000, 1);
+
+        property_borrowed_asset_value();
+    }
+
+    // forge test --match-test test_property_debt_increase_after_realizing_interest_8 -vvv
+    // NOTE: this requires fixing the use of the agent and replacing with just actor in the handlers
+    function test_property_debt_increase_after_realizing_interest_8() public {
+        capToken_mint_clamped(10000886199);
+
+        lender_borrow_clamped(105137047);
+        (,, address debtToken,,,,) = ILender(address(lender)).reservesData(_getAsset());
+        console2.log("debt token balance", MockERC20(debtToken).balanceOf(_getActor()));
+        console2.log("debt token total supply", MockERC20(debtToken).totalSupply());
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+        lender_realizeInterest(0xD16d567549A2a2a2005aEACf7fB193851603dd70);
+        console2.log("debt token balance after", MockERC20(debtToken).balanceOf(_getActor()));
+        console2.log("debt token total supply after", MockERC20(debtToken).totalSupply());
+
+        uint256 debtIncrease =
+            _after.debtTokenBalance[_getAsset()][_getActor()] - _before.debtTokenBalance[_getAsset()][_getActor()];
+        uint256 borrowsIncrease = _after.totalBorrows[_getAsset()] - _before.totalBorrows[_getAsset()];
+        console2.log(
+            "_after.debtTokenBalance[_getAsset()][_getActor()]", _after.debtTokenBalance[_getAsset()][_getActor()]
+        );
+        console2.log(
+            "_before.debtTokenBalance[_getAsset()][_getActor()]", _before.debtTokenBalance[_getAsset()][_getActor()]
+        );
+        console2.log("_after.totalBorrows[_getAsset()]", _after.totalBorrows[_getAsset()]);
+        console2.log("_before.totalBorrows[_getAsset()]", _before.totalBorrows[_getAsset()]);
+
+        property_debt_increase_after_realizing_interest();
+    }
+
+    // forge test --match-test test_property_utilization_ratio_9 -vvv
+    function test_property_utilization_ratio_9() public {
+        capToken_mint_clamped(10002632831);
+
+        lender_borrow_clamped(100014152);
+
+        property_utilization_ratio();
+    }
 }
-//// 5000000000000000000000000
-//// 500000000000000000000000000

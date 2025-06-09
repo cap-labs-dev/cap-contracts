@@ -23,23 +23,23 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
     function lender_borrow_clamped(uint256 _amount) public {
-        lender_borrow(_getAsset(), _amount, agent);
+        lender_borrow(_getAsset(), _amount, _getActor());
     }
 
     function lender_initiateLiquidation_clamped() public {
-        lender_initiateLiquidation(agent);
+        lender_initiateLiquidation();
     }
 
     function lender_cancelLiquidation_clamped() public {
-        lender_cancelLiquidation(agent);
+        lender_cancelLiquidation();
     }
 
     function lender_liquidate_clamped(uint256 _amount) public {
-        lender_liquidate(agent, _getAsset(), _amount);
+        lender_liquidate(_getAsset(), _amount);
     }
 
     function lender_repay_clamped(uint256 _amount) public {
-        lender_repay(_getAsset(), _amount, agent);
+        lender_repay(_getAsset(), _amount);
     }
 
     /// Helper functions
@@ -55,7 +55,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         bool isAssetPaused = capToken.paused(_asset);
         t(!isProtocolPaused && !isAssetPaused, "asset can be borrowed when it is paused");
 
-        (,,,,, uint256 health) = lender.agent(agent);
+        (,,,,, uint256 health) = lender.agent(_getActor());
         gt(health, RAY, "Borrower is unhealthy after borrowing");
 
         eq(
@@ -65,7 +65,11 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         );
 
         (,, address _debtToken,,,,) = lender.reservesData(_asset);
-        gt(DebtToken(_debtToken).balanceOf(agent), beforeBorrowerDebt, "Borrower debt did not increase after borrowing");
+        gt(
+            DebtToken(_debtToken).balanceOf(_getActor()),
+            beforeBorrowerDebt,
+            "Borrower debt did not increase after borrowing"
+        );
 
         eq(
             MockERC20(_asset).balanceOf(_receiver),
@@ -74,11 +78,12 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         );
 
         (uint256 assetPrice,) = oracle.getPrice(_asset);
-        (uint256 collateralValue,) = mockNetworkMiddleware.coverageByVault(address(0), agent, mockEth, address(0), 0);
+        (uint256 collateralValue,) =
+            mockNetworkMiddleware.coverageByVault(address(0), _getActor(), mockEth, address(0), 0);
 
         lte(
             (_amount * assetPrice / 10 ** MockERC20(_asset).decimals()) * RAY / collateralValue,
-            delegation.ltv(agent),
+            delegation.ltv(_getActor()),
             "Borrower can't borrow more than LTV"
         );
     }
@@ -113,14 +118,14 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     function lender_borrow(address _asset, uint256 _amount, address _receiver)
         public
         updateGhostsWithType(OpType.BORROW)
-        asAgent
+        asActor
     {
         uint256 beforeAssetBalance = MockERC20(_asset).balanceOf(_receiver);
         (,, address _debtToken,,,,) = lender.reservesData(_asset);
-        uint256 beforeBorrowerDebt = DebtToken(_debtToken).balanceOf(agent);
+        uint256 beforeBorrowerDebt = DebtToken(_debtToken).balanceOf(_getActor());
         uint256 beforeTotalBorrows = capToken.totalBorrows(_asset);
 
-        vm.prank(agent);
+        vm.prank(_getActor());
         try lender.borrow(_asset, _amount, _receiver) {
             _verifyBorrowProperties(
                 _asset, _amount, _receiver, beforeAssetBalance, beforeBorrowerDebt, beforeTotalBorrows
@@ -128,16 +133,16 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         } catch (bytes memory err) { }
     }
 
-    function lender_cancelLiquidation(address _agent) public updateGhosts asActor {
-        lender.cancelLiquidation(_agent);
+    function lender_cancelLiquidation() public updateGhosts asActor {
+        lender.cancelLiquidation(_getActor());
     }
 
     /// @dev Property: Agent should not be liquidatable with health > 1e27
     /// @dev Property: Agent should always be liquidatable if it is unhealthy
-    function lender_initiateLiquidation(address _agent) public updateGhosts asActor {
-        (,,,,, uint256 healthBefore) = ILender(address(lender)).agent(agent);
+    function lender_initiateLiquidation() public updateGhosts asActor {
+        (,,,,, uint256 healthBefore) = ILender(address(lender)).agent(_getActor());
 
-        try lender.initiateLiquidation(_agent) {
+        try lender.initiateLiquidation(_getActor()) {
             if (healthBefore > 1e27) {
                 t(false, "agent should not be liquidatable with health > 1e27");
             }
@@ -149,14 +154,15 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: agent should not be liquidatable with health > 1e27
     /// @dev Property: Liquidations should always improve the health factor
     /// @dev Property: Emergency liquidations should always be available when emergency health is below 1e27
-    function lender_liquidate(address _agent, address _asset, uint256 _amount) public updateGhosts asActor {
-        (uint256 totalDelegation,, uint256 totalDebt,,, uint256 healthBefore) = ILender(address(lender)).agent(agent);
+    function lender_liquidate(address _asset, uint256 _amount) public updateGhosts asActor {
+        (uint256 totalDelegation,, uint256 totalDebt,,, uint256 healthBefore) =
+            ILender(address(lender)).agent(_getActor());
 
-        try lender.liquidate(_agent, _asset, _amount) {
+        try lender.liquidate(_getActor(), _asset, _amount) {
             if (healthBefore > 1e27) {
                 t(false, "agent should not be liquidatable with health > 1e27");
             }
-            (,,,,, uint256 healthAfter) = ILender(address(lender)).agent(agent);
+            (,,,,, uint256 healthAfter) = ILender(address(lender)).agent(_getActor());
             gt(healthAfter, healthBefore, "Liquidation did not improve health factor");
         } catch {
             gte(
@@ -187,12 +193,12 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         }
     }
 
-    function lender_realizeRestakerInterest(address _agent, address _asset)
+    function lender_realizeRestakerInterest(address _asset)
         public
         updateGhostsWithType(OpType.REALIZE_INTEREST)
         asActor
     {
-        lender.realizeRestakerInterest(_agent, _asset);
+        lender.realizeRestakerInterest(_getActor(), _asset);
     }
 
     function lender_removeAsset(address _asset) public updateGhosts asAdmin {
@@ -200,8 +206,8 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     }
 
     /// @dev Property: Repay should never revert due to under/overflow
-    function lender_repay(address _asset, uint256 _amount, address _agent) public asActor {
-        try lender.repay(_asset, _amount, _agent) {
+    function lender_repay(address _asset, uint256 _amount) public asActor {
+        try lender.repay(_asset, _amount, _getActor()) {
             // success
         } catch (bytes memory reason) {
             bool underflowError = checkError(reason, Panic.arithmeticPanic);
