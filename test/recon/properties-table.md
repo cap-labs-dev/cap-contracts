@@ -41,3 +41,4 @@
 | 39 | lender_initiateLiquidation | Agent should always be liquidatable if it is unhealthy | |
 | 40 | lender_liquidate | agent should not be liquidatable with health > 1e27 | |
 | 41 | lender_liquidate | Liquidations should always improve the health factor | |
+| 42 | lender_liquidate | Emergency liquidations should always be available when emergency health is below 1e27 | |
