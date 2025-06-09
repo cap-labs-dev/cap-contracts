@@ -130,6 +130,8 @@ contract MockERC4626Tester is ERC4626 {
     uint8 public decimalsOffset;
     /// @dev Track total losses
     uint256 public totalLosses;
+    uint256 public lossOnWithdraw = 100;
+    uint256 public MAX_BPS = 10_000;
 
     constructor(address _asset) ERC4626(MockERC20(_asset)) { }
 
@@ -200,14 +202,22 @@ contract MockERC4626Tester is ERC4626 {
     function withdraw(uint256 assets, address receiver, address owner) public override returns (uint256) {
         _performRevertBehaviour(revertBehaviours[FunctionType.WITHDRAW]);
 
-        return super.withdraw(assets, receiver, owner);
+        uint256 shares = previewWithdraw(assets);
+        uint256 lossyAssets = assets - (assets * lossOnWithdraw / MAX_BPS);
+        _withdraw(msg.sender, receiver, owner, lossyAssets, shares);
+
+        return shares;
     }
 
     /// @dev Redeem shares, reverts as specified
     function redeem(uint256 shares, address receiver, address owner) public override returns (uint256) {
         _performRevertBehaviour(revertBehaviours[FunctionType.REDEEM]);
 
-        return super.redeem(shares, receiver, owner);
+        uint256 assets = previewRedeem(shares);
+        uint256 lossyAssets = assets - (assets * lossOnWithdraw / MAX_BPS);
+        _withdraw(msg.sender, receiver, owner, lossyAssets, shares);
+
+        return lossyAssets;
     }
 
     /// @dev Preview deposit, reverts as specified
