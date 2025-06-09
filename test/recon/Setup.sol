@@ -194,7 +194,7 @@ abstract contract Setup is
         /// AGENT SETUP
         delegation.addAgent(agent, address(mockNetworkMiddleware), 0.5e27, 0.7e27);
         mockNetworkMiddleware.registerAgent(agent, mockEth);
-        mockNetworkMiddleware.setMockCollateralByVault(agent, mockEth, 100e18);
+        mockNetworkMiddleware.setMockCollateralByVault(agent, mockEth, 100e18); // @audit CLAMP - we provide initial collateral to network
         // @audit info: min(slashableCollateral, coverage) is needed for agent to be able to borrow
 
         _addLabels();

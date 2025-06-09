@@ -15,6 +15,7 @@ import { Lender } from "contracts/lendingPool/Lender.sol";
 
 import { BeforeAfter, OpType } from "./BeforeAfter.sol";
 import { LenderWrapper } from "test/recon/helpers/LenderWrapper.sol";
+import { MockERC4626Tester } from "test/recon/mocks/MockERC4626Tester.sol";
 
 abstract contract Properties is BeforeAfter, Asserts {
     /// @dev Property: Sum of deposits is less than or equal to total supply
@@ -57,7 +58,7 @@ abstract contract Properties is BeforeAfter, Asserts {
                 MockERC20(assets[i]).balanceOf(IFractionalReserve(address(vault)).fractionalReserveVault(assets[i]));
             lte(
                 totalSupplied,
-                vaultBalance + totalBorrow + fractionalReserveBalance,
+                vaultBalance + totalBorrow + fractionalReserveBalance + MockERC4626Tester(_getVault()).totalLosses(),
                 "totalSupplies > vault balance + totalBorrows"
             );
         }
