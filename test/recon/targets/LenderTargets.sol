@@ -148,8 +148,9 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
     /// @dev Property: agent should not be liquidatable with health > 1e27
     /// @dev Property: Liquidations should always improve the health factor
+    /// @dev Property: Emergency liquidations should always be available when emergency health is below 1e27
     function lender_liquidate(address _agent, address _asset, uint256 _amount) public updateGhosts asActor {
-        (,,,,, uint256 healthBefore) = ILender(address(lender)).agent(agent);
+        (uint256 totalDelegation,, uint256 totalDebt,,, uint256 healthBefore) = ILender(address(lender)).agent(agent);
 
         try lender.liquidate(_agent, _asset, _amount) {
             if (healthBefore > 1e27) {
@@ -157,7 +158,13 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             }
             (,,,,, uint256 healthAfter) = ILender(address(lender)).agent(agent);
             gt(healthAfter, healthBefore, "Liquidation did not improve health factor");
-        } catch { }
+        } catch {
+            gte(
+                totalDelegation * lender.emergencyLiquidationThreshold() / totalDebt,
+                RAY,
+                "Emergency liquidations is not available when emergency health is below 1e27"
+            );
+        }
     }
 
     function lender_pauseAsset(address _asset, bool _pause) public updateGhosts asAdmin {
