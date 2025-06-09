@@ -200,53 +200,14 @@ contract MockERC4626Tester is ERC4626 {
     function withdraw(uint256 assets, address receiver, address owner) public override returns (uint256) {
         _performRevertBehaviour(revertBehaviours[FunctionType.WITHDRAW]);
 
-        // Calculate the actual assets we can return (might be less due to losses)
-        uint256 actualAssets = _calculateActualWithdrawAmount(assets);
-
-        // Calculate how many shares this withdrawal would burn
-        uint256 shares = previewWithdraw(actualAssets);
-
-        // Burn the shares
-        _burn(owner, shares);
-
-        // Transfer the actual assets (might be less than requested)
-        MockERC20(asset).transfer(receiver, actualAssets);
-
-        return actualAssets;
+        return super.withdraw(assets, receiver, owner);
     }
 
     /// @dev Redeem shares, reverts as specified
     function redeem(uint256 shares, address receiver, address owner) public override returns (uint256) {
         _performRevertBehaviour(revertBehaviours[FunctionType.REDEEM]);
 
-        // Calculate how many assets this redemption would return
-        uint256 assets = previewRedeem(shares);
-
-        // Calculate the actual assets we can return (might be less due to losses)
-        uint256 actualAssets = _calculateActualWithdrawAmount(assets);
-        uint256 actualShares = previewRedeem(actualAssets);
-
-        // Burn the shares
-        _burn(owner, actualShares);
-
-        // Transfer the actual assets (might be less than requested)
-        MockERC20(asset).transfer(receiver, actualAssets);
-
-        return actualAssets;
-    }
-
-    /// @dev Internal function to calculate actual withdraw amount based on losses
-    function _calculateActualWithdrawAmount(uint256 requestedAmount) internal view returns (uint256) {
-        // Get the actual balance we can return
-        uint256 actualBalance = MockERC20(asset).balanceOf(address(this));
-
-        // If we have enough balance, return the full amount
-        if (actualBalance >= requestedAmount) {
-            return requestedAmount;
-        }
-
-        // Otherwise return what we can
-        return actualBalance;
+        return super.redeem(shares, receiver, owner);
     }
 
     /// @dev Preview deposit, reverts as specified
