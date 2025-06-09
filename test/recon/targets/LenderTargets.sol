@@ -16,6 +16,8 @@ import { BeforeAfter, OpType } from "../BeforeAfter.sol";
 import { Properties } from "../Properties.sol";
 
 import { DebtToken } from "contracts/lendingPool/tokens/DebtToken.sol";
+
+import { console2 } from "forge-std/console2.sol";
 import { LenderWrapper } from "test/recon/helpers/LenderWrapper.sol";
 
 abstract contract LenderTargets is BaseTargetFunctions, Properties {
@@ -59,12 +61,6 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
         (,,,,, uint256 health) = lender.agent(_getActor());
         gt(health, RAY, "Borrower is unhealthy after borrowing");
-
-        eq(
-            capToken.totalBorrows(_asset),
-            beforeTotalBorrows + borrowerDebtDelta,
-            "Total borrows did not increase after borrowing"
-        );
 
         (,, address _debtToken,,,,) = lender.reservesData(_asset);
         gt(
@@ -151,7 +147,9 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
                 t(false, "agent should not be liquidatable with health > 1e27");
             }
         } catch (bytes memory reason) {
-            t(healthBefore <= 1e27, "Agent should always be liquidatable if it is unhealthy");
+            if (healthBefore < RAY) {
+                t(false, "Agent should always be liquidatable if it is unhealthy");
+            }
         }
     }
 

@@ -34,10 +34,11 @@ abstract contract ManagersTargets is BaseTargetFunctions, Properties {
     }
 
     /// @dev Deploy a new token and add it to the list of assets, then set it as the current asset
-    function add_new_asset(uint8 decimals) public returns (address) {
-        address newAsset = _newAsset(decimals);
-        return newAsset;
-    }
+    // NOTE: removed because introduces too many false positives
+    // function add_new_asset(uint8 decimals) public returns (address) {
+    //     address newAsset = _newAsset(decimals);
+    //     return newAsset;
+    // }
 
     /// === GHOST UPDATING HANDLERS ===///
     /// We `updateGhosts` cause you never know (e.g. donations)

@@ -81,7 +81,7 @@ abstract contract Properties is BeforeAfter, Asserts {
         gte(_after.utilizationIndex[_getAsset()], _before.utilizationIndex[_getAsset()], "utilization index decreased");
     }
 
-    /// @dev Property: Utilization ratio only increases after a borrow
+    /// @dev Property: Utilization ratio only increases after a borrow or realizing interest
     function property_utilization_ratio() public {
         // precondition: if the utilization ratio is 0 before and after, the borrowed amount was 0
         if (
@@ -91,7 +91,7 @@ abstract contract Properties is BeforeAfter, Asserts {
             return;
         }
 
-        if (currentOperation == OpType.BORROW) {
+        if (currentOperation == OpType.BORROW || currentOperation == OpType.REALIZE_INTEREST) {
             gt(
                 _after.utilizationRatio[_getAsset()],
                 _before.utilizationRatio[_getAsset()],

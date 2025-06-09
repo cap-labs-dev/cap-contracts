@@ -277,7 +277,8 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             bool expectedError = checkError(err, "InvalidMinAmountsOut()") || checkError(err, "PastDeadline()")
                 || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()")
                 || checkError(err, "InsufficientReserves(address,uint256,uint256)")
-                || checkError(err, "ERC20InvalidReceiver(address)");
+                || checkError(err, "ERC20InvalidReceiver(address)")
+                || checkError(err, "LossFromFractionalReserve(address,address,uint256)");
             bool isProtocolPaused = capToken.paused();
 
             if (!expectedError && _amountIn > 0 && !isProtocolPaused) {

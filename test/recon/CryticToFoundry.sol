@@ -154,4 +154,75 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         lender_repay_clamped(0);
     }
+
+    // forge test --match-test test_lender_liquidate_1 -vvv
+    function test_lender_liquidate_1() public {
+        capToken_mint_clamped(10003039659);
+
+        switchChainlinkOracle(2);
+
+        lender_borrow_clamped(101505219);
+
+        mockChainlinkPriceFeed_setLatestAnswer(172978832219520413055122);
+
+        lender_liquidate(0x0000000000000000000000000000000000000000, 0);
+    }
+
+    // forge test --match-test test_lender_liquidate_clamped_2 -vvv
+    function test_lender_liquidate_clamped_2() public {
+        capToken_mint_clamped(10020274632);
+
+        switchChainlinkOracle(2);
+
+        lender_borrow_clamped(1570244088);
+
+        mockChainlinkPriceFeed_setLatestAnswer(11150459009966507495810);
+
+        lender_liquidate_clamped(0);
+    }
+
+    // forge test --match-test test_lender_borrow_clamped_5 -vvv
+    function test_lender_borrow_clamped_5() public {
+        capToken_mint_clamped(10001602506);
+
+        lender_borrow_clamped(100171022);
+
+        vm.warp(block.timestamp + 1);
+
+        vm.roll(block.number + 1);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+    }
+
+    // forge test --match-test test_lender_repay_6 -vvv
+    // TODO: define some realistic bounds for the borrow rate so this doesn't trivially break
+    function test_lender_repay_6() public {
+        mockAaveDataProvider_setVariableBorrowRate(
+            57899629142092681212539648668816850347303020206421162146955475922475103470875
+        );
+
+        lender_repay(0x2a07706473244BC757E10F2a9E86fB532828afe3, 0);
+    }
+
+    // forge test --match-test test_capToken_mint_7 -vvv
+    // TODO: fix to use the currently set min fee instead of 0 by default
+    function test_capToken_mint_7() public {
+        switchChainlinkOracle(2);
+
+        mockChainlinkPriceFeed_setLatestAnswer(500014818870012950);
+        console2.log("latest answer: %e", uint256(500014818870012950)); // 5.0001481887001295e17
+
+        capToken_mint(
+            0xD16d567549A2a2a2005aEACf7fB193851603dd70, 2, 0, 0x00000000000000000000000000000000DeaDBeef, 1525295799
+        );
+    }
+
+    // forge test --match-test test_capToken_mint_clamped_11 -vvv
+    // NOTE: mint just underflows for insufficient approvals
+    // should it throw a custom error instead?
+    function test_capToken_mint_clamped_11() public {
+        asset_approve(0x796f2974e3C1af763252512dd6d521E9E984726C, 0);
+
+        capToken_mint_clamped(10000304985);
+    }
 }
