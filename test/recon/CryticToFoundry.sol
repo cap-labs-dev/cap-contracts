@@ -86,11 +86,21 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     }
 
     // forge test --match-test test_property_debt_increase_after_realizing_interest_8 -vvv
-    // NOTE: this requires fixing the use of the agent and replacing with just actor in the handlers
+    // NOTE: come back to this, something is up with before/after updates
     function test_property_debt_increase_after_realizing_interest_8() public {
         capToken_mint_clamped(10000886199);
 
         lender_borrow_clamped(105137047);
+
+        // console2.log(
+        //     "before lender_realizeInterest _before.debtTokenBalance[_getAsset()][_getActor()]",
+        //     _before.debtTokenBalance[_getAsset()][_getActor()]
+        // );
+        // console2.log(
+        //     "before lender_realizeInterest _after.debtTokenBalance[_getAsset()][_getActor()]",
+        //     _after.debtTokenBalance[_getAsset()][_getActor()]
+        // );
+
         (,, address debtToken,,,,) = ILender(address(lender)).reservesData(_getAsset());
         console2.log("debt token balance", MockERC20(debtToken).balanceOf(_getActor()));
         console2.log("debt token total supply", MockERC20(debtToken).totalSupply());
@@ -100,27 +110,48 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         console2.log("debt token balance after", MockERC20(debtToken).balanceOf(_getActor()));
         console2.log("debt token total supply after", MockERC20(debtToken).totalSupply());
 
-        uint256 debtIncrease =
-            _after.debtTokenBalance[_getAsset()][_getActor()] - _before.debtTokenBalance[_getAsset()][_getActor()];
-        uint256 borrowsIncrease = _after.totalBorrows[_getAsset()] - _before.totalBorrows[_getAsset()];
-        console2.log(
-            "_after.debtTokenBalance[_getAsset()][_getActor()]", _after.debtTokenBalance[_getAsset()][_getActor()]
-        );
-        console2.log(
-            "_before.debtTokenBalance[_getAsset()][_getActor()]", _before.debtTokenBalance[_getAsset()][_getActor()]
-        );
-        console2.log("_after.totalBorrows[_getAsset()]", _after.totalBorrows[_getAsset()]);
-        console2.log("_before.totalBorrows[_getAsset()]", _before.totalBorrows[_getAsset()]);
+        // console2.log(
+        //     "after lender_realizeInterest _before.debtTokenBalance[_getAsset()][_getActor()]",
+        //     _before.debtTokenBalance[_getAsset()][_getActor()]
+        // );
+        // console2.log(
+        //     "after lender_realizeInterest _after.debtTokenBalance[_getAsset()][_getActor()]",
+        //     _after.debtTokenBalance[_getAsset()][_getActor()]
+        // );
 
         property_debt_increase_after_realizing_interest();
     }
 
-    // forge test --match-test test_property_utilization_ratio_9 -vvv
-    function test_property_utilization_ratio_9() public {
-        capToken_mint_clamped(10002632831);
+    // forge test --match-test test_capToken_burn_clamped_3 -vvv
+    // NOTE: seems like a real break with a user being able to burn without fees
+    function test_capToken_burn_clamped_3() public {
+        capToken_mint_clamped(20000551208);
 
-        lender_borrow_clamped(100014152);
+        capToken_burn_clamped(10000683817);
+    }
 
-        property_utilization_ratio();
+    // forge test --match-test test_capToken_mint_14 -vvv
+    // NOTE: similar to the above, but due to a change in price
+    function test_capToken_mint_14() public {
+        switchChainlinkOracle(2);
+
+        mockChainlinkPriceFeed_setLatestAnswer(500256233200780722);
+
+        capToken_mint(
+            0xD16d567549A2a2a2005aEACf7fB193851603dd70, 2, 0, 0x00000000000000000000000000000000DeaDBeef, 1525295799
+        );
+    }
+
+    // forge test --match-test test_lender_repay_clamped_6 -vvv
+    // NOTE: repay can revert due to underflow
+    // TODO: need to determine if the call sequence is realistic or needs further clamping
+    function test_lender_repay_clamped_6() public {
+        switchAaveOracle(2);
+
+        mockAaveDataProvider_setVariableBorrowRate(
+            57904238167892068531037184868122078708591352565700547569692866999400797589496
+        );
+
+        lender_repay_clamped(0);
     }
 }

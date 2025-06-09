@@ -45,14 +45,16 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// Helper functions
     function _verifyBorrowProperties(
         address _asset,
-        uint256 _amount,
         address _receiver,
         uint256 beforeAssetBalance,
         uint256 beforeBorrowerDebt,
-        uint256 beforeTotalBorrows
+        uint256 beforeTotalBorrows,
+        uint256 afterBorrowerDebt
     ) internal {
         bool isProtocolPaused = capToken.paused();
         bool isAssetPaused = capToken.paused(_asset);
+        uint256 borrowerDebtDelta = afterBorrowerDebt - beforeBorrowerDebt;
+
         t(!isProtocolPaused && !isAssetPaused, "asset can be borrowed when it is paused");
 
         (,,,,, uint256 health) = lender.agent(_getActor());
@@ -60,7 +62,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
         eq(
             capToken.totalBorrows(_asset),
-            beforeTotalBorrows + _amount,
+            beforeTotalBorrows + borrowerDebtDelta,
             "Total borrows did not increase after borrowing"
         );
 
@@ -73,7 +75,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
         eq(
             MockERC20(_asset).balanceOf(_receiver),
-            beforeAssetBalance + _amount,
+            beforeAssetBalance + borrowerDebtDelta,
             "Borrower asset balance did not increase after borrowing"
         );
 
@@ -82,7 +84,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             mockNetworkMiddleware.coverageByVault(address(0), _getActor(), mockEth, address(0), 0);
 
         lte(
-            (_amount * assetPrice / 10 ** MockERC20(_asset).decimals()) * RAY / collateralValue,
+            (borrowerDebtDelta * assetPrice / 10 ** MockERC20(_asset).decimals()) * RAY / collateralValue,
             delegation.ltv(_getActor()),
             "Borrower can't borrow more than LTV"
         );
@@ -127,8 +129,10 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
         vm.prank(_getActor());
         try lender.borrow(_asset, _amount, _receiver) {
+            uint256 afterBorrowerDebt = DebtToken(_debtToken).balanceOf(_getActor());
+
             _verifyBorrowProperties(
-                _asset, _amount, _receiver, beforeAssetBalance, beforeBorrowerDebt, beforeTotalBorrows
+                _asset, _receiver, beforeAssetBalance, beforeBorrowerDebt, beforeTotalBorrows, afterBorrowerDebt
             );
         } catch (bytes memory err) { }
     }

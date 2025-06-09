@@ -83,10 +83,15 @@ abstract contract Properties is BeforeAfter, Asserts {
 
     /// @dev Property: Utilization ratio only increases after a borrow
     function property_utilization_ratio() public {
+        // precondition: if the utilization ratio is 0 before and after, the borrowed amount was 0
         if (
-            currentOperation == OpType.BORROW && _after.utilizationRatio[_getAsset()] != 0
-                && _before.utilizationRatio[_getAsset()] != 0
+            currentOperation == OpType.BORROW && _before.utilizationRatio[_getAsset()] == 0
+                && _after.utilizationRatio[_getAsset()] == 0
         ) {
+            return;
+        }
+
+        if (currentOperation == OpType.BORROW) {
             gt(
                 _after.utilizationRatio[_getAsset()],
                 _before.utilizationRatio[_getAsset()],
@@ -204,7 +209,7 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
-    /// @dev Property: agent'stotal debt should not change when interest is realized
+    /// @dev Property: agent's total debt should not change when interest is realized
     function property_total_debt_not_changed_with_realizeInterest() public {
         if (currentOperation == OpType.REALIZE_INTEREST) {
             eq(
@@ -218,7 +223,7 @@ abstract contract Properties is BeforeAfter, Asserts {
     /// @dev Property: The vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized
     function property_vault_debt_increase() public {
         if (currentOperation == OpType.REALIZE_INTEREST) {
-            uint256 debtIncrease = _after.totalVaultDebt[_getAsset()] - _before.totalVaultDebt[_getAsset()];
+            uint256 debtIncrease = _after.vaultDebt[_getAsset()] - _before.vaultDebt[_getAsset()];
             uint256 assetDecrease = _before.vaultAssetBalance - _after.vaultAssetBalance;
             eq(debtIncrease, assetDecrease, "vault debt increase != asset decrease");
         }
@@ -227,6 +232,8 @@ abstract contract Properties is BeforeAfter, Asserts {
     /// @dev Property: The debt token balance of the agent should increase by the same amount that the total borrows of the asset increases when interest is realized
     function property_debt_increase_after_realizing_interest() public {
         if (currentOperation == OpType.REALIZE_INTEREST) {
+            console2.log("_after.debtTokenBalance", _after.debtTokenBalance[_getAsset()][_getActor()]);
+            console2.log("_before.debtTokenBalance", _before.debtTokenBalance[_getAsset()][_getActor()]);
             uint256 debtIncrease =
                 _after.debtTokenBalance[_getAsset()][_getActor()] - _before.debtTokenBalance[_getAsset()][_getActor()];
             uint256 borrowsIncrease = _after.totalBorrows[_getAsset()] - _before.totalBorrows[_getAsset()];

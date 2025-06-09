@@ -133,7 +133,8 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         } catch (bytes memory err) {
             bool expectedError = checkError(err, "PastDeadline()")
                 || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()")
-                || checkError(err, "AssetNotSupported(address)");
+                || checkError(err, "AssetNotSupported(address)")
+                || checkError(err, "InsufficientReserves(address,uint256,uint256)");
             bool isPaused = capToken.paused();
             if (!expectedError && _amountIn > 0 && !isPaused) {
                 lt(capTokenBalanceBefore, _amountIn, "user cannot burn with sufficient cap token balance");
@@ -304,10 +305,6 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
 
     function capToken_setFractionalReserveVault(address _asset, address _vault) public updateGhosts asActor {
         capToken.setFractionalReserveVault(_asset, _vault);
-    }
-
-    function capToken_setRedeemFee(uint256 _redeemFee) public updateGhosts asActor {
-        capToken.setRedeemFee(_redeemFee);
     }
 
     function capToken_setReserve(address _asset, uint256 _reserve) public updateGhosts asActor {

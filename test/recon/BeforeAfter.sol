@@ -7,6 +7,7 @@ import { console2 } from "forge-std/console2.sol";
 import { ILender } from "contracts/interfaces/ILender.sol";
 
 import { Setup } from "./Setup.sol";
+import { LenderWrapper } from "test/recon/helpers/LenderWrapper.sol";
 
 enum OpType {
     GENERIC,
@@ -22,7 +23,7 @@ abstract contract BeforeAfter is Setup {
         uint256 vaultAssetBalance;
         uint256[] redeemAmountsOut;
         mapping(address => mapping(address => uint256)) debtTokenBalance;
-        mapping(address => uint256) totalVaultDebt;
+        mapping(address => uint256) vaultDebt;
         mapping(address => uint256) agentHealth;
         mapping(address => uint256) agentTotalDebt;
         mapping(address => uint256) utilizationIndex;
@@ -55,6 +56,8 @@ abstract contract BeforeAfter is Setup {
         vars.utilizationRatio[_getAsset()] = capToken.utilization(_getAsset());
         vars.totalBorrows[_getAsset()] = capToken.totalBorrows(_getAsset());
         vars.vaultAssetBalance = MockERC20(_getAsset()).balanceOf(address(capToken));
+        vars.vaultDebt[_getAsset()] = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
+
         try capToken.getRedeemAmount(capToken.balanceOf(_getActor())) returns (
             uint256[] memory amountsOut, uint256[] memory redeemFees
         ) {
@@ -90,10 +93,9 @@ abstract contract BeforeAfter is Setup {
 
     function _updateVaultDebt(Vars storage vars) internal {
         // Get the debt token address for the current asset
-        (,, address debtToken,,,,) = ILender(address(lender)).reservesData(_getAsset());
+        (,, address debtToken,,,,) = lender.reservesData(_getAsset());
 
         // Store total debt as the debt token's total supply
-        vars.totalVaultDebt[_getAsset()] = MockERC20(debtToken).totalSupply();
         vars.debtTokenBalance[_getAsset()][_getActor()] = MockERC20(debtToken).balanceOf(_getActor());
     }
 }

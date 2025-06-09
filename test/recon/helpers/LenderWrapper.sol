@@ -12,4 +12,9 @@ contract LenderWrapper is Lender {
         ILender.ReserveData storage reserve = getLenderStorage().reservesData[_asset];
         return reserve.totalUnrealizedInterest;
     }
+
+    function getVaultDebt(address _asset) external view returns (uint256) {
+        ILender.ReserveData storage reserve = getLenderStorage().reservesData[_asset];
+        return reserve.debt;
+    }
 }
