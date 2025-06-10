@@ -236,4 +236,16 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         mockChainlinkPriceFeed_setLatestAnswer(2713282178368992834);
         lender_liquidate_clamped(1);
     }
+
+    // forge test --match-test test_capToken_redeem -vvv
+    // NOTE: Erc4626 withdraw fails due to underflow
+    function test_capToken_redeem() public {
+        add_new_vault();
+        capToken_setFractionalReserveVault_clamped();
+        capToken_mint_clamped(10028693653);
+        capToken_investAll_clamped();
+        mockERC4626Tester_mintUnbackedShares(101078819858991464161, address(0));
+
+        capToken_redeem(1, new uint256[](0), address(0), 0);
+    }
 }
