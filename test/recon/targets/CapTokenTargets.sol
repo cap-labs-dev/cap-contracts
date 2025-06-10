@@ -7,16 +7,14 @@ import { vm } from "@chimera/Hevm.sol";
 import { console2 } from "forge-std/console2.sol";
 
 // Helpers
+
+import { OpType } from "../BeforeAfter.sol";
+import { Properties } from "../Properties.sol";
 import { MockERC20 } from "@recon/MockERC20.sol";
 import { Panic } from "@recon/Panic.sol";
-
 import { IMinter } from "contracts/interfaces/IMinter.sol";
-import { IVault } from "contracts/interfaces/IVault.sol";
-import "contracts/token/CapToken.sol";
-import { VaultLogic } from "contracts/vault/libraries/VaultLogic.sol";
 
-import { BeforeAfter, OpType } from "../BeforeAfter.sol";
-import { Properties } from "../Properties.sol";
+import "contracts/token/CapToken.sol";
 
 abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
@@ -62,8 +60,8 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         bool value0;
         try capToken.approve(spender, value) returns (bool tempValue0) {
             value0 = tempValue0;
-        } catch (bytes memory err) {
-            bool expectedError = checkError(err, "ERC20InvalidSpender(address)");
+        } catch (bytes memory reason) {
+            bool expectedError = checkError(reason, "ERC20InvalidSpender(address)");
             if (!expectedError) {
                 t(false, "capToken_approve");
             }
@@ -89,9 +87,8 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         address _receiver,
         uint256 _deadline
     ) public updateGhosts {
-        IVault vault = IVault(address(env.usdVault.capToken));
         uint256 capTokenBalanceBefore = capToken.balanceOf(_getActor());
-        uint256 insuranceFundBalanceBefore = MockERC20(_asset).balanceOf(vault.insuranceFund());
+        uint256 insuranceFundBalanceBefore = MockERC20(_asset).balanceOf(capToken.insuranceFund());
         uint256 totalCapSupplyBefore = capToken.totalSupply();
         (uint256 expectedAmountOut,) = capToken.getBurnAmount(_asset, _amountIn);
 
@@ -99,7 +96,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         try capToken.burn(_asset, _amountIn, _minAmountOut, _receiver, _deadline) {
             // update variables for inlined properties
             uint256 capTokenBalanceAfter = capToken.balanceOf(_getActor());
-            uint256 insuranceFundBalanceAfter = MockERC20(_asset).balanceOf(vault.insuranceFund());
+            uint256 insuranceFundBalanceAfter = MockERC20(_asset).balanceOf(capToken.insuranceFund());
             uint256 totalCapSupplyAfter = capToken.totalSupply();
 
             // update ghosts
@@ -121,8 +118,10 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 capTokenBalanceBefore - capTokenBalanceAfter,
                 "fees are greater than the amount out"
             );
-            if (!IMinter(address(vault)).whitelisted(_getActor())) {
-                gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when burning");
+            if (!capToken.whitelisted(_getActor())) {
+                if (insuranceFundBalanceAfter != 0) {
+                    gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when burning");
+                }
 
                 lte(
                     capTokenBalanceAfter,
@@ -130,11 +129,11 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                     "user received more than expected amount out"
                 );
             }
-        } catch (bytes memory err) {
-            bool expectedError = checkError(err, "PastDeadline()")
-                || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()")
-                || checkError(err, "AssetNotSupported(address)")
-                || checkError(err, "InsufficientReserves(address,uint256,uint256)");
+        } catch (bytes memory reason) {
+            bool expectedError = checkError(reason, "PastDeadline()")
+                || checkError(reason, "Slippage(address,uint256,uint256)") || checkError(reason, "InvalidAmount()")
+                || checkError(reason, "AssetNotSupported(address)")
+                || checkError(reason, "InsufficientReserves(address,uint256,uint256)");
             bool isPaused = capToken.paused();
             if (!expectedError && _amountIn > 0 && !isPaused) {
                 lt(capTokenBalanceBefore, _amountIn, "user cannot burn with sufficient cap token balance");
@@ -162,17 +161,16 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         address _receiver,
         uint256 _deadline
     ) public updateGhosts {
-        IVault vault = IVault(address(env.usdVault.capToken));
         uint256 assetBalance = MockERC20(_asset).balanceOf(_getActor());
         uint256 capTokenBalanceBefore = capToken.balanceOf(_receiver);
-        uint256 insuranceFundBalanceBefore = capToken.balanceOf(vault.insuranceFund());
+        uint256 insuranceFundBalanceBefore = capToken.balanceOf(capToken.insuranceFund());
         (uint256 expectedAmountOut,) = capToken.getMintAmount(_asset, _amountIn);
         bool isAssetPaused = capToken.paused(_asset);
 
         vm.prank(_getActor());
         try capToken.mint(_asset, _amountIn, _minAmountOut, _receiver, _deadline) returns (uint256 amountOut) {
             uint256 capTokenBalanceAfter = capToken.balanceOf(_receiver);
-            uint256 insuranceFundBalanceAfter = capToken.balanceOf(vault.insuranceFund());
+            uint256 insuranceFundBalanceAfter = capToken.balanceOf(capToken.insuranceFund());
 
             // update ghosts
             ghostAmountIn += amountOut;
@@ -187,8 +185,10 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 capTokenBalanceAfter - capTokenBalanceBefore,
                 "fees are greater than the amount out"
             );
-            if (!IMinter(address(vault)).whitelisted(_getActor())) {
-                gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when minting");
+            if (!capToken.whitelisted(_getActor())) {
+                if (insuranceFundBalanceAfter != 0) {
+                    gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when minting");
+                }
 
                 lte(
                     capTokenBalanceAfter,
@@ -197,13 +197,13 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 );
             }
             t(!isAssetPaused, "asset can be minted when it is paused");
-        } catch (bytes memory err) {
-            bool expectedError = checkError(err, "PastDeadline()")
-                || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()")
-                || checkError(err, "AssetNotSupported(address)") || checkError(err, "ERC20InvalidReceiver(address)");
+        } catch (bytes memory reason) {
+            bool expectedError = checkError(reason, "PastDeadline()")
+                || checkError(reason, "Slippage(address,uint256,uint256)") || checkError(reason, "InvalidAmount()")
+                || checkError(reason, "AssetNotSupported(address)") || checkError(reason, "ERC20InvalidReceiver(address)");
             bool isProtocolPaused = capToken.paused();
-
-            if (!expectedError && _amountIn > 0 && !isProtocolPaused && !isAssetPaused) {
+            bool enoughAllowance = MockERC20(_asset).allowance(_getActor(), address(capToken)) >= _amountIn;
+            if (!expectedError && _amountIn > 0 && enoughAllowance && !isProtocolPaused && !isAssetPaused) {
                 lt(assetBalance, _amountIn, "user cannot mint with sufficient asset balance");
             }
         }
@@ -263,7 +263,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             for (uint256 i = 0; i < expectedAmountsOut.length; i++) {
                 lte(fees[i], expectedAmountsOut[i], "fees are greater than the amount out");
 
-                if (!IMinter(address(env.usdVault.capToken)).whitelisted(_getActor())) {
+                if (!capToken.whitelisted(_getActor())) {
                     lte(amountsOut[i], expectedAmountsOut[i], "user received more than expected amount out");
                 }
             }
@@ -273,12 +273,12 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 capTokenBalanceBefore - capTokenBalanceAfter,
                 "total cap supply decreased by less than the amount out"
             );
-        } catch (bytes memory err) {
-            bool expectedError = checkError(err, "InvalidMinAmountsOut()") || checkError(err, "PastDeadline()")
-                || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()")
-                || checkError(err, "InsufficientReserves(address,uint256,uint256)")
-                || checkError(err, "ERC20InvalidReceiver(address)")
-                || checkError(err, "LossFromFractionalReserve(address,address,uint256)");
+        } catch (bytes memory reason) {
+            bool expectedError = checkError(reason, "InvalidMinAmountsOut()") || checkError(reason, "PastDeadline()")
+                || checkError(reason, "Slippage(address,uint256,uint256)") || checkError(reason, "InvalidAmount()")
+                || checkError(reason, "InsufficientReserves(address,uint256,uint256)")
+                || checkError(reason, "ERC20InvalidReceiver(address)")
+                || checkError(reason, "LossFromFractionalReserve(address,address,uint256)");
             bool isProtocolPaused = capToken.paused();
 
             if (!expectedError && _amountIn > 0 && !isProtocolPaused) {

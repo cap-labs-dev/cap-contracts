@@ -5,14 +5,6 @@ import { Asserts } from "@chimera/Asserts.sol";
 import { MockERC20 } from "@recon/MockERC20.sol";
 import { console2 } from "forge-std/console2.sol";
 
-import { IDelegation } from "contracts/interfaces/IDelegation.sol";
-import { IFractionalReserve } from "contracts/interfaces/IFractionalReserve.sol";
-import { ILender } from "contracts/interfaces/ILender.sol";
-import { INetworkMiddleware } from "contracts/interfaces/INetworkMiddleware.sol";
-import { IOracle } from "contracts/interfaces/IOracle.sol";
-import { IVault } from "contracts/interfaces/IVault.sol";
-import { Lender } from "contracts/lendingPool/Lender.sol";
-
 import { BeforeAfter, OpType } from "./BeforeAfter.sol";
 import { LenderWrapper } from "test/recon/helpers/LenderWrapper.sol";
 import { MockERC4626Tester } from "test/recon/mocks/MockERC4626Tester.sol";
@@ -27,8 +19,7 @@ abstract contract Properties is BeforeAfter, Asserts {
             sumAssets += capToken.balanceOf(actors[i]);
         }
         // include the CUSD minted as fees sent to the insurance fund
-        IVault vault = IVault(address(env.usdVault.capToken));
-        sumAssets += capToken.balanceOf(vault.insuranceFund());
+        sumAssets += capToken.balanceOf(capToken.insuranceFund());
 
         uint256 totalSupply = capToken.totalSupply();
         lte(sumAssets, totalSupply, "sum of deposits is > total supply");
@@ -36,8 +27,6 @@ abstract contract Properties is BeforeAfter, Asserts {
 
     /// @dev Property: Sum of deposits + sum of withdrawals is less than or equal to total supply
     function property_sum_of_withdrawals() public {
-        address[] memory actors = _getActors();
-
         lte(
             ghostAmountIn - ghostAmountOut,
             capToken.totalSupply(),
@@ -47,15 +36,14 @@ abstract contract Properties is BeforeAfter, Asserts {
 
     /// @dev Property: totalSupplies for a given asset is always <= vault balance + totalBorrows + fractionalReserveBalance
     function property_vault_solvency_assets() public {
-        IVault vault = IVault(address(env.usdVault.capToken));
-        address[] memory assets = vault.assets();
+        address[] memory assets = capToken.assets();
 
         for (uint256 i; i < assets.length; ++i) {
-            uint256 totalSupplied = vault.totalSupplies(assets[i]);
-            uint256 totalBorrow = vault.totalBorrows(assets[i]);
-            uint256 vaultBalance = MockERC20(assets[i]).balanceOf(address(vault));
+            uint256 totalSupplied = capToken.totalSupplies(assets[i]);
+            uint256 totalBorrow = capToken.totalBorrows(assets[i]);
+            uint256 vaultBalance = MockERC20(assets[i]).balanceOf(address(capToken));
             uint256 fractionalReserveBalance =
-                MockERC20(assets[i]).balanceOf(IFractionalReserve(address(vault)).fractionalReserveVault(assets[i]));
+                MockERC20(assets[i]).balanceOf(capToken.fractionalReserveVault(assets[i]));
             lte(
                 totalSupplied,
                 vaultBalance + totalBorrow + fractionalReserveBalance + MockERC4626Tester(_getVault()).totalLosses(),
@@ -66,12 +54,11 @@ abstract contract Properties is BeforeAfter, Asserts {
 
     /// @dev Property: totalSupplies for a given asset is always >= totalBorrows
     function property_vault_solvency_borrows() public {
-        IVault vault = IVault(address(env.usdVault.capToken));
-        address[] memory assets = vault.assets();
+        address[] memory assets = capToken.assets();
 
         for (uint256 i; i < assets.length; ++i) {
-            uint256 totalSupplied = vault.totalSupplies(assets[i]);
-            uint256 totalBorrow = vault.totalBorrows(assets[i]);
+            uint256 totalSupplied = capToken.totalSupplies(assets[i]);
+            uint256 totalBorrow = capToken.totalBorrows(assets[i]);
             gte(totalSupplied, totalBorrow, "totalSupplies < totalBorrows");
         }
     }
@@ -85,26 +72,20 @@ abstract contract Properties is BeforeAfter, Asserts {
     function property_utilization_ratio() public {
         // precondition: if the utilization ratio is 0 before and after, the borrowed amount was 0
         if (
-            (
-                currentOperation == OpType.BORROW && _before.utilizationRatio[_getAsset()] == 0
-                    && _after.utilizationRatio[_getAsset()] == 0
-            )
-                || (
-                    currentOperation == OpType.REALIZE_INTEREST && _before.utilizationRatio[_getAsset()] == 0
-                        && _after.utilizationRatio[_getAsset()] == 0
-                )
+            (currentOperation == OpType.BORROW || currentOperation == OpType.REALIZE_INTEREST)
+                && _before.utilizationRatio[_getAsset()] == 0 && _after.utilizationRatio[_getAsset()] == 0
         ) {
             return;
         }
 
         if (currentOperation == OpType.BORROW || currentOperation == OpType.REALIZE_INTEREST) {
-            gt(
+            gte(
                 _after.utilizationRatio[_getAsset()],
                 _before.utilizationRatio[_getAsset()],
                 "utilization ratio decreased after a borrow"
             );
         } else {
-            gte(
+            eq(
                 _before.utilizationRatio[_getAsset()],
                 _after.utilizationRatio[_getAsset()],
                 "utilization ratio increased without a borrow"
@@ -124,13 +105,13 @@ abstract contract Properties is BeforeAfter, Asserts {
     /// @dev Property: The sum of unrealized interests for all agents always == totalUnrealizedInterest
     // NOTE: can't be implemented because don't have a getter for totalUnrealizedInterest
     function property_sum_of_unrealized_interest() public {
-        address[] memory agents = IDelegation(address(delegation)).agents();
-        address[] memory assets = IVault(address(env.usdVault.capToken)).assets();
+        address[] memory agents = delegation.agents();
+        address[] memory assets = capToken.assets();
 
         uint256 sumUnrealizedInterest;
         for (uint256 i; i < assets.length; ++i) {
             for (uint256 j; j < agents.length; ++j) {
-                uint256 unrealizedInterest = Lender(address(lender)).unrealizedInterest(agents[j], assets[i]);
+                uint256 unrealizedInterest = lender.unrealizedInterest(agents[j], assets[i]);
                 sumUnrealizedInterest += unrealizedInterest;
             }
 
@@ -141,11 +122,11 @@ abstract contract Properties is BeforeAfter, Asserts {
 
     /// @dev Property: Agent can never have less than minBorrow balance of debt token
     function property_agent_cannot_have_less_than_minBorrow_balance_of_debt_token() public {
-        address[] memory agents = IDelegation(address(delegation)).agents();
+        address[] memory agents = delegation.agents();
 
         for (uint256 i; i < agents.length; ++i) {
-            (,, address debtToken,,,, uint256 minBorrow) = ILender(address(lender)).reservesData(_getAsset());
-            uint256 agentDebt = MockERC20(debtToken).balanceOf(agents[i]);
+            (,, address _debtToken,,,, uint256 minBorrow) = lender.reservesData(_getAsset());
+            uint256 agentDebt = MockERC20(_debtToken).balanceOf(agents[i]);
 
             if (agentDebt > 0) {
                 gte(agentDebt, minBorrow, "agent has less than minBorrow balance of debt token");
@@ -155,17 +136,17 @@ abstract contract Properties is BeforeAfter, Asserts {
 
     /// @dev Property: If all users have repaid their debt (have 0 DebtToken balance), reserve.debt == 0
     function property_repaid_debt_equals_zero_debt() public {
-        address[] memory agents = IDelegation(address(delegation)).agents();
-        address[] memory assets = IVault(address(env.usdVault.capToken)).assets();
+        address[] memory agents = delegation.agents();
+        address[] memory assets = capToken.assets();
 
         for (uint256 i; i < assets.length; ++i) {
             uint256 totalDebt;
             for (uint256 j; j < agents.length; ++j) {
-                totalDebt += ILender(address(lender)).debt(agents[j], assets[i]);
+                totalDebt += lender.debt(agents[j], assets[i]);
             }
 
-            (,, address debtToken,,,,) = ILender(address(lender)).reservesData(assets[i]);
-            uint256 totalDebtTokenSupply = MockERC20(debtToken).totalSupply();
+            (,, address _debtToken,,,,) = lender.reservesData(assets[i]);
+            uint256 totalDebtTokenSupply = MockERC20(_debtToken).totalSupply();
 
             if (totalDebtTokenSupply == 0) {
                 eq(totalDebt, 0, "total debt != 0");
@@ -176,23 +157,23 @@ abstract contract Properties is BeforeAfter, Asserts {
     /// @dev Property: loaned assets value < delegations value (strictly) or the position is liquidatable
     // NOTE: will probably trivially break because the oracle price can be changed by the fuzzer
     function property_borrowed_asset_value() public {
-        address[] memory agents = IDelegation(address(delegation)).agents();
+        address[] memory agents = delegation.agents();
         for (uint256 i; i < agents.length; ++i) {
             // Get the agent's debt for the asset
-            uint256 agentDebt = ILender(address(lender)).debt(agents[i], _getAsset());
+            uint256 agentDebt = lender.debt(agents[i], _getAsset());
             // Get the asset price from the oracle to calculate value
-            (uint256 assetPrice,) = IOracle(address(oracle)).getPrice(_getAsset());
+            (uint256 assetPrice,) = oracle.getPrice(_getAsset());
             // Calculate the value in USD (8 decimals)
             uint256 debtValue = agentDebt * assetPrice / (10 ** MockERC20(_getAsset()).decimals());
 
-            (uint256 coverageValue, uint256 coverage) = INetworkMiddleware(mockNetworkMiddleware).coverageByVault(
+            (uint256 coverageValue,) = mockNetworkMiddleware.coverageByVault(
                 address(0), agents[i], env.usdVault.capToken, address(0), uint48(0)
             );
 
             // check if the value of the loaned amount is < the coverage value
             if (debtValue < coverageValue) {
                 // if true, the position must be liquidatable
-                (,,,,, uint256 health) = ILender(address(lender)).agent(agents[i]);
+                (,,,,, uint256 health) = lender.agent(agents[i]);
                 // check if the position is liquidatable
                 lt(health, 1e27, "position is not liquidatable");
             }
@@ -201,9 +182,9 @@ abstract contract Properties is BeforeAfter, Asserts {
 
     /// @dev Property: LTV is always <= 1e27
     function property_ltv() public {
-        address[] memory agents = IDelegation(address(delegation)).agents();
+        address[] memory agents = delegation.agents();
         for (uint256 i; i < agents.length; ++i) {
-            (,,,, uint256 ltv,) = ILender(address(lender)).agent(agents[i]);
+            (,,,, uint256 ltv,) = lender.agent(agents[i]);
             lte(ltv, 1e27, "ltv > 1e27");
         }
     }

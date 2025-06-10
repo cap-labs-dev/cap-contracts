@@ -2,23 +2,20 @@
 pragma solidity ^0.8.0;
 
 // Chimera deps
-// Chimera deps
 import { BaseTargetFunctions } from "@chimera/BaseTargetFunctions.sol";
 import { vm } from "@chimera/Hevm.sol";
 
 // Helpers
+
+import { OpType } from "../BeforeAfter.sol";
+import { Properties } from "../Properties.sol";
 import { MockERC20 } from "@recon/MockERC20.sol";
 import { Panic } from "@recon/Panic.sol";
-
-import "contracts/lendingPool/Lender.sol";
-
-import { BeforeAfter, OpType } from "../BeforeAfter.sol";
-import { Properties } from "../Properties.sol";
-
 import { DebtToken } from "contracts/lendingPool/tokens/DebtToken.sol";
-
 import { console2 } from "forge-std/console2.sol";
 import { LenderWrapper } from "test/recon/helpers/LenderWrapper.sol";
+
+import "contracts/lendingPool/Lender.sol";
 
 abstract contract LenderTargets is BaseTargetFunctions, Properties {
     uint256 constant RAY = 1e27;
@@ -34,48 +31,6 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
     function lender_cancelLiquidation_clamped() public {
         lender_cancelLiquidation();
-    }
-
-    /// Helper functions
-    function _verifyBorrowProperties(
-        address _asset,
-        address _receiver,
-        uint256 beforeAssetBalance,
-        uint256 beforeBorrowerDebt,
-        uint256 beforeTotalBorrows,
-        uint256 afterBorrowerDebt
-    ) internal {
-        bool isProtocolPaused = capToken.paused();
-        bool isAssetPaused = capToken.paused(_asset);
-        uint256 borrowerDebtDelta = afterBorrowerDebt - beforeBorrowerDebt;
-
-        t(!isProtocolPaused && !isAssetPaused, "asset can be borrowed when it is paused");
-
-        (,,,,, uint256 health) = lender.agent(_getActor());
-        gt(health, RAY, "Borrower is unhealthy after borrowing");
-
-        (,, address _debtToken,,,,) = lender.reservesData(_asset);
-        gt(
-            DebtToken(_debtToken).balanceOf(_getActor()),
-            beforeBorrowerDebt,
-            "Borrower debt did not increase after borrowing"
-        );
-
-        eq(
-            MockERC20(_asset).balanceOf(_receiver),
-            beforeAssetBalance + borrowerDebtDelta,
-            "Borrower asset balance did not increase after borrowing"
-        );
-
-        (uint256 assetPrice,) = oracle.getPrice(_asset);
-        (uint256 collateralValue,) =
-            mockNetworkMiddleware.coverageByVault(address(0), _getActor(), mockEth, address(0), 0);
-
-        lte(
-            (borrowerDebtDelta * assetPrice / 10 ** MockERC20(_asset).decimals()) * RAY / collateralValue,
-            delegation.ltv(_getActor()),
-            "Borrower can't borrow more than LTV"
-        );
     }
 
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
@@ -113,16 +68,46 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         uint256 beforeAssetBalance = MockERC20(_asset).balanceOf(_receiver);
         (,, address _debtToken,,,,) = lender.reservesData(_asset);
         uint256 beforeBorrowerDebt = DebtToken(_debtToken).balanceOf(_getActor());
-        uint256 beforeTotalBorrows = capToken.totalBorrows(_asset);
+        uint256 beforeMaxBorrowable = lender.maxBorrowable(_getActor(), _asset);
 
         vm.prank(_getActor());
         try lender.borrow(_asset, _amount, _receiver) {
-            uint256 afterBorrowerDebt = DebtToken(_debtToken).balanceOf(_getActor());
+            uint256 borrowerDebtDelta = DebtToken(_debtToken).balanceOf(_getActor()) - beforeBorrowerDebt;
 
-            _verifyBorrowProperties(
-                _asset, _receiver, beforeAssetBalance, beforeBorrowerDebt, beforeTotalBorrows, afterBorrowerDebt
+            t(!capToken.paused() && !capToken.paused(_asset), "asset can be borrowed when it is paused");
+
+            (,,,,, uint256 health) = lender.agent(_getActor());
+            gt(health, RAY, "Borrower is unhealthy after borrowing");
+
+            gt(
+                DebtToken(_debtToken).balanceOf(_getActor()),
+                beforeBorrowerDebt,
+                "Borrower debt did not increase after borrowing"
             );
-        } catch (bytes memory err) { }
+            if (_amount == type(uint256).max) {
+                eq(
+                    MockERC20(_asset).balanceOf(_receiver),
+                    beforeAssetBalance + beforeMaxBorrowable,
+                    "Borrower asset balance did not increase after borrowing (in case of max borrow)"
+                );
+            } else {
+                eq(
+                    MockERC20(_asset).balanceOf(_receiver),
+                    beforeAssetBalance + _amount,
+                    "Borrower asset balance did not increase after borrowing"
+                );
+            }
+
+            (uint256 assetPrice,) = oracle.getPrice(_asset);
+            (uint256 collateralValue,) =
+                mockNetworkMiddleware.coverageByVault(address(0), _getActor(), mockEth, address(0), 0);
+
+            lte(
+                (borrowerDebtDelta * assetPrice / 10 ** MockERC20(_asset).decimals()) * RAY / collateralValue,
+                delegation.ltv(_getActor()),
+                "Borrower can't borrow more than LTV"
+            );
+        } catch (bytes memory reason) { }
     }
 
     function lender_cancelLiquidation() public updateGhosts asActor {
@@ -132,17 +117,17 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Agent should not be liquidatable with health > 1e27
     /// @dev Property: Agent should always be liquidatable if it is unhealthy
     function lender_initiateLiquidation() public updateGhosts asActor {
-        (,,,,, uint256 healthBefore) = ILender(address(lender)).agent(_getActor());
+        (,,,,, uint256 healthBefore) = lender.agent(_getActor());
 
         try lender.initiateLiquidation(_getActor()) {
-            if (healthBefore > 1e27) {
+            if (healthBefore > RAY) {
                 t(false, "agent should not be liquidatable with health > 1e27");
             }
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "AlreadyInitiated()");
 
-            if (!expectedError && healthBefore < RAY) {
-                t(false, "Agent should always be liquidatable if it is unhealthy");
+            if (!expectedError) {
+                gte(healthBefore, RAY, "Agent should always be liquidatable if it is unhealthy");
             }
         }
     }
@@ -151,14 +136,13 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Liquidations should always improve the health factor
     /// @dev Property: Emergency liquidations should always be available when emergency health is below 1e27
     function lender_liquidate(uint256 _amount) public updateGhosts asActor {
-        (uint256 totalDelegation,, uint256 totalDebt,,, uint256 healthBefore) =
-            ILender(address(lender)).agent(_getActor());
+        (uint256 totalDelegation,, uint256 totalDebt,,, uint256 healthBefore) = lender.agent(_getActor());
 
         try lender.liquidate(_getActor(), _getAsset(), _amount) {
             if (healthBefore > 1e27) {
                 t(false, "agent should not be liquidatable with health > 1e27");
             }
-            (,,,,, uint256 healthAfter) = ILender(address(lender)).agent(_getActor());
+            (,,,,, uint256 healthAfter) = lender.agent(_getActor());
             gt(healthAfter, healthBefore, "Liquidation did not improve health factor");
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "InvalidBurnAmount()");
@@ -200,7 +184,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         } catch (bytes memory reason) {
             bool zeroRealizationError = checkError(reason, "ZeroRealization()");
 
-            (,,,,, bool paused,) = ILender(address(lender)).reservesData(_getAsset());
+            (,,,,, bool paused,) = lender.reservesData(_getAsset());
             uint256 totalUnrealizedInterest = LenderWrapper(address(lender)).getTotalUnrealizedInterest(_getAsset());
 
             if (!paused && totalUnrealizedInterest != 0) {

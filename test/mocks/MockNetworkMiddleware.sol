@@ -40,8 +40,8 @@ contract MockNetworkMiddleware is INetworkMiddleware {
             slashShareOfCollateral = mockCollateralByVault[_agent][_vault];
         }
         mockCollateralByVault[_agent][_vault] -= slashShareOfCollateral;
-        MockERC20(_vault).transferFrom(_agent, _recipient, slashShareOfCollateral);
-        emit Slash(_agent, _recipient, _slashShare);
+        MockERC20(_vault).mint(_recipient, slashShareOfCollateral);
+        emit Slash(_agent, _recipient, slashShareOfCollateral);
     }
 
     function slashableCollateralByVault(address, address _agent, address _vault, address, uint48)

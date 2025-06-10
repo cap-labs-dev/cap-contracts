@@ -247,4 +247,16 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
             0xD16d567549A2a2a2005aEACf7fB193851603dd70, 2, 0, 0x00000000000000000000000000000000DeaDBeef, 1525295799
         );
     }
+
+    // forge test --match-test test_capToken_redeem -vvv
+    function test_capToken_redeem_1() public {
+        capToken_mint_clamped(10034717198);
+        add_new_vault();
+        capToken_setFractionalReserveVault_clamped();
+        capToken_investAll_clamped();
+        mockERC4626Tester_mintUnbackedShares(
+            181964593936325880160149202517977803269925767111890944683041699248, address(0)
+        );
+        capToken_redeem_clamped(1);
+    }
 }

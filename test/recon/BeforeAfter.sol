@@ -119,7 +119,7 @@ abstract contract BeforeAfter is Setup {
         try capToken.getRedeemAmount(capToken.balanceOf(_agent)) returns (
             uint256[] memory _amountsOut, uint256[] memory _redeemFees
         ) {
-            amountsOut;
+            amountsOut = _amountsOut;
         } catch {
             // If the call fails, we can assume the redeem amounts are zero
             amountsOut = new uint256[](0);
