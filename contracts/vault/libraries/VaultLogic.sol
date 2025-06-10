@@ -45,9 +45,6 @@ library VaultLogic {
     /// @dev Insufficient reserves
     error InsufficientReserves(address asset, uint256 balanceBefore, uint256 amount);
 
-    /// @dev Loss is larger than the available balance
-    error LossTooGreat(address asset, uint256 amount);
-
     /// @dev Cap token minted
     event Mint(
         address indexed minter,
