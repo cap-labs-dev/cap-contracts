@@ -236,4 +236,14 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         mockChainlinkPriceFeed_setLatestAnswer(2713282178368992834);
         lender_liquidate_clamped(1);
     }
+
+    function test_axxx() public {
+        add_new_vault();
+        capToken_setFractionalReserveVault_clamped();
+        capToken_mint_clamped(10028693653);
+        capToken_investAll_clamped();
+        mockERC4626Tester_mintUnbackedShares(101078819858991464161, address(0));
+        uint256[] memory _minAmountsOut = new uint256[](0);
+        capToken_redeem(1, _minAmountsOut, address(0), 0);
+    }
 }

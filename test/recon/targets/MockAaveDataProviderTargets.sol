@@ -18,6 +18,7 @@ abstract contract MockAaveDataProviderTargets is BaseTargetFunctions, Properties
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
     function mockAaveDataProvider_setVariableBorrowRate(uint256 _variableBorrowRate) public asActor {
+        // @audit-info clamped to avoid overflow in https://github.com/Recon-Fuzz/cap-contracts/blob/6c3c83daa7eec32c0394663edbea929e503d3ca4/contracts/lendingPool/tokens/DebtToken.sol#L120
         _variableBorrowRate = between(_variableBorrowRate, 0, type(uint88).max);
         mockAaveDataProvider.setVariableBorrowRate(_variableBorrowRate);
     }
