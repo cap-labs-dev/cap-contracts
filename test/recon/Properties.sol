@@ -209,17 +209,6 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
-    /// @dev Property: agent's total debt should not change when interest is realized
-    function property_total_debt_not_changed_with_realizeInterest() public {
-        if (currentOperation == OpType.REALIZE_INTEREST) {
-            eq(
-                _after.agentTotalDebt[_getActor()],
-                _before.agentTotalDebt[_getActor()],
-                "total debt changed with realizeInterest"
-            );
-        }
-    }
-
     /// @dev Property: The vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized
     function property_vault_debt_increase() public {
         if (currentOperation == OpType.REALIZE_INTEREST) {

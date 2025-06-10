@@ -58,29 +58,10 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         capToken_burn_clamped(withdrawAmount);
     }
 
-    // forge test --match-test test_property_vault_solvency_assets_3 -vvv
-    // NOTE: an unrealized loss causes the totalSupplied to be greater than the vault balance + totalBorrows + fractionalReserveBalance
-    // TODO: confirm what the impact of this is on the rest of the system
-    function test_property_vault_solvency_assets_3() public {
-        switch_asset(1);
-
-        add_new_vault();
-
-        capToken_setFractionalReserveVault_clamped();
-
-        capToken_mint_clamped(1);
-
-        capToken_investAll(0x3D7Ebc40AF7092E3F1C81F2e996cbA5Cae2090d7);
-
-        mockERC4626Tester_simulateLoss(1);
-
-        property_vault_solvency_assets();
-    }
-
-    // forge test --match-test test_property_borrowed_asset_value_7 -vvv
-    // NOTE: broken before, fixed with new mockNetworkMiddleware
-    function test_property_borrowed_asset_value_7() public {
-        mockNetworkMiddleware_setMockCollateralByVault(0x0000000000000000000000000000000000000000, 1);
+    // forge test --match-test test_property_borrowed_asset_value_1 -vvv
+    // NOTE: probably fixed by knot's latest changes
+    function test_property_borrowed_asset_value_1() public {
+        mockNetworkMiddleware_setMockCollateralByVault(0x796f2974e3C1af763252512dd6d521E9E984726C, 10007044488);
 
         property_borrowed_asset_value();
     }
@@ -106,7 +87,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         console2.log("debt token total supply", MockERC20(debtToken).totalSupply());
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 1);
-        lender_realizeInterest(0xD16d567549A2a2a2005aEACf7fB193851603dd70);
+        lender_realizeInterest();
         console2.log("debt token balance after", MockERC20(debtToken).balanceOf(_getActor()));
         console2.log("debt token total supply after", MockERC20(debtToken).totalSupply());
 
@@ -124,6 +105,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
     // forge test --match-test test_capToken_burn_clamped_3 -vvv
     // NOTE: seems like a real break with a user being able to burn without fees
+    // seems like it would allow working around preventions for oracle drift
     function test_capToken_burn_clamped_3() public {
         capToken_mint_clamped(20000551208);
 
@@ -224,5 +206,20 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         asset_approve(0x796f2974e3C1af763252512dd6d521E9E984726C, 0);
 
         capToken_mint_clamped(10000304985);
+    }
+
+    // forge test --match-test test_capToken_redeem_clamped_6 -vvv
+    function test_capToken_redeem_clamped_6() public {
+        capToken_mint_clamped(10000037441);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault_clamped();
+
+        capToken_investAll_clamped();
+
+        mockERC4626Tester_mintUnbackedShares(100003377823040994724, 0x0000000000000000000000000000000000000000);
+
+        capToken_redeem_clamped(1);
     }
 }

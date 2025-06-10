@@ -34,7 +34,7 @@
 | 32 | lender_borrow | Total borrows should increase after borrowing | |
 | 33 | property_borrowed_asset_value | loaned assets value < delegations value (strictly) or the position is liquidatable | |
 | 34 | property_health_not_changed_with_realizeInterest | health should not change when interest is realized | |
-| 35 | property_total_debt_not_changed_with_realizeInterest | agent's total debt should not change when interest is realized | |
+| 35 | lender_realizeInterest | agent's total debt should not change when interest is realized | |
 | 36 | property_vault_debt_increase | The vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized | |
 | 37 | property_debt_increase_after_realizing_interest | The debt token balance of the agent should increase by the same amount that the total borrows of the asset increases when interest is realized | |
 | 38 | lender_initiateLiquidation | agent should not be liquidatable with health > 1e27 | |

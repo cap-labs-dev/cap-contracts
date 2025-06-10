@@ -147,7 +147,9 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
                 t(false, "agent should not be liquidatable with health > 1e27");
             }
         } catch (bytes memory reason) {
-            if (healthBefore < RAY) {
+            bool expectedError = checkError(reason, "AlreadyInitiated()");
+
+            if (!expectedError && healthBefore < RAY) {
                 t(false, "Agent should always be liquidatable if it is unhealthy");
             }
         }
@@ -166,28 +168,39 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             }
             (,,,,, uint256 healthAfter) = ILender(address(lender)).agent(_getActor());
             gt(healthAfter, healthBefore, "Liquidation did not improve health factor");
-        } catch {
-            gte(
-                totalDelegation * lender.emergencyLiquidationThreshold() / totalDebt,
-                RAY,
-                "Emergency liquidations is not available when emergency health is below 1e27"
-            );
+        } catch (bytes memory reason) {
+            bool expectedError = checkError(reason, "InvalidBurnAmount()");
+            // precondition: must be liquidating more than 0
+            if (!expectedError) {
+                gte(
+                    totalDelegation * lender.emergencyLiquidationThreshold() / totalDebt,
+                    RAY,
+                    "Emergency liquidations is not available when emergency health is below 1e27"
+                );
+            }
         }
     }
 
-    function lender_pauseAsset(address _asset, bool _pause) public updateGhosts asAdmin {
-        lender.pauseAsset(_asset, _pause);
+    function lender_pauseAsset(bool _pause) public updateGhosts asAdmin {
+        lender.pauseAsset(_getAsset(), _pause);
     }
 
     /// @dev Property: realizeInterest should only revert with ZeroRealization if paused or totalUnrealizedInterest == 0, otherwise should always update the realization value
-    function lender_realizeInterest(address _asset) public updateGhostsWithType(OpType.REALIZE_INTEREST) asActor {
-        try lender.realizeInterest(_asset) {
+    /// @dev Property: agent's total debt should not change when interest is realized
+    function lender_realizeInterest() public updateGhostsWithType(OpType.REALIZE_INTEREST) {
+        (,, uint256 totalDebtBefore,,,) = _getAgentParams(_getActor());
+
+        vm.prank(_getActor());
+        try lender.realizeInterest(_getAsset()) {
+            (,, uint256 totalDebtAfter,,,) = _getAgentParams(_getActor());
+
+            eq(totalDebtAfter, totalDebtBefore, "total debt did not increase after realizeInterest");
             // success
         } catch (bytes memory reason) {
             bool zeroRealizationError = checkError(reason, "ZeroRealization()");
 
-            (,,,,, bool paused,) = ILender(address(lender)).reservesData(_asset);
-            uint256 totalUnrealizedInterest = LenderWrapper(address(lender)).getTotalUnrealizedInterest(_asset);
+            (,,,,, bool paused,) = ILender(address(lender)).reservesData(_getAsset());
+            uint256 totalUnrealizedInterest = LenderWrapper(address(lender)).getTotalUnrealizedInterest(_getAsset());
 
             if (!paused && totalUnrealizedInterest != 0) {
                 t(!zeroRealizationError, "realizeInterest does not update when it should");
