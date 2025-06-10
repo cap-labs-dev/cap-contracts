@@ -2,10 +2,10 @@
 pragma solidity ^0.8.28;
 
 import { IFractionalReserve } from "../../interfaces/IFractionalReserve.sol";
-import { IVault } from "../../interfaces/IVault.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title Fractional Reserve Logic
 /// @author kexley, @capLabs
@@ -14,8 +14,8 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 library FractionalReserveLogic {
     using SafeERC20 for IERC20;
 
-    /// @dev Loss not allowed from fractional reserve
-    error LossFromFractionalReserve(address asset, address vault, uint256 loss);
+    /// @dev Full divest required
+    error FullDivestRequired(address asset, uint256 loss);
 
     /// @dev Fractional reserve invested event
     event FractionalReserveInvested(address indexed asset, uint256 amount);
@@ -45,14 +45,6 @@ library FractionalReserveLogic {
             IERC20(_asset).forceApprove($.vault[_asset], investAmount);
             IERC4626($.vault[_asset]).deposit(investAmount, address(this));
 
-            uint256 vaultBalance =
-                IERC4626($.vault[_asset]).convertToAssets(IERC4626($.vault[_asset]).balanceOf(address(this)));
-            if (vaultBalance < $.loaned[_asset]) {
-                uint256 loss = $.loaned[_asset] - vaultBalance;
-                IVault(address(this)).reportLoss(_asset, loss);
-                $.loaned[_asset] -= loss;
-            }
-
             emit FractionalReserveInvested(_asset, investAmount);
         }
     }
@@ -71,7 +63,7 @@ library FractionalReserveLogic {
                 if (redeemedAssets > loanedAssets) {
                     IERC20(_asset).safeTransfer($.interestReceiver, redeemedAssets - loanedAssets);
                 } else if (redeemedAssets < loanedAssets) {
-                    IVault(address(this)).reportLoss(_asset, loanedAssets - redeemedAssets);
+                    revert FullDivestRequired(_asset, loanedAssets - redeemedAssets);
                 }
 
                 emit FractionalReserveDivested(_asset, loanedAssets);
@@ -80,6 +72,8 @@ library FractionalReserveLogic {
     }
 
     /// @notice Divest capital from a fractional reserve vault when not enough funds are held in reserve
+    /// @dev Some wei are left over in the ERC4626 after rounding, so a full divest will yield less than expected and could fail
+    /// Re-investing recovers the lost wei, it is not skimmable via realize interest
     /// @param $ Storage pointer
     /// @param _asset Asset address
     /// @param _withdrawAmount Amount to withdraw to fulfil
@@ -92,34 +86,18 @@ library FractionalReserveLogic {
             if (_withdrawAmount > assetBalance) {
                 /// Divest both the withdrawal amount and the buffer reserve for later withdrawals
                 uint256 divestAmount = _withdrawAmount + $.reserve[_asset] - assetBalance;
-                // Round up the share, overestimating the amount of assets to divest
-                uint256 shares = IERC4626($.vault[_asset]).previewWithdraw(divestAmount);
-                // Divest the maximum amount of assets given the shares
-                uint256 assets = IERC4626($.vault[_asset]).convertToAssets(shares);
 
-                divestAmount = assets > $.loaned[_asset] ? $.loaned[_asset] : assets;
-                if (divestAmount > 0) {
+                uint256 shares = Math.min(
+                    IERC4626($.vault[_asset]).previewWithdraw(divestAmount),
+                    IERC4626($.vault[_asset]).balanceOf(address(this))
+                );
+
+                if (shares > 0) {
+                    divestAmount = IERC4626($.vault[_asset]).redeem(shares, address(this), address(this));
                     $.loaned[_asset] -= divestAmount;
 
-                    IERC4626($.vault[_asset]).withdraw(divestAmount, address(this), address(this));
-
-                    // Report any rounding error loss to the protocol
-                    uint256 vaultBalance =
-                        IERC4626($.vault[_asset]).convertToAssets(IERC4626($.vault[_asset]).balanceOf(address(this)));
-                    if ($.loaned[_asset] > vaultBalance) {
-                        uint256 loss = $.loaned[_asset] - vaultBalance;
-                        IVault(address(this)).reportLoss(_asset, loss);
-                        $.loaned[_asset] -= loss;
-                    }
-
-                    // At least the requested amount must have been divested
-                    if (IERC20(_asset).balanceOf(address(this)) < divestAmount + assetBalance) {
-                        uint256 loss = divestAmount + assetBalance - IERC20(_asset).balanceOf(address(this));
-                        revert LossFromFractionalReserve(_asset, $.vault[_asset], loss);
-                    }
+                    emit FractionalReserveDivested(_asset, divestAmount);
                 }
-
-                emit FractionalReserveDivested(_asset, divestAmount);
             }
         }
     }

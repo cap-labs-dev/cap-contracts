@@ -97,11 +97,6 @@ interface IVault {
     /// @param _amount Amount of asset to repay
     function repay(address _asset, uint256 _amount) external;
 
-    /// @notice Report loss on an asset
-    /// @param _asset Asset to report loss on
-    /// @param _amount Amount of loss to report
-    function reportLoss(address _asset, uint256 _amount) external;
-
     /// @notice Add an asset to the vault list
     /// @param _asset Asset address
     function addAsset(address _asset) external;

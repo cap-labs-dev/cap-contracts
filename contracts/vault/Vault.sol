@@ -160,13 +160,6 @@ abstract contract Vault is IVault, ERC20PermitUpgradeable, Access, Minter, Fract
         VaultLogic.repay(getVaultStorage(), RepayParams({ asset: _asset, amount: _amount }));
     }
 
-    /// @notice Report loss on an asset
-    /// @param _asset Asset to report loss on
-    /// @param _amount Amount of loss to report
-    function reportLoss(address _asset, uint256 _amount) external checkAccess(this.reportLoss.selector) {
-        VaultLogic.reportLoss(getVaultStorage(), _asset, _amount);
-    }
-
     /// @notice Add an asset to the vault list
     /// @param _asset Asset address
     function addAsset(address _asset) external checkAccess(this.addAsset.selector) {
