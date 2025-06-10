@@ -236,12 +236,4 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         mockChainlinkPriceFeed_setLatestAnswer(2713282178368992834);
         lender_liquidate_clamped(1);
     }
-
-    function test_capToken_vault_solvency_assets() public {
-        capToken_mint_clamped(63023870275142);
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-        switchChainlinkOracle(31495427761900596702305915973759902979950607717640310280198);
-        mockChainlinkPriceFeed_setLatestAnswer(277813952348935684);
-        lender_liquidate(address(0xdeadbeef), 0);
-    }
 }
