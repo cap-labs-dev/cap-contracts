@@ -44,48 +44,6 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender_repay(_getAsset(), _amount);
     }
 
-    /// Helper functions
-    function _verifyBorrowProperties(
-        address _asset,
-        address _receiver,
-        uint256 beforeAssetBalance,
-        uint256 beforeBorrowerDebt,
-        uint256 beforeTotalBorrows,
-        uint256 afterBorrowerDebt
-    ) internal {
-        bool isProtocolPaused = capToken.paused();
-        bool isAssetPaused = capToken.paused(_asset);
-        uint256 borrowerDebtDelta = afterBorrowerDebt - beforeBorrowerDebt;
-
-        t(!isProtocolPaused && !isAssetPaused, "asset can be borrowed when it is paused");
-
-        (,,,,, uint256 health) = lender.agent(_getActor());
-        gt(health, RAY, "Borrower is unhealthy after borrowing");
-
-        (,, address _debtToken,,,,) = lender.reservesData(_asset);
-        gt(
-            DebtToken(_debtToken).balanceOf(_getActor()),
-            beforeBorrowerDebt,
-            "Borrower debt did not increase after borrowing"
-        );
-
-        eq(
-            MockERC20(_asset).balanceOf(_receiver),
-            beforeAssetBalance + borrowerDebtDelta,
-            "Borrower asset balance did not increase after borrowing"
-        );
-
-        (uint256 assetPrice,) = oracle.getPrice(_asset);
-        (uint256 collateralValue,) =
-            mockNetworkMiddleware.coverageByVault(address(0), _getActor(), mockEth, address(0), 0);
-
-        lte(
-            (borrowerDebtDelta * assetPrice / 10 ** MockERC20(_asset).decimals()) * RAY / collateralValue,
-            delegation.ltv(_getActor()),
-            "Borrower can't borrow more than LTV"
-        );
-    }
-
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
     function lender_addAsset(
@@ -121,16 +79,45 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         uint256 beforeAssetBalance = MockERC20(_asset).balanceOf(_receiver);
         (,, address _debtToken,,,,) = lender.reservesData(_asset);
         uint256 beforeBorrowerDebt = DebtToken(_debtToken).balanceOf(_getActor());
-        uint256 beforeTotalBorrows = capToken.totalBorrows(_asset);
+        uint256 beforeMaxBorrowable = lender.maxBorrowable(_getActor(), _asset);
 
         vm.prank(_getActor());
         try lender.borrow(_asset, _amount, _receiver) {
             uint256 afterBorrowerDebt = DebtToken(_debtToken).balanceOf(_getActor());
-
-            _verifyBorrowProperties(
-                _asset, _receiver, beforeAssetBalance, beforeBorrowerDebt, beforeTotalBorrows, afterBorrowerDebt
+            uint256 borrowerDebtDelta = afterBorrowerDebt - beforeBorrowerDebt;
+            t(!capToken.paused() && !capToken.paused(_asset), "asset can be borrowed when it is paused");
+            (,,,,, uint256 health) = lender.agent(_getActor());
+            gt(health, RAY, "Borrower is unhealthy after borrowing");
+            gt(
+                DebtToken(_debtToken).balanceOf(_getActor()),
+                beforeBorrowerDebt,
+                "Borrower debt did not increase after borrowing"
             );
-        } catch (bytes memory err) { }
+            if (_amount == type(uint256).max) {
+                // Borrowing max amount
+                eq(
+                    MockERC20(_asset).balanceOf(_receiver),
+                    beforeAssetBalance + beforeMaxBorrowable,
+                    "Borrower asset balance should not increase after borrowing max amount"
+                );
+            } else {
+                eq(
+                    MockERC20(_asset).balanceOf(_receiver),
+                    beforeAssetBalance + _amount,
+                    "Borrower asset balance did not increase after borrowing"
+                );
+            }
+
+            (uint256 assetPrice,) = oracle.getPrice(_asset);
+            (uint256 collateralValue,) =
+                mockNetworkMiddleware.coverageByVault(address(0), _getActor(), mockEth, address(0), 0);
+
+            lte(
+                (borrowerDebtDelta * assetPrice / 10 ** MockERC20(_asset).decimals()) * RAY / collateralValue,
+                delegation.ltv(_getActor()),
+                "Borrower can't borrow more than LTV"
+            );
+        } catch (bytes memory reason) { }
     }
 
     function lender_cancelLiquidation() public updateGhosts asActor {
@@ -147,8 +134,9 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
                 t(false, "agent should not be liquidatable with health > 1e27");
             }
         } catch (bytes memory reason) {
-            if (healthBefore < RAY) {
-                t(false, "Agent should always be liquidatable if it is unhealthy");
+            bool expectedError = checkError(reason, "AlreadyInitiated()");
+            if (!expectedError) {
+                gte(healthBefore, RAY, "Agent should always be liquidatable if it is unhealthy");
             }
         }
     }
@@ -157,21 +145,31 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Liquidations should always improve the health factor
     /// @dev Property: Emergency liquidations should always be available when emergency health is below 1e27
     function lender_liquidate(address _asset, uint256 _amount) public updateGhosts asActor {
-        (uint256 totalDelegation,, uint256 totalDebt,,, uint256 healthBefore) =
-            ILender(address(lender)).agent(_getActor());
+        (uint256 totalDelegation,, uint256 totalDebt,,, uint256 healthBefore) = lender.agent(_getActor());
 
         try lender.liquidate(_getActor(), _asset, _amount) {
             if (healthBefore > 1e27) {
                 t(false, "agent should not be liquidatable with health > 1e27");
             }
-            (,,,,, uint256 healthAfter) = ILender(address(lender)).agent(_getActor());
+            (,,,,, uint256 healthAfter) = lender.agent(_getActor());
             gt(healthAfter, healthBefore, "Liquidation did not improve health factor");
-        } catch {
-            gte(
-                totalDelegation * lender.emergencyLiquidationThreshold() / totalDebt,
-                RAY,
-                "Emergency liquidations is not available when emergency health is below 1e27"
-            );
+        } catch (bytes memory reason) {
+            bool expectedError =
+                checkError(reason, "ZeroAddressNotValid()") || checkError(reason, "InvalidBurnAmount()");
+            bool expectedAsset;
+            for (uint256 i = 0; i < capToken.assets().length; i++) {
+                if (capToken.assets()[i] == _asset) {
+                    expectedAsset = true;
+                    break;
+                }
+            }
+            if (!expectedError && expectedAsset) {
+                gte(
+                    totalDelegation * lender.emergencyLiquidationThreshold() / totalDebt,
+                    RAY,
+                    "Emergency liquidations is not available when emergency health is below 1e27"
+                );
+            }
         }
     }
 

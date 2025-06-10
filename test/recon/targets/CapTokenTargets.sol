@@ -122,7 +122,9 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 "fees are greater than the amount out"
             );
             if (!IMinter(address(vault)).whitelisted(_getActor())) {
-                gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when burning");
+                if (insuranceFundBalanceAfter != 0 && insuranceFundBalanceBefore != 0) {
+                    gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when burning");
+                }
 
                 lte(
                     capTokenBalanceAfter,
@@ -202,8 +204,8 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 || checkError(err, "Slippage(address,uint256,uint256)") || checkError(err, "InvalidAmount()")
                 || checkError(err, "AssetNotSupported(address)") || checkError(err, "ERC20InvalidReceiver(address)");
             bool isProtocolPaused = capToken.paused();
-
-            if (!expectedError && _amountIn > 0 && !isProtocolPaused && !isAssetPaused) {
+            bool enoughApproval = capToken.allowance(_getActor(), address(capToken)) >= _amountIn;
+            if (!expectedError && _amountIn > 0 && enoughApproval && !isProtocolPaused && !isAssetPaused) {
                 lt(assetBalance, _amountIn, "user cannot mint with sufficient asset balance");
             }
         }

@@ -192,6 +192,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         vm.roll(block.number + 1);
 
         lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
     }
 
     // forge test --match-test test_lender_repay_6 -vvv
@@ -224,5 +225,23 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         asset_approve(0x796f2974e3C1af763252512dd6d521E9E984726C, 0);
 
         capToken_mint_clamped(10000304985);
+    }
+
+    // forge test --match-test test_capToken_mint_7 -vvv
+    // NOTE: Liquidation did not improve health factor, try to invest
+    function test_lender_liquidate_2() public {
+        capToken_mint_clamped(6505424303794);
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+        switchChainlinkOracle(14211097524167602802493863989865037497162472790322337168572978);
+        mockChainlinkPriceFeed_setLatestAnswer(2713282178368992834);
+        lender_liquidate_clamped(1);
+    }
+
+    function test_capToken_vault_solvency_assets() public {
+        capToken_mint_clamped(63023870275142);
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+        switchChainlinkOracle(31495427761900596702305915973759902979950607717640310280198);
+        mockChainlinkPriceFeed_setLatestAnswer(277813952348935684);
+        lender_liquidate(address(0xdeadbeef), 0);
     }
 }
