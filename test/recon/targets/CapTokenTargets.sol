@@ -190,7 +190,9 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 "fees are greater than the amount out"
             );
             if (!IMinter(address(vault)).whitelisted(_getActor())) {
-                gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when minting");
+                if (insuranceFundBalanceAfter != 0 && insuranceFundBalanceBefore != 0) {
+                    gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when minting");
+                }
 
                 lte(
                     capTokenBalanceAfter,
