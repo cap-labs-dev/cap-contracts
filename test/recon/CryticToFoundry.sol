@@ -134,7 +134,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
             57904238167892068531037184868122078708591352565700547569692866999400797589496
         );
 
-        lender_repay_clamped(0);
+        lender_repay(0);
     }
 
     // forge test --match-test test_lender_liquidate_1 -vvv
@@ -147,7 +147,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         mockChainlinkPriceFeed_setLatestAnswer(172978832219520413055122);
 
-        lender_liquidate(0x0000000000000000000000000000000000000000, 0);
+        lender_liquidate(0);
     }
 
     // forge test --match-test test_lender_liquidate_clamped_2 -vvv
@@ -160,7 +160,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         mockChainlinkPriceFeed_setLatestAnswer(11150459009966507495810);
 
-        lender_liquidate_clamped(0);
+        lender_liquidate(0);
     }
 
     // forge test --match-test test_lender_borrow_clamped_5 -vvv
@@ -183,7 +183,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
             57899629142092681212539648668816850347303020206421162146955475922475103470875
         );
 
-        lender_repay(0x2a07706473244BC757E10F2a9E86fB532828afe3, 0);
+        lender_repay(0);
     }
 
     // forge test --match-test test_capToken_mint_7 -vvv
@@ -201,7 +201,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
     // forge test --match-test test_capToken_mint_clamped_11 -vvv
     // NOTE: mint just underflows for insufficient approvals
-    // should it throw a custom error instead?
+    // should it throw a custom error instead? seems like a QA
     function test_capToken_mint_clamped_11() public {
         asset_approve(0x796f2974e3C1af763252512dd6d521E9E984726C, 0);
 
@@ -209,6 +209,8 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     }
 
     // forge test --match-test test_capToken_redeem_clamped_6 -vvv
+    // NOTE: minting unbacked shares causes underflow revert in redemeptions, might just need to remove this from mockERC4626Tester
+    // TODO: determine if minting unbacked shares is realisitc behavior
     function test_capToken_redeem_clamped_6() public {
         capToken_mint_clamped(10000037441);
 
@@ -221,5 +223,28 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         mockERC4626Tester_mintUnbackedShares(100003377823040994724, 0x0000000000000000000000000000000000000000);
 
         capToken_redeem_clamped(1);
+    }
+
+    // forge test --match-test test_lender_borrow_clamped_10 -vvv
+    function test_lender_borrow_clamped_10() public {
+        capToken_mint_clamped(10091898204);
+
+        lender_borrow_clamped(105127212);
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+    }
+
+    // forge test --match-test test_capToken_mint_11 -vvv
+    // TODO: review this in meeting, seems like the best approach would be to check that the minFee is always paid, but requires additional tracking not available via interface
+    function test_capToken_mint_11() public {
+        switchChainlinkOracle(2);
+
+        mockChainlinkPriceFeed_setLatestAnswer(500144553869695547);
+
+        capToken_mint(
+            0xD16d567549A2a2a2005aEACf7fB193851603dd70, 2, 0, 0x00000000000000000000000000000000DeaDBeef, 1525295799
+        );
     }
 }

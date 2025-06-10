@@ -74,7 +74,7 @@ abstract contract BeforeAfter is Setup {
         // Get the debt token address for the current asset
         (,, address debtToken,,,,) = lender.reservesData(_getAsset());
 
-        // Store total debt as the debt token's total supply
+        // Store user debt as the debt token balance
         vars.debtTokenBalance[_getAsset()][_getActor()] = MockERC20(debtToken).balanceOf(_getActor());
     }
 

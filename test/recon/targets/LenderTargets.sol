@@ -36,14 +36,6 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender_cancelLiquidation();
     }
 
-    function lender_liquidate_clamped(uint256 _amount) public {
-        lender_liquidate(_getAsset(), _amount);
-    }
-
-    function lender_repay_clamped(uint256 _amount) public {
-        lender_repay(_getAsset(), _amount);
-    }
-
     /// Helper functions
     function _verifyBorrowProperties(
         address _asset,
@@ -158,11 +150,11 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: agent should not be liquidatable with health > 1e27
     /// @dev Property: Liquidations should always improve the health factor
     /// @dev Property: Emergency liquidations should always be available when emergency health is below 1e27
-    function lender_liquidate(address _asset, uint256 _amount) public updateGhosts asActor {
+    function lender_liquidate(uint256 _amount) public updateGhosts asActor {
         (uint256 totalDelegation,, uint256 totalDebt,,, uint256 healthBefore) =
             ILender(address(lender)).agent(_getActor());
 
-        try lender.liquidate(_getActor(), _asset, _amount) {
+        try lender.liquidate(_getActor(), _getAsset(), _amount) {
             if (healthBefore > 1e27) {
                 t(false, "agent should not be liquidatable with health > 1e27");
             }
@@ -189,12 +181,21 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: agent's total debt should not change when interest is realized
     function lender_realizeInterest() public updateGhostsWithType(OpType.REALIZE_INTEREST) {
         (,, uint256 totalDebtBefore,,,) = _getAgentParams(_getActor());
+        uint256 vaultDebtBefore = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
+        uint256 vaultAssetBalanceBefore = MockERC20(_getAsset()).balanceOf(address(capToken));
 
         vm.prank(_getActor());
         try lender.realizeInterest(_getAsset()) {
             (,, uint256 totalDebtAfter,,,) = _getAgentParams(_getActor());
+            uint256 vaultDebtAfter = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
+            uint256 vaultAssetBalanceAfter = MockERC20(_getAsset()).balanceOf(address(capToken));
 
-            eq(totalDebtAfter, totalDebtBefore, "total debt did not increase after realizeInterest");
+            eq(totalDebtAfter, totalDebtBefore, "agent total debt should not change after realizeInterest");
+            eq(
+                vaultDebtAfter - vaultDebtBefore,
+                vaultAssetBalanceBefore - vaultAssetBalanceAfter,
+                "vault debt increase != asset decrease in realizeInterest"
+            );
             // success
         } catch (bytes memory reason) {
             bool zeroRealizationError = checkError(reason, "ZeroRealization()");
@@ -213,7 +214,22 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         updateGhostsWithType(OpType.REALIZE_INTEREST)
         asActor
     {
+        uint256 vaultDebtBefore = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
+        uint256 vaultAssetBalanceBefore = MockERC20(_getAsset()).balanceOf(address(capToken));
+        (,, uint256 totalDebtBefore,,,) = _getAgentParams(_getActor());
+
         lender.realizeRestakerInterest(_getActor(), _asset);
+
+        uint256 vaultDebtAfter = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
+        uint256 vaultAssetBalanceAfter = MockERC20(_getAsset()).balanceOf(address(capToken));
+        (,, uint256 totalDebtAfter,,,) = _getAgentParams(_getActor());
+
+        eq(
+            vaultDebtAfter - vaultDebtBefore,
+            vaultAssetBalanceBefore - vaultAssetBalanceAfter,
+            "vault debt increase != asset decrease in realizeRestakerInterest"
+        );
+        eq(totalDebtAfter, totalDebtBefore, "agent total debt should not change after realizeRestakerInterest");
     }
 
     function lender_removeAsset(address _asset) public updateGhosts asAdmin {
@@ -221,8 +237,8 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     }
 
     /// @dev Property: Repay should never revert due to under/overflow
-    function lender_repay(address _asset, uint256 _amount) public asActor {
-        try lender.repay(_asset, _amount, _getActor()) {
+    function lender_repay(uint256 _amount) public asActor {
+        try lender.repay(_getAsset(), _amount, _getActor()) {
             // success
         } catch (bytes memory reason) {
             bool underflowError = checkError(reason, Panic.arithmeticPanic);
