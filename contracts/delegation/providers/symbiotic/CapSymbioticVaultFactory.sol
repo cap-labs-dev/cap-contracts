@@ -70,7 +70,7 @@ contract CapSymbioticVaultFactory is Ownable {
                     baseParams: IBaseDelegator.BaseParams({
                         defaultAdminRoleHolder: _owner,
                         hook: address(0),
-                        hookSetRoleHolder: _owner
+                        hookSetRoleHolder: address(0)
                     }),
                     networkLimitSetRoleHolders: new address[](0),
                     operatorNetworkSharesSetRoleHolders: new address[](0)
@@ -89,7 +89,7 @@ contract CapSymbioticVaultFactory is Ownable {
             IBurnerRouter.InitParams({
                 owner: address(0),
                 collateral: _collateral,
-                delay: 0,
+                delay: 1,
                 globalReceiver: middleware,
                 networkReceivers: new IBurnerRouter.NetworkReceiver[](0),
                 operatorNetworkReceivers: new IBurnerRouter.OperatorNetworkReceiver[](0)
