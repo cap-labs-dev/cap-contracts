@@ -26,21 +26,24 @@
 | 24 | property_agent_cannot_have_less_than_minBorrow_balance_of_debt_token | Agent can never have less than minBorrow balance of debt token | |
 | 25 | property_repaid_debt_equals_zero_debt | If all users have repaid their debt (have 0 DebtToken balance), reserve.debt == 0 | |
 | 26 | lender_repay | Repay should never revert due to under/overflow | |
-| 27 | lender_realizeInterest | realizeInterest should only revert with `ZeroRealization()` if paused or `totalUnrealizedInterest == 0`, otherwise should always update the realization value | |
-| 28 | lender_borrow | Asset cannot be borrowed when it is paused | |
-| 29 | lender_borrow | Borrower should be healthy after borrowing (self-liquidation) | |
-| 30 | lender_borrow | Borrower asset balance should increase after borrowing | |
-| 31 | lender_borrow | Borrower debt should increase after borrowing | |
-| 32 | lender_borrow | Total borrows should increase after borrowing | |
-| 33 | property_borrowed_asset_value | loaned assets value < delegations value (strictly) or the position is liquidatable | |
-| 34 | property_health_not_changed_with_realizeInterest | health should not change when interest is realized | |
-| 35 | lender_realizeInterest, lender_realizeRestakerInterest | agent's total debt should not change when interest is realized | |
-| 36 | lender_realizeInterest, lender_realizeRestakerInterest | The vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized | |
-| 37 | property_debt_increase_after_realizing_interest | The debt token balance of the agent should increase by the same amount that the total borrows of the asset increases when interest is realized | |
-| 38 | lender_initiateLiquidation | agent should not be liquidatable with health > 1e27 | |
-| 39 | lender_initiateLiquidation | Agent should always be liquidatable if it is unhealthy | |
-| 40 | lender_liquidate | agent should not be liquidatable with health > 1e27 | |
-| 41 | lender_liquidate | Liquidations should always improve the health factor | |
-| 42 | lender_liquidate | Emergency liquidations should always be available when emergency health is below 1e27 | |
-| 43 | doomsday_liquidate | Liquidate should always succeed for liquidatable agent | |
-| 44 | doomsday_repay | Repay should always succeed for agent that has debt | |
+| 27 | lender_realizeInterest | agent's total debt should not change when interest is realized | |
+| 28 | lender_realizeInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized | |
+| 29 | lender_realizeInterest | vault debt and total borrows should increase by the same amount after a call to `realizeInterest` | |
+| 30 | lender_borrow | Asset cannot be borrowed when it is paused | |
+| 31 | lender_borrow | Borrower should be healthy after borrowing (self-liquidation) | |
+| 32 | lender_borrow | Borrower asset balance should increase after borrowing | |
+| 33 | lender_borrow | Borrower debt should increase after borrowing | |
+| 34 | lender_borrow | Total borrows should increase after borrowing | |
+| 35 | property_borrowed_asset_value | loaned assets value < delegations value (strictly) or the position is liquidatable | |
+| 36 | property_health_not_changed_with_realizeInterest | health should not change when interest is realized | |
+| 37 | lender_realizeInterest | realizeInterest should only revert with `ZeroRealization()` if paused or `totalUnrealizedInterest == 0`, otherwise should always update the realization value | |
+| 38 | lender_realizeInterest, lender_realizeRestakerInterest | agent's total debt should not change when interest is realized | |
+| 39 | lender_realizeInterest, lender_realizeRestakerInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized | |
+| 40 | lender_realizeInterest, lender_realizeRestakerInterest | vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest` | |
+| 41 | lender_initiateLiquidation | agent should not be liquidatable with health > 1e27 | |
+| 42 | lender_initiateLiquidation | Agent should always be liquidatable if it is unhealthy | |
+| 43 | lender_liquidate | agent should not be liquidatable with health > 1e27 | |
+| 44 | lender_liquidate | Liquidations should always improve the health factor | |
+| 45 | lender_liquidate | Emergency liquidations should always be available when emergency health is below 1e27 | |
+| 46 | doomsday_liquidate | Liquidate should always succeed for liquidatable agent | |
+| 47 | doomsday_repay | Repay should always succeed for agent that has debt | |

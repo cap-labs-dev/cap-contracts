@@ -60,27 +60,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         capToken_burn_clamped(withdrawAmount);
     }
 
-    // forge test --match-test test_property_debt_increase_after_realizing_interest_8 -vvv
-    // NOTE: come back to this, something is up with before/after updates
-    function test_property_debt_increase_after_realizing_interest_8() public {
-        capToken_mint_clamped(10000886199);
-
-        lender_borrow_clamped(105137047);
-
-        (,, address debtToken,,,,) = ILender(address(lender)).reservesData(_getAsset());
-        console2.log("debt token balance before", MockERC20(debtToken).balanceOf(_getActor()));
-        console2.log("_before.debtTokenBalance", _before.debtTokenBalance[address(debtToken)][_getActor()]);
-        console2.log("_after.debtTokenBalance", _after.debtTokenBalance[address(debtToken)][_getActor()]);
-        vm.roll(block.number + 1);
-        vm.warp(block.timestamp + 1);
-        lender_realizeInterest();
-        console2.log("debt token balance after", MockERC20(debtToken).balanceOf(_getActor()));
-        console2.log("_before.debtTokenBalance", _before.debtTokenBalance[address(debtToken)][_getActor()]);
-        console2.log("_after.debtTokenBalance", _after.debtTokenBalance[address(debtToken)][_getActor()]);
-
-        property_debt_increase_after_realizing_interest();
-    }
-
     // forge test --match-test test_capToken_redeem_clamped_6 -vvv
     // NOTE: minting unbacked shares causes underflow revert in redemeptions, might just need to remove this from mockERC4626Tester
     // TODO: determine if minting unbacked shares is realisitc behavior

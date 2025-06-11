@@ -161,18 +161,22 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender.pauseAsset(_getAsset(), _pause);
     }
 
-    /// @dev Property: realizeInterest should only revert with ZeroRealization if paused or totalUnrealizedInterest == 0, otherwise should always update the realization value
     /// @dev Property: agent's total debt should not change when interest is realized
+    /// @dev Property: vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized
+    /// @dev Property: vault debt and total borrows should increase by the same amount after a call to `realizeInterest`
+    /// @dev Property: realizeInterest should only revert with ZeroRealization if paused or totalUnrealizedInterest == 0, otherwise should always update the realization value
     function lender_realizeInterest() public updateGhostsWithType(OpType.REALIZE_INTEREST) {
         (,, uint256 totalDebtBefore,,,) = _getAgentParams(_getActor());
         uint256 vaultDebtBefore = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
         uint256 vaultAssetBalanceBefore = MockERC20(_getAsset()).balanceOf(address(capToken));
+        uint256 totalBorrowsBefore = capToken.totalBorrows(_getAsset());
 
         vm.prank(_getActor());
         try lender.realizeInterest(_getAsset()) {
             (,, uint256 totalDebtAfter,,,) = _getAgentParams(_getActor());
             uint256 vaultDebtAfter = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
             uint256 vaultAssetBalanceAfter = MockERC20(_getAsset()).balanceOf(address(capToken));
+            uint256 totalBorrowsAfter = capToken.totalBorrows(_getAsset());
 
             eq(totalDebtAfter, totalDebtBefore, "agent total debt should not change after realizeInterest");
             eq(
@@ -180,7 +184,11 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
                 vaultAssetBalanceBefore - vaultAssetBalanceAfter,
                 "vault debt increase != asset decrease in realizeInterest"
             );
-            // success
+            eq(
+                vaultDebtAfter - vaultDebtBefore,
+                totalBorrowsAfter - totalBorrowsBefore,
+                "vault debt and total borrows should increase by the same amount after realizeInterest"
+            );
         } catch (bytes memory reason) {
             bool zeroRealizationError = checkError(reason, "ZeroRealization()");
 
@@ -193,6 +201,9 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         }
     }
 
+    /// @dev Property: agent's total debt should not change when restaker interest is realized
+    /// @dev Property: vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized
+    /// @dev Property: vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest`
     function lender_realizeRestakerInterest(address _asset)
         public
         updateGhostsWithType(OpType.REALIZE_INTEREST)
@@ -201,19 +212,26 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         uint256 vaultDebtBefore = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
         uint256 vaultAssetBalanceBefore = MockERC20(_getAsset()).balanceOf(address(capToken));
         (,, uint256 totalDebtBefore,,,) = _getAgentParams(_getActor());
+        uint256 totalBorrowsBefore = capToken.totalBorrows(_getAsset());
 
         lender.realizeRestakerInterest(_getActor(), _asset);
 
         uint256 vaultDebtAfter = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
         uint256 vaultAssetBalanceAfter = MockERC20(_getAsset()).balanceOf(address(capToken));
         (,, uint256 totalDebtAfter,,,) = _getAgentParams(_getActor());
+        uint256 totalBorrowsAfter = capToken.totalBorrows(_getAsset());
 
+        eq(totalDebtAfter, totalDebtBefore, "agent total debt should not change after realizeRestakerInterest");
         eq(
             vaultDebtAfter - vaultDebtBefore,
             vaultAssetBalanceBefore - vaultAssetBalanceAfter,
             "vault debt increase != asset decrease in realizeRestakerInterest"
         );
-        eq(totalDebtAfter, totalDebtBefore, "agent total debt should not change after realizeRestakerInterest");
+        eq(
+            vaultDebtAfter - vaultDebtBefore,
+            totalBorrowsAfter - totalBorrowsBefore,
+            "vault debt and total borrows should increase by the same amount after realizeRestakerInterest"
+        );
     }
 
     function lender_removeAsset(address _asset) public updateGhosts asAdmin {

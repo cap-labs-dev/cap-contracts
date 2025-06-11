@@ -194,18 +194,4 @@ abstract contract Properties is BeforeAfter, Asserts {
             eq(_after.agentHealth[_getActor()], _before.agentHealth[_getActor()], "health changed with realizeInterest");
         }
     }
-
-    /// @dev Property: The debt token balance of the agent should increase by the same amount that the total borrows of the asset increases when interest is realized
-    function property_debt_increase_after_realizing_interest() public {
-        if (currentOperation == OpType.REALIZE_INTEREST) {
-            // console2.log("_before.debtTokenBalance", _before.debtTokenBalance[_getAsset()][_getActor()]);
-            // console2.log("_after.debtTokenBalance", _after.debtTokenBalance[_getAsset()][_getActor()]);
-            // console2.log("_before.totalBorrows", _before.totalBorrows[_getAsset()]);
-            // console2.log("_after.totalBorrows", _after.totalBorrows[_getAsset()]);
-            uint256 debtIncrease =
-                _after.debtTokenBalance[_getAsset()][_getActor()] - _before.debtTokenBalance[_getAsset()][_getActor()];
-            uint256 borrowsIncrease = _after.totalBorrows[_getAsset()] - _before.totalBorrows[_getAsset()];
-            eq(debtIncrease, borrowsIncrease, "debt increase != borrows increase");
-        }
-    }
 }
