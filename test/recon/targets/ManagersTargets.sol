@@ -8,6 +8,7 @@ import { MockERC20 } from "@recon/MockERC20.sol";
 import { BeforeAfter } from "../BeforeAfter.sol";
 import { Properties } from "../Properties.sol";
 import { MockERC4626Tester } from "../mocks/MockERC4626Tester.sol";
+import { FunctionType, MockERC4626Tester, RevertType } from "test/recon/mocks/MockERC4626Tester.sol";
 
 // Target functions that are effectively inherited from the Actor and AssetManagers
 // Once properly standardized, managers will expose these by default
@@ -31,6 +32,12 @@ abstract contract ManagersTargets is BaseTargetFunctions, Properties {
 
     function add_new_vault() public {
         _newVault(_getAsset());
+    }
+
+    function vault_setRevertBehaviour(uint8 ft, uint8 rt) public {
+        ft %= 5;
+        rt %= 5;
+        MockERC4626Tester(_getVault()).setRevertBehaviour(FunctionType(ft), RevertType(rt));
     }
 
     /// @dev Deploy a new token and add it to the list of assets, then set it as the current asset

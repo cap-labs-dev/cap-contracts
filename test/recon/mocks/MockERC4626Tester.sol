@@ -108,23 +108,23 @@ abstract contract ERC4626 is MockERC20 {
     }
 }
 
+enum FunctionType {
+    NONE,
+    DEPOSIT,
+    MINT,
+    WITHDRAW,
+    REDEEM
+}
+
+enum RevertType {
+    NONE,
+    THROW,
+    OOG,
+    RETURN_BOMB,
+    REVERT_BOMB
+}
+
 contract MockERC4626Tester is ERC4626 {
-    enum FunctionType {
-        NONE,
-        DEPOSIT,
-        MINT,
-        WITHDRAW,
-        REDEEM
-    }
-
-    enum RevertType {
-        NONE,
-        THROW,
-        OOG,
-        RETURN_BOMB,
-        REVERT_BOMB
-    }
-
     mapping(FunctionType => RevertType) public revertBehaviours;
 
     uint8 public decimalsOffset;
