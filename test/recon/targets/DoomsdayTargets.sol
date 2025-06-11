@@ -21,34 +21,37 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
         revert("stateless");
     }
 
-    /// Note: Already checked in lender target functions
-    // /// @dev Property: liquidate should always succeed for liquidatable agent
-    // function doomsday_liquidate(uint256 _amount) public asActor {
-    //     try lender.liquidate(_getActor(), _getAsset(), _amount) {
-    //         // success
-    //     } catch (bytes memory reason) {
-    //         bool expectedError = checkError(reason, "HealthFactorNotBelowThreshold()")
-    //             || checkError(reason, "GracePeriodNotOver()") || checkError(reason, "LiquidationExpired()");
-    //         if (!expectedError) {
-    //             t(false, "liquidate should always succeed for liquidatable agent");
-    //         }
-    //     }
-    // }
+    /// @dev Property: liquidate should always succeed for liquidatable agent
+    function doomsday_liquidate(uint256 _amount) public asActor {
+        if (_amount == 0) {
+            return;
+        }
+        try lender.liquidate(_getActor(), _getAsset(), _amount) {
+            // success
+        } catch (bytes memory reason) {
+            bool expectedError = checkError(reason, "HealthFactorNotBelowThreshold()")
+                || checkError(reason, "GracePeriodNotOver()") || checkError(reason, "LiquidationExpired()");
+            if (!expectedError) {
+                t(false, "liquidate should always succeed for liquidatable agent");
+            }
+        }
+    }
 
     /// @dev Property: repay should always succeed for agent that has debt
     function doomsday_repay(uint256 _amount) public asActor {
         (,, uint256 totalDebt,,,) = lender.agent(_getActor());
-        if (totalDebt == 0) {
+        // Preconditions: should have debt, enough allowance and balance to repay
+        if (
+            totalDebt == 0 && MockERC20(_getAsset()).allowance(_getActor(), address(lender)) < _amount
+                && MockERC20(_getAsset()).balanceOf(_getActor()) < _amount
+        ) {
             return;
         }
-
         try lender.repay(_getAsset(), _amount, _getActor()) {
             // success
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "InvalidBurnAmount()");
-            bool enoughAllowance = MockERC20(_getAsset()).allowance(_getActor(), address(lender)) >= _amount;
-            bool enoughBalance = MockERC20(_getAsset()).balanceOf(_getActor()) >= _amount;
-            if (!expectedError && enoughAllowance && enoughBalance) {
+            if (!expectedError) {
                 t(false, "repay should always succeed for agent that has debt");
             }
         }

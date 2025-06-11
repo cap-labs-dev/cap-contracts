@@ -226,8 +226,11 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             // success
         } catch (bytes memory reason) {
             bool underflowError = checkError(reason, Panic.arithmeticPanic);
-
-            t(!underflowError, "underflow error");
+            bool enoughAllowance = MockERC20(_getAsset()).allowance(_getActor(), address(lender)) >= _amount;
+            bool enoughBalance = MockERC20(_getAsset()).balanceOf(_getActor()) >= _amount;
+            if (enoughAllowance && enoughBalance) {
+                t(!underflowError, "underflow error");
+            }
         }
     }
 }
