@@ -58,29 +58,8 @@ abstract contract BeforeAfter is Setup {
         vars.vaultAssetBalance = MockERC20(_getAsset()).balanceOf(address(capToken));
         vars.vaultDebt[_getAsset()] = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
 
-        try capToken.getRedeemAmount(capToken.balanceOf(_getActor())) returns (
-            uint256[] memory amountsOut, uint256[] memory redeemFees
-        ) {
-            vars.redeemAmountsOut = amountsOut;
-        } catch {
-            // If the call fails, we can assume the redeem amounts are zero
-            vars.redeemAmountsOut = new uint256[](0);
-        }
-        try lender.agent(_getActor()) returns (
-            uint256 totalDelegation,
-            uint256 totalSlashableCollateral,
-            uint256 totalDebt,
-            uint256 ltv,
-            uint256 liquidationThreshold,
-            uint256 health
-        ) {
-            vars.agentHealth[_getActor()] = health;
-            vars.agentTotalDebt[_getActor()] = totalDebt;
-        } catch {
-            // If the call fails, we can assume the health is 0
-            vars.agentHealth[_getActor()] = 0;
-            vars.agentTotalDebt[_getActor()] = 0;
-        }
+        vars.redeemAmountsOut = _getRedeemAmounts(_getActor());
+        (,, vars.agentTotalDebt[_getActor()],,, vars.agentHealth[_getActor()]) = _getAgentParams(_getActor());
     }
 
     function __before() internal {
@@ -95,7 +74,55 @@ abstract contract BeforeAfter is Setup {
         // Get the debt token address for the current asset
         (,, address debtToken,,,,) = lender.reservesData(_getAsset());
 
-        // Store total debt as the debt token's total supply
+        // Store user debt as the debt token balance
         vars.debtTokenBalance[_getAsset()][_getActor()] = MockERC20(debtToken).balanceOf(_getActor());
+    }
+
+    function _getAgentParams(address _agent)
+        internal
+        view
+        returns (
+            uint256 totalDelegation,
+            uint256 totalSlashableCollateral,
+            uint256 totalDebt,
+            uint256 ltv,
+            uint256 liquidationThreshold,
+            uint256 health
+        )
+    {
+        try lender.agent(_agent) returns (
+            uint256 _totalDelegation,
+            uint256 _totalSlashableCollateral,
+            uint256 _totalDebt,
+            uint256 _ltv,
+            uint256 _liquidationThreshold,
+            uint256 _health
+        ) {
+            totalDelegation = _totalDelegation;
+            totalSlashableCollateral = _totalSlashableCollateral;
+            totalDebt = _totalDebt;
+            ltv = _ltv;
+            liquidationThreshold = _liquidationThreshold;
+            health = _health;
+        } catch {
+            // If the call fails, we can assume the health is 0
+            totalDelegation = 0;
+            totalSlashableCollateral = 0;
+            totalDebt = 0;
+            ltv = 0;
+            liquidationThreshold = 0;
+            health = 0;
+        }
+    }
+
+    function _getRedeemAmounts(address _agent) internal view returns (uint256[] memory amountsOut) {
+        try capToken.getRedeemAmount(capToken.balanceOf(_agent)) returns (
+            uint256[] memory _amountsOut, uint256[] memory _redeemFees
+        ) {
+            amountsOut = _amountsOut;
+        } catch {
+            // If the call fails, we can assume the redeem amounts are zero
+            amountsOut = new uint256[](0);
+        }
     }
 }

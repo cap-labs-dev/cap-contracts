@@ -147,15 +147,13 @@ abstract contract Setup is
         _initVaultOracle(env.libs, env.infra, env.usdVault);
         for (uint256 i = 0; i < env.usdVault.assets.length; i++) {
             address asset = env.usdVault.assets[i];
-            address chainlinkPriceFeed = env.usdOracleMocks.chainlinkPriceFeeds[i];
-            address aavePriceFeed = env.usdOracleMocks.aaveDataProviders[i];
-            _initChainlinkPriceOracle(env.libs, env.infra, asset, chainlinkPriceFeed);
-            _initAaveRateOracle(env.libs, env.infra, asset, aavePriceFeed);
+            address _chainlinkPriceFeed = env.usdOracleMocks.chainlinkPriceFeeds[i];
+            address _aavePriceFeed = env.usdOracleMocks.aaveDataProviders[i];
+            _initChainlinkPriceOracle(env.libs, env.infra, asset, _chainlinkPriceFeed);
+            _initAaveRateOracle(env.libs, env.infra, asset, _aavePriceFeed);
         }
-        address chainlinkPriceFeed = env.usdOracleMocks.chainlinkPriceFeeds[assets.length];
-        address aavePriceFeed = env.usdOracleMocks.aaveDataProviders[assets.length];
-        _initChainlinkPriceOracle(env.libs, env.infra, mockEth, chainlinkPriceFeed);
-        _initAaveRateOracle(env.libs, env.infra, mockEth, aavePriceFeed);
+        _initChainlinkPriceOracle(env.libs, env.infra, mockEth, env.usdOracleMocks.chainlinkPriceFeeds[assets.length]); // Mock ETH
+        _initAaveRateOracle(env.libs, env.infra, mockEth, env.usdOracleMocks.aaveDataProviders[assets.length]); // Mock ETH
         //  oracle.setRestakerRate(address(this), uint256(1.585e18 + 0.01585e18));
 
         /// LENDER
