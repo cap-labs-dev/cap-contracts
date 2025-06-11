@@ -22,6 +22,8 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     // forge test --match-test test_crytic -vvv
     function test_crytic() public {
         // TODO: add failing property tests here for debugging
+        mockNetworkMiddleware_setMockCollateralByVault(0x796f2974e3C1af763252512dd6d521E9E984726C, 10002564536);
+        property_borrowed_asset_value();
     }
 
     function test_fractional_reserve_loss() public {
@@ -58,14 +60,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         capToken_burn_clamped(withdrawAmount);
     }
 
-    // forge test --match-test test_property_borrowed_asset_value_1 -vvv
-    // NOTE: probably fixed by knot's latest changes
-    function test_property_borrowed_asset_value_1() public {
-        mockNetworkMiddleware_setMockCollateralByVault(0x796f2974e3C1af763252512dd6d521E9E984726C, 10007044488);
-
-        property_borrowed_asset_value();
-    }
-
     // forge test --match-test test_property_debt_increase_after_realizing_interest_8 -vvv
     // NOTE: come back to this, something is up with before/after updates
     function test_property_debt_increase_after_realizing_interest_8() public {
@@ -73,139 +67,18 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         lender_borrow_clamped(105137047);
 
-        // console2.log(
-        //     "before lender_realizeInterest _before.debtTokenBalance[_getAsset()][_getActor()]",
-        //     _before.debtTokenBalance[_getAsset()][_getActor()]
-        // );
-        // console2.log(
-        //     "before lender_realizeInterest _after.debtTokenBalance[_getAsset()][_getActor()]",
-        //     _after.debtTokenBalance[_getAsset()][_getActor()]
-        // );
-
         (,, address debtToken,,,,) = ILender(address(lender)).reservesData(_getAsset());
-        console2.log("debt token balance", MockERC20(debtToken).balanceOf(_getActor()));
-        console2.log("debt token total supply", MockERC20(debtToken).totalSupply());
+        console2.log("debt token balance before", MockERC20(debtToken).balanceOf(_getActor()));
+        console2.log("_before.debtTokenBalance", _before.debtTokenBalance[address(debtToken)][_getActor()]);
+        console2.log("_after.debtTokenBalance", _after.debtTokenBalance[address(debtToken)][_getActor()]);
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 1);
         lender_realizeInterest();
         console2.log("debt token balance after", MockERC20(debtToken).balanceOf(_getActor()));
-        console2.log("debt token total supply after", MockERC20(debtToken).totalSupply());
-
-        // console2.log(
-        //     "after lender_realizeInterest _before.debtTokenBalance[_getAsset()][_getActor()]",
-        //     _before.debtTokenBalance[_getAsset()][_getActor()]
-        // );
-        // console2.log(
-        //     "after lender_realizeInterest _after.debtTokenBalance[_getAsset()][_getActor()]",
-        //     _after.debtTokenBalance[_getAsset()][_getActor()]
-        // );
+        console2.log("_before.debtTokenBalance", _before.debtTokenBalance[address(debtToken)][_getActor()]);
+        console2.log("_after.debtTokenBalance", _after.debtTokenBalance[address(debtToken)][_getActor()]);
 
         property_debt_increase_after_realizing_interest();
-    }
-
-    // forge test --match-test test_capToken_burn_clamped_3 -vvv
-    // NOTE: seems like a real break with a user being able to burn without fees
-    // seems like it would allow working around preventions for oracle drift
-    function test_capToken_burn_clamped_3() public {
-        capToken_mint_clamped(20000551208);
-
-        capToken_burn_clamped(10000683817);
-    }
-
-    // forge test --match-test test_capToken_mint_14 -vvv
-    // NOTE: similar to the above, but due to a change in price
-    function test_capToken_mint_14() public {
-        switchChainlinkOracle(2);
-
-        mockChainlinkPriceFeed_setLatestAnswer(500256233200780722);
-
-        capToken_mint(
-            0xD16d567549A2a2a2005aEACf7fB193851603dd70, 2, 0, 0x00000000000000000000000000000000DeaDBeef, 1525295799
-        );
-    }
-
-    // forge test --match-test test_lender_repay_clamped_6 -vvv
-    // NOTE: repay can revert due to underflow
-    // TODO: need to determine if the call sequence is realistic or needs further clamping
-    function test_lender_repay_clamped_6() public {
-        switchAaveOracle(2);
-
-        mockAaveDataProvider_setVariableBorrowRate(
-            57904238167892068531037184868122078708591352565700547569692866999400797589496
-        );
-
-        lender_repay(0);
-    }
-
-    // forge test --match-test test_lender_liquidate_1 -vvv
-    function test_lender_liquidate_1() public {
-        capToken_mint_clamped(10003039659);
-
-        switchChainlinkOracle(2);
-
-        lender_borrow_clamped(101505219);
-
-        mockChainlinkPriceFeed_setLatestAnswer(172978832219520413055122);
-
-        lender_liquidate(0);
-    }
-
-    // forge test --match-test test_lender_liquidate_clamped_2 -vvv
-    function test_lender_liquidate_clamped_2() public {
-        capToken_mint_clamped(10020274632);
-
-        switchChainlinkOracle(2);
-
-        lender_borrow_clamped(1570244088);
-
-        mockChainlinkPriceFeed_setLatestAnswer(11150459009966507495810);
-
-        lender_liquidate(0);
-    }
-
-    // forge test --match-test test_lender_borrow_clamped_5 -vvv
-    function test_lender_borrow_clamped_5() public {
-        capToken_mint_clamped(10001602506);
-
-        lender_borrow_clamped(100171022);
-
-        vm.warp(block.timestamp + 1);
-
-        vm.roll(block.number + 1);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-    }
-
-    // forge test --match-test test_lender_repay_6 -vvv
-    // TODO: define some realistic bounds for the borrow rate so this doesn't trivially break
-    function test_lender_repay_6() public {
-        mockAaveDataProvider_setVariableBorrowRate(
-            57899629142092681212539648668816850347303020206421162146955475922475103470875
-        );
-
-        lender_repay(0);
-    }
-
-    // forge test --match-test test_capToken_mint_7 -vvv
-    // TODO: fix to use the currently set min fee instead of 0 by default
-    function test_capToken_mint_7() public {
-        switchChainlinkOracle(2);
-
-        mockChainlinkPriceFeed_setLatestAnswer(500014818870012950);
-        console2.log("latest answer: %e", uint256(500014818870012950)); // 5.0001481887001295e17
-
-        capToken_mint(
-            0xD16d567549A2a2a2005aEACf7fB193851603dd70, 2, 0, 0x00000000000000000000000000000000DeaDBeef, 1525295799
-        );
-    }
-
-    // forge test --match-test test_capToken_mint_clamped_11 -vvv
-    // NOTE: mint just underflows for insufficient approvals
-    // should it throw a custom error instead? seems like a QA
-    function test_capToken_mint_clamped_11() public {
-        asset_approve(0x796f2974e3C1af763252512dd6d521E9E984726C, 0);
-
-        capToken_mint_clamped(10000304985);
     }
 
     // forge test --match-test test_capToken_redeem_clamped_6 -vvv
@@ -220,43 +93,11 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         capToken_investAll_clamped();
 
+        // decreases the PPFS
+        // is this realistic for yearn V3 though? is there anything in how losses are realized that would cause this?
+        // seems like it is because the PPS is decreased for all users when a loss is realized
         mockERC4626Tester_mintUnbackedShares(100003377823040994724, 0x0000000000000000000000000000000000000000);
 
-        capToken_redeem_clamped(1);
-    }
-
-    // forge test --match-test test_lender_borrow_clamped_10 -vvv
-    function test_lender_borrow_clamped_10() public {
-        capToken_mint_clamped(10091898204);
-
-        lender_borrow_clamped(105127212);
-
-        vm.roll(block.number + 1);
-        vm.warp(block.timestamp + 1);
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-    }
-
-    // forge test --match-test test_capToken_mint_11 -vvv
-    // TODO: review this in meeting, seems like the best approach would be to check that the minFee is always paid, but requires additional tracking not available via interface
-    function test_capToken_mint_11() public {
-        switchChainlinkOracle(2);
-
-        mockChainlinkPriceFeed_setLatestAnswer(500144553869695547);
-
-        capToken_mint(
-            0xD16d567549A2a2a2005aEACf7fB193851603dd70, 2, 0, 0x00000000000000000000000000000000DeaDBeef, 1525295799
-        );
-    }
-
-    // forge test --match-test test_capToken_redeem -vvv
-    function test_capToken_redeem_1() public {
-        capToken_mint_clamped(10034717198);
-        add_new_vault();
-        capToken_setFractionalReserveVault_clamped();
-        capToken_investAll_clamped();
-        mockERC4626Tester_mintUnbackedShares(
-            181964593936325880160149202517977803269925767111890944683041699248, address(0)
-        );
         capToken_redeem_clamped(1);
     }
 
@@ -270,15 +111,20 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         lender_liquidate(1);
     }
 
-    // forge test --match-test test_capToken_redeem -vvv
-    // NOTE: Erc4626 withdraw fails due to underflow
-    function test_capToken_redeem() public {
-        add_new_vault();
-        capToken_setFractionalReserveVault_clamped();
-        capToken_mint_clamped(10028693653);
-        capToken_investAll_clamped();
-        mockERC4626Tester_mintUnbackedShares(101078819858991464161, address(0));
+    // forge test --match-test test_property_vault_solvency_assets_12 -vvv
+    function test_property_vault_solvency_assets_12() public {
+        capToken_mint_clamped(10001099720);
 
-        capToken_redeem(1, new uint256[](0), address(0), 0);
+        add_new_vault();
+
+        capToken_setFractionalReserveVault_clamped();
+
+        capToken_investAll_clamped();
+
+        mockERC4626Tester_simulateLoss(1);
+
+        add_new_vault();
+
+        property_vault_solvency_assets();
     }
 }

@@ -71,11 +71,9 @@ abstract contract BeforeAfter is Setup {
     }
 
     function _updateVaultDebt(Vars storage vars) internal {
-        // Get the debt token address for the current asset
         (,, address debtToken,,,,) = lender.reservesData(_getAsset());
 
-        // Store user debt as the debt token balance
-        vars.debtTokenBalance[_getAsset()][_getActor()] = MockERC20(debtToken).balanceOf(_getActor());
+        vars.debtTokenBalance[address(debtToken)][_getActor()] = MockERC20(address(debtToken)).balanceOf(_getActor());
     }
 
     function _getAgentParams(address _agent)
