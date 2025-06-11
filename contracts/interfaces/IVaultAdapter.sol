@@ -52,4 +52,7 @@ interface IVaultAdapter {
     /// @param _minMultiplier Minimum slope multiplier
     /// @param _rate Rate at which the multiplier shifts
     event SetLimits(uint256 _maxMultiplier, uint256 _minMultiplier, uint256 _rate);
+
+    /// @dev Invalid kink
+    error InvalidKink();
 }

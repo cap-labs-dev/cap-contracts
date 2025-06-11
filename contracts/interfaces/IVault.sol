@@ -107,11 +107,17 @@ interface IVault {
 
     /// @notice Pause an asset
     /// @param _asset Asset address
-    function pause(address _asset) external;
+    function pauseAsset(address _asset) external;
 
     /// @notice Unpause an asset
     /// @param _asset Asset address
-    function unpause(address _asset) external;
+    function unpauseAsset(address _asset) external;
+
+    /// @notice Pause all protocol operations
+    function pauseProtocol() external;
+
+    /// @notice Unpause all protocol operations
+    function unpauseProtocol() external;
 
     /// @notice Rescue an unsupported asset
     /// @param _asset Asset to rescue

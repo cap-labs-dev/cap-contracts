@@ -15,7 +15,7 @@ library ChainlinkAdapter {
         uint8 decimals = IChainlink(_source).decimals();
         int256 intLatestAnswer;
         (, intLatestAnswer,, lastUpdated,) = IChainlink(_source).latestRoundData();
-        latestAnswer = uint256(intLatestAnswer);
+        latestAnswer = intLatestAnswer < 0 ? 0 : uint256(intLatestAnswer);
         if (decimals < 8) latestAnswer *= 10 ** (8 - decimals);
         if (decimals > 8) latestAnswer /= 10 ** (decimals - 8);
     }

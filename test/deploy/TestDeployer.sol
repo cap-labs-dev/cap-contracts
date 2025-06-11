@@ -165,9 +165,9 @@ contract TestDeployer is
             _initAaveRateOracle(env.libs, env.infra, env.ethVault.assets[i], env.ethOracleMocks.aaveDataProviders[i]);
         }
         for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            /// 1.585e18 is 5% per year
-            uint256 increment = (i + 1) * 0.01585e18; // Vary the restakers rate by 1% each
-            _initRestakerRateForAgent(env.infra, env.testUsers.agents[i], uint256(1.585e18 + increment)); // Restakers rate is per second in ray
+            /// 0.05e27 is 5% per year
+            uint256 increment = (i + 1) * 0.0001e27; // Vary the restakers rate by 1% each
+            _initRestakerRateForAgent(env.infra, env.testUsers.agents[i], uint256(0.05e27 + increment)); // Restakers rate is annualized in ray
         }
 
         /// LENDER
@@ -316,6 +316,7 @@ contract TestDeployer is
         vm.label(address(env.implems.accessControl), "AccessControlImplem");
         vm.label(address(env.implems.delegation), "DelegationImplem");
         vm.label(address(env.implems.feeAuction), "FeeAuctionImplem");
+        vm.label(address(env.implems.feeReceiver), "FeeReceiverImplem");
         vm.label(address(env.implems.oracle), "OracleImplem");
         vm.label(address(env.implems.lender), "LenderImplem");
         vm.label(address(env.implems.stakedCap), "StakedCapImplem");
@@ -344,9 +345,11 @@ contract TestDeployer is
         vm.label(address(env.usdVault.capToken), "cUSD");
         vm.label(address(env.usdVault.stakedCapToken), "scUSD");
         vm.label(address(env.usdVault.feeAuction), "cUSD_FeeAuction");
+        vm.label(address(env.usdVault.feeReceiver), "cUSD_FeeReceiver");
         vm.label(address(env.ethVault.capToken), "cETH");
         vm.label(address(env.ethVault.stakedCapToken), "scETH");
         vm.label(address(env.ethVault.feeAuction), "cETH_FeeAuction");
+        vm.label(address(env.ethVault.feeReceiver), "cETH_FeeReceiver");
 
         // Label symbiotic contracts
         if (!useMockBackingNetwork()) {

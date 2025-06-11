@@ -5,7 +5,7 @@ import { IFractionalReserve } from "../../interfaces/IFractionalReserve.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title Fractional Reserve Logic
 /// @author kexley, @capLabs
@@ -13,9 +13,13 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 /// withdrawing, redeeming or borrowing.
 library FractionalReserveLogic {
     using SafeERC20 for IERC20;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @dev Full divest required
     error FullDivestRequired(address asset, uint256 loss);
+
+    /// @dev Fractional reserve vault already set
+    error FractionalReserveVaultAlreadySet(address vault);
 
     /// @dev Fractional reserve invested event
     event FractionalReserveInvested(address indexed asset, uint256 amount);
@@ -39,7 +43,7 @@ library FractionalReserveLogic {
         uint256 assetBalance = IERC20(_asset).balanceOf(address(this));
         uint256 reserveBalance = $.reserve[_asset];
 
-        if (assetBalance > reserveBalance) {
+        if (assetBalance > reserveBalance && $.vault[_asset] != address(0)) {
             uint256 investAmount = assetBalance - reserveBalance;
             $.loaned[_asset] += investAmount;
             IERC20(_asset).forceApprove($.vault[_asset], investAmount);
@@ -112,6 +116,8 @@ library FractionalReserveLogic {
         address _asset,
         address _vault
     ) external {
+        if ($.vault[_asset] != address(0)) $.vaults.remove($.vault[_asset]);
+        if (!$.vaults.add(_vault)) revert FractionalReserveVaultAlreadySet(_vault);
         $.vault[_asset] = _vault;
 
         emit FractionalReserveVaultUpdated(_asset, _vault);

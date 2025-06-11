@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { IFractionalReserve } from "../../interfaces/IFractionalReserve.sol";
 import { IVault } from "../../interfaces/IVault.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -141,12 +142,12 @@ library VaultLogic {
         }
         if (params.amountOut == 0) revert InvalidAmount();
 
-        _verifyBalance($, params.asset, params.amountOut);
+        _verifyBalance($, params.asset, params.amountOut + params.fee);
 
         $.totalSupplies[params.asset] -= params.amountOut + params.fee;
 
         IERC20(params.asset).safeTransfer(params.receiver, params.amountOut);
-        IERC20(params.asset).safeTransfer($.insuranceFund, params.fee);
+        if (params.fee > 0) IERC20(params.asset).safeTransfer($.insuranceFund, params.fee);
 
         emit Burn(msg.sender, params.receiver, params.asset, params.amountIn, params.amountOut, params.fee);
     }
@@ -165,12 +166,11 @@ library VaultLogic {
             if (params.amountsOut[i] < params.minAmountsOut[i]) {
                 revert Slippage(asset, params.amountsOut[i], params.minAmountsOut[i]);
             }
-            if (params.amountsOut[i] == 0) revert InvalidAmount();
-            _verifyBalance($, asset, params.amountsOut[i]);
+            _verifyBalance($, asset, params.amountsOut[i] + params.fees[i]);
             _updateIndex($, asset);
             $.totalSupplies[asset] -= params.amountsOut[i] + params.fees[i];
             IERC20(asset).safeTransfer(params.receiver, params.amountsOut[i]);
-            IERC20(asset).safeTransfer($.insuranceFund, params.fees[i]);
+            if (params.fees[i] > 0) IERC20(asset).safeTransfer($.insuranceFund, params.fees[i]);
         }
 
         emit Redeem(msg.sender, params.receiver, params.amountIn, params.amountsOut, params.fees);
@@ -241,10 +241,16 @@ library VaultLogic {
 
     /// @notice Rescue an unsupported asset
     /// @param $ Vault storage pointer
+    /// @param reserve Fractional reserve storage pointer
     /// @param _asset Asset to rescue
     /// @param _receiver Receiver of the rescue
-    function rescueERC20(IVault.VaultStorage storage $, address _asset, address _receiver) external {
-        if (_listed($, _asset)) revert AssetNotRescuable(_asset);
+    function rescueERC20(
+        IVault.VaultStorage storage $,
+        IFractionalReserve.FractionalReserveStorage storage reserve,
+        address _asset,
+        address _receiver
+    ) external {
+        if (_listed($, _asset) || reserve.vaults.contains(_asset)) revert AssetNotRescuable(_asset);
         IERC20(_asset).safeTransfer(_receiver, IERC20(_asset).balanceOf(address(this)));
         emit RescueERC20(_asset, _receiver);
     }
