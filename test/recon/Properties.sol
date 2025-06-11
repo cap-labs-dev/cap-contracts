@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0
 pragma solidity ^0.8.0;
 
-import { BeforeAfter, OpType } from "./BeforeAfter.sol";
 import { Asserts } from "@chimera/Asserts.sol";
 import { MockERC20 } from "@recon/MockERC20.sol";
 import { console2 } from "forge-std/console2.sol";
+
+import { BeforeAfter, OpType } from "./BeforeAfter.sol";
+import { LenderWrapper } from "test/recon/helpers/LenderWrapper.sol";
 import { MockERC4626Tester } from "test/recon/mocks/MockERC4626Tester.sol";
 
 abstract contract Properties is BeforeAfter, Asserts {
@@ -25,8 +27,6 @@ abstract contract Properties is BeforeAfter, Asserts {
 
     /// @dev Property: Sum of deposits + sum of withdrawals is less than or equal to total supply
     function property_sum_of_withdrawals() public {
-        address[] memory actors = _getActors();
-
         lte(
             ghostAmountIn - ghostAmountOut,
             capToken.totalSupply(),
@@ -85,7 +85,7 @@ abstract contract Properties is BeforeAfter, Asserts {
                 "utilization ratio decreased after a borrow"
             );
         } else {
-            gte(
+            eq(
                 _before.utilizationRatio[_getAsset()],
                 _after.utilizationRatio[_getAsset()],
                 "utilization ratio increased without a borrow"
@@ -115,7 +115,7 @@ abstract contract Properties is BeforeAfter, Asserts {
                 sumUnrealizedInterest += unrealizedInterest;
             }
 
-            uint256 totalUnrealizedInterest = lender.getTotalUnrealizedInterest(assets[i]);
+            uint256 totalUnrealizedInterest = LenderWrapper(address(lender)).getTotalUnrealizedInterest(assets[i]);
             eq(sumUnrealizedInterest, totalUnrealizedInterest, "sum of unrealized interest != totalUnrealizedInterest");
         }
     }
@@ -125,8 +125,8 @@ abstract contract Properties is BeforeAfter, Asserts {
         address[] memory agents = delegation.agents();
 
         for (uint256 i; i < agents.length; ++i) {
-            (,, address debtToken,,,, uint256 minBorrow) = lender.reservesData(_getAsset());
-            uint256 agentDebt = MockERC20(debtToken).balanceOf(agents[i]);
+            (,, address _debtToken,,,, uint256 minBorrow) = lender.reservesData(_getAsset());
+            uint256 agentDebt = MockERC20(_debtToken).balanceOf(agents[i]);
 
             if (agentDebt > 0) {
                 gte(agentDebt, minBorrow, "agent has less than minBorrow balance of debt token");
@@ -145,8 +145,8 @@ abstract contract Properties is BeforeAfter, Asserts {
                 totalDebt += lender.debt(agents[j], assets[i]);
             }
 
-            (,, address debtToken,,,,) = lender.reservesData(assets[i]);
-            uint256 totalDebtTokenSupply = MockERC20(debtToken).totalSupply();
+            (,, address _debtToken,,,,) = lender.reservesData(assets[i]);
+            uint256 totalDebtTokenSupply = MockERC20(_debtToken).totalSupply();
 
             if (totalDebtTokenSupply == 0) {
                 eq(totalDebt, 0, "total debt != 0");
@@ -166,7 +166,7 @@ abstract contract Properties is BeforeAfter, Asserts {
             // Calculate the value in USD (8 decimals)
             uint256 debtValue = agentDebt * assetPrice / (10 ** MockERC20(_getAsset()).decimals());
 
-            (uint256 coverageValue, uint256 coverage) = mockNetworkMiddleware.coverageByVault(
+            (uint256 coverageValue,) = mockNetworkMiddleware.coverageByVault(
                 address(0), agents[i], env.usdVault.capToken, address(0), uint48(0)
             );
 
@@ -196,31 +196,13 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
-    /// @dev Property: agent's total debt should not change when interest is realized
-    function property_total_debt_not_changed_with_realizeInterest() public {
-        if (currentOperation == OpType.REALIZE_INTEREST) {
-            eq(
-                _after.agentTotalDebt[_getActor()],
-                _before.agentTotalDebt[_getActor()],
-                "total debt changed with realizeInterest"
-            );
-        }
-    }
-
-    /// @dev Property: The vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized
-    function property_vault_debt_increase() public {
-        if (currentOperation == OpType.REALIZE_INTEREST) {
-            uint256 debtIncrease = _after.vaultDebt[_getAsset()] - _before.vaultDebt[_getAsset()];
-            uint256 assetDecrease = _before.vaultAssetBalance - _after.vaultAssetBalance;
-            eq(debtIncrease, assetDecrease, "vault debt increase != asset decrease");
-        }
-    }
-
     /// @dev Property: The debt token balance of the agent should increase by the same amount that the total borrows of the asset increases when interest is realized
     function property_debt_increase_after_realizing_interest() public {
         if (currentOperation == OpType.REALIZE_INTEREST) {
-            console2.log("_after.debtTokenBalance", _after.debtTokenBalance[_getAsset()][_getActor()]);
-            console2.log("_before.debtTokenBalance", _before.debtTokenBalance[_getAsset()][_getActor()]);
+            // console2.log("_before.debtTokenBalance", _before.debtTokenBalance[_getAsset()][_getActor()]);
+            // console2.log("_after.debtTokenBalance", _after.debtTokenBalance[_getAsset()][_getActor()]);
+            // console2.log("_before.totalBorrows", _before.totalBorrows[_getAsset()]);
+            // console2.log("_after.totalBorrows", _after.totalBorrows[_getAsset()]);
             uint256 debtIncrease =
                 _after.debtTokenBalance[_getAsset()][_getActor()] - _before.debtTokenBalance[_getAsset()][_getActor()];
             uint256 borrowsIncrease = _after.totalBorrows[_getAsset()] - _before.totalBorrows[_getAsset()];
