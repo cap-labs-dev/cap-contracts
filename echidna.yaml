@@ -8,7 +8,7 @@ filterFunctions: []
 deployer: "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496"
 contractAddr: "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496"
 shrinkLimit: 100000
-testLimit: 1000000
+testLimit: 100000000
 format: "text"
 cryticArgs: ["--compile-libraries=(StakedCapAdapter,0xf01),(ReserveLogic,0xf02),(ViewLogic,0xf03),(ChainlinkAdapter,0xf04),(VaultLogic,0xf05),(MinterLogic,0xf06),(AaveAdapter,0xf07),(LiquidationLogic,0xf08),(BorrowLogic,0xf09),(FractionalReserveLogic,0xf0a),(CapTokenAdapter,0xf0b),(ValidationLogic,0xf0c)","--foundry-compile-all"]
 deployContracts: [

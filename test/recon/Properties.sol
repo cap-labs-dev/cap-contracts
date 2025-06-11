@@ -166,12 +166,11 @@ abstract contract Properties is BeforeAfter, Asserts {
             // Calculate the value in USD (8 decimals)
             uint256 debtValue = agentDebt * assetPrice / (10 ** MockERC20(_getAsset()).decimals());
 
-            (uint256 coverageValue,) = mockNetworkMiddleware.coverageByVault(
-                address(0), agents[i], env.usdVault.capToken, address(0), uint48(0)
-            );
+            (uint256 coverageValue,) =
+                mockNetworkMiddleware.coverageByVault(address(0), agents[i], mockEth, address(0), uint48(0));
 
             // check if the value of the loaned amount is < the coverage value
-            if (debtValue < coverageValue) {
+            if (debtValue > coverageValue) {
                 // if true, the position must be liquidatable
                 (,,,,, uint256 health) = lender.agent(agents[i]);
                 // check if the position is liquidatable

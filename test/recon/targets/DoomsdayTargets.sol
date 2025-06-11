@@ -4,6 +4,8 @@ pragma solidity ^0.8.0;
 import { BeforeAfter } from "../BeforeAfter.sol";
 import { Properties } from "../Properties.sol";
 import { BaseTargetFunctions } from "@chimera/BaseTargetFunctions.sol";
+import { MockERC20 } from "@recon/MockERC20.sol";
+
 // Chimera deps
 import { vm } from "@chimera/Hevm.sol";
 
@@ -19,18 +21,19 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
         revert("stateless");
     }
 
-    /// @dev Property: liquidate should always succeed for liquidatable agent
-    function doomsday_liquidate(uint256 _amount) public asActor {
-        try lender.liquidate(_getActor(), _getAsset(), _amount) {
-            // success
-        } catch (bytes memory reason) {
-            bool expectedError = checkError(reason, "HealthFactorNotBelowThreshold()")
-                || checkError(reason, "GracePeriodNotOver()") || checkError(reason, "LiquidationExpired()");
-            if (!expectedError) {
-                t(false, "liquidate should always succeed for liquidatable agent");
-            }
-        }
-    }
+    /// Note: Already checked in lender target functions
+    // /// @dev Property: liquidate should always succeed for liquidatable agent
+    // function doomsday_liquidate(uint256 _amount) public asActor {
+    //     try lender.liquidate(_getActor(), _getAsset(), _amount) {
+    //         // success
+    //     } catch (bytes memory reason) {
+    //         bool expectedError = checkError(reason, "HealthFactorNotBelowThreshold()")
+    //             || checkError(reason, "GracePeriodNotOver()") || checkError(reason, "LiquidationExpired()");
+    //         if (!expectedError) {
+    //             t(false, "liquidate should always succeed for liquidatable agent");
+    //         }
+    //     }
+    // }
 
     /// @dev Property: repay should always succeed for agent that has debt
     function doomsday_repay(uint256 _amount) public asActor {
@@ -43,7 +46,9 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
             // success
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "InvalidBurnAmount()");
-            if (!expectedError) {
+            bool enoughAllowance = MockERC20(_getAsset()).allowance(_getActor(), address(lender)) >= _amount;
+            bool enoughBalance = MockERC20(_getAsset()).balanceOf(_getActor()) >= _amount;
+            if (!expectedError && enoughAllowance && enoughBalance) {
                 t(false, "repay should always succeed for agent that has debt");
             }
         }

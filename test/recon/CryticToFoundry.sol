@@ -22,6 +22,8 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     // forge test --match-test test_crytic -vvv
     function test_crytic() public {
         // TODO: add failing property tests here for debugging
+        mockNetworkMiddleware_setMockCollateralByVault(0x796f2974e3C1af763252512dd6d521E9E984726C, 10002564536);
+        property_borrowed_asset_value();
     }
 
     function test_fractional_reserve_loss() public {
