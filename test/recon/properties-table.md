@@ -43,9 +43,13 @@
 | 41 | lender_realizeInterest, lender_realizeRestakerInterest | vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest` | |
 | 42 | lender_initiateLiquidation | agent should not be liquidatable with health > 1e27 | |
 | 43 | lender_initiateLiquidation | Agent should always be liquidatable if it is unhealthy | |
-| 44 | lender_liquidate | agent should not be liquidatable with health > 1e27 | |
-| 45 | lender_liquidate | Liquidations should always improve the health factor | |
-| 46 | lender_liquidate | Emergency liquidations should always be available when emergency health is below 1e27 | |
-| 47 | doomsday_liquidate | Liquidate should always succeed for liquidatable agent | |
-| 48 | doomsday_repay | Repay should always succeed for agent that has debt | |
-| 49 | property_total_system_collateralization | System must be overcollateralized after all liquidations | |
+| 44 | lender_liquidate | liquidation should be profitable for the liquidator | |
+| 45 | lender_liquidate | agent should not be liquidatable with health > 1e27 | |
+| 46 | lender_liquidate | Liquidations should always improve the health factor | |
+| 47 | lender_liquidate | Emergency liquidations should always be available when emergency health is below 1e27 | |
+| 48 | lender_liquidate | Partial liquidations should not bring health above 1.25 | |
+| 49 | doomsday_liquidate | Liquidate should always succeed for liquidatable agent | |
+| 50 | doomsday_repay | Repay should always succeed for agent that has debt | |
+| 51 | property_total_system_collateralization | System must be overcollateralized after all liquidations | |
+| 52 | property_delegated_value_greater_than_borrowed_value | Delegated value must be greater than borrowed value, if not the agent should be liquidatable | |
+| 53 | property_ltv | LTV is always <= 1e27 | |

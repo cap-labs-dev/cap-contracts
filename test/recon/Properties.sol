@@ -213,4 +213,15 @@ abstract contract Properties is BeforeAfter, Asserts {
         uint256 ratio = totalDebt == 0 ? 0 : (totalDelegation * 1e27) / totalDebt;
         gte(ratio, 1e27, "total system collateralization ratio < 1e27");
     }
+
+    /// @dev Property: Delegated value must be greater than borrowed value, if not the agent should be liquidatable
+    function property_delegated_value_greater_than_borrowed_value() public {
+        address[] memory agents = delegation.agents();
+        for (uint256 i; i < agents.length; ++i) {
+            (uint256 agentDelegation,, uint256 agentDebt,,, uint256 health) = lender.agent(agents[i]);
+            if (agentDelegation < agentDebt) {
+                t(health < 1e27, "delegated value < borrowed value and agent is not liquidatable");
+            }
+        }
+    }
 }

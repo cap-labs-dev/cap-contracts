@@ -132,18 +132,46 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         }
     }
 
+    /// @dev Property: Liquidations should always be profitable for the liquidator
     /// @dev Property: agent should not be liquidatable with health > 1e27
     /// @dev Property: Liquidations should always improve the health factor
+    /// @dev Property: Partial liquidations should not bring health above 1.25
     /// @dev Property: Emergency liquidations should always be available when emergency health is below 1e27
     function lender_liquidate(uint256 _amount) public updateGhosts asActor {
+        address vault = mockNetworkMiddleware.vaults(_getActor());
         (uint256 totalDelegation,, uint256 totalDebt,,, uint256 healthBefore) = lender.agent(_getActor());
+        uint256 maxLiquidatable = lender.maxLiquidatable(_getActor(), _getAsset());
+        uint256 assetBalanceBefore = MockERC20(_getAsset()).balanceOf(_getActor());
+        uint256 collateralBalanceBefore = MockERC20(vault).balanceOf(_getActor());
+        (uint256 collateralPrice,) = oracle.getPrice(vault); // vault token is what's minted by the MockNetworkMiddleware
+        (uint256 assetPrice,) = oracle.getPrice(_getAsset());
 
-        try lender.liquidate(_getActor(), _getAsset(), _amount) {
+        try lender.liquidate(_getActor(), _getAsset(), _amount) returns (uint256 liquidatedValue) {
+            {
+                uint256 assetBalanceAfter = MockERC20(_getAsset()).balanceOf(_getActor());
+                uint256 collateralBalanceAfter = MockERC20(vault).balanceOf(_getActor());
+                uint256 collateralAmountDelta = collateralBalanceAfter - collateralBalanceBefore;
+                uint256 assetAmountDelta = assetBalanceAfter - assetBalanceBefore;
+
+                // Calculate value of deltas using oracle price
+                uint256 collateralValueDelta =
+                    (collateralAmountDelta * collateralPrice) / (10 ** MockERC20(vault).decimals());
+                uint256 assetValueDelta = (assetAmountDelta * assetPrice) / (10 ** MockERC20(_getAsset()).decimals());
+
+                gte(collateralValueDelta, assetValueDelta, "liquidation should be profitable for the liquidator");
+            }
+
             if (healthBefore > 1e27) {
                 t(false, "agent should not be liquidatable with health > 1e27");
             }
+
             (,,,,, uint256 healthAfter) = lender.agent(_getActor());
             gt(healthAfter, healthBefore, "Liquidation did not improve health factor");
+
+            // precondition: must be liquidating less than maxLiquidatable
+            if (_amount < maxLiquidatable) {
+                lte(healthAfter, 1.25e27, "partial liquidation should not bring health above 1.25");
+            }
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "InvalidBurnAmount()");
             // precondition: must be liquidating more than 0
