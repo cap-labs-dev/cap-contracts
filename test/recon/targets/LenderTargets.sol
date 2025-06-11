@@ -74,7 +74,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         try lender.borrow(_asset, _amount, _receiver) {
             uint256 borrowerDebtDelta = DebtToken(_debtToken).balanceOf(_getActor()) - beforeBorrowerDebt;
 
-            t(!capToken.paused() && !capToken.paused(_asset), "asset can be borrowed when it is paused");
+            t(!capToken.paused() || !capToken.paused(_asset), "asset can be borrowed when it is paused");
 
             (,,,,, uint256 health) = lender.agent(_getActor());
             gt(health, RAY, "Borrower is unhealthy after borrowing");

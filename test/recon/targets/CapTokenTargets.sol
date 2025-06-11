@@ -149,11 +149,12 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         capToken.investAll(_asset);
     }
 
-    /// @dev Property: User can always mint cap token if they have sufficient balance of depositing asset
     /// @dev Property: User always receives at least the minimum amount out
-    /// @dev Property: User always receives at most the expected amount out
-    /// @dev Property: Fees are always nonzero when minting
     /// @dev Property: Fees are always <= the amount out
+    /// @dev Property: Fees are always nonzero when minting
+    /// @dev Property: User always receives at most the expected amount out
+    /// @dev Property: Asset cannot be minted when it is paused
+    /// @dev Property: User can always mint cap token if they have sufficient balance of depositing asset
     function capToken_mint(
         address _asset,
         uint256 _amountIn,
