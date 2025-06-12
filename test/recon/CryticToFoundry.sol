@@ -3,15 +3,14 @@ pragma solidity ^0.8.0;
 
 import { FoundryAsserts } from "@chimera/FoundryAsserts.sol";
 import { MockERC20 } from "@recon/MockERC20.sol";
-
-import { TargetFunctions } from "./TargetFunctions.sol";
+import { Test, console2 } from "forge-std/Test.sol";
 
 import { ILender } from "contracts/interfaces/ILender.sol";
+import { IOracle } from "contracts/interfaces/IOracle.sol";
 import { IVault } from "contracts/interfaces/IVault.sol";
-import "forge-std/console2.sol";
 
+import { TargetFunctions } from "./TargetFunctions.sol";
 import { MockERC4626Tester } from "./targets/MockERC4626TesterTargets.sol";
-import { Test } from "forge-std/Test.sol";
 
 // forge test --match-contract CryticToFoundry test/recon/CryticToFoundry.sol -vv
 contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
@@ -105,5 +104,35 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         add_new_vault();
 
         property_vault_solvency_assets();
+    }
+
+    // forge test --match-test test_lender_repay_6 -vvv
+    function test_lender_repay_6() public {
+        capToken_mint_clamped(10002011355);
+
+        lender_borrow_clamped(100051063);
+
+        oracle_setRestakerRate(
+            0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496,
+            1157449494152887941185278230451771113777492868836762663430031328785281
+        );
+
+        lender_repay(0);
+    }
+
+    // forge test --match-test test_lender_realizeRestakerInterest_7 -vvv
+    // TODO: come back to this, need to figure out why tracking delegation balance is off even though the transfer of the asset to it is successful
+    function test_lender_realizeRestakerInterest_7() public {
+        oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 1679060376);
+
+        capToken_mint_clamped(106481131726877242408);
+
+        lender_borrow_clamped(105848193758379280936);
+
+        vm.warp(block.timestamp + 177294);
+
+        vm.roll(block.number + 1);
+
+        lender_realizeRestakerInterest();
     }
 }
