@@ -38,7 +38,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         capToken_mint(_getAsset(), mintAmount, 0, _getActor(), block.timestamp + 1 days);
 
         // 4. Invest all assets in the CapToken
-        capToken_investAll(_getAsset());
+        capToken_investAll();
 
         // 5. Decrease the yield of the vault to simulate a loss
         mockERC4626Tester_simulateLoss(1e17); // 10% loss
@@ -70,7 +70,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         capToken_setFractionalReserveVault_clamped();
 
-        capToken_investAll_clamped();
+        capToken_investAll();
 
         // decreases the PPFS
         // is this realistic for yearn V3 though? is there anything in how losses are realized that would cause this?
@@ -98,7 +98,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         capToken_setFractionalReserveVault_clamped();
 
-        capToken_investAll_clamped();
+        capToken_investAll();
 
         mockERC4626Tester_simulateLoss(1);
 

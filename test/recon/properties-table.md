@@ -47,3 +47,4 @@
 | 45 | lender_liquidate | Emergency liquidations should always be available when emergency health is below 1e27 | |
 | 46 | doomsday_liquidate | Liquidate should always succeed for liquidatable agent | |
 | 47 | doomsday_repay | Repay should always succeed for agent that has debt | |
+| 48 | capToken_divestAll | ERC4626 must always be divestable | |
