@@ -181,13 +181,6 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
-    /// @dev Property: health should not change when interest is realized
-    function property_health_not_changed_with_realizeInterest() public {
-        if (currentOperation == OpType.REALIZE_INTEREST) {
-            eq(_after.agentHealth[_getActor()], _before.agentHealth[_getActor()], "health changed with realizeInterest");
-        }
-    }
-
     /// @dev Property: system must be overcollateralized after all liquidations
     // TODO: check if the minimum shouldn't be > 1e27
     function property_total_system_collateralization() public {
