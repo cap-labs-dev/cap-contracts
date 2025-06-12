@@ -174,12 +174,13 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             }
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "InvalidBurnAmount()");
-            // precondition: must be liquidating more than 0
-            if (!expectedError) {
+            bool isPaused = capToken.paused();
+            // precondition: must be liquidating more than 0 and not paused
+            if (!expectedError && !isPaused) {
                 gte(
                     totalDelegation * lender.emergencyLiquidationThreshold() / totalDebt,
                     RAY,
-                    "Emergency liquidations is not available when emergency health is below 1e27"
+                    "Emergency liquidation is not available when emergency health is below 1e27"
                 );
             }
         }
