@@ -210,7 +210,7 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
 
         // get the total system collateralization ratio
-        uint256 ratio = totalDebt == 0 ? 0 : (totalDelegation * 1e27) / totalDebt;
+        uint256 ratio = totalDebt == 0 ? type(uint256).max : (totalDelegation * 1e27) / totalDebt;
         gte(ratio, 1e27, "total system collateralization ratio < 1e27");
     }
 

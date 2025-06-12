@@ -194,22 +194,23 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: vault debt and total borrows should increase by the same amount after a call to `realizeInterest`
     /// @dev Property: realizeInterest should only revert with ZeroRealization if paused or totalUnrealizedInterest == 0, otherwise should always update the realization value
     function lender_realizeInterest() public updateGhostsWithType(OpType.REALIZE_INTEREST) {
+        (,,, address interestReceiver,,,) = lender.reservesData(_getAsset());
         (,, uint256 totalDebtBefore,,,) = _getAgentParams(_getActor());
         uint256 vaultDebtBefore = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
-        uint256 vaultAssetBalanceBefore = MockERC20(_getAsset()).balanceOf(address(capToken));
+        uint256 interestReceiverBalanceBefore = MockERC20(_getAsset()).balanceOf(address(interestReceiver)); // we check the balance of the interest receiver as a proxy for the vault because they're one that actually receive assets that get borrowed from vault
         uint256 totalBorrowsBefore = capToken.totalBorrows(_getAsset());
 
         vm.prank(_getActor());
         try lender.realizeInterest(_getAsset()) {
             (,, uint256 totalDebtAfter,,,) = _getAgentParams(_getActor());
             uint256 vaultDebtAfter = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
-            uint256 vaultAssetBalanceAfter = MockERC20(_getAsset()).balanceOf(address(capToken));
+            uint256 interestReceiverBalanceAfter = MockERC20(_getAsset()).balanceOf(address(interestReceiver));
             uint256 totalBorrowsAfter = capToken.totalBorrows(_getAsset());
 
             eq(totalDebtAfter, totalDebtBefore, "agent total debt should not change after realizeInterest");
             eq(
                 vaultDebtAfter - vaultDebtBefore,
-                vaultAssetBalanceBefore - vaultAssetBalanceAfter,
+                interestReceiverBalanceAfter - interestReceiverBalanceBefore,
                 "vault debt increase != asset decrease in realizeInterest"
             );
             eq(
@@ -237,22 +238,23 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         updateGhostsWithType(OpType.REALIZE_INTEREST)
         asActor
     {
+        address delegation = LenderWrapper(address(lender)).getDelegation();
         uint256 vaultDebtBefore = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
-        uint256 vaultAssetBalanceBefore = MockERC20(_getAsset()).balanceOf(address(capToken));
+        uint256 delegationAssetBalanceBefore = MockERC20(_getAsset()).balanceOf(delegation); // we check the balance of the delegation as a proxy for the vault because they're one that actually receive assets that get borrowed from vault
         (,, uint256 totalDebtBefore,,,) = _getAgentParams(_getActor());
         uint256 totalBorrowsBefore = capToken.totalBorrows(_getAsset());
 
         lender.realizeRestakerInterest(_getActor(), _asset);
 
         uint256 vaultDebtAfter = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
-        uint256 vaultAssetBalanceAfter = MockERC20(_getAsset()).balanceOf(address(capToken));
+        uint256 delegationAssetBalanceAfter = MockERC20(_getAsset()).balanceOf(delegation);
         (,, uint256 totalDebtAfter,,,) = _getAgentParams(_getActor());
         uint256 totalBorrowsAfter = capToken.totalBorrows(_getAsset());
 
         eq(totalDebtAfter, totalDebtBefore, "agent total debt should not change after realizeRestakerInterest");
         eq(
             vaultDebtAfter - vaultDebtBefore,
-            vaultAssetBalanceBefore - vaultAssetBalanceAfter,
+            delegationAssetBalanceAfter - delegationAssetBalanceBefore,
             "vault debt increase != asset decrease in realizeRestakerInterest"
         );
         eq(
