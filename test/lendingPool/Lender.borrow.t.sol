@@ -244,7 +244,9 @@ contract LenderBorrowTest is TestDeployer {
 
         lender.repay(address(usdc), debt, user_agent);
 
-        lender.repay(address(usdc), restakerInterest, user_agent);
+        (,,,,,, uint256 minBorrow) = lender.reservesData(address(usdc));
+
+        lender.repay(address(usdc), restakerInterest + minBorrow, user_agent);
 
         assertDebtEq(0);
     }
