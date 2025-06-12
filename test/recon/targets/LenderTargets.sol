@@ -227,8 +227,8 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             (,,,,, bool paused,) = lender.reservesData(_getAsset());
             uint256 totalUnrealizedInterest = LenderWrapper(address(lender)).getTotalUnrealizedInterest(_getAsset());
 
-            if (!paused && totalUnrealizedInterest != 0) {
-                t(!zeroRealizationError, "realizeInterest does not update when it should");
+            if (!paused && !zeroRealizationError && totalUnrealizedInterest != 0) {
+                t(false, "realizeInterest does not update when it should");
             }
         }
     }
@@ -237,18 +237,14 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized
     /// @dev Property: vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest`
     /// @dev Property: health should not change when realizeRestakerInterest is called
-    function lender_realizeRestakerInterest(address _asset)
-        public
-        updateGhostsWithType(OpType.REALIZE_INTEREST)
-        asActor
-    {
+    function lender_realizeRestakerInterest() public updateGhostsWithType(OpType.REALIZE_INTEREST) asActor {
         address delegation = LenderWrapper(address(lender)).getDelegation();
         uint256 vaultDebtBefore = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
         uint256 delegationAssetBalanceBefore = MockERC20(_getAsset()).balanceOf(delegation); // we check the balance of the delegation as a proxy for the vault because they're one that actually receive assets that get borrowed from vault
         (,, uint256 totalDebtBefore,,, uint256 healthBefore) = _getAgentParams(_getActor());
         uint256 totalBorrowsBefore = capToken.totalBorrows(_getAsset());
 
-        lender.realizeRestakerInterest(_getActor(), _asset);
+        lender.realizeRestakerInterest(_getActor(), _getAsset());
 
         uint256 vaultDebtAfter = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
         uint256 delegationAssetBalanceAfter = MockERC20(_getAsset()).balanceOf(delegation);
@@ -256,6 +252,10 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         uint256 totalBorrowsAfter = capToken.totalBorrows(_getAsset());
 
         eq(totalDebtAfter, totalDebtBefore, "agent total debt should not change after realizeRestakerInterest");
+        // console2.log("delegationAssetBalanceAfter", delegationAssetBalanceAfter);
+        // console2.log("delegationAssetBalanceBefore", delegationAssetBalanceBefore);
+        // console2.log("asset in handler", _getAsset());
+        // console2.log("delegation in handler", delegation);
         eq(
             vaultDebtAfter - vaultDebtBefore,
             delegationAssetBalanceAfter - delegationAssetBalanceBefore,

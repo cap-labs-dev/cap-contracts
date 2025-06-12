@@ -44,9 +44,11 @@ abstract contract Properties is BeforeAfter, Asserts {
             uint256 vaultBalance = MockERC20(assets[i]).balanceOf(address(capToken));
             uint256 fractionalReserveBalance =
                 MockERC20(assets[i]).balanceOf(capToken.fractionalReserveVault(assets[i]));
+            uint256 fractionalReserveLosses = _getFractionalReserveLosses(assets[i]);
+
             lte(
                 totalSupplied,
-                vaultBalance + totalBorrow + fractionalReserveBalance + MockERC4626Tester(_getVault()).totalLosses(),
+                vaultBalance + totalBorrow + fractionalReserveBalance + fractionalReserveLosses,
                 "totalSupplies > vault balance + totalBorrows"
             );
         }
@@ -215,6 +217,17 @@ abstract contract Properties is BeforeAfter, Asserts {
             if (agentDelegation < agentDebt) {
                 t(health < 1e27, "delegated value < borrowed value and agent is not liquidatable");
             }
+        }
+    }
+
+    /// === Helpers === ///
+    function _getFractionalReserveLosses(address _asset) internal view returns (uint256) {
+        address fractionalReserveVault = capToken.fractionalReserveVault(_asset);
+
+        if (fractionalReserveVault == address(0)) {
+            return 0;
+        } else {
+            return MockERC4626Tester(fractionalReserveVault).totalLosses();
         }
     }
 }
