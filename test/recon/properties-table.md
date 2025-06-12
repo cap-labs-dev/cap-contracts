@@ -34,6 +34,7 @@
 | 32 | lender_borrow | Borrower asset balance should increase after borrowing | |
 | 33 | lender_borrow | Borrower debt should increase after borrowing | |
 | 34 | lender_borrow | Total borrows should increase after borrowing | |
+| 34 | lender_borrow | Borrow should only revert with an expected error | |
 | 35 | property_borrowed_asset_value | loaned assets value < delegations value (strictly) or the position is liquidatable | |
 | 36 | property_health_not_changed_with_realizeInterest | health should not change when interest is realized | |
 | 37 | lender_realizeInterest | realizeInterest should only revert with `ZeroRealization()` if paused or `totalUnrealizedInterest == 0`, otherwise should always update the realization value | |
