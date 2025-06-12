@@ -28,7 +28,7 @@ contract DeployInfra is
     DeployLibs,
     ConfigureAccessControl
 {
-    string constant OUTPUT_PATH_FROM_PROJECT_ROOT = "config/cap-testnet-infra.json";
+    string constant OUTPUT_PATH_FROM_PROJECT_ROOT = "config/cap-mainnet-infra.json";
 
     UsersConfig users;
     ImplementationsConfig implems;
@@ -36,7 +36,7 @@ contract DeployInfra is
     InfraConfig infra;
 
     function run() external {
-        uint256 delegationEpochDuration = 1 days; // mainnet & unit tests
+        uint256 delegationEpochDuration = 3 days; // mainnet & unit tests
         //uint256 delegationEpochDuration = 1 minutes; // testnet
 
         vm.startBroadcast();
