@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import { Access } from "../access/Access.sol";
 import { IOracle } from "../interfaces/IOracle.sol";
+import { IOracleTypes } from "../interfaces/IOracleTypes.sol";
 import { IPriceOracle } from "../interfaces/IPriceOracle.sol";
 import { PriceOracleStorageUtils } from "../storage/PriceOracleStorageUtils.sol";
 
@@ -26,7 +27,7 @@ abstract contract PriceOracle is IPriceOracle, Access, PriceOracleStorageUtils {
     /// @return price Price of the asset
     function getPrice(address _asset) external view returns (uint256 price, uint256 lastUpdated) {
         PriceOracleStorage storage $ = getPriceOracleStorage();
-        IOracle.OracleData memory data = $.oracleData[_asset];
+        IOracleTypes.OracleData memory data = $.oracleData[_asset];
 
         (price, lastUpdated) = _getPrice(data.adapter, data.payload);
 
@@ -41,14 +42,14 @@ abstract contract PriceOracle is IPriceOracle, Access, PriceOracleStorageUtils {
     /// @notice View the oracle data for an asset
     /// @param _asset Asset address
     /// @return data Oracle data for an asset
-    function priceOracleData(address _asset) external view returns (IOracle.OracleData memory data) {
+    function priceOracleData(address _asset) external view returns (IOracleTypes.OracleData memory data) {
         data = getPriceOracleStorage().oracleData[_asset];
     }
 
     /// @notice View the backup oracle data for an asset
     /// @param _asset Asset address
     /// @return data Backup oracle data for an asset
-    function priceBackupOracleData(address _asset) external view returns (IOracle.OracleData memory data) {
+    function priceBackupOracleData(address _asset) external view returns (IOracleTypes.OracleData memory data) {
         data = getPriceOracleStorage().backupOracleData[_asset];
     }
 
@@ -62,7 +63,7 @@ abstract contract PriceOracle is IPriceOracle, Access, PriceOracleStorageUtils {
     /// @notice Set a price source for an asset
     /// @param _asset Asset address
     /// @param _oracleData Oracle data
-    function setPriceOracleData(address _asset, IOracle.OracleData calldata _oracleData)
+    function setPriceOracleData(address _asset, IOracleTypes.OracleData calldata _oracleData)
         external
         checkAccess(this.setPriceOracleData.selector)
     {
@@ -73,7 +74,7 @@ abstract contract PriceOracle is IPriceOracle, Access, PriceOracleStorageUtils {
     /// @notice Set a backup price source for an asset
     /// @param _asset Asset address
     /// @param _oracleData Oracle data
-    function setPriceBackupOracleData(address _asset, IOracle.OracleData calldata _oracleData)
+    function setPriceBackupOracleData(address _asset, IOracleTypes.OracleData calldata _oracleData)
         external
         checkAccess(this.setPriceBackupOracleData.selector)
     {

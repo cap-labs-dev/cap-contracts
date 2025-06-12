@@ -32,6 +32,7 @@ fs_permissions = [
     { access = "read", path = "./config/layerzero-v2-deployments.json" },
     { access = "read", path = "./config/zap.json" },
     { access = "read-write", path = "./config/cap-infra.json" },
+    { access = "read-write", path = "./config/cap-mainnet-infra.json" },
     { access = "read-write", path = "./config/cap-symbiotic.json" },
     { access = "read-write", path = "./config/cap-vaults-11155111.json" },
     { access = "read-write", path = "./config/cap-vaults-17000.json" },
@@ -77,7 +78,7 @@ gas_reports_ignore = [
     "MockOFT",
 ]
 optimizer = true
-optimizer_runs = 200000
+optimizer_runs = 200
 via_ir = true
 use_literal_content = true
 [profile.release.optimizer_details]

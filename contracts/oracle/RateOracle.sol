@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import { Access } from "../access/Access.sol";
 import { IOracle } from "../interfaces/IOracle.sol";
+import { IOracleTypes } from "../interfaces/IOracleTypes.sol";
 import { IRateOracle } from "../interfaces/IRateOracle.sol";
 import { RateOracleStorageUtils } from "../storage/RateOracleStorageUtils.sol";
 
@@ -24,7 +25,7 @@ abstract contract RateOracle is IRateOracle, Access, RateOracleStorageUtils {
     /// @param _asset Asset address
     /// @return rate Borrow interest rate
     function marketRate(address _asset) external returns (uint256 rate) {
-        IOracle.OracleData memory data = getRateOracleStorage().marketOracleData[_asset];
+        IOracleTypes.OracleData memory data = getRateOracleStorage().marketOracleData[_asset];
         rate = _getRate(data.adapter, data.payload);
     }
 
@@ -32,7 +33,7 @@ abstract contract RateOracle is IRateOracle, Access, RateOracleStorageUtils {
     /// @param _asset Asset address
     /// @return rate Utilization rate
     function utilizationRate(address _asset) external returns (uint256 rate) {
-        IOracle.OracleData memory data = getRateOracleStorage().utilizationOracleData[_asset];
+        IOracleTypes.OracleData memory data = getRateOracleStorage().utilizationOracleData[_asset];
         rate = _getRate(data.adapter, data.payload);
     }
 
@@ -53,21 +54,21 @@ abstract contract RateOracle is IRateOracle, Access, RateOracleStorageUtils {
     /// @notice View the market oracle data for an asset
     /// @param _asset Asset address
     /// @return data Oracle data for an asset
-    function marketOracleData(address _asset) external view returns (IOracle.OracleData memory data) {
+    function marketOracleData(address _asset) external view returns (IOracleTypes.OracleData memory data) {
         data = getRateOracleStorage().marketOracleData[_asset];
     }
 
     /// @notice View the utilization oracle data for an asset
     /// @param _asset Asset address
     /// @return data Oracle data for an asset
-    function utilizationOracleData(address _asset) external view returns (IOracle.OracleData memory data) {
+    function utilizationOracleData(address _asset) external view returns (IOracleTypes.OracleData memory data) {
         data = getRateOracleStorage().utilizationOracleData[_asset];
     }
 
     /// @notice Set a market source for an asset
     /// @param _asset Asset address
     /// @param _oracleData Oracle data
-    function setMarketOracleData(address _asset, IOracle.OracleData calldata _oracleData)
+    function setMarketOracleData(address _asset, IOracleTypes.OracleData calldata _oracleData)
         external
         checkAccess(this.setMarketOracleData.selector)
     {
@@ -78,7 +79,7 @@ abstract contract RateOracle is IRateOracle, Access, RateOracleStorageUtils {
     /// @notice Set a utilization source for an asset
     /// @param _asset Asset address
     /// @param _oracleData Oracle data
-    function setUtilizationOracleData(address _asset, IOracle.OracleData calldata _oracleData)
+    function setUtilizationOracleData(address _asset, IOracleTypes.OracleData calldata _oracleData)
         external
         checkAccess(this.setUtilizationOracleData.selector)
     {
