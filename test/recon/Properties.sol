@@ -42,14 +42,23 @@ abstract contract Properties is BeforeAfter, Asserts {
             uint256 totalSupplied = capToken.totalSupplies(assets[i]);
             uint256 totalBorrow = capToken.totalBorrows(assets[i]);
             uint256 vaultBalance = MockERC20(assets[i]).balanceOf(address(capToken));
+            uint256 totalLosses = _getTotalLosses(assets[i]);
             uint256 fractionalReserveBalance =
                 MockERC20(assets[i]).balanceOf(capToken.fractionalReserveVault(assets[i]));
             lte(
                 totalSupplied,
-                vaultBalance + totalBorrow + fractionalReserveBalance + MockERC4626Tester(_getVault()).totalLosses(),
+                vaultBalance + totalBorrow + fractionalReserveBalance + totalLosses,
                 "totalSupplies > vault balance + totalBorrows"
             );
         }
+    }
+
+    function _getTotalLosses(address _asset) internal view returns (uint256) {
+        address fractionalReserveVault = capToken.fractionalReserveVault(_asset);
+        if (fractionalReserveVault != address(0)) {
+            return MockERC4626Tester(fractionalReserveVault).totalLosses();
+        }
+        return 0;
     }
 
     /// @dev Property: totalSupplies for a given asset is always >= totalBorrows

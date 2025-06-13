@@ -9,5 +9,5 @@
   "solidity.packageDefaultDependenciesDirectory": "lib",
   "solidity.defaultCompiler": "remote",
   "recon.defaultFuzzer": "echidna",
-  "recon.echidna.workers": 10
+  "recon.echidna.workers": 4
 }
