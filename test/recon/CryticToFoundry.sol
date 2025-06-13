@@ -135,4 +135,16 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         lender_realizeRestakerInterest();
     }
+
+    // forge test --match-test test_capToken_burn_clamped_sqa5 -vvv
+    // NOTE: user can gets 0 fees when burning
+    function test_capToken_burn_clamped_sqa5() public {
+        switch_asset(1);
+
+        capToken_mint_clamped(2);
+
+        asset_mint(0x000000000000000000000000000000000000bEEF, 1);
+
+        capToken_burn_clamped(10000683817);
+    }
 }
