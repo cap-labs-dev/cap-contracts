@@ -42,7 +42,6 @@ abstract contract Properties is BeforeAfter, Asserts {
             uint256 totalSupplied = capToken.totalSupplies(assets[i]);
             uint256 totalBorrow = capToken.totalBorrows(assets[i]);
             uint256 vaultBalance = MockERC20(assets[i]).balanceOf(address(capToken));
-            uint256 totalLosses = _getTotalLosses(assets[i]);
             uint256 fractionalReserveBalance =
                 MockERC20(assets[i]).balanceOf(capToken.fractionalReserveVault(assets[i]));
             uint256 fractionalReserveLosses = _getFractionalReserveLosses(assets[i]);
@@ -53,14 +52,6 @@ abstract contract Properties is BeforeAfter, Asserts {
                 "totalSupplies > vault balance + totalBorrows"
             );
         }
-    }
-
-    function _getTotalLosses(address _asset) internal view returns (uint256) {
-        address fractionalReserveVault = capToken.fractionalReserveVault(_asset);
-        if (fractionalReserveVault != address(0)) {
-            return MockERC4626Tester(fractionalReserveVault).totalLosses();
-        }
-        return 0;
     }
 
     /// @dev Property: totalSupplies for a given asset is always >= totalBorrows
@@ -80,29 +71,30 @@ abstract contract Properties is BeforeAfter, Asserts {
     }
 
     /// @dev Property: Utilization ratio only increases after a borrow or realizing interest
-    function property_utilization_ratio() public {
-        // precondition: if the utilization ratio is 0 before and after, the borrowed amount was 0
-        if (
-            (currentOperation == OpType.BORROW || currentOperation == OpType.REALIZE_INTEREST)
-                && _before.utilizationRatio[_getAsset()] == 0 && _after.utilizationRatio[_getAsset()] == 0
-        ) {
-            return;
-        }
+    // NOTE: removed because it makes incorrect assumptions about the utilization ratio
+    // function property_utilization_ratio() public {
+    //     // precondition: if the utilization ratio is 0 before and after, the borrowed amount was 0
+    //     if (
+    //         (currentOperation == OpType.BORROW || currentOperation == OpType.REALIZE_INTEREST)
+    //             && _before.utilizationRatio[_getAsset()] == 0 && _after.utilizationRatio[_getAsset()] == 0
+    //     ) {
+    //         return;
+    //     }
 
-        if (currentOperation == OpType.BORROW || currentOperation == OpType.REALIZE_INTEREST) {
-            gte(
-                _after.utilizationRatio[_getAsset()],
-                _before.utilizationRatio[_getAsset()],
-                "utilization ratio decreased after a borrow"
-            );
-        } else {
-            eq(
-                _before.utilizationRatio[_getAsset()],
-                _after.utilizationRatio[_getAsset()],
-                "utilization ratio increased without a borrow"
-            );
-        }
-    }
+    //     if (currentOperation == OpType.BORROW || currentOperation == OpType.REALIZE_INTEREST) {
+    //         gte(
+    //             _after.utilizationRatio[_getAsset()],
+    //             _before.utilizationRatio[_getAsset()],
+    //             "utilization ratio decreased after a borrow"
+    //         );
+    //     } else {
+    //         eq(
+    //             _before.utilizationRatio[_getAsset()],
+    //             _after.utilizationRatio[_getAsset()],
+    //             "utilization ratio increased without a borrow"
+    //         );
+    //     }
+    // }
 
     /// @dev Property: If the vault invests/divests it shouldn't change the redeem amounts out
     function property_vault_balance_does_not_change_redeemAmountsOut() public {
