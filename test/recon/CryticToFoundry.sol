@@ -60,8 +60,8 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     }
 
     // forge test --match-test test_capToken_redeem_clamped_6 -vvv
-    // NOTE: minting unbacked shares causes underflow revert in redemeptions, might just need to remove this from mockERC4626Tester
-    // TODO: determine if minting unbacked shares is realisitc behavior
+    // NOTE: issue is because of implementation of ERC4626Tester, need to determine best way to fix behavior
+    // TODO: determine best way to fix ERC4626Tester behavior
     function test_capToken_redeem_clamped_6() public {
         capToken_mint_clamped(10000037441);
 
@@ -71,10 +71,11 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         capToken_investAll_clamped();
 
-        // decreases the PPFS
-        // is this realistic for yearn V3 though? is there anything in how losses are realized that would cause this?
-        // seems like it is because the PPS is decreased for all users when a loss is realized
+        // issue is because shares in withdraw calculated by previewWithdraw now get increased but user balance doesn't
+        // most likely fix would be to rebase shares for all users when unbacked shares are minted
+        // or just make it so that users can only withdraw up to the maxWithdraw amount
         mockERC4626Tester_mintUnbackedShares(100003377823040994724, 0x0000000000000000000000000000000000000000);
+        // mockERC4626Tester_simulateLoss(200);
 
         capToken_redeem_clamped(1);
     }
@@ -87,6 +88,19 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         switchChainlinkOracle(14211097524167602802493863989865037497162472790322337168572978);
         mockChainlinkPriceFeed_setLatestAnswer(2713282178368992834);
         lender_liquidate(1);
+    }
+
+    // forge test --match-test test_capToken_burn_clamped_5 -vvv
+    // NOTE: user can get 0 fees when burning (might only be for very small amounts)
+    // wouldn't this mean mechanism to prevent oracle drift can be avoided?
+    function test_capToken_burn_clamped_5() public {
+        switch_asset(1);
+
+        capToken_mint_clamped(2);
+
+        asset_mint(0x000000000000000000000000000000000000bEEF, 1);
+
+        capToken_burn_clamped(10000683817);
     }
 
     // forge test --match-test test_lender_realizeRestakerInterest_7 -vvv
@@ -103,17 +117,5 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         vm.roll(block.number + 1);
 
         lender_realizeRestakerInterest();
-    }
-
-    // forge test --match-test test_capToken_burn_clamped_sqa5 -vvv
-    // NOTE: user can get 0 fees when burning
-    function test_capToken_burn_clamped_sqa5() public {
-        switch_asset(1);
-
-        capToken_mint_clamped(2);
-
-        asset_mint(0x000000000000000000000000000000000000bEEF, 1);
-
-        capToken_burn_clamped(10000683817);
     }
 }
