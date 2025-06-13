@@ -34,22 +34,6 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         capToken_redeem(_amountIn, _minAmountsOut, _getActor(), block.timestamp + 1 days);
     }
 
-    function capToken_setFractionalReserveVault_clamped() public {
-        capToken_setFractionalReserveVault(_getAsset(), _getVault());
-    }
-
-    function capToken_setReserve_clamped(uint256 _reserve) public {
-        capToken_setReserve(_getAsset(), _reserve);
-    }
-
-    function capToken_investAll_clamped() public {
-        capToken_investAll(_getAsset());
-    }
-
-    function capToken_divestAll_clamped() public {
-        capToken_divestAll(_getAsset());
-    }
-
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
     function capToken_addAsset() public updateGhosts asActor {
@@ -138,12 +122,20 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         }
     }
 
-    function capToken_divestAll(address _asset) public updateGhostsWithType(OpType.DIVEST) asActor {
-        capToken.divestAll(_asset);
+    /// @dev Property: ERC4626 must always be divestable
+    function capToken_divestAll() public asActor {
+        try capToken.divestAll(_getAsset()) { }
+        catch (bytes memory reason) {
+            bool expectedError = checkError(reason, "LossFromFractionalReserve(address,address,uint256)")
+                || checkError(reason, "AccessControlUnauthorizedAccount(address,bytes32)");
+            if (!expectedError) {
+                t(false, "ERC4626 must always be divestable");
+            }
+        }
     }
 
-    function capToken_investAll(address _asset) public updateGhostsWithType(OpType.INVEST) asActor {
-        capToken.investAll(_asset);
+    function capToken_investAll() public updateGhostsWithType(OpType.INVEST) asActor {
+        capToken.investAll(_getAsset());
     }
 
     /// @dev Property: User always receives at least the minimum amount out
@@ -302,12 +294,12 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         capToken.setFeeData(_asset, _feeData);
     }
 
-    function capToken_setFractionalReserveVault(address _asset, address _vault) public updateGhosts asActor {
-        capToken.setFractionalReserveVault(_asset, _vault);
+    function capToken_setFractionalReserveVault() public updateGhosts asActor {
+        capToken.setFractionalReserveVault(_getAsset(), _getVault());
     }
 
-    function capToken_setReserve(address _asset, uint256 _reserve) public updateGhosts asActor {
-        capToken.setReserve(_asset, _reserve);
+    function capToken_setReserve(uint256 _reserve) public updateGhosts asActor {
+        capToken.setReserve(_getAsset(), _reserve);
     }
 
     function capToken_setWhitelist(address _user, bool _whitelisted) public updateGhosts asActor {

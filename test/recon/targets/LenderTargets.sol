@@ -22,7 +22,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
     function lender_borrow_clamped(uint256 _amount) public {
-        lender_borrow(_getAsset(), _amount, _getActor());
+        lender_borrow(_amount, _getActor());
     }
 
     function lender_initiateLiquidation_clamped() public {
@@ -60,21 +60,18 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Borrower debt should increase after borrowing
     /// @dev Property: Total borrows should increase after borrowing
     /// @dev Property: Borrower can't borrow more than LTV
-    function lender_borrow(address _asset, uint256 _amount, address _receiver)
-        public
-        updateGhostsWithType(OpType.BORROW)
-        asActor
-    {
-        uint256 beforeAssetBalance = MockERC20(_asset).balanceOf(_receiver);
-        (,, address _debtToken,,,,) = lender.reservesData(_asset);
+    /// @dev Property: Borrow should only revert with an expected error
+    function lender_borrow(uint256 _amount, address _receiver) public updateGhostsWithType(OpType.BORROW) asActor {
+        uint256 beforeAssetBalance = MockERC20(_getAsset()).balanceOf(_receiver);
+        (,, address _debtToken,,,,) = lender.reservesData(_getAsset());
         uint256 beforeBorrowerDebt = DebtToken(_debtToken).balanceOf(_getActor());
-        uint256 beforeMaxBorrowable = lender.maxBorrowable(_getActor(), _asset);
+        uint256 beforeMaxBorrowable = lender.maxBorrowable(_getActor(), _getAsset());
 
         vm.prank(_getActor());
-        try lender.borrow(_asset, _amount, _receiver) {
+        try lender.borrow(_getAsset(), _amount, _receiver) {
             uint256 borrowerDebtDelta = DebtToken(_debtToken).balanceOf(_getActor()) - beforeBorrowerDebt;
 
-            t(!capToken.paused() || !capToken.paused(_asset), "asset can be borrowed when it is paused");
+            t(!capToken.paused() || !capToken.paused(_getAsset()), "asset can be borrowed when it is paused");
 
             (,,,,, uint256 health) = lender.agent(_getActor());
             gt(health, RAY, "Borrower is unhealthy after borrowing");
@@ -86,28 +83,38 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             );
             if (_amount == type(uint256).max) {
                 eq(
-                    MockERC20(_asset).balanceOf(_receiver),
+                    MockERC20(_getAsset()).balanceOf(_receiver),
                     beforeAssetBalance + beforeMaxBorrowable,
                     "Borrower asset balance did not increase after borrowing (in case of max borrow)"
                 );
             } else {
                 eq(
-                    MockERC20(_asset).balanceOf(_receiver),
+                    MockERC20(_getAsset()).balanceOf(_receiver),
                     beforeAssetBalance + _amount,
                     "Borrower asset balance did not increase after borrowing"
                 );
             }
 
-            (uint256 assetPrice,) = oracle.getPrice(_asset);
+            (uint256 assetPrice,) = oracle.getPrice(_getAsset());
             (uint256 collateralValue,) =
                 mockNetworkMiddleware.coverageByVault(address(0), _getActor(), mockEth, address(0), 0);
 
             lte(
-                (borrowerDebtDelta * assetPrice / 10 ** MockERC20(_asset).decimals()) * RAY / collateralValue,
+                (borrowerDebtDelta * assetPrice / 10 ** MockERC20(_getAsset()).decimals()) * RAY / collateralValue,
                 delegation.ltv(_getActor()),
                 "Borrower can't borrow more than LTV"
             );
-        } catch (bytes memory reason) { }
+        } catch (bytes memory reason) {
+            bool expectedError = checkError(reason, "MinBorrowAmount()") || checkError(reason, "ZeroAddressNotValid()")
+                || checkError(reason, "ReservePaused()") || checkError(reason, "CollateralCannotCoverNewBorrow()")
+                || checkError(reason, "LossFromFractionalReserve(address,address,uint256)")
+                || checkError(reason, "ZeroRealization()");
+
+            // if borrow reverts for any other reason, it could be due to the call to divest in the ERC4626 made before borrowing
+            if (!expectedError) {
+                t(false, "borrow should revert with expected error");
+            }
+        }
     }
 
     function lender_cancelLiquidation() public updateGhosts asActor {

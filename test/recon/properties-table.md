@@ -36,6 +36,7 @@
 | 34 | lender_borrow | Borrower asset balance should increase after borrowing | |
 | 35 | lender_borrow | Borrower debt should increase after borrowing | |
 | 36 | lender_borrow | Total borrows should increase after borrowing | |
+| 34 | lender_borrow | Borrow should only revert with an expected error | |
 | 37 | property_borrowed_asset_value | loaned assets value < delegations value (strictly) or the position is liquidatable | |
 | 38 | property_health_not_changed_with_realizeInterest | health should not change when interest is realized | |
 | 39 | lender_realizeInterest | realizeInterest should only revert with `ZeroRealization()` if paused or `totalUnrealizedInterest == 0`, otherwise should always update the realization value | |
@@ -55,3 +56,5 @@
 | 53 | property_total_system_collateralization | System must be overcollateralized after all liquidations | |
 | 54 | property_delegated_value_greater_than_borrowed_value | Delegated value must be greater than borrowed value, if not the agent should be liquidatable | |
 | 55 | property_ltv | LTV is always <= 1e27 | |
+
+| 48 | capToken_divestAll | ERC4626 must always be divestable | |
