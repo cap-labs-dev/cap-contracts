@@ -86,11 +86,11 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         uint256 _minAmountOut,
         address _receiver,
         uint256 _deadline
-    ) public updateGhosts {
+    ) public updateGhostsWithType(OpType.BURN) {
         uint256 capTokenBalanceBefore = capToken.balanceOf(_getActor());
         uint256 insuranceFundBalanceBefore = MockERC20(_asset).balanceOf(capToken.insuranceFund());
         uint256 totalCapSupplyBefore = capToken.totalSupply();
-        (uint256 expectedAmountOut,) = capToken.getBurnAmount(_asset, _amountIn);
+        (uint256 expectedAmountOut, uint256 expectedFee) = capToken.getBurnAmount(_asset, _amountIn);
 
         vm.prank(_getActor());
         try capToken.burn(_asset, _amountIn, _minAmountOut, _receiver, _deadline) {
@@ -98,36 +98,33 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             uint256 capTokenBalanceAfter = capToken.balanceOf(_getActor());
             uint256 insuranceFundBalanceAfter = MockERC20(_asset).balanceOf(capToken.insuranceFund());
             uint256 totalCapSupplyAfter = capToken.totalSupply();
+            uint256 feesReceived = insuranceFundBalanceAfter - insuranceFundBalanceBefore;
+            uint256 capTokenBurned = capTokenBalanceBefore - capTokenBalanceAfter;
 
             // update ghosts
             ghostAmountOut += _amountIn;
 
             // check inlined properties
-            gte(
-                capTokenBalanceBefore - capTokenBalanceAfter,
-                _minAmountOut,
-                "user received less than minimum amount out"
-            );
+            gte(capTokenBurned, _minAmountOut, "user received less than minimum amount out");
             gte(
                 totalCapSupplyBefore - totalCapSupplyAfter,
-                capTokenBalanceBefore - capTokenBalanceAfter,
+                capTokenBurned,
                 "total cap supply decreased by less than the amount out"
             );
-            lte(
-                insuranceFundBalanceAfter - insuranceFundBalanceBefore,
-                capTokenBalanceBefore - capTokenBalanceAfter,
-                "fees are greater than the amount out"
-            );
+            lte(feesReceived, capTokenBurned, "fees are greater than the amount out");
             if (!capToken.whitelisted(_getActor())) {
-                if (insuranceFundBalanceAfter != 0) {
-                    gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when burning");
-                }
+                gt(feesReceived, 0, "0 fees when burning");
 
                 lte(
                     capTokenBalanceAfter,
                     capTokenBalanceBefore - expectedAmountOut,
                     "user received more than expected amount out"
                 );
+            }
+
+            // for optimization property, set the new value if the amount out is greater than the current max and there are no fees
+            if (int256(capTokenBurned) > maxAmountOut && feesReceived == 0) {
+                maxAmountOut = int256(capTokenBurned);
             }
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "PastDeadline()")

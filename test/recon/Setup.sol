@@ -77,6 +77,7 @@ abstract contract Setup is
     uint256 ghostAmountOut;
 
     address mockEth;
+    int256 maxAmountOut;
 
     /// === Setup === ///
     /// This contains all calls to be performed in the tester constructor, both for Echidna and Foundry

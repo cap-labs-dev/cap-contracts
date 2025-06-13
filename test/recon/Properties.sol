@@ -221,6 +221,18 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    function property_burn_amount_no_fee() public {
+        if (currentOperation == OpType.BURN) {
+            gt(_after.insuranceFundBalance, _before.insuranceFundBalance, "0 fees on burn");
+        }
+    }
+
+    /// === Optimization Properties === ///
+
+    function optimize_burnable_amount_no_fee() public returns (int256) {
+        return maxAmountOut;
+    }
+
     /// === Helpers === ///
     function _getFractionalReserveLosses(address _asset) internal view returns (uint256) {
         address fractionalReserveVault = capToken.fractionalReserveVault(_asset);

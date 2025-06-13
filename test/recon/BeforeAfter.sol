@@ -14,7 +14,8 @@ enum OpType {
     INVEST,
     DIVEST,
     BORROW,
-    REALIZE_INTEREST
+    REALIZE_INTEREST,
+    BURN
 }
 
 // ghost variables for tracking state variable values before and after function calls
@@ -22,6 +23,7 @@ abstract contract BeforeAfter is Setup {
     struct Vars {
         uint256 vaultAssetBalance;
         uint256[] redeemAmountsOut;
+        uint256 insuranceFundBalance;
         mapping(address => mapping(address => uint256)) debtTokenBalance;
         mapping(address => uint256) vaultDebt;
         mapping(address => uint256) agentTotalDebt;
@@ -56,6 +58,7 @@ abstract contract BeforeAfter is Setup {
         vars.totalBorrows[_getAsset()] = capToken.totalBorrows(_getAsset());
         vars.vaultAssetBalance = MockERC20(_getAsset()).balanceOf(address(capToken));
         vars.vaultDebt[_getAsset()] = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
+        vars.insuranceFundBalance = MockERC20(_getAsset()).balanceOf(capToken.insuranceFund());
 
         vars.redeemAmountsOut = _getRedeemAmounts(_getActor());
         (,, vars.agentTotalDebt[_getActor()],,,) = _getAgentParams(_getActor());
