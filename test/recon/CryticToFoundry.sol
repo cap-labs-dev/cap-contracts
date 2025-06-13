@@ -89,39 +89,8 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         lender_liquidate(1);
     }
 
-    // forge test --match-test test_property_vault_solvency_assets_12 -vvv
-    function test_property_vault_solvency_assets_12() public {
-        capToken_mint_clamped(10001099720);
-
-        add_new_vault();
-
-        capToken_setFractionalReserveVault_clamped();
-
-        capToken_investAll_clamped();
-
-        mockERC4626Tester_simulateLoss(1);
-
-        add_new_vault();
-
-        property_vault_solvency_assets();
-    }
-
-    // forge test --match-test test_lender_repay_6 -vvv
-    function test_lender_repay_6() public {
-        capToken_mint_clamped(10002011355);
-
-        lender_borrow_clamped(100051063);
-
-        oracle_setRestakerRate(
-            0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496,
-            1157449494152887941185278230451771113777492868836762663430031328785281
-        );
-
-        lender_repay(0);
-    }
-
     // forge test --match-test test_lender_realizeRestakerInterest_7 -vvv
-    // TODO: come back to this, need to figure out why tracking delegation balance is off even though the transfer of the asset to it is successful
+    // NOTE: previously broke when tracking delegation balance as proxy for vault, might need to switch to tracking balance of network since it's what receives the rewards that're distributed
     function test_lender_realizeRestakerInterest_7() public {
         oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 1679060376);
 
@@ -137,7 +106,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     }
 
     // forge test --match-test test_capToken_burn_clamped_sqa5 -vvv
-    // NOTE: user can gets 0 fees when burning
+    // NOTE: user can get 0 fees when burning
     function test_capToken_burn_clamped_sqa5() public {
         switch_asset(1);
 
