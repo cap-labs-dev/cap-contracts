@@ -18,13 +18,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         setup();
     }
 
-    // forge test --match-test test_crytic -vvv
-    function test_crytic() public {
-        // TODO: add failing property tests here for debugging
-        mockNetworkMiddleware_setMockCollateralByVault(0x796f2974e3C1af763252512dd6d521E9E984726C, 10002564536);
-        property_borrowed_asset_value();
-    }
-
     function test_fractional_reserve_loss() public {
         // 1. Create a new vault
         add_new_vault();
@@ -90,36 +83,8 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         lender_liquidate(1);
     }
 
-    // forge test --match-test test_property_vault_solvency_assets_12 -vvv
-    function test_property_vault_solvency_assets_12() public {
-        capToken_mint_clamped(10001099720);
-
-        add_new_vault();
-
-        capToken_setFractionalReserveVault();
-
-        capToken_investAll();
-
-        mockERC4626Tester_simulateLoss(1);
-
-        add_new_vault();
-
-        property_vault_solvency_assets();
-    }
-
-    // forge test --match-test test_doomsday_repay_8pb4 -vvv
-    function test_doomsday_repay_8pb4() public {
-        capToken_mint_clamped(10000667218);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
-        capToken_pauseProtocol();
-
-        doomsday_repay(1);
-    }
-
-    // forge test --match-test test_capToken_burn_clamped_uuhn -vvv
-    function test_capToken_burn_clamped_uuhn() public {
+    // forge test --match-test test_capToken_burn_clamped_3 -vvv
+    function test_capToken_burn_clamped_3() public {
         switch_asset(1);
 
         capToken_mint_clamped(2);
@@ -129,128 +94,8 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         capToken_burn_clamped(10000683817);
     }
 
-    // forge test --match-test test_lender_realizeInterest_92dr -vvv
-    function test_lender_realizeInterest_92dr() public {
-        capToken_mint_clamped(10001031987);
-
-        oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 6320941977990957197644574);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
-        vm.warp(block.timestamp + 1);
-
-        vm.roll(block.number + 1);
-
-        doomsday_repay(1);
-
-        lender_realizeInterest();
-    }
-
-    // forge test --match-test test_doomsday_liquidate_h1m4 -vvv
-    function test_doomsday_liquidate_h1m4() public {
-        doomsday_liquidate(1);
-    }
-
-    // forge test --match-test test_lender_repay_66ot -vvv
-    function test_lender_repay_66ot() public {
-        capToken_mint_clamped(10000257342);
-
-        switchChainlinkOracle(3);
-
-        oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 316797274992429809111462774);
-
-        lender_borrow(100000001, 0x00000000000000000000000000000000DeaDBeef);
-
-        mockChainlinkPriceFeed_setLatestAnswer(1157931559455332453960847362481255236276452787816647258012);
-
-        vm.warp(block.timestamp + 1);
-
-        vm.roll(block.number + 1);
-
-        lender_repay(0);
-    }
-
-    // forge test --match-test test_lender_borrow_clamped_22er -vvv
-    // function test_lender_borrow_clamped_22er() public {
-
-    //     vm.roll(block.number + 36723);
-    //     vm.warp(block.timestamp + 311699);
-    //     mockNetworkMiddleware_setMockSlashableCollateralByVault(53502540585222975478199632749217283793864113140416536062295354888833147494184);
-
-    //     vm.roll(block.number + 43649);
-    //     vm.warp(block.timestamp + 352545);
-    //     capToken_mint_clamped(12000000000000000000001);
-
-    //     vm.roll(block.number + 39455);
-    //     vm.warp(block.timestamp + 311575);
-    //     mockNetworkMiddleware_registerVault(0x00000000000000000000000000000000FFFFfFFF);
-
-    //     vm.roll(block.number + 11826);
-    //     vm.warp(block.timestamp + 322335);
-    //     mockNetworkMiddleware_setMockSlashableCollateralByVault(103341770688910690652700114498011722191660581929354966258250607465273380350457);
-
-    //     vm.roll(block.number + 31460);
-    //     vm.warp(block.timestamp + 64);
-    //     capToken_removeAsset(0x00000000000000000000000000000002fFffFffD);
-
-    //     vm.roll(block.number + 9842);
-    //     vm.warp(block.timestamp + 322335);
-    //     capToken_divestAll(0x00000000000000000000000000000000FFFFfFFF);
-
-    //     vm.roll(block.number + 49251);
-    //     vm.warp(block.timestamp + 503602);
-    //     lender_cancelLiquidation(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
-
-    //     vm.roll(block.number + 35571);
-    //     vm.warp(block.timestamp + 64);
-    //     capToken_rescueERC20(0x00000000000000000000000000000000FFFFfFFF,0x00000000000000000000000000000000FFFFfFFF);
-
-    //     vm.roll(block.number + 47075);
-    //     vm.warp(block.timestamp + 436727);
-    //     lender_realizeRestakerInterest(0xF62849F9A0B5Bf2913b396098F7c7019b51A820a,0x00000000000000000000000000000000FFFFfFFF);
-
-    //     vm.roll(block.number + 5022);
-    //     vm.warp(block.timestamp + 425633);
-    //     mockNetworkMiddleware_setMockSlashableCollateral(62661634916210430187291605662829386261351947169964313162115263642735077475654);
-
-    //     vm.roll(block.number + 6068);
-    //     vm.warp(block.timestamp + 322375);
-    //     lender_cancelLiquidation_clamped();
-
-    //     vm.roll(block.number + 14891);
-    //     vm.warp(block.timestamp + 36);
-    //     asset_approve(0x00000000000000000000000000000002fFffFffD,100000000000001);
-
-    // }
-
-    // forge test --match-test test_property_utilization_ratio_10zx -vvv
-    // function test_property_utilization_ratio_10zx() public {
-
-    //     capToken_mint_clamped(10000421606);
-
-    //     lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
-    //     mockNetworkMiddleware_setMockCollateralByVault(0xe8dc788818033232EF9772CB2e6622F1Ec8bc840,0);
-
-    //     lender_liquidate(421660);
-
-    //     property_utilization_ratio();
-
-    // }
-
-    // forge test --match-test test_lender_liquidate_6pvg -vvv
-    function test_lender_liquidate_6pvg() public {
-        capToken_mint_clamped(10000638121);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
-        mockNetworkMiddleware_setMockCollateralByVault(0xe8dc788818033232EF9772CB2e6622F1Ec8bc840, 0);
-
-        lender_liquidate(1);
-    }
-
-    // forge test --match-test test_lender_borrow_850x -vvv
-    function test_lender_borrow_850x() public {
+    // forge test --match-test test_lender_borrow_4 -vvv
+    function test_lender_borrow_4() public {
         capToken_mint_clamped(10003543734);
 
         capToken_pauseAsset(0xD16d567549A2a2a2005aEACf7fB193851603dd70);

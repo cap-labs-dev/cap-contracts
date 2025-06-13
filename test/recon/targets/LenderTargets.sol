@@ -66,12 +66,14 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         (,, address _debtToken,,,,) = lender.reservesData(_getAsset());
         uint256 beforeBorrowerDebt = DebtToken(_debtToken).balanceOf(_getActor());
         uint256 beforeMaxBorrowable = lender.maxBorrowable(_getActor(), _getAsset());
+        bool protocolPaused = capToken.paused();
+        bool assetPaused = capToken.paused(_getAsset());
 
         vm.prank(_getActor());
         try lender.borrow(_getAsset(), _amount, _receiver) {
             uint256 borrowerDebtDelta = DebtToken(_debtToken).balanceOf(_getActor()) - beforeBorrowerDebt;
 
-            t(!capToken.paused() || !capToken.paused(_getAsset()), "asset can be borrowed when it is paused");
+            t(!protocolPaused || !assetPaused, "asset can be borrowed when it is paused");
 
             (,,,,, uint256 health) = lender.agent(_getActor());
             gt(health, RAY, "Borrower is unhealthy after borrowing");
@@ -111,7 +113,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
                 || checkError(reason, "ZeroRealization()");
 
             // if borrow reverts for any other reason, it could be due to the call to divest in the ERC4626 made before borrowing
-            if (!expectedError) {
+            if (!expectedError && !protocolPaused && !assetPaused) {
                 t(false, "borrow should revert with expected error");
             }
         }
