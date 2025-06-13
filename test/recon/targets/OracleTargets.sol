@@ -31,6 +31,7 @@ abstract contract OracleTargets is BaseTargetFunctions, Properties {
     }
 
     function oracle_setPriceOracleData(address _asset, IOracle.OracleData memory _oracleData) public asActor {
+        require(_oracleData.adapter != address(0));
         oracle.setPriceOracleData(_asset, _oracleData);
     }
 
@@ -43,6 +44,7 @@ abstract contract OracleTargets is BaseTargetFunctions, Properties {
     }
 
     function oracle_setUtilizationOracleData(address _asset, IOracle.OracleData memory _oracleData) public asActor {
+        require(_oracleData.adapter != address(0));
         oracle.setUtilizationOracleData(_asset, _oracleData);
     }
 }

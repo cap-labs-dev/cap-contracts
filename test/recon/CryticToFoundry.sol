@@ -102,4 +102,38 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         lender_borrow(100018335, 0x00000000000000000000000000000000DeaDBeef);
     }
+
+    // forge test --match-test test_capToken_divestAll_6 -vvv
+    // NOTE: same issue as test_capToken_redeem_clamped_6 related to MockERC4626Tester
+    function test_capToken_divestAll_6() public {
+        capToken_mint_clamped(10006397379);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        capToken_investAll();
+
+        mockERC4626Tester_mintUnbackedShares(
+            11587865888101675086496162918830780777506068448851247110970105602638,
+            0x796f2974e3C1af763252512dd6d521E9E984726C
+        );
+
+        capToken_divestAll();
+    }
+
+    // forge test --match-test test_lender_repay_9 -vvv
+    // TODO: figure out a way to handle this without overclamping the oracle
+    function test_lender_repay_9() public {
+        capToken_mint_clamped(10008018367);
+
+        lender_borrow_clamped(100017430);
+
+        oracle_setRestakerRate(
+            0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496,
+            1160841625282391919459699258693856538360040157823143612386102239793921
+        );
+
+        lender_repay(1);
+    }
 }
