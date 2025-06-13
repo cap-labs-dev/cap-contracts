@@ -24,7 +24,6 @@ abstract contract BeforeAfter is Setup {
         uint256[] redeemAmountsOut;
         mapping(address => mapping(address => uint256)) debtTokenBalance;
         mapping(address => uint256) vaultDebt;
-        mapping(address => uint256) agentHealth;
         mapping(address => uint256) agentTotalDebt;
         mapping(address => uint256) utilizationIndex;
         mapping(address => uint256) utilizationRatio;
@@ -59,7 +58,7 @@ abstract contract BeforeAfter is Setup {
         vars.vaultDebt[_getAsset()] = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
 
         vars.redeemAmountsOut = _getRedeemAmounts(_getActor());
-        (,, vars.agentTotalDebt[_getActor()],,, vars.agentHealth[_getActor()]) = _getAgentParams(_getActor());
+        (,, vars.agentTotalDebt[_getActor()],,,) = _getAgentParams(_getActor());
     }
 
     function __before() internal {
