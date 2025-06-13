@@ -17,4 +17,8 @@ contract LenderWrapper is Lender {
         ILender.ReserveData storage reserve = getLenderStorage().reservesData[_asset];
         return reserve.debt;
     }
+
+    function getDelegation() external view returns (address) {
+        return getLenderStorage().delegation;
+    }
 }

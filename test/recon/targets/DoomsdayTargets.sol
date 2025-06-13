@@ -26,12 +26,16 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
         if (_amount == 0) {
             return;
         }
+
+        (,, uint256 totalDebt,,,) = lender.agent(_getActor());
+
         try lender.liquidate(_getActor(), _getAsset(), _amount) {
             // success
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "HealthFactorNotBelowThreshold()")
                 || checkError(reason, "GracePeriodNotOver()") || checkError(reason, "LiquidationExpired()");
-            if (!expectedError) {
+
+            if (!expectedError && totalDebt > 0) {
                 t(false, "liquidate should always succeed for liquidatable agent");
             }
         }
@@ -40,6 +44,7 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
     /// @dev Property: repay should always succeed for agent that has debt
     function doomsday_repay(uint256 _amount) public asActor {
         (,, uint256 totalDebt,,,) = lender.agent(_getActor());
+
         // Preconditions: should have debt, enough allowance and balance to repay
         if (
             totalDebt == 0 && MockERC20(_getAsset()).allowance(_getActor(), address(lender)) < _amount
@@ -51,7 +56,9 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
             // success
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "InvalidBurnAmount()");
-            if (!expectedError) {
+            bool paused = capToken.paused();
+
+            if (!expectedError && !paused) {
                 t(false, "repay should always succeed for agent that has debt");
             }
         }

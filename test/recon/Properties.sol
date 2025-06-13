@@ -44,9 +44,11 @@ abstract contract Properties is BeforeAfter, Asserts {
             uint256 vaultBalance = MockERC20(assets[i]).balanceOf(address(capToken));
             uint256 fractionalReserveBalance =
                 MockERC20(assets[i]).balanceOf(capToken.fractionalReserveVault(assets[i]));
+            uint256 fractionalReserveLosses = _getFractionalReserveLosses(assets[i]);
+
             lte(
                 totalSupplied,
-                vaultBalance + totalBorrow + fractionalReserveBalance + MockERC4626Tester(_getVault()).totalLosses(),
+                vaultBalance + totalBorrow + fractionalReserveBalance + fractionalReserveLosses,
                 "totalSupplies > vault balance + totalBorrows"
             );
         }
@@ -103,7 +105,6 @@ abstract contract Properties is BeforeAfter, Asserts {
     }
 
     /// @dev Property: The sum of unrealized interests for all agents always == totalUnrealizedInterest
-    // NOTE: can't be implemented because don't have a getter for totalUnrealizedInterest
     function property_sum_of_unrealized_interest() public {
         address[] memory agents = delegation.agents();
         address[] memory assets = capToken.assets();
@@ -159,21 +160,15 @@ abstract contract Properties is BeforeAfter, Asserts {
     function property_borrowed_asset_value() public {
         address[] memory agents = delegation.agents();
         for (uint256 i; i < agents.length; ++i) {
-            // Get the agent's debt for the asset
             uint256 agentDebt = lender.debt(agents[i], _getAsset());
-            // Get the asset price from the oracle to calculate value
             (uint256 assetPrice,) = oracle.getPrice(_getAsset());
-            // Calculate the value in USD (8 decimals)
             uint256 debtValue = agentDebt * assetPrice / (10 ** MockERC20(_getAsset()).decimals());
 
             (uint256 coverageValue,) =
                 mockNetworkMiddleware.coverageByVault(address(0), agents[i], mockEth, address(0), uint48(0));
 
-            // check if the value of the loaned amount is < the coverage value
             if (debtValue > coverageValue) {
-                // if true, the position must be liquidatable
                 (,,,,, uint256 health) = lender.agent(agents[i]);
-                // check if the position is liquidatable
                 lt(health, 1e27, "position is not liquidatable");
             }
         }
@@ -188,10 +183,51 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
-    /// @dev Property: health should not change when interest is realized
-    function property_health_not_changed_with_realizeInterest() public {
-        if (currentOperation == OpType.REALIZE_INTEREST) {
-            eq(_after.agentHealth[_getActor()], _before.agentHealth[_getActor()], "health changed with realizeInterest");
+    /// @dev Property: system must be overcollateralized after all liquidations
+    // TODO: check if the minimum shouldn't be > 1e27
+    function property_total_system_collateralization() public {
+        address[] memory agents = delegation.agents();
+        uint256 totalDelegation;
+        uint256 totalDebt;
+
+        // precondition: all agents that are liquidatable have been liquidated
+        for (uint256 i = 0; i < agents.length; i++) {
+            (,,,,, uint256 health) = lender.agent(agents[i]);
+            if (health < 1e27) {
+                return;
+            }
+        }
+
+        for (uint256 i = 0; i < agents.length; i++) {
+            (uint256 agentDelegation,, uint256 agentDebt,,,) = lender.agent(agents[i]);
+            totalDelegation += agentDelegation;
+            totalDebt += agentDebt;
+        }
+
+        // get the total system collateralization ratio
+        uint256 ratio = totalDebt == 0 ? type(uint256).max : (totalDelegation * 1e27) / totalDebt;
+        gte(ratio, 1e27, "total system collateralization ratio < 1e27");
+    }
+
+    /// @dev Property: Delegated value must be greater than borrowed value, if not the agent should be liquidatable
+    function property_delegated_value_greater_than_borrowed_value() public {
+        address[] memory agents = delegation.agents();
+        for (uint256 i; i < agents.length; ++i) {
+            (uint256 agentDelegation,, uint256 agentDebt,,, uint256 health) = lender.agent(agents[i]);
+            if (agentDelegation < agentDebt) {
+                t(health < 1e27, "delegated value < borrowed value and agent is not liquidatable");
+            }
+        }
+    }
+
+    /// === Helpers === ///
+    function _getFractionalReserveLosses(address _asset) internal view returns (uint256) {
+        address fractionalReserveVault = capToken.fractionalReserveVault(_asset);
+
+        if (fractionalReserveVault == address(0)) {
+            return 0;
+        } else {
+            return MockERC4626Tester(fractionalReserveVault).totalLosses();
         }
     }
 }

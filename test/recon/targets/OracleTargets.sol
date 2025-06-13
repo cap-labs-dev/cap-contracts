@@ -22,6 +22,7 @@ abstract contract OracleTargets is BaseTargetFunctions, Properties {
     }
 
     function oracle_setMarketOracleData(address _asset, IOracle.OracleData memory _oracleData) public asActor {
+        require(_oracleData.adapter != address(0));
         oracle.setMarketOracleData(_asset, _oracleData);
     }
 
