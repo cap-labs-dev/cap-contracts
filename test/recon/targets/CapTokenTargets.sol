@@ -34,14 +34,6 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         capToken_redeem(_amountIn, _minAmountsOut, _getActor(), block.timestamp + 1 days);
     }
 
-    function capToken_setFractionalReserveVault_clamped() public {
-        capToken_setFractionalReserveVault(_getAsset(), _getVault());
-    }
-
-    function capToken_setReserve_clamped(uint256 _reserve) public {
-        capToken_setReserve(_getAsset(), _reserve);
-    }
-
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
     function capToken_addAsset() public updateGhosts asActor {
@@ -305,12 +297,12 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         capToken.setFeeData(_asset, _feeData);
     }
 
-    function capToken_setFractionalReserveVault(address _asset, address _vault) public updateGhosts asActor {
-        capToken.setFractionalReserveVault(_asset, _vault);
+    function capToken_setFractionalReserveVault() public updateGhosts asActor {
+        capToken.setFractionalReserveVault(_getAsset(), _getVault());
     }
 
-    function capToken_setReserve(address _asset, uint256 _reserve) public updateGhosts asActor {
-        capToken.setReserve(_asset, _reserve);
+    function capToken_setReserve(uint256 _reserve) public updateGhosts asActor {
+        capToken.setReserve(_getAsset(), _reserve);
     }
 
     function capToken_setWhitelist(address _user, bool _whitelisted) public updateGhosts asActor {
