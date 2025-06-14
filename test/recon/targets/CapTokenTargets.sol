@@ -108,6 +108,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             uint256 capTokenBalanceAfter = capToken.balanceOf(_getActor());
             uint256 insuranceFundBalanceAfter = MockERC20(_asset).balanceOf(capToken.insuranceFund());
             uint256 totalCapSupplyAfter = capToken.totalSupply();
+            uint256 assetBalanceAfter = MockERC20(_asset).balanceOf(_receiver);
 
             // update ghosts
             ghostAmountOut += _amountIn;
@@ -146,8 +147,8 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 maxAmountOut = int256(capTokenBalanceBefore - capTokenBalanceAfter);
             }
 
-            if (MockERC20(_asset).balanceOf(_receiver) - assetBalanceBefore > 0) {
-                _validateBurnAssetValue(_asset, _amountIn, MockERC20(_asset).balanceOf(_receiver) - assetBalanceBefore);
+            if (assetBalanceAfter - assetBalanceBefore > 0) {
+                _validateBurnAssetValue(_asset, _amountIn, assetBalanceAfter - assetBalanceBefore);
             }
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "PastDeadline()")
