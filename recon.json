@@ -284,6 +284,36 @@
     ],
     "separated": true
   },
+  "out/FeeReceiver.sol/FeeReceiver.json": {
+    "functions": [
+      {
+        "signature": "distribute()",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "initialize(address,address,address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setProtocolFeePercentage(uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setProtocolFeeReceiver(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "upgradeToAndCall(address,bytes)",
+        "actor": "actor",
+        "mode": "normal"
+      }
+    ],
+    "separated": true
+  },
   "out/Lender.sol/Lender.json": {
     "functions": [
       {

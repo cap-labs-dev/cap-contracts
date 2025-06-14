@@ -16,6 +16,7 @@ import { DebtTokenTargets } from "./targets/DebtTokenTargets.sol";
 import { DelegationTargets } from "./targets/DelegationTargets.sol";
 import { DoomsdayTargets } from "./targets/DoomsdayTargets.sol";
 import { FeeAuctionTargets } from "./targets/FeeAuctionTargets.sol";
+import { FeeReceiverTargets } from "./targets/FeeReceiverTargets.sol";
 import { LenderTargets } from "./targets/LenderTargets.sol";
 import { ManagersTargets } from "./targets/ManagersTargets.sol";
 import { MockAaveDataProviderTargets } from "./targets/MockAaveDataProviderTargets.sol";
@@ -37,6 +38,7 @@ abstract contract TargetFunctions is
     DelegationTargets,
     DoomsdayTargets,
     FeeAuctionTargets,
+    FeeReceiverTargets,
     LenderTargets,
     ManagersTargets,
     MockAaveDataProviderTargets,

@@ -17,9 +17,12 @@ import { MockERC20 } from "@recon/MockERC20.sol";
 import { Utils } from "@recon/Utils.sol";
 
 // Your deps
+
 import { AccessControl } from "contracts/access/AccessControl.sol";
 import { Delegation } from "contracts/delegation/Delegation.sol";
 import { FeeConfig, InfraConfig, UsersConfig } from "contracts/deploy/interfaces/DeployConfigs.sol";
+import { Minter } from "contracts/vault/Minter.sol";
+import { Vault } from "contracts/vault/Vault.sol";
 
 import { ConfigureAccessControl } from "contracts/deploy/service/ConfigureAccessControl.sol";
 import { ConfigureDelegation } from "contracts/deploy/service/ConfigureDelegation.sol";
@@ -29,6 +32,7 @@ import { DeployInfra } from "contracts/deploy/service/DeployInfra.sol";
 import { DeployLibs } from "contracts/deploy/service/DeployLibs.sol";
 import { DeployVault } from "contracts/deploy/service/DeployVault.sol";
 import { FeeAuction } from "contracts/feeAuction/FeeAuction.sol";
+import { FeeReceiver } from "contracts/feeReceiver/FeeReceiver.sol";
 
 import { IPriceOracle } from "contracts/interfaces/IPriceOracle.sol";
 import { IRateOracle } from "contracts/interfaces/IRateOracle.sol";
@@ -68,6 +72,7 @@ abstract contract Setup is
     DebtToken debtToken;
     Delegation delegation;
     FeeAuction feeAuction;
+    FeeReceiver feeReceiver;
     LenderWrapper lender;
     MockAaveDataProvider mockAaveDataProvider;
     MockChainlinkPriceFeed mockChainlinkPriceFeed;
@@ -136,10 +141,15 @@ abstract contract Setup is
         capToken = CapToken(env.usdVault.capToken);
         stakedCap = StakedCap(env.usdVault.stakedCapToken);
         feeAuction = FeeAuction(env.usdVault.feeAuction);
+        feeReceiver = FeeReceiver(env.usdVault.feeReceiver);
 
         /// ACCESS CONTROL
         _initInfraAccessControl(env.infra, env.users);
         _initVaultAccessControl(env.infra, env.usdVault, env.users);
+        accessControl.grantAccess(Vault.addAsset.selector, env.usdVault.capToken, env.users.vault_config_admin);
+        accessControl.grantAccess(Vault.removeAsset.selector, env.usdVault.capToken, env.users.vault_config_admin);
+        accessControl.grantAccess(Vault.rescueERC20.selector, env.usdVault.capToken, env.users.vault_config_admin);
+        accessControl.grantAccess(Minter.setWhitelist.selector, env.usdVault.capToken, env.users.vault_config_admin);
 
         // Lets us use the additional getters in LenderWrapper for properties without having to change their existing deployment files
         address newLenderImplementation = address(new LenderWrapper());
