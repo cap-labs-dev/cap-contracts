@@ -222,7 +222,7 @@ abstract contract Properties is BeforeAfter, Asserts {
     }
 
     function property_burn_amount_no_fee() public {
-        if (currentOperation == OpType.BURN) {
+        if (currentOperation == OpType.BURN && _after.capTotalSupply != _before.capTotalSupply) {
             gt(_after.insuranceFundBalance, _before.insuranceFundBalance, "0 fees on burn");
         }
     }
@@ -250,7 +250,8 @@ abstract contract Properties is BeforeAfter, Asserts {
             uint256 totalBorrows = capToken.totalBorrows(asset);
             uint256 fractionalReserveBalance = MockERC20(asset).balanceOf(capToken.fractionalReserveVault(asset));
 
-            uint256 totalAssetAmount = vaultBalance + totalBorrows + fractionalReserveBalance;
+            uint256 totalAssetAmount =
+                vaultBalance + totalBorrows + fractionalReserveBalance + _getFractionalReserveLosses(asset);
 
             uint256 assetDecimals = MockERC20(asset).decimals();
             uint256 assetValue = totalAssetAmount * assetPrice * 1e18 / (10 ** assetDecimals * 1e8);

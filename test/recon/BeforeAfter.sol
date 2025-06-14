@@ -32,6 +32,7 @@ abstract contract BeforeAfter is Setup {
         mapping(address => uint256) utilizationRatio;
         mapping(address => uint256) totalBorrows;
         uint256 stakedCapValuePerShare;
+        uint256 capTotalSupply;
     }
 
     Vars internal _before;
@@ -65,6 +66,7 @@ abstract contract BeforeAfter is Setup {
 
         vars.redeemAmountsOut = _getRedeemAmounts(_getActor());
         (,, vars.agentTotalDebt[_getActor()],,, vars.agentHealth[_getActor()]) = _getAgentParams(_getActor());
+        vars.capTotalSupply = capToken.totalSupply();
     }
 
     function __before() internal {

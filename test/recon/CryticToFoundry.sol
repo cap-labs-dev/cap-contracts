@@ -18,6 +18,11 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         setup();
     }
 
+    // forge test --match-test test_crytic -vvv
+    function test_crytic() public {
+        // TODO: add failing property tests here for debugging
+    }
+
     function test_fractional_reserve_loss() public {
         // 1. Create a new vault
         add_new_vault();

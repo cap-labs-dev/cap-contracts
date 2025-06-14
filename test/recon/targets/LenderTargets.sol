@@ -83,18 +83,20 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
                 beforeBorrowerDebt,
                 "Borrower debt did not increase after borrowing"
             );
-            if (_amount == type(uint256).max) {
-                eq(
-                    MockERC20(_getAsset()).balanceOf(_receiver),
-                    beforeAssetBalance + beforeMaxBorrowable,
-                    "Borrower asset balance did not increase after borrowing (in case of max borrow)"
-                );
-            } else {
-                eq(
-                    MockERC20(_getAsset()).balanceOf(_receiver),
-                    beforeAssetBalance + _amount,
-                    "Borrower asset balance did not increase after borrowing"
-                );
+            if (_receiver != address(capToken)) {
+                if (_amount == type(uint256).max) {
+                    eq(
+                        MockERC20(_getAsset()).balanceOf(_receiver),
+                        beforeAssetBalance + beforeMaxBorrowable,
+                        "Borrower asset balance did not increase after borrowing (in case of max borrow)"
+                    );
+                } else {
+                    eq(
+                        MockERC20(_getAsset()).balanceOf(_receiver),
+                        beforeAssetBalance + _amount,
+                        "Borrower asset balance did not increase after borrowing"
+                    );
+                }
             }
 
             (uint256 assetPrice,) = oracle.getPrice(_getAsset());

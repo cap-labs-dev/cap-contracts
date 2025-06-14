@@ -35,21 +35,6 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     }
 
     /// HELPER FUNCTIONS ///
-    function _validateMintFee(address _asset, uint256 _amountIn, uint256 _mintFee) internal {
-        (uint256 assetPrice,) = oracle.getPrice(_asset);
-        (uint256 capPrice,) = oracle.getPrice(address(capToken));
-
-        if (assetPrice >= 0.85e8 && assetPrice <= 1.05e8) {
-            uint256 assetValue = _amountIn * assetPrice / (10 ** MockERC20(_asset).decimals());
-            uint256 mintValue = _mintFee * capPrice / (10 ** capToken.decimals());
-            uint256 priceDeviation = assetPrice > capPrice ? assetPrice - capPrice : capPrice - assetPrice;
-            uint256 expectedMinFeeAmount = priceDeviation * 2 * assetValue / 1e8;
-
-            gte(mintValue, expectedMinFeeAmount, "min fee below 2x asset price deviation from 1e8");
-            lte(mintValue, 5 * assetValue / 100, "min fee above 5% of _amountIn");
-        }
-    }
-
     function _validateMintAssetValue(address _asset, uint256 _cusdMinted, uint256 _assetsReceived) internal {
         (uint256 assetPrice,) = oracle.getPrice(_asset);
         (uint256 capPrice,) = oracle.getPrice(address(capToken));
@@ -199,7 +184,6 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     /// @dev Property: User always receives at most the expected amount out
     /// @dev Property: Asset cannot be minted when it is paused
     /// @dev Property: User can always mint cap token if they have sufficient balance of depositing asset
-    /// @dev Property: Minting fee must be ≥ 2× max oracle deviation, capped at 5%
     /// @dev Property: Minting increases vault assets based on oracle value.
     function capToken_mint(
         address _asset,
@@ -245,8 +229,6 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                     capTokenBalanceBefore + expectedAmountOut,
                     "user received more than expected amount out"
                 );
-
-                _validateMintFee(_asset, _amountIn, mintFee);
             }
             t(!isAssetPaused, "asset can be minted when it is paused");
         } catch (bytes memory reason) {

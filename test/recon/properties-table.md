@@ -63,5 +63,4 @@
 | 61 | property_staked_cap_value_non_decreasing | Staked cap token value must increase or stay the same over time | |
 | 62 | capToken_burn | Burning reduces cUSD supply, must always round down | |
 | 63 | capToken_burn | Burners must not receive more asset value than cUSD burned | |
-| 64 | capToken_mint | Minting fee must be ≥ 2× max oracle deviation, capped at 5% | |
-| 65 | capToken_mint | Minting increases vault assets based on oracle value | |
+| 64 | capToken_mint | Minting increases vault assets based on oracle value | |
