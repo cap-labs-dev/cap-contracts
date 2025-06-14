@@ -7,3 +7,7 @@
 // function capToken_setRedeemFee(uint256 _redeemFee) public updateGhosts asActor {
 //     capToken.setRedeemFee(_redeemFee);
 // }
+
+// function lender_removeAsset(address _asset) public asAdmin {
+//     lender.removeAsset(_asset);
+// }

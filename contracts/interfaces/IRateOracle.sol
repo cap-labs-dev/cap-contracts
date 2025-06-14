@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { IOracle } from "./IOracle.sol";
+import { IOracleTypes } from "./IOracleTypes.sol";
 
-interface IRateOracle {
+interface IRateOracle is IOracleTypes {
     /// @custom:storage-location erc7201:cap.storage.RateOracle
     struct RateOracleStorage {
-        mapping(address => IOracle.OracleData) marketOracleData;
-        mapping(address => IOracle.OracleData) utilizationOracleData;
+        mapping(address => IOracleTypes.OracleData) marketOracleData;
+        mapping(address => IOracleTypes.OracleData) utilizationOracleData;
         mapping(address => uint256) benchmarkRate;
         mapping(address => uint256) restakerRate;
     }
@@ -39,22 +39,22 @@ interface IRateOracle {
     /// @notice View the market oracle data for an asset
     /// @param _asset Asset address
     /// @return data Oracle data for an asset
-    function marketOracleData(address _asset) external view returns (IOracle.OracleData memory data);
+    function marketOracleData(address _asset) external view returns (IOracleTypes.OracleData memory data);
 
     /// @notice View the utilization oracle data for an asset
     /// @param _asset Asset address
     /// @return data Oracle data for an asset
-    function utilizationOracleData(address _asset) external view returns (IOracle.OracleData memory data);
+    function utilizationOracleData(address _asset) external view returns (IOracleTypes.OracleData memory data);
 
     /// @notice Set a market source for an asset
     /// @param _asset Asset address
     /// @param _oracleData Oracle data
-    function setMarketOracleData(address _asset, IOracle.OracleData calldata _oracleData) external;
+    function setMarketOracleData(address _asset, IOracleTypes.OracleData calldata _oracleData) external;
 
     /// @notice Set a utilization source for an asset
     /// @param _asset Asset address
     /// @param _oracleData Oracle data
-    function setUtilizationOracleData(address _asset, IOracle.OracleData calldata _oracleData) external;
+    function setUtilizationOracleData(address _asset, IOracleTypes.OracleData calldata _oracleData) external;
 
     /// @notice Update the minimum interest rate for an asset
     /// @dev Rate value is encoded in ray (27 decimals) and encodes yearly rates
@@ -69,10 +69,10 @@ interface IRateOracle {
     function setRestakerRate(address _agent, uint256 _rate) external;
 
     /// @dev Set market oracle data
-    event SetMarketOracleData(address asset, IOracle.OracleData data);
+    event SetMarketOracleData(address asset, IOracleTypes.OracleData data);
 
     /// @dev Set utilization oracle data
-    event SetUtilizationOracleData(address asset, IOracle.OracleData data);
+    event SetUtilizationOracleData(address asset, IOracleTypes.OracleData data);
 
     /// @dev Set benchmark rate
     /// @dev Rate value is encoded in ray (27 decimals) and encodes yearly rates

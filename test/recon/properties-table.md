@@ -57,3 +57,11 @@
 | 55 | property_total_system_collateralization | System must be overcollateralized after all liquidations | |
 | 56 | property_delegated_value_greater_than_borrowed_value | Delegated value must be greater than borrowed value, if not the agent should be liquidatable | |
 | 57 | property_ltv | LTV is always <= 1e27 | |
+| 58 | property_cap_token_backed_1_to_1 | cUSD (capToken) must be backed 1:1 by stable underlying assets | |
+| 59 | property_debt_token_balance_gte_total_vault_debt | DebtToken balance ≥ total vault debt at all times | |
+| 60 | property_total_borrowed_less_than_total_supply | Total cUSD borrowed < total supply (utilization < 1e27) | |
+| 61 | property_staked_cap_value_non_decreasing | Staked cap token value must increase or stay the same over time | |
+| 62 | capToken_burn | Burning reduces cUSD supply, must always round down | |
+| 63 | capToken_burn | Burners must not receive more asset value than cUSD burned | |
+| 64 | capToken_mint | Minting fee must be ≥ 2× max oracle deviation, capped at 5% | |
+| 65 | capToken_mint | Minting increases vault assets based on oracle value | |

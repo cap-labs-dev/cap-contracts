@@ -1,20 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { MockERC20 } from "@recon/MockERC20.sol";
-import { INetworkMiddleware } from "contracts/interfaces/INetworkMiddleware.sol";
-import { IOracle } from "contracts/interfaces/IOracle.sol";
-import "forge-std/console2.sol";
+import { INetworkMiddleware } from "../../contracts/interfaces/INetworkMiddleware.sol";
 
 contract MockNetworkMiddleware is INetworkMiddleware {
     NetworkMiddlewareStorage internal _storage;
 
     // Mock control variables
+    mapping(address => uint256) public mockCoverage;
+    mapping(address => uint256) public mockSlashableCollateral;
     mapping(address => mapping(address => uint256)) public mockCollateralByVault;
-
-    constructor(address _oracle) {
-        _storage.oracle = _oracle;
-    }
+    mapping(address => mapping(address => uint256)) public mockSlashableCollateralByVault;
 
     function registerAgent(address _agent, address _vault) external {
         _storage.agentsToVault[_agent] = _vault;
@@ -31,28 +27,14 @@ contract MockNetworkMiddleware is INetworkMiddleware {
     }
 
     function slash(address _agent, address _recipient, uint256 _slashShare, uint48) external {
+        mockSlashableCollateral[_agent] -= mockSlashableCollateral[_agent] * _slashShare / 1e18;
+        mockCoverage[_agent] -= mockCoverage[_agent] * _slashShare / 1e18;
+
         address _vault = _storage.agentsToVault[_agent];
-        // Round up in favor of the liquidator
-        uint256 slashShareOfCollateral = (mockCollateralByVault[_agent][_vault] * _slashShare / 1e18) + 1;
-
-        // If the slash share is greater than the total slashable collateral, set it to the total slashable collateral
-        if (slashShareOfCollateral > mockCollateralByVault[_agent][_vault]) {
-            slashShareOfCollateral = mockCollateralByVault[_agent][_vault];
-        }
-        mockCollateralByVault[_agent][_vault] -= slashShareOfCollateral;
-        MockERC20(_vault).mint(_recipient, slashShareOfCollateral);
+        mockCollateralByVault[_agent][_vault] -= mockCollateralByVault[_agent][_vault] * _slashShare / 1e18;
+        mockSlashableCollateralByVault[_agent][_vault] -=
+            mockSlashableCollateralByVault[_agent][_vault] * _slashShare / 1e18;
         emit Slash(_agent, _recipient, _slashShare);
-    }
-
-    function slashableCollateralByVault(address, address _agent, address _vault, address, uint48)
-        public
-        view
-        returns (uint256 collateralValue, uint256 collateral)
-    {
-        collateral = mockCollateralByVault[_agent][_vault];
-        (uint256 collateralPrice,) = IOracle(_storage.oracle).getPrice(_vault);
-        uint8 decimals = MockERC20(_vault).decimals();
-        collateralValue = collateral * collateralPrice / (10 ** decimals);
     }
 
     function coverageByVault(address, address _agent, address _vault, address, uint48)
@@ -60,17 +42,23 @@ contract MockNetworkMiddleware is INetworkMiddleware {
         view
         returns (uint256 collateralValue, uint256 collateral)
     {
-        return slashableCollateralByVault(address(0), _agent, _vault, address(0), 0);
+        return (mockCollateralByVault[_agent][_vault], mockCollateralByVault[_agent][_vault]);
+    }
+
+    function slashableCollateralByVault(address, address _agent, address _vault, address, uint48)
+        external
+        view
+        returns (uint256 collateralValue, uint256 collateral)
+    {
+        return (mockSlashableCollateralByVault[_agent][_vault], mockSlashableCollateralByVault[_agent][_vault]);
     }
 
     function coverage(address _agent) external view returns (uint256 delegation) {
-        (delegation,) =
-            slashableCollateralByVault(address(0), _agent, _storage.agentsToVault[_agent], _storage.oracle, 0);
+        return mockCoverage[_agent];
     }
 
     function slashableCollateral(address _agent, uint48) external view returns (uint256 _slashableCollateral) {
-        (_slashableCollateral,) =
-            slashableCollateralByVault(address(0), _agent, _storage.agentsToVault[_agent], _storage.oracle, 0);
+        _slashableCollateral = mockSlashableCollateral[_agent];
     }
 
     function vaults(address _agent) external view returns (address vault) {
@@ -82,7 +70,26 @@ contract MockNetworkMiddleware is INetworkMiddleware {
     }
 
     // Mock control functions
+    function setMockCoverage(address _agent, uint256 _coverage) external {
+        mockCoverage[_agent] = _coverage;
+    }
+
+    function setMockSlashableCollateral(address _agent, uint256 _slashableCollateral) external {
+        mockSlashableCollateral[_agent] = _slashableCollateral;
+    }
+
     function setMockCollateralByVault(address _agent, address _vault, uint256 _collateral) external {
         mockCollateralByVault[_agent][_vault] = _collateral;
+    }
+
+    function setMockSlashableCollateralByVault(address _agent, address _vault, uint256 _slashableCollateral) external {
+        mockSlashableCollateralByVault[_agent][_vault] = _slashableCollateral;
+    }
+
+    function addMockAgentCoverage(address _agent, address _vault, uint256 _coverage) external {
+        mockCoverage[_agent] += _coverage;
+        mockSlashableCollateral[_agent] += _coverage;
+        mockCollateralByVault[_agent][_vault] += _coverage;
+        mockSlashableCollateralByVault[_agent][_vault] += _coverage;
     }
 }

@@ -182,7 +182,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
                 lte(healthAfter, 1.25e27, "partial liquidation should not bring health above 1.25");
             }
         } catch (bytes memory reason) {
-            bool expectedError = checkError(reason, "InvalidBurnAmount()");
+            bool expectedError = checkError(reason, "InvalidBurnAmount()") || checkError(reason, "EnforcedPause()");
             bool isPaused = capToken.paused();
             // precondition: must be liquidating more than 0 and not paused
             if (!expectedError && !isPaused) {

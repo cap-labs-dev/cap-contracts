@@ -15,6 +15,7 @@ import { DebtToken } from "../../lendingPool/tokens/DebtToken.sol";
 import { FractionalReserve } from "../../vault/FractionalReserve.sol";
 import { Minter } from "../../vault/Minter.sol";
 
+import { FeeReceiver } from "../../feeReceiver/FeeReceiver.sol";
 import { CapToken } from "../../token/CapToken.sol";
 import { OFTLockbox } from "../../token/OFTLockbox.sol";
 import { StakedCap } from "../../token/StakedCap.sol";
@@ -45,6 +46,7 @@ contract DeployVault is ProxyUtils {
         // deploy and init cap instances
         d.capToken = _proxy(implementations.capToken);
         d.stakedCapToken = _proxy(implementations.stakedCap);
+        d.feeReceiver = _proxy(implementations.feeReceiver);
 
         // deploy fee auction for this vault
         d.feeAuction = _proxy(implementations.feeAuction);
@@ -60,6 +62,8 @@ contract DeployVault is ProxyUtils {
             name, symbol, infra.accessControl, d.feeAuction, infra.oracle, assets, insuranceFund
         );
         StakedCap(d.stakedCapToken).initialize(infra.accessControl, d.capToken, 24 hours);
+
+        FeeReceiver(d.feeReceiver).initialize(infra.accessControl, d.capToken, d.stakedCapToken);
 
         // deploy and init debt tokens
         d.assets = assets;
@@ -114,10 +118,6 @@ contract DeployVault is ProxyUtils {
         accessControl.grantAccess(Vault.unpauseProtocol.selector, vault.capToken, users.vault_config_admin);
         accessControl.grantAccess(Vault.pauseAsset.selector, vault.capToken, users.vault_config_admin);
         accessControl.grantAccess(Vault.unpauseAsset.selector, vault.capToken, users.vault_config_admin);
-        accessControl.grantAccess(Vault.addAsset.selector, vault.capToken, users.vault_config_admin);
-        accessControl.grantAccess(Vault.removeAsset.selector, vault.capToken, users.vault_config_admin);
-        accessControl.grantAccess(Vault.rescueERC20.selector, vault.capToken, users.vault_config_admin);
-        accessControl.grantAccess(Minter.setWhitelist.selector, vault.capToken, users.vault_config_admin);
         accessControl.grantAccess(bytes4(0), vault.capToken, users.access_control_admin);
 
         accessControl.grantAccess(FractionalReserve.setReserve.selector, vault.capToken, users.vault_config_admin);
@@ -143,6 +143,13 @@ contract DeployVault is ProxyUtils {
         accessControl.grantAccess(FeeAuction.setMinStartPrice.selector, vault.feeAuction, users.fee_auction_admin);
         accessControl.grantAccess(FeeAuction.setDuration.selector, vault.feeAuction, users.fee_auction_admin);
         accessControl.grantAccess(FeeAuction.setStartPrice.selector, vault.feeAuction, users.fee_auction_admin);
+
+        accessControl.grantAccess(
+            FeeReceiver.setProtocolFeePercentage.selector, vault.feeReceiver, users.vault_config_admin
+        );
+        accessControl.grantAccess(
+            FeeReceiver.setProtocolFeeReceiver.selector, vault.feeReceiver, users.vault_config_admin
+        );
 
         AccessControl(infra.accessControl).grantAccess(bytes4(0), vault.stakedCapToken, users.access_control_admin);
     }

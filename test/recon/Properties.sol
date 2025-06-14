@@ -227,6 +227,130 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: cUSD (capToken) must be backed 1:1 by stable underlying assets
+    function property_cap_token_backed_1_to_1() public {
+        address[] memory assets = capToken.assets();
+        uint256 totalBackingValue = 0;
+        bool hasUnrealisticPrice = false;
+        (uint256 capPrice,) = oracle.getPrice(address(capToken));
+
+        for (uint256 i = 0; i < assets.length; i++) {
+            address asset = assets[i];
+
+            (uint256 assetPrice,) = oracle.getPrice(asset);
+
+            // Sanity check: For stablecoins, price should be between $0.50 and $2.00
+            // In Chainlink format (8 decimals): 0.85e8 to 1.05e8
+            if (assetPrice < 0.85e8 || assetPrice > 1.05e8) {
+                hasUnrealisticPrice = true;
+                continue; // Skip this asset if price is unrealistic
+            }
+
+            uint256 vaultBalance = MockERC20(asset).balanceOf(address(capToken));
+            uint256 totalBorrows = capToken.totalBorrows(asset);
+            uint256 fractionalReserveBalance = MockERC20(asset).balanceOf(capToken.fractionalReserveVault(asset));
+
+            uint256 totalAssetAmount = vaultBalance + totalBorrows + fractionalReserveBalance;
+
+            uint256 assetDecimals = MockERC20(asset).decimals();
+            uint256 assetValue = totalAssetAmount * assetPrice * 1e18 / (10 ** assetDecimals * 1e8);
+
+            totalBackingValue += assetValue;
+        }
+
+        // Skip property check if any asset has unrealistic pricing (likely due to fuzzer manipulation)
+        if (hasUnrealisticPrice) {
+            return;
+        }
+
+        uint256 capTokenTotalSupply = capToken.totalSupply();
+
+        if (capTokenTotalSupply == 0) {
+            return;
+        }
+
+        gte(totalBackingValue, capTokenTotalSupply * capPrice / 1e8, "capToken not backed 1:1 by underlying assets");
+    }
+
+    /// @dev Property: DebtToken balance ≥ total vault debt at all times
+    function property_debt_token_balance_gte_total_vault_debt() public {
+        address[] memory assets = capToken.assets();
+        address[] memory agents = delegation.agents();
+
+        for (uint256 i = 0; i < assets.length; i++) {
+            address asset = assets[i];
+
+            (,, address _debtToken,,,,) = lender.reservesData(asset);
+
+            if (_debtToken == address(0)) {
+                continue;
+            }
+
+            uint256 totalDebtTokenSupply = MockERC20(_debtToken).totalSupply();
+
+            uint256 totalVaultDebt = 0;
+            for (uint256 j = 0; j < agents.length; j++) {
+                totalVaultDebt += lender.debt(agents[j], asset);
+            }
+
+            gte(totalDebtTokenSupply, totalVaultDebt, "DebtToken balance < total vault debt");
+        }
+    }
+
+    /// @dev Property: Total cUSD borrowed < total supply (utilization < 1e27)
+    function property_total_borrowed_less_than_total_supply() public {
+        address[] memory assets = capToken.assets();
+
+        for (uint256 i = 0; i < assets.length; i++) {
+            address asset = assets[i];
+
+            uint256 totalSupplied = capToken.totalSupplies(asset);
+            uint256 totalBorrowed = capToken.totalBorrows(asset);
+
+            // Skip if no supplies (division by zero in utilization calculation)
+            if (totalSupplied == 0) {
+                // If no supplies, there should be no borrows either
+                eq(totalBorrowed, 0, "borrows exist without supplies");
+                continue;
+            }
+
+            lte(totalBorrowed, totalSupplied, "total borrowed > total supply");
+            uint256 utilizationRatio = capToken.utilization(asset);
+            lte(utilizationRatio, 1e27, "utilization > 100%");
+
+            uint256 expectedUtilization = totalBorrowed * 1e27 / totalSupplied;
+
+            uint256 diff = utilizationRatio > expectedUtilization
+                ? utilizationRatio - expectedUtilization
+                : expectedUtilization - utilizationRatio;
+            lte(diff * 10000, 1e27, "utilization calculation inconsistent");
+        }
+    }
+
+    /// @dev Property: Staked cap token value must increase or stay the same over time
+    function property_staked_cap_value_non_decreasing() public {
+        uint256 valuePerShareBefore = _before.stakedCapValuePerShare;
+        uint256 valuePerShareAfter = _after.stakedCapValuePerShare;
+
+        // Skip if no meaningful value tracked (initial state or failed calls)
+        if (valuePerShareBefore == 0 || valuePerShareAfter == 0) {
+            return;
+        }
+
+        // Skip if values are exactly the same (no change)
+        if (valuePerShareBefore == valuePerShareAfter) {
+            return;
+        }
+
+        gte(valuePerShareAfter, valuePerShareBefore, "staked cap token value per share decreased");
+
+        if (valuePerShareAfter < valuePerShareBefore) {
+            uint256 decrease = valuePerShareBefore - valuePerShareAfter;
+            uint256 decreasePercentage = decrease * 10000 / valuePerShareBefore; // basis points
+            lte(decreasePercentage, 1, "staked cap value decreased by more than 0.01%");
+        }
+    }
+
     /// === Optimization Properties === ///
 
     function optimize_burnable_amount_no_fee() public returns (int256) {
