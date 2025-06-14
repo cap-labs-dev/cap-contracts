@@ -102,6 +102,8 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Total cap supply decreases by no more than the amount out
     /// @dev Property: Fees are always nonzero when burning
     /// @dev Property: Fees are always <= the amount out
+    /// @dev Property: Burning reduces cUSD supply, must always round down
+    /// @dev Property: Burners must not receive more asset value than cUSD burned
     function capToken_burn(
         address _asset,
         uint256 _amountIn,
@@ -112,7 +114,8 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         uint256 capTokenBalanceBefore = capToken.balanceOf(_getActor());
         uint256 insuranceFundBalanceBefore = MockERC20(_asset).balanceOf(capToken.insuranceFund());
         uint256 totalCapSupplyBefore = capToken.totalSupply();
-        (uint256 expectedAmountOut, uint256 expectedFee) = capToken.getBurnAmount(_asset, _amountIn);
+        uint256 assetBalanceBefore = MockERC20(_asset).balanceOf(_receiver);
+        (uint256 expectedAmountOut,) = capToken.getBurnAmount(_asset, _amountIn);
 
         vm.prank(_getActor());
         try capToken.burn(_asset, _amountIn, _minAmountOut, _receiver, _deadline) {
@@ -120,33 +123,47 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             uint256 capTokenBalanceAfter = capToken.balanceOf(_getActor());
             uint256 insuranceFundBalanceAfter = MockERC20(_asset).balanceOf(capToken.insuranceFund());
             uint256 totalCapSupplyAfter = capToken.totalSupply();
-            uint256 feesReceived = insuranceFundBalanceAfter - insuranceFundBalanceBefore;
-            uint256 capTokenBurned = capTokenBalanceBefore - capTokenBalanceAfter;
+            uint256 assetBalanceAfter = MockERC20(_asset).balanceOf(_receiver);
 
             // update ghosts
             ghostAmountOut += _amountIn;
 
             // check inlined properties
-            gte(capTokenBurned, _minAmountOut, "user received less than minimum amount out");
+            gte(
+                capTokenBalanceBefore - capTokenBalanceAfter,
+                _minAmountOut,
+                "user received less than minimum amount out"
+            );
             gte(
                 totalCapSupplyBefore - totalCapSupplyAfter,
-                capTokenBurned,
+                capTokenBalanceBefore - capTokenBalanceAfter,
                 "total cap supply decreased by less than the amount out"
             );
-            lte(feesReceived, capTokenBurned, "fees are greater than the amount out");
+            lte(
+                insuranceFundBalanceAfter - insuranceFundBalanceBefore,
+                capTokenBalanceBefore - capTokenBalanceAfter,
+                "fees are greater than the amount out"
+            );
             if (!capToken.whitelisted(_getActor())) {
-                gt(feesReceived, 0, "0 fees when burning");
+                gt(insuranceFundBalanceAfter - insuranceFundBalanceBefore, 0, "0 fees when burning");
 
                 lte(
-                    capTokenBalanceAfter,
+                    capTokenBalanceBefore - capTokenBalanceAfter,
                     capTokenBalanceBefore - expectedAmountOut,
                     "user received more than expected amount out"
                 );
             }
 
             // for optimization property, set the new value if the amount out is greater than the current max and there are no fees
-            if (int256(capTokenBurned) > maxAmountOut && feesReceived == 0) {
-                maxAmountOut = int256(capTokenBurned);
+            if (
+                int256(capTokenBalanceBefore - capTokenBalanceAfter) > maxAmountOut
+                    && (insuranceFundBalanceAfter - insuranceFundBalanceBefore) == 0
+            ) {
+                maxAmountOut = int256(capTokenBalanceBefore - capTokenBalanceAfter);
+            }
+
+            if (assetBalanceAfter - assetBalanceBefore > 0) {
+                _validateBurnAssetValue(_asset, _amountIn, assetBalanceAfter - assetBalanceBefore);
             }
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "PastDeadline()")
