@@ -21,12 +21,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     // forge test --match-test test_crytic -vvv
     function test_crytic() public {
         // TODO: add failing property tests here for debugging
-        capToken_mint_clamped(91747592667458389387);
-        lender_borrow_clamped(90017308991558959124);
-        switchChainlinkOracle(15500930495352523377434005916451063608665704137291179007452715);
-        switch_asset(234002657199225104869821102155071890515352497055191893111);
-        mockChainlinkPriceFeed_setLatestAnswer_clamped(5131691316084673923073400658621758140505207586025465692953);
-        doomsday_liquidate(1);
     }
 
     function test_fractional_reserve_loss() public {
