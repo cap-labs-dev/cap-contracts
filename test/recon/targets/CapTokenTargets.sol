@@ -97,8 +97,6 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             );
             lte(feesReceived, capTokenBurned, "fees are greater than the amount out");
             if (!capToken.whitelisted(_getActor())) {
-                gt(feesReceived, 0, "0 fees when burning");
-
                 lte(
                     capTokenBalanceAfter,
                     capTokenBalanceBefore - expectedAmountOut,

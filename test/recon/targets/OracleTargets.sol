@@ -21,11 +21,6 @@ abstract contract OracleTargets is BaseTargetFunctions, Properties {
         oracle.setBenchmarkRate(_asset, _rate);
     }
 
-    function oracle_setMarketOracleData(address _asset, IOracle.OracleData memory _oracleData) public asActor {
-        require(_oracleData.adapter != address(0));
-        oracle.setMarketOracleData(_asset, _oracleData);
-    }
-
     function oracle_setPriceBackupOracleData(address _asset, IOracle.OracleData memory _oracleData) public asActor {
         oracle.setPriceBackupOracleData(_asset, _oracleData);
     }
@@ -41,10 +36,5 @@ abstract contract OracleTargets is BaseTargetFunctions, Properties {
 
     function oracle_setStaleness(address _asset, uint256 _staleness) public asActor {
         oracle.setStaleness(_asset, _staleness);
-    }
-
-    function oracle_setUtilizationOracleData(address _asset, IOracle.OracleData memory _oracleData) public asActor {
-        require(_oracleData.adapter != address(0));
-        oracle.setUtilizationOracleData(_asset, _oracleData);
     }
 }

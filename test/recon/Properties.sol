@@ -222,7 +222,8 @@ abstract contract Properties is BeforeAfter, Asserts {
     }
 
     function property_burn_amount_no_fee() public {
-        if (currentOperation == OpType.BURN) {
+        // precondition: burn operation and cUSD had to actually be burned
+        if (currentOperation == OpType.BURN && _after.capTokenTotalSupply < _before.capTokenTotalSupply) {
             gt(_after.insuranceFundBalance, _before.insuranceFundBalance, "0 fees on burn");
         }
     }
