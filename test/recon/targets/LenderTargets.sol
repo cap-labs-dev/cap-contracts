@@ -43,6 +43,9 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         uint256 bonusCap,
         uint256 minBorrow
     ) public updateGhosts asAdmin {
+        require(!_isAddressUnderlying(vault), "vault is already an underlying asset");
+        require(!_isAddressUnderlying(debtToken), "debtToken is already an underlying asset");
+
         ILender.AddAssetParams memory params = ILender.AddAssetParams({
             asset: asset,
             vault: vault,
@@ -52,6 +55,16 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             minBorrow: minBorrow
         });
         lender.addAsset(params);
+    }
+
+    function _isAddressUnderlying(address addressToCheck) internal view returns (bool) {
+        address[] memory assets = _getAssets();
+        for (uint256 i; i < assets.length; ++i) {
+            if (assets[i] == addressToCheck) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// @dev Property: Asset cannot be borrowed when it is paused

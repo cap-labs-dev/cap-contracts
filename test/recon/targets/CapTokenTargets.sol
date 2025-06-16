@@ -149,9 +149,12 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         address _receiver,
         uint256 _deadline
     ) public updateGhosts {
+        address insuranceFund = capToken.insuranceFund();
+        require(insuranceFund != _receiver, "insurance fund cannot be the receiver"); // this messes up the property check that user doesn't receive more than the amountOut
+
         uint256 assetBalance = MockERC20(_asset).balanceOf(_getActor());
         uint256 capTokenBalanceBefore = capToken.balanceOf(_receiver);
-        uint256 insuranceFundBalanceBefore = capToken.balanceOf(capToken.insuranceFund());
+        uint256 insuranceFundBalanceBefore = capToken.balanceOf(insuranceFund);
         (uint256 expectedAmountOut,) = capToken.getMintAmount(_asset, _amountIn);
         bool isAssetPaused = capToken.paused(_asset);
 
