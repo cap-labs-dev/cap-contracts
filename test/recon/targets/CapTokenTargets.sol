@@ -346,6 +346,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     }
 
     function capToken_setReserve(uint256 _reserve) public updateGhosts asActor {
+        _reserve %= uint256(type(uint88).max);
         capToken.setReserve(_getAsset(), _reserve);
     }
 
