@@ -62,3 +62,4 @@
 | 60 | capToken_burn | Burning reduces cUSD supply, must always round down | |
 | 61 | capToken_burn | Burners must not receive more asset value than cUSD burned | |
 | 62 | capToken_mint | Minting increases vault assets based on oracle value | |
+| 63 | property_utilization_ratio_never_greater_than_1e27 | Utilization ratio is never greater than 1e27 | |

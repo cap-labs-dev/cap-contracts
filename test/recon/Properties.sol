@@ -359,6 +359,16 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: Utilization ratio is never greater than 1e27
+    function property_utilization_ratio_never_greater_than_1e27() public {
+        address[] memory assets = _getAssets();
+        for (uint256 i = 0; i < assets.length; i++) {
+            address asset = assets[i];
+            uint256 utilizationRatio = capToken.utilization(asset);
+            lte(utilizationRatio, 1e27, "utilization ratio > 100%");
+        }
+    }
+
     /// === Optimization Properties === ///
 
     function optimize_burnable_amount_no_fee() public returns (int256) {
