@@ -35,7 +35,7 @@ contract FeeAuction is IFeeAuction, UUPSUpgradeable, Access, FeeAuctionStorageUt
         __Access_init(_accessControl);
         __UUPSUpgradeable_init();
 
-        FeeAuctionStorage storage $ = get();
+        FeeAuctionStorage storage $ = getFeeAuctionStorage();
         $.paymentToken = _paymentToken;
         $.paymentRecipient = _paymentRecipient;
         $.startPrice = _minStartPrice;
@@ -49,7 +49,7 @@ contract FeeAuction is IFeeAuction, UUPSUpgradeable, Access, FeeAuctionStorageUt
     /// @notice Current price in the payment token, linearly decays toward 10% of the start price over time
     /// @return price Current price
     function currentPrice() public view returns (uint256 price) {
-        FeeAuctionStorage storage $ = get();
+        FeeAuctionStorage storage $ = getFeeAuctionStorage();
         uint256 elapsed = block.timestamp - $.startTimestamp;
         if (elapsed > $.duration) elapsed = $.duration;
         price = $.startPrice * (1e27 - (elapsed * 0.9e27 / $.duration)) / 1e27;
@@ -75,7 +75,7 @@ contract FeeAuction is IFeeAuction, UUPSUpgradeable, Access, FeeAuctionStorageUt
         if (_receiver == address(0)) revert InvalidReceiver();
         if (_deadline < block.timestamp) revert InvalidDeadline();
 
-        FeeAuctionStorage storage $ = get();
+        FeeAuctionStorage storage $ = getFeeAuctionStorage();
         $.startTimestamp = block.timestamp;
 
         uint256 newStartPrice = price * 2;
@@ -93,7 +93,7 @@ contract FeeAuction is IFeeAuction, UUPSUpgradeable, Access, FeeAuctionStorageUt
     /// @dev This will affect the current price, use with caution
     /// @param _startPrice New start price
     function setStartPrice(uint256 _startPrice) external checkAccess(this.setStartPrice.selector) {
-        FeeAuctionStorage storage $ = get();
+        FeeAuctionStorage storage $ = getFeeAuctionStorage();
         if (_startPrice < $.minStartPrice) revert InvalidStartPrice();
         $.startPrice = _startPrice;
         emit SetStartPrice(_startPrice);
@@ -104,7 +104,7 @@ contract FeeAuction is IFeeAuction, UUPSUpgradeable, Access, FeeAuctionStorageUt
     /// @param _duration New duration in seconds
     function setDuration(uint256 _duration) external checkAccess(this.setDuration.selector) {
         if (_duration == 0) revert NoDuration();
-        FeeAuctionStorage storage $ = get();
+        FeeAuctionStorage storage $ = getFeeAuctionStorage();
         $.duration = _duration;
         emit SetDuration(_duration);
     }
@@ -113,7 +113,7 @@ contract FeeAuction is IFeeAuction, UUPSUpgradeable, Access, FeeAuctionStorageUt
     /// @param _minStartPrice New minimum start price
     function setMinStartPrice(uint256 _minStartPrice) external checkAccess(this.setMinStartPrice.selector) {
         if (_minStartPrice == 0) revert NoMinStartPrice();
-        FeeAuctionStorage storage $ = get();
+        FeeAuctionStorage storage $ = getFeeAuctionStorage();
         $.minStartPrice = _minStartPrice;
         emit SetMinStartPrice(_minStartPrice);
     }
@@ -141,37 +141,37 @@ contract FeeAuction is IFeeAuction, UUPSUpgradeable, Access, FeeAuctionStorageUt
     /// @notice Get the payment token address
     /// @return token Address of the token used for payments
     function paymentToken() external view returns (address token) {
-        token = get().paymentToken;
+        token = getFeeAuctionStorage().paymentToken;
     }
 
     /// @notice Get the payment recipient address
     /// @return recipient Address that receives the payments
     function paymentRecipient() external view returns (address recipient) {
-        recipient = get().paymentRecipient;
+        recipient = getFeeAuctionStorage().paymentRecipient;
     }
 
     /// @notice Get the current start price
     /// @return price Current start price in payment token decimals
     function startPrice() external view returns (uint256 price) {
-        price = get().startPrice;
+        price = getFeeAuctionStorage().startPrice;
     }
 
     /// @notice Get the start timestamp of the current auction
     /// @return timestamp Timestamp when the current auction started
     function startTimestamp() external view returns (uint256 timestamp) {
-        timestamp = get().startTimestamp;
+        timestamp = getFeeAuctionStorage().startTimestamp;
     }
 
     /// @notice Get the auction duration
     /// @return auctionDuration Duration in seconds
     function duration() external view returns (uint256 auctionDuration) {
-        auctionDuration = get().duration;
+        auctionDuration = getFeeAuctionStorage().duration;
     }
 
     /// @notice Get the minimum start price
     /// @return price Minimum start price in payment token decimals
     function minStartPrice() external view returns (uint256 price) {
-        price = get().minStartPrice;
+        price = getFeeAuctionStorage().minStartPrice;
     }
 
     /// @dev Only admin can upgrade

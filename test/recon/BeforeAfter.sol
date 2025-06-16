@@ -27,10 +27,12 @@ abstract contract BeforeAfter is Setup {
         uint256[] redeemAmountsOut;
         mapping(address => mapping(address => uint256)) debtTokenBalance;
         mapping(address => uint256) vaultDebt;
+        mapping(address => uint256) agentHealth;
         mapping(address => uint256) agentTotalDebt;
         mapping(address => uint256) utilizationIndex;
         mapping(address => uint256) utilizationRatio;
         mapping(address => uint256) totalBorrows;
+        uint256 stakedCapValuePerShare;
     }
 
     Vars internal _before;
@@ -62,8 +64,10 @@ abstract contract BeforeAfter is Setup {
         vars.insuranceFundBalance = MockERC20(_getAsset()).balanceOf(capToken.insuranceFund());
         vars.capTokenTotalSupply = capToken.totalSupply();
 
+        vars.stakedCapValuePerShare = _getStakedCapValuePerShare();
+
         vars.redeemAmountsOut = _getRedeemAmounts(_getActor());
-        (,, vars.agentTotalDebt[_getActor()],,,) = _getAgentParams(_getActor());
+        (,, vars.agentTotalDebt[_getActor()],,, vars.agentHealth[_getActor()]) = _getAgentParams(_getActor());
     }
 
     function __before() internal {
@@ -125,6 +129,19 @@ abstract contract BeforeAfter is Setup {
         } catch {
             // If the call fails, we can assume the redeem amounts are zero
             amountsOut = new uint256[](0);
+        }
+    }
+
+    function _getStakedCapValuePerShare() internal view returns (uint256 valuePerShare) {
+        try stakedCap.totalAssets() returns (uint256 totalAssets) {
+            uint256 totalSupply = stakedCap.totalSupply();
+            if (totalSupply == 0) {
+                return 1e18; // Default to 1:1 ratio when no supply exists
+            }
+            valuePerShare = totalAssets * 1e18 / totalSupply;
+        } catch {
+            // If the call fails, return 1:1 ratio
+            valuePerShare = 1e18;
         }
     }
 }

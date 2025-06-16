@@ -7,7 +7,7 @@
   "license": "MIT",
   "private": true,
   "engines": {
-    "node": "20.18.0"
+    "node": "^20.18.0"
   },
   "scripts": {
     "postinstall": "lefthook install && forge remappings > remappings.txt",

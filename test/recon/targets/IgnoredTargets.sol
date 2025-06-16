@@ -8,12 +8,22 @@
 //     capToken.setRedeemFee(_redeemFee);
 // }
 
+// function lender_removeAsset(address _asset) public asAdmin {
+//     lender.removeAsset(_asset);
+// }
+
 // function oracle_setMarketOracleData(address _asset, IOracle.OracleData memory _oracleData) public asActor {
-//     require(_oracleData.adapter != address(0));
 //     oracle.setMarketOracleData(_asset, _oracleData);
 // }
 
+// function oracle_setPriceBackupOracleData(address _asset, IOracle.OracleData memory _oracleData) public asActor {
+//     oracle.setPriceBackupOracleData(_asset, _oracleData);
+// }
+
+// function oracle_setPriceOracleData(address _asset, IOracle.OracleData memory _oracleData) public asActor {
+//     oracle.setPriceOracleData(_asset, _oracleData);
+// }
+
 // function oracle_setUtilizationOracleData(address _asset, IOracle.OracleData memory _oracleData) public asActor {
-//     require(_oracleData.adapter != address(0));
 //     oracle.setUtilizationOracleData(_asset, _oracleData);
 // }

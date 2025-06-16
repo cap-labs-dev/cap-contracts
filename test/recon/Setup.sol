@@ -20,6 +20,10 @@ import { Utils } from "@recon/Utils.sol";
 import { AccessControl } from "contracts/access/AccessControl.sol";
 import { Delegation } from "contracts/delegation/Delegation.sol";
 import { FeeConfig, InfraConfig, UsersConfig } from "contracts/deploy/interfaces/DeployConfigs.sol";
+import { Minter } from "contracts/vault/Minter.sol";
+import { Vault } from "contracts/vault/Vault.sol";
+
+import { ConfigureAccessControl } from "contracts/deploy/service/ConfigureAccessControl.sol";
 import { ConfigureDelegation } from "contracts/deploy/service/ConfigureDelegation.sol";
 import { ConfigureOracle } from "contracts/deploy/service/ConfigureOracle.sol";
 import { DeployImplems } from "contracts/deploy/service/DeployImplems.sol";
@@ -27,6 +31,7 @@ import { DeployInfra } from "contracts/deploy/service/DeployInfra.sol";
 import { DeployLibs } from "contracts/deploy/service/DeployLibs.sol";
 import { DeployVault } from "contracts/deploy/service/DeployVault.sol";
 import { FeeAuction } from "contracts/feeAuction/FeeAuction.sol";
+import { FeeReceiver } from "contracts/feeReceiver/FeeReceiver.sol";
 
 import { IPriceOracle } from "contracts/interfaces/IPriceOracle.sol";
 import { IRateOracle } from "contracts/interfaces/IRateOracle.sol";
@@ -38,7 +43,7 @@ import { StakedCap } from "contracts/token/StakedCap.sol";
 import { OracleMocksConfig, TestEnvConfig } from "test/deploy/interfaces/TestDeployConfig.sol";
 import { MockAaveDataProvider } from "test/mocks/MockAaveDataProvider.sol";
 import { MockChainlinkPriceFeed } from "test/mocks/MockChainlinkPriceFeed.sol";
-import { MockNetworkMiddleware } from "test/mocks/MockNetworkMiddleware.sol";
+import { MockMiddleware } from "test/recon/mocks/MockMiddleware.sol";
 
 import { LenderWrapper } from "test/recon/helpers/LenderWrapper.sol";
 import { VaultManager } from "test/recon/helpers/VaultManager.sol";
@@ -54,6 +59,7 @@ abstract contract Setup is
     DeployImplems,
     DeployLibs,
     ConfigureOracle,
+    ConfigureAccessControl,
     ConfigureDelegation
 {
     // ConfigureAccessControl
@@ -65,10 +71,11 @@ abstract contract Setup is
     DebtToken debtToken;
     Delegation delegation;
     FeeAuction feeAuction;
+    FeeReceiver feeReceiver;
     LenderWrapper lender;
     MockAaveDataProvider mockAaveDataProvider;
     MockChainlinkPriceFeed mockChainlinkPriceFeed;
-    MockNetworkMiddleware mockNetworkMiddleware;
+    MockMiddleware mockNetworkMiddleware;
     Oracle oracle;
     StakedCap stakedCap;
 
@@ -78,6 +85,8 @@ abstract contract Setup is
 
     address mockEth;
     int256 maxAmountOut;
+
+    uint256 constant RAY = 1e27;
 
     /// === Setup === ///
     /// This contains all calls to be performed in the tester constructor, both for Echidna and Foundry
@@ -133,10 +142,15 @@ abstract contract Setup is
         capToken = CapToken(env.usdVault.capToken);
         stakedCap = StakedCap(env.usdVault.stakedCapToken);
         feeAuction = FeeAuction(env.usdVault.feeAuction);
+        feeReceiver = FeeReceiver(env.usdVault.feeReceiver);
 
         /// ACCESS CONTROL
         _initInfraAccessControl(env.infra, env.users);
         _initVaultAccessControl(env.infra, env.usdVault, env.users);
+        accessControl.grantAccess(Vault.addAsset.selector, env.usdVault.capToken, env.users.vault_config_admin);
+        accessControl.grantAccess(Vault.removeAsset.selector, env.usdVault.capToken, env.users.vault_config_admin);
+        accessControl.grantAccess(Vault.rescueERC20.selector, env.usdVault.capToken, env.users.vault_config_admin);
+        accessControl.grantAccess(Minter.setWhitelist.selector, env.usdVault.capToken, env.users.vault_config_admin);
 
         // Lets us use the additional getters in LenderWrapper for properties without having to change their existing deployment files
         address newLenderImplementation = address(new LenderWrapper());
@@ -167,7 +181,7 @@ abstract contract Setup is
             optimalRatio: 0.33e27
         });
         _initVaultLender(env.usdVault, env.infra, fee);
-        mockNetworkMiddleware = new MockNetworkMiddleware(address(oracle));
+        mockNetworkMiddleware = new MockMiddleware(address(oracle));
         mockNetworkMiddleware.registerVault(mockEth, address(stakedCap));
         delegation.registerNetwork(address(mockNetworkMiddleware));
 
@@ -195,55 +209,8 @@ abstract contract Setup is
                 // @audit info: min(slashableCollateral, coverage) is needed for actor to be able to borrow
         }
 
-        _addLabels();
-
         // help fuzzer to reach to next epoch of vault
         vm.warp(block.timestamp + 1 days);
-    }
-
-    /// === INTERNAL FUNCTIONS === ///
-    function _addLabels() internal {
-        vm.label(address(accessControl), "AccessControl");
-        vm.label(address(delegation), "Delegation");
-        vm.label(address(oracle), "Oracle");
-        vm.label(address(lender), "Lender");
-        vm.label(address(capToken), "Vault(CapToken)");
-        vm.label(address(stakedCap), "StakedCap");
-        vm.label(address(feeAuction), "FeeAuction");
-    }
-
-    /// Copied from ConfigureAccessControl.sol to avoid circular dependency
-    function _initInfraAccessControl(InfraConfig memory infra, UsersConfig memory users) internal {
-        accessControl.grantAccess(IPriceOracle.setPriceOracleData.selector, infra.oracle, users.oracle_admin);
-        accessControl.revokeAccess(IPriceOracle.setPriceOracleData.selector, infra.oracle, users.oracle_admin);
-        accessControl.grantAccess(IPriceOracle.setPriceOracleData.selector, infra.oracle, users.oracle_admin);
-        accessControl.grantAccess(IPriceOracle.setPriceBackupOracleData.selector, infra.oracle, users.oracle_admin);
-        accessControl.grantAccess(bytes4(0), infra.oracle, users.access_control_admin);
-
-        accessControl.grantAccess(IRateOracle.setBenchmarkRate.selector, infra.oracle, users.rate_oracle_admin);
-        accessControl.grantAccess(IRateOracle.setRestakerRate.selector, infra.oracle, users.rate_oracle_admin);
-        accessControl.grantAccess(IRateOracle.setMarketOracleData.selector, infra.oracle, users.rate_oracle_admin);
-        accessControl.grantAccess(IRateOracle.setUtilizationOracleData.selector, infra.oracle, users.rate_oracle_admin);
-
-        accessControl.grantAccess(Lender.addAsset.selector, infra.lender, users.lender_admin);
-        accessControl.grantAccess(Lender.setMinBorrow.selector, infra.lender, users.lender_admin);
-        accessControl.grantAccess(Lender.removeAsset.selector, infra.lender, users.lender_admin);
-        accessControl.grantAccess(Lender.pauseAsset.selector, infra.lender, users.lender_admin);
-        accessControl.grantAccess(bytes4(0), infra.lender, users.access_control_admin);
-
-        accessControl.grantAccess(Lender.borrow.selector, infra.lender, users.lender_admin);
-        accessControl.grantAccess(Lender.repay.selector, infra.lender, users.lender_admin);
-
-        accessControl.grantAccess(Lender.liquidate.selector, infra.lender, users.lender_admin);
-        accessControl.grantAccess(Lender.pauseAsset.selector, infra.lender, users.lender_admin);
-
-        accessControl.grantAccess(Delegation.addAgent.selector, infra.delegation, users.delegation_admin);
-        accessControl.grantAccess(Delegation.modifyAgent.selector, infra.delegation, users.delegation_admin);
-        accessControl.grantAccess(Delegation.registerNetwork.selector, infra.delegation, users.delegation_admin);
-        accessControl.grantAccess(Delegation.setLastBorrow.selector, infra.delegation, infra.lender);
-        accessControl.grantAccess(Delegation.slash.selector, infra.delegation, infra.lender);
-        accessControl.grantAccess(Delegation.setLtvBuffer.selector, infra.delegation, users.delegation_admin);
-        accessControl.grantAccess(bytes4(0), infra.delegation, users.access_control_admin);
     }
 
     /// === MODIFIERS === ///

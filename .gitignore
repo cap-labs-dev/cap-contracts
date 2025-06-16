@@ -38,6 +38,7 @@ bin
 .gambit
 .sumo*
 sumo
+.idea
 
 # Coverage files
 crytic-export

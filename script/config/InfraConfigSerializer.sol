@@ -12,7 +12,7 @@ contract InfraConfigSerializer {
 
     function _capInfraFilePath() private view returns (string memory) {
         Vm vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
-        return string.concat(vm.projectRoot(), "/config/cap-infra.json");
+        return string.concat(vm.projectRoot(), "/config/cap-mainnet-infra.json");
     }
 
     function _saveInfraConfig(ImplementationsConfig memory implems, LibsConfig memory libs, InfraConfig memory infra)
@@ -27,6 +27,7 @@ contract InfraConfigSerializer {
         implemsJson.serialize("oracle", implems.oracle);
         implemsJson.serialize("debtToken", implems.debtToken);
         implemsJson = implemsJson.serialize("feeAuction", implems.feeAuction);
+        implemsJson = implemsJson.serialize("feeReceiver", implems.feeReceiver);
         console.log(implemsJson);
 
         string memory libsJson = "libs";
@@ -75,7 +76,8 @@ contract InfraConfigSerializer {
             stakedCap: json.readAddress(string.concat(implemsPrefix, "stakedCap")),
             oracle: json.readAddress(string.concat(implemsPrefix, "oracle")),
             debtToken: json.readAddress(string.concat(implemsPrefix, "debtToken")),
-            feeAuction: json.readAddress(string.concat(implemsPrefix, "feeAuction"))
+            feeAuction: json.readAddress(string.concat(implemsPrefix, "feeAuction")),
+            feeReceiver: json.readAddress(string.concat(implemsPrefix, "feeReceiver"))
         });
 
         string memory libsPrefix = string.concat(chainPrefix, "libs.");
