@@ -159,19 +159,23 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: agent should not be liquidatable with health > 1e27
     /// @dev Property: Liquidations should always improve the health factor
     /// @dev Property: Partial liquidations should not bring health above 1.25
-    /// @dev Property: Emergency liquidations should always be available when emergency health is below 1e27
+    /// @dev Property: Agent should have their totalDelegation reduced by the liquidated value
+    /// @dev Property: Agent should have their totalSlashableCollateral reduced by the liquidated value
     function lender_liquidate(uint256 _amount) public updateGhosts asActor {
-        address vault = mockNetworkMiddleware.vaults(_getActor());
-        (uint256 totalDelegation,, uint256 totalDebt,,, uint256 healthBefore) = lender.agent(_getActor());
+        (uint256 totalDelegationBefore, uint256 totalSlashableCollateralBefore,,,, uint256 healthBefore) =
+            lender.agent(_getActor());
         uint256 maxLiquidatable = lender.maxLiquidatable(_getActor(), _getAsset());
         uint256 assetBalanceBefore = MockERC20(_getAsset()).balanceOf(_getActor());
-        uint256 collateralBalanceBefore = MockERC20(vault).balanceOf(_getActor());
-        (uint256 collateralPrice,) = oracle.getPrice(vault); // vault token is what's minted by the MockNetworkMiddleware
-        (uint256 assetPrice,) = oracle.getPrice(_getAsset());
+        uint256 collateralBalanceBefore = MockERC20(mockNetworkMiddleware.vaults(_getActor())).balanceOf(_getActor());
 
-        lender.liquidate(_getActor(), _getAsset(), _amount);
+        uint256 liquidatedValue = lender.liquidate(_getActor(), _getAsset(), _amount);
 
+        (uint256 totalDelegationAfter, uint256 totalSlashableCollateralAfter,,,, uint256 healthAfter) =
+            lender.agent(_getActor());
         {
+            address vault = mockNetworkMiddleware.vaults(_getActor());
+            (uint256 collateralPrice,) = oracle.getPrice(vault); // vault token is what's minted by the MockNetworkMiddleware
+            (uint256 assetPrice,) = oracle.getPrice(_getAsset());
             uint256 assetBalanceAfter = MockERC20(_getAsset()).balanceOf(_getActor());
             uint256 collateralBalanceAfter = MockERC20(vault).balanceOf(_getActor());
             uint256 collateralAmountDelta = collateralBalanceAfter - collateralBalanceBefore;
@@ -186,13 +190,23 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         if (healthBefore > RAY) {
             t(false, "agent should not be liquidatable with health > 1e27");
         }
-        (,,,,, uint256 healthAfter) = lender.agent(_getActor());
 
         gt(healthAfter, healthBefore, "Liquidation did not improve health factor");
         // precondition: must be liquidating less than maxLiquidatable
         if (_amount < maxLiquidatable) {
             lte(healthAfter, 1.25e27, "partial liquidation should not bring health above 1.25");
         }
+
+        eq(
+            totalDelegationAfter,
+            totalDelegationBefore - liquidatedValue,
+            "agent maintains more value in totalDelegation than they should"
+        );
+        eq(
+            totalSlashableCollateralAfter,
+            totalSlashableCollateralBefore - liquidatedValue,
+            "agent maintains more value in totalSlashableCollateral than they should"
+        );
     }
 
     function lender_pauseAsset(bool _pause) public updateGhosts asAdmin {

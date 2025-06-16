@@ -46,20 +46,22 @@
 | 44 | lender_liquidate | Liquidations should always improve the health factor | |
 | 45 | lender_liquidate | Emergency liquidations should always be available when emergency health is below 1e27 | |
 | 46 | lender_liquidate | Partial liquidations should not bring health above 1.25 | |
-| 47 | lender_realizeInterest | agent's total debt should not change when interest is realized | |
-| 48 | lender_realizeInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized | |
-| 49 | lender_realizeInterest | vault debt and total borrows should increase by the same amount after a call to `realizeInterest` | |
-| 50 | lender_realizeInterest | health should not change when `realizeInterest` is called | |
-| 51 | lender_realizeInterest | realizeInterest should only revert with `ZeroRealization()` if paused or `totalUnrealizedInterest == 0`, otherwise should always update the realization value | |
-| 52 | lender_realizeRestakerInterest | agent's total debt should not change when interest is realized | |
-| 53 | lender_realizeRestakerInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized | |
-| 54 | lender_realizeRestakerInterest | vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest` | |
-| 55 | lender_realizeRestakerInterest | health should not change when `realizeRestakerInterest` is called | |
-| 56 | property_cap_token_backed_1_to_1 | cUSD (capToken) must be backed 1:1 by stable underlying assets | |
-| 57 | property_debt_token_balance_gte_total_vault_debt | DebtToken balance ≥ total vault debt at all times | |
-| 58 | property_total_borrowed_less_than_total_supply | Total cUSD borrowed < total supply (utilization < 1e27) | |
-| 59 | property_staked_cap_value_non_decreasing | Staked cap token value must increase or stay the same over time | |
-| 60 | capToken_burn | Burning reduces cUSD supply, must always round down | |
-| 61 | capToken_burn | Burners must not receive more asset value than cUSD burned | |
-| 62 | capToken_mint | Minting increases vault assets based on oracle value | |
-| 63 | property_utilization_ratio_never_greater_than_1e27 | Utilization ratio is never greater than 1e27 | |
+| 47 | lender_liquidate | Agent should have their totalDelegation reduced by the liquidated value | |
+| 48 | lender_liquidate | Agent should have their totalSlashableCollateral reduced by the liquidated value | |
+| 49 | lender_realizeInterest | agent's total debt should not change when interest is realized | |
+| 50 | lender_realizeInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized | |
+| 51 | lender_realizeInterest | vault debt and total borrows should increase by the same amount after a call to `realizeInterest` | |
+| 52 | lender_realizeInterest | health should not change when `realizeInterest` is called | |
+| 53 | lender_realizeInterest | realizeInterest should only revert with `ZeroRealization()` if paused or `totalUnrealizedInterest == 0`, otherwise should always update the realization value | |
+| 54 | lender_realizeRestakerInterest | agent's total debt should not change when interest is realized | |
+| 55 | lender_realizeRestakerInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized | |
+| 56 | lender_realizeRestakerInterest | vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest` | |
+| 57 | lender_realizeRestakerInterest | health should not change when `realizeRestakerInterest` is called | |
+| 58 | property_cap_token_backed_1_to_1 | cUSD (capToken) must be backed 1:1 by stable underlying assets | |
+| 59 | property_debt_token_balance_gte_total_vault_debt | DebtToken balance ≥ total vault debt at all times | |
+| 60 | property_total_borrowed_less_than_total_supply | Total cUSD borrowed < total supply (utilization < 1e27) | |
+| 61 | property_staked_cap_value_non_decreasing | Staked cap token value must increase or stay the same over time | |
+| 62 | capToken_burn | Burning reduces cUSD supply, must always round down | |
+| 63 | capToken_burn | Burners must not receive more asset value than cUSD burned | |
+| 64 | capToken_mint | Minting increases vault assets based on oracle value | |
+| 65 | property_utilization_ratio_never_greater_than_1e27 | Utilization ratio is never greater than 1e27 | |
