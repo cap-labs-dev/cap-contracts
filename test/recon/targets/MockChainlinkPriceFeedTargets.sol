@@ -27,10 +27,7 @@ abstract contract MockChainlinkPriceFeedTargets is BaseTargetFunctions, Properti
     // }
 
     function mockChainlinkPriceFeed_setLatestAnswer(int256 answer) public asActor {
-        // to avoid false positives, clamp answer to max ~ 1:100M USD
-        if (answer > 1e19) {
-            answer = 1e19;
-        }
+        answer %= int256(uint256(type(uint88).max));
         mockChainlinkPriceFeed.setLatestAnswer(answer);
     }
 

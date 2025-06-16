@@ -22,8 +22,9 @@ enum OpType {
 abstract contract BeforeAfter is Setup {
     struct Vars {
         uint256 vaultAssetBalance;
-        uint256[] redeemAmountsOut;
         uint256 insuranceFundBalance;
+        uint256 capTokenTotalSupply;
+        uint256[] redeemAmountsOut;
         mapping(address => mapping(address => uint256)) debtTokenBalance;
         mapping(address => uint256) vaultDebt;
         mapping(address => uint256) agentHealth;
@@ -32,7 +33,6 @@ abstract contract BeforeAfter is Setup {
         mapping(address => uint256) utilizationRatio;
         mapping(address => uint256) totalBorrows;
         uint256 stakedCapValuePerShare;
-        uint256 capTotalSupply;
     }
 
     Vars internal _before;
@@ -62,11 +62,12 @@ abstract contract BeforeAfter is Setup {
         vars.vaultAssetBalance = MockERC20(_getAsset()).balanceOf(address(capToken));
         vars.vaultDebt[_getAsset()] = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
         vars.insuranceFundBalance = MockERC20(_getAsset()).balanceOf(capToken.insuranceFund());
+        vars.capTokenTotalSupply = capToken.totalSupply();
+
         vars.stakedCapValuePerShare = _getStakedCapValuePerShare();
 
         vars.redeemAmountsOut = _getRedeemAmounts(_getActor());
         (,, vars.agentTotalDebt[_getActor()],,, vars.agentHealth[_getActor()]) = _getAgentParams(_getActor());
-        vars.capTotalSupply = capToken.totalSupply();
     }
 
     function __before() internal {

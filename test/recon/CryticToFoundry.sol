@@ -21,6 +21,12 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     // forge test --match-test test_crytic -vvv
     function test_crytic() public {
         // TODO: add failing property tests here for debugging
+        capToken_mint_clamped(91747592667458389387);
+        lender_borrow_clamped(90017308991558959124);
+        switchChainlinkOracle(15500930495352523377434005916451063608665704137291179007452715);
+        switch_asset(234002657199225104869821102155071890515352497055191893111);
+        mockChainlinkPriceFeed_setLatestAnswer_clamped(5131691316084673923073400658621758140505207586025465692953);
+        doomsday_liquidate(1);
     }
 
     function test_fractional_reserve_loss() public {
@@ -78,6 +84,17 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         capToken_redeem_clamped(1);
     }
 
+    // forge test --match-test test_capToken_redeem_0 -vvv
+    // NOTE: same issue as above
+    function test_capToken_redeem_0() public {
+        capToken_mint_clamped(10001211781);
+        add_new_vault();
+        capToken_setFractionalReserveVault();
+        capToken_investAll();
+        mockERC4626Tester_mintUnbackedShares(100030086342248146205, address(0));
+        capToken_redeem_clamped(1);
+    }
+
     // forge test --match-test test_lender_liquidate_2 -vvv
     // NOTE: Liquidation did not improve health factor, try to invest
     function test_lender_liquidate_2() public {
@@ -86,26 +103,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         switchChainlinkOracle(14211097524167602802493863989865037497162472790322337168572978);
         mockChainlinkPriceFeed_setLatestAnswer(2713282178368992834);
         lender_liquidate(1);
-    }
-
-    // forge test --match-test test_capToken_burn_clamped_3 -vvv
-    function test_capToken_burn_clamped_3() public {
-        switch_asset(1);
-
-        capToken_mint_clamped(2);
-
-        asset_mint(0x000000000000000000000000000000000000bEEF, 1);
-
-        capToken_burn_clamped(10000683817);
-    }
-
-    // forge test --match-test test_lender_borrow_4 -vvv
-    function test_lender_borrow_4() public {
-        capToken_mint_clamped(10003543734);
-
-        capToken_pauseAsset(0xD16d567549A2a2a2005aEACf7fB193851603dd70);
-
-        lender_borrow(100018335, 0x00000000000000000000000000000000DeaDBeef);
     }
 
     // forge test --match-test test_capToken_divestAll_6 -vvv
@@ -140,5 +137,25 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         );
 
         lender_repay(1);
+    }
+
+    /// === Newest Issues === ///
+
+    // forge test --match-test test_property_agent_cannot_have_less_than_minBorrow_balance_of_debt_token_4 -vvv
+    function test_property_agent_cannot_have_less_than_minBorrow_balance_of_debt_token_4() public {
+        lender_removeAsset(0x2a07706473244BC757E10F2a9E86fB532828afe3);
+
+        lender_addAsset(
+            0x2a07706473244BC757E10F2a9E86fB532828afe3,
+            0x00000000000000000000000000000000DeaDBeef,
+            0xD16d567549A2a2a2005aEACf7fB193851603dd70,
+            0x00000000000000000000000000000000DeaDBeef,
+            0,
+            309782187519020897295356854
+        );
+
+        switch_asset(0);
+
+        property_agent_cannot_have_less_than_minBorrow_balance_of_debt_token();
     }
 }

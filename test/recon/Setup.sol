@@ -17,7 +17,6 @@ import { MockERC20 } from "@recon/MockERC20.sol";
 import { Utils } from "@recon/Utils.sol";
 
 // Your deps
-
 import { AccessControl } from "contracts/access/AccessControl.sol";
 import { Delegation } from "contracts/delegation/Delegation.sol";
 import { FeeConfig, InfraConfig, UsersConfig } from "contracts/deploy/interfaces/DeployConfigs.sol";
@@ -86,6 +85,8 @@ abstract contract Setup is
 
     address mockEth;
     int256 maxAmountOut;
+
+    uint256 constant RAY = 1e27;
 
     /// === Setup === ///
     /// This contains all calls to be performed in the tester constructor, both for Echidna and Foundry

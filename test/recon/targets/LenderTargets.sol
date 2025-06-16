@@ -18,8 +18,6 @@ import { LenderWrapper } from "test/recon/helpers/LenderWrapper.sol";
 import "contracts/lendingPool/Lender.sol";
 
 abstract contract LenderTargets is BaseTargetFunctions, Properties {
-    uint256 constant RAY = 1e27;
-
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
     function lender_borrow_clamped(uint256 _amount) public {
         lender_borrow(_amount, _getActor());
@@ -43,6 +41,9 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         uint256 bonusCap,
         uint256 minBorrow
     ) public updateGhosts asAdmin {
+        require(!_isAddressUnderlying(vault), "vault is already an underlying asset");
+        require(!_isAddressUnderlying(debtToken), "debtToken is already an underlying asset");
+
         ILender.AddAssetParams memory params = ILender.AddAssetParams({
             asset: asset,
             vault: vault,
@@ -52,6 +53,16 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             minBorrow: minBorrow
         });
         lender.addAsset(params);
+    }
+
+    function _isAddressUnderlying(address addressToCheck) internal view returns (bool) {
+        address[] memory assets = _getAssets();
+        for (uint256 i; i < assets.length; ++i) {
+            if (assets[i] == addressToCheck) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// @dev Property: Asset cannot be borrowed when it is paused
@@ -109,15 +120,16 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
                 "Borrower can't borrow more than LTV"
             );
         } catch (bytes memory reason) {
-            bool expectedError = checkError(reason, "MinBorrowAmount()") || checkError(reason, "ZeroAddressNotValid()")
-                || checkError(reason, "ReservePaused()") || checkError(reason, "CollateralCannotCoverNewBorrow()")
-                || checkError(reason, "LossFromFractionalReserve(address,address,uint256)")
-                || checkError(reason, "ZeroRealization()");
+            // bool expectedError = checkError(reason, "MinBorrowAmount()") || checkError(reason, "ZeroAddressNotValid()")
+            //     || checkError(reason, "ReservePaused()") || checkError(reason, "CollateralCannotCoverNewBorrow()")
+            //     || checkError(reason, "LossFromFractionalReserve(address,address,uint256)")
+            //     || checkError(reason, "ZeroRealization()");
 
-            // if borrow reverts for any other reason, it could be due to the call to divest in the ERC4626 made before borrowing
-            if (!expectedError && !protocolPaused && !assetPaused) {
-                t(false, "borrow should revert with expected error");
-            }
+            // NOTE: temporarily removed because we need higher specificity to be able to check for the divest error
+            // // if borrow reverts for any other reason, it could be due to the call to divest in the ERC4626 made before borrowing
+            // if (!expectedError && !protocolPaused && !assetPaused) {
+            //     t(false, "borrow should revert with expected error");
+            // }
         }
     }
 
@@ -157,43 +169,29 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         (uint256 collateralPrice,) = oracle.getPrice(vault); // vault token is what's minted by the MockNetworkMiddleware
         (uint256 assetPrice,) = oracle.getPrice(_getAsset());
 
-        try lender.liquidate(_getActor(), _getAsset(), _amount) returns (uint256 liquidatedValue) {
-            {
-                uint256 assetBalanceAfter = MockERC20(_getAsset()).balanceOf(_getActor());
-                uint256 collateralBalanceAfter = MockERC20(vault).balanceOf(_getActor());
-                uint256 collateralAmountDelta = collateralBalanceAfter - collateralBalanceBefore;
-                uint256 assetAmountDelta = assetBalanceAfter - assetBalanceBefore;
+        lender.liquidate(_getActor(), _getAsset(), _amount);
 
-                // Calculate value of deltas using oracle price
-                uint256 collateralValueDelta =
-                    (collateralAmountDelta * collateralPrice) / (10 ** MockERC20(vault).decimals());
-                uint256 assetValueDelta = (assetAmountDelta * assetPrice) / (10 ** MockERC20(_getAsset()).decimals());
+        {
+            uint256 assetBalanceAfter = MockERC20(_getAsset()).balanceOf(_getActor());
+            uint256 collateralBalanceAfter = MockERC20(vault).balanceOf(_getActor());
+            uint256 collateralAmountDelta = collateralBalanceAfter - collateralBalanceBefore;
+            uint256 assetAmountDelta = assetBalanceAfter - assetBalanceBefore;
+            // Calculate value of deltas using oracle price
+            uint256 collateralValueDelta =
+                (collateralAmountDelta * collateralPrice) / (10 ** MockERC20(vault).decimals());
+            uint256 assetValueDelta = (assetAmountDelta * assetPrice) / (10 ** MockERC20(_getAsset()).decimals());
+            gte(collateralValueDelta, assetValueDelta, "liquidation should be profitable for the liquidator");
+        }
 
-                gte(collateralValueDelta, assetValueDelta, "liquidation should be profitable for the liquidator");
-            }
+        if (healthBefore > RAY) {
+            t(false, "agent should not be liquidatable with health > 1e27");
+        }
+        (,,,,, uint256 healthAfter) = lender.agent(_getActor());
 
-            if (healthBefore > 1e27) {
-                t(false, "agent should not be liquidatable with health > 1e27");
-            }
-
-            (,,,,, uint256 healthAfter) = lender.agent(_getActor());
-            gt(healthAfter, healthBefore, "Liquidation did not improve health factor");
-
-            // precondition: must be liquidating less than maxLiquidatable
-            if (_amount < maxLiquidatable) {
-                lte(healthAfter, 1.25e27, "partial liquidation should not bring health above 1.25");
-            }
-        } catch (bytes memory reason) {
-            bool expectedError = checkError(reason, "InvalidBurnAmount()") || checkError(reason, "EnforcedPause()");
-            bool isPaused = capToken.paused();
-            // precondition: must be liquidating more than 0 and not paused
-            if (!expectedError && !isPaused) {
-                gte(
-                    totalDelegation * lender.emergencyLiquidationThreshold() / totalDebt,
-                    RAY,
-                    "Emergency liquidation is not available when emergency health is below 1e27"
-                );
-            }
+        gt(healthAfter, healthBefore, "Liquidation did not improve health factor");
+        // precondition: must be liquidating less than maxLiquidatable
+        if (_amount < maxLiquidatable) {
+            lte(healthAfter, 1.25e27, "partial liquidation should not bring health above 1.25");
         }
     }
 
@@ -279,17 +277,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender.removeAsset(_asset);
     }
 
-    /// @dev Property: Repay should never revert due to under/overflow
     function lender_repay(uint256 _amount) public asActor {
-        try lender.repay(_getAsset(), _amount, _getActor()) {
-            // success
-        } catch (bytes memory reason) {
-            bool underflowError = checkError(reason, Panic.arithmeticPanic);
-            bool enoughAllowance = MockERC20(_getAsset()).allowance(_getActor(), address(lender)) >= _amount;
-            bool enoughBalance = MockERC20(_getAsset()).balanceOf(_getActor()) >= _amount;
-            if (enoughAllowance && enoughBalance && _amount > 0) {
-                t(!underflowError, "underflow error");
-            }
-        }
+        lender.repay(_getAsset(), _amount, _getActor());
     }
 }

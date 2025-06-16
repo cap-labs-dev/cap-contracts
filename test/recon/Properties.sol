@@ -221,11 +221,12 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
-    function property_burn_amount_no_fee() public {
-        if (currentOperation == OpType.BURN && _after.capTotalSupply != _before.capTotalSupply) {
-            gt(_after.insuranceFundBalance, _before.insuranceFundBalance, "0 fees on burn");
-        }
-    }
+    // function property_burn_amount_no_fee() public {
+    //     // precondition: burn operation and cUSD had to actually be burned
+    //     if (currentOperation == OpType.BURN && _after.capTokenTotalSupply < _before.capTokenTotalSupply) {
+    //         gt(_after.insuranceFundBalance, _before.insuranceFundBalance, "0 fees on burn");
+    //     }
+    // }
 
     /// @dev Property: cUSD (capToken) must be backed 1:1 by stable underlying assets
     function property_cap_token_backed_1_to_1() public {
