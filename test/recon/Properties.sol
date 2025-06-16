@@ -291,11 +291,17 @@ abstract contract Properties is BeforeAfter, Asserts {
             uint256 totalDebtTokenSupply = MockERC20(_debtToken).totalSupply();
 
             uint256 totalVaultDebt = 0;
+            uint256 totalAccruedRestakerInterest = 0;
             for (uint256 j = 0; j < agents.length; j++) {
                 totalVaultDebt += lender.debt(agents[j], asset);
+                totalAccruedRestakerInterest += lender.accruedRestakerInterest(agents[j], asset);
             }
 
-            gte(totalDebtTokenSupply, totalVaultDebt, "DebtToken balance < total vault debt");
+            gte(
+                totalDebtTokenSupply,
+                totalVaultDebt - totalAccruedRestakerInterest,
+                "DebtToken balance < total vault debt"
+            );
         }
     }
 
