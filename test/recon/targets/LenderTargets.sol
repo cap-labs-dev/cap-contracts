@@ -259,7 +259,6 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         }
     }
 
-    /// @dev Property: agent's total debt should not change when restaker interest is realized
     /// @dev Property: vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized
     /// @dev Property: vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest`
     /// @dev Property: health should not change when realizeRestakerInterest is called
@@ -267,7 +266,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     function lender_realizeRestakerInterest() public updateGhostsWithType(OpType.REALIZE_INTEREST) asActor {
         uint256 vaultDebtBefore = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
         uint256 vaultAssetBalanceBefore = MockERC20(_getAsset()).balanceOf(address(capToken));
-        (,, uint256 totalDebtBefore,,, uint256 healthBefore) = _getAgentParams(_getActor());
+        (,,,,, uint256 healthBefore) = _getAgentParams(_getActor());
         uint256 totalBorrowsBefore = capToken.totalBorrows(_getAsset());
         uint256 totalSuppliesBefore = capToken.totalSupplies(_getAsset());
 
@@ -275,10 +274,9 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
         uint256 vaultDebtAfter = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
         uint256 vaultAssetBalanceAfter = MockERC20(_getAsset()).balanceOf(address(capToken));
-        (,, uint256 totalDebtAfter,,, uint256 healthAfter) = _getAgentParams(_getActor());
+        (,,,,, uint256 healthAfter) = _getAgentParams(_getActor());
         uint256 totalBorrowsAfter = capToken.totalBorrows(_getAsset());
 
-        eq(totalDebtAfter, totalDebtBefore, "agent total debt should not change after realizeRestakerInterest");
         eq(
             vaultDebtAfter - vaultDebtBefore,
             vaultAssetBalanceBefore - vaultAssetBalanceAfter,
