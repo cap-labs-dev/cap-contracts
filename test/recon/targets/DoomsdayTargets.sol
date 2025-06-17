@@ -37,9 +37,10 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
                 || checkError(reason, "GracePeriodNotOver()") || checkError(reason, "LiquidationExpired()");
             bool zeroBurnError = checkError(reason, "InvalidBurnAmount()");
             bool isPaused = capToken.paused();
+            bool stalePrice = checkError(reason, "PriceError(address)"); // Stale/invalid price (0 price)
 
             // precondition: must be liquidating more than 0 and not paused
-            if (!isPaused && !zeroBurnError) {
+            if (!isPaused && !zeroBurnError && !stalePrice) {
                 gte(
                     totalDelegation * lender.emergencyLiquidationThreshold() / totalDebt,
                     RAY,
@@ -47,7 +48,7 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
                 );
             }
 
-            if (!expectedError && !isPaused && !zeroBurnError && totalDebt > 0) {
+            if (!expectedError && !isPaused && !zeroBurnError && !stalePrice && totalDebt > 0) {
                 t(false, "liquidate should always succeed for liquidatable agent");
             }
         }
@@ -68,7 +69,8 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
         try lender.repay(_getAsset(), _amount, _getActor()) {
             // success
         } catch (bytes memory reason) {
-            bool expectedError = checkError(reason, "InvalidBurnAmount()");
+            bool expectedError = checkError(reason, "InvalidBurnAmount()")
+                || checkError(reason, "LossFromFractionalReserve(address,address,uint256)"); // fractional reserve loss
             bool enoughAllowance = MockERC20(_getAsset()).allowance(_getActor(), address(lender)) >= _amount;
             bool enoughBalance = MockERC20(_getAsset()).balanceOf(_getActor()) >= _amount;
             bool paused = capToken.paused();

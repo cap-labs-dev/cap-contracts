@@ -42,13 +42,15 @@ abstract contract Properties is BeforeAfter, Asserts {
             uint256 totalSupplied = capToken.totalSupplies(assets[i]);
             uint256 totalBorrow = capToken.totalBorrows(assets[i]);
             uint256 vaultBalance = MockERC20(assets[i]).balanceOf(address(capToken));
+            uint256 interestReceiverBalance = MockERC20(assets[i]).balanceOf(capToken.interestReceiver());
             uint256 fractionalReserveBalance =
                 MockERC20(assets[i]).balanceOf(capToken.fractionalReserveVault(assets[i]));
             uint256 fractionalReserveLosses = _getFractionalReserveLosses(assets[i]);
 
             lte(
                 totalSupplied,
-                vaultBalance + totalBorrow + fractionalReserveBalance + fractionalReserveLosses,
+                vaultBalance + totalBorrow + fractionalReserveBalance + fractionalReserveLosses
+                    + interestReceiverBalance,
                 "totalSupplies > vault balance + totalBorrows"
             );
         }
@@ -110,8 +112,8 @@ abstract contract Properties is BeforeAfter, Asserts {
         address[] memory agents = delegation.agents();
         address[] memory assets = capToken.assets();
 
-        uint256 sumUnrealizedInterest;
         for (uint256 i; i < assets.length; ++i) {
+            uint256 sumUnrealizedInterest;
             for (uint256 j; j < agents.length; ++j) {
                 uint256 unrealizedInterest = lender.unrealizedInterest(agents[j], assets[i]);
                 sumUnrealizedInterest += unrealizedInterest;

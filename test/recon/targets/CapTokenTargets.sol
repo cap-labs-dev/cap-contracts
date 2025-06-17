@@ -10,6 +10,8 @@ import { console2 } from "forge-std/console2.sol";
 
 import { OpType } from "../BeforeAfter.sol";
 import { Properties } from "../Properties.sol";
+
+import { ERC4626 } from "../mocks/MockERC4626Tester.sol";
 import { MockERC20 } from "@recon/MockERC20.sol";
 import { Panic } from "@recon/Panic.sol";
 import { IMinter } from "contracts/interfaces/IMinter.sol";
@@ -342,7 +344,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     }
 
     function capToken_setFractionalReserveVault() public updateGhosts asActor {
-        capToken.setFractionalReserveVault(_getAsset(), _getVault());
+        capToken.setFractionalReserveVault(address(ERC4626(_getVault()).asset()), _getVault());
     }
 
     function capToken_setReserve(uint256 _reserve) public updateGhosts asActor {
