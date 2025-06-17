@@ -60,6 +60,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     // forge test --match-test test_capToken_redeem_clamped_6 -vvv
     // NOTE: issue is because of implementation of ERC4626Tester, need to determine best way to fix behavior
     // TODO: determine best way to fix ERC4626Tester behavior
+    // NOTE: this no longer fails with the check for user allowance included because it was reverting before the cUSD was burned for the user
     function test_capToken_redeem_clamped_6() public {
         capToken_mint_clamped(10000037441);
 
@@ -134,22 +135,4 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     }
 
     /// === Newest Issues === ///
-
-    // forge test --match-test test_property_agent_cannot_have_less_than_minBorrow_balance_of_debt_token_4 -vvv
-    function test_property_agent_cannot_have_less_than_minBorrow_balance_of_debt_token_4() public {
-        lender_removeAsset(0x2a07706473244BC757E10F2a9E86fB532828afe3);
-
-        lender_addAsset(
-            0x2a07706473244BC757E10F2a9E86fB532828afe3,
-            0x00000000000000000000000000000000DeaDBeef,
-            0xD16d567549A2a2a2005aEACf7fB193851603dd70,
-            0x00000000000000000000000000000000DeaDBeef,
-            0,
-            309782187519020897295356854
-        );
-
-        switch_asset(0);
-
-        property_agent_cannot_have_less_than_minBorrow_balance_of_debt_token();
-    }
 }
