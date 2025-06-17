@@ -181,6 +181,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
 
     /// @dev Property: User always receives at least the minimum amount out
     /// @dev Property: Fees are always <= the amount out
+    /// @dev Property: Total supplies increases by the amountIn - mintFee
     /// @dev Property: Fees are always nonzero when minting
     /// @dev Property: User always receives at most the expected amount out
     /// @dev Property: Asset cannot be minted when it is paused
@@ -197,6 +198,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         uint256 assetBalance = MockERC20(_asset).balanceOf(_getActor());
         uint256 capTokenBalanceBefore = capToken.balanceOf(_receiver);
         uint256 insuranceFundBalanceBefore = capToken.balanceOf(capToken.insuranceFund());
+        uint256 totalSuppliesBefore = capToken.totalSupplies(_getAsset());
         (uint256 expectedAmountOut, uint256 mintFee) = capToken.getMintAmount(_asset, _amountIn);
         bool isAssetPaused = capToken.paused(_asset);
 
@@ -204,6 +206,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         try capToken.mint(_asset, _amountIn, _minAmountOut, _receiver, _deadline) returns (uint256 amountOut) {
             uint256 capTokenBalanceAfter = capToken.balanceOf(_receiver);
             uint256 insuranceFundBalanceAfter = capToken.balanceOf(capToken.insuranceFund());
+            uint256 totalSuppliesAfter = capToken.totalSupplies(_getAsset());
 
             // update ghosts
             ghostAmountIn += amountOut;
@@ -218,6 +221,12 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 capTokenBalanceAfter - capTokenBalanceBefore,
                 "fees are greater than the amount out"
             );
+            eq(
+                totalSuppliesAfter,
+                totalSuppliesBefore + (_amountIn - mintFee), // we can use mintFee here with the assumption that the assets are 1:1 with cUSD
+                "total supplies did not increase by the amount out"
+            );
+
             if (capTokenBalanceAfter > capTokenBalanceBefore) {
                 _validateMintAssetValue(_asset, amountOut, _amountIn);
             }
