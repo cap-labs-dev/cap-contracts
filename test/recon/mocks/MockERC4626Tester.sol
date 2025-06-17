@@ -181,11 +181,6 @@ contract MockERC4626Tester is ERC4626 {
         _mint(msg.sender, newShares);
     }
 
-    /// @dev Mint unbacked shares
-    function mintUnbackedShares(uint256 amount, address to) public {
-        _mint(to, amount);
-    }
-
     /// @dev Deposit assets, reverts as specified
     function deposit(uint256 assets, address receiver) public override returns (uint256) {
         _performRevertBehaviour(revertBehaviours[FunctionType.DEPOSIT]);
