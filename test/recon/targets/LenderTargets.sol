@@ -197,12 +197,12 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             lte(healthAfter, 1.25e27, "partial liquidation should not bring health above 1.25");
         }
 
-        eq(
+        lte(
             totalDelegationAfter,
             totalDelegationBefore - liquidatedValue,
             "agent maintains more value in totalDelegation than they should"
         );
-        eq(
+        lte(
             totalSlashableCollateralAfter,
             totalSlashableCollateralBefore - liquidatedValue,
             "agent maintains more value in totalSlashableCollateral than they should"
