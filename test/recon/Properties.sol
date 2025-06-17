@@ -51,7 +51,7 @@ abstract contract Properties is BeforeAfter, Asserts {
                 totalSupplied,
                 vaultBalance + totalBorrow + fractionalReserveBalance + fractionalReserveLosses
                     + interestReceiverBalance,
-                "totalSupplies > vault balance + totalBorrows"
+                "totalSupplies > vaultBalance + totalBorrow + fractionalReserveBalance + fractionalReserveLosses + interestReceiverBalance"
             );
         }
     }
