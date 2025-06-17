@@ -159,19 +159,23 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: agent should not be liquidatable with health > 1e27
     /// @dev Property: Liquidations should always improve the health factor
     /// @dev Property: Partial liquidations should not bring health above 1.25
-    /// @dev Property: Emergency liquidations should always be available when emergency health is below 1e27
+    /// @dev Property: Agent should have their totalDelegation reduced by the liquidated value
+    /// @dev Property: Agent should have their totalSlashableCollateral reduced by the liquidated value
     function lender_liquidate(uint256 _amount) public updateGhosts asActor {
-        address vault = mockNetworkMiddleware.vaults(_getActor());
-        (uint256 totalDelegation,, uint256 totalDebt,,, uint256 healthBefore) = lender.agent(_getActor());
+        (uint256 totalDelegationBefore, uint256 totalSlashableCollateralBefore,,,, uint256 healthBefore) =
+            lender.agent(_getActor());
         uint256 maxLiquidatable = lender.maxLiquidatable(_getActor(), _getAsset());
         uint256 assetBalanceBefore = MockERC20(_getAsset()).balanceOf(_getActor());
-        uint256 collateralBalanceBefore = MockERC20(vault).balanceOf(_getActor());
-        (uint256 collateralPrice,) = oracle.getPrice(vault); // vault token is what's minted by the MockNetworkMiddleware
-        (uint256 assetPrice,) = oracle.getPrice(_getAsset());
+        uint256 collateralBalanceBefore = MockERC20(mockNetworkMiddleware.vaults(_getActor())).balanceOf(_getActor());
 
-        lender.liquidate(_getActor(), _getAsset(), _amount);
+        uint256 liquidatedValue = lender.liquidate(_getActor(), _getAsset(), _amount);
 
+        (uint256 totalDelegationAfter, uint256 totalSlashableCollateralAfter,,,, uint256 healthAfter) =
+            lender.agent(_getActor());
         {
+            address vault = mockNetworkMiddleware.vaults(_getActor());
+            (uint256 collateralPrice,) = oracle.getPrice(vault); // vault token is what's minted by the MockNetworkMiddleware
+            (uint256 assetPrice,) = oracle.getPrice(_getAsset());
             uint256 assetBalanceAfter = MockERC20(_getAsset()).balanceOf(_getActor());
             uint256 collateralBalanceAfter = MockERC20(vault).balanceOf(_getActor());
             uint256 collateralAmountDelta = collateralBalanceAfter - collateralBalanceBefore;
@@ -186,13 +190,23 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         if (healthBefore > RAY) {
             t(false, "agent should not be liquidatable with health > 1e27");
         }
-        (,,,,, uint256 healthAfter) = lender.agent(_getActor());
 
         gt(healthAfter, healthBefore, "Liquidation did not improve health factor");
         // precondition: must be liquidating less than maxLiquidatable
         if (_amount < maxLiquidatable) {
             lte(healthAfter, 1.25e27, "partial liquidation should not bring health above 1.25");
         }
+
+        lte(
+            totalDelegationAfter,
+            totalDelegationBefore - liquidatedValue,
+            "agent maintains more value in totalDelegation than they should"
+        );
+        lte(
+            totalSlashableCollateralAfter,
+            totalSlashableCollateralBefore - liquidatedValue,
+            "agent maintains more value in totalSlashableCollateral than they should"
+        );
     }
 
     function lender_pauseAsset(bool _pause) public updateGhosts asAdmin {
@@ -203,6 +217,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized
     /// @dev Property: vault debt and total borrows should increase by the same amount after a call to `realizeInterest`
     /// @dev Property: health should not change when realizeInterest is called
+    /// @dev Property: interest can only be realized if there are sufficient vault assets
     /// @dev Property: realizeInterest should only revert with ZeroRealization if paused or totalUnrealizedInterest == 0, otherwise should always update the realization value
     function lender_realizeInterest() public updateGhostsWithType(OpType.REALIZE_INTEREST) {
         (,,, address interestReceiver,,,) = lender.reservesData(_getAsset());
@@ -210,9 +225,10 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         uint256 vaultDebtBefore = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
         uint256 interestReceiverBalanceBefore = MockERC20(_getAsset()).balanceOf(address(interestReceiver)); // we check the balance of the interest receiver as a proxy for the vault because they're the one that actually receive assets that get borrowed from vault
         uint256 totalBorrowsBefore = capToken.totalBorrows(_getAsset());
+        uint256 totalSuppliesBefore = capToken.totalSupplies(_getAsset());
 
         vm.prank(_getActor());
-        try lender.realizeInterest(_getAsset()) {
+        try lender.realizeInterest(_getAsset()) returns (uint256 realizedInterest) {
             (,, uint256 totalDebtAfter,,, uint256 healthAfter) = _getAgentParams(_getActor());
             uint256 vaultDebtAfter = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
             uint256 interestReceiverBalanceAfter = MockERC20(_getAsset()).balanceOf(address(interestReceiver));
@@ -230,6 +246,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
                 "vault debt and total borrows should increase by the same amount after realizeInterest"
             );
             eq(healthAfter, healthBefore, "health should not change after realizeInterest");
+            gte(totalSuppliesBefore, realizedInterest, "interest realized without sufficient vault assets");
         } catch (bytes memory reason) {
             bool zeroRealizationError = checkError(reason, "ZeroRealization()");
 
@@ -246,13 +263,15 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized
     /// @dev Property: vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest`
     /// @dev Property: health should not change when realizeRestakerInterest is called
+    /// @dev Property: restakerinterest can only be realized if there are sufficient vault assets
     function lender_realizeRestakerInterest() public updateGhostsWithType(OpType.REALIZE_INTEREST) asActor {
         uint256 vaultDebtBefore = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
         uint256 vaultAssetBalanceBefore = MockERC20(_getAsset()).balanceOf(address(capToken));
         (,, uint256 totalDebtBefore,,, uint256 healthBefore) = _getAgentParams(_getActor());
         uint256 totalBorrowsBefore = capToken.totalBorrows(_getAsset());
+        uint256 totalSuppliesBefore = capToken.totalSupplies(_getAsset());
 
-        lender.realizeRestakerInterest(_getActor(), _getAsset());
+        uint256 realizedInterest = lender.realizeRestakerInterest(_getActor(), _getAsset());
 
         uint256 vaultDebtAfter = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
         uint256 vaultAssetBalanceAfter = MockERC20(_getAsset()).balanceOf(address(capToken));
@@ -271,6 +290,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             "vault debt and total borrows should increase by the same amount after realizeRestakerInterest"
         );
         eq(healthAfter, healthBefore, "health should not change after realizeRestakerInterest");
+        gte(totalSuppliesBefore, realizedInterest, "interest realized without sufficient vault assets");
     }
 
     function lender_removeAsset(address _asset) public updateGhosts asAdmin {
