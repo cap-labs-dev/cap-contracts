@@ -34,10 +34,6 @@ abstract contract MockERC4626TesterTargets is BaseTargetFunctions, Properties {
         MockERC4626Tester(_getVault()).mint(shares, receiver);
     }
 
-    function mockERC4626Tester_mintUnbackedShares(uint256 amount, address to) public asActor {
-        MockERC4626Tester(_getVault()).mintUnbackedShares(amount, to);
-    }
-
     function mockERC4626Tester_redeem(uint256 shares, address receiver, address owner) public asActor {
         MockERC4626Tester(_getVault()).redeem(shares, receiver, owner);
     }
