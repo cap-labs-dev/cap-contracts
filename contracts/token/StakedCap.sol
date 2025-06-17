@@ -37,8 +37,8 @@ contract StakedCap is
     /// @param _asset Address of the cap token
     /// @param _lockDuration Duration in seconds for profit locking
     function initialize(address _accessControl, address _asset, uint256 _lockDuration) external initializer {
-        string memory _name = string.concat("s", IERC20Metadata(_asset).name());
-        string memory _symbol = string.concat("s", IERC20Metadata(_asset).symbol());
+        string memory _name = string.concat("Staked ", IERC20Metadata(_asset).name());
+        string memory _symbol = string.concat("st", IERC20Metadata(_asset).symbol());
 
         __ERC4626_init(IERC20(_asset));
         __ERC20_init(_name, _symbol);

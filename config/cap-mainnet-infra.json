@@ -1,1 +1,27 @@
-{"1":{"implems":{"feeReceiver":"0xdDAF4E33Ad99a9Ec7bB453dB0869E064A47255B0"},"infra":{"accessControl":"0x32fd97A5196a6D98656a7F2f191Ae4732ad13170","delegation":"0xDB34C0849DE02ABC719740E147e6df4ffE4e8163","lender":"0x1036C242ccE7a6632E2f2649F293eaa881835772","oracle":"0xe23680f14214c4c9238411d2a85e74A9297ECEF0"},"libs":{"aaveAdapter":"0x05913A7f54Ce258D58D0D57BE38f72ABDF77beA8","capTokenAdapter":"0xF7e1B01404676CDb1F2B7faA46D915Aa118918ac","chainlinkAdapter":"0x5e3C5D90054ce319694306bb692e06511fC91B6C","stakedCapAdapter":"0x0e037A45D28DDF171688954863487FF18635d4ea"}}}
+{
+    "1": {
+        "implems": {
+            "accessControl": "0xc162E91576246f90ff7E5A3B3c9a0daA05BF1Bd5",
+            "capToken": "0x031b51BEd47543Aa87D2f74Ab3B1FCd606c99B24",
+            "debtToken": "0x8868614D7e945ef0b30988B11B63103976edfD6d",
+            "delegation": "0x65721910DaeA0F28CBaa99964F952c68Cd9bBFef",
+            "feeAuction": "0xbD12E50Bfaa25735D074DBfDCF73208b9ccD2e43",
+            "feeReceiver": "0xdDAF4E33Ad99a9Ec7bB453dB0869E064A47255B0",
+            "lender": "0x48C442cb3cC8503690D39582B0E9F36872126749",
+            "oracle": "0xA99C0AE66dd5131AE155F25F42ACEb1D1A00ff6F",
+            "stakedCap": "0x7858d18569E8e232415b07b82B8E1EC896ade1c8"
+        },
+        "infra": {
+            "accessControl": "0x32fd97A5196a6D98656a7F2f191Ae4732ad13170",
+            "delegation": "0xDB34C0849DE02ABC719740E147e6df4ffE4e8163",
+            "lender": "0x1036C242ccE7a6632E2f2649F293eaa881835772",
+            "oracle": "0xe23680f14214c4c9238411d2a85e74A9297ECEF0"
+        },
+        "libs": {
+            "aaveAdapter": "0x05913A7f54Ce258D58D0D57BE38f72ABDF77beA8",
+            "capTokenAdapter": "0xF7e1B01404676CDb1F2B7faA46D915Aa118918ac",
+            "chainlinkAdapter": "0x5e3C5D90054ce319694306bb692e06511fC91B6C",
+            "stakedCapAdapter": "0x0e037A45D28DDF171688954863487FF18635d4ea"
+        }
+    }
+}

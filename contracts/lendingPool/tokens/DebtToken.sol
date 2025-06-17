@@ -43,7 +43,7 @@ contract DebtToken is IDebtToken, UUPSUpgradeable, Access, ScaledToken, DebtToke
         $.lastIndexUpdate = block.timestamp;
         $.oracle = _oracle;
 
-        string memory _name = string.concat("debt", IERC20Metadata(_asset).name());
+        string memory _name = string.concat("Debt ", IERC20Metadata(_asset).name());
         string memory _symbol = string.concat("debt", IERC20Metadata(_asset).symbol());
         uint8 _decimals = IERC20Metadata(_asset).decimals();
 

@@ -59,7 +59,7 @@ contract DeployTestnetVault is
         assetMocks = _deployUSDMocks();
         oracleMocks = _deployOracleMocks(assetMocks);
 
-        vault = _deployVault(implems, infra, "Cap USD", "cUSD", oracleMocks.assets, users.insurance_fund);
+        vault = _deployVault(implems, infra, "cap USD", "cUSD", oracleMocks.assets, users.insurance_fund);
         vault.lzperiphery = _deployVaultLzPeriphery(lzAb, zapAb, vault, users);
 
         /// ACCESS CONTROL
