@@ -22,6 +22,7 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
     }
 
     /// @dev Property: liquidate should always succeed for liquidatable agent
+    /// @dev Property: Emergency liquidations should always be available when emergency health is below 1e27
     function doomsday_liquidate(uint256 _amount) public stateless {
         if (_amount == 0) {
             return;
