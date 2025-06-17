@@ -67,3 +67,4 @@
 | 65 | lender_realizeRestakerInterest | vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest` | |
 | 66 | lender_realizeRestakerInterest | health should not change when `realizeRestakerInterest` is called | |
 | 67 | lender_realizeRestakerInterest | restakerinterest can only be realized if there are sufficient vault assets | |
+| 68 | property_maxWithdraw_less_than_loaned_and_reserve | sum of all `maxWithdraw` for users should be <= loaned + reserve | |
