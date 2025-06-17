@@ -381,6 +381,16 @@ abstract contract Properties is BeforeAfter, Asserts {
         lte(maxWithdraw, loaned + reserve, "maxWithdraw > loaned + reserve");
     }
 
+    /// @dev Property: loaned is always <= maxWithdraw
+    function property_loaned_less_than_maxWithdraw() public {
+        // we only check maxWithdraw for capToken because it's the only depositor into the vault
+        uint256 maxWithdraw =
+            MockERC4626Tester(capToken.fractionalReserveVault(_getAsset())).maxWithdraw(address(capToken));
+        uint256 loaned = capToken.loaned(_getAsset());
+
+        lte(loaned, maxWithdraw, "loaned > maxWithdraw");
+    }
+
     /// === Optimization Properties === ///
 
     function optimize_burnable_amount_no_fee() public returns (int256) {
