@@ -21,11 +21,11 @@ import "contracts/token/CapToken.sol";
 abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
     function capToken_mint_clamped(uint256 _amountIn) public {
-        capToken_mint(_getAsset(), _amountIn, 0, _getActor(), block.timestamp + 1 days);
+        capToken_mint(_amountIn, 0, block.timestamp + 1 days);
     }
 
     function capToken_burn_clamped(uint256 _amountIn) public {
-        capToken_burn(_getAsset(), _amountIn, 0, _getActor(), block.timestamp + 1 days);
+        capToken_burn(_amountIn, 0, block.timestamp + 1 days);
     }
 
     function capToken_redeem_clamped(uint256 _amountIn) public {
@@ -57,6 +57,16 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             uint256 assetValueReceived = _assetsReceived * assetPrice * 1e18 / (10 ** assetDecimals * 1e8);
             lte(assetValueReceived, _cusdBurned * capPrice / 1e8, "burner received more asset value than cUSD burned");
         }
+    }
+
+    function _validateTotalSupplyIncrease(uint256 totalSuppliesBefore, uint256 amountIn, uint256 mintFee) internal {
+        uint256 totalSuppliesAfter = capToken.totalSupplies(_getAsset());
+
+        eq(
+            totalSuppliesAfter,
+            totalSuppliesBefore + (amountIn - mintFee), // we can use mintFee here with the assumption that the assets are 1:1 with cUSD
+            "total supplies did not increase by the amount out"
+        );
     }
 
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
@@ -91,26 +101,20 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Fees are always <= the amount out
     /// @dev Property: Burning reduces cUSD supply, must always round down
     /// @dev Property: Burners must not receive more asset value than cUSD burned
-    function capToken_burn(
-        address _asset,
-        uint256 _amountIn,
-        uint256 _minAmountOut,
-        address _receiver,
-        uint256 _deadline
-    ) public updateGhostsWithType(OpType.BURN) {
+    function capToken_burn(uint256 _amountIn, uint256 _minAmountOut, uint256 _deadline) public updateGhosts {
         uint256 capTokenBalanceBefore = capToken.balanceOf(_getActor());
-        uint256 insuranceFundBalanceBefore = MockERC20(_asset).balanceOf(capToken.insuranceFund());
+        uint256 insuranceFundBalanceBefore = MockERC20(_getAsset()).balanceOf(capToken.insuranceFund());
         uint256 totalCapSupplyBefore = capToken.totalSupply();
-        uint256 assetBalanceBefore = MockERC20(_asset).balanceOf(_receiver);
-        (uint256 expectedAmountOut,) = capToken.getBurnAmount(_asset, _amountIn);
+        uint256 assetBalanceBefore = MockERC20(_getAsset()).balanceOf(_getActor());
+        (uint256 expectedAmountOut,) = capToken.getBurnAmount(_getAsset(), _amountIn);
 
         vm.prank(_getActor());
-        try capToken.burn(_asset, _amountIn, _minAmountOut, _receiver, _deadline) {
+        try capToken.burn(_getAsset(), _amountIn, _minAmountOut, _getActor(), _deadline) {
             // update variables for inlined properties
             uint256 capTokenBalanceAfter = capToken.balanceOf(_getActor());
-            uint256 insuranceFundBalanceAfter = MockERC20(_asset).balanceOf(capToken.insuranceFund());
+            uint256 insuranceFundBalanceAfter = MockERC20(_getAsset()).balanceOf(capToken.insuranceFund());
             uint256 totalCapSupplyAfter = capToken.totalSupply();
-            uint256 assetBalanceAfter = MockERC20(_asset).balanceOf(_receiver);
+            uint256 assetBalanceAfter = MockERC20(_getAsset()).balanceOf(_getActor());
 
             // update ghosts
             ghostAmountOut += _amountIn;
@@ -148,7 +152,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             }
 
             if (assetBalanceAfter - assetBalanceBefore > 0) {
-                _validateBurnAssetValue(_asset, _amountIn, assetBalanceAfter - assetBalanceBefore);
+                _validateBurnAssetValue(_getAsset(), _amountIn, assetBalanceAfter - assetBalanceBefore);
             }
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "PastDeadline()")
@@ -187,26 +191,18 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Asset cannot be minted when it is paused
     /// @dev Property: User can always mint cap token if they have sufficient balance of depositing asset
     /// @dev Property: Minting increases vault assets based on oracle value.
-    function capToken_mint(
-        address _asset,
-        uint256 _amountIn,
-        uint256 _minAmountOut,
-        address _receiver,
-        uint256 _deadline
-    ) public updateGhosts {
-        require(capToken.insuranceFund() != _receiver, "insurance fund cannot be the receiver"); // this messes up the property check that user doesn't receive more than the amountOut
-        uint256 assetBalance = MockERC20(_asset).balanceOf(_getActor());
-        uint256 capTokenBalanceBefore = capToken.balanceOf(_receiver);
+    function capToken_mint(uint256 _amountIn, uint256 _minAmountOut, uint256 _deadline) public updateGhosts {
+        uint256 assetBalance = MockERC20(_getAsset()).balanceOf(_getActor());
+        uint256 capTokenBalanceBefore = capToken.balanceOf(_getActor());
         uint256 insuranceFundBalanceBefore = capToken.balanceOf(capToken.insuranceFund());
         uint256 totalSuppliesBefore = capToken.totalSupplies(_getAsset());
-        (uint256 expectedAmountOut, uint256 mintFee) = capToken.getMintAmount(_asset, _amountIn);
-        bool isAssetPaused = capToken.paused(_asset);
+        (uint256 expectedAmountOut, uint256 mintFee) = capToken.getMintAmount(_getAsset(), _amountIn);
+        bool isAssetPaused = capToken.paused(_getAsset());
 
         vm.prank(_getActor());
-        try capToken.mint(_asset, _amountIn, _minAmountOut, _receiver, _deadline) returns (uint256 amountOut) {
-            uint256 capTokenBalanceAfter = capToken.balanceOf(_receiver);
+        try capToken.mint(_getAsset(), _amountIn, _minAmountOut, _getActor(), _deadline) returns (uint256 amountOut) {
+            uint256 capTokenBalanceAfter = capToken.balanceOf(_getActor());
             uint256 insuranceFundBalanceAfter = capToken.balanceOf(capToken.insuranceFund());
-            uint256 totalSuppliesAfter = capToken.totalSupplies(_getAsset());
 
             // update ghosts
             ghostAmountIn += amountOut;
@@ -221,14 +217,11 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 capTokenBalanceAfter - capTokenBalanceBefore,
                 "fees are greater than the amount out"
             );
-            eq(
-                totalSuppliesAfter,
-                totalSuppliesBefore + (_amountIn - mintFee), // we can use mintFee here with the assumption that the assets are 1:1 with cUSD
-                "total supplies did not increase by the amount out"
-            );
+
+            _validateTotalSupplyIncrease(totalSuppliesBefore, _amountIn, mintFee);
 
             if (capTokenBalanceAfter > capTokenBalanceBefore) {
-                _validateMintAssetValue(_asset, amountOut, _amountIn);
+                _validateMintAssetValue(_getAsset(), amountOut, _amountIn);
             }
             if (!capToken.whitelisted(_getActor())) {
                 // NOTE: temporarily removed because we need a better check for mint fee using price deviation
@@ -242,13 +235,14 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                     "user received more than expected amount out"
                 );
             }
+
             t(!isAssetPaused, "asset can be minted when it is paused");
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "PastDeadline()")
                 || checkError(reason, "Slippage(address,uint256,uint256)") || checkError(reason, "InvalidAmount()")
                 || checkError(reason, "AssetNotSupported(address)") || checkError(reason, "ERC20InvalidReceiver(address)");
             bool isProtocolPaused = capToken.paused();
-            bool enoughAllowance = MockERC20(_asset).allowance(_getActor(), address(capToken)) >= _amountIn;
+            bool enoughAllowance = MockERC20(_getAsset()).allowance(_getActor(), address(capToken)) >= _amountIn;
             if (!expectedError && _amountIn > 0 && enoughAllowance && !isProtocolPaused && !isAssetPaused) {
                 lt(assetBalance, _amountIn, "user cannot mint with sufficient asset balance");
             }
