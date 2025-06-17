@@ -217,6 +217,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized
     /// @dev Property: vault debt and total borrows should increase by the same amount after a call to `realizeInterest`
     /// @dev Property: health should not change when realizeInterest is called
+    /// @dev Property: interest can only be realized if there are sufficient vault assets
     /// @dev Property: realizeInterest should only revert with ZeroRealization if paused or totalUnrealizedInterest == 0, otherwise should always update the realization value
     function lender_realizeInterest() public updateGhostsWithType(OpType.REALIZE_INTEREST) {
         (,,, address interestReceiver,,,) = lender.reservesData(_getAsset());
@@ -224,9 +225,10 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         uint256 vaultDebtBefore = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
         uint256 interestReceiverBalanceBefore = MockERC20(_getAsset()).balanceOf(address(interestReceiver)); // we check the balance of the interest receiver as a proxy for the vault because they're the one that actually receive assets that get borrowed from vault
         uint256 totalBorrowsBefore = capToken.totalBorrows(_getAsset());
+        uint256 totalSuppliesBefore = capToken.totalSupplies(_getAsset());
 
         vm.prank(_getActor());
-        try lender.realizeInterest(_getAsset()) {
+        try lender.realizeInterest(_getAsset()) returns (uint256 realizedInterest) {
             (,, uint256 totalDebtAfter,,, uint256 healthAfter) = _getAgentParams(_getActor());
             uint256 vaultDebtAfter = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
             uint256 interestReceiverBalanceAfter = MockERC20(_getAsset()).balanceOf(address(interestReceiver));
@@ -244,6 +246,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
                 "vault debt and total borrows should increase by the same amount after realizeInterest"
             );
             eq(healthAfter, healthBefore, "health should not change after realizeInterest");
+            gte(totalSuppliesBefore, realizedInterest, "interest realized without sufficient vault assets");
         } catch (bytes memory reason) {
             bool zeroRealizationError = checkError(reason, "ZeroRealization()");
 
@@ -260,13 +263,15 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized
     /// @dev Property: vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest`
     /// @dev Property: health should not change when realizeRestakerInterest is called
+    /// @dev Property: restakerinterest can only be realized if there are sufficient vault assets
     function lender_realizeRestakerInterest() public updateGhostsWithType(OpType.REALIZE_INTEREST) asActor {
         uint256 vaultDebtBefore = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
         uint256 vaultAssetBalanceBefore = MockERC20(_getAsset()).balanceOf(address(capToken));
         (,, uint256 totalDebtBefore,,, uint256 healthBefore) = _getAgentParams(_getActor());
         uint256 totalBorrowsBefore = capToken.totalBorrows(_getAsset());
+        uint256 totalSuppliesBefore = capToken.totalSupplies(_getAsset());
 
-        lender.realizeRestakerInterest(_getActor(), _getAsset());
+        uint256 realizedInterest = lender.realizeRestakerInterest(_getActor(), _getAsset());
 
         uint256 vaultDebtAfter = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
         uint256 vaultAssetBalanceAfter = MockERC20(_getAsset()).balanceOf(address(capToken));
@@ -285,6 +290,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             "vault debt and total borrows should increase by the same amount after realizeRestakerInterest"
         );
         eq(healthAfter, healthBefore, "health should not change after realizeRestakerInterest");
+        gte(totalSuppliesBefore, realizedInterest, "interest realized without sufficient vault assets");
     }
 
     function lender_removeAsset(address _asset) public updateGhosts asAdmin {

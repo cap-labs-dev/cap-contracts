@@ -20,48 +20,50 @@
 | 18 | capToken_burn | Total cap supply decreases by no more than the amount out | |
 | 19 | capToken_burn | Fees are always nonzero when burning | |
 | 20 | capToken_burn | Fees are always <= the amount out | |
-| 21 | capToken_divestAll | ERC4626 must always be divestable | |
-| 22 | capToken_mint | User can always mint cap token if they have sufficient balance of depositing asset | |
-| 23 | capToken_mint | User always receives at least the minimum amount out | |
-| 24 | capToken_mint | User always receives at most the expected amount out | |
-| 25 | capToken_mint | Fees are always nonzero when minting | |
-| 26 | capToken_mint | Asset cannot be minted when it is paused | |
-| 27 | capToken_mint | Fees are always <= the amount out | |
-| 28 | capToken_redeem | User can always redeem cap token if they have sufficient balance of cap token | |
-| 29 | capToken_redeem | User always receives at least the minimum amount out | |
-| 30 | capToken_redeem | User always receives at most the expected amount out | |
-| 31 | capToken_redeem | Total cap supply decreases by no more than the amount out | |
-| 32 | capToken_redeem | Fees are always <= the amount out | |
-| 33 | doomsday_liquidate | Liquidate should always succeed for liquidatable agent | |
-| 34 | doomsday_repay | Repay should always succeed for agent that has debt | |
-| 35 | lender_borrow | Asset cannot be borrowed when it is paused | |
-| 36 | lender_borrow | Borrower should be healthy after borrowing (self-liquidation) | |
-| 37 | lender_borrow | Borrower asset balance should increase after borrowing | |
-| 38 | lender_borrow | Borrower debt should increase after borrowing | |
-| 39 | lender_borrow | Total borrows should increase after borrowing | |
-| 40 | lender_initiateLiquidation | agent should not be liquidatable with health > 1e27 | |
-| 41 | lender_initiateLiquidation | Agent should always be liquidatable if it is unhealthy | |
-| 42 | lender_liquidate | liquidation should be profitable for the liquidator | |
-| 43 | lender_liquidate | agent should not be liquidatable with health > 1e27 | |
-| 44 | lender_liquidate | Liquidations should always improve the health factor | |
-| 45 | lender_liquidate | Emergency liquidations should always be available when emergency health is below 1e27 | |
-| 46 | lender_liquidate | Partial liquidations should not bring health above 1.25 | |
-| 47 | lender_liquidate | Agent should have their totalDelegation reduced by the liquidated value | |
-| 48 | lender_liquidate | Agent should have their totalSlashableCollateral reduced by the liquidated value | |
-| 49 | lender_realizeInterest | agent's total debt should not change when interest is realized | |
-| 50 | lender_realizeInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized | |
-| 51 | lender_realizeInterest | vault debt and total borrows should increase by the same amount after a call to `realizeInterest` | |
-| 52 | lender_realizeInterest | health should not change when `realizeInterest` is called | |
-| 53 | lender_realizeInterest | realizeInterest should only revert with `ZeroRealization()` if paused or `totalUnrealizedInterest == 0`, otherwise should always update the realization value | |
-| 54 | lender_realizeRestakerInterest | agent's total debt should not change when interest is realized | |
-| 55 | lender_realizeRestakerInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized | |
-| 56 | lender_realizeRestakerInterest | vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest` | |
-| 57 | lender_realizeRestakerInterest | health should not change when `realizeRestakerInterest` is called | |
-| 58 | property_cap_token_backed_1_to_1 | cUSD (capToken) must be backed 1:1 by stable underlying assets | |
-| 59 | property_debt_token_balance_gte_total_vault_debt | DebtToken balance ≥ total vault debt at all times | |
-| 60 | property_total_borrowed_less_than_total_supply | Total cUSD borrowed < total supply (utilization < 1e27) | |
-| 61 | property_staked_cap_value_non_decreasing | Staked cap token value must increase or stay the same over time | |
-| 62 | capToken_burn | Burning reduces cUSD supply, must always round down | |
-| 63 | capToken_burn | Burners must not receive more asset value than cUSD burned | |
-| 64 | capToken_mint | Minting increases vault assets based on oracle value | |
-| 65 | property_utilization_ratio_never_greater_than_1e27 | Utilization ratio is never greater than 1e27 | |
+| 21 | capToken_burn | Burning reduces cUSD supply, must always round down | |
+| 22 | capToken_burn | Burners must not receive more asset value than cUSD burned | |
+| 23 | capToken_divestAll | ERC4626 must always be divestable | |
+| 24 | capToken_mint | User can always mint cap token if they have sufficient balance of depositing asset | |
+| 25 | capToken_mint | User always receives at least the minimum amount out | |
+| 26 | capToken_mint | User always receives at most the expected amount out | |
+| 27 | capToken_mint | Fees are always nonzero when minting | |
+| 28 | capToken_mint | Asset cannot be minted when it is paused | |
+| 29 | capToken_mint | Fees are always <= the amount out | |
+| 30 | capToken_mint | Minting increases vault assets based on oracle value | |
+| 31 | capToken_redeem | User can always redeem cap token if they have sufficient balance of cap token | |
+| 32 | capToken_redeem | User always receives at least the minimum amount out | |
+| 33 | capToken_redeem | User always receives at most the expected amount out | |
+| 34 | capToken_redeem | Total cap supply decreases by no more than the amount out | |
+| 35 | capToken_redeem | Fees are always <= the amount out | |
+| 36 | doomsday_liquidate | Liquidate should always succeed for liquidatable agent | |
+| 37 | doomsday_repay | Repay should always succeed for agent that has debt | |
+| 38 | lender_borrow | Asset cannot be borrowed when it is paused | |
+| 39 | lender_borrow | Borrower should be healthy after borrowing (self-liquidation) | |
+| 40 | lender_borrow | Borrower asset balance should increase after borrowing | |
+| 41 | lender_borrow | Borrower debt should increase after borrowing | |
+| 42 | lender_borrow | Total borrows should increase after borrowing | |
+| 43 | lender_initiateLiquidation | agent should not be liquidatable with health > 1e27 | |
+| 44 | lender_initiateLiquidation | Agent should always be liquidatable if it is unhealthy | |
+| 45 | lender_liquidate | liquidation should be profitable for the liquidator | |
+| 46 | lender_liquidate | agent should not be liquidatable with health > 1e27 | |
+| 47 | lender_liquidate | Liquidations should always improve the health factor | |
+| 48 | lender_liquidate | Emergency liquidations should always be available when emergency health is below 1e27 | |
+| 49 | lender_liquidate | Partial liquidations should not bring health above 1.25 | |
+| 50 | lender_liquidate | Agent should have their totalDelegation reduced by the liquidated value | |
+| 51 | lender_liquidate | Agent should have their totalSlashableCollateral reduced by the liquidated value | |
+| 52 | lender_realizeInterest | agent's total debt should not change when interest is realized | |
+| 53 | lender_realizeInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized | |
+| 54 | lender_realizeInterest | vault debt and total borrows should increase by the same amount after a call to `realizeInterest` | |
+| 55 | lender_realizeInterest | health should not change when `realizeInterest` is called | |
+| 56 | lender_realizeInterest | interest can only be realized if there are sufficient vault assets | |
+| 57 | lender_realizeInterest | realizeInterest should only revert with `ZeroRealization()` if paused or `totalUnrealizedInterest == 0`, otherwise should always update the realization value | |
+| 58 | lender_realizeRestakerInterest | agent's total debt should not change when interest is realized | |
+| 59 | lender_realizeRestakerInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized | |
+| 60 | lender_realizeRestakerInterest | vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest` | |
+| 61 | lender_realizeRestakerInterest | health should not change when `realizeRestakerInterest` is called | |
+| 62 | lender_realizeRestakerInterest | restakerinterest can only be realized if there are sufficient vault assets | |
+| 63 | property_cap_token_backed_1_to_1 | cUSD (capToken) must be backed 1:1 by stable underlying assets | |
+| 64 | property_debt_token_balance_gte_total_vault_debt | DebtToken balance ≥ total vault debt at all times | |
+| 65 | property_total_borrowed_less_than_total_supply | Total cUSD borrowed < total supply (utilization < 1e27) | |
+| 66 | property_staked_cap_value_non_decreasing | Staked cap token value must increase or stay the same over time | |
+| 67 | property_utilization_ratio_never_greater_than_1e27 | Utilization ratio is never greater than 1e27 | |
