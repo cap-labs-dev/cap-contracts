@@ -18,13 +18,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         setup();
     }
 
-    // forge test --match-test test_crytic -vvv
-    function test_crytic() public {
-        // TODO: add failing property tests here for debugging
-    }
-
-    /// === Newest Issues === ///
-
     // forge test --match-test test_lender_liquidate_0 -vvv
     // NOTE: Liquidation did not improve health factor, related to oracle price, looks Low
     function test_lender_liquidate_0() public {
@@ -86,5 +79,34 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         vm.warp(block.timestamp + 56837);
 
         lender_realizeRestakerInterest();
+    }
+
+    /// === Newest Issues === ///
+    // forge test --match-test test_lender_borrow_clamped_6 -vvv
+    // NOTE: looks like a real break
+    // TODO: investigate what the root cause is
+    function test_lender_borrow_clamped_6() public {
+        switch_asset(0);
+
+        delegation_modifyAgent_clamped(
+            129181229575799737715131132821888667075620458965846965435092154830549421623,
+            72839458564055505122023948938095823631408136626438696912038330677298861505
+        );
+
+        capToken_mint_clamped(126357672253);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+
+        vm.warp(block.timestamp + 17866);
+
+        vm.roll(block.number + 1);
+
+        switchActor(1);
+
+        vm.warp(block.timestamp + 1299632);
+
+        vm.roll(block.number + 1);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
     }
 }
