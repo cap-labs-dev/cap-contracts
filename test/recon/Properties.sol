@@ -293,17 +293,10 @@ abstract contract Properties is BeforeAfter, Asserts {
             uint256 totalDebtTokenSupply = MockERC20(_debtToken).totalSupply();
 
             uint256 totalVaultDebt = 0;
-            uint256 totalAccruedRestakerInterest = 0;
             for (uint256 j = 0; j < agents.length; j++) {
                 totalVaultDebt += lender.debt(agents[j], asset);
-                // totalAccruedRestakerInterest += lender.accruedRestakerInterest(agents[j], asset);
             }
 
-            // gte(
-            //     totalDebtTokenSupply,
-            //     totalVaultDebt - totalAccruedRestakerInterest,
-            //     "DebtToken totalSupply < total vault debt"
-            // );
             eq(totalDebtTokenSupply, totalVaultDebt, "DebtToken totalSupply < total vault debt");
         }
     }
@@ -373,6 +366,44 @@ abstract contract Properties is BeforeAfter, Asserts {
     }
 
     /// === Optimization Properties === ///
+
+    /// @dev test for optimizing the difference between the debt token supply and the total vault debt
+    function optimize_property_debt_token_supply_neq_total_vault_debt() public returns (int256) {
+        address[] memory assets = capToken.assets();
+        address[] memory agents = delegation.agents();
+
+        for (uint256 i = 0; i < assets.length; i++) {
+            address asset = assets[i];
+
+            (,, address _debtToken,,,,) = lender.reservesData(asset);
+
+            if (_debtToken == address(0)) {
+                continue;
+            }
+
+            uint256 totalDebtTokenSupply = MockERC20(_debtToken).totalSupply();
+
+            uint256 totalVaultDebt = 0;
+            for (uint256 j = 0; j < agents.length; j++) {
+                totalVaultDebt += lender.debt(agents[j], asset);
+            }
+
+            int256 currentDebtDifference;
+            if (totalVaultDebt > totalDebtTokenSupply) {
+                currentDebtDifference = int256(totalVaultDebt - totalDebtTokenSupply);
+            } else {
+                currentDebtDifference = int256(totalDebtTokenSupply - totalVaultDebt);
+            }
+
+            // checks if current difference is a new max difference
+            if (currentDebtDifference > maxDebtDifference) {
+                maxDebtDifference = currentDebtDifference;
+                return maxDebtDifference;
+            }
+        }
+
+        return 0;
+    }
 
     function optimize_burnable_amount_no_fee() public returns (int256) {
         return maxAmountOut;
