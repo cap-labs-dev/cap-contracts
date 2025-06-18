@@ -12,7 +12,7 @@ contract InfraConfigSerializer {
 
     function _capInfraFilePath() private view returns (string memory) {
         Vm vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
-        return string.concat(vm.projectRoot(), "/config/cap-mainnet-infra.json");
+        return string.concat(vm.projectRoot(), "/config/cap-infra.json");
     }
 
     function _saveInfraConfig(ImplementationsConfig memory implems, LibsConfig memory libs, InfraConfig memory infra)

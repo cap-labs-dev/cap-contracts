@@ -2,15 +2,15 @@
 pragma solidity ^0.8.28;
 
 import { AccessControl } from "../../contracts/access/AccessControl.sol";
-
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
 import { Network } from "../../contracts/delegation/providers/symbiotic/Network.sol";
 import { NetworkMiddleware } from "../../contracts/delegation/providers/symbiotic/NetworkMiddleware.sol";
+import { InfraConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
+import { VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
+import { SymbioticNetworkAdapterConfig } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 import { FeeAuction } from "../../contracts/feeAuction/FeeAuction.sol";
 import { FeeReceiver } from "../../contracts/feeReceiver/FeeReceiver.sol";
-import { IMinter } from "../../contracts/interfaces/IMinter.sol";
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
-
 import { DebtToken } from "../../contracts/lendingPool/tokens/DebtToken.sol";
 import { PriceOracle } from "../../contracts/oracle/PriceOracle.sol";
 import { RateOracle } from "../../contracts/oracle/RateOracle.sol";
@@ -18,39 +18,32 @@ import { VaultAdapter } from "../../contracts/oracle/libraries/VaultAdapter.sol"
 import { FractionalReserve } from "../../contracts/vault/FractionalReserve.sol";
 import { Minter } from "../../contracts/vault/Minter.sol";
 import { Vault } from "../../contracts/vault/Vault.sol";
+import { InfraConfigSerializer } from "../config/InfraConfigSerializer.sol";
+import { SymbioticAdapterConfigSerializer } from "../config/SymbioticAdapterConfigSerializer.sol";
+import { VaultConfigSerializer } from "../config/VaultConfigSerializer.sol";
+import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { Script } from "forge-std/Script.sol";
 import { console } from "forge-std/console.sol";
 
-contract CheckAccess is Script {
-    AccessControl accessControl = AccessControl(0x32fd97A5196a6D98656a7F2f191Ae4732ad13170);
-    /// @dev Delegation Contract Selectors
-    Delegation delegation = Delegation(0xDB34C0849DE02ABC719740E147e6df4ffE4e8163);
-    /// @dev Network Contract Selectors
-    Network network = Network(0x0000000000000000000000000000000000000000);
-    /// @dev Network Middleware Contract Selectors
-    NetworkMiddleware networkMiddleware = NetworkMiddleware(0x0000000000000000000000000000000000000000);
-    /// @dev Fee Auction Contract Selectors
-    FeeAuction feeAuction = FeeAuction(0x019B65850E3ad55939169845551f3D9C512E52Cd);
-    /// @dev Fee Receiver Contract Selectors
-    FeeReceiver feeReceiver = FeeReceiver(0x0000000000000000000000000000000000000000);
-    /// @dev Lender Contract Selectors
-    Lender lender = Lender(0x1036C242ccE7a6632E2f2649F293eaa881835772);
-    /// @dev Oracle Contract Selectors
-    PriceOracle priceOracle = PriceOracle(0xe23680f14214c4c9238411d2a85e74A9297ECEF0);
-    RateOracle rateOracle = RateOracle(0xe23680f14214c4c9238411d2a85e74A9297ECEF0);
-    VaultAdapter vaultAdapter = VaultAdapter(0x0000000000000000000000000000000000000000);
-    /// @dev cUSD Contract Selectors
-    Minter minter = Minter(0xF79e8E7Ba2dDb5d0a7D98B1F57fCb8A50436E9aA);
-    Vault vault = Vault(0xF79e8E7Ba2dDb5d0a7D98B1F57fCb8A50436E9aA);
-    FractionalReserve fractionalReserve = FractionalReserve(0xF79e8E7Ba2dDb5d0a7D98B1F57fCb8A50436E9aA);
-    DebtToken debtToken = DebtToken(0xe20fbE3467436bd6Dd7096aDf0770A0870bAe567);
+contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, SymbioticAdapterConfigSerializer {
+    using Strings for address;
+
+    InfraConfig infra;
+    VaultConfig vaultConfig;
+    SymbioticNetworkAdapterConfig symbioticAdapter;
+    AccessControl accessControl;
+    address[] devEoas = [0xc1ab5a9593E6e1662A9a44F84Df4F31Fc8A76B52];
 
     function run() external {
+        (,, infra) = _readInfraConfig();
+        vaultConfig = _readVaultConfig("cUSD");
+        accessControl = AccessControl(infra.accessControl);
+
         vm.startBroadcast();
 
         console.log("Checking Access for Delegation Contract...");
         (bytes4[] memory selectors, string[] memory selectorsNames) = buildDelegationSelectors();
-        checkRoles(selectors, selectorsNames, address(delegation), accessControl);
+        checkRoles(selectors, selectorsNames, infra.delegation, accessControl);
         console.log("");
         console.log("Checking Access for Network Contract...");
         (selectors, selectorsNames) = buildNetworkSelectors();
@@ -62,7 +55,7 @@ contract CheckAccess is Script {
         console.log("");
         console.log("Checking Access for Fee Auction Contract...");
         (selectors, selectorsNames) = buildFeeAuctionSelectors();
-        checkRoles(selectors, selectorsNames, address(feeAuction), accessControl);
+        checkRoles(selectors, selectorsNames, vaultConfig.feeAuction, accessControl);
         console.log("");
         console.log("Checking Access for Fee Receiver Contract...");
         (selectors, selectorsNames) = buildFeeReceiverSelectors();
@@ -70,31 +63,33 @@ contract CheckAccess is Script {
         console.log("");
         console.log("Checking Access for Lender Contract...");
         (selectors, selectorsNames) = buildLenderSelectors();
-        checkRoles(selectors, selectorsNames, address(lender), accessControl);
+        checkRoles(selectors, selectorsNames, infra.lender, accessControl);
         console.log("");
         console.log("Checking Access for Price Oracle Contract...");
         (selectors, selectorsNames) = buildPriceOracleSelectors();
-        checkRoles(selectors, selectorsNames, address(priceOracle), accessControl);
+        checkRoles(selectors, selectorsNames, infra.oracle, accessControl);
         console.log("");
         console.log("Checking Access for Rate Oracle Contract...");
         (selectors, selectorsNames) = buildRateOracleSelectors();
-        checkRoles(selectors, selectorsNames, address(rateOracle), accessControl);
+        checkRoles(selectors, selectorsNames, infra.oracle, accessControl);
         console.log("");
         console.log("Checking Access for Minter Contract...");
         (selectors, selectorsNames) = buildMinterSelectors();
-        checkRoles(selectors, selectorsNames, address(minter), accessControl);
+        checkRoles(selectors, selectorsNames, vaultConfig.capToken, accessControl);
         console.log("");
         console.log("Checking Access for Vault Contract...");
         (selectors, selectorsNames) = buildVaultSelectors();
-        checkRoles(selectors, selectorsNames, address(vault), accessControl);
+        checkRoles(selectors, selectorsNames, vaultConfig.capToken, accessControl);
         console.log("");
         console.log("Checking Access for Fractional Reserve Contract...");
         (selectors, selectorsNames) = buildFractionalReserveSelectors();
-        checkRoles(selectors, selectorsNames, address(fractionalReserve), accessControl);
+        checkRoles(selectors, selectorsNames, vaultConfig.capToken, accessControl);
         console.log("");
         console.log("Checking Access for Debt Token Contract...");
         (selectors, selectorsNames) = buildDebtTokenSelectors();
-        checkRoles(selectors, selectorsNames, address(debtToken), accessControl);
+        for (uint256 i = 0; i < vaultConfig.debtTokens.length; i++) {
+            checkRoles(selectors, selectorsNames, vaultConfig.debtTokens[i], accessControl);
+        }
         console.log("");
         vm.stopBroadcast();
     }
@@ -320,8 +315,40 @@ contract CheckAccess is Script {
             }
             for (uint256 j = 0; j < memberCount; j++) {
                 address member = _accessControl.getRoleMember(role, j);
-                console.log(selectorsNames[i], member);
+                console.log(selectorsNames[i], labelledAddress(member));
             }
         }
+    }
+
+    function labelledAddress(address _address) internal view returns (string memory) {
+        if (_address == address(infra.delegation)) {
+            return "Delegation";
+        } else if (_address == address(symbioticAdapter.network)) {
+            return "Network";
+        } else if (_address == address(symbioticAdapter.networkMiddleware)) {
+            return "Network Middleware";
+        } else if (_address == address(infra.lender)) {
+            return "Lender";
+        } else if (_address == address(infra.oracle)) {
+            return "Oracle";
+        } else if (_address == address(vaultConfig.feeAuction)) {
+            return "Fee Auction (cUSD)";
+        } else if (_address == address(vaultConfig.feeReceiver)) {
+            return "Fee Receiver (cUSD)";
+        } else if (_address == address(vaultConfig.capToken)) {
+            return "Vault (cUSD)";
+        } else {
+            for (uint256 i = 0; i < vaultConfig.debtTokens.length; i++) {
+                if (_address == address(vaultConfig.debtTokens[i])) {
+                    return string.concat("Debt Token ", Strings.toString(i), " (cUSD)");
+                }
+            }
+            for (uint256 i = 0; i < devEoas.length; i++) {
+                if (devEoas[i] == _address) {
+                    return unicode"🚨 Dev EOA 🚨";
+                }
+            }
+        }
+        return _address.toHexString();
     }
 }
