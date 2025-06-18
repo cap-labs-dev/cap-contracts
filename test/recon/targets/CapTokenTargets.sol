@@ -62,11 +62,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     function _validateTotalSupplyIncrease(uint256 totalSuppliesBefore, uint256 amountIn, uint256 mintFee) internal {
         uint256 totalSuppliesAfter = capToken.totalSupplies(_getAsset());
 
-        eq(
-            totalSuppliesAfter,
-            totalSuppliesBefore + (amountIn - mintFee), // we can use mintFee here with the assumption that the assets are 1:1 with cUSD
-            "total supplies did not increase by the amount out"
-        );
+        eq(totalSuppliesAfter, totalSuppliesBefore + amountIn, "total supplies did not increase by the amount in");
     }
 
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
