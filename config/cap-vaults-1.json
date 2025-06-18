@@ -29,7 +29,7 @@
             }
         ],
         "feeAuction": "0x019B65850E3ad55939169845551f3D9C512E52Cd",
-        "feeReceiver": "0x0000000000000000000000000000000000000000",
+        "feeReceiver": "0xfdeb31951781effbd2a0c5eb3f1da4da5c1b29ac",
         "stakedCapOFTLockbox": "0x0000000000000000000000000000000000000000",
         "stakedCapToken": {
             "address": "0x5349937179F7B7e499FA58C797a27d000156A489",
