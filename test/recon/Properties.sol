@@ -304,7 +304,7 @@ abstract contract Properties is BeforeAfter, Asserts {
             //     totalVaultDebt - totalAccruedRestakerInterest,
             //     "DebtToken totalSupply < total vault debt"
             // );
-            gte(totalDebtTokenSupply, totalVaultDebt, "DebtToken totalSupply < total vault debt");
+            eq(totalDebtTokenSupply, totalVaultDebt, "DebtToken totalSupply < total vault debt");
         }
     }
 
