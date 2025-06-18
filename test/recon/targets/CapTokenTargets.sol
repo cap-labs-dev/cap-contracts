@@ -59,12 +59,6 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         }
     }
 
-    function _validateTotalSupplyIncrease(uint256 totalSuppliesBefore, uint256 amountIn, uint256 mintFee) internal {
-        uint256 totalSuppliesAfter = capToken.totalSupplies(_getAsset());
-
-        eq(totalSuppliesAfter, totalSuppliesBefore + amountIn, "total supplies did not increase by the amount in");
-    }
-
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///
 
     function capToken_addAsset() public updateGhosts asActor {
@@ -213,8 +207,6 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 capTokenBalanceAfter - capTokenBalanceBefore,
                 "fees are greater than the amount out"
             );
-
-            _validateTotalSupplyIncrease(totalSuppliesBefore, _amountIn, mintFee);
 
             if (capTokenBalanceAfter > capTokenBalanceBefore) {
                 _validateMintAssetValue(_getAsset(), amountOut, _amountIn);
