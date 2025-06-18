@@ -14,6 +14,7 @@
     "compile": "forge build",
     "build": "forge build --skip Test",
     "check-access": "forge script script/manage/CheckAccess.s.sol:CheckAccess --via-ir --rpc-url ethereum",
+    "check-access:save": "yarn --silent check-access > access.txt",
     "test": "forge test",
     "test:unit": "forge test --no-match-path 'test/**/*.invariants.t.sol'",
     "test:invariants": "forge test --match-path 'test/**/*.invariants.t.sol'",

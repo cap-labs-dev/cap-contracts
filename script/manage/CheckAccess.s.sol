@@ -21,6 +21,7 @@ import { Vault } from "../../contracts/vault/Vault.sol";
 import { InfraConfigSerializer } from "../config/InfraConfigSerializer.sol";
 import { SymbioticAdapterConfigSerializer } from "../config/SymbioticAdapterConfigSerializer.sol";
 import { VaultConfigSerializer } from "../config/VaultConfigSerializer.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { Script } from "forge-std/Script.sol";
 import { console } from "forge-std/console.sol";
@@ -127,20 +128,24 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
             NamedContract({ contractAddress: vaultConfig.stakedCapToken, name: "Staked Vault (cUSD)" })
         ];
         for (uint256 i = 0; i < vaultConfig.debtTokens.length; i++) {
+            address debtToken = vaultConfig.debtTokens[i];
+            string memory debtTokenName = IERC20Metadata(debtToken).name();
             namedContracts.push(
                 NamedContract({
-                    contractAddress: vaultConfig.debtTokens[i],
-                    name: string.concat("Debt Token ", Strings.toString(i), " (cUSD)")
+                    contractAddress: debtToken,
+                    name: string.concat("Debt Token ", Strings.toString(i), " of cUSD vault (", debtTokenName, ")")
                 })
             );
         }
 
+        vm.startBroadcast();
         for (uint256 i = 0; i < namedContracts.length; i++) {
             console.log("Checking Access for", namedContracts[i].name, "Contract...");
             address contractAddress = namedContracts[i].contractAddress;
             checkAllRoles(contractAddress);
             console.log("");
         }
+        vm.stopBroadcast();
     }
 
     function checkAllRoles(address contractAddress) internal view {
