@@ -19,20 +19,20 @@
 | 17 | property_total_borrowed_less_than_total_supply | Total cUSD borrowed < total supply (utilization < 1e27) | |
 | 18 | property_staked_cap_value_non_decreasing | Staked cap token value must increase or stay the same over time | |
 | 19 | property_utilization_ratio_never_greater_than_1e27 | Utilization ratio is never greater than 1e27 | |
-| 20 | capToken_burn | User always receives at least the minimum amount out | |
-| 21 | capToken_burn | User always receives at most the expected amount out | |
-| 22 | capToken_burn | Total cap supply decreases by no more than the amount out | |
-| 23 | capToken_burn | Fees are always nonzero when burning | |
-| 24 | capToken_burn | Fees are always <= the amount out | |
-| 25 | capToken_burn | Burning reduces cUSD supply, must always round down | |
-| 26 | capToken_burn | Burners must not receive more asset value than cUSD burned | |
-| 27 | capToken_burn | User can always burn cap token if they have sufficient balance of cap token | |
-| 28 | capToken_divestAll | ERC4626 must always be divestable | |
-| 29 | capToken_mint | User always receives at least the minimum amount out | |
-| 30 | capToken_mint | User always receives at most the expected amount out | |
-| 31 | capToken_mint | Fees are always nonzero when minting | |
-| 32 | capToken_mint | Fees are always <= the amount out | |
-| 33 | capToken_mint | Total supplies increases by the amountIn - mintFee | |
+| 20 | property_maxWithdraw_less_than_loaned_and_reserve | sum of all `maxWithdraw` for users should be <= loaned + reserve | |
+| 21 | capToken_burn | User always receives at least the minimum amount out | |
+| 22 | capToken_burn | User always receives at most the expected amount out | |
+| 23 | capToken_burn | Total cap supply decreases by no more than the amount out | |
+| 24 | capToken_burn | Fees are always nonzero when burning | |
+| 25 | capToken_burn | Fees are always <= the amount out | |
+| 26 | capToken_burn | Burning reduces cUSD supply, must always round down | |
+| 27 | capToken_burn | Burners must not receive more asset value than cUSD burned | |
+| 28 | capToken_burn | User can always burn cap token if they have sufficient balance of cap token | |
+| 29 | capToken_divestAll | ERC4626 must always be divestable | |
+| 30 | capToken_mint | User always receives at least the minimum amount out | |
+| 31 | capToken_mint | User always receives at most the expected amount out | |
+| 32 | capToken_mint | Fees are always nonzero when minting | |
+| 33 | capToken_mint | Fees are always <= the amount out | |
 | 34 | capToken_mint | Minting increases vault assets based on oracle value | |
 | 35 | capToken_mint | User can always mint cap token if they have sufficient balance of depositing asset | |
 | 36 | capToken_mint | Asset cannot be minted when it is paused | |
@@ -67,4 +67,4 @@
 | 65 | lender_realizeRestakerInterest | vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest` | |
 | 66 | lender_realizeRestakerInterest | health should not change when `realizeRestakerInterest` is called | |
 | 67 | lender_realizeRestakerInterest | restakerinterest can only be realized if there are sufficient vault assets | |
-| 68 | property_maxWithdraw_less_than_loaned_and_reserve | sum of all `maxWithdraw` for users should be <= loaned + reserve | |
+| 68 | property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset | fractional reserve vault must always have reserve amount of underyling asset | |

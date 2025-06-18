@@ -175,7 +175,6 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
 
     /// @dev Property: User always receives at least the minimum amount out
     /// @dev Property: Fees are always <= the amount out
-    /// @dev Property: Total supplies increases by the amountIn - mintFee
     /// @dev Property: Fees are always nonzero when minting
     /// @dev Property: User always receives at most the expected amount out
     /// @dev Property: Asset cannot be minted when it is paused

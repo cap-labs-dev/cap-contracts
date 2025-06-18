@@ -381,6 +381,18 @@ abstract contract Properties is BeforeAfter, Asserts {
         lte(maxWithdraw, loaned + reserve, "maxWithdraw > loaned + reserve");
     }
 
+    /// @dev Property: fractional reserve vault must always have reserve amount of underyling asset
+    function property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset() public {
+        uint256 reserve = capToken.reserve(_getAsset());
+        uint256 fractionalReserveBalance =
+            MockERC20(_getAsset()).balanceOf(capToken.fractionalReserveVault(_getAsset()));
+        gte(
+            fractionalReserveBalance,
+            reserve,
+            "fractional reserve vault does not have reserve amount of underlying asset"
+        );
+    }
+
     /// === Optimization Properties === ///
 
     function optimize_burnable_amount_no_fee() public returns (int256) {
