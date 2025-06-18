@@ -59,6 +59,11 @@ abstract contract ManagersTargets is BaseTargetFunctions, Properties {
 
     /// @dev Mint to arbitrary address, uses owner by default, even though MockERC20 doesn't check
     function asset_mint(address to, uint128 amt) public updateGhosts asAdmin {
+        address[] memory vaults = _getVaults();
+        // minting assets to fractional reserve vaults messes up properties
+        for (uint256 i = 0; i < vaults.length; i++) {
+            require(to != vaults[i], "Cannot mint assets to vault");
+        }
         MockERC20(_getAsset()).mint(to, amt);
     }
 }
