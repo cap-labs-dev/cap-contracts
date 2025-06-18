@@ -296,14 +296,15 @@ abstract contract Properties is BeforeAfter, Asserts {
             uint256 totalAccruedRestakerInterest = 0;
             for (uint256 j = 0; j < agents.length; j++) {
                 totalVaultDebt += lender.debt(agents[j], asset);
-                totalAccruedRestakerInterest += lender.accruedRestakerInterest(agents[j], asset);
+                // totalAccruedRestakerInterest += lender.accruedRestakerInterest(agents[j], asset);
             }
 
-            gte(
-                totalDebtTokenSupply,
-                totalVaultDebt - totalAccruedRestakerInterest,
-                "DebtToken totalSupply < total vault debt"
-            );
+            // gte(
+            //     totalDebtTokenSupply,
+            //     totalVaultDebt - totalAccruedRestakerInterest,
+            //     "DebtToken totalSupply < total vault debt"
+            // );
+            gte(totalDebtTokenSupply, totalVaultDebt, "DebtToken totalSupply < total vault debt");
         }
     }
 
