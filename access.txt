@@ -1,5 +1,5 @@
-Compiling 1 files with Solc 0.8.28
-Solc 0.8.28 finished in 1.82s
+Compiling 253 files with Solc 0.8.28
+Solc 0.8.28 finished in 17.10s
 Compiler run successful!
 Script ran successfully.
 
@@ -32,6 +32,8 @@ Script ran successfully.
   Proxy.upgrade 🚨 Dev EOA 🚨
   
   Checking Access for Access Control Contract...
+  AccessControl.grantAccess 🚨 Dev EOA 🚨
+  AccessControl.revokeAccess 🚨 Dev EOA 🚨
   
   Checking Access for Network Contract...
   Proxy.upgrade 🚨 Dev EOA 🚨

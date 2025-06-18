@@ -47,6 +47,9 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
     address[] devEoas = [0xc1ab5a9593E6e1662A9a44F84Df4F31Fc8A76B52];
 
     NamedSelector[] namedSelectors = [
+        NamedSelector({ selector: AccessControl.grantAccess.selector, name: "AccessControl.grantAccess" }),
+        NamedSelector({ selector: AccessControl.revokeAccess.selector, name: "AccessControl.revokeAccess" }),
+        NamedSelector({ selector: AccessControl.checkAccess.selector, name: "AccessControl.checkAccess" }),
         NamedSelector({ selector: Delegation.slash.selector, name: "Delegation.slash" }),
         NamedSelector({ selector: Delegation.setLastBorrow.selector, name: "Delegation.setLastBorrow" }),
         NamedSelector({ selector: Delegation.addAgent.selector, name: "Delegation.addAgent" }),
