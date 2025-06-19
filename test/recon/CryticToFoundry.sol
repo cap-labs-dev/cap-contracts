@@ -65,20 +65,34 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     }
 
     // forge test --match-test test_lender_realizeRestakerInterest_8 -vvv
-    // NOTE: agent health changes after realizeRestakerInterest when it shouldn't, could it be because of borrowing max?
+    // NOTE: agent health changes after realizeRestakerInterest when it shouldn't
     function test_lender_realizeRestakerInterest_8() public {
         switch_asset(0);
 
+        // set initial rate to 0.5%
+        oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 0.05e27);
+
         capToken_mint_clamped(100711969);
 
-        // borrowing type(uint256).max here
         lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
 
+        (,, uint256 totalDebtBefore,,, uint256 healthBefore) = _getAgentParams(_getActor());
+
+        console2.log("rate before %e", oracle.restakerRate(_getActor()));
         oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 33056249739822063734181);
+        console2.log("rate after %e", oracle.restakerRate(_getActor()));
 
         vm.warp(block.timestamp + 56837);
 
         lender_realizeRestakerInterest();
+
+        (,, uint256 totalDebtAfter,,, uint256 healthAfter) = _getAgentParams(_getActor());
+
+        // NOTE: remove the failing assertion in lender_realizeRestakerInterest to log these
+        console2.log("totalDebtBefore %e", totalDebtBefore);
+        console2.log("totalDebtAfter %e", totalDebtAfter);
+        console2.log("healthBefore %e", healthBefore);
+        console2.log("healthAfter %e", healthAfter);
     }
 
     /// === Newest Issues === ///
