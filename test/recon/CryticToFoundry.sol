@@ -18,33 +18,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         setup();
     }
 
-    // forge test --match-test test_crytic -vvv
-    function test_crytic() public {
-        // TODO: add failing property tests here for debugging
-    }
-
-    // forge test --match-test test_capToken_redeem_clamped_6 -vvv
-    // NOTE: issue is because of implementation of ERC4626Tester, need to determine best way to fix behavior
-    // TODO: determine best way to fix ERC4626Tester behavior
-    // NOTE: this no longer fails with the check for user allowance included because it was reverting before the cUSD was burned for the user
-    function test_capToken_redeem_clamped_6() public {
-        capToken_mint_clamped(10000037441);
-
-        add_new_vault();
-
-        capToken_setFractionalReserveVault();
-
-        capToken_investAll();
-
-        // issue is because shares in withdraw calculated by previewWithdraw now get increased but user balance doesn't
-        // most likely fix would be to rebase shares for all users when unbacked shares are minted
-        // or just make it so that users can only withdraw up to the maxWithdraw amount
-        // mockERC4626Tester_mintUnbackedShares(100003377823040994724, 0x0000000000000000000000000000000000000000);
-        // mockERC4626Tester_simulateLoss(200);
-
-        capToken_redeem_clamped(1);
-    }
-
     /// === Newest Issues === ///
 
     // forge test --match-test test_lender_liquidate_0 -vvv
@@ -117,5 +90,45 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         vm.warp(block.timestamp + 56837);
 
         lender_realizeRestakerInterest();
+    }
+
+    // forge test --match-test test_capToken_burn_6 -vvv
+    function test_capToken_burn_6() public {
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        capToken_setWhitelist(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, true);
+
+        capToken_mint_clamped(20002627083);
+
+        capToken_investAll();
+
+        mockERC4626Tester_decreaseYield(1);
+
+        capToken_setReserve(10003071403);
+
+        capToken_burn(10000037442, 0, 0);
+    }
+
+    /// === Ignored Breaks === ///
+
+    // forge test --match-test test_property_maxWithdraw_less_than_loaned_and_reserve_3 -vvv
+    // NOTE: this breaks because the fractional reserve vault has a gain on it, which makes the maxWithdraw more than the loaned + reserve
+    // NOTE: commented out because it's expected but maintained for future reference
+    function test_property_maxWithdraw_less_than_loaned_and_reserve_3() public {
+        capToken_mint_clamped(10000179551);
+
+        add_new_vault();
+
+        asset_approve(0xe916cadb12C49389E487eB1e8194B1459b29B0eC, 1000921);
+
+        capToken_setFractionalReserveVault();
+
+        capToken_investAll();
+
+        mockERC4626Tester_increaseYield(1);
+
+        // property_maxWithdraw_less_than_loaned_and_reserve();
     }
 }

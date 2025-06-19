@@ -372,14 +372,15 @@ abstract contract Properties is BeforeAfter, Asserts {
     }
 
     /// @dev Property: sum of all maxWithdraw for users should be <= loaned + reserve
-    function property_maxWithdraw_less_than_loaned_and_reserve() public {
-        // we only check maxWithdraw for capToken because it's the only depositor into the vault
-        uint256 maxWithdraw =
-            MockERC4626Tester(capToken.fractionalReserveVault(_getAsset())).maxWithdraw(address(capToken));
-        uint256 loaned = capToken.loaned(_getAsset());
-        uint256 reserve = capToken.reserve(_getAsset());
-        lte(maxWithdraw, loaned + reserve, "maxWithdraw > loaned + reserve");
-    }
+    // NOTE: temporarily removed because it trivially breaks anytime there's a gain on the fractional reserve vault
+    // function property_maxWithdraw_less_than_loaned_and_reserve() public {
+    //     // we only check maxWithdraw for capToken because it's the only depositor into the vault
+    //     uint256 maxWithdraw =
+    //         MockERC4626Tester(capToken.fractionalReserveVault(_getAsset())).maxWithdraw(address(capToken));
+    //     uint256 loaned = capToken.loaned(_getAsset());
+    //     uint256 reserve = capToken.reserve(_getAsset());
+    //     lte(maxWithdraw, loaned + reserve, "maxWithdraw > loaned + reserve");
+    // }
 
     /// @dev Property: fractional reserve vault must always have reserve amount of underyling asset
     function property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset() public {
