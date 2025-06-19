@@ -383,14 +383,18 @@ abstract contract Properties is BeforeAfter, Asserts {
 
     /// @dev Property: fractional reserve vault must always have reserve amount of underyling asset
     function property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset() public {
-        uint256 reserve = capToken.reserve(_getAsset());
-        uint256 fractionalReserveBalance =
-            MockERC20(_getAsset()).balanceOf(capToken.fractionalReserveVault(_getAsset()));
-        gte(
-            fractionalReserveBalance,
-            reserve,
-            "fractional reserve vault does not have reserve amount of underlying asset"
-        );
+        if (currentOperation == OpType.INVEST || currentOperation == OpType.DIVEST) {
+            for (uint256 i = 0; i < capToken.assets().length; i++) {
+                address asset = capToken.assets()[i];
+                uint256 beforeReserve = _before.fractionalReserveReserve[asset];
+                uint256 afterBalance = _after.vaultAssetBalance[asset];
+                gte(
+                    afterBalance,
+                    beforeReserve,
+                    "fractional reserve vault does not have reserve amount of underlying asset"
+                );
+            }
+        }
     }
 
     /// === Optimization Properties === ///

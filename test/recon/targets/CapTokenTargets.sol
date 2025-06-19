@@ -91,7 +91,10 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Fees are always <= the amount out
     /// @dev Property: Burning reduces cUSD supply, must always round down
     /// @dev Property: Burners must not receive more asset value than cUSD burned
-    function capToken_burn(uint256 _amountIn, uint256 _minAmountOut, uint256 _deadline) public updateGhosts {
+    function capToken_burn(uint256 _amountIn, uint256 _minAmountOut, uint256 _deadline)
+        public
+        updateGhostsWithType(OpType.DIVEST)
+    {
         uint256 capTokenBalanceBefore = capToken.balanceOf(_getActor());
         uint256 insuranceFundBalanceBefore = MockERC20(_getAsset()).balanceOf(capToken.insuranceFund());
         uint256 totalCapSupplyBefore = capToken.totalSupply();
@@ -158,7 +161,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     }
 
     /// @dev Property: ERC4626 must always be divestable
-    function capToken_divestAll() public asActor {
+    function capToken_divestAll() public updateGhostsWithType(OpType.DIVEST) asActor {
         try capToken.divestAll(_getAsset()) { }
         catch (bytes memory reason) {
             bool expectedError = checkError(reason, "LossFromFractionalReserve(address,address,uint256)")
@@ -267,7 +270,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Fees are always <= the amount out
     function capToken_redeem(uint256 _amountIn, uint256[] memory _minAmountsOut, address _receiver, uint256 _deadline)
         public
-        updateGhosts
+        updateGhostsWithType(OpType.DIVEST) // using divest OpType here because it performs a call to divest
     {
         uint256 capTokenBalanceBefore = capToken.balanceOf(_getActor());
         uint256 totalCapSupplyBefore = capToken.totalSupply();

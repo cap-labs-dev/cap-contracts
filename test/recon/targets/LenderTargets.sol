@@ -72,7 +72,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Total borrows should increase after borrowing
     /// @dev Property: Borrower can't borrow more than LTV
     /// @dev Property: Borrow should only revert with an expected error
-    function lender_borrow(uint256 _amount, address _receiver) public updateGhostsWithType(OpType.BORROW) asActor {
+    function lender_borrow(uint256 _amount, address _receiver) public updateGhostsWithType(OpType.DIVEST) asActor {
         uint256 beforeAssetBalance = MockERC20(_getAsset()).balanceOf(_receiver);
         (,, address _debtToken,,,,) = lender.reservesData(_getAsset());
         uint256 beforeBorrowerDebt = DebtToken(_debtToken).balanceOf(_getActor());

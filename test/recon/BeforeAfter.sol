@@ -21,18 +21,19 @@ enum OpType {
 // ghost variables for tracking state variable values before and after function calls
 abstract contract BeforeAfter is Setup {
     struct Vars {
-        uint256 vaultAssetBalance;
         uint256 insuranceFundBalance;
         uint256 capTokenTotalSupply;
+        uint256 stakedCapValuePerShare;
         uint256[] redeemAmountsOut;
-        mapping(address => mapping(address => uint256)) debtTokenBalance;
         mapping(address => uint256) vaultDebt;
         mapping(address => uint256) agentHealth;
         mapping(address => uint256) agentTotalDebt;
         mapping(address => uint256) utilizationIndex;
         mapping(address => uint256) utilizationRatio;
         mapping(address => uint256) totalBorrows;
-        uint256 stakedCapValuePerShare;
+        mapping(address asset => uint256 reserve) fractionalReserveReserve;
+        mapping(address asset => uint256 balance) vaultAssetBalance;
+        mapping(address => mapping(address => uint256)) debtTokenBalance;
     }
 
     Vars internal _before;
@@ -55,18 +56,19 @@ abstract contract BeforeAfter is Setup {
 
     function __snapshot(Vars storage vars) internal {
         _updateVaultDebt(vars);
+        _updateVaultBalances(vars);
 
         vars.utilizationIndex[_getAsset()] = capToken.currentUtilizationIndex(_getAsset());
         vars.utilizationRatio[_getAsset()] = capToken.utilization(_getAsset());
         vars.totalBorrows[_getAsset()] = capToken.totalBorrows(_getAsset());
-        vars.vaultAssetBalance = MockERC20(_getAsset()).balanceOf(address(capToken));
         vars.vaultDebt[_getAsset()] = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
         vars.insuranceFundBalance = MockERC20(_getAsset()).balanceOf(capToken.insuranceFund());
         vars.capTokenTotalSupply = capToken.totalSupply();
+        vars.fractionalReserveReserve[_getAsset()] = capToken.reserve(_getAsset());
 
         vars.stakedCapValuePerShare = _getStakedCapValuePerShare();
-
         vars.redeemAmountsOut = _getRedeemAmounts(_getActor());
+
         (,, vars.agentTotalDebt[_getActor()],,, vars.agentHealth[_getActor()]) = _getAgentParams(_getActor());
     }
 
@@ -82,6 +84,16 @@ abstract contract BeforeAfter is Setup {
         (,, address debtToken,,,,) = lender.reservesData(_getAsset());
 
         vars.debtTokenBalance[address(debtToken)][_getActor()] = MockERC20(address(debtToken)).balanceOf(_getActor());
+    }
+
+    function _updateVaultBalances(Vars storage vars) internal {
+        address[] memory assets = capToken.assets();
+        // only update vault balances if the operation is invest or divest to avoid unnecessary updates for every handler call
+        if (currentOperation == OpType.INVEST || currentOperation == OpType.DIVEST) {
+            for (uint256 i = 0; i < assets.length; i++) {
+                vars.vaultAssetBalance[assets[i]] = MockERC20(assets[i]).balanceOf(address(capToken));
+            }
+        }
     }
 
     function _getAgentParams(address _agent)
