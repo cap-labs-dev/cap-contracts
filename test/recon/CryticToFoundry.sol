@@ -65,7 +65,8 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     }
 
     // forge test --match-test test_lender_realizeRestakerInterest_8 -vvv
-    // NOTE: agent health changes after realizeRestakerInterest when it shouldn't
+    // NOTE: agent health changes if the restaker rate is decreased
+    // TODO: optimization test for this
     function test_lender_realizeRestakerInterest_8() public {
         switch_asset(0);
 
