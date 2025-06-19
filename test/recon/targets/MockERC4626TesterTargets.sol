@@ -37,12 +37,4 @@ abstract contract MockERC4626TesterTargets is BaseTargetFunctions, Properties {
     function mockERC4626Tester_transferFrom(address from, address to, uint256 value) public asActor {
         MockERC4626Tester(_getVault()).transferFrom(from, to, value);
     }
-
-    function mockERC4626Tester_simulateLoss(uint256 lossAmount) public asActor {
-        MockERC4626Tester(_getVault()).simulateLoss(lossAmount);
-    }
-
-    function mockERC4626Tester_simulateGain(uint256 gainAmount) public asActor {
-        MockERC4626Tester(_getVault()).simulateGain(gainAmount);
-    }
 }

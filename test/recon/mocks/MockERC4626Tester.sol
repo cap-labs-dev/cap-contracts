@@ -152,16 +152,16 @@ contract MockERC4626Tester is ERC4626 {
         revertBehaviours[ft] = rt;
     }
 
-    /// @dev Simulate a loss on the vault's assets
-    function simulateLoss(uint256 lossAmount) external {
-        MockERC20(asset).transfer(address(0xbeef), lossAmount);
-        totalLosses += lossAmount;
-    }
+    // /// @dev Simulate a loss on the vault's assets
+    // function simulateLoss(uint256 lossAmount) external {
+    //     MockERC20(asset).transfer(address(0xbeef), lossAmount);
+    //     totalLosses += lossAmount;
+    // }
 
-    /// @dev Simulate a gain on the vault's assets (similar to Yearn's profit taking)
-    function simulateGain(uint256 gainAmount) external {
-        MockERC20(asset).transferFrom(msg.sender, address(this), gainAmount);
-    }
+    // /// @dev Simulate a gain on the vault's assets (similar to Yearn's profit taking)
+    // function simulateGain(uint256 gainAmount) external {
+    //     MockERC20(asset).transferFrom(msg.sender, address(this), gainAmount);
+    // }
 
     /// @dev Increase the yield by a given percentage by taking assets from the caller.
     /// @param increasePercentageFP4 Percentage increase in basis points (e.g., 100 = 1%)
@@ -171,14 +171,13 @@ contract MockERC4626Tester is ERC4626 {
         MockERC20(asset).transferFrom(msg.sender, address(this), amount);
     }
 
-    /// @dev Decrease the yield by a given percentage by minting unbacked shares to the caller.
+    /// @dev Decrease the yield by a given percentage by burning the underlying asset from the vault.
     /// @param decreasePercentageFP4 Percentage decrease in basis points (e.g., 100 = 1%)
     function decreaseYield(uint256 decreasePercentageFP4) public {
         require(decreasePercentageFP4 <= 10000, "Invalid percentage");
-        // x = a/r' - s
-        uint256 targetRatio = 10000 - decreasePercentageFP4;
-        uint256 newShares = totalAssets() * 10000 / targetRatio - totalSupply;
-        _mint(msg.sender, newShares);
+        uint256 amount = totalAssets() * decreasePercentageFP4 / 10000;
+        MockERC20(asset).transfer(address(0xbeef), amount);
+        totalLosses += amount;
     }
 
     /// @dev Deposit assets, reverts as specified
