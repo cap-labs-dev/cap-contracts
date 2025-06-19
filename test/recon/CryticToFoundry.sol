@@ -96,10 +96,9 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         console2.log("healthAfter %e", healthAfter);
     }
 
-    /// === Newest Issues === ///
     // forge test --match-test test_lender_borrow_clamped_6 -vvv
-    // NOTE: looks like a real break
-    // TODO: investigate what the root cause is
+    // NOTE: looks like truncation in LTV calculation causes the issue
+    // TODO: optimization test for this
     function test_lender_borrow_clamped_6() public {
         switch_asset(0);
 
@@ -124,4 +123,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
     }
+
+    /// === Newest Issues === ///
 }

@@ -86,7 +86,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
             t(!protocolPaused || !assetPaused, "asset can be borrowed when it is paused");
 
-            (,,,,, uint256 health) = lender.agent(_getActor());
+            (,,, uint256 ltvAfter,, uint256 health) = lender.agent(_getActor());
             gt(health, RAY, "Borrower is unhealthy after borrowing");
 
             gt(
@@ -114,11 +114,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             (uint256 collateralValue,) =
                 mockNetworkMiddleware.coverageByVault(address(0), _getActor(), mockEth, address(0), 0);
 
-            lte(
-                (borrowerDebtDelta * assetPrice / 10 ** MockERC20(_getAsset()).decimals()) * RAY / collateralValue,
-                delegation.ltv(_getActor()),
-                "Borrower can't borrow more than LTV"
-            );
+            lte(ltvAfter, delegation.ltv(_getActor()), "Borrower can't borrow more than LTV");
         } catch (bytes memory reason) {
             // bool expectedError = checkError(reason, "MinBorrowAmount()") || checkError(reason, "ZeroAddressNotValid()")
             //     || checkError(reason, "ReservePaused()") || checkError(reason, "CollateralCannotCoverNewBorrow()")
