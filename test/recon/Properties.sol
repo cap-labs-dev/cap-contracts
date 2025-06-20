@@ -407,6 +407,14 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: no operation should make a user liquidatable
+    function property_no_operation_makes_user_liquidatable() public {
+        // before/after are only set for user operations so changes to price are automatically excluded since these are the only thing that should make a user liquidatable
+        if (_before.agentHealth[_getActor()] > RAY) {
+            gt(_after.agentHealth[_getActor()], RAY, "user is liquidatable");
+        }
+    }
+
     /// === Optimization Properties === ///
 
     function optimize_burnable_amount_no_fee() public returns (int256) {
