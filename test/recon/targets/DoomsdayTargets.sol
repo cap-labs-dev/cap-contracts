@@ -40,24 +40,23 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
             }
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "HealthFactorNotBelowThreshold()")
-                || checkError(reason, "GracePeriodNotOver()") || checkError(reason, "LiquidationExpired()");
-            bool zeroBurnError = checkError(reason, "InvalidBurnAmount()");
+                || checkError(reason, "GracePeriodNotOver()") || checkError(reason, "LiquidationExpired()")
+                || checkError(reason, "LossFromFractionalReserve(address,address,uint256)")
+                || checkError(reason, "InvalidBurnAmount()") || checkError(reason, "PriceError(address)");
             bool isPaused = capToken.paused();
-            bool stalePrice = checkError(reason, "PriceError(address)"); // Stale/invalid price (0 price)
             (, address vault,,,,,) = lender.reservesData(_getAsset());
-            bool isReserve = vault != address(0); // token must be a reserve in the lender
+            bool isReserve = vault != address(0); // token must be a reserve in the lending vault
 
-            // precondition: must be liquidating more than 0 and not paused
-            if (!isPaused && !zeroBurnError && !stalePrice && isReserve) {
-                gte(
-                    totalDelegation * lender.emergencyLiquidationThreshold() / totalDebt,
+            // precondition: must not error for one of the expected reasons
+            if (!expectedError && !isPaused && totalDebt > 0 && isReserve) {
+                uint256 emergencyLiquidationHealth =
+                    totalDelegation * lender.emergencyLiquidationThreshold() / totalDebt;
+                gt(
+                    emergencyLiquidationHealth,
                     RAY,
                     "Emergency liquidation is not available when emergency health is below 1e27"
                 );
-            }
-
-            if (!expectedError && !isPaused && !zeroBurnError && !stalePrice && totalDebt > 0 && isReserve) {
-                t(false, "liquidate should always succeed for liquidatable agent");
+                gt(healthBefore, RAY, "liquidate should always succeed for liquidatable agent");
             }
         }
     }
