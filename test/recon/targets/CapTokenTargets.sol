@@ -93,7 +93,8 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Burners must not receive more asset value than cUSD burned
     function capToken_burn(uint256 _amountIn, uint256 _minAmountOut, uint256 _deadline)
         public
-        updateGhostsWithType(OpType.DIVEST)
+        // precondition: so we only check cases where an amount actually gets divested
+        updateGhostsWithType(_amountIn != 0 ? OpType.DIVEST : OpType.GENERIC)
     {
         uint256 capTokenBalanceBefore = capToken.balanceOf(_getActor());
         uint256 insuranceFundBalanceBefore = MockERC20(_getAsset()).balanceOf(capToken.insuranceFund());
@@ -270,7 +271,8 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Fees are always <= the amount out
     function capToken_redeem(uint256 _amountIn, uint256[] memory _minAmountsOut, address _receiver, uint256 _deadline)
         public
-        updateGhostsWithType(OpType.DIVEST) // using divest OpType here because it performs a call to divest
+        // precondition: so we only check cases where an amount actually gets divested
+        updateGhostsWithType(_amountIn != 0 ? OpType.DIVEST : OpType.GENERIC) // using divest OpType here because it performs a call to divest
     {
         uint256 capTokenBalanceBefore = capToken.balanceOf(_getActor());
         uint256 totalCapSupplyBefore = capToken.totalSupply();
