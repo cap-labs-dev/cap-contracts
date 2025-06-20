@@ -169,7 +169,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Partial liquidations should not bring health above 1.25
     /// @dev Property: Agent should have their totalDelegation reduced by the liquidated value
     /// @dev Property: Agent should have their totalSlashableCollateral reduced by the liquidated value
-    function lender_liquidate(uint256 _amount) public updateGhosts asActor {
+    function lender_liquidate(uint256 _amount) public updateGhostsWithType(OpType.LIQUIDATE) asActor {
         (uint256 totalDelegationBefore, uint256 totalSlashableCollateralBefore,,,, uint256 healthBefore) =
             lender.agent(_getActor());
         uint256 maxLiquidatable = lender.maxLiquidatable(_getActor(), _getAsset());
