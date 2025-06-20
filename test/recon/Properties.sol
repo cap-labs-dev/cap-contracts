@@ -381,11 +381,15 @@ abstract contract Properties is BeforeAfter, Asserts {
                 address asset = capToken.assets()[i];
                 uint256 beforeReserve = _before.fractionalReserveReserve[asset];
                 uint256 afterBalance = _after.vaultAssetBalance[asset];
-                gte(
-                    afterBalance,
-                    beforeReserve,
-                    "fractional reserve vault does not have reserve amount of underlying asset"
-                );
+
+                // precondition: the vault's balance of the asset has to have changed, or else can have a set reserve with no assets on invest/divest
+                if (_after.vaultAssetBalance[asset] != _before.vaultAssetBalance[asset]) {
+                    gte(
+                        afterBalance,
+                        beforeReserve,
+                        "fractional reserve vault does not have reserve amount of underlying asset"
+                    );
+                }
             }
         }
     }
