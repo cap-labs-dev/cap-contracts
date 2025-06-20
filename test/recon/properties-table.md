@@ -69,3 +69,4 @@
 | 67 | lender_realizeRestakerInterest | restakerinterest can only be realized if there are sufficient vault assets | |
 | 68 | property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset | fractional reserve vault must always have reserve amount of underyling asset | |
 | 69 | property_borrower_cannot_borrow_more_than_ltv | borrower can't borrow more than LTV | |
+| 69 | property_health_should_not_change_when_realizeRestakerInterest_is_called | health should not change when realizeRestakerInterest is called | |
