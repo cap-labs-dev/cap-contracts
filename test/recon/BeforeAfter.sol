@@ -15,7 +15,8 @@ enum OpType {
     DIVEST,
     BORROW,
     REALIZE_INTEREST,
-    BURN
+    BURN,
+    LIQUIDATE
 }
 
 // ghost variables for tracking state variable values before and after function calls
@@ -31,6 +32,7 @@ abstract contract BeforeAfter is Setup {
         mapping(address => uint256) utilizationIndex;
         mapping(address => uint256) utilizationRatio;
         mapping(address => uint256) totalBorrows;
+        mapping(address => uint256) agentBonus;
         mapping(address asset => uint256 reserve) fractionalReserveReserve;
         mapping(address asset => uint256 balance) vaultAssetBalance;
         mapping(address => mapping(address => uint256)) debtTokenBalance;
@@ -57,6 +59,7 @@ abstract contract BeforeAfter is Setup {
     function __snapshot(Vars storage vars) internal {
         _updateVaultDebt(vars);
         _updateVaultBalances(vars);
+        _updateAgentBonus(vars);
 
         vars.utilizationIndex[_getAsset()] = capToken.currentUtilizationIndex(_getAsset());
         vars.utilizationRatio[_getAsset()] = capToken.utilization(_getAsset());
@@ -93,6 +96,15 @@ abstract contract BeforeAfter is Setup {
             for (uint256 i = 0; i < assets.length; i++) {
                 vars.vaultAssetBalance[assets[i]] = MockERC20(assets[i]).balanceOf(address(capToken));
             }
+        }
+    }
+
+    function _updateAgentBonus(Vars storage vars) internal {
+        try lender.bonus(_getActor()) returns (uint256 bonus) {
+            vars.agentBonus[_getActor()] = bonus;
+        } catch {
+            // If the call fails, we can assume the bonus is 0
+            vars.agentBonus[_getActor()] = 0;
         }
     }
 

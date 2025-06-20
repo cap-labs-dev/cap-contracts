@@ -383,6 +383,13 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: liquidation does not increase bonus
+    function property_liquidation_does_not_increase_bonus() public {
+        if (currentOperation == OpType.LIQUIDATE) {
+            gte(_before.agentBonus[_getActor()], _after.agentBonus[_getActor()], "liquidation increases bonus");
+        }
+    }
+
     /// === Optimization Properties === ///
 
     /// @dev test for optimizing the difference when debt token supply > total vault debt
