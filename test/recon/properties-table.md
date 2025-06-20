@@ -42,29 +42,30 @@
 | 40 | capToken_redeem | Fees are always <= the amount out | |
 | 41 | capToken_redeem | User can always redeem cap token if they have sufficient balance of cap token | |
 | 42 | doomsday_liquidate | Liquidate should always succeed for liquidatable agent | |
-| 43 | doomsday_repay | Repay should always succeed for agent that has debt | |
-| 44 | lender_borrow | Asset cannot be borrowed when it is paused | |
-| 45 | lender_borrow | Borrower should be healthy after borrowing (self-liquidation) | |
-| 46 | lender_borrow | Borrower asset balance should increase after borrowing | |
-| 47 | lender_borrow | Borrower debt should increase after borrowing | |
-| 48 | lender_borrow | Total borrows should increase after borrowing | |
-| 49 | lender_initiateLiquidation | agent should not be liquidatable with health > 1e27 | |
-| 50 | lender_initiateLiquidation | Agent should always be liquidatable if it is unhealthy | |
-| 51 | lender_liquidate | liquidation should be profitable for the liquidator | |
-| 52 | lender_liquidate | agent should not be liquidatable with health > 1e27 | |
-| 53 | lender_liquidate | Liquidations should always improve the health factor | |
-| 54 | lender_liquidate | Emergency liquidations should always be available when emergency health is below 1e27 | |
-| 55 | lender_liquidate | Partial liquidations should not bring health above 1.25 | |
-| 56 | lender_liquidate | Agent should have their totalDelegation reduced by the liquidated value | |
-| 57 | lender_liquidate | Agent should have their totalSlashableCollateral reduced by the liquidated value | |
-| 58 | lender_realizeInterest | agent's total debt should not change when interest is realized | |
-| 59 | lender_realizeInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized | |
-| 60 | lender_realizeInterest | vault debt and total borrows should increase by the same amount after a call to `realizeInterest` | |
-| 61 | lender_realizeInterest | health should not change when `realizeInterest` is called | |
-| 62 | lender_realizeInterest | interest can only be realized if there are sufficient vault assets | |
-| 63 | lender_realizeInterest | realizeInterest should only revert with `ZeroRealization()` if paused or `totalUnrealizedInterest == 0`, otherwise should always update the realization value | |
-| 64 | lender_realizeRestakerInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized | |
-| 65 | lender_realizeRestakerInterest | vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest` | |
-| 66 | lender_realizeRestakerInterest | health should not change when `realizeRestakerInterest` is called | |
-| 67 | lender_realizeRestakerInterest | restakerinterest can only be realized if there are sufficient vault assets | |
-| 68 | property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset | fractional reserve vault must always have reserve amount of underyling asset | |
+| 43 | doomsday_liquidate | Liquidating a healthy agent should not generate bad debt | |
+| 44 | doomsday_repay | Repay should always succeed for agent that has debt | |
+| 45 | lender_borrow | Asset cannot be borrowed when it is paused | |
+| 46 | lender_borrow | Borrower should be healthy after borrowing (self-liquidation) | |
+| 47 | lender_borrow | Borrower asset balance should increase after borrowing | |
+| 48 | lender_borrow | Borrower debt should increase after borrowing | |
+| 49 | lender_borrow | Total borrows should increase after borrowing | |
+| 50 | lender_initiateLiquidation | agent should not be liquidatable with health > 1e27 | |
+| 51 | lender_initiateLiquidation | Agent should always be liquidatable if it is unhealthy | |
+| 52 | lender_liquidate | liquidation should be profitable for the liquidator | |
+| 53 | lender_liquidate | agent should not be liquidatable with health > 1e27 | |
+| 54 | lender_liquidate | Liquidations should always improve the health factor | |
+| 55 | lender_liquidate | Emergency liquidations should always be available when emergency health is below 1e27 | |
+| 56 | lender_liquidate | Partial liquidations should not bring health above 1.25 | |
+| 57 | lender_liquidate | Agent should have their totalDelegation reduced by the liquidated value | |
+| 58 | lender_liquidate | Agent should have their totalSlashableCollateral reduced by the liquidated value | |
+| 59 | lender_realizeInterest | agent's total debt should not change when interest is realized | |
+| 60 | lender_realizeInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized | |
+| 61 | lender_realizeInterest | vault debt and total borrows should increase by the same amount after a call to `realizeInterest` | |
+| 62 | lender_realizeInterest | health should not change when `realizeInterest` is called | |
+| 63 | lender_realizeInterest | interest can only be realized if there are sufficient vault assets | |
+| 64 | lender_realizeInterest | realizeInterest should only revert with `ZeroRealization()` if paused or `totalUnrealizedInterest == 0`, otherwise should always update the realization value | |
+| 65 | lender_realizeRestakerInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized | |
+| 66 | lender_realizeRestakerInterest | vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest` | |
+| 67 | lender_realizeRestakerInterest | health should not change when `realizeRestakerInterest` is called | |
+| 68 | lender_realizeRestakerInterest | restakerinterest can only be realized if there are sufficient vault assets | |
+| 69 | property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset | fractional reserve vault must always have reserve amount of underyling asset | |

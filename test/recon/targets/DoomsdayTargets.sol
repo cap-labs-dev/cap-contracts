@@ -23,16 +23,21 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
 
     /// @dev Property: liquidate should always succeed for liquidatable agent
     /// @dev Property: Emergency liquidations should always be available when emergency health is below 1e27
+    /// @dev Property: liquidating a healthy agent should not generate bad debt
     function doomsday_liquidate(uint256 _amount) public stateless {
         if (_amount == 0) {
             return;
         }
 
-        (uint256 totalDelegation,, uint256 totalDebt,,,) = lender.agent(_getActor());
+        (uint256 totalDelegation,, uint256 totalDebt,,, uint256 healthBefore) = _getAgentParams(_getActor());
 
         // Note: this function will always be called by address(this) (Liquidator will be address(this))
         try lender.liquidate(_getActor(), _getAsset(), _amount) {
-            // success
+            (,,,,, uint256 healthAfter) = _getAgentParams(_getActor());
+
+            if (healthBefore > RAY) {
+                gt(healthAfter, RAY, "liquidating a healthy agent should not generate bad debt");
+            }
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "HealthFactorNotBelowThreshold()")
                 || checkError(reason, "GracePeriodNotOver()") || checkError(reason, "LiquidationExpired()");
