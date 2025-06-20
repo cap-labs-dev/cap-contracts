@@ -131,8 +131,8 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             );
             if (!capToken.whitelisted(_getActor())) {
                 lte(
-                    capTokenBalanceAfter,
-                    capTokenBalanceBefore - expectedAmountOut,
+                    assetBalanceAfter,
+                    assetBalanceBefore + expectedAmountOut,
                     "user received more than expected amount out"
                 );
             }

@@ -18,8 +18,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         setup();
     }
 
-    /// === Newest Issues === ///
-
     // forge test --match-test test_lender_liquidate_0 -vvv
     // NOTE: Liquidation did not improve health factor, related to oracle price, looks Low
     function test_lender_liquidate_0() public {
@@ -38,6 +36,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
     // forge test --match-test test_property_debt_token_balance_gte_total_vault_debt_1 -vvv
     // NOTE: DebtToken balance < total vault debt, this looks valid
+    // NOTE: something is weird about the borrowing amount being type(uint256).max
     function test_property_debt_token_balance_gte_total_vault_debt_1() public {
         capToken_mint_clamped(10000718111);
 
@@ -49,21 +48,10 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         switchActor(1);
 
+        // borrowing type(uint256).max here
         lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
+        console2.log("uint256.max)", type(uint256).max);
         property_debt_token_balance_gte_total_vault_debt();
-    }
-
-    // forge test --match-test test_capToken_burn_clamped_4 -vvv
-    // NOTE: user received more than expected amount out, this looks valid
-    function test_capToken_burn_clamped_4() public {
-        capToken_mint_clamped(10000718111);
-
-        switchChainlinkOracle(2);
-
-        mockChainlinkPriceFeed_setLatestAnswer(56196342554784885);
-
-        capToken_burn_clamped(14217);
     }
 
     // forge test --match-test test_capToken_mint_clamped_6 -vvv
@@ -77,58 +65,64 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     }
 
     // forge test --match-test test_lender_realizeRestakerInterest_8 -vvv
-    // NOTE: Make sure this property should hold: agent total debt should not change after realizeRestakerInterest
+    // NOTE: agent health changes if the restaker rate is decreased
+    // TODO: optimization test for this
     function test_lender_realizeRestakerInterest_8() public {
         switch_asset(0);
+
+        // set initial rate to 0.5%
+        oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 0.05e27);
 
         capToken_mint_clamped(100711969);
 
         lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
 
+        (,, uint256 totalDebtBefore,,, uint256 healthBefore) = _getAgentParams(_getActor());
+
+        console2.log("rate before %e", oracle.restakerRate(_getActor()));
         oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 33056249739822063734181);
+        console2.log("rate after %e", oracle.restakerRate(_getActor()));
 
         vm.warp(block.timestamp + 56837);
 
         lender_realizeRestakerInterest();
+
+        (,, uint256 totalDebtAfter,,, uint256 healthAfter) = _getAgentParams(_getActor());
+
+        // NOTE: remove the failing assertion in lender_realizeRestakerInterest to log these
+        console2.log("totalDebtBefore %e", totalDebtBefore);
+        console2.log("totalDebtAfter %e", totalDebtAfter);
+        console2.log("healthBefore %e", healthBefore);
+        console2.log("healthAfter %e", healthAfter);
     }
 
-    // forge test --match-test test_capToken_burn_6 -vvv
-    function test_capToken_burn_6() public {
-        add_new_vault();
+    // forge test --match-test test_lender_borrow_clamped_6 -vvv
+    // NOTE: looks like truncation in LTV calculation causes the issue
+    // TODO: optimization test for this
+    function test_lender_borrow_clamped_6() public {
+        switch_asset(0);
 
-        capToken_setFractionalReserveVault();
+        delegation_modifyAgent_clamped(
+            129181229575799737715131132821888667075620458965846965435092154830549421623,
+            72839458564055505122023948938095823631408136626438696912038330677298861505
+        );
 
-        capToken_setWhitelist(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, true);
+        capToken_mint_clamped(126357672253);
 
-        capToken_mint_clamped(20002627083);
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
 
-        capToken_investAll();
+        vm.warp(block.timestamp + 17866);
 
-        mockERC4626Tester_decreaseYield(1);
+        vm.roll(block.number + 1);
 
-        capToken_setReserve(10003071403);
+        switchActor(1);
 
-        capToken_burn(10000037442, 0, 0);
+        vm.warp(block.timestamp + 1299632);
+
+        vm.roll(block.number + 1);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
     }
 
-    /// === Ignored Breaks === ///
-
-    // forge test --match-test test_property_maxWithdraw_less_than_loaned_and_reserve_3 -vvv
-    // NOTE: this breaks because the fractional reserve vault has a gain on it, which makes the maxWithdraw more than the loaned + reserve
-    // NOTE: commented out because it's expected but maintained for future reference
-    function test_property_maxWithdraw_less_than_loaned_and_reserve_3() public {
-        capToken_mint_clamped(10000179551);
-
-        add_new_vault();
-
-        asset_approve(0xe916cadb12C49389E487eB1e8194B1459b29B0eC, 1000921);
-
-        capToken_setFractionalReserveVault();
-
-        capToken_investAll();
-
-        mockERC4626Tester_increaseYield(1);
-
-        // property_maxWithdraw_less_than_loaned_and_reserve();
-    }
+    /// === Newest Issues === ///
 }

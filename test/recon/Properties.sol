@@ -267,7 +267,7 @@ abstract contract Properties is BeforeAfter, Asserts {
         gte(totalBackingValue, capTokenTotalSupply * capPrice / 1e8, "capToken not backed 1:1 by underlying assets");
     }
 
-    /// @dev Property: DebtToken balance ≥ total vault debt at all times
+    /// @dev Property: DebtToken total supply ≥ total vault debt at all times
     function property_debt_token_balance_gte_total_vault_debt() public {
         address[] memory assets = capToken.assets();
         address[] memory agents = delegation.agents();
@@ -287,14 +287,15 @@ abstract contract Properties is BeforeAfter, Asserts {
             uint256 totalAccruedRestakerInterest = 0;
             for (uint256 j = 0; j < agents.length; j++) {
                 totalVaultDebt += lender.debt(agents[j], asset);
-                totalAccruedRestakerInterest += lender.accruedRestakerInterest(agents[j], asset);
+                // totalAccruedRestakerInterest += lender.accruedRestakerInterest(agents[j], asset);
             }
 
-            gte(
-                totalDebtTokenSupply,
-                totalVaultDebt - totalAccruedRestakerInterest,
-                "DebtToken balance < total vault debt"
-            );
+            // gte(
+            //     totalDebtTokenSupply,
+            //     totalVaultDebt - totalAccruedRestakerInterest,
+            //     "DebtToken totalSupply < total vault debt"
+            // );
+            gte(totalDebtTokenSupply, totalVaultDebt, "DebtToken totalSupply < total vault debt");
         }
     }
 

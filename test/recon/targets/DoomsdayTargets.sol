@@ -39,9 +39,11 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
             bool zeroBurnError = checkError(reason, "InvalidBurnAmount()");
             bool isPaused = capToken.paused();
             bool stalePrice = checkError(reason, "PriceError(address)"); // Stale/invalid price (0 price)
+            (, address vault,,,,,) = lender.reservesData(_getAsset());
+            bool isReserve = vault != address(0); // token must be a reserve in the lender
 
             // precondition: must be liquidating more than 0 and not paused
-            if (!isPaused && !zeroBurnError && !stalePrice) {
+            if (!isPaused && !zeroBurnError && !stalePrice && isReserve) {
                 gte(
                     totalDelegation * lender.emergencyLiquidationThreshold() / totalDebt,
                     RAY,
@@ -49,7 +51,7 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
                 );
             }
 
-            if (!expectedError && !isPaused && !zeroBurnError && !stalePrice && totalDebt > 0) {
+            if (!expectedError && !isPaused && !zeroBurnError && !stalePrice && totalDebt > 0 && isReserve) {
                 t(false, "liquidate should always succeed for liquidatable agent");
             }
         }
@@ -66,6 +68,7 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
         ) {
             return;
         }
+
         vm.prank(_getActor());
         try lender.repay(_getAsset(), _amount, _getActor()) {
             // success
@@ -75,8 +78,10 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
             bool enoughAllowance = MockERC20(_getAsset()).allowance(_getActor(), address(lender)) >= _amount;
             bool enoughBalance = MockERC20(_getAsset()).balanceOf(_getActor()) >= _amount;
             bool paused = capToken.paused();
+            (, address vault,,,,,) = lender.reservesData(_getAsset());
+            bool isReserve = vault != address(0); // token must be a reserve in the lender
 
-            if (!expectedError && !paused && enoughAllowance && enoughBalance && _amount > 0) {
+            if (!expectedError && !paused && enoughAllowance && enoughBalance && _amount > 0 && isReserve) {
                 t(false, "repay should always succeed for agent that has debt");
             }
         }
