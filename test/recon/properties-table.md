@@ -69,3 +69,4 @@
 | 67 | lender_realizeRestakerInterest | health should not change when `realizeRestakerInterest` is called | |
 | 68 | lender_realizeRestakerInterest | restakerinterest can only be realized if there are sufficient vault assets | |
 | 69 | property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset | fractional reserve vault must always have reserve amount of underyling asset | |
+| 70 | property_liquidation_does_not_increase_bonus | liquidation does not increase bonus | |
