@@ -257,10 +257,11 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         } catch (bytes memory reason) {
             bool zeroRealizationError = checkError(reason, "ZeroRealization()");
 
-            (,,,,, bool paused,) = lender.reservesData(_getAsset());
             uint256 totalUnrealizedInterest = LenderWrapper(address(lender)).getTotalUnrealizedInterest(_getAsset());
+            bool assetPaused = capToken.paused(_getAsset());
+            bool protocolPaused = capToken.paused();
 
-            if (!paused && !zeroRealizationError && totalUnrealizedInterest != 0) {
+            if (!assetPaused && !protocolPaused && !zeroRealizationError && totalUnrealizedInterest != 0) {
                 t(false, "realizeInterest does not update when it should");
             }
         }
