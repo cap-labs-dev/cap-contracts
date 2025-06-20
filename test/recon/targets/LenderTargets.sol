@@ -70,7 +70,6 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Borrower asset balance should increase after borrowing
     /// @dev Property: Borrower debt should increase after borrowing
     /// @dev Property: Total borrows should increase after borrowing
-    /// @dev Property: Borrower can't borrow more than LTV
     /// @dev Property: Borrow should only revert with an expected error
     function lender_borrow(uint256 _amount, address _receiver)
         public
@@ -119,7 +118,14 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             (uint256 collateralValue,) =
                 mockNetworkMiddleware.coverageByVault(address(0), _getActor(), mockEth, address(0), 0);
 
-            lte(ltvAfter, delegation.ltv(_getActor()), "Borrower can't borrow more than LTV");
+            // set a new max for the optimization test
+            if (ltvAfter > delegation.ltv(_getActor())) {
+                int256 ltvDelta = int256(ltvAfter) - int256(delegation.ltv(_getActor()));
+
+                if (ltvDelta > maxLTVDelta) {
+                    maxLTVDelta = ltvDelta;
+                }
+            }
         } catch (bytes memory reason) {
             // bool expectedError = checkError(reason, "MinBorrowAmount()") || checkError(reason, "ZeroAddressNotValid()")
             //     || checkError(reason, "ReservePaused()") || checkError(reason, "CollateralCannotCoverNewBorrow()")

@@ -390,10 +390,20 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: Borrower can't borrow more than LTV
+    function property_borrower_cannot_borrow_more_than_ltv() public {
+        (,,, uint256 ltv,,) = lender.agent(_getActor());
+        lte(ltv, delegation.ltv(_getActor()), "borrower can't borrow more than LTV");
+    }
+
     /// === Optimization Properties === ///
 
     function optimize_burnable_amount_no_fee() public returns (int256) {
         return maxAmountOut;
+    }
+
+    function optimize_max_ltv_delta() public returns (int256) {
+        return maxLTVDelta;
     }
 
     /// === Helpers === ///
