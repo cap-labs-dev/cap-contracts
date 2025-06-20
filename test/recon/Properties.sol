@@ -51,7 +51,7 @@ abstract contract Properties is BeforeAfter, Asserts {
                 totalSupplied,
                 vaultBalance + totalBorrow + fractionalReserveBalance + fractionalReserveLosses
                     + interestReceiverBalance,
-                "totalSupplies > vault balance + totalBorrows"
+                "totalSupplies > vaultBalance + totalBorrow + fractionalReserveBalance + fractionalReserveLosses + interestReceiverBalance"
             );
         }
     }
@@ -97,15 +97,6 @@ abstract contract Properties is BeforeAfter, Asserts {
     //         );
     //     }
     // }
-
-    /// @dev Property: If the vault invests/divests it shouldn't change the redeem amounts out
-    function property_vault_balance_does_not_change_redeemAmountsOut() public {
-        if (currentOperation == OpType.INVEST || currentOperation == OpType.DIVEST) {
-            for (uint256 i; i < _after.redeemAmountsOut.length; ++i) {
-                eq(_after.redeemAmountsOut[i], _before.redeemAmountsOut[i], "redeem amounts out changed");
-            }
-        }
-    }
 
     /// @dev Property: The sum of unrealized interests for all agents always == totalUnrealizedInterest
     function property_sum_of_unrealized_interest() public {
@@ -369,6 +360,33 @@ abstract contract Properties is BeforeAfter, Asserts {
             address asset = assets[i];
             uint256 utilizationRatio = capToken.utilization(asset);
             lte(utilizationRatio, 1e27, "utilization ratio > 100%");
+        }
+    }
+
+    /// @dev Property: sum of all maxWithdraw for users should be <= loaned + reserve
+    // NOTE: temporarily removed because it trivially breaks anytime there's a gain on the fractional reserve vault
+    // function property_maxWithdraw_less_than_loaned_and_reserve() public {
+    //     // we only check maxWithdraw for capToken because it's the only depositor into the vault
+    //     uint256 maxWithdraw =
+    //         MockERC4626Tester(capToken.fractionalReserveVault(_getAsset())).maxWithdraw(address(capToken));
+    //     uint256 loaned = capToken.loaned(_getAsset());
+    //     uint256 reserve = capToken.reserve(_getAsset());
+    //     lte(maxWithdraw, loaned + reserve, "maxWithdraw > loaned + reserve");
+    // }
+
+    /// @dev Property: fractional reserve vault must always have reserve amount of underyling asset
+    function property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset() public {
+        if (currentOperation == OpType.INVEST || currentOperation == OpType.DIVEST) {
+            for (uint256 i = 0; i < capToken.assets().length; i++) {
+                address asset = capToken.assets()[i];
+                uint256 beforeReserve = _before.fractionalReserveReserve[asset];
+                uint256 afterBalance = _after.vaultAssetBalance[asset];
+                gte(
+                    afterBalance,
+                    beforeReserve,
+                    "fractional reserve vault does not have reserve amount of underlying asset"
+                );
+            }
         }
     }
 

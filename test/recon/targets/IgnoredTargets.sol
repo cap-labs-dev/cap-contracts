@@ -27,3 +27,19 @@
 // function oracle_setUtilizationOracleData(address _asset, IOracle.OracleData memory _oracleData) public asActor {
 //     oracle.setUtilizationOracleData(_asset, _oracleData);
 // }
+
+// function mockERC4626Tester_deposit(uint256 assets, address receiver) public asActor {
+//     MockERC4626Tester(_getVault()).deposit(assets, receiver);
+// }
+
+// function mockERC4626Tester_mint(uint256 shares, address receiver) public asActor {
+//     MockERC4626Tester(_getVault()).mint(shares, receiver);
+// }
+
+// function mockERC4626Tester_redeem(uint256 shares, address receiver, address owner) public asActor {
+//     MockERC4626Tester(_getVault()).redeem(shares, receiver, owner);
+// }
+
+// function mockERC4626Tester_withdraw(uint256 assets, address receiver, address owner) public asActor {
+//     MockERC4626Tester(_getVault()).withdraw(assets, receiver, owner);
+// }

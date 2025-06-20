@@ -19,7 +19,7 @@
 | 17 | property_total_borrowed_less_than_total_supply | Total cUSD borrowed < total supply (utilization < 1e27) | |
 | 18 | property_staked_cap_value_non_decreasing | Staked cap token value must increase or stay the same over time | |
 | 19 | property_utilization_ratio_never_greater_than_1e27 | Utilization ratio is never greater than 1e27 | |
-| 20 | capToken_burn | User can always burn cap token if they have sufficient balance of cap token | |
+| 20 | property_maxWithdraw_less_than_loaned_and_reserve | sum of all `maxWithdraw` for users should be <= loaned + reserve | |
 | 21 | capToken_burn | User always receives at least the minimum amount out | |
 | 22 | capToken_burn | User always receives at most the expected amount out | |
 | 23 | capToken_burn | Total cap supply decreases by no more than the amount out | |
@@ -27,42 +27,44 @@
 | 25 | capToken_burn | Fees are always <= the amount out | |
 | 26 | capToken_burn | Burning reduces cUSD supply, must always round down | |
 | 27 | capToken_burn | Burners must not receive more asset value than cUSD burned | |
-| 28 | capToken_divestAll | ERC4626 must always be divestable | |
-| 29 | capToken_mint | User can always mint cap token if they have sufficient balance of depositing asset | |
+| 28 | capToken_burn | User can always burn cap token if they have sufficient balance of cap token | |
+| 29 | capToken_divestAll | ERC4626 must always be divestable | |
 | 30 | capToken_mint | User always receives at least the minimum amount out | |
 | 31 | capToken_mint | User always receives at most the expected amount out | |
 | 32 | capToken_mint | Fees are always nonzero when minting | |
-| 33 | capToken_mint | Asset cannot be minted when it is paused | |
-| 34 | capToken_mint | Fees are always <= the amount out | |
-| 35 | capToken_mint | Minting increases vault assets based on oracle value | |
-| 36 | capToken_redeem | User can always redeem cap token if they have sufficient balance of cap token | |
+| 33 | capToken_mint | Fees are always <= the amount out | |
+| 34 | capToken_mint | Minting increases vault assets based on oracle value | |
+| 35 | capToken_mint | User can always mint cap token if they have sufficient balance of depositing asset | |
+| 36 | capToken_mint | Asset cannot be minted when it is paused | |
 | 37 | capToken_redeem | User always receives at least the minimum amount out | |
 | 38 | capToken_redeem | User always receives at most the expected amount out | |
 | 39 | capToken_redeem | Total cap supply decreases by no more than the amount out | |
 | 40 | capToken_redeem | Fees are always <= the amount out | |
-| 41 | doomsday_liquidate | Liquidate should always succeed for liquidatable agent | |
-| 42 | doomsday_repay | Repay should always succeed for agent that has debt | |
-| 43 | lender_borrow | Asset cannot be borrowed when it is paused | |
-| 44 | lender_borrow | Borrower should be healthy after borrowing (self-liquidation) | |
-| 45 | lender_borrow | Borrower asset balance should increase after borrowing | |
-| 46 | lender_borrow | Borrower debt should increase after borrowing | |
-| 47 | lender_borrow | Total borrows should increase after borrowing | |
-| 48 | lender_initiateLiquidation | agent should not be liquidatable with health > 1e27 | |
-| 49 | lender_initiateLiquidation | Agent should always be liquidatable if it is unhealthy | |
-| 50 | lender_liquidate | liquidation should be profitable for the liquidator | |
-| 51 | lender_liquidate | agent should not be liquidatable with health > 1e27 | |
-| 52 | lender_liquidate | Liquidations should always improve the health factor | |
-| 53 | lender_liquidate | Emergency liquidations should always be available when emergency health is below 1e27 | |
-| 54 | lender_liquidate | Partial liquidations should not bring health above 1.25 | |
-| 55 | lender_liquidate | Agent should have their totalDelegation reduced by the liquidated value | |
-| 56 | lender_liquidate | Agent should have their totalSlashableCollateral reduced by the liquidated value | |
-| 57 | lender_realizeInterest | agent's total debt should not change when interest is realized | |
-| 58 | lender_realizeInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized | |
-| 59 | lender_realizeInterest | vault debt and total borrows should increase by the same amount after a call to `realizeInterest` | |
-| 60 | lender_realizeInterest | health should not change when `realizeInterest` is called | |
-| 61 | lender_realizeInterest | interest can only be realized if there are sufficient vault assets | |
-| 62 | lender_realizeInterest | realizeInterest should only revert with `ZeroRealization()` if paused or `totalUnrealizedInterest == 0`, otherwise should always update the realization value | |
-| 63 | lender_realizeRestakerInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized | |
-| 64 | lender_realizeRestakerInterest | vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest` | |
-| 65 | lender_realizeRestakerInterest | health should not change when `realizeRestakerInterest` is called | |
-| 66 | lender_realizeRestakerInterest | restakerinterest can only be realized if there are sufficient vault assets | |
+| 41 | capToken_redeem | User can always redeem cap token if they have sufficient balance of cap token | |
+| 42 | doomsday_liquidate | Liquidate should always succeed for liquidatable agent | |
+| 43 | doomsday_repay | Repay should always succeed for agent that has debt | |
+| 44 | lender_borrow | Asset cannot be borrowed when it is paused | |
+| 45 | lender_borrow | Borrower should be healthy after borrowing (self-liquidation) | |
+| 46 | lender_borrow | Borrower asset balance should increase after borrowing | |
+| 47 | lender_borrow | Borrower debt should increase after borrowing | |
+| 48 | lender_borrow | Total borrows should increase after borrowing | |
+| 49 | lender_initiateLiquidation | agent should not be liquidatable with health > 1e27 | |
+| 50 | lender_initiateLiquidation | Agent should always be liquidatable if it is unhealthy | |
+| 51 | lender_liquidate | liquidation should be profitable for the liquidator | |
+| 52 | lender_liquidate | agent should not be liquidatable with health > 1e27 | |
+| 53 | lender_liquidate | Liquidations should always improve the health factor | |
+| 54 | lender_liquidate | Emergency liquidations should always be available when emergency health is below 1e27 | |
+| 55 | lender_liquidate | Partial liquidations should not bring health above 1.25 | |
+| 56 | lender_liquidate | Agent should have their totalDelegation reduced by the liquidated value | |
+| 57 | lender_liquidate | Agent should have their totalSlashableCollateral reduced by the liquidated value | |
+| 58 | lender_realizeInterest | agent's total debt should not change when interest is realized | |
+| 59 | lender_realizeInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized | |
+| 60 | lender_realizeInterest | vault debt and total borrows should increase by the same amount after a call to `realizeInterest` | |
+| 61 | lender_realizeInterest | health should not change when `realizeInterest` is called | |
+| 62 | lender_realizeInterest | interest can only be realized if there are sufficient vault assets | |
+| 63 | lender_realizeInterest | realizeInterest should only revert with `ZeroRealization()` if paused or `totalUnrealizedInterest == 0`, otherwise should always update the realization value | |
+| 64 | lender_realizeRestakerInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized | |
+| 65 | lender_realizeRestakerInterest | vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest` | |
+| 66 | lender_realizeRestakerInterest | health should not change when `realizeRestakerInterest` is called | |
+| 67 | lender_realizeRestakerInterest | restakerinterest can only be realized if there are sufficient vault assets | |
+| 68 | property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset | fractional reserve vault must always have reserve amount of underyling asset | |
