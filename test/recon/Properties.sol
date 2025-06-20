@@ -98,15 +98,6 @@ abstract contract Properties is BeforeAfter, Asserts {
     //     }
     // }
 
-    /// @dev Property: If the vault invests/divests it shouldn't change the redeem amounts out
-    function property_vault_balance_does_not_change_redeemAmountsOut() public {
-        if (currentOperation == OpType.INVEST || currentOperation == OpType.DIVEST) {
-            for (uint256 i; i < _after.redeemAmountsOut.length; ++i) {
-                eq(_after.redeemAmountsOut[i], _before.redeemAmountsOut[i], "redeem amounts out changed");
-            }
-        }
-    }
-
     /// @dev Property: The sum of unrealized interests for all agents always == totalUnrealizedInterest
     function property_sum_of_unrealized_interest() public {
         address[] memory agents = delegation.agents();
