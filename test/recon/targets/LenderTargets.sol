@@ -155,8 +155,9 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             }
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "AlreadyInitiated()");
+            bool protocolPaused = capToken.paused();
 
-            if (!expectedError) {
+            if (!expectedError && !protocolPaused) {
                 gte(healthBefore, RAY, "Agent should always be liquidatable if it is unhealthy");
             }
         }
