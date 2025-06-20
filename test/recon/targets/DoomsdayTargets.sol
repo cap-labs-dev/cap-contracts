@@ -43,12 +43,13 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
                 || checkError(reason, "GracePeriodNotOver()") || checkError(reason, "LiquidationExpired()")
                 || checkError(reason, "LossFromFractionalReserve(address,address,uint256)")
                 || checkError(reason, "InvalidBurnAmount()") || checkError(reason, "PriceError(address)");
-            bool isPaused = capToken.paused();
+            bool protocolPaused = capToken.paused();
+            bool assetPaused = capToken.paused(_getAsset());
             (, address vault,,,,,) = lender.reservesData(_getAsset());
             bool isReserve = vault != address(0); // token must be a reserve in the lending vault
 
             // precondition: must not error for one of the expected reasons
-            if (!expectedError && !isPaused && totalDebt > 0 && isReserve) {
+            if (!expectedError && !protocolPaused && !assetPaused && totalDebt > 0 && isReserve) {
                 uint256 emergencyLiquidationHealth =
                     totalDelegation * lender.emergencyLiquidationThreshold() / totalDebt;
                 gt(
@@ -81,11 +82,15 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
                 || checkError(reason, "LossFromFractionalReserve(address,address,uint256)"); // fractional reserve loss
             bool enoughAllowance = MockERC20(_getAsset()).allowance(_getActor(), address(lender)) >= _amount;
             bool enoughBalance = MockERC20(_getAsset()).balanceOf(_getActor()) >= _amount;
-            bool paused = capToken.paused();
+            bool protocolPaused = capToken.paused();
+            bool assetPaused = capToken.paused(_getAsset());
             (, address vault,,,,,) = lender.reservesData(_getAsset());
             bool isReserve = vault != address(0); // token must be a reserve in the lender
 
-            if (!expectedError && !paused && enoughAllowance && enoughBalance && _amount > 0 && isReserve) {
+            if (
+                !expectedError && !protocolPaused && !assetPaused && enoughAllowance && enoughBalance && _amount > 0
+                    && isReserve
+            ) {
                 t(false, "repay should always succeed for agent that has debt");
             }
         }

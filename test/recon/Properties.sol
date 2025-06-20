@@ -374,12 +374,41 @@ abstract contract Properties is BeforeAfter, Asserts {
                 address asset = capToken.assets()[i];
                 uint256 beforeReserve = _before.fractionalReserveReserve[asset];
                 uint256 afterBalance = _after.vaultAssetBalance[asset];
-                gte(
-                    afterBalance,
-                    beforeReserve,
-                    "fractional reserve vault does not have reserve amount of underlying asset"
-                );
+
+                // precondition: the vault's balance of the asset has to have changed, or else can have a set reserve with no assets on invest/divest
+                if (_after.vaultAssetBalance[asset] != _before.vaultAssetBalance[asset]) {
+                    gte(
+                        afterBalance,
+                        beforeReserve,
+                        "fractional reserve vault does not have reserve amount of underlying asset"
+                    );
+                }
             }
+        }
+    }
+
+    /// @dev Property: Borrower can't borrow more than LTV
+    function property_borrower_cannot_borrow_more_than_ltv() public {
+        (,,, uint256 ltv,,) = lender.agent(_getActor());
+        lte(ltv, delegation.ltv(_getActor()), "borrower can't borrow more than LTV");
+    }
+
+    /// @dev Property: health should not change when realizeRestakerInterest is called
+    function property_health_should_not_change_when_realizeRestakerInterest_is_called() public {
+        if (currentOperation == OpType.REALIZE_INTEREST) {
+            eq(
+                _before.agentHealth[_getActor()],
+                _after.agentHealth[_getActor()],
+                "health should not change when realizeRestakerInterest is called"
+            );
+        }
+    }
+
+    /// @dev Property: no operation should make a user liquidatable
+    function property_no_operation_makes_user_liquidatable() public {
+        // before/after are only set for user operations so changes to price are automatically excluded since these are the only thing that should make a user liquidatable
+        if (_before.agentHealth[_getActor()] > RAY) {
+            gt(_after.agentHealth[_getActor()], RAY, "user is liquidatable");
         }
     }
 
@@ -510,6 +539,18 @@ abstract contract Properties is BeforeAfter, Asserts {
 
     function optimize_burnable_amount_no_fee() public returns (int256) {
         return maxAmountOut;
+    }
+
+    function optimize_max_ltv_delta() public returns (int256) {
+        return maxLTVDelta;
+    }
+
+    function optimize_max_health_increase() public returns (int256) {
+        return maxIncreaseHealthDelta;
+    }
+
+    function optimize_max_health_decrease() public returns (int256) {
+        return maxDecreaseHealthDelta;
     }
 
     /// === Helpers === ///

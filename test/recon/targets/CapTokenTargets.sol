@@ -154,8 +154,9 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 || checkError(reason, "AssetNotSupported(address)")
                 || checkError(reason, "InsufficientReserves(address,uint256,uint256)")
                 || checkError(reason, "LossFromFractionalReserve(address,address,uint256)");
-            bool isPaused = capToken.paused();
-            if (!expectedError && _amountIn > 0 && !isPaused) {
+            bool protocolPaused = capToken.paused();
+            bool assetPaused = capToken.paused(_getAsset());
+            if (!expectedError && _amountIn > 0 && !protocolPaused && !assetPaused) {
                 lt(capTokenBalanceBefore, _amountIn, "user cannot burn with sufficient cap token balance");
             }
         }
@@ -232,9 +233,12 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             bool expectedError = checkError(reason, "PastDeadline()")
                 || checkError(reason, "Slippage(address,uint256,uint256)") || checkError(reason, "InvalidAmount()")
                 || checkError(reason, "AssetNotSupported(address)") || checkError(reason, "ERC20InvalidReceiver(address)");
-            bool isProtocolPaused = capToken.paused();
             bool enoughAllowance = MockERC20(_getAsset()).allowance(_getActor(), address(capToken)) >= _amountIn;
-            if (!expectedError && _amountIn > 0 && enoughAllowance && !isProtocolPaused && !isAssetPaused) {
+
+            if (
+                !expectedError && _amountIn > 0 && enoughAllowance && !capToken.paused()
+                    && !capToken.paused(_getAsset())
+            ) {
                 lt(assetBalance, _amountIn, "user cannot mint with sufficient asset balance");
             }
         }
@@ -311,11 +315,13 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 || checkError(reason, "InsufficientReserves(address,uint256,uint256)")
                 || checkError(reason, "ERC20InvalidReceiver(address)")
                 || checkError(reason, "LossFromFractionalReserve(address,address,uint256)");
-            bool isProtocolPaused = capToken.paused();
             bool hasEnoughBalance = capTokenBalanceBefore >= _amountIn;
             bool hasEnoughAllowance = capToken.allowance(_getActor(), address(capToken)) >= _amountIn;
 
-            if (!expectedError && _amountIn > 0 && hasEnoughBalance && hasEnoughAllowance && !isProtocolPaused) {
+            if (
+                !expectedError && _amountIn > 0 && hasEnoughBalance && hasEnoughAllowance && !capToken.paused()
+                    && !capToken.paused(_getAsset())
+            ) {
                 lt(capTokenBalanceBefore, _amountIn, "user cannot redeem with sufficient cap token balance");
             }
         }

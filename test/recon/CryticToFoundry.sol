@@ -89,11 +89,11 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         (,, uint256 totalDebtAfter,,, uint256 healthAfter) = _getAgentParams(_getActor());
 
-        // NOTE: remove the failing assertion in lender_realizeRestakerInterest to log these
         console2.log("totalDebtBefore %e", totalDebtBefore);
         console2.log("totalDebtAfter %e", totalDebtAfter);
         console2.log("healthBefore %e", healthBefore);
         console2.log("healthAfter %e", healthAfter);
+        property_health_should_not_change_when_realizeRestakerInterest_is_called();
     }
 
     // forge test --match-test test_lender_borrow_clamped_6 -vvv

@@ -85,6 +85,9 @@ abstract contract Setup is
 
     address mockEth;
     int256 maxAmountOut;
+    int256 maxLTVDelta;
+    int256 maxIncreaseHealthDelta;
+    int256 maxDecreaseHealthDelta;
 
     uint256 constant RAY = 1e27;
 

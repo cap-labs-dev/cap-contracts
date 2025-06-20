@@ -70,7 +70,6 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Borrower asset balance should increase after borrowing
     /// @dev Property: Borrower debt should increase after borrowing
     /// @dev Property: Total borrows should increase after borrowing
-    /// @dev Property: Borrower can't borrow more than LTV
     /// @dev Property: Borrow should only revert with an expected error
     function lender_borrow(uint256 _amount, address _receiver)
         public
@@ -119,7 +118,14 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             (uint256 collateralValue,) =
                 mockNetworkMiddleware.coverageByVault(address(0), _getActor(), mockEth, address(0), 0);
 
-            lte(ltvAfter, delegation.ltv(_getActor()), "Borrower can't borrow more than LTV");
+            // set a new max for the optimization test
+            if (ltvAfter > delegation.ltv(_getActor())) {
+                int256 ltvDelta = int256(ltvAfter) - int256(delegation.ltv(_getActor()));
+
+                if (ltvDelta > maxLTVDelta) {
+                    maxLTVDelta = ltvDelta;
+                }
+            }
         } catch (bytes memory reason) {
             // bool expectedError = checkError(reason, "MinBorrowAmount()") || checkError(reason, "ZeroAddressNotValid()")
             //     || checkError(reason, "ReservePaused()") || checkError(reason, "CollateralCannotCoverNewBorrow()")
@@ -149,8 +155,9 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             }
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "AlreadyInitiated()");
+            bool protocolPaused = capToken.paused();
 
-            if (!expectedError) {
+            if (!expectedError && !protocolPaused) {
                 gte(healthBefore, RAY, "Agent should always be liquidatable if it is unhealthy");
             }
         }
@@ -220,7 +227,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: health should not change when realizeInterest is called
     /// @dev Property: interest can only be realized if there are sufficient vault assets
     /// @dev Property: realizeInterest should only revert with ZeroRealization if paused or totalUnrealizedInterest == 0, otherwise should always update the realization value
-    function lender_realizeInterest() public updateGhostsWithType(OpType.REALIZE_INTEREST) {
+    function lender_realizeInterest() public updateGhosts {
         (,,, address interestReceiver,,,) = lender.reservesData(_getAsset());
         (,, uint256 totalDebtBefore,,, uint256 healthBefore) = _getAgentParams(_getActor());
         uint256 vaultDebtBefore = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
@@ -251,10 +258,11 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         } catch (bytes memory reason) {
             bool zeroRealizationError = checkError(reason, "ZeroRealization()");
 
-            (,,,,, bool paused,) = lender.reservesData(_getAsset());
             uint256 totalUnrealizedInterest = LenderWrapper(address(lender)).getTotalUnrealizedInterest(_getAsset());
+            bool assetPaused = capToken.paused(_getAsset());
+            bool protocolPaused = capToken.paused();
 
-            if (!paused && !zeroRealizationError && totalUnrealizedInterest != 0) {
+            if (!assetPaused && !protocolPaused && !zeroRealizationError && totalUnrealizedInterest != 0) {
                 t(false, "realizeInterest does not update when it should");
             }
         }
@@ -262,7 +270,6 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
     /// @dev Property: vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized
     /// @dev Property: vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest`
-    /// @dev Property: health should not change when realizeRestakerInterest is called
     /// @dev Property: restakerinterest can only be realized if there are sufficient vault assets
     function lender_realizeRestakerInterest() public updateGhostsWithType(OpType.REALIZE_INTEREST) asActor {
         uint256 vaultDebtBefore = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
@@ -288,8 +295,21 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             totalBorrowsAfter - totalBorrowsBefore,
             "vault debt and total borrows should increase by the same amount after realizeRestakerInterest"
         );
-        eq(healthAfter, healthBefore, "health should not change after realizeRestakerInterest");
         gte(totalSuppliesBefore, realizedInterest, "interest realized without sufficient vault assets");
+
+        // for optimization test
+        int256 healthDelta;
+        if (healthAfter < healthBefore) {
+            healthDelta = int256(healthBefore) - int256(healthAfter);
+            if (healthDelta > maxDecreaseHealthDelta) {
+                maxDecreaseHealthDelta = healthDelta;
+            }
+        } else {
+            healthDelta = int256(healthAfter) - int256(healthBefore);
+            if (healthDelta > maxIncreaseHealthDelta) {
+                maxIncreaseHealthDelta = healthDelta;
+            }
+        }
     }
 
     function lender_removeAsset(address _asset) public updateGhosts asAdmin {
