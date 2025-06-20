@@ -233,11 +233,12 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             bool expectedError = checkError(reason, "PastDeadline()")
                 || checkError(reason, "Slippage(address,uint256,uint256)") || checkError(reason, "InvalidAmount()")
                 || checkError(reason, "AssetNotSupported(address)") || checkError(reason, "ERC20InvalidReceiver(address)");
-            bool protocolPaused = capToken.paused();
-            bool assetPaused = capToken.paused(_getAsset());
             bool enoughAllowance = MockERC20(_getAsset()).allowance(_getActor(), address(capToken)) >= _amountIn;
 
-            if (!expectedError && _amountIn > 0 && enoughAllowance && !protocolPaused && !assetPaused) {
+            if (
+                !expectedError && _amountIn > 0 && enoughAllowance && !capToken.paused()
+                    && !capToken.paused(_getAsset())
+            ) {
                 lt(assetBalance, _amountIn, "user cannot mint with sufficient asset balance");
             }
         }
@@ -314,14 +315,12 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 || checkError(reason, "InsufficientReserves(address,uint256,uint256)")
                 || checkError(reason, "ERC20InvalidReceiver(address)")
                 || checkError(reason, "LossFromFractionalReserve(address,address,uint256)");
-            bool protocolPaused = capToken.paused();
-            bool assetPaused = capToken.paused(_getAsset());
             bool hasEnoughBalance = capTokenBalanceBefore >= _amountIn;
             bool hasEnoughAllowance = capToken.allowance(_getActor(), address(capToken)) >= _amountIn;
 
             if (
-                !expectedError && _amountIn > 0 && hasEnoughBalance && hasEnoughAllowance && !protocolPaused
-                    && !assetPaused
+                !expectedError && _amountIn > 0 && hasEnoughBalance && hasEnoughAllowance && !capToken.paused()
+                    && !capToken.paused(_getAsset())
             ) {
                 lt(capTokenBalanceBefore, _amountIn, "user cannot redeem with sufficient cap token balance");
             }
