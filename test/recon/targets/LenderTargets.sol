@@ -226,7 +226,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: health should not change when realizeInterest is called
     /// @dev Property: interest can only be realized if there are sufficient vault assets
     /// @dev Property: realizeInterest should only revert with ZeroRealization if paused or totalUnrealizedInterest == 0, otherwise should always update the realization value
-    function lender_realizeInterest() public updateGhostsWithType(OpType.REALIZE_INTEREST) {
+    function lender_realizeInterest() public updateGhosts {
         (,,, address interestReceiver,,,) = lender.reservesData(_getAsset());
         (,, uint256 totalDebtBefore,,, uint256 healthBefore) = _getAgentParams(_getActor());
         uint256 vaultDebtBefore = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
@@ -268,7 +268,6 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
     /// @dev Property: vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized
     /// @dev Property: vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest`
-    /// @dev Property: health should not change when realizeRestakerInterest is called
     /// @dev Property: restakerinterest can only be realized if there are sufficient vault assets
     function lender_realizeRestakerInterest() public updateGhostsWithType(OpType.REALIZE_INTEREST) asActor {
         uint256 vaultDebtBefore = LenderWrapper(address(lender)).getVaultDebt(_getAsset());
@@ -294,8 +293,21 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             totalBorrowsAfter - totalBorrowsBefore,
             "vault debt and total borrows should increase by the same amount after realizeRestakerInterest"
         );
-        eq(healthAfter, healthBefore, "health should not change after realizeRestakerInterest");
         gte(totalSuppliesBefore, realizedInterest, "interest realized without sufficient vault assets");
+
+        // for optimization test
+        int256 healthDelta;
+        if (healthAfter < healthBefore) {
+            healthDelta = int256(healthBefore) - int256(healthAfter);
+            if (healthDelta > maxDecreaseHealthDelta) {
+                maxDecreaseHealthDelta = healthDelta;
+            }
+        } else {
+            healthDelta = int256(healthAfter) - int256(healthBefore);
+            if (healthDelta > maxIncreaseHealthDelta) {
+                maxIncreaseHealthDelta = healthDelta;
+            }
+        }
     }
 
     function lender_removeAsset(address _asset) public updateGhosts asAdmin {

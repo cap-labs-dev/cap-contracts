@@ -396,6 +396,17 @@ abstract contract Properties is BeforeAfter, Asserts {
         lte(ltv, delegation.ltv(_getActor()), "borrower can't borrow more than LTV");
     }
 
+    /// @dev Property: health should not change when realizeRestakerInterest is called
+    function property_health_should_not_change_when_realizeRestakerInterest_is_called() public {
+        if (currentOperation == OpType.REALIZE_INTEREST) {
+            eq(
+                _before.agentHealth[_getActor()],
+                _after.agentHealth[_getActor()],
+                "health should not change when realizeRestakerInterest is called"
+            );
+        }
+    }
+
     /// === Optimization Properties === ///
 
     function optimize_burnable_amount_no_fee() public returns (int256) {
@@ -404,6 +415,14 @@ abstract contract Properties is BeforeAfter, Asserts {
 
     function optimize_max_ltv_delta() public returns (int256) {
         return maxLTVDelta;
+    }
+
+    function optimize_max_health_increase() public returns (int256) {
+        return maxIncreaseHealthDelta;
+    }
+
+    function optimize_max_health_decrease() public returns (int256) {
+        return maxDecreaseHealthDelta;
     }
 
     /// === Helpers === ///
