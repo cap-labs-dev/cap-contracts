@@ -74,3 +74,4 @@
 | 70 | property_health_should_not_change_when_realizeRestakerInterest_is_called | health should not change when realizeRestakerInterest is called | |
 | 71 | property_no_operation_makes_user_liquidatable | no operation should make a user liquidatable | |
 | 72 | property_dust_on_repay | after all users have repaid their debt, their balance of `debtToken` should be 0 | |
+| 73 | property_agent_always_has_more_than_min_borrow | agent always has more than minBorrow balance of debtToken | |
