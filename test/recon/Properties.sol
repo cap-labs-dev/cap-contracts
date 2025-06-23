@@ -449,6 +449,16 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: agent always has more than minBorrow balance of debtToken
+    function property_agent_always_has_more_than_min_borrow() public {
+        (,, address debtToken,,,, uint256 minBorrow) = lender.reservesData(_getAsset());
+
+        for (uint256 i = 0; i < delegation.agents().length; i++) {
+            address agent = delegation.agents()[i];
+            gte(MockERC20(debtToken).balanceOf(agent), minBorrow, "agent has less than minBorrow balance of debtToken");
+        }
+    }
+
     /// === Optimization Properties === ///
 
     /// @dev test for optimizing the difference when debt token supply > total vault debt
