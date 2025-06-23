@@ -33,6 +33,7 @@ abstract contract BeforeAfter is Setup {
         mapping(address => uint256) utilizationRatio;
         mapping(address => uint256) totalBorrows;
         mapping(address => uint256) agentBonus;
+        mapping(address => uint256) fractionalReserveLoaned;
         mapping(address asset => uint256 reserve) fractionalReserveReserve;
         mapping(address asset => uint256 balance) vaultAssetBalance;
         mapping(address => mapping(address => uint256)) debtTokenBalance;
@@ -68,6 +69,7 @@ abstract contract BeforeAfter is Setup {
         vars.insuranceFundBalance = MockERC20(_getAsset()).balanceOf(capToken.insuranceFund());
         vars.capTokenTotalSupply = capToken.totalSupply();
         vars.fractionalReserveReserve[_getAsset()] = capToken.reserve(_getAsset());
+        vars.fractionalReserveLoaned[_getAsset()] = capToken.loaned(_getAsset());
 
         vars.stakedCapValuePerShare = _getStakedCapValuePerShare();
         vars.redeemAmountsOut = _getRedeemAmounts(_getActor());
