@@ -90,6 +90,9 @@ library VaultLogic {
     /// @dev Rescue unsupported ERC20 tokens
     event RescueERC20(address asset, address receiver);
 
+    /// @dev Set the insurance fund
+    event SetInsuranceFund(address insuranceFund);
+
     /// @dev Modifier to only allow supplies and borrows when not paused
     /// @param $ Vault storage pointer
     /// @param _asset Asset address
@@ -237,6 +240,14 @@ library VaultLogic {
     function unpause(IVault.VaultStorage storage $, address _asset) external {
         $.paused[_asset] = false;
         emit UnpauseAsset(_asset);
+    }
+
+    /// @notice Set the insurance fund
+    /// @param $ Vault storage pointer
+    /// @param _insuranceFund Insurance fund address
+    function setInsuranceFund(IVault.VaultStorage storage $, address _insuranceFund) external {
+        $.insuranceFund = _insuranceFund;
+        emit SetInsuranceFund(_insuranceFund);
     }
 
     /// @notice Rescue an unsupported asset

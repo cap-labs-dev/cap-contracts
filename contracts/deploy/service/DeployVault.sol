@@ -54,7 +54,7 @@ contract DeployVault is ProxyUtils {
             infra.accessControl,
             d.capToken, // payment token is the vault's cap token
             d.stakedCapToken, // payment recipient is the staked cap token
-            3 hours, // 3 hour auctions
+            24 hours, // 3 hour auctions
             1e18 // min price of 1 token
         );
 

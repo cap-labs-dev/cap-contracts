@@ -26,7 +26,7 @@ contract InfraConfigSerializer {
         implemsJson.serialize("stakedCap", implems.stakedCap);
         implemsJson.serialize("oracle", implems.oracle);
         implemsJson.serialize("debtToken", implems.debtToken);
-        implemsJson = implemsJson.serialize("feeAuction", implems.feeAuction);
+        implemsJson.serialize("feeAuction", implems.feeAuction);
         implemsJson = implemsJson.serialize("feeReceiver", implems.feeReceiver);
         console.log(implemsJson);
 

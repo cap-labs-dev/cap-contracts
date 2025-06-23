@@ -36,6 +36,7 @@ fs_permissions = [
     { access = "read-write", path = "./config/cap-infra.json" },
     { access = "read-write", path = "./config/cap-mainnet-infra.json" },
     { access = "read-write", path = "./config/cap-symbiotic.json" },
+    { access = "read-write", path = "./config/cap-vaults-1.json" },
     { access = "read-write", path = "./config/cap-vaults-11155111.json" },
     { access = "read-write", path = "./config/cap-vaults-17000.json" },
     { access = "read-write", path = "./config/cap-l2tokens-421614.json" },

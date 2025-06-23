@@ -117,6 +117,7 @@ contract VaultConfigSerializer is TokenSerializer {
             capToken: json.readAddress(string.concat(tokenPrefix, "['capToken'].address")),
             stakedCapToken: json.readAddress(string.concat(tokenPrefix, "['stakedCapToken'].address")),
             feeAuction: json.readAddress(string.concat(tokenPrefix, "feeAuction")),
+            feeReceiver: json.readAddress(string.concat(tokenPrefix, "feeReceiver")),
             lzperiphery: VaultLzPeriphery({
                 capOFTLockbox: json.readAddress(string.concat(tokenPrefix, "capOFTLockbox")),
                 stakedCapOFTLockbox: json.readAddress(string.concat(tokenPrefix, "stakedCapOFTLockbox")),

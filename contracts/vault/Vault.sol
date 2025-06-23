@@ -215,6 +215,12 @@ abstract contract Vault is
         _unpause();
     }
 
+    /// @notice Set the insurance fund
+    /// @param _insuranceFund Insurance fund address
+    function setInsuranceFund(address _insuranceFund) external checkAccess(this.setInsuranceFund.selector) {
+        VaultLogic.setInsuranceFund(getVaultStorage(), _insuranceFund);
+    }
+
     /// @notice Rescue an unsupported asset
     /// @param _asset Asset to rescue
     /// @param _receiver Receiver of the rescue

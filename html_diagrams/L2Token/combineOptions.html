@@ -1,0 +1,1196 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Function Call Trees - L2Token</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        
+        .container {
+            max-width: 1200px;
+            min-width: 920px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .tree-node {
+            margin-bottom: 10px;
+            border-left: 2px solid #e9ecef;
+            position: relative;
+        }
+        
+        .node-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 5px;
+        }
+        
+        .node-header:hover {
+            background: #e9ecef;
+            transform: translateX(2px);
+        }
+        
+        .node-header-left {
+            display: flex;
+            align-items: center;
+        }
+        
+        .node-toggle {
+            margin-right: 8px;
+            font-size: 12px;
+            color: #6c757d;
+            user-select: none;
+        }
+        
+        .node-name {
+            font-weight: 600;
+            color: #495057;
+            font-size: 14px;
+        }
+        
+        .node-path {
+            font-size: 11px;
+            color: #6c757d;
+            font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, monospace;
+            opacity: 0.7;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .node-content {
+            margin-left: 20px;
+            margin-bottom: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        .node-content pre {
+            margin: 0;
+            background: #2d3748;
+            color: #e2e8f0;
+            font-size: 13px;
+            line-height: 1.5;
+            overflow-x: auto;
+        }
+        
+        .node-content code {
+            display: block;
+            padding: 15px;
+            font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, monospace;
+        }
+        
+        .node-children {
+            border-left: 2px solid #3498db;
+            margin-left: -2px;
+            padding-left: 10px;
+        }
+        
+        .collapsed {
+            display: none;
+        }
+        
+        .info-panel {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .info-panel h3 {
+            margin: 0 0 10px 0;
+            color: #1976d2;
+        }
+        
+        .call-type {
+            font-size: 10px;
+            color: #6c757d;
+            margin-left: 8px;
+            font-weight: normal;
+            opacity: 0.8;
+        }
+        
+        .warning-bg {
+            background-color: #fff3cd !important;
+            border-color: #ffeaa7 !important;
+        }
+        
+        .warning-bg:hover {
+            background-color: #ffecb5 !important;
+        }
+        
+        .danger-bg {
+            background-color: #f8d7da !important;
+            border-color: #f5c6cb !important;
+        }
+        
+        .danger-bg:hover {
+            background-color: #f1b0b7 !important;
+        }
+        
+        .stats-panel {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+        }
+        
+        .stat-item {
+            flex: 1;
+        }
+        
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #495057;
+        }
+        
+                 .stat-label {
+             font-size: 12px;
+             color: #6c757d;
+             text-transform: uppercase;
+         }
+         
+         .external-indicator {
+             display: inline-block;
+             min-width: 18px;
+             height: 18px;
+             border-radius: 50%;
+             font-size: 10px;
+             font-weight: bold;
+             text-align: center;
+             line-height: 18px;
+             margin-left: 6px;
+             color: white;
+         }
+         
+        .red-indicator {
+             background-color: #dc3545;
+        }
+         
+        .yellow-indicator {
+            background-color: #ffc107;            color: #212529;
+        }
+        
+        .view-pure-indicator {
+            margin-left: 6px;
+            font-size: 12px;
+        }
+        
+        .node-actions {
+            display: flex;
+            flex-direction: row;
+            gap: 4px;
+            padding: 10px 15px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .export-btn {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0,123,255,0.3);
+        }
+        
+        .export-btn:hover {
+            background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,123,255,0.4);
+        }
+        
+        .export-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0,123,255,0.3);
+        }
+        
+              
+        .contract-elements-sidebar {
+            margin-top: 20px;
+        }
+
+        
+        .contract-elements-sidebar .sidebar-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .sidebar-content {
+            background: white;
+        }
+        
+        .element-section {
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        
+        .element-toggle {
+            margin-right: 10px;
+            font-size: 14px;
+            color: #495057;
+            transition: transform 0.2s;
+            font-weight: bold;
+        }
+        
+        .element-toggle.collapsed {
+            display: block;
+        }
+        
+        .element-label {
+            flex: 1;
+            font-weight: 600;
+            font-size: 14px;
+            color: #495057;
+        }
+        
+        .element-count {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 11px;
+            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(0,123,255,0.3);
+        }
+        
+        .element-content {
+            background: white;
+            overflow-y: auto;
+            transition: max-height 0.3s ease-out;
+        }
+        
+        .element-content.collapsed {
+            max-height: 0;
+            overflow: hidden;
+        }
+        
+        .element-item {
+            border-bottom: 1px solid #f8f9fa;
+            transition: background-color 0.2s;
+        }
+        
+        .element-item:last-child {
+            border-bottom: none;
+        }
+        
+        .element-item pre {
+            margin: 0;
+            background: #2d3748;
+            color: #e2e8f0;
+            font-size: 12px;
+            line-height: 1.4;
+            border-radius: 6px;
+            overflow-x: auto;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .element-item code {
+            display: block;
+            padding: 10px 12px;
+            font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, monospace;
+        }
+        
+        .main-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        
+        .slots-ruler {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .ruler-label {
+            width: 90px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #495057;
+            font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, monospace;
+        }
+        
+        .ruler-bytes {
+            display: flex;
+            flex: 1;
+            position: relative;
+            margin-top: 16px;
+        }
+        
+        .ruler-section {
+            display: flex;
+            flex: 1;
+            justify-content: center;
+        }
+        .tick-section {
+            position: absolute;
+            flex: 1;
+            display: flex;
+            left: -35px;
+            right: -34px;
+            top: -16px;
+        }
+        .ruler-byte {
+            flex: 1;
+            height: 28px;
+            background: rgba(102, 126, 234, 0.1);
+            /*border-right: 1px solid #dee2e6;*/
+            box-shadow: 0 0 0 0 black, 1px 0 0 0 #dee2e6;
+            position: relative;
+            display: flex;
+            align-items: end;
+            justify-content: center;
+        }
+        
+        .ruler-tick {
+            font-size: 10px;
+            font-weight: 600;
+            color: #495057;
+            font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, monospace;
+        }
+        
+        .slot-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        
+        .slot-label {
+            width: 90px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #495057;
+            font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, monospace;
+            cursor: help;
+        }
+        
+        .slot-bytes {
+            display: flex;
+            flex: 1;
+        }
+        
+        .byte-cell {
+            height: 32px;
+            box-shadow: 0 0 0 0 black, 1px 0 0 0 #dee2e6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 600;
+            color: white;
+            text-align: center;
+            cursor: help;
+            font-family: 'Fira Code', 'Cascadia Code', Consolas, Monaco, monospace;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .byte-cell.empty {
+            background: rgba(102, 126, 234, 0.1);
+            flex: 1;
+        }
+        
+        .byte-cell.occupied {
+            border-radius: 4px;
+            margin: 1px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+        
+        .byte-cell.occupied:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="container">
+            <h1>📊 L2Token</h1>
+        <div class="info-panel">
+            <h3>📋 Instructions</h3>
+            <p>Click on function names to expand/collapse their call trees. Color coding: 🟡 Yellow = High/Low-level immutable external calls, 🔴 Red = High/Low-level mutable external calls.</p>
+        </div>
+        
+        
+        
+        <div class="functions-container">
+            
+<div class="tree-node" style="margin-left: 0px;">
+  <div class="node-header " onclick="toggleNode('func0_node_0')">
+    <div class="node-header-left">
+      <span class="node-toggle">▶</span>
+      <span class="node-name">combineOptions<span class="view-pure-indicator" title="view">👁️</span></span>
+      <span class="call-type">[Local]</span>
+      
+      
+    </div>
+    <span class="node-path">lib/layerzero-devtools/packages/oapp-evm/contracts/oapp/libs/OAppOptionsType3.sol</span>
+  </div>
+  <div class="node-content collapsed" id="func0_node_0" data-json="{&quot;code&quot;:&quot;///  @notice Combines options for a given endpoint and message type.\n///  @param _eid The endpoint ID.\n///  @param _msgType The OAPP message type.\n///  @param _extraOptions Additional options passed by the caller.\n///  @return options The combination of caller specified options AND enforced options.\n///  @dev If there is an enforced lzReceive option:\n///  - {gasLimit: 200k, msg.value: 1 ether} AND a caller supplies a lzReceive option: {gasLimit: 100k, msg.value: 0.5 ether}\n///  - The resulting options will be {gasLimit: 300k, msg.value: 1.5 ether} when the message is executed on the remote lzReceive() function.\n///  @dev This presence of duplicated options is handled off-chain in the verifier/executor.\nfunction combineOptions(uint32 _eid, uint16 _msgType, bytes calldata _extraOptions) virtual public view returns (bytes memory) {\n    bytes memory enforced = enforcedOptions[_eid][_msgType];\n    if (enforced.length == 0) return _extraOptions;\n    if (_extraOptions.length == 0) return enforced;\n    if (_extraOptions.length &gt;= 2) {\n        _assertOptionsType3(_extraOptions);\n        return bytes.concat(enforced, _extraOptions[2:]);\n    }\n    revert InvalidOptions(_extraOptions);\n}&quot;,&quot;children&quot;:[{&quot;code&quot;:&quot;///  @dev Internal function to assert that options are of type 3.\n///  @param _options The options to be checked.\nfunction _assertOptionsType3(bytes memory _options) virtual internal pure {\n    uint16 optionsType;\n    assembly {\n        optionsType := mload(add(_options, 2))\n    }\n    if (optionsType != OPTION_TYPE_3) revert InvalidOptions(_options);\n}&quot;,&quot;children&quot;:[]}]}">
+    <pre><code class="language-solidity">///  @notice Combines options for a given endpoint and message type.
+///  @param _eid The endpoint ID.
+///  @param _msgType The OAPP message type.
+///  @param _extraOptions Additional options passed by the caller.
+///  @return options The combination of caller specified options AND enforced options.
+///  @dev If there is an enforced lzReceive option:
+///  - {gasLimit: 200k, msg.value: 1 ether} AND a caller supplies a lzReceive option: {gasLimit: 100k, msg.value: 0.5 ether}
+///  - The resulting options will be {gasLimit: 300k, msg.value: 1.5 ether} when the message is executed on the remote lzReceive() function.
+///  @dev This presence of duplicated options is handled off-chain in the verifier/executor.
+function combineOptions(uint32 _eid, uint16 _msgType, bytes calldata _extraOptions) virtual public view returns (bytes memory) {
+    bytes memory enforced = enforcedOptions[_eid][_msgType];
+    if (enforced.length == 0) return _extraOptions;
+    if (_extraOptions.length == 0) return enforced;
+    if (_extraOptions.length &gt;= 2) {
+        _assertOptionsType3(_extraOptions);
+        return bytes.concat(enforced, _extraOptions[2:]);
+    }
+    revert InvalidOptions(_extraOptions);
+}</code></pre>
+    <div class="node-actions">
+      <button class="export-btn" onclick="exportNodeToJson('func0_node_0', event)" title="Export tree to JSON">📥 Export</button>
+      <button class="export-btn" onclick="copyNodeToPrompt('func0_node_0', event)" title="Copy flattened sources to clipboard">💾 Copy</button>
+    </div>
+  </div>  <div class="node-children collapsed" id="func0_node_0-children">
+  <div class="tree-node" style="margin-left: 20px;">
+    <div class="node-header " onclick="toggleNode('func0_node_1')">
+      <div class="node-header-left">
+        <span class="node-toggle">▶</span>
+        <span class="node-name">_assertOptionsType3<span class="view-pure-indicator" title="pure">👁️</span></span>
+        <span class="call-type">[Local]</span>
+        
+        
+      </div>
+      <span class="node-path">lib/layerzero-devtools/packages/oapp-evm/contracts/oapp/libs/OAppOptionsType3.sol</span>
+    </div>
+    <div class="node-content collapsed" id="func0_node_1" data-json="{&quot;code&quot;:&quot;///  @dev Internal function to assert that options are of type 3.\n///  @param _options The options to be checked.\nfunction _assertOptionsType3(bytes memory _options) virtual internal pure {\n    uint16 optionsType;\n    assembly {\n        optionsType := mload(add(_options, 2))\n    }\n    if (optionsType != OPTION_TYPE_3) revert InvalidOptions(_options);\n}&quot;,&quot;children&quot;:[]}">
+      <pre><code class="language-solidity">///  @dev Internal function to assert that options are of type 3.
+///  @param _options The options to be checked.
+function _assertOptionsType3(bytes memory _options) virtual internal pure {
+    uint16 optionsType;
+    assembly {
+        optionsType := mload(add(_options, 2))
+    }
+    if (optionsType != OPTION_TYPE_3) revert InvalidOptions(_options);
+}</code></pre>
+      <div class="node-actions">
+        <button class="export-btn" onclick="exportNodeToJson('func0_node_1', event)" title="Export tree to JSON">📥 Export</button>
+        <button class="export-btn" onclick="copyNodeToPrompt('func0_node_1', event)" title="Copy flattened sources to clipboard">💾 Copy</button>
+      </div>
+    </div>  </div>  </div></div>
+        </div>
+        
+        <div class="contract-elements-sidebar">
+            <div class="sidebar-header">
+                <h3>🗂️ Storage Slots</h3>
+            </div>
+            <div class="sidebar-content">
+                
+            <div class="element-section">
+                <div class="node-header" onclick="toggleElementSection('constants-section')">
+                    <span class="element-toggle collapsed" id="toggle-constants-section">▶</span>
+                    <span class="element-label">Constant/Immutable Variables</span>
+                    <span class="element-count">16</span>
+                </div>
+                <div class="element-content collapsed" id="constants-section">
+                    
+                        <div class="element-item">
+                            <pre><code class="language-solidity">ILayerZeroEndpointV2 public immutable endpoint;</code></pre>
+                        </div>
+                    
+                        <div class="element-item">
+                            <pre><code class="language-solidity">uint64 internal constant SENDER_VERSION = 1;</code></pre>
+                        </div>
+                    
+                        <div class="element-item">
+                            <pre><code class="language-solidity">uint64 internal constant RECEIVER_VERSION = 2;</code></pre>
+                        </div>
+                    
+                        <div class="element-item">
+                            <pre><code class="language-solidity">uint16 internal constant OPTION_TYPE_3 = 3;</code></pre>
+                        </div>
+                    
+                        <div class="element-item">
+                            <pre><code class="language-solidity">uint256 public immutable decimalConversionRate;</code></pre>
+                        </div>
+                    
+                        <div class="element-item">
+                            <pre><code class="language-solidity">uint16 public constant SEND = 1;</code></pre>
+                        </div>
+                    
+                        <div class="element-item">
+                            <pre><code class="language-solidity">uint16 public constant SEND_AND_CALL = 2;</code></pre>
+                        </div>
+                    
+                        <div class="element-item">
+                            <pre><code class="language-solidity">bytes32 private constant TYPE_HASH = keccak256(&quot;EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)&quot;);</code></pre>
+                        </div>
+                    
+                        <div class="element-item">
+                            <pre><code class="language-solidity">bytes32 private immutable _cachedDomainSeparator;</code></pre>
+                        </div>
+                    
+                        <div class="element-item">
+                            <pre><code class="language-solidity">uint256 private immutable _cachedChainId;</code></pre>
+                        </div>
+                    
+                        <div class="element-item">
+                            <pre><code class="language-solidity">address private immutable _cachedThis;</code></pre>
+                        </div>
+                    
+                        <div class="element-item">
+                            <pre><code class="language-solidity">bytes32 private immutable _hashedName;</code></pre>
+                        </div>
+                    
+                        <div class="element-item">
+                            <pre><code class="language-solidity">bytes32 private immutable _hashedVersion;</code></pre>
+                        </div>
+                    
+                        <div class="element-item">
+                            <pre><code class="language-solidity">ShortString private immutable _name;</code></pre>
+                        </div>
+                    
+                        <div class="element-item">
+                            <pre><code class="language-solidity">ShortString private immutable _version;</code></pre>
+                        </div>
+                    
+                        <div class="element-item">
+                            <pre><code class="language-solidity">bytes32 private constant PERMIT_TYPEHASH = keccak256(&quot;Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)&quot;);</code></pre>
+                        </div>
+                    
+                </div>
+            </div>
+        
+                
+        <div class="slots-ruler">
+            <div class="ruler-label">Slot</div>
+            <div class="ruler-bytes">
+                <div class="tick-section">
+                    <div class="ruler-section"><div class="ruler-tick">32</div></div><div class="ruler-section"><div class="ruler-tick">30</div></div><div class="ruler-section"><div class="ruler-tick">28</div></div><div class="ruler-section"><div class="ruler-tick">26</div></div><div class="ruler-section"><div class="ruler-tick">24</div></div><div class="ruler-section"><div class="ruler-tick">22</div></div><div class="ruler-section"><div class="ruler-tick">20</div></div><div class="ruler-section"><div class="ruler-tick">18</div></div><div class="ruler-section"><div class="ruler-tick">16</div></div><div class="ruler-section"><div class="ruler-tick">14</div></div><div class="ruler-section"><div class="ruler-tick">12</div></div><div class="ruler-section"><div class="ruler-tick">10</div></div><div class="ruler-section"><div class="ruler-tick">8</div></div><div class="ruler-section"><div class="ruler-tick">6</div></div><div class="ruler-section"><div class="ruler-tick">4</div></div><div class="ruler-section"><div class="ruler-tick">2</div></div><div class="ruler-section"><div class="ruler-tick">0</div></div>
+                </div>
+                
+                        <div class="ruler-section">
+                            <div class="ruler-byte" style="box-shadow: -2px 0 0 0 black, 1px 0 0 0 #dee2e6;"></div>
+                            <div class="ruler-byte"></div>
+                        </div>
+                    
+                        <div class="ruler-section">
+                            <div class="ruler-byte" style="box-shadow: 0 0 0 0 black, 1px 0 0 0 #dee2e6;"></div>
+                            <div class="ruler-byte"></div>
+                        </div>
+                    
+                        <div class="ruler-section">
+                            <div class="ruler-byte" style="box-shadow: 0 0 0 0 black, 1px 0 0 0 #dee2e6;"></div>
+                            <div class="ruler-byte"></div>
+                        </div>
+                    
+                        <div class="ruler-section">
+                            <div class="ruler-byte" style="box-shadow: 0 0 0 0 black, 1px 0 0 0 #dee2e6;"></div>
+                            <div class="ruler-byte"></div>
+                        </div>
+                    
+                        <div class="ruler-section">
+                            <div class="ruler-byte" style="box-shadow: -2px 0 0 0 black, 1px 0 0 0 #dee2e6;"></div>
+                            <div class="ruler-byte"></div>
+                        </div>
+                    
+                        <div class="ruler-section">
+                            <div class="ruler-byte" style="box-shadow: 0 0 0 0 black, 1px 0 0 0 #dee2e6;"></div>
+                            <div class="ruler-byte"></div>
+                        </div>
+                    
+                        <div class="ruler-section">
+                            <div class="ruler-byte" style="box-shadow: 0 0 0 0 black, 1px 0 0 0 #dee2e6;"></div>
+                            <div class="ruler-byte"></div>
+                        </div>
+                    
+                        <div class="ruler-section">
+                            <div class="ruler-byte" style="box-shadow: 0 0 0 0 black, 1px 0 0 0 #dee2e6;"></div>
+                            <div class="ruler-byte"></div>
+                        </div>
+                    
+                        <div class="ruler-section">
+                            <div class="ruler-byte" style="box-shadow: -2px 0 0 0 black, 1px 0 0 0 #dee2e6;"></div>
+                            <div class="ruler-byte"></div>
+                        </div>
+                    
+                        <div class="ruler-section">
+                            <div class="ruler-byte" style="box-shadow: 0 0 0 0 black, 1px 0 0 0 #dee2e6;"></div>
+                            <div class="ruler-byte"></div>
+                        </div>
+                    
+                        <div class="ruler-section">
+                            <div class="ruler-byte" style="box-shadow: 0 0 0 0 black, 1px 0 0 0 #dee2e6;"></div>
+                            <div class="ruler-byte"></div>
+                        </div>
+                    
+                        <div class="ruler-section">
+                            <div class="ruler-byte" style="box-shadow: 0 0 0 0 black, 1px 0 0 0 #dee2e6;"></div>
+                            <div class="ruler-byte"></div>
+                        </div>
+                    
+                        <div class="ruler-section">
+                            <div class="ruler-byte" style="box-shadow: -2px 0 0 0 black, 1px 0 0 0 #dee2e6;"></div>
+                            <div class="ruler-byte"></div>
+                        </div>
+                    
+                        <div class="ruler-section">
+                            <div class="ruler-byte" style="box-shadow: 0 0 0 0 black, 1px 0 0 0 #dee2e6;"></div>
+                            <div class="ruler-byte"></div>
+                        </div>
+                    
+                        <div class="ruler-section">
+                            <div class="ruler-byte" style="box-shadow: 0 0 0 0 black, 1px 0 0 0 #dee2e6;"></div>
+                            <div class="ruler-byte"></div>
+                        </div>
+                    
+                        <div class="ruler-section">
+                            <div class="ruler-byte" style="box-shadow: 0 0 0 0 black, 1px 0 0 0 #dee2e6;"></div>
+                            <div class="ruler-byte"></div>
+                        </div>
+                    
+            </div>
+        </div>
+    
+                
+            <div class="slot-row">
+                <div class="slot-label" title="0x0000000000000000000000000000000000000000000000000000000000000000 => 0">0x0000...00</div>
+                <div class="slot-bytes">
+                    <div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div>
+                    
+                        <div class="byte-cell occupied" 
+                             style="flex: 20; background-color: #3b82f6;"
+                             title="address _owner&#10;Visibility: private&#10;Size: 20 bytes&#10;Offset: 0">
+                            address _owner
+                        </div>
+                    
+                </div>
+            </div>
+        
+            <div class="slot-row">
+                <div class="slot-label" title="0x0000000000000000000000000000000000000000000000000000000000000001 => 1">0x0000...01</div>
+                <div class="slot-bytes">
+                    
+                    
+                        <div class="byte-cell occupied" 
+                             style="flex: 32; background-color: #3b82f6;"
+                             title="mapping(uint32 => bytes32) peers&#10;Visibility: public&#10;Size: 32 bytes&#10;Offset: 0">
+                            mapping(uint32 => bytes32) peers
+                        </div>
+                    
+                </div>
+            </div>
+        
+            <div class="slot-row">
+                <div class="slot-label" title="0x0000000000000000000000000000000000000000000000000000000000000002 => 2">0x0000...02</div>
+                <div class="slot-bytes">
+                    <div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div>
+                    
+                        <div class="byte-cell occupied" 
+                             style="flex: 20; background-color: #3b82f6;"
+                             title="address preCrime&#10;Visibility: public&#10;Size: 20 bytes&#10;Offset: 0">
+                            address preCrime
+                        </div>
+                    
+                </div>
+            </div>
+        
+            <div class="slot-row">
+                <div class="slot-label" title="0x0000000000000000000000000000000000000000000000000000000000000003 => 3">0x0000...03</div>
+                <div class="slot-bytes">
+                    
+                    
+                        <div class="byte-cell occupied" 
+                             style="flex: 32; background-color: #3b82f6;"
+                             title="mapping(uint32 => mapping(uint16 => bytes)) enforcedOptions&#10;Visibility: public&#10;Size: 32 bytes&#10;Offset: 0">
+                            mapping(uint32 => mapping(uint16 => bytes)) enforcedOptions
+                        </div>
+                    
+                </div>
+            </div>
+        
+            <div class="slot-row">
+                <div class="slot-label" title="0x0000000000000000000000000000000000000000000000000000000000000004 => 4">0x0000...04</div>
+                <div class="slot-bytes">
+                    <div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div><div class="byte-cell empty"></div>
+                    
+                        <div class="byte-cell occupied" 
+                             style="flex: 20; background-color: #3b82f6;"
+                             title="address msgInspector&#10;Visibility: public&#10;Size: 20 bytes&#10;Offset: 0">
+                            address msgInspector
+                        </div>
+                    
+                </div>
+            </div>
+        
+            <div class="slot-row">
+                <div class="slot-label" title="0x0000000000000000000000000000000000000000000000000000000000000005 => 5">0x0000...05</div>
+                <div class="slot-bytes">
+                    
+                    
+                        <div class="byte-cell occupied" 
+                             style="flex: 32; background-color: #3b82f6;"
+                             title="mapping(address => uint256) _balances&#10;Visibility: private&#10;Size: 32 bytes&#10;Offset: 0">
+                            mapping(address => uint256) _balances
+                        </div>
+                    
+                </div>
+            </div>
+        
+            <div class="slot-row">
+                <div class="slot-label" title="0x0000000000000000000000000000000000000000000000000000000000000006 => 6">0x0000...06</div>
+                <div class="slot-bytes">
+                    
+                    
+                        <div class="byte-cell occupied" 
+                             style="flex: 32; background-color: #3b82f6;"
+                             title="mapping(address => mapping(address => uint256)) _allowances&#10;Visibility: private&#10;Size: 32 bytes&#10;Offset: 0">
+                            mapping(address => mapping(address => uint256)) _allowances
+                        </div>
+                    
+                </div>
+            </div>
+        
+            <div class="slot-row">
+                <div class="slot-label" title="0x0000000000000000000000000000000000000000000000000000000000000007 => 7">0x0000...07</div>
+                <div class="slot-bytes">
+                    
+                    
+                        <div class="byte-cell occupied" 
+                             style="flex: 32; background-color: #3b82f6;"
+                             title="uint256 _totalSupply&#10;Visibility: private&#10;Size: 32 bytes&#10;Offset: 0">
+                            uint256 _totalSupply
+                        </div>
+                    
+                </div>
+            </div>
+        
+            <div class="slot-row">
+                <div class="slot-label" title="0x0000000000000000000000000000000000000000000000000000000000000008 => 8">0x0000...08</div>
+                <div class="slot-bytes">
+                    
+                    
+                        <div class="byte-cell occupied" 
+                             style="flex: 32; background-color: #3b82f6;"
+                             title="string _name&#10;Visibility: private&#10;Size: 32 bytes&#10;Offset: 0">
+                            string _name
+                        </div>
+                    
+                </div>
+            </div>
+        
+            <div class="slot-row">
+                <div class="slot-label" title="0x0000000000000000000000000000000000000000000000000000000000000009 => 9">0x0000...09</div>
+                <div class="slot-bytes">
+                    
+                    
+                        <div class="byte-cell occupied" 
+                             style="flex: 32; background-color: #3b82f6;"
+                             title="string _symbol&#10;Visibility: private&#10;Size: 32 bytes&#10;Offset: 0">
+                            string _symbol
+                        </div>
+                    
+                </div>
+            </div>
+        
+            <div class="slot-row">
+                <div class="slot-label" title="0x000000000000000000000000000000000000000000000000000000000000000a => 10">0x0000...0a</div>
+                <div class="slot-bytes">
+                    
+                    
+                        <div class="byte-cell occupied" 
+                             style="flex: 32; background-color: #3b82f6;"
+                             title="string _nameFallback&#10;Visibility: private&#10;Size: 32 bytes&#10;Offset: 0">
+                            string _nameFallback
+                        </div>
+                    
+                </div>
+            </div>
+        
+            <div class="slot-row">
+                <div class="slot-label" title="0x000000000000000000000000000000000000000000000000000000000000000b => 11">0x0000...0b</div>
+                <div class="slot-bytes">
+                    
+                    
+                        <div class="byte-cell occupied" 
+                             style="flex: 32; background-color: #3b82f6;"
+                             title="string _versionFallback&#10;Visibility: private&#10;Size: 32 bytes&#10;Offset: 0">
+                            string _versionFallback
+                        </div>
+                    
+                </div>
+            </div>
+        
+            <div class="slot-row">
+                <div class="slot-label" title="0x000000000000000000000000000000000000000000000000000000000000000c => 12">0x0000...0c</div>
+                <div class="slot-bytes">
+                    
+                    
+                        <div class="byte-cell occupied" 
+                             style="flex: 32; background-color: #3b82f6;"
+                             title="mapping(address => uint256) _nonces&#10;Visibility: private&#10;Size: 32 bytes&#10;Offset: 0">
+                            mapping(address => uint256) _nonces
+                        </div>
+                    
+                </div>
+            </div>
+        
+            </div>
+        </div>
+    
+        
+        <div class="contract-elements-sidebar">
+            <div class="sidebar-header">
+                <h3>📋 Contract Elements</h3>
+            </div>
+            <div class="sidebar-content">
+                
+                <div class="element-section">
+                    <div class="node-header" onclick="toggleElementSection('element-section-0')">
+                        <span class="element-toggle collapsed" id="toggle-element-section-0">▶</span>
+                        <span class="element-label">Events</span>
+                        <span class="element-count">10</span>
+                    </div>
+                    <div class="element-content collapsed" id="element-section-0">
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">///  @dev MAY be emitted to signal that the domain could have changed.
+event EIP712DomainChanged();</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">///  @dev Emitted when the allowance of a `spender` for an `owner` is set by
+///  a call to {approve}. `value` is the new allowance.
+event Approval(address indexed owner, address indexed spender, uint256 value);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">///  @dev Emitted when `value` tokens are moved from one account (`from`) to
+///  another (`to`).
+///  Note that `value` may be zero.
+event Transfer(address indexed from, address indexed to, uint256 value);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">event MsgInspectorSet(address inspector);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">event EnforcedOptionSet(EnforcedOptionParam[] _enforcedOptions);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">///  @dev Emitted when the preCrime contract address is set.
+///  @param preCrimeAddress The address of the preCrime contract.
+event PreCrimeSet(address preCrimeAddress);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">event PeerSet(uint32 eid, bytes32 peer);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">event OFTReceived(bytes32 indexed guid, uint32 srcEid, address indexed toAddress, uint256 amountReceivedLD);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">event OFTSent(bytes32 indexed guid, uint32 dstEid, address indexed fromAddress, uint256 amountSentLD, uint256 amountReceivedLD);</code></pre>
+                            </div>
+                        
+                    </div>
+                </div>
+            
+                <div class="element-section">
+                    <div class="node-header" onclick="toggleElementSection('element-section-1')">
+                        <span class="element-toggle collapsed" id="toggle-element-section-1">▶</span>
+                        <span class="element-label">Errors</span>
+                        <span class="element-count">23</span>
+                    </div>
+                    <div class="element-content collapsed" id="element-section-1">
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">///  @dev Mismatched signature.
+error ERC2612InvalidSigner(address signer, address owner);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">///  @dev Permit deadline has expired.
+error ERC2612ExpiredSignature(uint256 deadline);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">///  @dev The nonce used for an `account` is not the expected current nonce.
+error InvalidAccountNonce(address account, uint256 currentNonce);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">///  @dev Indicates a failure with the `spender` to be approved. Used in approvals.
+///  @param spender Address that may be allowed to operate on tokens without being their owner.
+error ERC20InvalidSpender(address spender);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">///  @dev Indicates a failure with the `approver` of a token to be approved. Used in approvals.
+///  @param approver Address initiating an approval operation.
+error ERC20InvalidApprover(address approver);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">///  @dev Indicates a failure with the `spender`’s `allowance`. Used in transfers.
+///  @param spender Address that may be allowed to operate on tokens without being their owner.
+///  @param allowance Amount of tokens a `spender` is allowed to operate with.
+///  @param needed Minimum amount required to perform a transfer.
+error ERC20InsufficientAllowance(address spender, uint256 allowance, uint256 needed);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">///  @dev Indicates a failure with the token `receiver`. Used in transfers.
+///  @param receiver Address to which tokens are being transferred.
+error ERC20InvalidReceiver(address receiver);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">///  @dev Indicates a failure with the token `sender`. Used in transfers.
+///  @param sender Address whose tokens are being transferred.
+error ERC20InvalidSender(address sender);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">///  @dev Indicates an error related to the current `balance` of a `sender`. Used in transfers.
+///  @param sender Address whose tokens are being transferred.
+///  @param balance Current balance for the interacting account.
+///  @param needed Minimum amount required to perform a transfer.
+error ERC20InsufficientBalance(address sender, uint256 balance, uint256 needed);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">error OnlyEndpoint(address addr);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">error LzTokenUnavailable();</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">error NotEnoughNative(uint256 msgValue);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">///  @dev The owner is not a valid owner account. (eg. `address(0)`)
+error OwnableInvalidOwner(address owner);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">///  @dev The caller account is not authorized to perform an operation.
+error OwnableUnauthorizedAccount(address account);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">error InvalidOptions(bytes options);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">error OnlySelf();</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">error SimulationResult(bytes result);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">error InvalidDelegate();</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">error InvalidEndpointCall();</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">error NoPeer(uint32 eid);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">error OnlyPeer(uint32 eid, bytes32 sender);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">error SlippageExceeded(uint256 amountLD, uint256 minAmountLD);</code></pre>
+                            </div>
+                        
+                            <div class="element-item">
+                                <pre><code class="language-solidity">error InvalidLocalDecimals();</code></pre>
+                            </div>
+                        
+                    </div>
+                </div>
+            
+            </div>
+        </div>
+    
+    </div>
+</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script>
+        function toggleNode(nodeId) {
+            const node = document.getElementById(nodeId);
+            const children = document.getElementById(nodeId + '-children');
+            const toggle = node.previousElementSibling.querySelector('.node-toggle');
+            
+            if (node.classList.contains('collapsed')) {
+                // Expanding - show content and children
+                node.classList.remove('collapsed');
+                if (children) {
+                    children.classList.remove('collapsed');
+                }
+                toggle.textContent = '▼';
+            } else {
+                // Collapsing - hide content and recursively collapse all children
+                node.classList.add('collapsed');
+                if (children) {
+                    children.classList.add('collapsed');
+                    // Recursively collapse all descendant nodes
+                    collapseAllChildren(children);
+                }
+                toggle.textContent = '▶';
+            }
+        }
+        
+        function collapseAllChildren(parentElement) {
+            // Find all node-content and node-children elements within this parent
+            const allContents = parentElement.querySelectorAll('.node-content, .node-children');
+            const allToggles = parentElement.querySelectorAll('.node-toggle');
+            
+            allContents.forEach(element => {
+                element.classList.add('collapsed');
+            });
+            
+            allToggles.forEach(toggle => {
+                if (toggle.textContent === '▼') {
+                    toggle.textContent = '▶';
+                }
+            });
+        }
+        
+        function toggleElementSection(sectionId) {
+            const content = document.getElementById(sectionId);
+            const toggle = document.getElementById('toggle-' + sectionId);
+            
+            if (content.classList.contains('collapsed')) {
+                content.classList.remove('collapsed');
+                toggle.classList.remove('collapsed');
+                toggle.textContent = '▼';
+            } else {
+                content.classList.add('collapsed');
+                toggle.classList.add('collapsed');
+                toggle.textContent = '▶';
+            }
+        }
+        
+        function exportNodeToJson(nodeId, event) {
+            event.stopPropagation(); // Prevent node toggle
+            
+            // Get the JSON data from the data attribute
+            const nodeElement = document.getElementById(nodeId);
+            const jsonDataStr = nodeElement.getAttribute('data-json');
+            const nodeData = JSON.parse(jsonDataStr);
+            
+            // Create downloadable JSON
+            const jsonStr = JSON.stringify(nodeData, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            // Extract function name for filename
+            const functionName = nodeData.code.split(/[\s(]/)[0] || 'node';
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${functionName}_tree.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        function copyNodeToPrompt(nodeId, event) {
+            event.stopPropagation(); // Prevent node toggle
+            
+            // Get the JSON data from the data attribute
+            const nodeElement = document.getElementById(nodeId);
+            const jsonDataStr = nodeElement.getAttribute('data-json');
+            const nodeData = JSON.parse(jsonDataStr);
+            
+            // Flatten the tree to get all function sources
+            const flattenedSources = [];
+            
+            function flattenTree(node) {
+                if (node.code && node.code.trim()) {
+                    flattenedSources.push(node.code.trim());
+                }
+                if (node.children && node.children.length > 0) {
+                    node.children.forEach(child => flattenTree(child));
+                }
+            }
+            
+            flattenTree(nodeData);
+            
+            // Join all sources with double newlines
+            const flattenedText = flattenedSources.join('\n\n');
+            
+            // Copy to clipboard and show a success message
+            navigator.clipboard.writeText(flattenedText);
+            alert('Flattened sources copied to clipboard');
+        }
+        
+        // Initialize all nodes as collapsed
+        document.addEventListener('DOMContentLoaded', function() {
+            Prism.highlightAll();
+        });
+    </script>
+</body>
+</html>
