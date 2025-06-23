@@ -375,8 +375,8 @@ abstract contract Properties is BeforeAfter, Asserts {
                 uint256 beforeReserve = _before.fractionalReserveReserve[asset];
                 uint256 afterBalance = _after.vaultAssetBalance[asset];
 
-                // precondition: the vault's balance of the asset has to have changed, or else can have a set reserve with no assets on invest/divest
-                if (_after.vaultAssetBalance[asset] != _before.vaultAssetBalance[asset]) {
+                // precondition: the reserve amount has to be <= the loaned amount or else nothing's been transferred to the fractional reserve vault so reserves won't be applied
+                if (_before.fractionalReserveReserve[asset] <= _before.fractionalReserveLoaned[asset]) {
                     gte(
                         afterBalance,
                         beforeReserve,
@@ -407,6 +407,10 @@ abstract contract Properties is BeforeAfter, Asserts {
     /// @dev Property: no operation should make a user liquidatable
     function property_no_operation_makes_user_liquidatable() public {
         // before/after are only set for user operations so changes to price are automatically excluded since these are the only thing that should make a user liquidatable
+        console2.log("before health", _before.agentHealth[_getActor()]);
+        console2.log("after health", _after.agentHealth[_getActor()]);
+        console2.log("agent debt before", _before.agentTotalDebt[_getActor()]);
+        console2.log("agent debt after", _after.agentTotalDebt[_getActor()]);
         if (_before.agentHealth[_getActor()] > RAY) {
             gt(_after.agentHealth[_getActor()], RAY, "user is liquidatable");
         }
