@@ -423,6 +423,18 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: after all users have repaid their debt, their balance of debtToken should be 0
+    function property_dust_on_repay() public {
+        address[] memory agents = delegation.agents();
+        (,, address debtToken,,,,) = lender.reservesData(_getAsset());
+
+        if (capToken.totalBorrows(_getAsset()) == 0) {
+            for (uint256 i = 0; i < agents.length; i++) {
+                eq(MockERC20(debtToken).balanceOf(agents[i]), 0, "dust amount of debtToken remaining");
+            }
+        }
+    }
+
     /// === Optimization Properties === ///
 
     /// @dev test for optimizing the difference when debt token supply > total vault debt
