@@ -96,6 +96,26 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         property_health_should_not_change_when_realizeRestakerInterest_is_called();
     }
 
+    // forge test --match-test test_property_health_should_not_change_when_realizeRestakerInterest_is_called_6 -vvv
+    // NOTE: same as above with the property extracted to be global
+    function test_property_health_should_not_change_when_realizeRestakerInterest_is_called_6() public {
+        switch_asset(0);
+
+        capToken_mint_clamped(612047141);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+
+        oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 2735589900858180726609421);
+
+        vm.warp(block.timestamp + 152);
+
+        vm.roll(block.number + 1);
+
+        lender_realizeRestakerInterest();
+
+        property_health_should_not_change_when_realizeRestakerInterest_is_called();
+    }
+
     // forge test --match-test test_lender_borrow_clamped_6 -vvv
     // NOTE: looks like truncation in LTV calculation causes the issue
     // TODO: optimization test for this
@@ -124,5 +144,117 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
     }
 
+    // forge test --match-test test_property_borrower_cannot_borrow_more_than_ltv_5 -vvv
+    // NOTE: same as above with the property extracted to be global
+    function test_property_borrower_cannot_borrow_more_than_ltv_5() public {
+        switch_asset(0);
+
+        capToken_mint_clamped(125007552716);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+
+        vm.warp(block.timestamp + 1);
+
+        vm.roll(block.number + 1);
+
+        property_borrower_cannot_borrow_more_than_ltv();
+    }
+
+    // forge test --match-test test_capToken_burn_4 -vvv
+    // NOTE: looks like a real issue, if the vault suffers a loss and reserve amount is set too high, divest call in burn reverts due to underflow
+    // partial admin error, can be changed by them resetting the reserve but would require constant oversight
+    function test_capToken_burn_4() public {
+        capToken_mint_clamped(20000530684);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        capToken_investAll();
+
+        mockERC4626Tester_decreaseYield(1);
+
+        capToken_setReserve(9999523071);
+
+        capToken_burn(10008354012, 0, 0);
+    }
+
+    // forge test --match-test test_capToken_burn_clamped_9 -vvv
+    // NOTE: same as above but with the burn_clamped call instead
+    function test_capToken_burn_clamped_9() public {
+        capToken_mint_clamped(20002834052);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        capToken_investAll();
+
+        mockERC4626Tester_decreaseYield(1);
+
+        capToken_setReserve(10001776161);
+
+        capToken_burn_clamped(10000570266);
+    }
+
+    // forge test --match-test test_doomsday_liquidate_7 -vvv
+    // NOTE: fails at the call to repay
+    function test_doomsday_liquidate_7() public {
+        switchChainlinkOracle(2);
+
+        capToken_mint_clamped(73605660843);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+
+        switch_asset(0);
+
+        mockChainlinkPriceFeed_setLatestAnswer(305875086761391717524);
+
+        mockAaveDataProvider_setVariableBorrowRate(2);
+
+        oracle_setBenchmarkRate(
+            0x3D7Ebc40AF7092E3F1C81F2e996cbA5Cae2090d7,
+            115792089237316195423570985008687907853269984665640564039457584007913129639934
+        );
+
+        doomsday_liquidate(1);
+    }
+
+    // forge test --match-test test_doomsday_repay_8 -vvv
+    // NOTE: this is a subset of the above, also reverts at repay
+    // TODO: optimization test that increases the amount trying to be repaid
+    function test_doomsday_repay_8() public {
+        capToken_mint_clamped(10000686559);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+
+        switch_asset(0);
+
+        oracle_setBenchmarkRate(
+            0x3D7Ebc40AF7092E3F1C81F2e996cbA5Cae2090d7,
+            115792089237316195423570985008687907853269984665640564039457584007913129639934
+        );
+
+        mockAaveDataProvider_setVariableBorrowRate(2);
+
+        doomsday_repay(1);
+    }
+
     /// === Newest Issues === ///
+    // forge test --match-test test_property_no_operation_makes_user_liquidatable_2 -vvv
+    // TODO: investigate further, something is wrong with setting before/after because health is actually correct but the _after call in lender_removeAsset looks like it's silently failing
+    function test_property_no_operation_makes_user_liquidatable_2() public {
+        capToken_mint_clamped(10002668741);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+
+        lender_repay(10004991667);
+
+        switch_asset(0);
+
+        console2.log("==== REMOVE ASSET ====");
+        lender_removeAsset(0x96d3F6c20EEd2697647F543fE6C08bC2Fbf39758);
+
+        property_no_operation_makes_user_liquidatable();
+    }
 }
