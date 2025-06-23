@@ -30,6 +30,7 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
         }
 
         (uint256 totalDelegation,, uint256 totalDebt,,, uint256 healthBefore) = _getAgentParams(_getActor());
+        uint256 emergencyLiquidationHealth = totalDelegation * lender.emergencyLiquidationThreshold() / totalDebt;
 
         // Note: this function will always be called by address(this) (Liquidator will be address(this))
         try lender.liquidate(_getActor(), _getAsset(), _amount) {
@@ -50,8 +51,6 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
 
             // precondition: must not error for one of the expected reasons
             if (!expectedError && !protocolPaused && !assetPaused && totalDebt > 0 && isReserve) {
-                uint256 emergencyLiquidationHealth =
-                    totalDelegation * lender.emergencyLiquidationThreshold() / totalDebt;
                 gt(
                     emergencyLiquidationHealth,
                     RAY,
