@@ -410,6 +410,13 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: after all users have repaid their debt, the reserve.debt should be 0
+    function property_debt_zero_after_repay() public {
+        if (capToken.totalBorrows(_getAsset()) == 0) {
+            eq(lender.getVaultDebt(_getAsset()), 0, "reserve.debt != 0 after all users have repaid their debt");
+        }
+    }
+
     /// @dev Property: if the debt token balance is 0, the agent should not be isBorrowing
     function property_zero_debt_is_borrowing() public {
         for (uint256 i = 0; i < _getActors().length; i++) {
@@ -422,6 +429,24 @@ abstract contract Properties is BeforeAfter, Asserts {
                 }
             }
         }
+    }
+
+    /// @dev Property: agent always has more than minBorrow balance of debtToken
+    function property_agent_always_has_more_than_min_borrow() public {
+        (,, address debtToken,,,, uint256 minBorrow) = lender.reservesData(_getAsset());
+
+        for (uint256 i = 0; i < delegation.agents().length; i++) {
+            address agent = delegation.agents()[i];
+            uint256 debtTokenBalance = MockERC20(debtToken).balanceOf(agent);
+            if (debtTokenBalance != 0) {
+                gte(debtTokenBalance, minBorrow, "agent has less than minBorrow balance of debtToken");
+            }
+        }
+    }
+
+    /// @dev Property: lender does not accumulate dust
+    function property_lender_does_not_accumulate_dust() public {
+        eq(MockERC20(_getAsset()).balanceOf(address(lender)), 0, "lender has dust amount of underlying asset");
     }
 
     /// === Optimization Properties === ///

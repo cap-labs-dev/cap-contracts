@@ -130,4 +130,51 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
             eq(totalDebtTokenSupply, totalVaultDebt, "DebtToken totalSupply < total vault debt");
         }
     }
+
+    /// @dev Property: repaying all debt for all actors transfers same amount of interest as would have been transferred by realizeInterest
+    function doomsday_repay_all() public stateless {
+        // get the maxRealization of what realizing interest would transfer to the interestReceiver
+        uint256 maxRealization = lender.maxRealization(_getAsset());
+        (,, address debtToken, address interestReceiver,,,) = lender.reservesData(_getAsset());
+
+        // repay all debt for all actors, this actually transfers interest to the interestReceiver
+        uint256 interestReceiverBalanceBefore = MockERC20(_getAsset()).balanceOf(interestReceiver);
+        address[] memory actors = _getActors();
+        for (uint256 i = 0; i < actors.length; i++) {
+            address actor = actors[i];
+            uint256 actorDebt = MockERC20(debtToken).balanceOf(actor);
+            if (actorDebt > 0) {
+                lender.repay(_getAsset(), actorDebt, actor);
+            }
+        }
+        uint256 interestReceiverBalanceAfter = MockERC20(_getAsset()).balanceOf(interestReceiver);
+
+        eq(
+            interestReceiverBalanceAfter - interestReceiverBalanceBefore,
+            maxRealization,
+            "interestReceiver balance delta != maxRealization"
+        );
+    }
+
+    /// @dev Property: borrowing and repaying an amount in the same block shouldn't change the utilization rate
+    // NOTE: from previous spearbit finding
+    function doomsday_manipulate_utilization_rate(uint256 _amount) public stateless {
+        // get the utilization rate before a borrow
+        uint256 utilizationBefore = capToken.utilization(_getAsset());
+        uint256 utilizationIndexBefore = capToken.currentUtilizationIndex(_getAsset());
+
+        // borrow some amount
+        lender.borrow(_getAsset(), _amount, _getActor());
+
+        // repay the borrowed amount
+        lender.repay(_getAsset(), _amount, _getActor());
+
+        // get the utilization rate after repaying the borrowed amount
+        uint256 utilizationAfter = capToken.utilization(_getAsset());
+        uint256 utilizationIndexAfter = capToken.currentUtilizationIndex(_getAsset());
+
+        // the utilization rate should be the same as before the borrow
+        eq(utilizationAfter, utilizationBefore, "utilization rate is not the same as before the borrow");
+        eq(utilizationIndexAfter, utilizationIndexBefore, "utilization index is not the same as before the borrow");
+    }
 }

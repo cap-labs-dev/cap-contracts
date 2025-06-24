@@ -221,6 +221,34 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         doomsday_repay(1);
     }
 
+    // forge test --match-test test_doomsday_manipulate_utilization_rate_2 -vvv
+    // NOTE: appears to be valid, need to discover the root cause
+    function test_doomsday_manipulate_utilization_rate_2() public {
+        switchActor(1);
+
+        capToken_mint_clamped(10016233150);
+
+        lender_borrow(100620828, 0x00000000000000000000000000000000DeaDBeef);
+
+        doomsday_manipulate_utilization_rate(100106565);
+    }
+
+    // forge test --match-test test_doomsday_repay_all_5 -vvv
+    // NOTE: looks like a real issue, realizeInterest gives an inconsistent realized interest amount compared to repay
+    function test_doomsday_repay_all_5() public {
+        capToken_mint_clamped(10015633476);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+
+        // note: realizing interest explicitly errors with zero realization
+        // uint256 realizedInterest = lender.realizeInterest(_getAsset());
+        // console2.log("realizedInterest %e", realizedInterest);
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+        doomsday_repay_all();
+    }
+
     /// === Newest Issues === ///
     // forge test --match-test test_property_no_operation_makes_user_liquidatable_2 -vvv
     // TODO: investigate further, something is wrong with setting before/after because health is actually correct but the _after call in lender_removeAsset looks like it's silently failing
