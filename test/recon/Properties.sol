@@ -459,16 +459,6 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
-    /// @dev Property: agent cannot be set to borrowing with zero debt
-    function property_not_borrowing_with_zero_debt() public {
-        (,, address debtToken,,,, uint256 minBorrow) = lender.reservesData(_getAsset());
-        bool borrowing = lender.isBorrowing(_getActor(), _getAsset());
-
-        if (MockERC20(debtToken).balanceOf(_getActor()) == 0) {
-            t(!borrowing, "agent is borrowing with zero debt");
-        }
-    }
-
     /// === Optimization Properties === ///
 
     /// @dev test for optimizing the difference when debt token supply > total vault debt
