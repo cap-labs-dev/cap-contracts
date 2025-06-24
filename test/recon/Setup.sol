@@ -88,6 +88,8 @@ abstract contract Setup is
     int256 maxLTVDelta;
     int256 maxIncreaseHealthDelta;
     int256 maxDecreaseHealthDelta;
+    int256 maxFailedLiquidatedAmount;
+    int256 maxFailedRepayAmount;
 
     uint256 constant RAY = 1e27;
 
