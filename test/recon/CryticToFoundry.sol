@@ -34,6 +34,43 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         lender_liquidate(1);
     }
 
+    // forge test --match-test test_property_zero_debt_is_borrowing_0 -vvv
+    function test_property_zero_debt_is_borrowing_0() public {
+        capToken_mint_clamped(1210366228196525416932125);
+
+        lender_borrow_clamped(381970873);
+
+        lender_repay(381970873);
+
+        lender_borrow_clamped(1);
+    }
+
+    // forge test --match-test test_property_borrower_cannot_borrow_more_than_ltv_0 -vvv
+    function test_property_borrower_cannot_borrow_more_than_ltv_0() public {
+        capToken_mint_clamped(10010535683);
+
+        lender_borrow_clamped(100487071);
+
+        switchChainlinkOracle(13371331940277520313429436050054);
+
+        mockChainlinkPriceFeed_setLatestAnswer(124427995051457044655482);
+
+        property_borrower_cannot_borrow_more_than_ltv();
+    }
+
+    // forge test --match-test test_capToken_burn_clamped_0 -vvv
+    function test_capToken_burn_clamped_0() public {
+        capToken_mint_clamped(20026227836);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        capToken_investAll();
+
+        capToken_burn_clamped(10004329462);
+    }
+
     // forge test --match-test test_property_debt_token_balance_gte_total_vault_debt_1 -vvv
     // NOTE: DebtToken balance < total vault debt, this looks valid
     // NOTE: something is weird about the borrowing amount being type(uint256).max

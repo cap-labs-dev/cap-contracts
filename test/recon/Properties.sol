@@ -449,6 +449,21 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: previewRedeem(totalSupply) >= loaned
+    function property_previewRedeem_greater_than_loaned() public {
+        for (uint256 i = 0; i < capToken.assets().length; i++) {
+            address asset = capToken.assets()[i];
+            uint256 loaned = capToken.loaned(asset);
+            address frVault = capToken.fractionalReserveVault(asset);
+            uint256 totalSupply = MockERC4626Tester(frVault).totalSupply();
+            if (totalSupply == 0) {
+                continue;
+            }
+            uint256 previewRedeem = MockERC4626Tester(frVault).previewRedeem(totalSupply);
+            gte(previewRedeem, loaned, "previewRedeem < loaned");
+        }
+    }
+
     /// === Optimization Properties === ///
 
     /// @dev test for optimizing the difference when debt token supply > total vault debt
