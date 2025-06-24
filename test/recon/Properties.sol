@@ -445,6 +445,11 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: lender does not accumulate dust
+    function property_lender_does_not_accumulate_dust() public {
+        eq(MockERC20(_getAsset()).balanceOf(address(lender)), 0, "lender has dust amount of underlying asset");
+    }
+
     /// === Optimization Properties === ///
 
     /// @dev test for optimizing the difference when debt token supply > total vault debt
