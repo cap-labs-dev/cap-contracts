@@ -94,4 +94,40 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
             }
         }
     }
+
+    /// @dev Property: DebtToken total supply ≥ total vault debt at all times
+    // NOTE: stateless because we're realizing restaker interest since this contributes to the total vault debt
+    function doomsday_debt_token_solvency() public stateless {
+        address[] memory assets = capToken.assets();
+        address[] memory agents = delegation.agents();
+
+        for (uint256 i = 0; i < assets.length; i++) {
+            address asset = assets[i];
+
+            (,, address _debtToken,,,,) = lender.reservesData(asset);
+
+            if (_debtToken == address(0)) {
+                continue;
+            }
+
+            // realize restaker interest for all agents so that we have the correct amount of debtToken minted to each agent
+            for (uint256 j = 0; j < agents.length; j++) {
+                lender.realizeRestakerInterest(agents[j], asset);
+            }
+
+            uint256 totalDebtTokenSupply = MockERC20(_debtToken).totalSupply();
+
+            uint256 totalVaultDebt = 0;
+            uint256 totalDebtTokenBalance = 0;
+            for (uint256 j = 0; j < agents.length; j++) {
+                totalDebtTokenBalance += MockERC20(_debtToken).balanceOf(agents[j]);
+                totalVaultDebt += lender.debt(agents[j], asset);
+            }
+            console2.log("totalDebtTokenBalance %e", totalDebtTokenBalance);
+            console2.log("totalVaultDebt %e", totalVaultDebt);
+            console2.log("totalDebtTokenSupply %e", totalDebtTokenSupply);
+
+            eq(totalDebtTokenSupply, totalVaultDebt, "DebtToken totalSupply < total vault debt");
+        }
+    }
 }

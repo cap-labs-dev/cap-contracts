@@ -50,8 +50,8 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         // borrowing type(uint256).max here
         lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-        console2.log("uint256.max)", type(uint256).max);
-        property_debt_token_balance_gte_total_vault_debt();
+
+        doomsday_debt_token_solvency();
     }
 
     // forge test --match-test test_capToken_mint_clamped_6 -vvv

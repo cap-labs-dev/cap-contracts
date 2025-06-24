@@ -15,7 +15,7 @@
 | 13 | property_delegated_value_greater_than_borrowed_value | Delegated value must be greater than borrowed value, if not the agent should be liquidatable | |
 | 14 | property_ltv | LTV is always <= 1e27 | |
 | 15 | property_cap_token_backed_1_to_1 | cUSD (capToken) must be backed 1:1 by stable underlying assets | |
-| 16 | property_debt_token_balance_gte_total_vault_debt | DebtToken balance ≥ total vault debt at all times | |
+| 16 | doomsday_debt_token_solvency | DebtToken balance ≥ total vault debt at all times | |
 | 17 | property_total_borrowed_less_than_total_supply | Total cUSD borrowed < total supply (utilization < 1e27) | |
 | 18 | property_staked_cap_value_non_decreasing | Staked cap token value must increase or stay the same over time | |
 | 19 | property_utilization_ratio_never_greater_than_1e27 | Utilization ratio is never greater than 1e27 | |
