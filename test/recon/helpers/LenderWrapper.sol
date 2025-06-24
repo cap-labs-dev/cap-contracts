@@ -4,11 +4,8 @@ pragma solidity ^0.8.28;
 import { ILender } from "contracts/interfaces/ILender.sol";
 import { Lender } from "contracts/lendingPool/Lender.sol";
 import { AgentConfiguration } from "contracts/lendingPool/libraries/configuration/AgentConfiguration.sol";
-import { AgentConfiguration } from "contracts/lendingPool/libraries/configuration/AgentConfiguration.sol";
 
 contract LenderWrapper is Lender {
-    using AgentConfiguration for ILender.AgentConfigurationMap;
-
     using AgentConfiguration for ILender.AgentConfigurationMap;
 
     /// @notice Get the total unrealized interest for an asset
