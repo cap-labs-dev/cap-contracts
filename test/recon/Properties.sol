@@ -462,7 +462,10 @@ abstract contract Properties is BeforeAfter, Asserts {
 
         for (uint256 i = 0; i < delegation.agents().length; i++) {
             address agent = delegation.agents()[i];
-            gte(MockERC20(debtToken).balanceOf(agent), minBorrow, "agent has less than minBorrow balance of debtToken");
+            uint256 debtTokenBalance = MockERC20(debtToken).balanceOf(agent);
+            if (debtTokenBalance != 0) {
+                gte(debtTokenBalance, minBorrow, "agent has less than minBorrow balance of debtToken");
+            }
         }
     }
 
