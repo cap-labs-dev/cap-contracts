@@ -435,6 +435,20 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: if the debt token balance is 0, the agent should not be isBorrowing
+    function property_zero_debt_is_borrowing() public {
+        for (uint256 i = 0; i < _getActors().length; i++) {
+            address actor = _getActors()[i];
+            for (uint256 j = 0; j < capToken.assets().length; j++) {
+                address asset = capToken.assets()[j];
+                (,, address _debtToken,,,,) = lender.reservesData(asset);
+                if (MockERC20(_debtToken).balanceOf(actor) == 0) {
+                    t(LenderWrapper(address(lender)).getIsBorrowing(actor, asset) == false, "actor is borrowing");
+                }
+            }
+        }
+    }
+
     /// === Optimization Properties === ///
 
     /// @dev test for optimizing the difference when debt token supply > total vault debt
