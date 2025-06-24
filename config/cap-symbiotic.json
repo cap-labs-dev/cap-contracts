@@ -1,13 +1,13 @@
 {
-    "11155111": {
+    "1": {
         "adapter": {
-            "network": "0x7DE28046eE237912DD799a596F7Ea4a66f2A8fa3",
-            "networkMiddleware": "0xC0cED3b51222507f5fD16861f90cb3dC4F2C41B5",
-            "slashDuration": 3000
+            "feeAllowed": 1000,
+            "network": "0x0000000000000000000000000000000000000000",
+            "networkMiddleware": "0x0000000000000000000000000000000000000000"
         },
         "implems": {
-            "network": "0xB95E2C9d43EB886EDAb0441A6BFf2b59D7e89e5D",
-            "networkMiddleware": "0xcaadd1b8dD14b1581cB3D3172359C643FaCD82D9"
+            "network": "0x0000000000000000000000000000000000000000",
+            "networkMiddleware": "0x0000000000000000000000000000000000000000"
         }
     },
     "17000": {

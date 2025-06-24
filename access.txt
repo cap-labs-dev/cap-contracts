@@ -1,0 +1,78 @@
+No files changed, compilation skipped
+Script ran successfully.
+
+== Logs ==
+  Checking Access for Delegation Contract...
+  Delegation.slash Lender
+  Delegation.setLastBorrow Lender
+  Delegation.addAgent 🚨 Dev EOA 🚨
+  Delegation.modifyAgent 🚨 Dev EOA 🚨
+  Delegation.registerNetwork 🚨 Dev EOA 🚨
+  Delegation.setLtvBuffer 🚨 Dev EOA 🚨
+  Proxy.upgrade 🚨 Dev EOA 🚨
+  
+  Checking Access for Lender Contract...
+  Lender.addAsset 🚨 Dev EOA 🚨
+  Lender.removeAsset 🚨 Dev EOA 🚨
+  Lender.pauseAsset 🚨 Dev EOA 🚨
+  Lender.setMinBorrow 🚨 Dev EOA 🚨
+  Lender.liquidate 🚨 Dev EOA 🚨
+  Vault.removeAsset 🚨 Dev EOA 🚨
+  Proxy.upgrade 🚨 Dev EOA 🚨
+  
+  Checking Access for Oracle Contract...
+  PriceOracle.setPriceOracleData 🚨 Dev EOA 🚨
+  PriceOracle.setPriceBackupOracleData 🚨 Dev EOA 🚨
+  PriceOracle.setStaleness 🚨 Dev EOA 🚨
+  RateOracle.setMarketOracleData 🚨 Dev EOA 🚨
+  RateOracle.setUtilizationOracleData 🚨 Dev EOA 🚨
+  RateOracle.setBenchmarkRate 🚨 Dev EOA 🚨
+  RateOracle.setRestakerRate 🚨 Dev EOA 🚨
+  Proxy.upgrade 🚨 Dev EOA 🚨
+  
+  Checking Access for Access Control Contract...
+  AccessControl.grantAccess 🚨 Dev EOA 🚨
+  AccessControl.revokeAccess 🚨 Dev EOA 🚨
+  
+  Checking Access for Network Contract...
+  Proxy.upgrade 🚨 Dev EOA 🚨
+  
+  Checking Access for Network Middleware Contract...
+  Proxy.upgrade 🚨 Dev EOA 🚨
+  
+  Checking Access for Fee Auction (cUSD) Contract...
+  FeeAuction.setStartPrice Lender
+  FeeAuction.setStartPrice 🚨 Dev EOA 🚨
+  FeeAuction.setDuration Lender
+  FeeAuction.setDuration 🚨 Dev EOA 🚨
+  FeeAuction.setMinStartPrice Lender
+  FeeAuction.setMinStartPrice 🚨 Dev EOA 🚨
+  Proxy.upgrade 🚨 Dev EOA 🚨
+  
+  Checking Access for Fee Receiver (cUSD) Contract...
+  FeeReceiver.setProtocolFeePercentage 🚨 Dev EOA 🚨
+  FeeReceiver.setProtocolFeeReceiver 🚨 Dev EOA 🚨
+  
+  Checking Access for Vault (cUSD) Contract...
+  FractionalReserve.investAll 🚨 Dev EOA 🚨
+  FractionalReserve.divestAll 🚨 Dev EOA 🚨
+  FractionalReserve.setFractionalReserveVault 🚨 Dev EOA 🚨
+  FractionalReserve.setReserve 🚨 Dev EOA 🚨
+  Minter.setFeeData 🚨 Dev EOA 🚨
+  Minter.setRedeemFee 🚨 Dev EOA 🚨
+  Minter.setWhitelist 🚨 Dev EOA 🚨
+  Vault.repay Lender
+  Vault.pauseAsset 🚨 Dev EOA 🚨
+  Vault.unpauseAsset 🚨 Dev EOA 🚨
+  Vault.pauseProtocol 🚨 Dev EOA 🚨
+  Vault.unpauseProtocol 🚨 Dev EOA 🚨
+  Proxy.upgrade 🚨 Dev EOA 🚨
+  
+  Checking Access for Staked Vault (cUSD) Contract...
+  Proxy.upgrade 🚨 Dev EOA 🚨
+  
+  Checking Access for Debt Token 0 of cUSD vault (Debt USD Coin) Contract...
+  DebtToken.mint Lender
+  DebtToken.burn Lender
+  Proxy.upgrade 🚨 Dev EOA 🚨
+  
