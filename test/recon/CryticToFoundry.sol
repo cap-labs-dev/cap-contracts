@@ -50,8 +50,8 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         // borrowing type(uint256).max here
         lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-        console2.log("uint256.max)", type(uint256).max);
-        property_debt_token_balance_gte_total_vault_debt();
+
+        doomsday_debt_token_solvency();
     }
 
     // forge test --match-test test_capToken_mint_clamped_6 -vvv
@@ -160,25 +160,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         property_borrower_cannot_borrow_more_than_ltv();
     }
 
-    // forge test --match-test test_capToken_burn_4 -vvv
-    // NOTE: looks like a real issue, if the vault suffers a loss and reserve amount is set too high, divest call in burn reverts due to underflow
-    // partial admin error, can be changed by them resetting the reserve but would require constant oversight
-    function test_capToken_burn_4() public {
-        capToken_mint_clamped(20000530684);
-
-        add_new_vault();
-
-        capToken_setFractionalReserveVault();
-
-        capToken_investAll();
-
-        mockERC4626Tester_decreaseYield(1);
-
-        capToken_setReserve(9999523071);
-
-        capToken_burn(10008354012, 0, 0);
-    }
-
     // forge test --match-test test_capToken_burn_clamped_9 -vvv
     // NOTE: same as above but with the burn_clamped call instead
     function test_capToken_burn_clamped_9() public {
@@ -284,5 +265,16 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         lender_removeAsset(0x96d3F6c20EEd2697647F543fE6C08bC2Fbf39758);
 
         property_no_operation_makes_user_liquidatable();
+    }
+
+    // forge test --match-test test_property_zero_debt_is_borrowing_0 -vvv
+    function test_property_zero_debt_is_borrowing_0() public {
+        capToken_mint_clamped(1210366228196525416932125);
+
+        lender_borrow_clamped(381970873);
+
+        lender_repay(381970873);
+
+        property_zero_debt_is_borrowing();
     }
 }

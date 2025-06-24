@@ -267,31 +267,6 @@ abstract contract Properties is BeforeAfter, Asserts {
         gte(totalBackingValue, capTokenTotalSupply * capPrice / 1e8, "capToken not backed 1:1 by underlying assets");
     }
 
-    /// @dev Property: DebtToken total supply ≥ total vault debt at all times
-    function property_debt_token_balance_gte_total_vault_debt() public {
-        address[] memory assets = capToken.assets();
-        address[] memory agents = delegation.agents();
-
-        for (uint256 i = 0; i < assets.length; i++) {
-            address asset = assets[i];
-
-            (,, address _debtToken,,,,) = lender.reservesData(asset);
-
-            if (_debtToken == address(0)) {
-                continue;
-            }
-
-            uint256 totalDebtTokenSupply = MockERC20(_debtToken).totalSupply();
-
-            uint256 totalVaultDebt = 0;
-            for (uint256 j = 0; j < agents.length; j++) {
-                totalVaultDebt += lender.debt(agents[j], asset);
-            }
-
-            eq(totalDebtTokenSupply, totalVaultDebt, "DebtToken totalSupply < total vault debt");
-        }
-    }
-
     /// @dev Property: Total cUSD borrowed < total supply (utilization < 1e27)
     function property_total_borrowed_less_than_total_supply() public {
         address[] memory assets = capToken.assets();
@@ -479,23 +454,9 @@ abstract contract Properties is BeforeAfter, Asserts {
     /// @dev test for optimizing the difference when debt token supply > total vault debt
     function optimize_debt_token_supply_greater_than_total_vault_debt() public returns (int256) {
         address[] memory assets = capToken.assets();
-        address[] memory agents = delegation.agents();
 
         for (uint256 i = 0; i < assets.length; i++) {
-            address asset = assets[i];
-
-            (,, address _debtToken,,,,) = lender.reservesData(asset);
-
-            if (_debtToken == address(0)) {
-                continue;
-            }
-
-            uint256 totalDebtTokenSupply = MockERC20(_debtToken).totalSupply();
-
-            uint256 totalVaultDebt = 0;
-            for (uint256 j = 0; j < agents.length; j++) {
-                totalVaultDebt += lender.debt(agents[j], asset);
-            }
+            (uint256 totalDebtTokenSupply, uint256 totalVaultDebt) = _sumTotalDebtTokens(assets[i]);
 
             if (totalDebtTokenSupply > totalVaultDebt) {
                 return int256(totalDebtTokenSupply - totalVaultDebt);
@@ -511,20 +472,7 @@ abstract contract Properties is BeforeAfter, Asserts {
         address[] memory agents = delegation.agents();
 
         for (uint256 i = 0; i < assets.length; i++) {
-            address asset = assets[i];
-
-            (,, address _debtToken,,,,) = lender.reservesData(asset);
-
-            if (_debtToken == address(0)) {
-                continue;
-            }
-
-            uint256 totalDebtTokenSupply = MockERC20(_debtToken).totalSupply();
-
-            uint256 totalVaultDebt = 0;
-            for (uint256 j = 0; j < agents.length; j++) {
-                totalVaultDebt += lender.debt(agents[j], asset);
-            }
+            (uint256 totalDebtTokenSupply, uint256 totalVaultDebt) = _sumTotalDebtTokens(assets[i]);
 
             if (totalVaultDebt > totalDebtTokenSupply) {
                 return int256(totalVaultDebt - totalDebtTokenSupply);
@@ -540,20 +488,7 @@ abstract contract Properties is BeforeAfter, Asserts {
         address[] memory agents = delegation.agents();
 
         for (uint256 i = 0; i < assets.length; i++) {
-            address asset = assets[i];
-
-            (,, address _debtToken,,,,) = lender.reservesData(asset);
-
-            if (_debtToken == address(0)) {
-                continue;
-            }
-
-            uint256 totalDebtTokenSupply = MockERC20(_debtToken).totalSupply();
-
-            uint256 totalVaultDebt = 0;
-            for (uint256 j = 0; j < agents.length; j++) {
-                totalVaultDebt += lender.debt(agents[j], asset);
-            }
+            (uint256 totalDebtTokenSupply, uint256 totalVaultDebt) = _sumTotalDebtTokens(assets[i]);
 
             if (totalDebtTokenSupply > totalVaultDebt) {
                 return int256(totalDebtTokenSupply * 1e18 / totalVaultDebt);
@@ -569,20 +504,7 @@ abstract contract Properties is BeforeAfter, Asserts {
         address[] memory agents = delegation.agents();
 
         for (uint256 i = 0; i < assets.length; i++) {
-            address asset = assets[i];
-
-            (,, address _debtToken,,,,) = lender.reservesData(asset);
-
-            if (_debtToken == address(0)) {
-                continue;
-            }
-
-            uint256 totalDebtTokenSupply = MockERC20(_debtToken).totalSupply();
-
-            uint256 totalVaultDebt = 0;
-            for (uint256 j = 0; j < agents.length; j++) {
-                totalVaultDebt += lender.debt(agents[j], asset);
-            }
+            (uint256 totalDebtTokenSupply, uint256 totalVaultDebt) = _sumTotalDebtTokens(assets[i]);
 
             if (totalVaultDebt > totalDebtTokenSupply) {
                 return int256(totalVaultDebt * 1e18 / totalDebtTokenSupply);
@@ -617,5 +539,28 @@ abstract contract Properties is BeforeAfter, Asserts {
         } else {
             return MockERC4626Tester(fractionalReserveVault).totalLosses();
         }
+    }
+
+    function _sumTotalDebtTokens(address _asset) internal returns (uint256, uint256) {
+        address[] memory agents = delegation.agents();
+        (,, address _debtToken,,,,) = lender.reservesData(_asset);
+
+        if (_debtToken == address(0)) {
+            return (0, 0);
+        }
+
+        // realize restaker interest for all agents so that we have the correct amount of debtToken minted to each agent
+        for (uint256 j = 0; j < agents.length; j++) {
+            lender.realizeRestakerInterest(agents[j], _asset);
+        }
+
+        uint256 totalDebtTokenSupply = MockERC20(_debtToken).totalSupply();
+
+        uint256 totalVaultDebt = 0;
+        for (uint256 j = 0; j < agents.length; j++) {
+            totalVaultDebt += lender.debt(agents[j], _asset);
+        }
+
+        return (totalDebtTokenSupply, totalVaultDebt);
     }
 }
