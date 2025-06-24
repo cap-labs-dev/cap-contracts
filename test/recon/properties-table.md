@@ -79,3 +79,4 @@
 | 75 | property_lender_does_not_accumulate_dust | lender does not accumulate dust | |
 | 76 | property_debt_zero_after_repay | after all users have repaid their debt, the `reserve.debt` should be 0 | |
 | 77 | doomsday_repay_all | repaying all debt for all actors transfers same amount of interest as would have been transferred by `realizeInterest` | |
+| 78 | doomsday_manipulate_utilization_rate | borrowing and repaying an amount in the same block shouldn't change the utilization rate | |

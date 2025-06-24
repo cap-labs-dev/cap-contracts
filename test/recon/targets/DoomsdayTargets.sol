@@ -119,4 +119,26 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
             "interestReceiver balance delta != maxRealization"
         );
     }
+
+    /// @dev Property: borrowing and repaying an amount in the same block shouldn't change the utilization rate
+    // NOTE: from previous spearbit finding
+    function doomsday_manipulate_utilization_rate(uint256 _amount) public stateless {
+        // get the utilization rate before a borrow
+        uint256 utilizationBefore = capToken.utilization(_getAsset());
+        uint256 utilizationIndexBefore = capToken.currentUtilizationIndex(_getAsset());
+
+        // borrow some amount
+        lender.borrow(_getAsset(), _amount, _getActor());
+
+        // repay the borrowed amount
+        lender.repay(_getAsset(), _amount, _getActor());
+
+        // get the utilization rate after repaying the borrowed amount
+        uint256 utilizationAfter = capToken.utilization(_getAsset());
+        uint256 utilizationIndexAfter = capToken.currentUtilizationIndex(_getAsset());
+
+        // the utilization rate should be the same as before the borrow
+        eq(utilizationAfter, utilizationBefore, "utilization rate is not the same as before the borrow");
+        eq(utilizationIndexAfter, utilizationIndexBefore, "utilization index is not the same as before the borrow");
+    }
 }
