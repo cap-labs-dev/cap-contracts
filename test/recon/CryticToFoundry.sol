@@ -180,6 +180,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
     // forge test --match-test test_doomsday_liquidate_7 -vvv
     // NOTE: fails at the call to repay
+    // NOTE: fixed by clamping benchmark rate up to 100%, need to confirm if it doesn't break again
     function test_doomsday_liquidate_7() public {
         switchChainlinkOracle(2);
 
