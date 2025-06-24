@@ -435,6 +435,13 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: after all users have repaid their debt, the reserve.debt should be 0
+    function property_debt_zero_after_repay() public {
+        if (capToken.totalBorrows(_getAsset()) == 0) {
+            eq(lender.getVaultDebt(_getAsset()), 0, "reserve.debt != 0 after all users have repaid their debt");
+        }
+    }
+
     /// @dev Property: if the debt token balance is 0, the agent should not be isBorrowing
     function property_zero_debt_is_borrowing() public {
         for (uint256 i = 0; i < _getActors().length; i++) {

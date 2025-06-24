@@ -77,3 +77,4 @@
 | 73 | property_zero_debt_is_borrowing | if the debt token balance is 0, the agent should not be isBorrowing | |
 | 74 | property_agent_always_has_more_than_min_borrow | agent always has more than minBorrow balance of debtToken | |
 | 75 | property_lender_does_not_accumulate_dust | lender does not accumulate dust | |
+| 76 | property_debt_zero_after_repay | after all users have repaid their debt, the reserve.debt should be 0 | |
