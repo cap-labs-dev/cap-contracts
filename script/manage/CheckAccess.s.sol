@@ -75,6 +75,7 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
         NamedSelector({ selector: Lender.removeAsset.selector, name: "Lender.removeAsset" }),
         NamedSelector({ selector: Lender.pauseAsset.selector, name: "Lender.pauseAsset" }),
         NamedSelector({ selector: Lender.setMinBorrow.selector, name: "Lender.setMinBorrow" }),
+        NamedSelector({ selector: Lender.liquidate.selector, name: "Lender.liquidate" }),
         NamedSelector({ selector: DebtToken.mint.selector, name: "DebtToken.mint" }),
         NamedSelector({ selector: DebtToken.burn.selector, name: "DebtToken.burn" }),
         NamedSelector({ selector: PriceOracle.setPriceOracleData.selector, name: "PriceOracle.setPriceOracleData" }),

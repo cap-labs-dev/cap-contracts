@@ -1,6 +1,4 @@
-Compiling 253 files with Solc 0.8.28
-Solc 0.8.28 finished in 17.10s
-Compiler run successful!
+No files changed, compilation skipped
 Script ran successfully.
 
 == Logs ==
@@ -18,6 +16,7 @@ Script ran successfully.
   Lender.removeAsset 🚨 Dev EOA 🚨
   Lender.pauseAsset 🚨 Dev EOA 🚨
   Lender.setMinBorrow 🚨 Dev EOA 🚨
+  Lender.liquidate 🚨 Dev EOA 🚨
   Vault.removeAsset 🚨 Dev EOA 🚨
   Proxy.upgrade 🚨 Dev EOA 🚨
   
