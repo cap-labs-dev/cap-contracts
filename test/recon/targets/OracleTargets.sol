@@ -23,6 +23,7 @@ abstract contract OracleTargets is BaseTargetFunctions, Properties {
     }
 
     function oracle_setRestakerRate(address _agent, uint256 _rate) public asActor {
+        _rate %= (RAY + 1); // upper bound of 100% interest rates
         oracle.setRestakerRate(_agent, _rate);
     }
 

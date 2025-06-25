@@ -25,7 +25,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         capToken_mint_clamped(10005653326);
 
-        lender_borrow(501317817, 0x00000000000000000000000000000000DeaDBeef);
+        lender_borrow(501317817);
 
         switchChainlinkOracle(2);
 
@@ -47,13 +47,31 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         property_borrower_cannot_borrow_more_than_ltv();
     }
 
+    // forge test --match-test test_capToken_burn_8 -vvv
+    function test_capToken_burn_8() public {
+        capToken_mint_clamped(20004575791);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        mockERC4626Tester_setLossOnWithdraw(100);
+
+        capToken_investAll();
+
+        capToken_burn(10000142451, 0, 1525106545);
+    }
+
     // forge test --match-test test_capToken_burn_clamped_0 -vvv
+    // NOTE: same as above but with the burn_clamped call instead
     function test_capToken_burn_clamped_0() public {
         capToken_mint_clamped(20026227836);
 
         add_new_vault();
 
         capToken_setFractionalReserveVault();
+
+        mockERC4626Tester_setLossOnWithdraw(100);
 
         capToken_investAll();
 
@@ -66,7 +84,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     function test_property_debt_token_balance_gte_total_vault_debt_1() public {
         capToken_mint_clamped(10000718111);
 
-        lender_borrow(100014444, 0x00000000000000000000000000000000DeaDBeef);
+        lender_borrow(100014444);
 
         vm.warp(block.timestamp + 6);
 
@@ -90,10 +108,10 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         capToken_mint_clamped(10000107608);
     }
 
-    // forge test --match-test test_lender_realizeRestakerInterest_8 -vvv
+    // forge test --match-test test_property_health_should_not_change_when_realizeRestakerInterest_is_called_6 -vvv
     // NOTE: agent health changes if the restaker rate is decreased
     // TODO: optimization test for this
-    function test_lender_realizeRestakerInterest_8() public {
+    function test_property_health_should_not_change_when_realizeRestakerInterest_is_called_6() public {
         switch_asset(0);
 
         // set initial rate to 0.5%
@@ -122,56 +140,8 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         property_health_should_not_change_when_realizeRestakerInterest_is_called();
     }
 
-    // forge test --match-test test_property_health_should_not_change_when_realizeRestakerInterest_is_called_6 -vvv
-    // NOTE: same as above with the property extracted to be global
-    function test_property_health_should_not_change_when_realizeRestakerInterest_is_called_6() public {
-        switch_asset(0);
-
-        capToken_mint_clamped(612047141);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
-        oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 2735589900858180726609421);
-
-        vm.warp(block.timestamp + 152);
-
-        vm.roll(block.number + 1);
-
-        lender_realizeRestakerInterest();
-
-        property_health_should_not_change_when_realizeRestakerInterest_is_called();
-    }
-
-    // forge test --match-test test_lender_borrow_clamped_6 -vvv
-    // NOTE: looks like truncation in LTV calculation causes the issue
-    // TODO: optimization test for this
-    function test_lender_borrow_clamped_6() public {
-        switch_asset(0);
-
-        delegation_modifyAgent_clamped(
-            129181229575799737715131132821888667075620458965846965435092154830549421623,
-            72839458564055505122023948938095823631408136626438696912038330677298861505
-        );
-
-        capToken_mint_clamped(126357672253);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
-        vm.warp(block.timestamp + 17866);
-
-        vm.roll(block.number + 1);
-
-        switchActor(1);
-
-        vm.warp(block.timestamp + 1299632);
-
-        vm.roll(block.number + 1);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-    }
-
     // forge test --match-test test_property_borrower_cannot_borrow_more_than_ltv_5 -vvv
-    // NOTE: same as above with the property extracted to be global
+    // NOTE: looks like truncation in LTV calculation causes the issue
     function test_property_borrower_cannot_borrow_more_than_ltv_5() public {
         switch_asset(0);
 
@@ -184,24 +154,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         vm.roll(block.number + 1);
 
         property_borrower_cannot_borrow_more_than_ltv();
-    }
-
-    // forge test --match-test test_capToken_burn_clamped_9 -vvv
-    // NOTE: same as above but with the burn_clamped call instead
-    function test_capToken_burn_clamped_9() public {
-        capToken_mint_clamped(20002834052);
-
-        add_new_vault();
-
-        capToken_setFractionalReserveVault();
-
-        capToken_investAll();
-
-        mockERC4626Tester_decreaseYield(1);
-
-        capToken_setReserve(10001776161);
-
-        capToken_burn_clamped(10000570266);
     }
 
     // forge test --match-test test_doomsday_liquidate_7 -vvv
@@ -255,7 +207,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         capToken_mint_clamped(10016233150);
 
-        lender_borrow(100620828, 0x00000000000000000000000000000000DeaDBeef);
+        lender_borrow(100620828);
 
         doomsday_manipulate_utilization_rate(100106565);
     }
@@ -276,6 +228,35 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         doomsday_repay_all();
     }
 
+    // forge test --match-test test_property_zero_debt_is_borrowing_0 -vvv
+    // NOTE: looks like a real issue, user can have 0 debt but still be borrowing
+    function test_property_zero_debt_is_borrowing_0() public {
+        capToken_mint_clamped(1210366228196525416932125);
+
+        lender_borrow_clamped(381970873);
+
+        lender_repay(381970873);
+
+        property_zero_debt_is_borrowing();
+    }
+
+    // forge test --match-test test_doomsday_liquidate_1 -vvv
+    // NOTE: looks like a depeg can cause liquidation to fail
+    function test_doomsday_liquidate_1() public {
+        capToken_mint_clamped(76546915659384565102);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+
+        asset_approve(0x15cF58144EF33af1e14b5208015d11F9143E27b9, 0);
+
+        switchChainlinkOracle(3);
+
+        // sets the price to 8.5016866e7
+        mockChainlinkPriceFeed_setLatestAnswer_clamped(-158910016361134981458467509623070);
+
+        doomsday_liquidate(1);
+    }
+
     /// === Newest Issues === ///
     // forge test --match-test test_property_no_operation_makes_user_liquidatable_2 -vvv
     // TODO: investigate further, something is wrong with setting before/after because health is actually correct but the _after call in lender_removeAsset looks like it's silently failing
@@ -294,14 +275,22 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         property_no_operation_makes_user_liquidatable();
     }
 
-    // forge test --match-test test_property_zero_debt_is_borrowing_0 -vvv
-    function test_property_zero_debt_is_borrowing_0() public {
-        capToken_mint_clamped(1210366228196525416932125);
+    // forge test --match-test test_lender_borrow_clamped_13 -vvv
+    function test_lender_borrow_clamped_13() public {
+        switch_asset(0);
 
-        lender_borrow_clamped(381970873);
+        capToken_mint_clamped(114947380);
 
-        lender_repay(381970873);
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
 
-        property_zero_debt_is_borrowing();
+        oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 292733041588401904719173);
+
+        capToken_mint_clamped(124892572629);
+
+        vm.warp(block.timestamp + 6620);
+
+        vm.roll(block.number + 1);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
     }
 }
