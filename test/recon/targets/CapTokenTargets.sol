@@ -167,7 +167,8 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         try capToken.divestAll(_getAsset()) { }
         catch (bytes memory reason) {
             bool expectedError = checkError(reason, "LossFromFractionalReserve(address,address,uint256)")
-                || checkError(reason, "AccessControlUnauthorizedAccount(address,bytes32)");
+                || checkError(reason, "AccessControlUnauthorizedAccount(address,bytes32)")
+                || checkError(reason, "FullDivestRequired(address,uint256)");
             if (!expectedError) {
                 t(false, "ERC4626 must always be divestable");
             }
