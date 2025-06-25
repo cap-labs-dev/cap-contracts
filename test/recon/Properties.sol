@@ -529,10 +529,6 @@ abstract contract Properties is BeforeAfter, Asserts {
         return 0;
     }
 
-    function optimize_burnable_amount_no_fee() public returns (int256) {
-        return maxAmountOut;
-    }
-
     function optimize_max_ltv_delta() public returns (int256) {
         return maxLTVDelta;
     }
