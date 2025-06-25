@@ -81,3 +81,4 @@
 | 77 | doomsday_repay_all | repaying all debt for all actors transfers same amount of interest as would have been transferred by `realizeInterest` | |
 | 78 | doomsday_manipulate_utilization_rate | borrowing and repaying an amount in the same block shouldn't change the utilization rate | |
 | 79 | property_previewRedeem_greater_than_loaned | `previewRedeem(totalSupply)` >= `loaned` | |
+| 80 | doomsday_dust_on_redeem | after all users redeem there should be no assets left in the vault | |
