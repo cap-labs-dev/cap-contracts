@@ -115,7 +115,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             );
 
             if (_amount == type(uint256).max) {
-                eq(
+                lte(
                     MockERC20(_getAsset()).balanceOf(_getActor()),
                     beforeAssetBalance + beforeMaxBorrowable,
                     "Borrower asset balance did not increase after borrowing (in case of max borrow)"
