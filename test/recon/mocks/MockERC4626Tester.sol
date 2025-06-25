@@ -3,7 +3,6 @@
 pragma solidity ^0.8.0;
 
 import { MockERC20 } from "@recon/MockERC20.sol";
-import { console2 } from "forge-std/console2.sol";
 
 abstract contract ERC4626 is MockERC20 {
     MockERC20 public immutable asset;
@@ -130,7 +129,7 @@ contract MockERC4626Tester is ERC4626 {
     uint8 public decimalsOffset;
     /// @dev Track total losses
     uint256 public totalLosses;
-    uint256 public lossOnWithdraw = 100;
+    uint256 public lossOnWithdraw;
     uint256 public MAX_BPS = 10_000;
 
     constructor(address _asset) ERC4626(MockERC20(_asset)) { }
@@ -163,6 +162,11 @@ contract MockERC4626Tester is ERC4626 {
     //     MockERC20(asset).transferFrom(msg.sender, address(this), gainAmount);
     // }
 
+    function setLossOnWithdraw(uint256 _lossOnWithdraw) public {
+        _lossOnWithdraw %= MAX_BPS + 1; // clamp to ensure we set a max of 100%
+        lossOnWithdraw = _lossOnWithdraw;
+    }
+
     /// @dev Increase the yield by a given percentage by taking assets from the caller.
     /// @param increasePercentageFP4 Percentage increase in basis points (e.g., 100 = 1%)
     function increaseYield(uint256 increasePercentageFP4) public {
@@ -177,6 +181,7 @@ contract MockERC4626Tester is ERC4626 {
         require(decreasePercentageFP4 <= 10000, "Invalid percentage");
         uint256 amount = totalAssets() * decreasePercentageFP4 / 10000;
         MockERC20(asset).transfer(address(0xbeef), amount);
+
         totalLosses += amount;
     }
 
