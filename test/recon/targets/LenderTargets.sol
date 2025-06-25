@@ -43,6 +43,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     ) public updateGhosts asAdmin {
         require(!_isAddressUnderlying(vault), "vault is already an underlying asset");
         require(!_isAddressUnderlying(debtToken), "debtToken is already an underlying asset");
+        require(_isAddressDebtToken(debtToken), "debtToken is not a deployed DebtToken");
 
         ILender.AddAssetParams memory params = ILender.AddAssetParams({
             asset: asset,
@@ -59,6 +60,20 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         address[] memory assets = _getAssets();
         for (uint256 i; i < assets.length; ++i) {
             if (assets[i] == addressToCheck) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function _isAddressDebtToken(address addressToCheck) internal view returns (bool) {
+        // In your test contract that inherits from Setup
+        address[] memory debtTokens = env.usdVault.debtTokens;
+
+        // Access individual debt tokens
+        for (uint256 i = 0; i < debtTokens.length; i++) {
+            address debtToken = debtTokens[i];
+            if (debtToken == addressToCheck) {
                 return true;
             }
         }
