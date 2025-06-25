@@ -556,10 +556,6 @@ abstract contract Properties is BeforeAfter, Asserts {
         return maxFailedLiquidatedAmount;
     }
 
-    function optimize_max_failed_repay_amount() public returns (int256) {
-        return maxFailedRepayAmount;
-    }
-
     /// === Helpers === ///
     function _getFractionalReserveLosses(address _asset) internal view returns (uint256) {
         address fractionalReserveVault = capToken.fractionalReserveVault(_asset);

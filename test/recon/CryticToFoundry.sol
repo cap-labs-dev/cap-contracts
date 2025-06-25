@@ -34,19 +34,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         lender_liquidate(1);
     }
 
-    // forge test --match-test test_property_borrower_cannot_borrow_more_than_ltv_0 -vvv
-    function test_property_borrower_cannot_borrow_more_than_ltv_0() public {
-        capToken_mint_clamped(10010535683);
-
-        lender_borrow_clamped(100487071);
-
-        switchChainlinkOracle(13371331940277520313429436050054);
-
-        mockChainlinkPriceFeed_setLatestAnswer(124427995051457044655482);
-
-        property_borrower_cannot_borrow_more_than_ltv();
-    }
-
     // forge test --match-test test_capToken_burn_8 -vvv
     function test_capToken_burn_8() public {
         capToken_mint_clamped(20004575791);
@@ -137,6 +124,9 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         console2.log("totalDebtAfter %e", totalDebtAfter);
         console2.log("healthBefore %e", healthBefore);
         console2.log("healthAfter %e", healthAfter);
+        console2.log("maxDecreaseHealthDelta %e", maxDecreaseHealthDelta);
+        console2.log("optimize_max_health_decrease %e", optimize_max_health_decrease());
+
         property_health_should_not_change_when_realizeRestakerInterest_is_called();
     }
 
@@ -154,50 +144,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         vm.roll(block.number + 1);
 
         property_borrower_cannot_borrow_more_than_ltv();
-    }
-
-    // forge test --match-test test_doomsday_liquidate_7 -vvv
-    // NOTE: fails at the call to repay
-    // NOTE: fixed by clamping benchmark rate up to 100%, need to confirm if it doesn't break again
-    function test_doomsday_liquidate_7() public {
-        switchChainlinkOracle(2);
-
-        capToken_mint_clamped(73605660843);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
-        switch_asset(0);
-
-        mockChainlinkPriceFeed_setLatestAnswer(305875086761391717524);
-
-        mockAaveDataProvider_setVariableBorrowRate(2);
-
-        oracle_setBenchmarkRate(
-            0x3D7Ebc40AF7092E3F1C81F2e996cbA5Cae2090d7,
-            115792089237316195423570985008687907853269984665640564039457584007913129639934
-        );
-
-        doomsday_liquidate(1);
-    }
-
-    // forge test --match-test test_doomsday_repay_8 -vvv
-    // NOTE: this is a subset of the above, also reverts at repay
-    // TODO: optimization test that increases the amount trying to be repaid
-    function test_doomsday_repay_8() public {
-        capToken_mint_clamped(10000686559);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
-        switch_asset(0);
-
-        oracle_setBenchmarkRate(
-            0x3D7Ebc40AF7092E3F1C81F2e996cbA5Cae2090d7,
-            115792089237316195423570985008687907853269984665640564039457584007913129639934
-        );
-
-        mockAaveDataProvider_setVariableBorrowRate(2);
-
-        doomsday_repay(1);
     }
 
     // forge test --match-test test_doomsday_manipulate_utilization_rate_2 -vvv

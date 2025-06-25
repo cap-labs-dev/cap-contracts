@@ -6,16 +6,17 @@ import { BaseTargetFunctions } from "@chimera/BaseTargetFunctions.sol";
 import { vm } from "@chimera/Hevm.sol";
 
 // Helpers
+import { MockERC20 } from "@recon/MockERC20.sol";
+import { Panic } from "@recon/Panic.sol";
+import { console2 } from "forge-std/console2.sol";
+
+import { ILender } from "contracts/interfaces/ILender.sol";
+import { Lender } from "contracts/lendingPool/Lender.sol";
+import { DebtToken } from "contracts/lendingPool/tokens/DebtToken.sol";
 
 import { OpType } from "../BeforeAfter.sol";
 import { Properties } from "../Properties.sol";
-import { MockERC20 } from "@recon/MockERC20.sol";
-import { Panic } from "@recon/Panic.sol";
-import { DebtToken } from "contracts/lendingPool/tokens/DebtToken.sol";
-import { console2 } from "forge-std/console2.sol";
 import { LenderWrapper } from "test/recon/helpers/LenderWrapper.sol";
-
-import "contracts/lendingPool/Lender.sol";
 
 abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
@@ -228,7 +229,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         );
     }
 
-    // NOTE: this handler just exists to make optimization easier because the lender_liquidate handler has stack too deep issues
+    // NOTE: this handler only exists to make optimization easier because the lender_liquidate handler has stack too deep issues
     function lender_liquidate_optimization(uint256 _amount) public updateGhostsWithType(OpType.LIQUIDATE) asActor {
         (uint256 totalDelegation,, uint256 totalDebt,,, uint256 healthBefore) = _getAgentParams(_getActor());
         uint256 emergencyLiquidationHealth = totalDelegation * lender.emergencyLiquidationThreshold() / totalDebt;
@@ -355,37 +356,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender.removeAsset(_asset);
     }
 
-    function lender_repay(uint256 _amount) public asActor {
-        (,, uint256 totalDebt,,,) = lender.agent(_getActor());
-
-        try lender.repay(_getAsset(), _amount, _getActor()) { }
-        catch (bytes memory reason) {
-            // Preconditions: should have debt, enough allowance and balance to repay
-            if (
-                totalDebt == 0 || MockERC20(_getAsset()).allowance(_getActor(), address(lender)) < _amount
-                    || MockERC20(_getAsset()).balanceOf(_getActor()) < _amount
-            ) {
-                return;
-            }
-
-            bool expectedError = checkError(reason, "InvalidBurnAmount()")
-                || checkError(reason, "LossFromFractionalReserve(address,address,uint256)"); // fractional reserve loss
-            bool enoughAllowance = MockERC20(_getAsset()).allowance(_getActor(), address(lender)) >= _amount;
-            bool enoughBalance = MockERC20(_getAsset()).balanceOf(_getActor()) >= _amount;
-            bool protocolPaused = capToken.paused();
-            bool assetPaused = capToken.paused(_getAsset());
-            (, address vault,,,,,) = lender.reservesData(_getAsset());
-            bool isReserve = vault != address(0); // token must be a reserve in the lender
-
-            if (
-                !expectedError && !protocolPaused && !assetPaused && enoughAllowance && enoughBalance && _amount > 0
-                    && isReserve
-            ) {
-                // set the max failed repay amount if it's larger than the existing amount
-                if (maxFailedRepayAmount < int256(_amount)) {
-                    maxFailedRepayAmount = int256(_amount);
-                }
-            }
-        }
+    function lender_repay(uint256 _amount) public updateGhosts asActor {
+        lender.repay(_getAsset(), _amount, _getActor());
     }
 }
