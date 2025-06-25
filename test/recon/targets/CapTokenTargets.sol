@@ -163,9 +163,14 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
     }
 
     /// @dev Property: ERC4626 must always be divestable
+    /// @dev Property: No assets should be left in the vault after divesting all
     function capToken_divestAll() public updateGhostsWithType(OpType.DIVEST) asActor {
-        try capToken.divestAll(_getAsset()) { }
-        catch (bytes memory reason) {
+        address frVault = capToken.fractionalReserveVault(_getAsset());
+
+        try capToken.divestAll(_getAsset()) {
+            uint256 assetBalance = MockERC20(_getAsset()).balanceOf(address(frVault));
+            eq(assetBalance, 0, "dust amount of asset remaining after divesting all");
+        } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "LossFromFractionalReserve(address,address,uint256)")
                 || checkError(reason, "AccessControlUnauthorizedAccount(address,bytes32)")
                 || checkError(reason, "FullDivestRequired(address,uint256)");
