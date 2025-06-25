@@ -38,7 +38,8 @@ abstract contract MockERC4626TesterTargets is BaseTargetFunctions, Properties {
         MockERC4626Tester(_getVault()).transferFrom(from, to, value);
     }
 
-    function mockERC4626Tester_setLossOnWithdraw(uint256 lossOnWithdraw) public asActor {
-        MockERC4626Tester(_getVault()).setLossOnWithdraw(lossOnWithdraw);
-    }
+    // NOTE: ERC4626 vaults being used as fractional reserves will not take losses on withdraw
+    // function mockERC4626Tester_setLossOnWithdraw(uint256 lossOnWithdraw) public asActor {
+    //     MockERC4626Tester(_getVault()).setLossOnWithdraw(lossOnWithdraw);
+    // }
 }

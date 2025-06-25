@@ -34,37 +34,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         lender_liquidate(1);
     }
 
-    // forge test --match-test test_capToken_burn_8 -vvv
-    function test_capToken_burn_8() public {
-        capToken_mint_clamped(20004575791);
-
-        add_new_vault();
-
-        capToken_setFractionalReserveVault();
-
-        mockERC4626Tester_setLossOnWithdraw(100);
-
-        capToken_investAll();
-
-        capToken_burn(10000142451, 0, 1525106545);
-    }
-
-    // forge test --match-test test_capToken_burn_clamped_0 -vvv
-    // NOTE: same as above but with the burn_clamped call instead
-    function test_capToken_burn_clamped_0() public {
-        capToken_mint_clamped(20026227836);
-
-        add_new_vault();
-
-        capToken_setFractionalReserveVault();
-
-        mockERC4626Tester_setLossOnWithdraw(100);
-
-        capToken_investAll();
-
-        capToken_burn_clamped(10004329462);
-    }
-
     // forge test --match-test test_property_debt_token_balance_gte_total_vault_debt_1 -vvv
     // NOTE: DebtToken balance < total vault debt, this looks valid
     // NOTE: something is weird about the borrowing amount being type(uint256).max
