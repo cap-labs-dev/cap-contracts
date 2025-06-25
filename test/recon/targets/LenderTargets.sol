@@ -131,15 +131,6 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             (uint256 assetPrice,) = oracle.getPrice(_getAsset());
             (uint256 collateralValue,) =
                 mockNetworkMiddleware.coverageByVault(address(0), _getActor(), mockEth, address(0), 0);
-
-            // set a new max for the optimization test
-            if (ltvAfter > delegation.ltv(_getActor())) {
-                int256 ltvDelta = int256(ltvAfter) - int256(delegation.ltv(_getActor()));
-
-                if (ltvDelta > maxLTVDelta) {
-                    maxLTVDelta = ltvDelta;
-                }
-            }
         } catch (bytes memory reason) {
             // bool expectedError = checkError(reason, "MinBorrowAmount()") || checkError(reason, "ZeroAddressNotValid()")
             //     || checkError(reason, "ReservePaused()") || checkError(reason, "CollateralCannotCoverNewBorrow()")

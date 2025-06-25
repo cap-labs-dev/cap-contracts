@@ -529,8 +529,19 @@ abstract contract Properties is BeforeAfter, Asserts {
         return 0;
     }
 
+    /// @dev test for optimizing the difference between the lender's ltv and the delegation's ltv
+    /// @notice optimizing directly here because result requires time to have elapsed since the call to borrow to increase restaker interest
     function optimize_max_ltv_delta() public returns (int256) {
-        return maxLTVDelta;
+        (,,, uint256 ltv,,) = lender.agent(_getActor());
+        uint256 ltvInDelegation = delegation.ltv(_getActor());
+
+        if (ltv > ltvInDelegation) {
+            int256 ltvDelta = int256(ltv) - int256(ltvInDelegation);
+
+            return ltvDelta;
+        }
+
+        return 0;
     }
 
     function optimize_max_health_increase() public returns (int256) {
