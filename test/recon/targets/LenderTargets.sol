@@ -20,7 +20,7 @@ import "contracts/lendingPool/Lender.sol";
 abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
     function lender_borrow_clamped(uint256 _amount) public {
-        lender_borrow(_amount, _getActor());
+        lender_borrow(_amount);
     }
 
     function lender_initiateLiquidation_clamped() public {
@@ -86,13 +86,13 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Borrower debt should increase after borrowing
     /// @dev Property: Total borrows should increase after borrowing
     /// @dev Property: Borrow should only revert with an expected error
-    function lender_borrow(uint256 _amount, address _receiver)
+    function lender_borrow(uint256 _amount)
         public
         // precondition: so we only check cases where an amount actually gets divested
         updateGhostsWithType(_amount != 0 ? OpType.DIVEST : OpType.GENERIC)
         asActor
     {
-        uint256 beforeAssetBalance = MockERC20(_getAsset()).balanceOf(_receiver);
+        uint256 beforeAssetBalance = MockERC20(_getAsset()).balanceOf(_getActor());
         (,, address _debtToken,,,,) = lender.reservesData(_getAsset());
         uint256 beforeBorrowerDebt = DebtToken(_debtToken).balanceOf(_getActor());
         uint256 beforeMaxBorrowable = lender.maxBorrowable(_getActor(), _getAsset());
@@ -100,7 +100,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         bool assetPaused = capToken.paused(_getAsset());
 
         vm.prank(_getActor());
-        try lender.borrow(_getAsset(), _amount, _receiver) {
+        try lender.borrow(_getAsset(), _amount, _getActor()) {
             uint256 borrowerDebtDelta = DebtToken(_debtToken).balanceOf(_getActor()) - beforeBorrowerDebt;
 
             t(!protocolPaused || !assetPaused, "asset can be borrowed when it is paused");
@@ -113,20 +113,19 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
                 beforeBorrowerDebt,
                 "Borrower debt did not increase after borrowing"
             );
-            if (_receiver != address(capToken)) {
-                if (_amount == type(uint256).max) {
-                    eq(
-                        MockERC20(_getAsset()).balanceOf(_receiver),
-                        beforeAssetBalance + beforeMaxBorrowable,
-                        "Borrower asset balance did not increase after borrowing (in case of max borrow)"
-                    );
-                } else {
-                    eq(
-                        MockERC20(_getAsset()).balanceOf(_receiver),
-                        beforeAssetBalance + _amount,
-                        "Borrower asset balance did not increase after borrowing"
-                    );
-                }
+
+            if (_amount == type(uint256).max) {
+                eq(
+                    MockERC20(_getAsset()).balanceOf(_getActor()),
+                    beforeAssetBalance + beforeMaxBorrowable,
+                    "Borrower asset balance did not increase after borrowing (in case of max borrow)"
+                );
+            } else {
+                eq(
+                    MockERC20(_getAsset()).balanceOf(_getActor()),
+                    beforeAssetBalance + _amount,
+                    "Borrower asset balance did not increase after borrowing"
+                );
             }
 
             (uint256 assetPrice,) = oracle.getPrice(_getAsset());
