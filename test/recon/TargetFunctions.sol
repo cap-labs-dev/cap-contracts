@@ -12,7 +12,6 @@ import { Panic } from "@recon/Panic.sol";
 import { AccessControlTargets } from "./targets/AccessControlTargets.sol";
 import { AdminTargets } from "./targets/AdminTargets.sol";
 import { CapTokenTargets } from "./targets/CapTokenTargets.sol";
-import { DebtTokenTargets } from "./targets/DebtTokenTargets.sol";
 import { DelegationTargets } from "./targets/DelegationTargets.sol";
 import { DoomsdayTargets } from "./targets/DoomsdayTargets.sol";
 import { FeeAuctionTargets } from "./targets/FeeAuctionTargets.sol";
@@ -34,7 +33,6 @@ abstract contract TargetFunctions is
     AccessControlTargets,
     AdminTargets,
     CapTokenTargets,
-    DebtTokenTargets,
     DelegationTargets,
     DoomsdayTargets,
     FeeAuctionTargets,
@@ -57,11 +55,6 @@ abstract contract TargetFunctions is
     function switchAaveOracle(uint256 entropy) public {
         address target = env.usdOracleMocks.aaveDataProviders[entropy % env.usdOracleMocks.aaveDataProviders.length];
         mockAaveDataProvider = MockAaveDataProvider(target);
-    }
-
-    function switchDebtToken(uint256 entropy) public {
-        address target = env.usdVault.debtTokens[entropy % env.usdVault.debtTokens.length];
-        debtToken = DebtToken(target);
     }
 
     /// AUTO GENERATED TARGET FUNCTIONS - WARNING: DO NOT DELETE OR MODIFY THIS LINE ///

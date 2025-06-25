@@ -36,7 +36,6 @@ import { FeeReceiver } from "contracts/feeReceiver/FeeReceiver.sol";
 import { IPriceOracle } from "contracts/interfaces/IPriceOracle.sol";
 import { IRateOracle } from "contracts/interfaces/IRateOracle.sol";
 import { Lender } from "contracts/lendingPool/Lender.sol";
-import { DebtToken } from "contracts/lendingPool/tokens/DebtToken.sol";
 import { Oracle } from "contracts/oracle/Oracle.sol";
 import { CapToken } from "contracts/token/CapToken.sol";
 import { StakedCap } from "contracts/token/StakedCap.sol";
@@ -68,7 +67,6 @@ abstract contract Setup is
 
     AccessControl accessControl;
     CapToken capToken;
-    DebtToken debtToken;
     Delegation delegation;
     FeeAuction feeAuction;
     FeeReceiver feeReceiver;

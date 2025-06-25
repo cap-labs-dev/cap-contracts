@@ -293,4 +293,23 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
     }
+
+    // forge test --match-test test_property_cap_token_backed_1_to_1_12 -vvv
+    function test_property_cap_token_backed_1_to_1_12() public {
+        capToken_mint_clamped(20000530684);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        capToken_investAll();
+
+        capToken_setReserve(101037885);
+
+        capToken_burn_clamped(10006208396);
+
+        capToken_setFractionalReserveVault();
+
+        property_cap_token_backed_1_to_1();
+    }
 }
