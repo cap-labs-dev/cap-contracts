@@ -175,8 +175,14 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Agent should have their totalDelegation reduced by the liquidated value
     /// @dev Property: Agent should have their totalSlashableCollateral reduced by the liquidated value
     function lender_liquidate(uint256 _amount) public updateGhostsWithType(OpType.LIQUIDATE) asActor {
-        (uint256 totalDelegationBefore, uint256 totalSlashableCollateralBefore,,,, uint256 healthBefore) =
-            lender.agent(_getActor());
+        (
+            uint256 totalDelegationBefore,
+            uint256 totalSlashableCollateralBefore,
+            uint256 totalDebtBefore,
+            ,
+            ,
+            uint256 healthBefore
+        ) = lender.agent(_getActor());
         uint256 maxLiquidatable = lender.maxLiquidatable(_getActor(), _getAsset());
         uint256 assetBalanceBefore = MockERC20(_getAsset()).balanceOf(_getActor());
         uint256 collateralBalanceBefore = MockERC20(mockNetworkMiddleware.vaults(_getActor())).balanceOf(_getActor());
@@ -220,6 +226,34 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             totalSlashableCollateralBefore - liquidatedValue,
             "agent maintains more value in totalSlashableCollateral than they should"
         );
+    }
+
+    // NOTE: this handler just exists to make optimization easier because the lender_liquidate handler has stack too deep issues
+    function lender_liquidate_optimization(uint256 _amount) public updateGhostsWithType(OpType.LIQUIDATE) asActor {
+        (uint256 totalDelegation,, uint256 totalDebt,,, uint256 healthBefore) = _getAgentParams(_getActor());
+        uint256 emergencyLiquidationHealth = totalDelegation * lender.emergencyLiquidationThreshold() / totalDebt;
+
+        try lender.liquidate(_getActor(), _getAsset(), _amount) { }
+        catch (bytes memory reason) {
+            bool expectedError = checkError(reason, "HealthFactorNotBelowThreshold()")
+                || checkError(reason, "GracePeriodNotOver()") || checkError(reason, "LiquidationExpired()")
+                || checkError(reason, "LossFromFractionalReserve(address,address,uint256)")
+                || checkError(reason, "InvalidBurnAmount()") || checkError(reason, "PriceError(address)");
+            bool protocolPaused = capToken.paused();
+            bool assetPaused = capToken.paused(_getAsset());
+            (, address vault,,,,,) = lender.reservesData(_getAsset());
+            bool isReserve = vault != address(0); // token must be a reserve in the lending vault
+
+            // precondition: must not error for one of the expected reasons
+            if (!expectedError && !protocolPaused && !assetPaused && totalDebt > 0 && isReserve) {
+                // if it failed for these cases we want to optimize the max liquidated amount
+                if (emergencyLiquidationHealth < RAY || healthBefore < RAY) {
+                    if (maxFailedLiquidatedAmount < int256(_amount)) {
+                        maxFailedLiquidatedAmount = int256(_amount);
+                    }
+                }
+            }
+        }
     }
 
     function lender_pauseAsset(bool _pause) public updateGhosts asAdmin {
@@ -322,6 +356,36 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     }
 
     function lender_repay(uint256 _amount) public asActor {
-        lender.repay(_getAsset(), _amount, _getActor());
+        (,, uint256 totalDebt,,,) = lender.agent(_getActor());
+
+        try lender.repay(_getAsset(), _amount, _getActor()) { }
+        catch (bytes memory reason) {
+            // Preconditions: should have debt, enough allowance and balance to repay
+            if (
+                totalDebt == 0 || MockERC20(_getAsset()).allowance(_getActor(), address(lender)) < _amount
+                    || MockERC20(_getAsset()).balanceOf(_getActor()) < _amount
+            ) {
+                return;
+            }
+
+            bool expectedError = checkError(reason, "InvalidBurnAmount()")
+                || checkError(reason, "LossFromFractionalReserve(address,address,uint256)"); // fractional reserve loss
+            bool enoughAllowance = MockERC20(_getAsset()).allowance(_getActor(), address(lender)) >= _amount;
+            bool enoughBalance = MockERC20(_getAsset()).balanceOf(_getActor()) >= _amount;
+            bool protocolPaused = capToken.paused();
+            bool assetPaused = capToken.paused(_getAsset());
+            (, address vault,,,,,) = lender.reservesData(_getAsset());
+            bool isReserve = vault != address(0); // token must be a reserve in the lender
+
+            if (
+                !expectedError && !protocolPaused && !assetPaused && enoughAllowance && enoughBalance && _amount > 0
+                    && isReserve
+            ) {
+                // set the max failed repay amount if it's larger than the existing amount
+                if (maxFailedRepayAmount < int256(_amount)) {
+                    maxFailedRepayAmount = int256(_amount);
+                }
+            }
+        }
     }
 }
