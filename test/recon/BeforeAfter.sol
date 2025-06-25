@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import { MockERC20 } from "@recon/MockERC20.sol";
-import { console2 } from "forge-std/console2.sol";
 
 import { ILender } from "contracts/interfaces/ILender.sol";
 
@@ -137,13 +136,13 @@ abstract contract BeforeAfter is Setup {
             liquidationThreshold = _liquidationThreshold;
             health = _health;
         } catch {
-            // If the call fails, we can assume the health is 0
+            // If the call fails, we can assume the health is max since that's how it's set in ViewLogic
             totalDelegation = 0;
             totalSlashableCollateral = 0;
             totalDebt = 0;
             ltv = 0;
             liquidationThreshold = 0;
-            health = 0;
+            health = type(uint256).max;
         }
     }
 

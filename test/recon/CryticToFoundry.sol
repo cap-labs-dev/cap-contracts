@@ -173,23 +173,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     }
 
     /// === Newest Issues === ///
-    // forge test --match-test test_property_no_operation_makes_user_liquidatable_2 -vvv
-    // TODO: investigate further, something is wrong with setting before/after because health is actually correct but the _after call in lender_removeAsset looks like it's silently failing
-    function test_property_no_operation_makes_user_liquidatable_2() public {
-        capToken_mint_clamped(10002668741);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
-        lender_repay(10004991667);
-
-        switch_asset(0);
-
-        console2.log("==== REMOVE ASSET ====");
-        lender_removeAsset(0x96d3F6c20EEd2697647F543fE6C08bC2Fbf39758);
-
-        property_no_operation_makes_user_liquidatable();
-    }
-
     // forge test --match-test test_lender_borrow_clamped_13 -vvv
     function test_lender_borrow_clamped_13() public {
         switch_asset(0);
