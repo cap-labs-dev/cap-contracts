@@ -83,3 +83,4 @@
 | 79 | property_previewRedeem_greater_than_loaned | `previewRedeem(totalSupply)` >= `loaned` | |
 | 80 | doomsday_dust_on_redeem | after all users redeem there should be no assets left in the vault | |
 | 81 | capToken_divestAll | no assets should be left in the vault after divesting all | |
+| 82 | property_available_balance_never_reverts | available balance should never revert | |

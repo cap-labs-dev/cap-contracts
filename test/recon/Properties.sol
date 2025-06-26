@@ -464,6 +464,15 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: available balance should never revert
+    function property_available_balance_never_reverts() public {
+        try capToken.availableBalance(_getAsset()) {
+            // success
+        } catch (bytes memory reason) {
+            t(false, "available balance should never revert");
+        }
+    }
+
     /// === Optimization Properties === ///
 
     /// @dev test for optimizing the difference when debt token supply > total vault debt
