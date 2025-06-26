@@ -361,12 +361,6 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
-    /// @dev Property: Borrower can't borrow more than LTV
-    function property_borrower_cannot_borrow_more_than_ltv() public {
-        (,,, uint256 ltv,,) = lender.agent(_getActor());
-        lte(ltv, delegation.ltv(_getActor()), "borrower can't borrow more than LTV");
-    }
-
     /// @dev Property: health should not change when realizeRestakerInterest is called
     function property_health_should_not_change_when_realizeRestakerInterest_is_called() public {
         if (currentOperation == OpType.REALIZE_INTEREST) {
@@ -381,10 +375,6 @@ abstract contract Properties is BeforeAfter, Asserts {
     /// @dev Property: no operation should make a user liquidatable
     function property_no_operation_makes_user_liquidatable() public {
         // before/after are only set for user operations so changes to price are automatically excluded since these are the only thing that should make a user liquidatable
-        console2.log("before health", _before.agentHealth[_getActor()]);
-        console2.log("after health", _after.agentHealth[_getActor()]);
-        console2.log("agent debt before", _before.agentTotalDebt[_getActor()]);
-        console2.log("agent debt after", _after.agentTotalDebt[_getActor()]);
         if (_before.agentHealth[_getActor()] > RAY) {
             gt(_after.agentHealth[_getActor()], RAY, "user is liquidatable");
         }

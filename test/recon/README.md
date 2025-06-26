@@ -34,7 +34,7 @@ You can offload your fuzzing job to Recon to run long duration jobs and share te
 See the [Recon book](https://book.getrecon.xyz/using_recon/running_jobs.html) for more info on how to upload a job to the Recon web app. 
 
 ## Improvements to be made
-Over the course of the engagement, a best effort attempt was made to define as many properties as possible which would test the most important logic of the system. However, given the time-constrained nature of the engagement there were some parts that we believe require more attention which we have outlined below.  
+Over the course of the engagement, a best effort attempt was made to define as many properties as possible which would test the most important logic of the system. This allowed use to uncover mutliple findings that hint at unexpected behaviors in the system, however given the time-constrained nature of the engagement some of these findings were not explored to their full potential and so we wanted to highlight these here for their potential to cause issues.  
 
 ### Room for improvement
 - Checks for agent health need to be made after all operations. This already led to the discovery of [issue 22](https://github.com/Recon-Fuzz/cap-invariants/issues/22) but the property should be refactored to exclude this case and check for others.

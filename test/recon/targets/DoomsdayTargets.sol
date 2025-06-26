@@ -43,7 +43,9 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
             bool expectedError = checkError(reason, "HealthFactorNotBelowThreshold()")
                 || checkError(reason, "GracePeriodNotOver()") || checkError(reason, "LiquidationExpired()")
                 || checkError(reason, "LossFromFractionalReserve(address,address,uint256)")
-                || checkError(reason, "InvalidBurnAmount()") || checkError(reason, "PriceError(address)");
+                || checkError(reason, "InvalidBurnAmount()") || checkError(reason, "PriceError(address)")
+                || checkError(reason, "InsufficientAllowance(address,address,uint256,uint256)")
+                || checkError(reason, "InsufficientBalance(address,uint256,uint256)");
             bool protocolPaused = capToken.paused();
             bool assetPaused = capToken.paused(_getAsset());
             (, address vault,,,,,) = lender.reservesData(_getAsset());

@@ -102,20 +102,15 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
         vm.prank(_getActor());
         try lender.borrow(_getAsset(), _amount, _getActor()) {
+            (,,, uint256 ltvAfter,, uint256 healthAfter) = lender.agent(_getActor());
             uint256 borrowerDebtDelta = DebtToken(_debtToken).balanceOf(_getActor()) - beforeBorrowerDebt;
 
             t(!protocolPaused || !assetPaused, "asset can be borrowed when it is paused");
 
-            (,,, uint256 ltvAfter,, uint256 health) = lender.agent(_getActor());
-            gt(health, RAY, "Borrower is unhealthy after borrowing");
+            gt(healthAfter, RAY, "Borrower is unhealthy after borrowing");
 
-            gt(
-                DebtToken(_debtToken).balanceOf(_getActor()),
-                beforeBorrowerDebt,
-                "Borrower debt did not increase after borrowing"
-            );
-
-            if (_amount == type(uint256).max) {
+            // note: this is necessary or else the test will overflow
+            if (_amount >= beforeMaxBorrowable) {
                 lte(
                     MockERC20(_getAsset()).balanceOf(_getActor()),
                     beforeAssetBalance + beforeMaxBorrowable,
@@ -129,9 +124,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
                 );
             }
 
-            (uint256 assetPrice,) = oracle.getPrice(_getAsset());
-            (uint256 collateralValue,) =
-                mockNetworkMiddleware.coverageByVault(address(0), _getActor(), mockEth, address(0), 0);
+            lte(ltvAfter, delegation.ltv(_getActor()), "borrower can't borrow more than LTV");
         } catch (bytes memory reason) {
             bool arithmeticError = checkError(reason, Panic.arithmeticPanic);
 

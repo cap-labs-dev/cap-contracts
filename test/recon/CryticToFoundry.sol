@@ -99,22 +99,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         property_health_should_not_change_when_realizeRestakerInterest_is_called();
     }
 
-    // forge test --match-test test_property_borrower_cannot_borrow_more_than_ltv_5 -vvv
-    // NOTE: looks like truncation in LTV calculation causes the issue
-    function test_property_borrower_cannot_borrow_more_than_ltv_5() public {
-        switch_asset(0);
-
-        capToken_mint_clamped(125007552716);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
-        vm.warp(block.timestamp + 1);
-
-        vm.roll(block.number + 1);
-
-        property_borrower_cannot_borrow_more_than_ltv();
-    }
-
     // forge test --match-test test_doomsday_manipulate_utilization_rate_2 -vvv
     // NOTE: appears to be valid, need to discover the root cause
     function test_doomsday_manipulate_utilization_rate_2() public {
