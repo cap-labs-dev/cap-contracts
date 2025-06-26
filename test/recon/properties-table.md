@@ -88,3 +88,9 @@
 | 86 | capToken_divestAll | no assets should be left in the vault after divesting all | |
 | 87 | property_available_balance_never_reverts | available balance should never revert | |
 | 88 | property_maxBorrow_never_reverts | maxBorrowable should never revert | |
+| 89 | property_no_agent_borrowing_total_debt_should_be_zero | if no agent is borrowing, the total debt should be 0 | |
+| 90 | property_no_agent_borrowing_utilization_rate_should_be_zero | if no agent is borrowing, the utilization rate should be 0 | |
+| 91 | property_no_agent_borrowing_total_debt_and_utilization_rate_should_be_zero | if no agent is borrowing, the current utilization index should be 0 | |
+| 92 | doomsday_maxBorrow | maxBorrowable after borrowing max should be 0 | |
+| 93 | doomsday_maxBorrow | if no agent is borrowing, the current utilization index should be 0 | |
+| 94 | doomsday_compound_vs_linear_accumulation | interest accumulation should be the same whether it's realized or not | |
