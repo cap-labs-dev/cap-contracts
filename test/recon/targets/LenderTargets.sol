@@ -86,7 +86,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// @dev Property: Borrower asset balance should increase after borrowing
     /// @dev Property: Borrower debt should increase after borrowing
     /// @dev Property: Total borrows should increase after borrowing
-    /// @dev Property: Borrow should only revert with an expected error
+    /// @dev Property: Borrow should never revert with arithmetic error
     function lender_borrow(uint256 _amount)
         public
         // precondition: so we only check cases where an amount actually gets divested
@@ -133,16 +133,9 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             (uint256 collateralValue,) =
                 mockNetworkMiddleware.coverageByVault(address(0), _getActor(), mockEth, address(0), 0);
         } catch (bytes memory reason) {
-            // bool expectedError = checkError(reason, "MinBorrowAmount()") || checkError(reason, "ZeroAddressNotValid()")
-            //     || checkError(reason, "ReservePaused()") || checkError(reason, "CollateralCannotCoverNewBorrow()")
-            //     || checkError(reason, "LossFromFractionalReserve(address,address,uint256)")
-            //     || checkError(reason, "ZeroRealization()");
+            bool arithmeticError = checkError(reason, Panic.arithmeticPanic);
 
-            // NOTE: temporarily removed because we need higher specificity to be able to check for the divest error
-            // // if borrow reverts for any other reason, it could be due to the call to divest in the ERC4626 made before borrowing
-            // if (!expectedError && !protocolPaused && !assetPaused) {
-            //     t(false, "borrow should revert with expected error");
-            // }
+            t(!arithmeticError, "borrow should never revert with arithmetic error");
         }
     }
 
@@ -169,13 +162,14 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         }
     }
 
+    /// @dev Property: Liquidate should never revert with arithmetic error
     /// @dev Property: Liquidations should always be profitable for the liquidator
-    /// @dev Property: agent should not be liquidatable with health > 1e27
+    /// @dev Property: Agent should not be liquidatable with health > 1e27
     /// @dev Property: Liquidations should always improve the health factor
     /// @dev Property: Partial liquidations should not bring health above 1.25
     /// @dev Property: Agent should have their totalDelegation reduced by the liquidated value
     /// @dev Property: Agent should have their totalSlashableCollateral reduced by the liquidated value
-    function lender_liquidate(uint256 _amount) public updateGhostsWithType(OpType.LIQUIDATE) asActor {
+    function lender_liquidate(uint256 _amount) public updateGhostsWithType(OpType.LIQUIDATE) {
         (
             uint256 totalDelegationBefore,
             uint256 totalSlashableCollateralBefore,
@@ -188,7 +182,14 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         uint256 assetBalanceBefore = MockERC20(_getAsset()).balanceOf(_getActor());
         uint256 collateralBalanceBefore = MockERC20(mockNetworkMiddleware.vaults(_getActor())).balanceOf(_getActor());
 
-        uint256 liquidatedValue = lender.liquidate(_getActor(), _getAsset(), _amount);
+        uint256 liquidatedValue;
+        vm.prank(_getActor());
+        try lender.liquidate(_getActor(), _getAsset(), _amount) returns (uint256 _liquidatedValue) {
+            liquidatedValue = _liquidatedValue;
+        } catch (bytes memory reason) {
+            bool arithmeticError = checkError(reason, Panic.arithmeticPanic);
+            t(!arithmeticError, "liquidate should never revert with arithmetic error");
+        }
 
         (uint256 totalDelegationAfter, uint256 totalSlashableCollateralAfter,,,, uint256 healthAfter) =
             lender.agent(_getActor());
@@ -356,7 +357,13 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         lender.removeAsset(_asset);
     }
 
+    /// @dev Property: repay should never revert with arithmetic error
     function lender_repay(uint256 _amount) public updateGhosts asActor {
-        lender.repay(_getAsset(), _amount, _getActor());
+        try lender.repay(_getAsset(), _amount, _getActor()) {
+            // success
+        } catch (bytes memory reason) {
+            bool arithmeticError = checkError(reason, Panic.arithmeticPanic);
+            t(!arithmeticError, "repay should never revert with arithmetic error");
+        }
     }
 }

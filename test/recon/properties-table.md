@@ -49,39 +49,42 @@
 | 47 | lender_borrow | Borrower asset balance should increase after borrowing | |
 | 48 | lender_borrow | Borrower debt should increase after borrowing | |
 | 49 | lender_borrow | Total borrows should increase after borrowing | |
-| 50 | lender_initiateLiquidation | agent should not be liquidatable with health > 1e27 | |
-| 51 | lender_initiateLiquidation | Agent should always be liquidatable if it is unhealthy | |
-| 52 | lender_liquidate | liquidation should be profitable for the liquidator | |
-| 53 | lender_liquidate | agent should not be liquidatable with health > 1e27 | |
-| 54 | lender_liquidate | Liquidations should always improve the health factor | |
-| 55 | lender_liquidate | Emergency liquidations should always be available when emergency health is below 1e27 | |
-| 56 | lender_liquidate | Partial liquidations should not bring health above 1.25 | |
-| 57 | lender_liquidate | Agent should have their totalDelegation reduced by the liquidated value | |
-| 58 | lender_liquidate | Agent should have their totalSlashableCollateral reduced by the liquidated value | |
-| 59 | lender_realizeInterest | agent's total debt should not change when interest is realized | |
-| 60 | lender_realizeInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized | |
-| 61 | lender_realizeInterest | vault debt and total borrows should increase by the same amount after a call to `realizeInterest` | |
-| 62 | lender_realizeInterest | health should not change when `realizeInterest` is called | |
-| 63 | lender_realizeInterest | interest can only be realized if there are sufficient vault assets | |
-| 64 | lender_realizeInterest | realizeInterest should only revert with `ZeroRealization()` if paused or `totalUnrealizedInterest == 0`, otherwise should always update the realization value | |
-| 65 | lender_realizeRestakerInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized | |
-| 66 | lender_realizeRestakerInterest | vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest` | |
-| 67 | lender_realizeRestakerInterest | health should not change when `realizeRestakerInterest` is called | |
-| 68 | lender_realizeRestakerInterest | restakerinterest can only be realized if there are sufficient vault assets | |
-| 69 | property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset | fractional reserve vault must always have reserve amount of underyling asset | |
-| 70 | property_liquidation_does_not_increase_bonus | liquidation does not increase bonus | |
-| 69 | property_borrower_cannot_borrow_more_than_ltv | borrower can't borrow more than LTV | |
-| 70 | property_health_should_not_change_when_realizeRestakerInterest_is_called | health should not change when realizeRestakerInterest is called | |
-| 71 | property_no_operation_makes_user_liquidatable | no operation should make a user liquidatable | |
-| 72 | property_dust_on_repay | after all users have repaid their debt, their balance of `debtToken` should be 0 | |
-| 73 | property_zero_debt_is_borrowing | if the debt token balance is 0, the agent should not be isBorrowing | |
-| 74 | property_agent_always_has_more_than_min_borrow | agent always has more than minBorrow balance of debtToken | |
-| 75 | property_lender_does_not_accumulate_dust | lender does not accumulate dust | |
-| 76 | property_debt_zero_after_repay | after all users have repaid their debt, the `reserve.debt` should be 0 | |
-| 77 | doomsday_repay_all | repaying all debt for all actors transfers same amount of interest as would have been transferred by `realizeInterest` | |
-| 78 | doomsday_manipulate_utilization_rate | borrowing and repaying an amount in the same block shouldn't change the utilization rate | |
-| 79 | property_previewRedeem_greater_than_loaned | `previewRedeem(totalSupply)` >= `loaned` | |
-| 80 | doomsday_dust_on_redeem | after all users redeem there should be no assets left in the vault | |
-| 81 | capToken_divestAll | no assets should be left in the vault after divesting all | |
-| 82 | property_available_balance_never_reverts | available balance should never revert | |
-| 83 | property_maxBorrow_never_reverts | maxBorrowable should never revert | |
+| 50 | lender_borrow | Borrow should never revert with arithmetic error | |
+| 51 | lender_initiateLiquidation | agent should not be liquidatable with health > 1e27 | |
+| 52 | lender_initiateLiquidation | Agent should always be liquidatable if it is unhealthy | |
+| 53 | lender_liquidate | Liquidate should never revert with arithmetic error | |
+| 54 | lender_liquidate | Liquidation should be profitable for the liquidator | |
+| 55 | lender_liquidate | Agent should not be liquidatable with health > 1e27 | |
+| 56 | lender_liquidate | Liquidations should always improve the health factor | |
+| 57 | lender_liquidate | Emergency liquidations should always be available when emergency health is below 1e27 | |
+| 58 | lender_liquidate | Partial liquidations should not bring health above 1.25 | |
+| 59 | lender_liquidate | Agent should have their totalDelegation reduced by the liquidated value | |
+| 60 | lender_liquidate | Agent should have their totalSlashableCollateral reduced by the liquidated value | |
+| 61 | lender_realizeInterest | agent's total debt should not change when interest is realized | |
+| 62 | lender_realizeInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when interest is realized | |
+| 63 | lender_realizeInterest | vault debt and total borrows should increase by the same amount after a call to `realizeInterest` | |
+| 64 | lender_realizeInterest | health should not change when `realizeInterest` is called | |
+| 65 | lender_realizeInterest | interest can only be realized if there are sufficient vault assets | |
+| 66 | lender_realizeInterest | realizeInterest should only revert with `ZeroRealization()` if paused or `totalUnrealizedInterest == 0`, otherwise should always update the realization value | |
+| 67 | lender_realizeRestakerInterest | vault debt should increase by the same amount that the underlying asset in the vault decreases when restaker interest is realized | |
+| 68 | lender_realizeRestakerInterest | vault debt and total borrows should increase by the same amount after a call to `realizeRestakerInterest` | |
+| 69 | lender_realizeRestakerInterest | health should not change when `realizeRestakerInterest` is called | |
+| 70 | lender_realizeRestakerInterest | restakerinterest can only be realized if there are sufficient vault assets | |
+| 71 | lender_repay | repay should never revert with arithmetic error | |
+| 72 | property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset | fractional reserve vault must always have reserve amount of underyling asset | |
+| 73 | property_liquidation_does_not_increase_bonus | liquidation does not increase bonus | |
+| 74 | property_borrower_cannot_borrow_more_than_ltv | borrower can't borrow more than LTV | |
+| 75 | property_health_should_not_change_when_realizeRestakerInterest_is_called | health should not change when realizeRestakerInterest is called | |
+| 76 | property_no_operation_makes_user_liquidatable | no operation should make a user liquidatable | |
+| 77 | property_dust_on_repay | after all users have repaid their debt, their balance of `debtToken` should be 0 | |
+| 78 | property_zero_debt_is_borrowing | if the debt token balance is 0, the agent should not be isBorrowing | |
+| 79 | property_agent_always_has_more_than_min_borrow | agent always has more than minBorrow balance of debtToken | |
+| 80 | property_lender_does_not_accumulate_dust | lender does not accumulate dust | |
+| 81 | property_debt_zero_after_repay | after all users have repaid their debt, the `reserve.debt` should be 0 | |
+| 82 | doomsday_repay_all | repaying all debt for all actors transfers same amount of interest as would have been transferred by `realizeInterest` | |
+| 83 | doomsday_manipulate_utilization_rate | borrowing and repaying an amount in the same block shouldn't change the utilization rate | |
+| 84 | property_previewRedeem_greater_than_loaned | `previewRedeem(totalSupply)` >= `loaned` | |
+| 85 | doomsday_dust_on_redeem | after all users redeem there should be no assets left in the vault | |
+| 86 | capToken_divestAll | no assets should be left in the vault after divesting all | |
+| 87 | property_available_balance_never_reverts | available balance should never revert | |
+| 88 | property_maxBorrow_never_reverts | maxBorrowable should never revert | |
