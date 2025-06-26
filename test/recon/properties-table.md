@@ -93,3 +93,4 @@
 | 91 | property_no_agent_borrowing_total_debt_and_utilization_rate_should_be_zero | if no agent is borrowing, the current utilization index should be 0 | |
 | 92 | doomsday_maxBorrow | maxBorrowable after borrowing max should be 0 | |
 | 93 | doomsday_maxBorrow | if no agent is borrowing, the current utilization index should be 0 | |
+| 94 | doomsday_compound_vs_linear_accumulation | interest accumulation should be the same whether it's realized or not | |
