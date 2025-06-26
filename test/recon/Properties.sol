@@ -243,9 +243,8 @@ abstract contract Properties is BeforeAfter, Asserts {
             uint256 vaultBalance = MockERC20(asset).balanceOf(address(capToken));
             uint256 totalBorrows = capToken.totalBorrows(asset);
             uint256 fractionalReserveBalance = MockERC20(asset).balanceOf(capToken.fractionalReserveVault(asset));
-            uint256 feeAuctionBalance = MockERC20(asset).balanceOf(address(feeAuction));
 
-            uint256 totalAssetAmount = vaultBalance + totalBorrows + fractionalReserveBalance + feeAuctionBalance;
+            uint256 totalAssetAmount = vaultBalance + totalBorrows + fractionalReserveBalance;
 
             uint256 assetDecimals = MockERC20(asset).decimals();
             uint256 assetValue = totalAssetAmount * assetPrice * 1e18 / (10 ** assetDecimals * 1e8);
