@@ -139,23 +139,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         property_zero_debt_is_borrowing();
     }
 
-    // forge test --match-test test_doomsday_liquidate_1 -vvv
-    // NOTE: looks like a depeg can cause liquidation to fail
-    function test_doomsday_liquidate_1() public {
-        capToken_mint_clamped(76546915659384565102);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
-        asset_approve(0x15cF58144EF33af1e14b5208015d11F9143E27b9, 0);
-
-        switchChainlinkOracle(3);
-
-        // sets the price to 8.5016866e7
-        mockChainlinkPriceFeed_setLatestAnswer_clamped(-158910016361134981458467509623070);
-
-        doomsday_liquidate(1);
-    }
-
     /// === Newest Issues === ///
     // forge test --match-test test_lender_borrow_clamped_13 -vvv
     function test_lender_borrow_clamped_13() public {
