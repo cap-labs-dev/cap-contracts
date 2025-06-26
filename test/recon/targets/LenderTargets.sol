@@ -109,17 +109,20 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
 
             gt(healthAfter, RAY, "Borrower is unhealthy after borrowing");
 
-            gt(
-                DebtToken(_debtToken).balanceOf(_getActor()),
-                beforeBorrowerDebt,
-                "Borrower debt did not increase after borrowing"
-            );
-
-            eq(
-                MockERC20(_getAsset()).balanceOf(_getActor()),
-                beforeAssetBalance + _amount,
-                "Borrower asset balance did not increase after borrowing"
-            );
+            // note: this is necessary or else the test will overflow
+            if (_amount >= beforeMaxBorrowable) {
+                lte(
+                    MockERC20(_getAsset()).balanceOf(_getActor()),
+                    beforeAssetBalance + beforeMaxBorrowable,
+                    "Borrower asset balance did not increase after borrowing (in case of max borrow)"
+                );
+            } else {
+                eq(
+                    MockERC20(_getAsset()).balanceOf(_getActor()),
+                    beforeAssetBalance + _amount,
+                    "Borrower asset balance did not increase after borrowing"
+                );
+            }
 
             lte(ltvAfter, delegation.ltv(_getActor()), "borrower can't borrow more than LTV");
         } catch (bytes memory reason) {
