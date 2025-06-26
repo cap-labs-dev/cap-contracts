@@ -499,7 +499,7 @@ abstract contract Properties is BeforeAfter, Asserts {
     }
 
     /// @dev Property: if no agent is borrowing, the current utilization index should be 0
-    function property_no_agent_borrowing_total_debt_and_utilization_rate_should_be_zero() public {
+    function property_no_agent_borrowing_current_utilization_rate_should_be_zero() public {
         if (_checkNoAgentBorrowing(_getAsset())) {
             uint256 currentUtilizationIndex = capToken.currentUtilizationIndex(_getAsset());
             eq(currentUtilizationIndex, 0, "current utilization index should be 0");

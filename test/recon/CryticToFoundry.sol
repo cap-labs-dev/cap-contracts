@@ -172,42 +172,61 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         doomsday_liquidate(1);
     }
 
-    /// === Newest Issues === ///
-    // forge test --match-test test_lender_borrow_clamped_13 -vvv
-    function test_lender_borrow_clamped_13() public {
-        switch_asset(0);
-
-        capToken_mint_clamped(114947380);
+    // forge test --match-test test_property_no_agent_borrowing_total_debt_and_utilization_rate_should_be_zero_13 -vvv
+    // NOTE: seems like this would mess up the rate calculation in VaultAdapter, causing a 0 rate if all agents have repaid
+    // TODO: investigate further
+    function test_property_no_agent_borrowing_total_debt_and_utilization_rate_should_be_zero_13() public {
+        capToken_mint_clamped(10155906430);
 
         lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
 
-        oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 292733041588401904719173);
-
-        capToken_mint_clamped(124892572629);
-
-        vm.warp(block.timestamp + 6620);
+        vm.warp(block.timestamp + 1);
 
         vm.roll(block.number + 1);
 
+        lender_repay(11578722538);
+
+        switch_asset(507841201531444);
+
+        lender_removeAsset(0x96d3F6c20EEd2697647F543fE6C08bC2Fbf39758);
+
+        switch_asset(51100855422138231202198802307432956527994435);
+
+        // need a way to query VaultAdapter rate
+        // uint256 rate = oracle.rate(address(capToken), _getAsset());
+
+        // utilizationIndex 1e27
+        property_no_agent_borrowing_current_utilization_rate_should_be_zero();
+    }
+
+    // forge test --match-test test_doomsday_maxBorrow_14 -vvv
+    // NOTE: looks like a real break, maxBorrows is nonzero after borrowing max
+    function test_doomsday_maxBorrow_14() public {
+        switch_asset(1);
+
+        capToken_mint_clamped(14710106794859);
+
+        switchChainlinkOracle(1);
+
+        mockChainlinkPriceFeed_setLatestAnswer_clamped(0);
+        console2.log("latest answer %e", mockChainlinkPriceFeed.latestAnswer());
+
+        doomsday_maxBorrow();
+    }
+
+    // forge test --match-test test_doomsday_compound_vs_linear_accumulation_16 -vvv
+    // NOTE: realizing interest partway through a time period increases the unrealized interest
+    function test_doomsday_compound_vs_linear_accumulation_16() public {
+        switch_asset(0);
+
+        capToken_mint_clamped(122454342);
+
         lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+
+        oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 1600783476099645525198470);
+
+        doomsday_compound_vs_linear_accumulation(81);
     }
 
-    // forge test --match-test test_property_cap_token_backed_1_to_1_12 -vvv
-    function test_property_cap_token_backed_1_to_1_12() public {
-        capToken_mint_clamped(20000530684);
-
-        add_new_vault();
-
-        capToken_setFractionalReserveVault();
-
-        capToken_investAll();
-
-        capToken_setReserve(101037885);
-
-        capToken_burn_clamped(10006208396);
-
-        capToken_setFractionalReserveVault();
-
-        property_cap_token_backed_1_to_1();
-    }
+    /// === Newest Issues === ///
 }
