@@ -91,3 +91,5 @@
 | 89 | property_no_agent_borrowing_total_debt_should_be_zero | if no agent is borrowing, the total debt should be 0 | |
 | 90 | property_no_agent_borrowing_utilization_rate_should_be_zero | if no agent is borrowing, the utilization rate should be 0 | |
 | 91 | property_no_agent_borrowing_total_debt_and_utilization_rate_should_be_zero | if no agent is borrowing, the current utilization index should be 0 | |
+| 92 | doomsday_maxBorrow | maxBorrowable after borrowing max should be 0 | |
+| 93 | doomsday_maxBorrow | if no agent is borrowing, the current utilization index should be 0 | |

@@ -112,6 +112,7 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
 
             // realize restaker interest for all agents so that we have the correct amount of debtToken minted to each agent
             for (uint256 j = 0; j < agents.length; j++) {
+                vm.prank(agents[j]);
                 lender.realizeRestakerInterest(agents[j], asset);
             }
 
@@ -144,6 +145,7 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
             address actor = actors[i];
             uint256 actorDebt = MockERC20(debtToken).balanceOf(actor);
             if (actorDebt > 0) {
+                vm.prank(actor);
                 lender.repay(_getAsset(), actorDebt, actor);
             }
         }
@@ -164,9 +166,11 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
         uint256 utilizationIndexBefore = capToken.currentUtilizationIndex(_getAsset());
 
         // borrow some amount
+        vm.prank(_getActor());
         lender.borrow(_getAsset(), _amount, _getActor());
 
         // repay the borrowed amount
+        vm.prank(_getActor());
         lender.repay(_getAsset(), _amount, _getActor());
 
         // get the utilization rate after repaying the borrowed amount
@@ -188,6 +192,7 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
             uint256 actorBalance = capToken.balanceOf(actor);
             if (actorBalance > 0) {
                 uint256[] memory minAmountsOut = new uint256[](assets.length);
+                vm.prank(actor);
                 capToken.redeem(actorBalance, minAmountsOut, actor, block.timestamp);
             }
         }
@@ -196,5 +201,20 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
         for (uint256 i = 0; i < assets.length; i++) {
             eq(MockERC20(assets[i]).balanceOf(address(capToken)), 0, "dust amount of asset remaining in vault");
         }
+    }
+
+    /// @dev Property: maxBorrowable after borrowing max should be 0
+    /// @dev Property: borrowing max should not make agent unhealthy
+    function doomsday_maxBorrow() public stateless {
+        uint256 maxBorrowBefore = lender.maxBorrowable(_getActor(), _getAsset());
+
+        vm.prank(_getActor());
+        lender.borrow(_getAsset(), maxBorrowBefore, _getActor());
+
+        uint256 maxBorrowAfter = lender.maxBorrowable(_getActor(), _getAsset());
+        (,,,,, uint256 health) = lender.agent(_getActor());
+
+        eq(maxBorrowAfter, 0, "max borrow should be 0 after borrowing max");
+        gt(health, RAY, "agent should be healthy after borrowing max");
     }
 }
