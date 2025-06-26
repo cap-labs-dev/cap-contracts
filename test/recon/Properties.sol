@@ -473,6 +473,15 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: maxBorrowable should never revert
+    function property_maxBorrow_never_reverts() public {
+        try lender.maxBorrowable(_getActor(), _getAsset()) {
+            // success
+        } catch {
+            t(false, "maxBorrow should never revert");
+        }
+    }
+
     /// === Optimization Properties === ///
 
     /// @dev test for optimizing the difference when debt token supply > total vault debt
