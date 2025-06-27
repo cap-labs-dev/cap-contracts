@@ -565,6 +565,16 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: staked cap total assets should never revert due to arithmetic error
+    function property_staked_cap_total_assets_never_reverts() public {
+        try stakedCap.totalAssets() {
+            // success
+        } catch (bytes memory reason) {
+            bool arithmeticError = checkError(reason, Panic.arithmeticPanic);
+            t(!arithmeticError, "staked cap total assets should never revert due to arithmetic error");
+        }
+    }
+
     /// === Optimization Properties === ///
 
     /// @dev test for optimizing the difference when debt token supply > total vault debt

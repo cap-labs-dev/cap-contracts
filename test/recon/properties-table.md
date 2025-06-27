@@ -98,5 +98,6 @@
 | 97 | doomsday_realizeRestakerInterest_never_reverts | `realizeRestakerInterest` never reverts due to under/overflow | |
 | 98 | lender_cancelLiquidation | cancelLiquidation should always succeed when health is above 1e27 | |
 | 99 | lender_cancelLiquidation | cancelLiquidation should revert when health is below 1e27 | |
-| 100 | doomsday_maxLiquidatable_never_reverts | maxLiquidatable should never revert due to arithmetic error | |
-| 101 | doomsday_bonus_never_reverts | bonus should never revert due to arithmetic error | |
+| 100 | property_maxLiquidatable_never_reverts | maxLiquidatable should never revert due to arithmetic error | |
+| 101 | property_bonus_never_reverts | bonus should never revert due to arithmetic error | |
+| 101 | property_staked_cap_total_assets_never_reverts | staked cap total assets should never revert due to arithmetic error | |
