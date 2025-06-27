@@ -65,8 +65,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     }
 
     // forge test --match-test test_property_health_should_not_change_when_realizeRestakerInterest_is_called_6 -vvv
-    // NOTE: agent health changes if the restaker rate is decreased
-    // TODO: optimization test for this
+    // NOTE: acknowledged by team that this is a real break, but fix will be delayed because admin can just realize interest before changing restaker rate to fix it
     function test_property_health_should_not_change_when_realizeRestakerInterest_is_called_6() public {
         switch_asset(0);
 
@@ -100,15 +99,16 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     }
 
     // forge test --match-test test_doomsday_manipulate_utilization_rate_2 -vvv
-    // NOTE: appears to be valid, need to discover the root cause
-    function test_doomsday_manipulate_utilization_rate_2() public {
-        switchActor(1);
+    // NOTE: valid, need to discover the root cause
+    // forge test --match-test test_doomsday_manipulate_utilization_rate_10 -vvv
+    function test_doomsday_manipulate_utilization_rate_10() public {
+        capToken_mint_clamped(10001224997);
 
-        capToken_mint_clamped(10016233150);
+        lender_borrow_clamped(100010974);
 
-        lender_borrow(100620828);
-
-        doomsday_manipulate_utilization_rate(100106565);
+        doomsday_manipulate_utilization_rate(
+            115792089237316195423570985008687907853269984665640564039457584007913129639935
+        );
     }
 
     // forge test --match-test test_doomsday_repay_all_5 -vvv
@@ -139,50 +139,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         property_zero_debt_is_borrowing();
     }
 
-    // forge test --match-test test_doomsday_liquidate_1 -vvv
-    // NOTE: looks like a depeg can cause liquidation to fail
-    function test_doomsday_liquidate_1() public {
-        capToken_mint_clamped(76546915659384565102);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
-        asset_approve(0x15cF58144EF33af1e14b5208015d11F9143E27b9, 0);
-
-        switchChainlinkOracle(3);
-
-        // sets the price to 8.5016866e7
-        mockChainlinkPriceFeed_setLatestAnswer_clamped(-158910016361134981458467509623070);
-
-        doomsday_liquidate(1);
-    }
-
-    // forge test --match-test test_property_no_agent_borrowing_total_debt_and_utilization_rate_should_be_zero_13 -vvv
-    // NOTE: seems like this would mess up the rate calculation in VaultAdapter, causing a 0 rate if all agents have repaid
-    // TODO: investigate further
-    function test_property_no_agent_borrowing_total_debt_and_utilization_rate_should_be_zero_13() public {
-        capToken_mint_clamped(10155906430);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
-        vm.warp(block.timestamp + 1);
-
-        vm.roll(block.number + 1);
-
-        lender_repay(11578722538);
-
-        switch_asset(507841201531444);
-
-        lender_removeAsset(0x96d3F6c20EEd2697647F543fE6C08bC2Fbf39758);
-
-        switch_asset(51100855422138231202198802307432956527994435);
-
-        // need a way to query VaultAdapter rate
-        // uint256 rate = oracle.rate(address(capToken), _getAsset());
-
-        // utilizationIndex 1e27
-        property_no_agent_borrowing_current_utilization_rate_should_be_zero();
-    }
-
     // forge test --match-test test_doomsday_maxBorrow_14 -vvv
     // NOTE: looks like a real break, maxBorrows is nonzero after borrowing max
     function test_doomsday_maxBorrow_14() public {
@@ -210,6 +166,84 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 1600783476099645525198470);
 
         doomsday_compound_vs_linear_accumulation(81);
+    }
+
+    // forge test --match-test test_doomsday_debt_token_solvency_4 -vvv
+    // NOTE: real break, but minimal max insolvency of 1 wei
+    function test_doomsday_debt_token_solvency_4() public {
+        capToken_mint_clamped(10030351031);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+
+        vm.warp(block.timestamp + 3);
+
+        vm.roll(block.number + 1);
+
+        switchActor(1);
+
+        capToken_mint_clamped(10000217616);
+
+        lender_borrow_clamped(100077341);
+
+        doomsday_debt_token_solvency();
+    }
+
+    // forge test --match-test test_capToken_burn_clamped_6 -vvv
+    // NOTE: real break, setting high reserves can prevent burning
+    function test_capToken_burn_clamped_6() public {
+        asset_mint(0xe916cadb12C49389E487eB1e8194B1459b29B0eC, 1);
+
+        capToken_mint_clamped(20002893847);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        capToken_investAll();
+
+        capToken_setReserve(10011737767);
+
+        capToken_burn_clamped(10000256330);
+    }
+
+    // forge test --match-test test_capToken_burn_8 -vvv
+    // NOTE: same as above, but with unclamped handler
+    function test_capToken_burn_8() public {
+        asset_mint(0xe916cadb12C49389E487eB1e8194B1459b29B0eC, 1);
+
+        capToken_mint_clamped(20017387312);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        lender_repay(1);
+
+        capToken_investAll();
+
+        capToken_burn(10011616360, 0, 0);
+    }
+
+    // forge test --match-test test_property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset_13 -vvv
+    // NOTE: if the fractional reserve vault experiences a loss, it will have less reserves than expected after divesting
+    function test_property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset_13() public {
+        capToken_mint_clamped(10003050268);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        capToken_investAll();
+
+        mockERC4626Tester_decreaseYield(1);
+
+        capToken_setReserve(1);
+
+        capToken_divestAll();
+
+        property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset();
     }
 
     /// === Newest Issues === ///

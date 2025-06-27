@@ -128,7 +128,10 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         } catch (bytes memory reason) {
             bool arithmeticError = checkError(reason, Panic.arithmeticPanic);
 
-            t(!arithmeticError, "borrow should never revert with arithmetic error");
+            // precondition: need to be trying to borrow a valid amount
+            if (_amount <= beforeMaxBorrowable) {
+                t(!arithmeticError, "borrow should never revert with arithmetic error");
+            }
         }
     }
 

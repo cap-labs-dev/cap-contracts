@@ -84,16 +84,14 @@
 | 82 | doomsday_repay_all | repaying all debt for all actors transfers same amount of interest as would have been transferred by `realizeInterest` | |
 | 83 | doomsday_manipulate_utilization_rate | borrowing and repaying an amount in the same block shouldn't change the utilization rate | |
 | 84 | property_previewRedeem_greater_than_loaned | `previewRedeem(totalSupply)` >= `loaned` | |
-| 85 | doomsday_dust_on_redeem | after all users redeem there should be no assets left in the vault | |
 | 86 | capToken_divestAll | no assets should be left in the vault after divesting all | |
 | 87 | property_available_balance_never_reverts | available balance should never revert | |
 | 88 | property_maxBorrow_never_reverts | maxBorrowable should never revert | |
 | 89 | property_no_agent_borrowing_total_debt_should_be_zero | if no agent is borrowing, the total debt should be 0 | |
 | 90 | property_no_agent_borrowing_utilization_rate_should_be_zero | if no agent is borrowing, the utilization rate should be 0 | |
-| 91 | property_no_agent_borrowing_total_debt_and_utilization_rate_should_be_zero | if no agent is borrowing, the current utilization index should be 0 | |
-| 92 | doomsday_maxBorrow | maxBorrowable after borrowing max should be 0 | |
-| 93 | doomsday_maxBorrow | if no agent is borrowing, the current utilization index should be 0 | |
-| 94 | doomsday_compound_vs_linear_accumulation | interest accumulation should be the same whether it's realized or not | |
-| 95 | debtToken.totalSupply should never be less than reserve.debt | |
-| 96 | A healthy account (collateral/debt > 1) should never become unhealthy after a liquidation | |
-| 97 | A liquidatable account that doesn't have bad debt should not suddenly have bad debt after liquidation | |
+| 91 | doomsday_maxBorrow | maxBorrowable after borrowing max should be 0 | |
+| 92 | doomsday_maxBorrow | if no agent is borrowing, the current utilization index should be 0 | |
+| 93 | doomsday_compound_vs_linear_accumulation | interest accumulation should be the same whether it's realized or not | |
+| 94 | debtToken.totalSupply should never be less than reserve.debt | |
+| 95 | A healthy account (collateral/debt > 1) should never become unhealthy after a liquidation | |
+| 96 | A liquidatable account that doesn't have bad debt should not suddenly have bad debt after liquidation | |
