@@ -507,7 +507,7 @@ abstract contract Properties is BeforeAfter, Asserts {
 
     /// @dev Property: A healthy account (collateral/debt > 1) should never become unhealthy after a liquidation
     function property_healthy_account_stays_healthy_after_liquidation() public {
-        if (currentOperation != OpType.LIQUIDATE) {
+        if (currentOperation != OpType.LIQUIDATE || currentOperationTimestamp != block.timestamp) {
             return;
         }
 
@@ -521,18 +521,9 @@ abstract contract Properties is BeforeAfter, Asserts {
                 continue;
             }
 
-            uint256 healthBefore = _before.agentHealth[agent];
-            uint256 healthAfter;
-
-            try lender.agent(agent) returns (uint256, uint256, uint256, uint256, uint256, uint256 currentHealth) {
-                healthAfter = currentHealth;
-            } catch {
-                healthAfter = type(uint256).max; // Default to healthy if call fails
-            }
-
             // If the agent was healthy before (health > RAY), they should still be healthy after
-            if (healthBefore > RAY) {
-                gte(healthAfter, RAY, "healthy account became unhealthy after liquidation");
+            if (_before.agentHealth[agent] > RAY) {
+                gte(_after.agentHealth[agent], RAY, "healthy account became unhealthy after liquidation");
             }
         }
     }
@@ -540,18 +531,14 @@ abstract contract Properties is BeforeAfter, Asserts {
     /// @dev Property: A liquidatable account that doesn't have bad debt should not suddenly have bad debt after liquidation
     function property_no_bad_debt_creation_on_liquidation() public {
         // Only check this property for liquidation operations
-        if (currentOperation != OpType.LIQUIDATE) {
+        if (currentOperation != OpType.LIQUIDATE || currentOperationTimestamp != block.timestamp) {
             return;
         }
 
-        address liquidatedAgent = _getActor();
-
-        // Get agent's financial state before and after liquidation
-        uint256 delegationBefore =
-            _before.agentHealth[liquidatedAgent] > 0 ? _getAgentDelegationValue(liquidatedAgent) : 0;
-        uint256 debtBefore = _before.agentTotalDebt[liquidatedAgent];
-
-        (uint256 delegationAfter,, uint256 debtAfter,,,) = lender.agent(liquidatedAgent);
+        uint256 debtBefore = _before.agentTotalDebt[_getActor()];
+        uint256 delegationBefore = _before.agentDelegation[_getActor()];
+        uint256 debtAfter = _after.agentTotalDebt[_getActor()];
+        uint256 delegationAfter = _after.agentDelegation[_getActor()];
 
         // debt > collateral (underwater position)
         bool hadBadDebtBefore = delegationBefore < debtBefore && debtBefore > 0;
