@@ -92,6 +92,11 @@
 | 91 | doomsday_maxBorrow | maxBorrowable after borrowing max should be 0 | |
 | 92 | doomsday_maxBorrow | if no agent is borrowing, the current utilization index should be 0 | |
 | 93 | doomsday_compound_vs_linear_accumulation | interest accumulation should be the same whether it's realized or not | |
-| 94 | debtToken.totalSupply should never be less than reserve.debt | |
-| 95 | A healthy account (collateral/debt > 1) should never become unhealthy after a liquidation | |
-| 96 | A liquidatable account that doesn't have bad debt should not suddenly have bad debt after liquidation | |
+| 94 | property_debt_token_total_supply_greater_than_vault_debt | debtToken.totalSupply should never be less than reserve.debt | |
+| 95 | property_healthy_account_stays_healthy_after_liquidation | A healthy account (collateral/debt > 1) should never become unhealthy after a liquidation | |
+| 96 | property_no_bad_debt_creation_on_liquidation | A liquidatable account that doesn't have bad debt should not suddenly have bad debt after liquidation | |
+| 97 | doomsday_realizeRestakerInterest_never_reverts | `realizeRestakerInterest` never reverts due to under/overflow | |
+| 98 | lender_cancelLiquidation | cancelLiquidation should always succeed when health is above 1e27 | |
+| 99 | lender_cancelLiquidation | cancelLiquidation should revert when health is below 1e27 | |
+| 100 | doomsday_maxLiquidatable_never_reverts | maxLiquidatable should never revert due to arithmetic error | |
+| 101 | doomsday_bonus_never_reverts | bonus should never revert due to arithmetic error | |

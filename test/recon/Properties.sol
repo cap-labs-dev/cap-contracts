@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import { Asserts } from "@chimera/Asserts.sol";
 import { MockERC20 } from "@recon/MockERC20.sol";
+import { Panic } from "@recon/Panic.sol";
 import { console2 } from "forge-std/console2.sol";
 
 import { BeforeAfter, OpType } from "./BeforeAfter.sol";
@@ -627,6 +628,28 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
 
         return 0;
+    }
+
+    /// @dev Property: maxLiquidatable should never revert due to arithmetic error
+    function property_maxLiquidatable_never_reverts() public {
+        try lender.maxLiquidatable(_getActor(), _getAsset()) {
+            // success
+        } catch (bytes memory reason) {
+            bool arithmeticError = checkError(reason, Panic.arithmeticPanic);
+            if (!arithmeticError) {
+                t(false, "maxLiquidatable should never revert due to arithmetic error");
+            }
+        }
+    }
+
+    /// @dev Property: bonus should never revert due to arithmetic error
+    function property_bonus_never_reverts() public {
+        try lender.bonus(_getActor()) {
+            // success
+        } catch (bytes memory reason) {
+            bool arithmeticError = checkError(reason, Panic.arithmeticPanic);
+            t(!arithmeticError, "bonus should never revert due to arithmetic error");
+        }
     }
 
     /// @dev test for optimizing the difference between the lender's ltv and the delegation's ltv
