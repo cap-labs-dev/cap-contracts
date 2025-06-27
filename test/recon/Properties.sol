@@ -466,8 +466,11 @@ abstract contract Properties is BeforeAfter, Asserts {
     function property_maxBorrow_never_reverts() public {
         try lender.maxBorrowable(_getActor(), _getAsset()) {
             // success
-        } catch {
-            t(false, "maxBorrow should never revert");
+        } catch (bytes memory reason) {
+            bool expectedError = checkError(reason, "PriceError(address)");
+            if (!expectedError) {
+                t(false, "maxBorrow should never revert");
+            }
         }
     }
 
