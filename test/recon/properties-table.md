@@ -96,3 +96,5 @@
 | 95 | property_healthy_account_stays_healthy_after_liquidation | A healthy account (collateral/debt > 1) should never become unhealthy after a liquidation | |
 | 96 | property_no_bad_debt_creation_on_liquidation | A liquidatable account that doesn't have bad debt should not suddenly have bad debt after liquidation | |
 | 97 | doomsday_realizeRestakerInterest_never_reverts | `realizeRestakerInterest` never reverts due to under/overflow | |
+| 98 | lender_cancelLiquidation | cancelLiquidation should always succeed when health is above 1e27 | |
+| 99 | lender_cancelLiquidation | cancelLiquidation should revert when health is below 1e27 | |

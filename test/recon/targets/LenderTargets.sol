@@ -135,8 +135,20 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         }
     }
 
+    /// @dev Property: cancelLiquidation should always succeed when health is above 1e27
+    /// @dev Property: cancelLiquidation should revert when health is below 1e27
     function lender_cancelLiquidation() public updateGhosts asActor {
-        lender.cancelLiquidation(_getActor());
+        (,,,,, uint256 healthBefore) = lender.agent(_getActor());
+
+        try lender.cancelLiquidation(_getActor()) {
+            if (healthBefore < RAY) {
+                t(false, "liquidation should not be cancelled when health is below 1e27");
+            }
+        } catch (bytes memory reason) {
+            if (healthBefore > RAY) {
+                t(false, "cancelLiquidation should always succeed when health is above 1e27");
+            }
+        }
     }
 
     /// @dev Property: Agent should not be liquidatable with health > 1e27
