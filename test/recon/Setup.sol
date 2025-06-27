@@ -87,6 +87,8 @@ abstract contract Setup is
     int256 maxIncreaseHealthDelta;
     int256 maxDecreaseHealthDelta;
     int256 maxFailedLiquidatedAmount;
+    int256 maxUtilizationDecrease;
+    int256 maxUtilizationIncrease;
 
     uint256 constant RAY = 1e27;
 

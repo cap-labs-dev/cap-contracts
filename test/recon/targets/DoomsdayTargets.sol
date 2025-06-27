@@ -184,6 +184,35 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
         eq(utilizationIndexAfter, utilizationIndexBefore, "utilization index is not the same as before the borrow");
     }
 
+    /// @dev optimizes the difference in utilization discovered by doomsday_manipulate_utilization_rate
+    function doomsday_manipulate_utilization_rate_optimization(uint256 _amount) public {
+        // get the utilization rate before a borrow
+        uint256 utilizationBefore = capToken.utilization(_getAsset());
+
+        // borrow some amount
+        vm.prank(_getActor());
+        lender.borrow(_getAsset(), _amount, _getActor());
+
+        // repay the borrowed amount
+        vm.prank(_getActor());
+        lender.repay(_getAsset(), _amount, _getActor());
+
+        // get the utilization rate after repaying the borrowed amount
+        uint256 utilizationAfter = capToken.utilization(_getAsset());
+
+        if (utilizationAfter > utilizationBefore) {
+            int256 increase = int256(utilizationAfter) - int256(utilizationBefore);
+            if (increase > maxUtilizationIncrease) {
+                maxUtilizationIncrease = increase;
+            }
+        } else {
+            int256 decrease = int256(utilizationBefore) - int256(utilizationAfter);
+            if (decrease > maxUtilizationDecrease) {
+                maxUtilizationDecrease = decrease;
+            }
+        }
+    }
+
     /// @dev Property: maxBorrowable after borrowing max should be 0
     /// @dev Property: borrowing max should not make agent unhealthy
     function doomsday_maxBorrow() public stateless {
