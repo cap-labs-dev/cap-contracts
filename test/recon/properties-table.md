@@ -94,3 +94,4 @@
 | 92 | doomsday_maxBorrow | maxBorrowable after borrowing max should be 0 | |
 | 93 | doomsday_maxBorrow | if no agent is borrowing, the current utilization index should be 0 | |
 | 94 | doomsday_compound_vs_linear_accumulation | interest accumulation should be the same whether it's realized or not | |
+| 95 | debtToken.totalSupply should never be less than reserve.debt | |

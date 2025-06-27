@@ -495,6 +495,16 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: debtToken.totalSupply should never be less than reserve.debt
+    function property_debt_token_total_supply_greater_than_vault_debt() public {
+        (,, address _debtToken,,,,) = lender.reservesData(_getAsset());
+        gte(
+            MockERC20(_debtToken).totalSupply(),
+            lender.getVaultDebt(_getAsset()),
+            "debtToken.totalSupply < reserve.debt"
+        );
+    }
+
     /// === Optimization Properties === ///
 
     /// @dev test for optimizing the difference when debt token supply > total vault debt
