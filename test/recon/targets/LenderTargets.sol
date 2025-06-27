@@ -21,6 +21,8 @@ import { LenderWrapper } from "test/recon/helpers/LenderWrapper.sol";
 abstract contract LenderTargets is BaseTargetFunctions, Properties {
     /// CUSTOM TARGET FUNCTIONS - Add your own target functions here ///
     function lender_borrow_clamped(uint256 _amount) public {
+        // clamp by the max borrowable amount
+        _amount %= lender.maxBorrowable(_getActor(), _getAsset());
         lender_borrow(_amount);
     }
 
@@ -93,6 +95,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         updateGhostsWithType(_amount != 0 ? OpType.DIVEST : OpType.GENERIC)
         asActor
     {
+        console2.log("borrowing %e", _amount);
         uint256 beforeAssetBalance = MockERC20(_getAsset()).balanceOf(_getActor());
         (,, address _debtToken,,,,) = lender.reservesData(_getAsset());
         uint256 beforeBorrowerDebt = DebtToken(_debtToken).balanceOf(_getActor());
