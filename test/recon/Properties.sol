@@ -505,6 +505,72 @@ abstract contract Properties is BeforeAfter, Asserts {
         );
     }
 
+    /// @dev Property: A healthy account (collateral/debt > 1) should never become unhealthy after a liquidation
+    function property_healthy_account_stays_healthy_after_liquidation() public {
+        if (currentOperation != OpType.LIQUIDATE) {
+            return;
+        }
+
+        address[] memory agents = delegation.agents();
+
+        for (uint256 i = 0; i < agents.length; i++) {
+            address agent = agents[i];
+
+            // Skip the agent being liquidated (they're expected to be unhealthy)
+            if (agent == _getActor()) {
+                continue;
+            }
+
+            uint256 healthBefore = _before.agentHealth[agent];
+            uint256 healthAfter;
+
+            try lender.agent(agent) returns (uint256, uint256, uint256, uint256, uint256, uint256 currentHealth) {
+                healthAfter = currentHealth;
+            } catch {
+                healthAfter = type(uint256).max; // Default to healthy if call fails
+            }
+
+            // If the agent was healthy before (health > RAY), they should still be healthy after
+            if (healthBefore > RAY) {
+                gte(healthAfter, RAY, "healthy account became unhealthy after liquidation");
+            }
+        }
+    }
+
+    /// @dev Property: A liquidatable account that doesn't have bad debt should not suddenly have bad debt after liquidation
+    function property_no_bad_debt_creation_on_liquidation() public {
+        // Only check this property for liquidation operations
+        if (currentOperation != OpType.LIQUIDATE) {
+            return;
+        }
+
+        address liquidatedAgent = _getActor();
+
+        // Get agent's financial state before and after liquidation
+        uint256 delegationBefore =
+            _before.agentHealth[liquidatedAgent] > 0 ? _getAgentDelegationValue(liquidatedAgent) : 0;
+        uint256 debtBefore = _before.agentTotalDebt[liquidatedAgent];
+
+        (uint256 delegationAfter,, uint256 debtAfter,,,) = lender.agent(liquidatedAgent);
+
+        // debt > collateral (underwater position)
+        bool hadBadDebtBefore = delegationBefore < debtBefore && debtBefore > 0;
+        bool hasBadDebtAfter = delegationAfter < debtAfter && debtAfter > 0;
+
+        // If the account didn't have bad debt before, it shouldn't have bad debt after liquidation
+        if (!hadBadDebtBefore && debtBefore > 0) {
+            t(!hasBadDebtAfter, "liquidation created bad debt in previously solvent account");
+        }
+
+        // Additional check: if there was bad debt before, it should be reduced or eliminated
+        if (hadBadDebtBefore) {
+            uint256 badDebtBefore = debtBefore - delegationBefore;
+            uint256 badDebtAfter = hasBadDebtAfter ? debtAfter - delegationAfter : 0;
+
+            lte(badDebtAfter, badDebtBefore, "liquidation increased bad debt amount");
+        }
+    }
+
     /// === Optimization Properties === ///
 
     /// @dev test for optimizing the difference when debt token supply > total vault debt
@@ -640,5 +706,13 @@ abstract contract Properties is BeforeAfter, Asserts {
             }
         }
         return true;
+    }
+
+    function _getAgentDelegationValue(address agent) internal view returns (uint256) {
+        try lender.agent(agent) returns (uint256 totalDelegation, uint256, uint256, uint256, uint256, uint256) {
+            return totalDelegation;
+        } catch {
+            return 0;
+        }
     }
 }

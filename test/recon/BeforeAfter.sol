@@ -74,6 +74,8 @@ abstract contract BeforeAfter is Setup {
         vars.redeemAmountsOut = _getRedeemAmounts(_getActor());
 
         (,, vars.agentTotalDebt[_getActor()],,, vars.agentHealth[_getActor()]) = _getAgentParams(_getActor());
+
+        _updateAllAgentsHealth(vars);
     }
 
     function __before() internal {
@@ -167,6 +169,19 @@ abstract contract BeforeAfter is Setup {
         } catch {
             // If the call fails, return 1:1 ratio
             valuePerShare = 1e18;
+        }
+    }
+
+    function _updateAllAgentsHealth(Vars storage vars) internal {
+        try delegation.agents() returns (address[] memory agents) {
+            for (uint256 i = 0; i < agents.length; i++) {
+                address agent = agents[i];
+                (,, uint256 totalDebt,,, uint256 health) = _getAgentParams(agent);
+                vars.agentHealth[agent] = health;
+                vars.agentTotalDebt[agent] = totalDebt;
+            }
+        } catch {
+            // If we can't get agents, skip this update
         }
     }
 }
