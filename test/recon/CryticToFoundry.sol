@@ -100,7 +100,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     }
 
     // forge test --match-test test_doomsday_manipulate_utilization_rate_2 -vvv
-    // NOTE: appears to be valid, need to discover the root cause
+    // NOTE: valid, need to discover the root cause
     function test_doomsday_manipulate_utilization_rate_2() public {
         switchActor(1);
 
@@ -156,33 +156,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         doomsday_liquidate(1);
     }
 
-    // forge test --match-test test_property_no_agent_borrowing_total_debt_and_utilization_rate_should_be_zero_13 -vvv
-    // NOTE: seems like this would mess up the rate calculation in VaultAdapter, causing a 0 rate if all agents have repaid
-    // TODO: investigate further
-    function test_property_no_agent_borrowing_total_debt_and_utilization_rate_should_be_zero_13() public {
-        capToken_mint_clamped(10155906430);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
-        vm.warp(block.timestamp + 1);
-
-        vm.roll(block.number + 1);
-
-        lender_repay(11578722538);
-
-        switch_asset(507841201531444);
-
-        lender_removeAsset(0x96d3F6c20EEd2697647F543fE6C08bC2Fbf39758);
-
-        switch_asset(51100855422138231202198802307432956527994435);
-
-        // need a way to query VaultAdapter rate
-        // uint256 rate = oracle.rate(address(capToken), _getAsset());
-
-        // utilizationIndex 1e27
-        property_no_agent_borrowing_current_utilization_rate_should_be_zero();
-    }
-
     // forge test --match-test test_doomsday_maxBorrow_14 -vvv
     // NOTE: looks like a real break, maxBorrows is nonzero after borrowing max
     function test_doomsday_maxBorrow_14() public {
@@ -212,5 +185,142 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         doomsday_compound_vs_linear_accumulation(81);
     }
 
+    // forge test --match-test test_doomsday_debt_token_solvency_4 -vvv
+    // NOTE: real break, but minimal max insolvency of 1 wei
+    function test_doomsday_debt_token_solvency_4() public {
+        capToken_mint_clamped(10030351031);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+
+        vm.warp(block.timestamp + 3);
+
+        vm.roll(block.number + 1);
+
+        switchActor(1);
+
+        capToken_mint_clamped(10000217616);
+
+        lender_borrow_clamped(100077341);
+
+        doomsday_debt_token_solvency();
+    }
+
+    // forge test --match-test test_capToken_burn_clamped_6 -vvv
+    // NOTE: real break, setting high reserves can prevent burning
+    function test_capToken_burn_clamped_6() public {
+        asset_mint(0xe916cadb12C49389E487eB1e8194B1459b29B0eC, 1);
+
+        capToken_mint_clamped(20002893847);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        capToken_investAll();
+
+        capToken_setReserve(10011737767);
+
+        capToken_burn_clamped(10000256330);
+    }
+
+    // forge test --match-test test_capToken_burn_8 -vvv
+    // NOTE: same as above, but with unclamped handler
+    function test_capToken_burn_8() public {
+        asset_mint(0xe916cadb12C49389E487eB1e8194B1459b29B0eC, 1);
+
+        capToken_mint_clamped(20017387312);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        lender_repay(1);
+
+        capToken_investAll();
+
+        capToken_burn(10011616360, 0, 0);
+    }
+
+    // forge test --match-test test_property_health_should_not_change_when_realizeRestakerInterest_is_called_1 -vvv
+    // NOTE: acknowledged by team that this is a real break, but fix will be delayed because admin can just realize interest before changing restaker rate to fix it
+    function test_property_health_should_not_change_when_realizeRestakerInterest_is_called_1() public {
+        switch_asset(0);
+
+        capToken_mint_clamped(612047141);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+
+        oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 2721150519359211144892391);
+
+        vm.warp(block.timestamp + 152);
+
+        vm.roll(block.number + 1);
+
+        lender_realizeRestakerInterest();
+
+        property_health_should_not_change_when_realizeRestakerInterest_is_called();
+    }
+
     /// === Newest Issues === ///
+
+    // forge test --match-test test_lender_borrow_clamped_12 -vvv
+    function test_lender_borrow_clamped_12() public {
+        asset_mint(0xe916cadb12C49389E487eB1e8194B1459b29B0eC, 1);
+
+        capToken_mint_clamped(10001191134);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        capToken_investAll();
+
+        capToken_setReserve(1);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+    }
+
+    // forge test --match-test test_property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset_13 -vvv
+    function test_property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset_13() public {
+        capToken_mint_clamped(10003050268);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        capToken_investAll();
+
+        mockERC4626Tester_decreaseYield(1);
+
+        capToken_setReserve(1);
+
+        capToken_divestAll();
+
+        property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset();
+    }
+
+    // forge test --match-test test_lender_realizeRestakerInterest_17 -vvv
+    function test_lender_realizeRestakerInterest_17() public {
+        capToken_mint_clamped(10000008847);
+
+        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        vm.warp(block.timestamp + 1);
+
+        vm.roll(block.number + 1);
+
+        capToken_mint_clamped(10004852425);
+
+        capToken_investAll();
+
+        oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 3160608635315932379945424);
+
+        lender_realizeRestakerInterest();
+    }
 }
