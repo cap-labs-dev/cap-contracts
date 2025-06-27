@@ -28,6 +28,7 @@ abstract contract BeforeAfter is Setup {
         mapping(address => uint256) vaultDebt;
         mapping(address => uint256) agentHealth;
         mapping(address => uint256) agentTotalDebt;
+        mapping(address => uint256) agentDelegation;
         mapping(address => uint256) utilizationIndex;
         mapping(address => uint256) utilizationRatio;
         mapping(address => uint256) totalBorrows;
@@ -41,9 +42,11 @@ abstract contract BeforeAfter is Setup {
     Vars internal _before;
     Vars internal _after;
     OpType internal currentOperation;
+    uint256 internal currentOperationTimestamp;
 
     modifier updateGhosts() {
         currentOperation = OpType.GENERIC;
+        currentOperationTimestamp = block.timestamp;
         __before();
         _;
         __after();
@@ -51,6 +54,7 @@ abstract contract BeforeAfter is Setup {
 
     modifier updateGhostsWithType(OpType _opType) {
         currentOperation = _opType;
+        currentOperationTimestamp = block.timestamp;
         __before();
         _;
         __after();
@@ -73,7 +77,8 @@ abstract contract BeforeAfter is Setup {
         vars.stakedCapValuePerShare = _getStakedCapValuePerShare();
         vars.redeemAmountsOut = _getRedeemAmounts(_getActor());
 
-        (,, vars.agentTotalDebt[_getActor()],,, vars.agentHealth[_getActor()]) = _getAgentParams(_getActor());
+        (vars.agentDelegation[_getActor()],, vars.agentTotalDebt[_getActor()],,, vars.agentHealth[_getActor()]) =
+            _getAgentParams(_getActor());
     }
 
     function __before() internal {

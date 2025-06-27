@@ -92,3 +92,6 @@
 | 91 | doomsday_maxBorrow | maxBorrowable after borrowing max should be 0 | |
 | 92 | doomsday_maxBorrow | if no agent is borrowing, the current utilization index should be 0 | |
 | 93 | doomsday_compound_vs_linear_accumulation | interest accumulation should be the same whether it's realized or not | |
+| 94 | debtToken.totalSupply should never be less than reserve.debt | |
+| 95 | A healthy account (collateral/debt > 1) should never become unhealthy after a liquidation | |
+| 96 | A liquidatable account that doesn't have bad debt should not suddenly have bad debt after liquidation | |

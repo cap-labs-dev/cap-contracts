@@ -244,7 +244,10 @@ abstract contract Properties is BeforeAfter, Asserts {
             uint256 totalBorrows = capToken.totalBorrows(asset);
             uint256 fractionalReserveBalance = MockERC20(asset).balanceOf(capToken.fractionalReserveVault(asset));
 
-            uint256 totalAssetAmount = vaultBalance + totalBorrows + fractionalReserveBalance;
+            // this is related to loss simulation in MockERC4626Tester
+            uint256 burnedAmount = MockERC20(asset).balanceOf(address(0xbeef));
+
+            uint256 totalAssetAmount = vaultBalance + totalBorrows + fractionalReserveBalance + burnedAmount;
 
             uint256 assetDecimals = MockERC20(asset).decimals();
             uint256 assetValue = totalAssetAmount * assetPrice * 1e18 / (10 ** assetDecimals * 1e8);
@@ -490,6 +493,77 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: if no agent is borrowing, the current utilization index should be 0
+    function property_no_agent_borrowing_current_utilization_rate_should_be_zero() public {
+        if (_checkNoAgentBorrowing(_getAsset())) {
+            uint256 currentUtilizationIndex = capToken.currentUtilizationIndex(_getAsset());
+            eq(currentUtilizationIndex, 0, "current utilization index should be 0");
+        }
+    }
+
+    /// @dev Property: debtToken.totalSupply should never be less than reserve.debt
+    function property_debt_token_total_supply_greater_than_vault_debt() public {
+        (,, address _debtToken,,,,) = lender.reservesData(_getAsset());
+        gte(
+            MockERC20(_debtToken).totalSupply(),
+            lender.getVaultDebt(_getAsset()),
+            "debtToken.totalSupply < reserve.debt"
+        );
+    }
+
+    /// @dev Property: A healthy account (collateral/debt > 1) should never become unhealthy after a liquidation
+    function property_healthy_account_stays_healthy_after_liquidation() public {
+        if (currentOperation != OpType.LIQUIDATE || currentOperationTimestamp != block.timestamp) {
+            return;
+        }
+
+        address[] memory agents = delegation.agents();
+
+        for (uint256 i = 0; i < agents.length; i++) {
+            address agent = agents[i];
+
+            // Skip the agent being liquidated (they're expected to be unhealthy)
+            if (agent == _getActor()) {
+                continue;
+            }
+
+            // If the agent was healthy before (health > RAY), they should still be healthy after
+            if (_before.agentHealth[agent] > RAY) {
+                gte(_after.agentHealth[agent], RAY, "healthy account became unhealthy after liquidation");
+            }
+        }
+    }
+
+    /// @dev Property: A liquidatable account that doesn't have bad debt should not suddenly have bad debt after liquidation
+    function property_no_bad_debt_creation_on_liquidation() public {
+        // Only check this property for liquidation operations
+        if (currentOperation != OpType.LIQUIDATE || currentOperationTimestamp != block.timestamp) {
+            return;
+        }
+
+        uint256 debtBefore = _before.agentTotalDebt[_getActor()];
+        uint256 delegationBefore = _before.agentDelegation[_getActor()];
+        uint256 debtAfter = _after.agentTotalDebt[_getActor()];
+        uint256 delegationAfter = _after.agentDelegation[_getActor()];
+
+        // debt > collateral (underwater position)
+        bool hadBadDebtBefore = delegationBefore < debtBefore && debtBefore > 0;
+        bool hasBadDebtAfter = delegationAfter < debtAfter && debtAfter > 0;
+
+        // If the account didn't have bad debt before, it shouldn't have bad debt after liquidation
+        if (!hadBadDebtBefore && debtBefore > 0) {
+            t(!hasBadDebtAfter, "liquidation created bad debt in previously solvent account");
+        }
+
+        // Additional check: if there was bad debt before, it should be reduced or eliminated
+        if (hadBadDebtBefore) {
+            uint256 badDebtBefore = debtBefore - delegationBefore;
+            uint256 badDebtAfter = hasBadDebtAfter ? debtAfter - delegationAfter : 0;
+
+            lte(badDebtAfter, badDebtBefore, "liquidation increased bad debt amount");
+        }
+    }
+
     /// === Optimization Properties === ///
 
     /// @dev test for optimizing the difference when debt token supply > total vault debt
@@ -625,5 +699,13 @@ abstract contract Properties is BeforeAfter, Asserts {
             }
         }
         return true;
+    }
+
+    function _getAgentDelegationValue(address agent) internal view returns (uint256) {
+        try lender.agent(agent) returns (uint256 totalDelegation, uint256, uint256, uint256, uint256, uint256) {
+            return totalDelegation;
+        } catch {
+            return 0;
+        }
     }
 }
