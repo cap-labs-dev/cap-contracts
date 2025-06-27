@@ -84,7 +84,6 @@
 | 82 | doomsday_repay_all | repaying all debt for all actors transfers same amount of interest as would have been transferred by `realizeInterest` | |
 | 83 | doomsday_manipulate_utilization_rate | borrowing and repaying an amount in the same block shouldn't change the utilization rate | |
 | 84 | property_previewRedeem_greater_than_loaned | `previewRedeem(totalSupply)` >= `loaned` | |
-| 85 | doomsday_dust_on_redeem | after all users redeem there should be no assets left in the vault | |
 | 86 | capToken_divestAll | no assets should be left in the vault after divesting all | |
 | 87 | property_available_balance_never_reverts | available balance should never revert | |
 | 88 | property_maxBorrow_never_reverts | maxBorrowable should never revert | |

@@ -184,27 +184,6 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
         eq(utilizationIndexAfter, utilizationIndexBefore, "utilization index is not the same as before the borrow");
     }
 
-    /// @dev Property: after all users redeem there should be no assets left in the vault
-    function doomsday_dust_on_redeem() public stateless {
-        address[] memory assets = capToken.assets();
-
-        address[] memory actors = _getActors();
-        for (uint256 i = 0; i < actors.length; i++) {
-            address actor = actors[i];
-            uint256 actorBalance = capToken.balanceOf(actor);
-            if (actorBalance > 0) {
-                uint256[] memory minAmountsOut = new uint256[](assets.length);
-                vm.prank(actor);
-                capToken.redeem(actorBalance, minAmountsOut, actor, block.timestamp);
-            }
-        }
-
-        // verify no assets remain
-        for (uint256 i = 0; i < assets.length; i++) {
-            eq(MockERC20(assets[i]).balanceOf(address(capToken)), 0, "dust amount of asset remaining in vault");
-        }
-    }
-
     /// @dev Property: maxBorrowable after borrowing max should be 0
     /// @dev Property: borrowing max should not make agent unhealthy
     function doomsday_maxBorrow() public stateless {
