@@ -290,4 +290,14 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
             "accumulated unrealized interest with realization != accumulated unrealized interest no realization"
         );
     }
+
+    /// @dev Property: realizeRestakerInterest never reverts due to under/overflow
+    function doomsday_realizeRestakerInterest_never_reverts() public stateless {
+        try lender.realizeRestakerInterest(_getActor(), _getAsset()) {
+            // success
+        } catch (bytes memory reason) {
+            bool underflowError = checkError(reason, Panic.arithmeticPanic);
+            t(!underflowError, "realizeRestakerInterest should never revert");
+        }
+    }
 }
