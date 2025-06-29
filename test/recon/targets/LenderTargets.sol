@@ -135,15 +135,6 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         }
     }
 
-    // function lender_borrow(uint256 _amount, address _receiver)
-    //     public
-    //     // precondition: so we only check cases where an amount actually gets divested
-    //     updateGhostsWithType(_amount != 0 ? OpType.DIVEST : OpType.GENERIC)
-    //     asActor
-    // {
-    //     lender.borrow(_getAsset(), _amount, _receiver);
-    // }
-
     /// @dev Property: cancelLiquidation should always succeed when health is above 1e27
     /// @dev Property: cancelLiquidation should revert when health is below 1e27
     function lender_cancelLiquidation() public updateGhosts asActor {

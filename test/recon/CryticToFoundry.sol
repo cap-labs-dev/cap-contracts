@@ -100,15 +100,14 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
     // forge test --match-test test_doomsday_manipulate_utilization_rate_2 -vvv
     // NOTE: valid, need to discover the root cause
-    // forge test --match-test test_doomsday_manipulate_utilization_rate_10 -vvv
-    function test_doomsday_manipulate_utilization_rate_10() public {
-        capToken_mint_clamped(10001224997);
+    function test_doomsday_manipulate_utilization_rate_2() public {
+        switchActor(1);
 
-        lender_borrow_clamped(100010974);
+        capToken_mint_clamped(10016233150);
 
-        doomsday_manipulate_utilization_rate(
-            115792089237316195423570985008687907853269984665640564039457584007913129639935
-        );
+        lender_borrow(100620828);
+
+        doomsday_manipulate_utilization_rate(100106565);
     }
 
     // forge test --match-test test_doomsday_repay_all_5 -vvv

@@ -168,11 +168,9 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
         uint256 utilizationIndexBefore = capToken.currentUtilizationIndex(_getAsset());
 
         // borrow some amount
-        vm.prank(_getActor());
         lender.borrow(_getAsset(), _amount, _getActor());
 
         // repay the borrowed amount
-        vm.prank(_getActor());
         lender.repay(_getAsset(), _amount, _getActor());
 
         // get the utilization rate after repaying the borrowed amount
