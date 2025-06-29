@@ -62,7 +62,6 @@ library ViewLogic {
         view
         returns (uint256 totalDebt)
     {
-        totalDebt = 0;
         for (uint256 i; i < $.reservesCount; ++i) {
             if (!$.agentConfig[_agent].isBorrowing(i)) {
                 continue;
@@ -77,7 +76,6 @@ library ViewLogic {
             totalDebt += (IERC20(reserve.debtToken).balanceOf(_agent) + accruedRestakerInterest($, _agent, asset))
                 .mulDiv(assetPrice, 10 ** reserve.decimals, Math.Rounding.Ceil);
         }
-        return totalDebt;
     }
 
     /// @notice Calculate the maximum amount that can be borrowed for a given asset
