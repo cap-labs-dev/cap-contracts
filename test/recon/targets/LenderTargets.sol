@@ -199,55 +199,53 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         uint256 assetBalanceBefore = MockERC20(_getAsset()).balanceOf(_getActor());
         uint256 collateralBalanceBefore = MockERC20(mockNetworkMiddleware.vaults(_getActor())).balanceOf(_getActor());
 
-        uint256 liquidatedValue;
         vm.prank(_getActor());
-        try lender.liquidate(_getActor(), _getAsset(), _amount) returns (uint256 _liquidatedValue) {
-            liquidatedValue = _liquidatedValue;
+        try lender.liquidate(_getActor(), _getAsset(), _amount) returns (uint256 liquidatedValue) {
+            (uint256 totalDelegationAfter, uint256 totalSlashableCollateralAfter,,,, uint256 healthAfter) =
+                lender.agent(_getActor());
+            {
+                address vault = mockNetworkMiddleware.vaults(_getActor());
+                (uint256 collateralPrice,) = oracle.getPrice(vault); // vault token is what's minted by the MockNetworkMiddleware
+                (uint256 assetPrice,) = oracle.getPrice(_getAsset());
+                uint256 assetBalanceAfter = MockERC20(_getAsset()).balanceOf(_getActor());
+                uint256 collateralBalanceAfter = MockERC20(vault).balanceOf(_getActor());
+                uint256 collateralAmountDelta = collateralBalanceAfter - collateralBalanceBefore;
+                // liquidator asset balance decreases since they're paying for the debt
+                uint256 assetAmountDelta = assetBalanceBefore - assetBalanceAfter;
+                // Calculate value of deltas using oracle price
+                uint256 collateralValueDelta =
+                    (collateralAmountDelta * collateralPrice) / (10 ** MockERC20(vault).decimals());
+                uint256 assetValueDelta = (assetAmountDelta * assetPrice) / (10 ** MockERC20(_getAsset()).decimals());
+                gte(collateralValueDelta, assetValueDelta, "liquidation should be profitable for the liquidator");
+            }
+
+            if (healthBefore > RAY && _amount > 0) {
+                t(false, "agent should not be liquidatable with health > 1e27");
+            }
+
+            if (_amount > 0) {
+                gt(healthAfter, healthBefore, "Liquidation did not improve health factor");
+            }
+
+            // precondition: must be liquidating less than maxLiquidatable
+            if (_amount < maxLiquidatable) {
+                lte(healthAfter, 1.25e27, "partial liquidation should not bring health above 1.25");
+            }
+
+            lte(
+                totalDelegationAfter,
+                totalDelegationBefore - liquidatedValue,
+                "agent maintains more value in totalDelegation than they should"
+            );
+            lte(
+                totalSlashableCollateralAfter,
+                totalSlashableCollateralBefore - liquidatedValue,
+                "agent maintains more value in totalSlashableCollateral than they should"
+            );
         } catch (bytes memory reason) {
             bool arithmeticError = checkError(reason, Panic.arithmeticPanic);
             t(!arithmeticError, "liquidate should never revert with arithmetic error");
         }
-
-        (uint256 totalDelegationAfter, uint256 totalSlashableCollateralAfter,,,, uint256 healthAfter) =
-            lender.agent(_getActor());
-        {
-            address vault = mockNetworkMiddleware.vaults(_getActor());
-            (uint256 collateralPrice,) = oracle.getPrice(vault); // vault token is what's minted by the MockNetworkMiddleware
-            (uint256 assetPrice,) = oracle.getPrice(_getAsset());
-            uint256 assetBalanceAfter = MockERC20(_getAsset()).balanceOf(_getActor());
-            uint256 collateralBalanceAfter = MockERC20(vault).balanceOf(_getActor());
-            uint256 collateralAmountDelta = collateralBalanceAfter - collateralBalanceBefore;
-            uint256 assetAmountDelta = assetBalanceAfter - assetBalanceBefore;
-            // Calculate value of deltas using oracle price
-            uint256 collateralValueDelta =
-                (collateralAmountDelta * collateralPrice) / (10 ** MockERC20(vault).decimals());
-            uint256 assetValueDelta = (assetAmountDelta * assetPrice) / (10 ** MockERC20(_getAsset()).decimals());
-            gte(collateralValueDelta, assetValueDelta, "liquidation should be profitable for the liquidator");
-        }
-
-        if (healthBefore > RAY && _amount > 0) {
-            t(false, "agent should not be liquidatable with health > 1e27");
-        }
-
-        if (_amount > 0) {
-            gt(healthAfter, healthBefore, "Liquidation did not improve health factor");
-        }
-
-        // precondition: must be liquidating less than maxLiquidatable
-        if (_amount < maxLiquidatable) {
-            lte(healthAfter, 1.25e27, "partial liquidation should not bring health above 1.25");
-        }
-
-        lte(
-            totalDelegationAfter,
-            totalDelegationBefore - liquidatedValue,
-            "agent maintains more value in totalDelegation than they should"
-        );
-        lte(
-            totalSlashableCollateralAfter,
-            totalSlashableCollateralBefore - liquidatedValue,
-            "agent maintains more value in totalSlashableCollateral than they should"
-        );
     }
 
     // NOTE: this handler only exists to make optimization easier because the lender_liquidate handler has stack too deep issues
