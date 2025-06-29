@@ -106,11 +106,6 @@ library BorrowLogic {
 
         IERC20(params.asset).safeTransferFrom(params.caller, address(this), repaid);
 
-        if (IERC20(reserve.debtToken).balanceOf(params.agent) == 0) {
-            $.agentConfig[params.agent].setBorrowing(reserve.id, false);
-            emit TotalRepayment(params.agent, params.asset);
-        }
-
         uint256 remaining = repaid;
         uint256 interestRepaid;
         uint256 restakerRepaid;
@@ -150,6 +145,11 @@ library BorrowLogic {
         }
 
         IDebtToken(reserve.debtToken).burn(params.agent, repaid);
+
+        if (IERC20(reserve.debtToken).balanceOf(params.agent) == 0) {
+            $.agentConfig[params.agent].setBorrowing(reserve.id, false);
+            emit TotalRepayment(params.agent, params.asset);
+        }
 
         emit Repay(
             params.asset,
