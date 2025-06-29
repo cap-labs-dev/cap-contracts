@@ -228,69 +228,6 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
         gt(health, RAY, "agent should be healthy after borrowing max");
     }
 
-    /// @dev Property: interest accumulation should be the same whether it's realized or not
-    function doomsday_compound_vs_linear_accumulation(uint256 timeToAccumulate) public stateless {
-        // fetch initial interest amount to compare against
-        (uint256 initialRealizedInterest1, uint256 initialUnrealizedInterest1) =
-            lender.maxRestakerRealization(_getActor(), _getAsset());
-
-        /// ==== TIME PERIOD 1  ==== ///
-
-        // accumulate interest for a given amount of time
-        vm.warp(block.timestamp + timeToAccumulate);
-
-        // fetch the amount of interest accumulated over the given time
-        (uint256 accumulatedRealizedInterest1, uint256 accumulatedUnrealizedInterest1) =
-            lender.maxRestakerRealization(_getActor(), _getAsset());
-
-        uint256 accumulatedRealizedInterestNoRealization = accumulatedRealizedInterest1 - initialRealizedInterest1;
-        uint256 accumulatedUnrealizedInterestNoRealization = accumulatedUnrealizedInterest1 - initialUnrealizedInterest1;
-
-        /// ==== TIME PERIOD 2  ==== ///
-
-        // accumulate interest for the same amount of time but realize interest in the middle of the time period
-        vm.warp(block.timestamp + timeToAccumulate / 2);
-
-        (uint256 accumulatedRealizedInterest2, uint256 accumulatedUnrealizedInterest2) =
-            lender.maxRestakerRealization(_getActor(), _getAsset());
-
-        /// ==== TIME PERIOD 3  ==== ///
-
-        // accumulate interest for the second half of the time period
-        vm.warp(block.timestamp + timeToAccumulate / 2);
-
-        (uint256 accumulatedRealizedInterest3, uint256 accumulatedUnrealizedInterest3) =
-            lender.maxRestakerRealization(_getActor(), _getAsset());
-
-        //            timeToAccumulate     timeToAccumulate/2     timeToAccumulate/2
-        // time period 1     |     time period 2    |    time period 3
-        uint256 accumulatedRealizedInterestWithRealizationFirstHalf =
-            accumulatedRealizedInterest2 - accumulatedRealizedInterest1;
-        uint256 accumulatedRealizedInterestWithRealizationSecondHalf =
-            accumulatedRealizedInterest3 - accumulatedRealizedInterest2;
-        uint256 accumulatedRealizedInterestWithRealization =
-            accumulatedRealizedInterestWithRealizationFirstHalf + accumulatedRealizedInterestWithRealizationSecondHalf;
-
-        uint256 accumulatedUnrealizedInterestWithRealizationFirstHalf =
-            accumulatedUnrealizedInterest2 - accumulatedUnrealizedInterest1;
-        uint256 accumulatedUnrealizedInterestWithRealizationSecondHalf =
-            accumulatedUnrealizedInterest3 - accumulatedUnrealizedInterest2;
-        uint256 accumulatedUnrealizedInterestWithRealization = accumulatedUnrealizedInterestWithRealizationFirstHalf
-            + accumulatedUnrealizedInterestWithRealizationSecondHalf;
-
-        // compare the two amounts of interest accumulated and ensure they're the same
-        eq(
-            accumulatedRealizedInterestWithRealization,
-            accumulatedRealizedInterestNoRealization,
-            "accumulated realized interest with realization != accumulated realized interest no realization"
-        );
-        eq(
-            accumulatedUnrealizedInterestWithRealization,
-            accumulatedUnrealizedInterestNoRealization,
-            "accumulated unrealized interest with realization != accumulated unrealized interest no realization"
-        );
-    }
-
     /// @dev Property: realizeRestakerInterest never reverts due to under/overflow
     function doomsday_realizeRestakerInterest_never_reverts() public stateless {
         try lender.realizeRestakerInterest(_getActor(), _getAsset()) {

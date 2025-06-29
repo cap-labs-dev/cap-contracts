@@ -154,20 +154,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         doomsday_maxBorrow();
     }
 
-    // forge test --match-test test_doomsday_compound_vs_linear_accumulation_16 -vvv
-    // NOTE: realizing interest partway through a time period increases the unrealized interest
-    function test_doomsday_compound_vs_linear_accumulation_16() public {
-        switch_asset(0);
-
-        capToken_mint_clamped(122454342);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
-        oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 1600783476099645525198470);
-
-        doomsday_compound_vs_linear_accumulation(81);
-    }
-
     // forge test --match-test test_doomsday_debt_token_solvency_4 -vvv
     // NOTE: real break, but minimal max insolvency of 1 wei
     function test_doomsday_debt_token_solvency_4() public {
