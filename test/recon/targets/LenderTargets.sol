@@ -135,6 +135,15 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         }
     }
 
+    // function lender_borrow(uint256 _amount, address _receiver)
+    //     public
+    //     // precondition: so we only check cases where an amount actually gets divested
+    //     updateGhostsWithType(_amount != 0 ? OpType.DIVEST : OpType.GENERIC)
+    //     asActor
+    // {
+    //     lender.borrow(_getAsset(), _amount, _receiver);
+    // }
+
     /// @dev Property: cancelLiquidation should always succeed when health is above 1e27
     /// @dev Property: cancelLiquidation should revert when health is below 1e27
     function lender_cancelLiquidation() public updateGhosts asActor {
@@ -216,11 +225,14 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             gte(collateralValueDelta, assetValueDelta, "liquidation should be profitable for the liquidator");
         }
 
-        if (healthBefore > RAY) {
+        if (healthBefore > RAY && _amount > 0) {
             t(false, "agent should not be liquidatable with health > 1e27");
         }
 
-        gt(healthAfter, healthBefore, "Liquidation did not improve health factor");
+        if (_amount > 0) {
+            gt(healthAfter, healthBefore, "Liquidation did not improve health factor");
+        }
+
         // precondition: must be liquidating less than maxLiquidatable
         if (_amount < maxLiquidatable) {
             lte(healthAfter, 1.25e27, "partial liquidation should not bring health above 1.25");
