@@ -54,7 +54,7 @@ library ViewLogic {
     }
 
     /// @notice Helper function to calculate the total debt of an agent across all assets
-    /// @param $ Lender storagew
+    /// @param $ Lender storage
     /// @param _agent Agent address
     /// @return totalDebt Total debt of an agent in USD, encoded with 8 decimals
     function calculateTotalDebt(ILender.LenderStorage storage $, address _agent)
