@@ -346,24 +346,25 @@ abstract contract Properties is BeforeAfter, Asserts {
     // }
 
     /// @dev Property: fractional reserve vault must always have reserve amount of underyling asset
-    function property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset() public {
-        if (currentOperation == OpType.INVEST || currentOperation == OpType.DIVEST) {
-            for (uint256 i = 0; i < capToken.assets().length; i++) {
-                address asset = capToken.assets()[i];
-                uint256 beforeReserve = _before.fractionalReserveReserve[asset];
-                uint256 afterBalance = _after.vaultAssetBalance[asset];
+    // NOTE: expected to break, protocol will supply any lost assets from fractional reserve vault see issue: https://github.com/Recon-Fuzz/cap-invariants/issues/36#issuecomment-3014003162
+    // function property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset() public {
+    //     if (currentOperation == OpType.INVEST || currentOperation == OpType.DIVEST) {
+    //         for (uint256 i = 0; i < capToken.assets().length; i++) {
+    //             address asset = capToken.assets()[i];
+    //             uint256 beforeReserve = _before.fractionalReserveReserve[asset];
+    //             uint256 afterBalance = _after.vaultAssetBalance[asset];
 
-                // precondition: the reserve amount has to be <= the loaned amount or else nothing's been transferred to the fractional reserve vault so reserves won't be applied
-                if (_before.fractionalReserveReserve[asset] <= _before.fractionalReserveLoaned[asset]) {
-                    gte(
-                        afterBalance,
-                        beforeReserve,
-                        "fractional reserve vault does not have reserve amount of underlying asset"
-                    );
-                }
-            }
-        }
-    }
+    //             // precondition: the reserve amount has to be <= the loaned amount or else nothing's been transferred to the fractional reserve vault so reserves won't be applied
+    //             if (_before.fractionalReserveReserve[asset] <= _before.fractionalReserveLoaned[asset]) {
+    //                 gte(
+    //                     afterBalance,
+    //                     beforeReserve,
+    //                     "fractional reserve vault does not have reserve amount of underlying asset"
+    //                 );
+    //             }
+    //         }
+    //     }
+    // }
 
     /// @dev Property: health should not change when realizeRestakerInterest is called
     function property_health_should_not_change_when_realizeRestakerInterest_is_called() public {

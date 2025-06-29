@@ -226,25 +226,5 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         capToken_burn(10011616360, 0, 0);
     }
 
-    // forge test --match-test test_property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset_13 -vvv
-    // NOTE: if the fractional reserve vault experiences a loss, it will have less reserves than expected after divesting
-    function test_property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset_13() public {
-        capToken_mint_clamped(10003050268);
-
-        add_new_vault();
-
-        capToken_setFractionalReserveVault();
-
-        capToken_investAll();
-
-        mockERC4626Tester_decreaseYield(1);
-
-        capToken_setReserve(1);
-
-        capToken_divestAll();
-
-        property_fractional_reserve_vault_has_reserve_amount_of_underlying_asset();
-    }
-
     /// === Newest Issues === ///
 }
