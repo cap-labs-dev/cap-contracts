@@ -188,10 +188,10 @@ library ViewLogic {
         returns (uint256 accruedInterest)
     {
         ILender.ReserveData storage reserve = $.reservesData[_asset];
-        uint256 totalInterest = IERC20(reserve.debtToken).balanceOf(_agent);
+        uint256 totalDebt = IERC20(reserve.debtToken).balanceOf(_agent);
         uint256 rate = IOracle($.oracle).restakerRate(_agent);
         uint256 elapsedTime = block.timestamp - reserve.lastRealizationTime[_agent];
 
-        accruedInterest = totalInterest * rate * elapsedTime / (1e27 * SECONDS_IN_YEAR);
+        accruedInterest = totalDebt * rate * elapsedTime / (1e27 * SECONDS_IN_YEAR);
     }
 }
