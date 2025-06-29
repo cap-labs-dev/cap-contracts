@@ -227,7 +227,7 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     /// @notice Set the ltv buffer
     /// @param _ltvBuffer LTV buffer
     function setLtvBuffer(uint256 _ltvBuffer) external checkAccess(this.setLtvBuffer.selector) {
-        if (_ltvBuffer > 1e27) revert InvalidLtvBuffer();
+        if (_ltvBuffer > 1e27 || _ltvBuffer <= 0.01e27) revert InvalidLtvBuffer();
         getDelegationStorage().ltvBuffer = _ltvBuffer;
         emit SetLtvBuffer(_ltvBuffer);
     }
