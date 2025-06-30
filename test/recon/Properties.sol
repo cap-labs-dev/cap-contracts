@@ -473,7 +473,8 @@ abstract contract Properties is BeforeAfter, Asserts {
             // success
         } catch (bytes memory reason) {
             bool expectedError = checkError(reason, "PriceError(address)");
-            if (!expectedError) {
+            bool assetRemoved = LenderWrapper(address(lender)).getIsAssetRemoved(_getAsset());
+            if (!expectedError && !assetRemoved) {
                 t(false, "maxBorrow should never revert");
             }
         }
