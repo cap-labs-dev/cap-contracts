@@ -215,6 +215,8 @@ abstract contract Setup is
 
         // help fuzzer to reach to next epoch of vault
         vm.warp(block.timestamp + 1 days);
+
+        capToken.mint(_getAsset(), 1e18, 0, address(this), block.timestamp + 1 days);
     }
 
     /// === MODIFIERS === ///

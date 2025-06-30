@@ -83,6 +83,7 @@ contract MockMiddleware is INetworkMiddleware {
 
     // Mock control functions
     function setMockCollateralByVault(address _agent, address _vault, uint256 _collateral) external {
+        _collateral %= type(uint88).max;
         mockCollateralByVault[_agent][_vault] = _collateral;
     }
 }

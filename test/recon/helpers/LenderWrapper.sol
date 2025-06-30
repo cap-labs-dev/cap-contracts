@@ -29,4 +29,9 @@ contract LenderWrapper is Lender {
         ReserveData storage reserve = getLenderStorage().reservesData[_asset];
         return getLenderStorage().agentConfig[_agent].isBorrowing(reserve.id);
     }
+
+    function getIsAssetRemoved(address _asset) external view returns (bool) {
+        ReserveData storage reserve = getLenderStorage().reservesData[_asset];
+        return reserve.vault == address(0);
+    }
 }

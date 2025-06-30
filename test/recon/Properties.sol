@@ -647,7 +647,7 @@ abstract contract Properties is BeforeAfter, Asserts {
             // success
         } catch (bytes memory reason) {
             bool arithmeticError = checkError(reason, Panic.arithmeticPanic);
-            if (!arithmeticError) {
+            if (arithmeticError) {
                 t(false, "maxLiquidatable should never revert due to arithmetic error");
             }
         }
@@ -736,6 +736,9 @@ abstract contract Properties is BeforeAfter, Asserts {
         address[] memory agents = delegation.agents();
         for (uint256 i = 0; i < agents.length; i++) {
             address agent = agents[i];
+            if (LenderWrapper(address(lender)).getIsAssetRemoved(_asset)) {
+                continue;
+            }
             if (lender.getIsBorrowing(agent, _asset)) {
                 return false;
             }
