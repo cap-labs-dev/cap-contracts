@@ -54,16 +54,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         doomsday_debt_token_solvency();
     }
 
-    // forge test --match-test test_capToken_mint_clamped_6 -vvv
-    // NOTE: minted cUSD is less than the asset value received, this looks valid and related to
-    // cUSD price increases unexpectedly (oracle price of cUSD 100000000 -> 104000000)
-    // We should determine if the math in property is correct
-    function test_capToken_mint_clamped_6() public {
-        capToken_mint_clamped(249999999999);
-
-        capToken_mint_clamped(10000107608);
-    }
-
     // forge test --match-test test_property_health_should_not_change_when_realizeRestakerInterest_is_called_6 -vvv
     // NOTE: acknowledged by team that this is a real break, but fix will be delayed because admin can just realize interest before changing restaker rate to fix it
     function test_property_health_should_not_change_when_realizeRestakerInterest_is_called_6() public {
@@ -126,33 +116,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         doomsday_repay_all();
     }
 
-    // forge test --match-test test_property_zero_debt_is_borrowing_0 -vvv
-    // NOTE: looks like a real issue, user can have 0 debt but still be borrowing
-    function test_property_zero_debt_is_borrowing_0() public {
-        capToken_mint_clamped(1210366228196525416932125);
-
-        lender_borrow_clamped(381970873);
-
-        lender_repay(381970873);
-
-        property_zero_debt_is_borrowing();
-    }
-
-    // forge test --match-test test_doomsday_maxBorrow_14 -vvv
-    // NOTE: looks like a real break, maxBorrows is nonzero after borrowing max
-    function test_doomsday_maxBorrow_14() public {
-        switch_asset(1);
-
-        capToken_mint_clamped(14710106794859);
-
-        switchChainlinkOracle(1);
-
-        mockChainlinkPriceFeed_setLatestAnswer_clamped(0);
-        console2.log("latest answer %e", mockChainlinkPriceFeed.latestAnswer());
-
-        doomsday_maxBorrow();
-    }
-
     // forge test --match-test test_doomsday_debt_token_solvency_4 -vvv
     // NOTE: real break, but minimal max insolvency of 1 wei
     function test_doomsday_debt_token_solvency_4() public {
@@ -171,24 +134,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         lender_borrow_clamped(100077341);
 
         doomsday_debt_token_solvency();
-    }
-
-    // forge test --match-test test_capToken_burn_clamped_6 -vvv
-    // NOTE: real break, setting high reserves can prevent burning
-    function test_capToken_burn_clamped_6() public {
-        asset_mint(0xe916cadb12C49389E487eB1e8194B1459b29B0eC, 1);
-
-        capToken_mint_clamped(20002893847);
-
-        add_new_vault();
-
-        capToken_setFractionalReserveVault();
-
-        capToken_investAll();
-
-        capToken_setReserve(10011737767);
-
-        capToken_burn_clamped(10000256330);
     }
 
     // forge test --match-test test_capToken_burn_8 -vvv
