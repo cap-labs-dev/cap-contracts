@@ -157,15 +157,4 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     }
 
     /// === Newest Issues === ///
-
-    // forge test --match-test test_property_no_agent_borrowing_current_utilization_rate_should_be_zero_0 -vvv
-    function test_property_no_agent_borrowing_current_utilization_rate_should_be_zero_0() public {
-        lender_borrow(100218131);
-
-        vm.roll(block.number + 1);
-        vm.warp(block.timestamp + 1);
-        lender_repay(100563958);
-
-        property_no_agent_borrowing_current_utilization_rate_should_be_zero();
-    }
 }
