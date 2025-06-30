@@ -737,7 +737,7 @@ abstract contract Properties is BeforeAfter, Asserts {
         for (uint256 i = 0; i < agents.length; i++) {
             address agent = agents[i];
             if (LenderWrapper(address(lender)).getIsAssetRemoved(_asset)) {
-                continue;
+                return false;
             }
             if (lender.getIsBorrowing(agent, _asset)) {
                 return false;

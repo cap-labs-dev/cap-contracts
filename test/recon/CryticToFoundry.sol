@@ -212,4 +212,21 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     }
 
     /// === Newest Issues === ///
+
+    // forge test --match-test test_property_no_agent_borrowing_current_utilization_rate_should_be_zero_0 -vvv
+    function test_property_no_agent_borrowing_current_utilization_rate_should_be_zero_0() public {
+        capToken_mint_clamped(51703470273109061179119571);
+
+        lender_borrow(1071811828);
+
+        vm.warp(block.timestamp + 866395);
+
+        vm.roll(block.number + 46976);
+
+        lender_repay(69878868808481689422603570895210800295358466310374543214221492350610853650679);
+
+        lender_borrow_clamped(24396851147815041643746435252666803302612992042282080059293645135207045202897);
+
+        property_no_agent_borrowing_current_utilization_rate_should_be_zero();
+    }
 }
