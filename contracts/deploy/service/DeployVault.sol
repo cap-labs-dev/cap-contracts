@@ -47,23 +47,20 @@ contract DeployVault is ProxyUtils {
         d.capToken = _proxy(implementations.capToken);
         d.stakedCapToken = _proxy(implementations.stakedCap);
         d.feeReceiver = _proxy(implementations.feeReceiver);
-
-        // deploy fee auction for this vault
         d.feeAuction = _proxy(implementations.feeAuction);
+
+        FeeReceiver(d.feeReceiver).initialize(infra.accessControl, d.capToken, d.stakedCapToken);
         FeeAuction(d.feeAuction).initialize(
             infra.accessControl,
             d.capToken, // payment token is the vault's cap token
-            d.stakedCapToken, // payment recipient is the staked cap token
+            d.feeReceiver, // payment recipient is the staked cap token
             24 hours, // 3 hour auctions
             1e18 // min price of 1 token
         );
-
         CapToken(d.capToken).initialize(
             name, symbol, infra.accessControl, d.feeAuction, infra.oracle, assets, insuranceFund
         );
         StakedCap(d.stakedCapToken).initialize(infra.accessControl, d.capToken, 24 hours);
-
-        FeeReceiver(d.feeReceiver).initialize(infra.accessControl, d.capToken, d.stakedCapToken);
 
         // deploy and init debt tokens
         d.assets = assets;

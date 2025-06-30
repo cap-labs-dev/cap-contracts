@@ -8,13 +8,16 @@ import { IOracle } from "../../interfaces/IOracle.sol";
 import { IVault } from "../../interfaces/IVault.sol";
 
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
+
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title View Logic
 /// @author kexley, @capLabs
 /// @notice View functions to see the state of an agent's health
 library ViewLogic {
     using AgentConfiguration for ILender.AgentConfigurationMap;
+    using Math for uint256;
 
     uint256 constant SECONDS_IN_YEAR = 31536000;
 
@@ -43,6 +46,22 @@ library ViewLogic {
         totalSlashableCollateral = IDelegation($.delegation).slashableCollateral(_agent);
         liquidationThreshold = IDelegation($.delegation).liquidationThreshold(_agent);
 
+        // Extract debt calculation to a separate function to reduce local variables
+        totalDebt = calculateTotalDebt($, _agent);
+
+        ltv = totalDelegation == 0 ? 0 : (totalDebt * 1e27) / totalDelegation;
+        health = totalDebt == 0 ? type(uint256).max : (totalDelegation * liquidationThreshold) / totalDebt;
+    }
+
+    /// @notice Helper function to calculate the total debt of an agent across all assets
+    /// @param $ Lender storage
+    /// @param _agent Agent address
+    /// @return totalDebt Total debt of an agent in USD, encoded with 8 decimals
+    function calculateTotalDebt(ILender.LenderStorage storage $, address _agent)
+        private
+        view
+        returns (uint256 totalDebt)
+    {
         for (uint256 i; i < $.reservesCount; ++i) {
             if (!$.agentConfig[_agent].isBorrowing(i)) {
                 continue;
@@ -55,11 +74,8 @@ library ViewLogic {
             ILender.ReserveData storage reserve = $.reservesData[asset];
 
             totalDebt += (IERC20(reserve.debtToken).balanceOf(_agent) + accruedRestakerInterest($, _agent, asset))
-                * assetPrice / (10 ** reserve.decimals);
+                .mulDiv(assetPrice, 10 ** reserve.decimals, Math.Rounding.Ceil);
         }
-
-        ltv = totalDelegation == 0 ? 0 : (totalDebt * 1e27) / totalDelegation;
-        health = totalDebt == 0 ? type(uint256).max : (totalDelegation * liquidationThreshold) / totalDebt;
     }
 
     /// @notice Calculate the maximum amount that can be borrowed for a given asset

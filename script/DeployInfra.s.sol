@@ -28,7 +28,7 @@ contract DeployInfra is
     DeployLibs,
     ConfigureAccessControl
 {
-    string constant OUTPUT_PATH_FROM_PROJECT_ROOT = "config/cap-mainnet-infra.json";
+    string constant OUTPUT_PATH_FROM_PROJECT_ROOT = "config/cap-infra.json";
 
     UsersConfig users;
     ImplementationsConfig implems;
