@@ -51,8 +51,14 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
             (, address vault,,,,,) = lender.reservesData(_getAsset());
             bool isReserve = vault != address(0); // token must be a reserve in the lending vault
 
+            bool enoughBalance = MockERC20(_getAsset()).balanceOf(address(this)) >= _amount;
+            bool enoughAllowance = MockERC20(_getAsset()).allowance(address(this), address(lender)) >= _amount;
+
             // precondition: must not error for one of the expected reasons
-            if (!expectedError && !protocolPaused && !assetPaused && totalDebt > 0 && isReserve) {
+            if (
+                !expectedError && !protocolPaused && !assetPaused && totalDebt > 0 && isReserve && enoughBalance
+                    && enoughAllowance
+            ) {
                 gt(
                     emergencyLiquidationHealth,
                     RAY,
