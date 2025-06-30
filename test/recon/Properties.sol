@@ -733,12 +733,14 @@ abstract contract Properties is BeforeAfter, Asserts {
     }
 
     function _checkNoAgentBorrowing(address _asset) internal view returns (bool) {
+        // if the asset is removed, then no agent is borrowing
+        if (LenderWrapper(address(lender)).getIsAssetRemoved(_asset)) {
+            return false;
+        }
         address[] memory agents = delegation.agents();
         for (uint256 i = 0; i < agents.length; i++) {
             address agent = agents[i];
-            if (LenderWrapper(address(lender)).getIsAssetRemoved(_asset)) {
-                return false;
-            }
+
             if (lender.getIsBorrowing(agent, _asset)) {
                 return false;
             }
