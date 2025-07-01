@@ -73,6 +73,7 @@ interface ILender {
     /// @param asset Asset to borrow
     /// @param amount Amount to borrow
     /// @param receiver Receiver of the borrowed asset
+    /// @param maxBorrow True if the maximum amount is being borrowed, false otherwise
     struct BorrowParams {
         address agent;
         address asset;
