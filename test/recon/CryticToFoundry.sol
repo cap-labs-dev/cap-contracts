@@ -134,4 +134,53 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     }
 
     /// === Newest Issues === ///
+
+    // forge test --match-test test_lender_realizeRestakerInterest_8 -vvv
+    // NOTE: if interest isn't realized after the rate is changed for a user and the fractional reserve vault is set
+    // it can cause vault debt increase != asset decrease in realizeRestakerInterest
+    function test_lender_realizeRestakerInterest_8() public {
+        lender_borrow_clamped(100009864);
+
+        oracle_setRestakerRate(0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496, 315727571370246195585225815);
+
+        add_new_vault();
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 1);
+        capToken_setFractionalReserveVault();
+
+        // @audit realizing interest here resolves the issue
+        // lender_realizeRestakerInterest();
+
+        capToken_investAll();
+
+        lender_realizeRestakerInterest();
+    }
+
+    // forge test --match-test test_capToken_redeem_11 -vvv
+    // NOTE: this fails because of loss from fractional reserve vault, acknowledged as expected by team
+    function test_capToken_redeem_11() public {
+        add_new_vault();
+        capToken_setFractionalReserveVault();
+        capToken_investAll();
+        mockERC4626Tester_decreaseYield(10000);
+        capToken_approve(0x92a6649Fdcc044DA968d94202465578a9371C7b1, 1);
+        capToken_redeem(1, new uint256[](1), address(0), 0);
+    }
+
+    // forge test --match-test test_capToken_redeem_clamped_14 -vvv
+    // NOTE: fails for same reason as test_capToken_redeem_11
+    function test_capToken_redeem_clamped_14() public {
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        capToken_investAll();
+
+        mockERC4626Tester_decreaseYield(10000);
+
+        capToken_approve(0x92a6649Fdcc044DA968d94202465578a9371C7b1, 1);
+
+        capToken_redeem_clamped(1);
+    }
 }

@@ -63,6 +63,7 @@ abstract contract ManagersTargets is BaseTargetFunctions, Properties {
         require(to != address(0), "Cannot mint assets to zero address");
         // minting to lender messes up property_lender_does_not_accumulate_dust
         require(to != address(lender), "Cannot mint assets to lender");
+        require(to != address(capToken), "Cannot mint assets to capToken");
 
         address[] memory vaults = _getVaults();
         // minting assets to fractional reserve vaults messes up properties
