@@ -225,25 +225,18 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         doomsday_manipulate_utilization_rate(10016233151);
     }
 
-    // forge test --match-test test_property_liquidation_does_not_increase_bonus_1 -vvv
-    function test_property_liquidation_does_not_increase_bonus_1() public {
-        switchChainlinkOracle(2);
+    // forge test --match-test test_doomsday_maxBorrow_5 -vvv
+    function test_doomsday_maxBorrow_5() public {
+        switch_asset(1072445895501);
 
-        lender_borrow_clamped(6353038465);
+        capToken_mint_clamped(125148553275);
 
-        vm.warp(block.timestamp + 801793);
+        lender_borrow(100077341);
+
+        vm.warp(block.timestamp + 8);
 
         vm.roll(block.number + 1);
 
-        oracle_setRestakerRate(
-            0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496,
-            274135303604404403656699624596169140699093339764519295863268467400136
-        );
-
-        mockChainlinkPriceFeed_setLatestAnswer(3483682502146676253120);
-
-        lender_liquidate_optimization(1);
-
-        property_liquidation_does_not_increase_bonus();
+        doomsday_maxBorrow();
     }
 }
