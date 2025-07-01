@@ -47,7 +47,7 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
 
         if (_delegation == address(0) || _oracle == address(0)) revert ZeroAddressNotValid();
         if (_targetHealth < 1e27) revert InvalidTargetHealth();
-        if (_grace > _expiry) revert GracePeriodGreaterThanExpiry();
+        if (_grace >= _expiry) revert GraceGreaterThanExpiry();
         if (_bonusCap > 1e27) revert InvalidBonusCap();
 
         LenderStorage storage $ = getLenderStorage();
@@ -245,6 +245,27 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     function setMinBorrow(address _asset, uint256 _minBorrow) external checkAccess(this.setMinBorrow.selector) {
         if (_asset == address(0)) revert ZeroAddressNotValid();
         ReserveLogic.setMinBorrow(getLenderStorage(), _asset, _minBorrow);
+    }
+
+    /// @notice Set the grace period
+    /// @param _grace Grace period in seconds
+    function setGrace(uint256 _grace) external checkAccess(this.setGrace.selector) {
+        if (_grace >= getLenderStorage().expiry) revert GraceGreaterThanExpiry();
+        getLenderStorage().grace = _grace;
+    }
+
+    /// @notice Set the expiry period
+    /// @param _expiry Expiry period in seconds
+    function setExpiry(uint256 _expiry) external checkAccess(this.setExpiry.selector) {
+        if (_expiry <= getLenderStorage().grace) revert ExpiryLessThanGrace();
+        getLenderStorage().expiry = _expiry;
+    }
+
+    /// @notice Set the bonus cap
+    /// @param _bonusCap Bonus cap in percentage ray decimals
+    function setBonusCap(uint256 _bonusCap) external checkAccess(this.setBonusCap.selector) {
+        if (_bonusCap > 1e27) revert InvalidBonusCap();
+        getLenderStorage().bonusCap = _bonusCap;
     }
 
     /// @notice The total number of reserves
