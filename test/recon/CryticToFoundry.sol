@@ -133,23 +133,5 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         capToken_burn(10011616360, 0, 0);
     }
 
-    // forge test --match-test test_property_previewRedeem_greater_than_loaned_11 -vvv
-    // NOTE: expected due to loss in fractional reserve vault, any losses can assume to be covered by the protocol
-    function test_property_previewRedeem_greater_than_loaned_11() public {
-        capToken_mint_clamped(10000570471);
-
-        add_new_vault();
-
-        capToken_setFractionalReserveVault();
-
-        capToken_investAll();
-
-        mockERC4626Tester_decreaseYield(1);
-
-        capToken_removeAsset(0x3D7Ebc40AF7092E3F1C81F2e996cbA5Cae2090d7);
-
-        property_previewRedeem_greater_than_loaned();
-    }
-
     /// === Newest Issues === ///
 }
