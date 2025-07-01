@@ -191,8 +191,8 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
         uint256 utilizationAfter = capToken.utilization(_getAsset());
         uint256 utilizationIndexAfter = capToken.currentUtilizationIndex(_getAsset());
 
-        // precondition: the amount repaid is less than or equal to the additional debt borrowed in this sequence
-        if (repaid <= additionalDebt) {
+        // precondition: the amount repaid must be the same as the additional debt borrowed in this sequence
+        if (repaid == additionalDebt) {
             // the utilization rate should be the same as before the borrow
             eq(utilizationAfter, utilizationBefore, "utilization rate is not the same as before the borrow");
             eq(utilizationIndexAfter, utilizationIndexBefore, "utilization index is not the same as before the borrow");

@@ -19,7 +19,8 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     }
 
     // forge test --match-test test_lender_liquidate_0 -vvv
-    // NOTE: Liquidation did not improve health factor, related to oracle price, looks Low
+    // NOTE: Liquidation did not improve health factor, related to oracle price
+    // valid break but is the case when bad debt is created after a liquidation: https://github.com/Recon-Fuzz/cap-invariants/issues/32
     function test_lender_liquidate_0() public {
         switchActor(1);
 
@@ -113,31 +114,11 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         doomsday_debt_token_solvency();
     }
 
-    // forge test --match-test test_capToken_burn_8 -vvv
-    // NOTE: same as above, but with unclamped handler
-    function test_capToken_burn_8() public {
-        asset_mint(0xe916cadb12C49389E487eB1e8194B1459b29B0eC, 1);
-
-        capToken_mint_clamped(20017387312);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
-        add_new_vault();
-
-        capToken_setFractionalReserveVault();
-
-        lender_repay(1);
-
-        capToken_investAll();
-
-        capToken_burn(10011616360, 0, 0);
-    }
-
     /// === Newest Issues === ///
 
     // forge test --match-test test_lender_realizeRestakerInterest_8 -vvv
     // NOTE: if interest isn't realized after the rate is changed for a user and the fractional reserve vault is set
-    // it can cause vault debt increase != asset decrease in realizeRestakerInterest
+    // it can cause vault debt increase != asset decrease in realizeRestakerInterest, added as a gotcha here: https://github.com/Recon-Fuzz/cap-invariants/issues/22#issuecomment-3025077296
     function test_lender_realizeRestakerInterest_8() public {
         lender_borrow_clamped(100009864);
 
@@ -182,5 +163,85 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         capToken_approve(0x92a6649Fdcc044DA968d94202465578a9371C7b1, 1);
 
         capToken_redeem_clamped(1);
+    }
+
+    // forge test --match-test test_capToken_burn_5 -vvv
+    // NOTE: setting reserve too high causes burn to fail, expected behavior, see issue: https://github.com/Recon-Fuzz/cap-invariants/issues/26#issuecomment-3016509608
+    function test_capToken_burn_5() public {
+        asset_mint(0xe916cadb12C49389E487eB1e8194B1459b29B0eC, 1190);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        capToken_investAll();
+
+        capToken_setReserve(1208501357961003772);
+
+        capToken_burn(
+            10005653327,
+            1527893632663543898168596194132481378078474264047297169757312420,
+            13640361619568770847200887666290325598958930765379039836150357
+        );
+    }
+
+    // forge test --match-test test_capToken_burn_clamped_9 -vvv
+    // NOTE: setting reserve too high causes burn to fail, expected behavior, see issue: https://github.com/Recon-Fuzz/cap-invariants/issues/26#issuecomment-3016509608
+    function test_capToken_burn_clamped_9() public {
+        asset_mint(0xe916cadb12C49389E487eB1e8194B1459b29B0eC, 1);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        capToken_investAll();
+
+        capToken_setReserve(1000199038263126991);
+
+        capToken_burn_clamped(10054550237);
+    }
+
+    // forge test --match-test test_doomsday_manipulate_utilization_rate_0 -vvv
+    function test_doomsday_manipulate_utilization_rate_0() public {
+        switchChainlinkOracle(2);
+
+        lender_borrow_clamped(104198808);
+
+        oracle_setRestakerRate(
+            0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496,
+            1292885857466966404694820171239146586750476467482391956968497085095751611
+        );
+
+        mockChainlinkPriceFeed_setLatestAnswer(645438256455630);
+
+        vm.roll(block.number + 1);
+        vm.warp(block.timestamp + 5553);
+        lender_realizeRestakerInterest();
+
+        vm.roll(block.number + 1707);
+        vm.warp(block.timestamp + 452805);
+        doomsday_manipulate_utilization_rate(10016233151);
+    }
+
+    // forge test --match-test test_property_liquidation_does_not_increase_bonus_1 -vvv
+    function test_property_liquidation_does_not_increase_bonus_1() public {
+        switchChainlinkOracle(2);
+
+        lender_borrow_clamped(6353038465);
+
+        vm.warp(block.timestamp + 801793);
+
+        vm.roll(block.number + 1);
+
+        oracle_setRestakerRate(
+            0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496,
+            274135303604404403656699624596169140699093339764519295863268467400136
+        );
+
+        mockChainlinkPriceFeed_setLatestAnswer(3483682502146676253120);
+
+        lender_liquidate_optimization(1);
+
+        property_liquidation_does_not_increase_bonus();
     }
 }
