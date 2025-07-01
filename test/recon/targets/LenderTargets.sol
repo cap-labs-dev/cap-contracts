@@ -371,6 +371,11 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         try lender.repay(_getAsset(), _amount, _getActor()) {
             // success
         } catch (bytes memory reason) {
+            bool hasEnoughBalance = MockERC20(_getAsset()).balanceOf(_getActor()) >= _amount;
+            bool hasEnoughAllowance = MockERC20(_getAsset()).allowance(_getActor(), address(lender)) >= _amount;
+            if (!hasEnoughBalance || !hasEnoughAllowance) {
+                return;
+            }
             bool arithmeticError = checkError(reason, Panic.arithmeticPanic);
             t(!arithmeticError, "repay should never revert with arithmetic error");
         }
