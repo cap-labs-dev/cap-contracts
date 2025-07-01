@@ -212,7 +212,9 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
             1292885857466966404694820171239146586750476467482391956968497085095751611
         );
 
-        mockChainlinkPriceFeed_setLatestAnswer(645438256455630);
+        console2.log("latestAnswer before", mockChainlinkPriceFeed.latestAnswer());
+        mockChainlinkPriceFeed_setLatestAnswer(100000001);
+        console2.log("latestAnswer after", mockChainlinkPriceFeed.latestAnswer());
 
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 5553);
