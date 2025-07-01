@@ -141,30 +141,31 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
     }
 
     /// @dev Property: repaying all debt for all actors transfers same amount of interest as would have been transferred by realizeInterest
-    function doomsday_repay_all() public stateless {
-        // get the maxRealization of what realizing interest would transfer to the interestReceiver
-        uint256 maxRealization = lender.maxRealization(_getAsset());
-        (,, address debtToken, address interestReceiver,,,) = lender.reservesData(_getAsset());
+    // NOTE: commenting out because it's expected, realized interest can be different, see issue: https://github.com/Recon-Fuzz/cap-invariants/issues/29
+    // function doomsday_repay_all() public stateless {
+    //     // get the maxRealization of what realizing interest would transfer to the interestReceiver
+    //     uint256 maxRealization = lender.maxRealization(_getAsset());
+    //     (,, address debtToken, address interestReceiver,,,) = lender.reservesData(_getAsset());
 
-        // repay all debt for all actors, this actually transfers interest to the interestReceiver
-        uint256 interestReceiverBalanceBefore = MockERC20(_getAsset()).balanceOf(interestReceiver);
-        address[] memory actors = _getActors();
-        for (uint256 i = 0; i < actors.length; i++) {
-            address actor = actors[i];
-            uint256 actorDebt = MockERC20(debtToken).balanceOf(actor);
-            if (actorDebt > 0) {
-                vm.prank(actor);
-                lender.repay(_getAsset(), actorDebt, actor);
-            }
-        }
-        uint256 interestReceiverBalanceAfter = MockERC20(_getAsset()).balanceOf(interestReceiver);
+    //     // repay all debt for all actors, this actually transfers interest to the interestReceiver
+    //     uint256 interestReceiverBalanceBefore = MockERC20(_getAsset()).balanceOf(interestReceiver);
+    //     address[] memory actors = _getActors();
+    //     for (uint256 i = 0; i < actors.length; i++) {
+    //         address actor = actors[i];
+    //         uint256 actorDebt = MockERC20(debtToken).balanceOf(actor);
+    //         if (actorDebt > 0) {
+    //             vm.prank(actor);
+    //             lender.repay(_getAsset(), actorDebt, actor);
+    //         }
+    //     }
+    //     uint256 interestReceiverBalanceAfter = MockERC20(_getAsset()).balanceOf(interestReceiver);
 
-        eq(
-            interestReceiverBalanceAfter - interestReceiverBalanceBefore,
-            maxRealization,
-            "interestReceiver balance delta != maxRealization"
-        );
-    }
+    //     eq(
+    //         interestReceiverBalanceAfter - interestReceiverBalanceBefore,
+    //         maxRealization,
+    //         "interestReceiver balance delta != maxRealization"
+    //     );
+    // }
 
     /// @dev Property: borrowing and repaying an amount in the same block shouldn't change the utilization rate
     // NOTE: from previous spearbit finding

@@ -93,22 +93,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         property_health_should_not_change_when_realizeRestakerInterest_is_called();
     }
 
-    // forge test --match-test test_doomsday_repay_all_5 -vvv
-    // NOTE: looks like a real issue, realizeInterest gives an inconsistent realized interest amount compared to repay
-    function test_doomsday_repay_all_5() public {
-        capToken_mint_clamped(10015633476);
-
-        lender_borrow_clamped(115792089237316195423570985008687907853269984665640564039457584007913129639935);
-
-        // note: realizing interest explicitly errors with zero realization
-        // uint256 realizedInterest = lender.realizeInterest(_getAsset());
-        // console2.log("realizedInterest %e", realizedInterest);
-
-        vm.roll(block.number + 1);
-        vm.warp(block.timestamp + 1);
-        doomsday_repay_all();
-    }
-
     // forge test --match-test test_doomsday_debt_token_solvency_4 -vvv
     // NOTE: real break, but minimal max insolvency of 1 wei
     function test_doomsday_debt_token_solvency_4() public {
