@@ -141,7 +141,8 @@ interface ILender {
     /// @param _asset Asset to borrow
     /// @param _amount Amount to borrow
     /// @param _receiver Receiver of the borrowed asset
-    function borrow(address _asset, uint256 _amount, address _receiver) external;
+    /// @return borrowed Actual amount borrowed
+    function borrow(address _asset, uint256 _amount, address _receiver) external returns (uint256 borrowed);
 
     /// @notice Repay an asset
     /// @param _asset Asset to repay
