@@ -31,6 +31,11 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         mockChainlinkPriceFeed_setLatestAnswer(49869528211447337507581);
 
+        (,, uint256 totalDebt,,,) = _getAgentParams(_getActor());
+        console2.log("totalDebt", totalDebt);
+        uint256 coverage = delegation.coverage(_getActor());
+        console2.log("coverage", coverage);
+
         lender_liquidate(1);
     }
 
@@ -88,18 +93,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         property_health_should_not_change_when_realizeRestakerInterest_is_called();
     }
 
-    // forge test --match-test test_doomsday_manipulate_utilization_rate_2 -vvv
-    // NOTE: valid, need to discover the root cause
-    function test_doomsday_manipulate_utilization_rate_2() public {
-        switchActor(1);
-
-        capToken_mint_clamped(10016233150);
-
-        lender_borrow(100620828);
-
-        doomsday_manipulate_utilization_rate(100106565);
-    }
-
     // forge test --match-test test_doomsday_repay_all_5 -vvv
     // NOTE: looks like a real issue, realizeInterest gives an inconsistent realized interest amount compared to repay
     function test_doomsday_repay_all_5() public {
@@ -154,6 +147,24 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         capToken_investAll();
 
         capToken_burn(10011616360, 0, 0);
+    }
+
+    // forge test --match-test test_property_previewRedeem_greater_than_loaned_11 -vvv
+    // NOTE: expected due to loss in fractional reserve vault, any losses can assume to be covered by the protocol
+    function test_property_previewRedeem_greater_than_loaned_11() public {
+        capToken_mint_clamped(10000570471);
+
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        capToken_investAll();
+
+        mockERC4626Tester_decreaseYield(1);
+
+        capToken_removeAsset(0x3D7Ebc40AF7092E3F1C81F2e996cbA5Cae2090d7);
+
+        property_previewRedeem_greater_than_loaned();
     }
 
     /// === Newest Issues === ///

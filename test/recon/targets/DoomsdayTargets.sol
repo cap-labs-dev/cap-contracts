@@ -172,20 +172,30 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
         // get the utilization rate before a borrow
         uint256 utilizationBefore = capToken.utilization(_getAsset());
         uint256 utilizationIndexBefore = capToken.currentUtilizationIndex(_getAsset());
+        uint256 totalDebtBefore = lender.debt(_getActor(), _getAsset());
 
         // borrow some amount
+        vm.prank(_getActor());
         lender.borrow(_getAsset(), _amount, _getActor());
 
+        uint256 totalDebtAfterBorrow = lender.debt(_getActor(), _getAsset());
+        // this is the additional debt that was borrowed in this sequence only, we don't care about debt from other calls
+        uint256 additionalDebt = totalDebtAfterBorrow - totalDebtBefore;
+
         // repay the borrowed amount
-        lender.repay(_getAsset(), _amount, _getActor());
+        vm.prank(_getActor());
+        uint256 repaid = lender.repay(_getAsset(), _amount, _getActor());
 
         // get the utilization rate after repaying the borrowed amount
         uint256 utilizationAfter = capToken.utilization(_getAsset());
         uint256 utilizationIndexAfter = capToken.currentUtilizationIndex(_getAsset());
 
-        // the utilization rate should be the same as before the borrow
-        eq(utilizationAfter, utilizationBefore, "utilization rate is not the same as before the borrow");
-        eq(utilizationIndexAfter, utilizationIndexBefore, "utilization index is not the same as before the borrow");
+        // precondition: the amount repaid is less than or equal to the additional debt borrowed in this sequence
+        if (repaid <= additionalDebt) {
+            // the utilization rate should be the same as before the borrow
+            eq(utilizationAfter, utilizationBefore, "utilization rate is not the same as before the borrow");
+            eq(utilizationIndexAfter, utilizationIndexBefore, "utilization index is not the same as before the borrow");
+        }
     }
 
     /// @dev optimizes the difference in utilization discovered by doomsday_manipulate_utilization_rate
