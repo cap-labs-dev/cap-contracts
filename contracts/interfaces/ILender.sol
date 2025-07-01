@@ -73,6 +73,7 @@ interface ILender {
     /// @param asset Asset to borrow
     /// @param amount Amount to borrow
     /// @param receiver Receiver of the borrowed asset
+    /// @param maxBorrow True if the maximum amount is being borrowed, false otherwise
     struct BorrowParams {
         address agent;
         address asset;
@@ -140,7 +141,8 @@ interface ILender {
     /// @param _asset Asset to borrow
     /// @param _amount Amount to borrow
     /// @param _receiver Receiver of the borrowed asset
-    function borrow(address _asset, uint256 _amount, address _receiver) external;
+    /// @return borrowed Actual amount borrowed
+    function borrow(address _asset, uint256 _amount, address _receiver) external returns (uint256 borrowed);
 
     /// @notice Repay an asset
     /// @param _asset Asset to repay
@@ -231,6 +233,18 @@ interface ILender {
     /// @param _minBorrow Minimum borrow amount in asset decimals
     function setMinBorrow(address _asset, uint256 _minBorrow) external;
 
+    /// @notice Set the grace period
+    /// @param _grace Grace period in seconds
+    function setGrace(uint256 _grace) external;
+
+    /// @notice Set the expiry period
+    /// @param _expiry Expiry period in seconds
+    function setExpiry(uint256 _expiry) external;
+
+    /// @notice Set the bonus cap
+    /// @param _bonusCap Bonus cap in percentage ray decimals
+    function setBonusCap(uint256 _bonusCap) external;
+
     /// @notice Get the target health ratio
     function targetHealth() external view returns (uint256 targetHealth);
 
@@ -278,8 +292,11 @@ interface ILender {
     /// @notice Invalid target health
     error InvalidTargetHealth();
 
-    /// @notice Grace period greater than expiry
-    error GracePeriodGreaterThanExpiry();
+    /// @notice Grace period greater than or equal to expiry
+    error GraceGreaterThanExpiry();
+
+    /// @notice Expiry less than or equal to grace
+    error ExpiryLessThanGrace();
 
     /// @notice Invalid bonus cap
     error InvalidBonusCap();

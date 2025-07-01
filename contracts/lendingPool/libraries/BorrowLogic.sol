@@ -52,7 +52,11 @@ library BorrowLogic {
     /// Restaker debt token is updated after so the new principal debt can be used in calculations
     /// @param $ Lender storage
     /// @param params Parameters to borrow an asset
-    function borrow(ILender.LenderStorage storage $, ILender.BorrowParams memory params) external {
+    /// @return borrowed Actual amount borrowed
+    function borrow(ILender.LenderStorage storage $, ILender.BorrowParams memory params)
+        external
+        returns (uint256 borrowed)
+    {
         /// Realize restaker interest before borrowing
         realizeRestakerInterest($, params.agent, params.asset);
 
@@ -69,13 +73,15 @@ library BorrowLogic {
             $.agentConfig[params.agent].setBorrowing(reserve.id, true);
         }
 
-        IVault(reserve.vault).borrow(params.asset, params.amount, params.receiver);
+        borrowed = params.amount;
 
-        IDebtToken(reserve.debtToken).mint(params.agent, params.amount);
+        IVault(reserve.vault).borrow(params.asset, borrowed, params.receiver);
 
-        reserve.debt += params.amount;
+        IDebtToken(reserve.debtToken).mint(params.agent, borrowed);
 
-        emit Borrow(params.asset, params.agent, params.amount);
+        reserve.debt += borrowed;
+
+        emit Borrow(params.asset, params.agent, borrowed);
     }
 
     /// @notice Repay an asset, burning the debt token and/or paying down interest
