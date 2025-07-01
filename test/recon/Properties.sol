@@ -386,11 +386,12 @@ abstract contract Properties is BeforeAfter, Asserts {
     }
 
     /// @dev Property: liquidation does not increase bonus
-    function property_liquidation_does_not_increase_bonus() public {
-        if (currentOperation == OpType.LIQUIDATE) {
-            gte(_before.agentBonus[_getActor()], _after.agentBonus[_getActor()], "liquidation increases bonus");
-        }
-    }
+    // NOTE: removed because it's expected to not hold
+    // function property_liquidation_does_not_increase_bonus() public {
+    //     if (currentOperation == OpType.LIQUIDATE) {
+    //         gte(_before.agentBonus[_getActor()], _after.agentBonus[_getActor()], "liquidation increases bonus");
+    //     }
+    // }
 
     /// @dev Property: after all users have repaid their debt, their balance of debtToken should be 0
     // NOTE: removed because it breaks when bad debt is created after a liquidation, acknowledged by team that bad debt will be covered by the protocol
