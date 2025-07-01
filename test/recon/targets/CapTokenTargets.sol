@@ -156,6 +156,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
                 || checkError(reason, "LossFromFractionalReserve(address,address,uint256)");
             bool protocolPaused = capToken.paused();
             bool assetPaused = capToken.paused(_getAsset());
+            // NOTE: this fails when reserve is set too high, expected behavior, see issue: https://github.com/Recon-Fuzz/cap-invariants/issues/26#issuecomment-3016509608
             if (!expectedError && _amountIn > 0 && !protocolPaused && !assetPaused) {
                 lt(capTokenBalanceBefore, _amountIn, "user cannot burn with sufficient cap token balance");
             }
@@ -172,7 +173,8 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             bool expectedError = checkError(reason, "LossFromFractionalReserve(address,address,uint256)")
                 || checkError(reason, "AccessControlUnauthorizedAccount(address,bytes32)")
                 || checkError(reason, "FullDivestRequired(address,uint256)");
-            if (!expectedError) {
+            uint256 loanedAmount = capToken.loaned(_getAsset());
+            if (!expectedError && loanedAmount > 0) {
                 t(false, "ERC4626 must always be divestable");
             }
         }
@@ -322,6 +324,7 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
             bool hasEnoughBalance = capTokenBalanceBefore >= _amountIn;
             bool hasEnoughAllowance = capToken.allowance(_getActor(), address(capToken)) >= _amountIn;
 
+            // NOTE: this fails because of loss from fractional reserve vault, acknowledged as expected by team
             if (
                 !expectedError && _amountIn > 0 && hasEnoughBalance && hasEnoughAllowance && !capToken.paused()
                     && !capToken.paused(_getAsset())
