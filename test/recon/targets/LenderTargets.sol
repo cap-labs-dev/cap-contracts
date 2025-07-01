@@ -336,6 +336,7 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
         (,,,,, uint256 healthAfter) = _getAgentParams(_getActor());
         uint256 totalBorrowsAfter = capToken.totalBorrows(_getAsset());
 
+        // NOTE: this fails for reason in test_lender_realizeRestakerInterest_8
         eq(
             vaultDebtAfter - vaultDebtBefore,
             vaultAssetBalanceBefore - vaultAssetBalanceAfter,
