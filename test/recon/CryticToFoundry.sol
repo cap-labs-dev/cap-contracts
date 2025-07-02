@@ -114,8 +114,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         doomsday_debt_token_solvency();
     }
 
-    /// === Newest Issues === ///
-
     // forge test --match-test test_lender_realizeRestakerInterest_8 -vvv
     // NOTE: if interest isn't realized after the rate is changed for a user and the fractional reserve vault is set
     // it can cause vault debt increase != asset decrease in realizeRestakerInterest, added as a gotcha here: https://github.com/Recon-Fuzz/cap-invariants/issues/22#issuecomment-3025077296
@@ -202,6 +200,7 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
     }
 
     // forge test --match-test test_doomsday_maxBorrow_5 -vvv
+    // NOTE: still not resolved after latest changes in commit 1371276e3d553c2feac20c3e93308aee65d1ad97
     function test_doomsday_maxBorrow_5() public {
         switch_asset(1072445895501);
 
@@ -215,4 +214,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
 
         doomsday_maxBorrow();
     }
+
+    /// === Newest Issues === ///
 }
