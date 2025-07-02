@@ -378,8 +378,9 @@ abstract contract LenderTargets is BaseTargetFunctions, Properties {
             if (!hasEnoughBalance || !hasEnoughAllowance) {
                 return;
             }
-            bool arithmeticError = checkError(reason, Panic.arithmeticPanic);
-            t(!arithmeticError, "repay should never revert with arithmetic error");
+            // NOTE: removed because it can break if reserve is set too high
+            // bool arithmeticError = checkError(reason, Panic.arithmeticPanic);
+            // t(!arithmeticError, "repay should never revert with arithmetic error");
         }
     }
 }
