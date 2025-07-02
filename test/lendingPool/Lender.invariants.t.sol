@@ -431,8 +431,7 @@ contract LenderInvariantsTest is TestDeployer {
         address[] memory agents = env.testUsers.agents;
         for (uint256 i = 0; i < agents.length; i++) {
             address agent = agents[i];
-            (uint256 totalDelegation, uint256 slashableCollateral, uint256 totalDebt,,,) = lender.agent(agent);
-            uint256 maxLiquidatable = lender.maxLiquidatable(agent, address(usdc));
+            (, uint256 slashableCollateral, uint256 totalDebt,,,) = lender.agent(agent);
             if (slashableCollateral < totalDebt) return;
             assertGe(slashableCollateral, totalDebt, "User borrow must not exceed delegation");
         }

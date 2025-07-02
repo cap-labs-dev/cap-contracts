@@ -8,7 +8,11 @@ contract MockAccessControl is IAccessControl {
         // Initialize the admin
     }
 
-    function checkAccess(bytes4 _selector, address _contract, address _caller) external view returns (bool hasAccess) {
+    function checkAccess(bytes4, /*_selector*/ address, /*_contract*/ address /*_caller*/ )
+        external
+        pure
+        returns (bool hasAccess)
+    {
         // Always ok
         hasAccess = true;
     }
