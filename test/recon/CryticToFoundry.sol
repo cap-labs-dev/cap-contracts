@@ -179,5 +179,19 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         doomsday_maxBorrow();
     }
 
+    // forge test --match-test test_capToken_burn_clamped_4 -vvv
+    // NOTE: loss on fractional reserve vault causes burn to fail, expected behavior
+    function test_capToken_burn_clamped_4() public {
+        add_new_vault();
+
+        capToken_setFractionalReserveVault();
+
+        capToken_investAll();
+
+        mockERC4626Tester_decreaseYield(10000);
+
+        capToken_burn_clamped(10001839867);
+    }
+
     /// === Newest Issues === ///
 }
