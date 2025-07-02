@@ -10,12 +10,9 @@ import { ValidationLogic } from "./ValidationLogic.sol";
 import { ViewLogic } from "./ViewLogic.sol";
 
 /// @title Liquidation Logic
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Liquidate an agent that has an unhealthy ltv by slashing their delegation backing
 library LiquidationLogic {
-    /// @dev Zero address not valid
-    error ZeroAddressNotValid();
-
     /// @notice A liquidation has been initiated against an agent
     event InitiateLiquidation(address agent);
 
@@ -24,6 +21,9 @@ library LiquidationLogic {
 
     /// @notice An agent has been liquidated
     event Liquidate(address indexed agent, address indexed liquidator, address asset, uint256 amount, uint256 value);
+
+    /// @dev Zero address not valid
+    error ZeroAddressNotValid();
 
     /// @notice Initiate the liquidation of an agent if unhealthy
     /// @param $ Lender storage

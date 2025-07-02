@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IDelegation } from "../interfaces/IDelegation.sol";
 
 /// @title Delegation Storage Utils
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Storage utilities for Delegation
 abstract contract DelegationStorageUtils {
     /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.Delegation")) - 1)) & ~bytes32(uint256(0xff))

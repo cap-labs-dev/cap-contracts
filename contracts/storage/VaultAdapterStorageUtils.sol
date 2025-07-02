@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IVaultAdapter } from "../interfaces/IVaultAdapter.sol";
 
 /// @title VaultAdapterStorageUtils
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Storage utilities for VaultAdapter contract
 abstract contract VaultAdapterStorageUtils {
     /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.VaultAdapter")) - 1)) & ~bytes32(uint256(0xff))

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
-import { Network } from "../../contracts/delegation/providers/symbiotic/Network.sol";
-import { NetworkMiddleware } from "../../contracts/delegation/providers/symbiotic/NetworkMiddleware.sol";
+import { SymbioticNetwork } from "../../contracts/delegation/providers/symbiotic/SymbioticNetwork.sol";
+import { SymbioticNetworkMiddleware } from
+    "../../contracts/delegation/providers/symbiotic/SymbioticNetworkMiddleware.sol";
 import { TestDeployer } from "../../test/deploy/TestDeployer.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -25,7 +26,6 @@ contract MiddlewareTest is TestDeployer {
 
             _timeTravel(symbioticWethVault.vaultEpochDuration + 1 days);
 
-
             vm.stopPrank();
         }
     }
@@ -38,13 +38,13 @@ contract MiddlewareTest is TestDeployer {
 
             // remove all delegations to our slashable agent
             _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 0);
-           // _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 0);
+            // _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 0);
 
             _timeTravel(10);
 
             // remove all delegations to our slashable agent
             _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 2e18);
-           // _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 1000e6);
+            // _symbioticVaultDelegateToAgent(symbioticUsdtVault, env.symbiotic.networkAdapter, agent, 1000e6);
 
             _timeTravel(10);
 
@@ -60,7 +60,7 @@ contract MiddlewareTest is TestDeployer {
     }
 
     function test_current_agent_coverage_accounts_for_burner_router_changes() public {
-        Network _network = Network(env.symbiotic.networkAdapter.network);
+        SymbioticNetwork _network = SymbioticNetwork(env.symbiotic.networkAdapter.network);
 
         address agent = _getRandomAgent();
 

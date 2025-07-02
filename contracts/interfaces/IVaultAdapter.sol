@@ -1,17 +1,28 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+/// @title Vault Adapter
+/// @author kexley, Cap Labs
+/// @notice Utilization rates are sourced from the Vault
 interface IVaultAdapter {
-    /// @custom:storage-location erc7201:cap.storage.VaultAdapter
+    /// @dev Storage for the vault adapter
+    /// @param slopeData Slope data for an asset
+    /// @param utilizationData Utilization data for an asset
+    /// @param maxMultiplier Maximum slope multiplier
+    /// @param minMultiplier Minimum slope multiplier
+    /// @param rate Rate at which the multiplier shifts
     struct VaultAdapterStorage {
-        mapping(address => SlopeData) slopeData; // asset => slope data
-        mapping(address => mapping(address => UtilizationData)) utilizationData; // vault => asset => utilization data
+        mapping(address => SlopeData) slopeData;
+        mapping(address => mapping(address => UtilizationData)) utilizationData;
         uint256 maxMultiplier;
         uint256 minMultiplier;
         uint256 rate;
     }
 
     /// @dev Slope data for an asset
+    /// @param kink Kink point
+    /// @param slope0 Slope before kink
+    /// @param slope1 Slope after kink
     struct SlopeData {
         uint256 kink;
         uint256 slope0;
@@ -19,11 +30,32 @@ interface IVaultAdapter {
     }
 
     /// @dev Slope data for an asset
+    /// @param multiplier Multiplier for the asset
+    /// @param index Index of the asset
+    /// @param lastUpdate Last updated timestamp
     struct UtilizationData {
         uint256 multiplier;
         uint256 index;
         uint256 lastUpdate;
     }
+
+    /// @notice Emitted when slopes are set
+    /// @param _asset Asset address
+    /// @param _slopes Slope data
+    event SetSlopes(address indexed _asset, SlopeData _slopes);
+
+    /// @notice Emitted when limits are set
+    /// @param _maxMultiplier Maximum slope multiplier
+    /// @param _minMultiplier Minimum slope multiplier
+    /// @param _rate Rate at which the multiplier shifts
+    event SetLimits(uint256 _maxMultiplier, uint256 _minMultiplier, uint256 _rate);
+
+    /// @dev Invalid kink
+    error InvalidKink();
+
+    /// @notice Initialize the vault adapter
+    /// @param _accessControl Access control
+    function initialize(address _accessControl) external;
 
     /// @notice Fetch borrow rate for an asset from the Vault
     /// @param _vault Vault address
@@ -41,18 +73,4 @@ interface IVaultAdapter {
     /// @param _minMultiplier Minimum slope multiplier
     /// @param _rate Rate at which the multiplier shifts
     function setLimits(uint256 _maxMultiplier, uint256 _minMultiplier, uint256 _rate) external;
-
-    /// @notice Emitted when slopes are set
-    /// @param _asset Asset address
-    /// @param _slopes Slope data
-    event SetSlopes(address indexed _asset, SlopeData _slopes);
-
-    /// @notice Emitted when limits are set
-    /// @param _maxMultiplier Maximum slope multiplier
-    /// @param _minMultiplier Minimum slope multiplier
-    /// @param _rate Rate at which the multiplier shifts
-    event SetLimits(uint256 _maxMultiplier, uint256 _minMultiplier, uint256 _rate);
-
-    /// @dev Invalid kink
-    error InvalidKink();
 }

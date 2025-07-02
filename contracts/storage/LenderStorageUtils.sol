@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { ILender } from "../interfaces/ILender.sol";
 
 /// @title LenderStorageUtils
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Storage utilities for Lender contract
 abstract contract LenderStorageUtils {
     /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.Lender")) - 1)) & ~bytes32(uint256(0xff))

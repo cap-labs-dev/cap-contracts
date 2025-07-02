@@ -8,7 +8,7 @@ import { WadRayMath } from "../../libraries/math/WadRayMath.sol";
 import { MintableERC20 } from "./MintableERC20.sol";
 
 /// @title ScaledToken
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice A token that scales with an index, meant to be inherited by interest debt tokens
 /// @dev The scaled balance of the user is multiplied by the change in index to get the actual balance
 abstract contract ScaledToken is IScaledToken, MintableERC20, ScaledTokenStorageUtils {
@@ -25,7 +25,7 @@ abstract contract ScaledToken is IScaledToken, MintableERC20, ScaledTokenStorage
         __MintableERC20_init(_name, _symbol, _decimals);
     }
 
-    /// @notice Mints a token to an address
+    /// @dev Mints a token to an address
     /// @param _agent The address to mint the token to
     /// @param _amount The amount of tokens to mint
     /// @param _index The index of the token
@@ -46,7 +46,7 @@ abstract contract ScaledToken is IScaledToken, MintableERC20, ScaledTokenStorage
         emit Transfer(address(0), _agent, amountToMint);
     }
 
-    /// @notice Burns a token from an address
+    /// @dev Burns a token from an address
     /// @param _agent The address to burn the token from
     /// @param _amount The amount of tokens to burn
     /// @param _index The index of the token
@@ -70,5 +70,20 @@ abstract contract ScaledToken is IScaledToken, MintableERC20, ScaledTokenStorage
             uint256 amountToBurn = _amount - balanceIncrease;
             emit Transfer(_agent, address(0), amountToBurn);
         }
+    }
+
+    /// @dev Get the scaled balance of an agent scaled by the index
+    /// @param _agent The address of the agent
+    /// @param _index The index of the token
+    /// @return scaledBalance The balance of the agent scaled by the index
+    function _balanceOfScaled(address _agent, uint256 _index) internal view returns (uint256 scaledBalance) {
+        scaledBalance = super.balanceOf(_agent).rayMul(_index);
+    }
+
+    /// @dev Get the total supply of the token scaled by the index
+    /// @param _index The index of the token
+    /// @return totalSupply The total supply of the token scaled by the index
+    function _totalSupplyScaled(uint256 _index) internal view returns (uint256 totalSupply) {
+        totalSupply = super.totalSupply().rayMul(_index);
     }
 }

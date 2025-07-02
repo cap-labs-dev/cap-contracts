@@ -10,20 +10,17 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title Fee Receiver
-/// @author weso, @capLabs
+/// @author weso, Cap Labs
 /// @notice Fee receiver contract
 contract FeeReceiver is IFeeReceiver, UUPSUpgradeable, Access, FeeReceiverStorageUtils {
     using SafeERC20 for IERC20;
 
-    /// @dev Disable initializers on the implementation
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    /// @notice Initialize the fee receiver
-    /// @param _accessControl Access control address
-    /// @param _capToken Cap token address
-    /// @param _stakedCapToken Staked cap token address
+    /// @inheritdoc IFeeReceiver
     function initialize(address _accessControl, address _capToken, address _stakedCapToken) external initializer {
         __Access_init(_accessControl);
         __UUPSUpgradeable_init();
@@ -35,7 +32,7 @@ contract FeeReceiver is IFeeReceiver, UUPSUpgradeable, Access, FeeReceiverStorag
         $.stakedCapToken = IStakedCap(_stakedCapToken);
     }
 
-    /// @notice Distribute Fees to the staked cap token
+    /// @inheritdoc IFeeReceiver
     function distribute() external {
         FeeReceiverStorage storage $ = getFeeReceiverStorage();
         if ($.capToken.balanceOf(address(this)) > 0) {
@@ -49,18 +46,7 @@ contract FeeReceiver is IFeeReceiver, UUPSUpgradeable, Access, FeeReceiverStorag
         }
     }
 
-    /// @notice Claim protocol fees
-    /// @dev Transfers the protocol fee to the protocol fee receiver
-    function _claimProtocolFees() private {
-        FeeReceiverStorage storage $ = getFeeReceiverStorage();
-        uint256 balance = $.capToken.balanceOf(address(this));
-        uint256 protocolFee = (balance * $.protocolFeePercentage) / 1e27;
-        if (protocolFee > 0) $.capToken.safeTransfer($.protocolFeeReceiver, protocolFee);
-        emit ProtocolFeeClaimed(protocolFee);
-    }
-
-    /// @notice Set protocol fee percentage
-    /// @param _protocolFeePercentage Protocol fee percentage
+    /// @inheritdoc IFeeReceiver
     function setProtocolFeePercentage(uint256 _protocolFeePercentage)
         external
         checkAccess(this.setProtocolFeePercentage.selector)
@@ -72,8 +58,7 @@ contract FeeReceiver is IFeeReceiver, UUPSUpgradeable, Access, FeeReceiverStorag
         emit ProtocolFeePercentageSet(_protocolFeePercentage);
     }
 
-    /// @notice Set protocol fee receiver
-    /// @param _protocolFeeReceiver Protocol fee receiver address
+    /// @inheritdoc IFeeReceiver
     function setProtocolFeeReceiver(address _protocolFeeReceiver)
         external
         checkAccess(this.setProtocolFeeReceiver.selector)
@@ -84,5 +69,15 @@ contract FeeReceiver is IFeeReceiver, UUPSUpgradeable, Access, FeeReceiverStorag
         emit ProtocolFeeReceiverSet(_protocolFeeReceiver);
     }
 
+    /// @dev Transfers the protocol fee to the protocol fee receiver
+    function _claimProtocolFees() private {
+        FeeReceiverStorage storage $ = getFeeReceiverStorage();
+        uint256 balance = $.capToken.balanceOf(address(this));
+        uint256 protocolFee = (balance * $.protocolFeePercentage) / 1e27;
+        if (protocolFee > 0) $.capToken.safeTransfer($.protocolFeeReceiver, protocolFee);
+        emit ProtocolFeeClaimed(protocolFee);
+    }
+
+    /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }
 }

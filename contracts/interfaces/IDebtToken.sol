@@ -1,8 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-interface IDebtToken {
-    /// @custom:storage-location erc7201:cap.storage.DebtToken
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
+/// @title IDebtToken
+/// @author kexley, Cap Labs
+/// @notice Interface for the DebtToken contract
+interface IDebtToken is IERC20Metadata {
+    /// @dev Debt token storage
+    /// @param asset Asset address
+    /// @param oracle Oracle address
+    /// @param index Index
+    /// @param lastIndexUpdate Last index update
+    /// @param interestRate Interest rate
     struct DebtTokenStorage {
         address asset;
         address oracle;
@@ -26,4 +36,8 @@ interface IDebtToken {
     /// @param from Burn tokens from agent
     /// @param amount Amount to burn
     function burn(address from, uint256 amount) external;
+
+    /// @notice Get the current index
+    /// @return currentIndex The current index
+    function index() external view returns (uint256 currentIndex);
 }

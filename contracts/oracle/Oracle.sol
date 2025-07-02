@@ -8,7 +8,7 @@ import { RateOracle } from "./RateOracle.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 /// @title Oracle
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Price and Rate oracles are unified
 contract Oracle is IOracle, UUPSUpgradeable, Access, PriceOracle, RateOracle {
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -16,8 +16,7 @@ contract Oracle is IOracle, UUPSUpgradeable, Access, PriceOracle, RateOracle {
         _disableInitializers();
     }
 
-    /// @notice Initialize the oracle with the access control
-    /// @param _accessControl Access control
+    /// @inheritdoc IOracle
     function initialize(address _accessControl) external initializer {
         __Access_init(_accessControl);
         __UUPSUpgradeable_init();
@@ -25,6 +24,6 @@ contract Oracle is IOracle, UUPSUpgradeable, Access, PriceOracle, RateOracle {
         __RateOracle_init_unchained();
     }
 
-    /// @dev Only admin is allowed to upgrade implementation
+    /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address) internal view override checkAccess(bytes4(0)) { }
 }

@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IChainlink } from "../../interfaces/IChainlink.sol";
 
 /// @title Chainlink Adapter
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Prices are sourced from Chainlink
 library ChainlinkAdapter {
     /// @notice Fetch price for an asset from Chainlink fixed to 8 decimals

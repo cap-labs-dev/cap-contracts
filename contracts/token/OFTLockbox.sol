@@ -5,7 +5,7 @@ import { OFTAdapter } from "@layerzerolabs/oft-evm/contracts/OFTAdapter.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @title OFT Lockbox
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs, LayerZero Labs
 contract OFTLockbox is OFTAdapter {
     /// @dev Initialize the cap token lockbox
     /// @param _token Token address

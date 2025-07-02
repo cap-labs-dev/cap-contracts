@@ -2,10 +2,14 @@
 pragma solidity ^0.8.28;
 
 /// @title Staked Cap Token Interface
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Interface for the staked cap token that distributes yield accrued from agents borrowing underlying assets
 interface IStakedCap {
-    /// @custom:storage-location erc7201:cap.storage.StakedCap
+    /// @dev Storage for the staked cap token
+    /// @param storedTotal Total amount of the token stored
+    /// @param totalLocked Total amount of the token locked
+    /// @param lastNotify Last notify timestamp
+    /// @param lockDuration Lock duration
     struct StakedCapStorage {
         uint256 storedTotal;
         uint256 totalLocked;

@@ -4,8 +4,17 @@ pragma solidity ^0.8.28;
 import { IRestakerRewardReceiver } from "./IRestakerRewardReceiver.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+/// @title IDelegation
+/// @author weso, Cap Labs
+/// @notice Interface for Delegation contract
 interface IDelegation is IRestakerRewardReceiver {
-    /// @custom:storage-location erc7201:cap.storage.Delegation
+    /// @dev Delegation storage
+    /// @param agents Agent addresses
+    /// @param agentData Agent data
+    /// @param networks Network addresses
+    /// @param oracle Oracle address
+    /// @param epochDuration Epoch duration
+    /// @param ltvBuffer LTV buffer from LT
     struct DelegationStorage {
         EnumerableSet.AddressSet agents;
         mapping(address => AgentData) agentData;
@@ -15,6 +24,11 @@ interface IDelegation is IRestakerRewardReceiver {
         uint256 ltvBuffer;
     }
 
+    /// @dev Agent data
+    /// @param network Network address
+    /// @param ltv Loan to value ratio
+    /// @param liquidationThreshold Liquidation threshold
+    /// @param lastBorrow Last borrow timestamp
     struct AgentData {
         address network;
         uint256 ltv;
@@ -89,6 +103,43 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @param _epochDuration Epoch duration in seconds
     function initialize(address _accessControl, address _oracle, uint256 _epochDuration) external;
 
+    /// @notice The slash function. Calls the underlying networks to slash the delegated capital
+    /// @dev Called only by the lender during liquidation
+    /// @param _agent The agent who is unhealthy
+    /// @param _liquidator The liquidator who receives the funds
+    /// @param _amount The USD value of the delegation needed to cover the debt
+    function slash(address _agent, address _liquidator, uint256 _amount) external;
+
+    /// @notice Distribute rewards to networks covering an agent proportionally to their coverage
+    /// @param _agent The agent address
+    /// @param _asset The reward token address
+    function distributeRewards(address _agent, address _asset) external;
+
+    /// @notice Set the last borrow timestamp for an agent
+    /// @param _agent Agent address
+    function setLastBorrow(address _agent) external;
+
+    /// @notice Add agent to be delegated to
+    /// @param _agent Agent address
+    /// @param _network Network address
+    /// @param _ltv Loan to value ratio
+    /// @param _liquidationThreshold Liquidation threshold
+    function addAgent(address _agent, address _network, uint256 _ltv, uint256 _liquidationThreshold) external;
+
+    /// @notice Modify an agents config only callable by the operator
+    /// @param _agent the agent to modify
+    /// @param _ltv Loan to value ratio
+    /// @param _liquidationThreshold Liquidation threshold
+    function modifyAgent(address _agent, uint256 _ltv, uint256 _liquidationThreshold) external;
+
+    /// @notice Register a new network
+    /// @param _network Network address
+    function registerNetwork(address _network) external;
+
+    /// @notice Set the ltv buffer
+    /// @param _ltvBuffer LTV buffer
+    function setLtvBuffer(uint256 _ltvBuffer) external;
+
     /// @notice Get the epoch duration
     /// @return duration Epoch duration in seconds
     function epochDuration() external view returns (uint256 duration);
@@ -135,40 +186,8 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @return lt Liquidation threshold of the agent
     function liquidationThreshold(address _agent) external view returns (uint256 lt);
 
-    /// @notice The slash function. Calls the underlying networks to slash the delegated capital
-    /// @dev Called only by the lender during liquidation
-    /// @param _agent The agent who is unhealthy
-    /// @param _liquidator The liquidator who receives the funds
-    /// @param _amount The USD value of the delegation needed to cover the debt
-    function slash(address _agent, address _liquidator, uint256 _amount) external;
-
-    /// @notice Distribute rewards to networks covering an agent proportionally to their coverage
-    /// @param _agent The agent address
-    /// @param _asset The reward token address
-    function distributeRewards(address _agent, address _asset) external;
-
-    /// @notice Set the last borrow timestamp for an agent
-    /// @param _agent Agent address
-    function setLastBorrow(address _agent) external;
-
-    /// @notice Add agent to be delegated to
-    /// @param _agent Agent address
+    /// @notice Check if a network exists
     /// @param _network Network address
-    /// @param _ltv Loan to value ratio
-    /// @param _liquidationThreshold Liquidation threshold
-    function addAgent(address _agent, address _network, uint256 _ltv, uint256 _liquidationThreshold) external;
-
-    /// @notice Modify an agents config only callable by the operator
-    /// @param _agent the agent to modify
-    /// @param _ltv Loan to value ratio
-    /// @param _liquidationThreshold Liquidation threshold
-    function modifyAgent(address _agent, uint256 _ltv, uint256 _liquidationThreshold) external;
-
-    /// @notice Register a new network
-    /// @param _network Network address
-    function registerNetwork(address _network) external;
-
-    /// @notice Set the ltv buffer
-    /// @param _ltvBuffer LTV buffer
-    function setLtvBuffer(uint256 _ltvBuffer) external;
+    /// @return exists True if the network is registered
+    function networkExists(address _network) external view returns (bool exists);
 }

@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IMinter } from "../interfaces/IMinter.sol";
 
 /// @title MinterStorageUtils
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Storage utilities for Minter contract
 abstract contract MinterStorageUtils {
     /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.Minter")) - 1)) & ~bytes32(uint256(0xff))

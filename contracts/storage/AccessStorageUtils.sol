@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IAccess } from "../interfaces/IAccess.sol";
 
 /// @title Access Storage Utils
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Storage utilities for access control
 abstract contract AccessStorageUtils {
     /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.Access")) - 1)) & ~bytes32(uint256(0xff))

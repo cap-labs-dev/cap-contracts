@@ -14,7 +14,7 @@ import { ViewLogic } from "./ViewLogic.sol";
 import { AgentConfiguration } from "./configuration/AgentConfiguration.sol";
 
 /// @title BorrowLogic
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Logic for borrowing and repaying assets from the Lender
 /// @dev Interest rates for borrowing are not based on utilization like other lending markets.
 /// Instead the rates are based on a benchmark rate per asset set by an admin or an alternative
@@ -25,15 +25,20 @@ library BorrowLogic {
     using SafeERC20 for IERC20;
     using AgentConfiguration for ILender.AgentConfigurationMap;
 
-    /// @dev An agent has borrowed an asset from the Lender
-    event Borrow(address indexed asset, address indexed agent, uint256 amount);
-
+    /// @dev Details of a repayment
+    /// @param repaid Amount repaid
+    /// @param vaultRepaid Amount repaid to the vault
+    /// @param restakerRepaid Amount repaid to the restaker
+    /// @param interestRepaid Amount repaid to the interest receiver
     struct RepaymentDetails {
         uint256 repaid;
         uint256 vaultRepaid;
         uint256 restakerRepaid;
         uint256 interestRepaid;
     }
+
+    /// @dev An agent has borrowed an asset from the Lender
+    event Borrow(address indexed asset, address indexed agent, uint256 amount);
 
     /// @dev An agent, or someone on behalf of an agent, has repaid
     event Repay(address indexed asset, address indexed agent, RepaymentDetails details);

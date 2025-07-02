@@ -4,10 +4,15 @@ pragma solidity ^0.8.28;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title Scaled Token Interface
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Interface for the scaled token that distributes yield accrued from agents borrowing underlying assets
 interface IScaledToken is IERC20 {
-    /// @custom:storage-location erc7201:cap.storage.ScaledToken
+    /// @dev Storage for the scaled token
+    /// @param balance Balance of each user
+    /// @param scaledBalance Scaled balance of each user
+    /// @param storedIndex Stored index of the token
+    /// @param totalSupply Total supply of the token
+    /// @param scaledTotalSupply Scaled total supply of the token
     struct ScaledTokenStorage {
         mapping(address => uint256) balance;
         mapping(address => uint256) scaledBalance;

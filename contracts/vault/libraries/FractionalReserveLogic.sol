@@ -8,18 +8,12 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title Fractional Reserve Logic
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Idle capital is put to work in fractional reserve vaults and can be recalled when
 /// withdrawing, redeeming or borrowing.
 library FractionalReserveLogic {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
-
-    /// @dev Full divest required
-    error FullDivestRequired(address asset, uint256 loss);
-
-    /// @dev Fractional reserve vault already set
-    error FractionalReserveVaultAlreadySet(address vault);
 
     /// @dev Fractional reserve invested event
     event FractionalReserveInvested(address indexed asset, uint256 amount);
@@ -35,6 +29,12 @@ library FractionalReserveLogic {
 
     /// @dev Fractional reserve interest realized event
     event FractionalReserveInterestRealized(address indexed asset);
+
+    /// @dev Full divest required
+    error FullDivestRequired(address asset, uint256 loss);
+
+    /// @dev Fractional reserve vault already set
+    error FractionalReserveVaultAlreadySet(address vault);
 
     /// @notice Invest unborrowed capital in a fractional reserve vault
     /// @param $ Storage pointer

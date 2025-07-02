@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 /// @title Chainlink Interface
-/// @author @capLabs
+/// @author kexley, Cap Labs
 /// @notice Interface for Chainlink price feeds
 interface IChainlink {
     /// @notice Get the number of decimals of the price feed

@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IFractionalReserve } from "../interfaces/IFractionalReserve.sol";
 
 /// @title FractionalReserveStorageUtils
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Storage utilities for Fractional Reserve contract
 abstract contract FractionalReserveStorageUtils {
     /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.FractionalReserve")) - 1)) & ~bytes32(uint256(0xff))

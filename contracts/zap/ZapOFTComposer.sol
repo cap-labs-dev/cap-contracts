@@ -10,23 +10,25 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title ZapOFTComposer
-/// @author @capLabs
+/// @author Cap Labs
 /// @notice Compose an OFT with Zap capabilities
 /// @dev This contract is used to compose an OFT message with Zap capabilities.
-///      It handles ERC20 approvals, zap execution, and refunds the remaining tokens to the zap recipient.
-///      Expects the funds to be sent to the ZapOFTComposer contract before the message is composed.
+/// It handles ERC20 approvals, zap execution, and refunds the remaining tokens to the zap recipient.
+/// Expects the funds to be sent to the ZapOFTComposer contract before the message is composed.
 contract ZapOFTComposer is SafeOFTLzComposer {
     using SafeERC20 for IERC20;
 
-    /// @notice Store ZapRouter addresses.
+    /// @notice ZapRouter address
     address public immutable zapRouter;
+
+    /// @notice ZapTokenManager address
     address public immutable zapTokenManager;
 
-    /// @notice Constructs the contract.
-    /// @param _endpoint The address of the LayerZero endpoint.
-    /// @param _oApp The address of the OApp that is sending the composed message.
-    /// @param _zapRouter The address of the ZapRouter to use for Zap capabilities.
-    /// @param _zapTokenManager The address of the ZapTokenManager to use for token permissions.
+    /// @notice Constructs the ZapOFTComposer contract
+    /// @param _endpoint The address of the LayerZero endpoint
+    /// @param _oApp The address of the OApp that is sending the composed message
+    /// @param _zapRouter The address of the ZapRouter to use for Zap capabilities
+    /// @param _zapTokenManager The address of the ZapTokenManager to use for token permissions
     constructor(address _endpoint, address _oApp, address _zapRouter, address _zapTokenManager)
         SafeOFTLzComposer(_oApp, _endpoint)
     {
@@ -35,6 +37,7 @@ contract ZapOFTComposer is SafeOFTLzComposer {
     }
 
     /// @notice Handles incoming composed messages from LayerZero OFTs and executes the zap order it represents.
+    /// @inheritdoc SafeOFTLzComposer
     function _lzCompose(address, /*_oApp*/ bytes32, /*_guid*/ bytes calldata _message, address, bytes calldata)
         internal
         override

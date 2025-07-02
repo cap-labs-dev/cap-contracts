@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 /// @title Zap Router Interface
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Interface for zap router that contains the structs for orders and routes
 interface IZapRouter {
     /// @notice Input token and amount used in a step of the zap

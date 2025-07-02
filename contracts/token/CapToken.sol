@@ -5,10 +5,10 @@ import { Vault } from "../vault/Vault.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 /// @title Cap Token
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Token representing the basket of underlying assets
 contract CapToken is UUPSUpgradeable, Vault {
-    /// @dev Disable initializers on the implementation
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
@@ -34,6 +34,6 @@ contract CapToken is UUPSUpgradeable, Vault {
         __UUPSUpgradeable_init();
     }
 
-    /// @dev Only admin can upgrade
+    /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address) internal view override checkAccess(bytes4(0)) { }
 }

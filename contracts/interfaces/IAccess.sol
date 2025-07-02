@@ -2,10 +2,11 @@
 pragma solidity ^0.8.28;
 
 /// @title IAccess
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Interface for Access contract
 interface IAccess {
-    /// @custom:storage-location erc7201:cap.storage.Access
+    /// @dev Access storage
+    /// @param accessControl Access control address
     struct AccessStorage {
         address accessControl;
     }

@@ -2,7 +2,8 @@
 pragma solidity ^0.8.0;
 
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
-import { NetworkMiddleware } from "../../contracts/delegation/providers/symbiotic/NetworkMiddleware.sol";
+import { SymbioticNetworkMiddleware } from
+    "../../contracts/delegation/providers/symbiotic/SymbioticNetworkMiddleware.sol";
 import { FeeConfig, VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
@@ -423,7 +424,7 @@ contract TestDeployer is
     StakedCap scETH;
     FeeAuction cETHFeeAuction;
 
-    NetworkMiddleware middleware;
+    SymbioticNetworkMiddleware middleware;
     SymbioticVaultConfig symbioticWethVault;
     SymbioticNetworkRewardsConfig symbioticWethNetworkRewards;
 
@@ -446,7 +447,7 @@ contract TestDeployer is
         cETHFeeAuction = FeeAuction(ethVault.feeAuction);
 
         if (!useMockBackingNetwork()) {
-            middleware = NetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
+            middleware = SymbioticNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
             symbioticWethVault = _getSymbioticVaultConfig(0);
             symbioticWethNetworkRewards = _getSymbioticNetworkRewardsConfig(0);
         }

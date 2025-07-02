@@ -6,6 +6,7 @@ import { IVault } from "../../interfaces/IVault.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /// @title Cap Token Adapter
+/// @author kexley, Cap Labs
 /// @notice Prices are calculated based on the weighted average of underlying assets
 library CapTokenAdapter {
     /// @notice Fetch price for a cap token based on its underlying assets

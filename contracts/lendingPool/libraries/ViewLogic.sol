@@ -13,70 +13,13 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title View Logic
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice View functions to see the state of an agent's health
 library ViewLogic {
     using AgentConfiguration for ILender.AgentConfigurationMap;
     using Math for uint256;
 
     uint256 constant SECONDS_IN_YEAR = 31536000;
-
-    /// @notice Calculate the agent data
-    /// @param $ Lender storage
-    /// @param _agent Agent address
-    /// @return totalDelegation Total delegation of an agent in USD, encoded with 8 decimals
-    /// @return totalSlashableCollateral Total slashable collateral of an agent in USD, encoded with 8 decimals
-    /// @return totalDebt Total debt of an agent in USD, encoded with 8 decimals
-    /// @return ltv Loan to value ratio, encoded in ray (1e27)
-    /// @return liquidationThreshold Liquidation ratio of an agent, encoded in ray (1e27)
-    /// @return health Health status of an agent, encoded in ray (1e27)
-    function agent(ILender.LenderStorage storage $, address _agent)
-        public
-        view
-        returns (
-            uint256 totalDelegation,
-            uint256 totalSlashableCollateral,
-            uint256 totalDebt,
-            uint256 ltv,
-            uint256 liquidationThreshold,
-            uint256 health
-        )
-    {
-        totalDelegation = IDelegation($.delegation).coverage(_agent);
-        totalSlashableCollateral = IDelegation($.delegation).slashableCollateral(_agent);
-        liquidationThreshold = IDelegation($.delegation).liquidationThreshold(_agent);
-
-        // Extract debt calculation to a separate function to reduce local variables
-        totalDebt = calculateTotalDebt($, _agent);
-
-        ltv = totalDelegation == 0 ? 0 : (totalDebt * 1e27) / totalDelegation;
-        health = totalDebt == 0 ? type(uint256).max : (totalDelegation * liquidationThreshold) / totalDebt;
-    }
-
-    /// @notice Helper function to calculate the total debt of an agent across all assets
-    /// @param $ Lender storage
-    /// @param _agent Agent address
-    /// @return totalDebt Total debt of an agent in USD, encoded with 8 decimals
-    function calculateTotalDebt(ILender.LenderStorage storage $, address _agent)
-        private
-        view
-        returns (uint256 totalDebt)
-    {
-        for (uint256 i; i < $.reservesCount; ++i) {
-            if (!$.agentConfig[_agent].isBorrowing(i)) {
-                continue;
-            }
-
-            address asset = $.reservesList[i];
-            (uint256 assetPrice,) = IOracle($.oracle).getPrice(asset);
-            if (assetPrice == 0) continue;
-
-            ILender.ReserveData storage reserve = $.reservesData[asset];
-
-            totalDebt += (IERC20(reserve.debtToken).balanceOf(_agent) + accruedRestakerInterest($, _agent, asset))
-                .mulDiv(assetPrice, 10 ** reserve.decimals, Math.Rounding.Ceil);
-        }
-    }
 
     /// @notice Calculate the maximum amount that can be borrowed for a given asset
     /// @param $ Lender storage
@@ -153,30 +96,36 @@ library ViewLogic {
         if (agentDebt < maxLiquidatableAmount + reserve.minBorrow) maxLiquidatableAmount = agentDebt;
     }
 
-    /// @dev Get the bonus for a liquidation in percentage ray decimals, max for emergencies and none if health is too low
+    /// @notice Calculate the agent data
     /// @param $ Lender storage
     /// @param _agent Agent address
-    /// @return maxBonus Bonus percentage in ray decimals
-    function bonus(ILender.LenderStorage storage $, address _agent) internal view returns (uint256 maxBonus) {
-        (uint256 totalDelegation,, uint256 totalDebt,,,) = agent($, _agent);
+    /// @return totalDelegation Total delegation of an agent in USD, encoded with 8 decimals
+    /// @return totalSlashableCollateral Total slashable collateral of an agent in USD, encoded with 8 decimals
+    /// @return totalDebt Total debt of an agent in USD, encoded with 8 decimals
+    /// @return ltv Loan to value ratio, encoded in ray (1e27)
+    /// @return liquidationThreshold Liquidation ratio of an agent, encoded in ray (1e27)
+    /// @return health Health status of an agent, encoded in ray (1e27)
+    function agent(ILender.LenderStorage storage $, address _agent)
+        public
+        view
+        returns (
+            uint256 totalDelegation,
+            uint256 totalSlashableCollateral,
+            uint256 totalDebt,
+            uint256 ltv,
+            uint256 liquidationThreshold,
+            uint256 health
+        )
+    {
+        totalDelegation = IDelegation($.delegation).coverage(_agent);
+        totalSlashableCollateral = IDelegation($.delegation).slashableCollateral(_agent);
+        liquidationThreshold = IDelegation($.delegation).liquidationThreshold(_agent);
 
-        if (totalDelegation > totalDebt) {
-            // Emergency liquidations get max bonus
-            if (totalDelegation * $.emergencyLiquidationThreshold / totalDebt < 1e27) {
-                maxBonus = $.bonusCap;
-            } else {
-                // Pro-rata bonus for non-emergency liquidations
-                if (block.timestamp > ($.liquidationStart[_agent] + $.grace)) {
-                    uint256 elapsed = block.timestamp - ($.liquidationStart[_agent] + $.grace);
-                    uint256 duration = $.expiry - $.grace;
-                    if (elapsed > duration) elapsed = duration;
-                    maxBonus = $.bonusCap * elapsed / duration;
-                }
-            }
+        // Extract debt calculation to a separate function to reduce local variables
+        totalDebt = calculateTotalDebt($, _agent);
 
-            uint256 maxHealthyBonus = (totalDelegation - totalDebt) * 1e27 / totalDebt;
-            if (maxBonus > maxHealthyBonus) maxBonus = maxHealthyBonus;
-        }
+        ltv = totalDelegation == 0 ? 0 : (totalDebt * 1e27) / totalDelegation;
+        health = totalDebt == 0 ? type(uint256).max : (totalDelegation * liquidationThreshold) / totalDebt;
     }
 
     /// @notice Get the current debt balances for an agent for a specific asset
@@ -204,10 +153,61 @@ library ViewLogic {
         returns (uint256 accruedInterest)
     {
         ILender.ReserveData storage reserve = $.reservesData[_asset];
-        uint256 totalInterest = IERC20(reserve.debtToken).balanceOf(_agent);
+        uint256 totalDebt = IERC20(reserve.debtToken).balanceOf(_agent);
         uint256 rate = IOracle($.oracle).restakerRate(_agent);
         uint256 elapsedTime = block.timestamp - reserve.lastRealizationTime[_agent];
 
-        accruedInterest = totalInterest * rate * elapsedTime / (1e27 * SECONDS_IN_YEAR);
+        accruedInterest = totalDebt * rate * elapsedTime / (1e27 * SECONDS_IN_YEAR);
+    }
+
+    /// @notice Helper function to calculate the total debt of an agent across all assets
+    /// @param $ Lender storage
+    /// @param _agent Agent address
+    /// @return totalDebt Total debt of an agent in USD, encoded with 8 decimals
+    function calculateTotalDebt(ILender.LenderStorage storage $, address _agent)
+        private
+        view
+        returns (uint256 totalDebt)
+    {
+        for (uint256 i; i < $.reservesCount; ++i) {
+            if (!$.agentConfig[_agent].isBorrowing(i)) {
+                continue;
+            }
+
+            address asset = $.reservesList[i];
+            (uint256 assetPrice,) = IOracle($.oracle).getPrice(asset);
+            if (assetPrice == 0) continue;
+
+            ILender.ReserveData storage reserve = $.reservesData[asset];
+
+            totalDebt += (IERC20(reserve.debtToken).balanceOf(_agent) + accruedRestakerInterest($, _agent, asset))
+                .mulDiv(assetPrice, 10 ** reserve.decimals, Math.Rounding.Ceil);
+        }
+    }
+
+    /// @dev Get the bonus for a liquidation in percentage ray decimals, max for emergencies and none if health is too low
+    /// @param $ Lender storage
+    /// @param _agent Agent address
+    /// @return maxBonus Bonus percentage in ray decimals
+    function bonus(ILender.LenderStorage storage $, address _agent) internal view returns (uint256 maxBonus) {
+        (uint256 totalDelegation,, uint256 totalDebt,,,) = agent($, _agent);
+
+        if (totalDelegation > totalDebt) {
+            // Emergency liquidations get max bonus
+            if (totalDelegation * $.emergencyLiquidationThreshold / totalDebt < 1e27) {
+                maxBonus = $.bonusCap;
+            } else {
+                // Pro-rata bonus for non-emergency liquidations
+                if (block.timestamp > ($.liquidationStart[_agent] + $.grace)) {
+                    uint256 elapsed = block.timestamp - ($.liquidationStart[_agent] + $.grace);
+                    uint256 duration = $.expiry - $.grace;
+                    if (elapsed > duration) elapsed = duration;
+                    maxBonus = $.bonusCap * elapsed / duration;
+                }
+            }
+
+            uint256 maxHealthyBonus = (totalDelegation - totalDebt) * 1e27 / totalDebt;
+            if (maxBonus > maxHealthyBonus) maxBonus = maxHealthyBonus;
+        }
     }
 }

@@ -9,25 +9,21 @@ import { VaultAdapterStorageUtils } from "../../storage/VaultAdapterStorageUtils
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 /// @title Vault Adapter
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Market rates are sourced from the Vault
 contract VaultAdapter is IVaultAdapter, UUPSUpgradeable, Access, VaultAdapterStorageUtils {
-    /// @dev Disable initializers on the implementation
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    /// @notice Initialize the vault adapter with the access control
-    /// @param _accessControl Access control
+    /// @inheritdoc IVaultAdapter
     function initialize(address _accessControl) external initializer {
         __Access_init(_accessControl);
         __UUPSUpgradeable_init();
     }
 
-    /// @notice Fetch borrow rate for an asset from the Vault
-    /// @param _vault Vault address
-    /// @param _asset Asset to fetch rate for
-    /// @return latestAnswer Borrow rate
+    /// @inheritdoc IVaultAdapter
     function rate(address _vault, address _asset) external returns (uint256 latestAnswer) {
         UtilizationData storage utilizationData = getVaultAdapterStorage().utilizationData[_vault][_asset];
 
@@ -53,19 +49,14 @@ contract VaultAdapter is IVaultAdapter, UUPSUpgradeable, Access, VaultAdapterSto
         latestAnswer = _applySlopes(_vault, _asset, utilization, elapsed);
     }
 
-    /// @notice Set utilization slopes for an asset
-    /// @param _asset Asset address
-    /// @param _slopes Slope data
+    /// @inheritdoc IVaultAdapter
     function setSlopes(address _asset, SlopeData memory _slopes) external checkAccess(this.setSlopes.selector) {
         if (_slopes.kink >= 1e27 || _slopes.kink == 0) revert InvalidKink();
         getVaultAdapterStorage().slopeData[_asset] = _slopes;
         emit SetSlopes(_asset, _slopes);
     }
 
-    /// @notice Set limits for the utilization multiplier
-    /// @param _maxMultiplier Maximum slope multiplier
-    /// @param _minMultiplier Minimum slope multiplier
-    /// @param _rate Rate at which the multiplier shifts
+    /// @inheritdoc IVaultAdapter
     function setLimits(uint256 _maxMultiplier, uint256 _minMultiplier, uint256 _rate)
         external
         checkAccess(this.setLimits.selector)
@@ -114,6 +105,6 @@ contract VaultAdapter is IVaultAdapter, UUPSUpgradeable, Access, VaultAdapterSto
         }
     }
 
-    /// @dev Only admin is allowed to upgrade implementation
+    /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address) internal view override checkAccess(bytes4(0)) { }
 }

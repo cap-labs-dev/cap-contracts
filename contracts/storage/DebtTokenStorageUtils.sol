@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IDebtToken } from "../interfaces/IDebtToken.sol";
 
 /// @title Debt Token Storage Utils
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Storage utilities for debt token
 abstract contract DebtTokenStorageUtils {
     /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.DebtToken")) - 1)) & ~bytes32(uint256(0xff))

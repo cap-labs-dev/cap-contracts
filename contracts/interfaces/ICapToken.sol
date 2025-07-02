@@ -7,7 +7,7 @@ import { IVault } from "./IVault.sol";
 import { IERC20 } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 /// @title Cap Token interface
-/// @author @capLabs
+/// @author Cap Labs
 /// @notice Interface for the Cap Token contract
 interface ICapToken is IERC20, IVault, IMinter, IFractionalReserve {
     /// @notice Initialize the Cap token

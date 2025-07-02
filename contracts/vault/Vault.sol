@@ -14,7 +14,7 @@ import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/P
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title Vault for storing the backing for cTokens
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Tokens are supplied by cToken minters and borrowed by covered agents
 /// @dev Supplies, borrows and utilization rates are tracked. Interest rates should be computed and
 /// charged on the external contracts, only the principle amount is counted on this contract.
@@ -28,6 +28,177 @@ abstract contract Vault is
     VaultStorageUtils
 {
     using EnumerableSet for EnumerableSet.AddressSet;
+
+    /// @inheritdoc IVault
+    function mint(address _asset, uint256 _amountIn, uint256 _minAmountOut, address _receiver, uint256 _deadline)
+        external
+        whenNotPaused
+        returns (uint256 amountOut)
+    {
+        uint256 fee;
+        (amountOut, fee) = getMintAmount(_asset, _amountIn);
+        VaultLogic.mint(
+            getVaultStorage(),
+            MintBurnParams({
+                asset: _asset,
+                amountIn: _amountIn,
+                amountOut: amountOut,
+                minAmountOut: _minAmountOut,
+                receiver: _receiver,
+                deadline: _deadline,
+                fee: fee
+            })
+        );
+        _mint(_receiver, amountOut);
+        if (fee > 0) _mint(getVaultStorage().insuranceFund, fee);
+    }
+
+    /// @inheritdoc IVault
+    function burn(address _asset, uint256 _amountIn, uint256 _minAmountOut, address _receiver, uint256 _deadline)
+        external
+        whenNotPaused
+        returns (uint256 amountOut)
+    {
+        uint256 fee;
+        (amountOut, fee) = getBurnAmount(_asset, _amountIn);
+        divest(_asset, amountOut + fee);
+        VaultLogic.burn(
+            getVaultStorage(),
+            MintBurnParams({
+                asset: _asset,
+                amountIn: _amountIn,
+                amountOut: amountOut,
+                minAmountOut: _minAmountOut,
+                receiver: _receiver,
+                deadline: _deadline,
+                fee: fee
+            })
+        );
+        _burn(msg.sender, _amountIn);
+    }
+
+    /// @inheritdoc IVault
+    function redeem(uint256 _amountIn, uint256[] calldata _minAmountsOut, address _receiver, uint256 _deadline)
+        external
+        whenNotPaused
+        returns (uint256[] memory amountsOut)
+    {
+        uint256[] memory fees;
+        (amountsOut, fees) = getRedeemAmount(_amountIn);
+        uint256[] memory totalDivestAmounts = new uint256[](amountsOut.length);
+        for (uint256 i; i < amountsOut.length; i++) {
+            totalDivestAmounts[i] = amountsOut[i] + fees[i];
+        }
+
+        divestMany(assets(), totalDivestAmounts);
+        VaultLogic.redeem(
+            getVaultStorage(),
+            RedeemParams({
+                amountIn: _amountIn,
+                amountsOut: amountsOut,
+                minAmountsOut: _minAmountsOut,
+                receiver: _receiver,
+                deadline: _deadline,
+                fees: fees
+            })
+        );
+        _burn(msg.sender, _amountIn);
+    }
+
+    /// @inheritdoc IVault
+    function borrow(address _asset, uint256 _amount, address _receiver)
+        external
+        whenNotPaused
+        checkAccess(this.borrow.selector)
+    {
+        divest(_asset, _amount);
+        VaultLogic.borrow(getVaultStorage(), BorrowParams({ asset: _asset, amount: _amount, receiver: _receiver }));
+    }
+
+    /// @inheritdoc IVault
+    function repay(address _asset, uint256 _amount) external whenNotPaused checkAccess(this.repay.selector) {
+        VaultLogic.repay(getVaultStorage(), RepayParams({ asset: _asset, amount: _amount }));
+    }
+
+    /// @inheritdoc IVault
+    function addAsset(address _asset) external checkAccess(this.addAsset.selector) {
+        VaultLogic.addAsset(getVaultStorage(), _asset);
+    }
+
+    /// @inheritdoc IVault
+    function removeAsset(address _asset) external checkAccess(this.removeAsset.selector) {
+        VaultLogic.removeAsset(getVaultStorage(), _asset);
+    }
+
+    /// @inheritdoc IVault
+    function pauseAsset(address _asset) external checkAccess(this.pauseAsset.selector) {
+        VaultLogic.pause(getVaultStorage(), _asset);
+    }
+
+    /// @inheritdoc IVault
+    function unpauseAsset(address _asset) external checkAccess(this.unpauseAsset.selector) {
+        VaultLogic.unpause(getVaultStorage(), _asset);
+    }
+
+    /// @inheritdoc IVault
+    function pauseProtocol() external checkAccess(this.pauseProtocol.selector) {
+        _pause();
+    }
+
+    /// @inheritdoc IVault
+    function unpauseProtocol() external checkAccess(this.unpauseProtocol.selector) {
+        _unpause();
+    }
+
+    /// @inheritdoc IVault
+    function setInsuranceFund(address _insuranceFund) external checkAccess(this.setInsuranceFund.selector) {
+        VaultLogic.setInsuranceFund(getVaultStorage(), _insuranceFund);
+    }
+
+    /// @inheritdoc IVault
+    function rescueERC20(address _asset, address _receiver) external checkAccess(this.rescueERC20.selector) {
+        VaultLogic.rescueERC20(getVaultStorage(), getFractionalReserveStorage(), _asset, _receiver);
+    }
+
+    /// @inheritdoc IVault
+    function assets() public view returns (address[] memory assetList) {
+        assetList = getVaultStorage().assets.values();
+    }
+
+    /// @inheritdoc IVault
+    function totalSupplies(address _asset) external view returns (uint256 _totalSupply) {
+        _totalSupply = getVaultStorage().totalSupplies[_asset];
+    }
+
+    /// @inheritdoc IVault
+    function totalBorrows(address _asset) external view returns (uint256 totalBorrow) {
+        totalBorrow = getVaultStorage().totalBorrows[_asset];
+    }
+
+    /// @inheritdoc IVault
+    function paused(address _asset) external view returns (bool isPaused) {
+        isPaused = getVaultStorage().paused[_asset];
+    }
+
+    /// @inheritdoc IVault
+    function availableBalance(address _asset) external view returns (uint256 amount) {
+        amount = VaultLogic.availableBalance(getVaultStorage(), _asset);
+    }
+
+    /// @inheritdoc IVault
+    function utilization(address _asset) external view returns (uint256 ratio) {
+        ratio = VaultLogic.utilization(getVaultStorage(), _asset);
+    }
+
+    /// @inheritdoc IVault
+    function currentUtilizationIndex(address _asset) external view returns (uint256 index) {
+        index = VaultLogic.currentUtilizationIndex(getVaultStorage(), _asset);
+    }
+
+    /// @inheritdoc IVault
+    function insuranceFund() external view returns (address) {
+        return getVaultStorage().insuranceFund;
+    }
 
     /// @dev Initialize the assets
     /// @param _name Name of the cap token
@@ -64,223 +235,5 @@ abstract contract Vault is
             $.assets.add(_assets[i]);
         }
         $.insuranceFund = _insuranceFund;
-    }
-
-    /// @notice Mint the cap token using an asset
-    /// @dev This contract must have approval to move asset from msg.sender
-    /// @param _asset Whitelisted asset to deposit
-    /// @param _amountIn Amount of asset to use in the minting
-    /// @param _minAmountOut Minimum amount to mint
-    /// @param _receiver Receiver of the minting
-    /// @param _deadline Deadline of the tx
-    function mint(address _asset, uint256 _amountIn, uint256 _minAmountOut, address _receiver, uint256 _deadline)
-        external
-        whenNotPaused
-        returns (uint256 amountOut)
-    {
-        uint256 fee;
-        (amountOut, fee) = getMintAmount(_asset, _amountIn);
-        VaultLogic.mint(
-            getVaultStorage(),
-            MintBurnParams({
-                asset: _asset,
-                amountIn: _amountIn,
-                amountOut: amountOut,
-                minAmountOut: _minAmountOut,
-                receiver: _receiver,
-                deadline: _deadline,
-                fee: fee
-            })
-        );
-        _mint(_receiver, amountOut);
-        if (fee > 0) _mint(getVaultStorage().insuranceFund, fee);
-    }
-
-    /// @notice Burn the cap token for an asset
-    /// @dev Asset is withdrawn from the reserve or divested from the underlying vault
-    /// @param _asset Asset to withdraw
-    /// @param _amountIn Amount of cap token to burn
-    /// @param _minAmountOut Minimum amount out to receive
-    /// @param _receiver Receiver of the withdrawal
-    /// @param _deadline Deadline of the tx
-    function burn(address _asset, uint256 _amountIn, uint256 _minAmountOut, address _receiver, uint256 _deadline)
-        external
-        whenNotPaused
-        returns (uint256 amountOut)
-    {
-        uint256 fee;
-        (amountOut, fee) = getBurnAmount(_asset, _amountIn);
-        divest(_asset, amountOut + fee);
-        VaultLogic.burn(
-            getVaultStorage(),
-            MintBurnParams({
-                asset: _asset,
-                amountIn: _amountIn,
-                amountOut: amountOut,
-                minAmountOut: _minAmountOut,
-                receiver: _receiver,
-                deadline: _deadline,
-                fee: fee
-            })
-        );
-        _burn(msg.sender, _amountIn);
-    }
-
-    /// @notice Redeem the Cap token for a bundle of assets
-    /// @dev Assets are withdrawn from the reserve or divested from the underlying vault
-    /// @param _amountIn Amount of Cap token to burn
-    /// @param _minAmountsOut Minimum amounts of assets to withdraw
-    /// @param _receiver Receiver of the withdrawal
-    /// @param _deadline Deadline of the tx
-    /// @return amountsOut Amount of assets withdrawn
-    function redeem(uint256 _amountIn, uint256[] calldata _minAmountsOut, address _receiver, uint256 _deadline)
-        external
-        whenNotPaused
-        returns (uint256[] memory amountsOut)
-    {
-        uint256[] memory fees;
-        (amountsOut, fees) = getRedeemAmount(_amountIn);
-        uint256[] memory totalDivestAmounts = new uint256[](amountsOut.length);
-        for (uint256 i; i < amountsOut.length; i++) {
-            totalDivestAmounts[i] = amountsOut[i] + fees[i];
-        }
-
-        divestMany(assets(), totalDivestAmounts);
-        VaultLogic.redeem(
-            getVaultStorage(),
-            RedeemParams({
-                amountIn: _amountIn,
-                amountsOut: amountsOut,
-                minAmountsOut: _minAmountsOut,
-                receiver: _receiver,
-                deadline: _deadline,
-                fees: fees
-            })
-        );
-        _burn(msg.sender, _amountIn);
-    }
-
-    /// @notice Borrow an asset
-    /// @dev Whitelisted agents can borrow any amount, LTV is handled by Agent contracts
-    /// @param _asset Asset to borrow
-    /// @param _amount Amount of asset to borrow
-    /// @param _receiver Receiver of the borrow
-    function borrow(address _asset, uint256 _amount, address _receiver)
-        external
-        whenNotPaused
-        checkAccess(this.borrow.selector)
-    {
-        divest(_asset, _amount);
-        VaultLogic.borrow(getVaultStorage(), BorrowParams({ asset: _asset, amount: _amount, receiver: _receiver }));
-    }
-
-    /// @notice Repay an asset
-    /// @param _asset Asset to repay
-    /// @param _amount Amount of asset to repay
-    function repay(address _asset, uint256 _amount) external whenNotPaused checkAccess(this.repay.selector) {
-        VaultLogic.repay(getVaultStorage(), RepayParams({ asset: _asset, amount: _amount }));
-    }
-
-    /// @notice Add an asset to the vault list
-    /// @param _asset Asset address
-    function addAsset(address _asset) external checkAccess(this.addAsset.selector) {
-        VaultLogic.addAsset(getVaultStorage(), _asset);
-    }
-
-    /// @notice Remove an asset from the vault list
-    /// @param _asset Asset address
-    function removeAsset(address _asset) external checkAccess(this.removeAsset.selector) {
-        VaultLogic.removeAsset(getVaultStorage(), _asset);
-    }
-
-    /// @notice Pause an asset
-    /// @param _asset Asset address
-    function pauseAsset(address _asset) external checkAccess(this.pauseAsset.selector) {
-        VaultLogic.pause(getVaultStorage(), _asset);
-    }
-
-    /// @notice Unpause an asset
-    /// @param _asset Asset address
-    function unpauseAsset(address _asset) external checkAccess(this.unpauseAsset.selector) {
-        VaultLogic.unpause(getVaultStorage(), _asset);
-    }
-
-    /// @notice Pause all protocol operations
-    function pauseProtocol() external checkAccess(this.pauseProtocol.selector) {
-        _pause();
-    }
-
-    /// @notice Unpause all protocol operations
-    function unpauseProtocol() external checkAccess(this.unpauseProtocol.selector) {
-        _unpause();
-    }
-
-    /// @notice Set the insurance fund
-    /// @param _insuranceFund Insurance fund address
-    function setInsuranceFund(address _insuranceFund) external checkAccess(this.setInsuranceFund.selector) {
-        VaultLogic.setInsuranceFund(getVaultStorage(), _insuranceFund);
-    }
-
-    /// @notice Rescue an unsupported asset
-    /// @param _asset Asset to rescue
-    /// @param _receiver Receiver of the rescue
-    function rescueERC20(address _asset, address _receiver) external checkAccess(this.rescueERC20.selector) {
-        VaultLogic.rescueERC20(getVaultStorage(), getFractionalReserveStorage(), _asset, _receiver);
-    }
-
-    /// @notice Get the list of assets supported by the vault
-    /// @return assetList List of assets
-    function assets() public view returns (address[] memory assetList) {
-        assetList = getVaultStorage().assets.values();
-    }
-
-    /// @notice Get the total supplies of an asset
-    /// @param _asset Asset address
-    /// @return _totalSupply Total supply
-    function totalSupplies(address _asset) external view returns (uint256 _totalSupply) {
-        _totalSupply = getVaultStorage().totalSupplies[_asset];
-    }
-
-    /// @notice Get the total borrows of an asset
-    /// @param _asset Asset address
-    /// @return totalBorrow Total borrow
-    function totalBorrows(address _asset) external view returns (uint256 totalBorrow) {
-        totalBorrow = getVaultStorage().totalBorrows[_asset];
-    }
-
-    /// @notice Get the pause state of an asset
-    /// @param _asset Asset address
-    /// @return isPaused Pause state
-    function paused(address _asset) external view returns (bool isPaused) {
-        isPaused = getVaultStorage().paused[_asset];
-    }
-
-    /// @notice Available balance to borrow
-    /// @param _asset Asset to borrow
-    /// @return amount Amount available
-    function availableBalance(address _asset) external view returns (uint256 amount) {
-        amount = VaultLogic.availableBalance(getVaultStorage(), _asset);
-    }
-
-    /// @notice Utilization rate of an asset
-    /// @dev Utilization scaled by 1e27
-    /// @param _asset Utilized asset
-    /// @return ratio Utilization ratio
-    function utilization(address _asset) external view returns (uint256 ratio) {
-        ratio = VaultLogic.utilization(getVaultStorage(), _asset);
-    }
-
-    /// @notice Up to date cumulative utilization index of an asset
-    /// @dev Utilization scaled by 1e27
-    /// @param _asset Utilized asset
-    /// @return index Utilization ratio index
-    function currentUtilizationIndex(address _asset) external view returns (uint256 index) {
-        index = VaultLogic.currentUtilizationIndex(getVaultStorage(), _asset);
-    }
-
-    /// @notice Get the insurance fund
-    /// @return insuranceFund Insurance fund
-    function insuranceFund() external view returns (address) {
-        return getVaultStorage().insuranceFund;
     }
 }

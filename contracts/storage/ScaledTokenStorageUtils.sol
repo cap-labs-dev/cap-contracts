@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IScaledToken } from "../interfaces/IScaledToken.sol";
 
 /// @title ScaledToken Storage Utils
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Storage utilities for ScaledToken
 abstract contract ScaledTokenStorageUtils {
     /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.ScaledToken")) - 1)) & ~bytes32(uint256(0xff))

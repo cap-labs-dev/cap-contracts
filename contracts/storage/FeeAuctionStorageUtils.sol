@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IFeeAuction } from "../interfaces/IFeeAuction.sol";
 
 /// @title Fee Auction Storage Utils
-/// @author kexley, @capLabs
+/// @author kexley, Cap Labs
 /// @notice Storage utilities for fee auction
 abstract contract FeeAuctionStorageUtils {
     /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.FeeAuction")) - 1)) & ~bytes32(uint256(0xff))

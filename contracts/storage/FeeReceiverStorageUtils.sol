@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IFeeReceiver } from "../interfaces/IFeeReceiver.sol";
 
 /// @title Fee Receiver Storage Utils
-/// @author weso, @capLabs
+/// @author weso, Cap Labs
 /// @notice Storage utilities for fee receiver
 abstract contract FeeReceiverStorageUtils {
     /// @dev keccak256(abi.encode(uint256(keccak256("cap.storage.FeeReceiver")) - 1)) & ~bytes32(uint256(0xff))
