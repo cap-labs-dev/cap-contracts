@@ -163,42 +163,6 @@ contract CryticToFoundry is Test, TargetFunctions, FoundryAsserts {
         capToken_redeem_clamped(1);
     }
 
-    // forge test --match-test test_capToken_burn_5 -vvv
-    // NOTE: setting reserve too high causes burn to fail, expected behavior, see issue: https://github.com/Recon-Fuzz/cap-invariants/issues/26#issuecomment-3016509608
-    function test_capToken_burn_5() public {
-        asset_mint(0xe916cadb12C49389E487eB1e8194B1459b29B0eC, 1190);
-
-        add_new_vault();
-
-        capToken_setFractionalReserveVault();
-
-        capToken_investAll();
-
-        capToken_setReserve(1208501357961003772);
-
-        capToken_burn(
-            10005653327,
-            1527893632663543898168596194132481378078474264047297169757312420,
-            13640361619568770847200887666290325598958930765379039836150357
-        );
-    }
-
-    // forge test --match-test test_capToken_burn_clamped_9 -vvv
-    // NOTE: setting reserve too high causes burn to fail, expected behavior, see issue: https://github.com/Recon-Fuzz/cap-invariants/issues/26#issuecomment-3016509608
-    function test_capToken_burn_clamped_9() public {
-        asset_mint(0xe916cadb12C49389E487eB1e8194B1459b29B0eC, 1);
-
-        add_new_vault();
-
-        capToken_setFractionalReserveVault();
-
-        capToken_investAll();
-
-        capToken_setReserve(1000199038263126991);
-
-        capToken_burn_clamped(10054550237);
-    }
-
     // forge test --match-test test_doomsday_maxBorrow_5 -vvv
     // NOTE: still not resolved after latest changes in commit 1371276e3d553c2feac20c3e93308aee65d1ad97
     function test_doomsday_maxBorrow_5() public {

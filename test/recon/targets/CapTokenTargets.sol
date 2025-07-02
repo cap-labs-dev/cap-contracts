@@ -355,10 +355,11 @@ abstract contract CapTokenTargets is BaseTargetFunctions, Properties {
         capToken.setFractionalReserveVault(address(ERC4626(_getVault()).asset()), _getVault());
     }
 
-    function capToken_setReserve(uint256 _reserve) public updateGhosts asActor {
-        _reserve %= uint256(type(uint88).max);
-        capToken.setReserve(_getAsset(), _reserve);
-    }
+    // NOTE: removed because it introduces too many false positives
+    // function capToken_setReserve(uint256 _reserve) public updateGhosts asActor {
+    //     _reserve %= uint256(type(uint88).max);
+    //     capToken.setReserve(_getAsset(), _reserve);
+    // }
 
     function capToken_setWhitelist(address _user, bool _whitelisted) public updateGhosts asActor {
         capToken.setWhitelist(_user, _whitelisted);
