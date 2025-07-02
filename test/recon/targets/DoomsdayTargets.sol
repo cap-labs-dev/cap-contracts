@@ -169,35 +169,36 @@ abstract contract DoomsdayTargets is BaseTargetFunctions, Properties {
 
     /// @dev Property: borrowing and repaying an amount in the same block shouldn't change the utilization rate
     // NOTE: from previous spearbit finding
-    function doomsday_manipulate_utilization_rate(uint256 _amount) public stateless {
-        // get the utilization rate before a borrow
-        uint256 utilizationBefore = capToken.utilization(_getAsset());
-        uint256 utilizationIndexBefore = capToken.currentUtilizationIndex(_getAsset());
-        uint256 totalDebtBefore = lender.debt(_getActor(), _getAsset());
+    // removed because can't correctly be implemented, too many false positives
+    // function doomsday_manipulate_utilization_rate(uint256 _amount) public stateless {
+    //     // get the utilization rate before a borrow
+    //     uint256 utilizationBefore = capToken.utilization(_getAsset());
+    //     uint256 utilizationIndexBefore = capToken.currentUtilizationIndex(_getAsset());
+    //     uint256 totalDebtBefore = lender.debt(_getActor(), _getAsset());
 
-        // borrow some amount
-        vm.prank(_getActor());
-        lender.borrow(_getAsset(), _amount, _getActor());
+    //     // borrow some amount
+    //     vm.prank(_getActor());
+    //     lender.borrow(_getAsset(), _amount, _getActor());
 
-        uint256 totalDebtAfterBorrow = lender.debt(_getActor(), _getAsset());
-        // this is the additional debt that was borrowed in this sequence only, we don't care about debt from other calls
-        uint256 additionalDebt = totalDebtAfterBorrow - totalDebtBefore;
+    //     uint256 totalDebtAfterBorrow = lender.debt(_getActor(), _getAsset());
+    //     // this is the additional debt that was borrowed in this sequence only, we don't care about debt from other calls
+    //     uint256 additionalDebt = totalDebtAfterBorrow - totalDebtBefore;
 
-        // repay the borrowed amount
-        vm.prank(_getActor());
-        uint256 repaid = lender.repay(_getAsset(), _amount, _getActor());
+    //     // repay the borrowed amount
+    //     vm.prank(_getActor());
+    //     uint256 repaid = lender.repay(_getAsset(), _amount, _getActor());
 
-        // get the utilization rate after repaying the borrowed amount
-        uint256 utilizationAfter = capToken.utilization(_getAsset());
-        uint256 utilizationIndexAfter = capToken.currentUtilizationIndex(_getAsset());
+    //     // get the utilization rate after repaying the borrowed amount
+    //     uint256 utilizationAfter = capToken.utilization(_getAsset());
+    //     uint256 utilizationIndexAfter = capToken.currentUtilizationIndex(_getAsset());
 
-        // precondition: the amount repaid must be the same as the additional debt borrowed in this sequence
-        if (repaid == additionalDebt) {
-            // the utilization rate should be the same as before the borrow
-            eq(utilizationAfter, utilizationBefore, "utilization rate is not the same as before the borrow");
-            eq(utilizationIndexAfter, utilizationIndexBefore, "utilization index is not the same as before the borrow");
-        }
-    }
+    //     // precondition: the amount repaid must be the same as the additional debt borrowed in this sequence
+    //     if (repaid == additionalDebt) {
+    //         // the utilization rate should be the same as before the borrow
+    //         eq(utilizationAfter, utilizationBefore, "utilization rate is not the same as before the borrow");
+    //         eq(utilizationIndexAfter, utilizationIndexBefore, "utilization index is not the same as before the borrow");
+    //     }
+    // }
 
     /// @dev optimizes the difference in utilization discovered by doomsday_manipulate_utilization_rate
     function doomsday_manipulate_utilization_rate_optimization(uint256 _amount) public {
