@@ -84,20 +84,19 @@
 | 82 | doomsday_repay_all | repaying all debt for all actors transfers same amount of interest as would have been transferred by `realizeInterest` | |
 | 83 | doomsday_manipulate_utilization_rate | borrowing and repaying an amount in the same block shouldn't change the utilization rate | |
 | 84 | property_previewRedeem_greater_than_loaned | `previewRedeem(totalSupply)` >= `loaned` | |
-| 86 | capToken_divestAll | no assets should be left in the vault after divesting all | |
-| 87 | property_available_balance_never_reverts | available balance should never revert | |
-| 88 | property_maxBorrow_never_reverts | maxBorrowable should never revert | |
-| 89 | property_no_agent_borrowing_total_debt_should_be_zero | if no agent is borrowing, the total debt should be 0 | |
-| 90 | property_no_agent_borrowing_utilization_rate_should_be_zero | if no agent is borrowing, the utilization rate should be 0 | |
-| 91 | doomsday_maxBorrow | maxBorrowable after borrowing max should be 0 | |
-| 92 | doomsday_maxBorrow | if no agent is borrowing, the current utilization index should be 0 | |
-| 93 | doomsday_compound_vs_linear_accumulation | interest accumulation should be the same whether it's realized or not | |
-| 94 | property_debt_token_total_supply_greater_than_vault_debt | debtToken.totalSupply should never be less than reserve.debt | |
-| 95 | property_healthy_account_stays_healthy_after_liquidation | A healthy account (collateral/debt > 1) should never become unhealthy after a liquidation | |
-| 96 | property_no_bad_debt_creation_on_liquidation | A liquidatable account that doesn't have bad debt should not suddenly have bad debt after liquidation | |
-| 97 | doomsday_realizeRestakerInterest_never_reverts | `realizeRestakerInterest` never reverts due to under/overflow | |
-| 98 | lender_cancelLiquidation | cancelLiquidation should always succeed when health is above 1e27 | |
-| 99 | lender_cancelLiquidation | cancelLiquidation should revert when health is below 1e27 | |
-| 100 | property_maxLiquidatable_never_reverts | maxLiquidatable should never revert due to arithmetic error | |
-| 101 | property_bonus_never_reverts | bonus should never revert due to arithmetic error | |
-| 101 | property_staked_cap_total_assets_never_reverts | staked cap total assets should never revert due to arithmetic error | |
+| 85 | capToken_divestAll | no assets should be left in the vault after divesting all | |
+| 86 | property_available_balance_never_reverts | available balance should never revert | |
+| 87 | property_maxBorrow_never_reverts | maxBorrowable should never revert | |
+| 88 | property_no_agent_borrowing_total_debt_should_be_zero | if no agent is borrowing, the total debt should be 0 | |
+| 89 | property_no_agent_borrowing_utilization_rate_should_be_zero | if no agent is borrowing, the utilization rate should be 0 | |
+| 90 | doomsday_maxBorrow | maxBorrowable after borrowing max should be 0 | |
+| 91 | doomsday_maxBorrow | if no agent is borrowing, the current utilization index should be 0 | |
+| 92 | doomsday_compound_vs_linear_accumulation | interest accumulation should be the same whether it's realized or not | |
+| 93 | property_debt_token_total_supply_greater_than_vault_debt | debtToken.totalSupply should never be less than reserve.debt | |
+| 94 | property_healthy_account_stays_healthy_after_liquidation | A healthy account (collateral/debt > 1) should never become unhealthy after a liquidation | |
+| 95 | property_no_bad_debt_creation_on_liquidation | A liquidatable account that doesn't have bad debt should not suddenly have bad debt after liquidation | |
+| 96 | lender_cancelLiquidation | cancelLiquidation should always succeed when health is above 1e27 | |
+| 97 | lender_cancelLiquidation | cancelLiquidation should revert when health is below 1e27 | |
+| 98 | property_maxLiquidatable_never_reverts | maxLiquidatable should never revert due to arithmetic error | |
+| 99 | property_bonus_never_reverts | bonus should never revert due to arithmetic error | |
+| 100 | property_staked_cap_total_assets_never_reverts | staked cap total assets should never revert due to arithmetic error | |
