@@ -123,7 +123,7 @@ contract LenderLiquidateTest is TestDeployer {
         vm.startPrank(env.testUsers.liquidator);
 
         vm.expectRevert();
-        lender.initiateLiquidation(user_agent);
+        lender.openLiquidation(user_agent);
 
         vm.stopPrank();
 
@@ -145,7 +145,7 @@ contract LenderLiquidateTest is TestDeployer {
             DebtToken debtToken = DebtToken(usdVault.debtTokens[assetIndex]);
 
             // start the first liquidation
-            lender.initiateLiquidation(user_agent);
+            lender.openLiquidation(user_agent);
             uint256 gracePeriod = lender.grace();
 
             console.log("Starting Liquidations");
@@ -272,7 +272,7 @@ contract LenderLiquidateTest is TestDeployer {
             deal(address(usdc), env.testUsers.liquidator, 3000e6);
 
             // start the first liquidation
-            lender.initiateLiquidation(user_agent);
+            lender.openLiquidation(user_agent);
             uint256 gracePeriod = lender.grace();
             uint256 expiry = lender.expiry();
 
@@ -293,7 +293,7 @@ contract LenderLiquidateTest is TestDeployer {
             vm.expectRevert(ValidationLogic.LiquidationExpired.selector);
             lender.liquidate(user_agent, address(usdc), 1000e6);
 
-            lender.initiateLiquidation(user_agent);
+            lender.openLiquidation(user_agent);
 
             _timeTravel(gracePeriod + 1);
 
@@ -311,7 +311,7 @@ contract LenderLiquidateTest is TestDeployer {
 
             vm.startPrank(env.testUsers.liquidator);
 
-            lender.initiateLiquidation(user_agent);
+            lender.openLiquidation(user_agent);
             lender.liquidate(user_agent, address(usdc), 1000e6);
 
             console.log("Liquidator usdt balance after third liquidation", usdt.balanceOf(env.testUsers.liquidator));
@@ -373,7 +373,7 @@ contract LenderLiquidateTest is TestDeployer {
             deal(address(usdc), env.testUsers.liquidator, 3200e6);
 
             // start the first liquidation
-            lender.initiateLiquidation(user_agent);
+            lender.openLiquidation(user_agent);
             uint256 gracePeriod = lender.grace();
 
             console.log("Starting Liquidations");

@@ -18,8 +18,8 @@ library ValidationLogic {
     /// @dev Health factor lower than liquidation threshold
     error HealthFactorLowerThanLiquidationThreshold(uint256 health);
 
-    /// @dev Already initiated
-    error AlreadyInitiated();
+    /// @dev Liquidation window already opened
+    error LiquidationAlreadyOpened();
 
     /// @dev Grace period not over
     error GracePeriodNotOver();
@@ -67,14 +67,14 @@ library ValidationLogic {
         }
     }
 
-    /// @notice Validate the initialization of the liquidation of an agent
+    /// @notice Validate the opening of the liquidation window of an agent
     /// @dev Health of above 1e27 is healthy, below is liquidatable
     /// @param health Health of an agent's position
     /// @param start Last liquidation start time
     /// @param expiry Liquidation duration after which it expires
-    function validateInitiateLiquidation(uint256 health, uint256 start, uint256 expiry) external view {
+    function validateOpenLiquidation(uint256 health, uint256 start, uint256 expiry) external view {
         if (health >= 1e27) revert HealthFactorNotBelowThreshold();
-        if (block.timestamp <= start + expiry) revert AlreadyInitiated();
+        if (block.timestamp <= start + expiry) revert LiquidationAlreadyOpened();
     }
 
     /// @notice Validate the liquidation of an agent
@@ -127,10 +127,10 @@ library ValidationLogic {
         if ($.reservesData[_asset].vault == address(0)) revert AssetNotListed();
     }
 
-    /// @notice Validate the cancellation of the liquidation of an agent
+    /// @notice Validate the closing of the liquidation window of an agent
     /// @dev Health of above 1e27 is healthy, below is liquidatable
     /// @param health Health of an agent's position
-    function validateCancelLiquidation(uint256 health) external pure {
+    function validateCloseLiquidation(uint256 health) external pure {
         if (health < 1e27) revert HealthFactorLowerThanLiquidationThreshold(health);
     }
 }

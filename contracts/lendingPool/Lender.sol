@@ -84,13 +84,13 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     }
 
     /// @inheritdoc ILender
-    function initiateLiquidation(address _agent) external {
-        LiquidationLogic.initiateLiquidation(getLenderStorage(), _agent);
+    function openLiquidation(address _agent) external {
+        LiquidationLogic.openLiquidation(getLenderStorage(), _agent);
     }
 
     /// @inheritdoc ILender
-    function cancelLiquidation(address _agent) external {
-        LiquidationLogic.cancelLiquidation(getLenderStorage(), _agent);
+    function closeLiquidation(address _agent) external {
+        LiquidationLogic.closeLiquidation(getLenderStorage(), _agent);
     }
 
     /// @inheritdoc ILender

@@ -13,11 +13,11 @@ import { ViewLogic } from "./ViewLogic.sol";
 /// @author kexley, Cap Labs
 /// @notice Liquidate an agent that has an unhealthy ltv by slashing their delegation backing
 library LiquidationLogic {
-    /// @notice A liquidation has been initiated against an agent
-    event InitiateLiquidation(address agent);
+    /// @notice A liquidation window has been opened against an agent
+    event OpenLiquidation(address agent);
 
-    /// @notice A liquidation has been cancelled
-    event CancelLiquidation(address agent);
+    /// @notice A liquidation window has been closed
+    event CloseLiquidation(address agent);
 
     /// @notice An agent has been liquidated
     event Liquidate(address indexed agent, address indexed liquidator, address asset, uint256 amount, uint256 value);
@@ -25,36 +25,34 @@ library LiquidationLogic {
     /// @dev Zero address not valid
     error ZeroAddressNotValid();
 
-    /// @notice Initiate the liquidation of an agent if unhealthy
+    /// @notice Open the liquidation window of an agent if unhealthy
     /// @param $ Lender storage
     /// @param _agent Agent address
-    function initiateLiquidation(ILender.LenderStorage storage $, address _agent) external {
+    function openLiquidation(ILender.LenderStorage storage $, address _agent) external {
         if (_agent == address(0)) revert ZeroAddressNotValid();
         (,,,,, uint256 health) = ViewLogic.agent($, _agent);
 
-        ValidationLogic.validateInitiateLiquidation(health, $.liquidationStart[_agent], $.expiry);
+        ValidationLogic.validateOpenLiquidation(health, $.liquidationStart[_agent], $.expiry);
 
         $.liquidationStart[_agent] = block.timestamp;
 
-        emit InitiateLiquidation(_agent);
+        emit OpenLiquidation(_agent);
     }
 
-    /// @notice Cancel the liquidation of an agent if healthy
+    /// @notice Close the liquidation window of an agent if healthy
     /// @param $ Lender storage
     /// @param _agent Agent address
-    function cancelLiquidation(ILender.LenderStorage storage $, address _agent) external {
+    function closeLiquidation(ILender.LenderStorage storage $, address _agent) external {
         if (_agent == address(0)) revert ZeroAddressNotValid();
         (,,,,, uint256 health) = ViewLogic.agent($, _agent);
 
-        ValidationLogic.validateCancelLiquidation(health);
+        ValidationLogic.validateCloseLiquidation(health);
 
-        $.liquidationStart[_agent] = 0;
-
-        emit CancelLiquidation(_agent);
+        _closeLiquidation($, _agent);
     }
 
     /// @notice Liquidate an agent when their health is below 1
-    /// @dev Liquidation must be initiated first and the grace period must have passed. Liquidation
+    /// @dev Liquidation must be opened first and the grace period must have passed. Liquidation
     /// bonus linearly increases, once grace period has ended, up to the cap at expiry.
     /// All health factors, LTV ratios, and thresholds are in ray (1e27)
     /// @param $ Lender storage
@@ -85,6 +83,9 @@ library LiquidationLogic {
             ILender.RepayParams({ agent: params.agent, asset: params.asset, amount: liquidated, caller: params.caller })
         );
 
+        (,,,,, health) = ViewLogic.agent($, params.agent);
+        if (health >= 1e27) _closeLiquidation($, params.agent);
+
         liquidatedValue =
             (liquidated + (liquidated * bonus / 1e27)) * assetPrice / (10 ** $.reservesData[params.asset].decimals);
         if (totalSlashableCollateral < liquidatedValue) liquidatedValue = totalSlashableCollateral;
@@ -92,5 +93,13 @@ library LiquidationLogic {
         if (liquidatedValue > 0) IDelegation($.delegation).slash(params.agent, params.caller, liquidatedValue);
 
         emit Liquidate(params.agent, params.caller, params.asset, liquidated, liquidatedValue);
+    }
+
+    /// @dev Cancel further liquidations with no checks
+    /// @param $ Lender storage
+    /// @param _agent Agent address
+    function _closeLiquidation(ILender.LenderStorage storage $, address _agent) internal {
+        $.liquidationStart[_agent] = 0;
+        emit CloseLiquidation(_agent);
     }
 }

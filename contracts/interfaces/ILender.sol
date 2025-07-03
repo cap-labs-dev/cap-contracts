@@ -178,13 +178,13 @@ interface ILender {
     /// @return actualRealized Actual amount realized
     function realizeRestakerInterest(address _agent, address _asset) external returns (uint256 actualRealized);
 
-    /// @notice Initiate liquidation of an agent when the health is below 1
+    /// @notice Open liquidation window of an agent when the health is below 1
     /// @param _agent Agent address
-    function initiateLiquidation(address _agent) external;
+    function openLiquidation(address _agent) external;
 
-    /// @notice Cancel liquidation of an agent when the health is above 1
+    /// @notice Close liquidation window of an agent when the health is above 1
     /// @param _agent Agent address
-    function cancelLiquidation(address _agent) external;
+    function closeLiquidation(address _agent) external;
 
     /// @notice Liquidate an agent when the health is below 1
     /// @param _agent Agent address

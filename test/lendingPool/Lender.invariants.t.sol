@@ -442,14 +442,14 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
             uint256 canLiquidateFrom = liquidationStart + lender.grace();
             uint256 canLiquidateUntil = canLiquidateFrom + lender.expiry();
             if (liquidationStart == 0) {
-                lender.initiateLiquidation(agent);
+                lender.openLiquidation(agent);
                 _timeTravel(lender.grace() + 1);
             } else if (block.timestamp <= canLiquidateFrom) {
                 _timeTravel(canLiquidateFrom - block.timestamp);
             } else if (block.timestamp >= canLiquidateUntil) {
-                // lender.cancelLiquidation(agent);
+                // lender.closeLiquidation(agent);
                 //  _timeTravel(1);
-                lender.initiateLiquidation(agent);
+                lender.openLiquidation(agent);
                 _timeTravel(lender.grace() + 1);
             }
 
@@ -505,16 +505,16 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         lender.realizeRestakerInterest(agent, currentAsset);
     }
 
-    function cancelLiquidation(uint256 agentSeed) external {
+    function closeLiquidation(uint256 agentSeed) external {
         address agent = randomActor(agentSeed);
 
-        // Only attempt to cancel if there's an active liquidation
+        // Only attempt to close if there's an active liquidation
         if (lender.liquidationStart(agent) > 0) {
             (,,,,, uint256 health) = lender.agent(agent);
-            // Only cancel if health is above 1e27 (healthy)
+            // Only close if health is above 1e27 (healthy)
             if (health >= 1e27) {
                 vm.prank(address(env.users.lender_admin));
-                lender.cancelLiquidation(agent);
+                lender.closeLiquidation(agent);
                 vm.stopPrank();
             }
         }

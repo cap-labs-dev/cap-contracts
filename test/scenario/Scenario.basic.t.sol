@@ -406,17 +406,17 @@ contract ScenarioBasicTest is TestDeployer {
             vm.startPrank(env.testUsers.liquidator);
             deal(address(usdc), env.testUsers.liquidator, 4000e6);
             usdc.approve(address(lender), 4000e6);
-            lender.initiateLiquidation(user_agent);
+            lender.openLiquidation(user_agent);
 
             vm.expectRevert();
-            lender.cancelLiquidation(user_agent);
+            lender.closeLiquidation(user_agent);
 
             vm.expectRevert();
-            lender.initiateLiquidation(user_agent);
+            lender.openLiquidation(user_agent);
             _timeTravel(lender.grace() + 1);
             lender.liquidate(user_agent, address(usdc), 4000e6);
 
-            lender.cancelLiquidation(user_agent);
+            lender.closeLiquidation(user_agent);
             vm.stopPrank();
 
             (totalDelegation,, totalDebt, ltv, liquidationThreshold, health) = lender.agent(user_agent);
