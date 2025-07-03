@@ -14,6 +14,7 @@ interface IVault {
     /// @param utilizationIndex Utilization index of an asset
     /// @param lastUpdate Last update time of an asset
     /// @param paused Pause state of an asset
+    /// @param insuranceFund Insurance fund address
     struct VaultStorage {
         EnumerableSet.AddressSet assets;
         mapping(address => uint256) totalSupplies;
