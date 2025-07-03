@@ -383,8 +383,10 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         if (currentAsset == address(0)) return;
 
         uint256 availableToBorrow = lender.maxBorrowable(agent, currentAsset);
-        uint256 amount = bound(amountSeed, 0, availableToBorrow);
-        if (amount < 100e6) return;
+        (,,,,,, uint256 minBorrow) = lender.reservesData(currentAsset);
+        if (availableToBorrow < minBorrow) return;
+        uint256 amount = bound(amountSeed, minBorrow, availableToBorrow);
+        if (amount == 0) return;
 
         vm.startPrank(agent);
         lender.borrow(currentAsset, amount, agent);
@@ -398,7 +400,11 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         // Bound amount to actual borrowed amount
         uint256 debt = lender.debt(agent, currentAsset);
         uint256 amount = bound(amountSeed, 0, debt);
-        if (amount < 100) return;
+
+        // If the debt is less than the minimum borrow, the full debt must be repaid
+        (,,,,,, uint256 minBorrow) = lender.reservesData(currentAsset);
+        if (debt < minBorrow) amount = debt;
+        if (amount == 0) return;
 
         // Mint tokens to repay
         MockERC20(currentAsset).mint(agent, amount);

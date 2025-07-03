@@ -504,6 +504,9 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         uint256 burnKinkRatio = bound(burnKinkRatioSeed, 0.0000000000001e27, 0.9999999999999e27);
         uint256 optimalRatio = bound(optimalRatioSeed, 0.0000000000001e27, 0.9999999999999e27);
 
+        // Ensure optimalRatio is not equal to mintKinkRatio or burnKinkRatio
+        if (optimalRatio == mintKinkRatio || optimalRatio == burnKinkRatio) optimalRatio += 1;
+
         vault.setFeeData(
             currentAsset,
             IMinter.FeeData({
