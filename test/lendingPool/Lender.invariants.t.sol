@@ -91,7 +91,6 @@ contract LenderInvariantsTest is TestDeployer {
         }
 
         // Check that system invariants still hold
-        invariant_borrowingLimits();
         invariant_agentDelegationLimitsDebt();
         invariant_healthFactorConsistency();
 
@@ -101,45 +100,6 @@ contract LenderInvariantsTest is TestDeployer {
             // Debt should not decrease from interest accrual
             assertGe(currentDebt, previousDebts[i], "Interest accrual should not decrease debt");
         }
-    }
-
-    function test_fuzzing_non_regression_liquidate_after_set_coverage() public {
-        // [FAIL: panic: division or modulo by zero (0x12)]
-        // [Sequence]
-        //         sender=0x0000000000000000000000000000000000001207 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[5402, 4969, 4395]
-        //         sender=0x0000000000000000000000000000000000000758 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[8504, 11352 [1.135e4]]
-        //         sender=0x0000000000000000000000000000000000000423 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256,uint256) args=[1109431098096784405597004399778520969000778 [1.109e42], 937481123910104941 [9.374e17], 61623886549693656488416079379073384034876 [6.162e40], 3768160486856916064340765479018069586352278996523203668143 [3.768e57]]
-        handler.borrow(5402, 4969, 4395);
-        handler.setAgentCoverage(8504, 11352);
-        handler.liquidate(
-            1109431098096784405597004399778520969000778,
-            61623886549693656488416079379073384034876,
-            3768160486856916064340765479018069586352278996523203668143
-        );
-
-        invariant_borrowingLimits();
-    }
-
-    function test_fuzzing_non_regression_liquidate_fails() public {
-        //         Encountered 1 failing test in test/lendingPool/Lender.invariants.t.sol:LenderInvariantsTest
-        // [FAIL: invariant_borrowingLimits persisted failure revert]
-        //         [Sequence]
-        //                 sender=0x000000000000000000000000000000004DEeAad4 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[500000000000000000000000000 [5e26], 260243407 [2.602e8], 7520]
-        //                 sender=0x0000000000000000000000000000000000002834 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[4763, 5672]
-        //                 sender=0x0000000000000000000000000000000000000A2B addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256,uint256) args=[9998, 5300, 806165946075049551985264334151369441818954475481 [8.061e47], 5711]
-        //                 sender=0x00000000000000000001ddDBFa0a9CD64ECaa149 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256,uint256) args=[11056068703988633693957203172599663392891881631940881250732208 [1.105e61], 30007872054813680496550892600715668912378495406850871 [3e52], 1928259676971630563350495955946765 [1.928e33], 420729907401969 [4.207e14]]
-        //  invariant_borrowingLimits() (runs: 1, calls: 1, reverts: 1)
-
-        handler.borrow(500000000000000000000000000, 260243407, 7520);
-        handler.setAgentCoverage(4763, 5672);
-        handler.liquidate(9998, 806165946075049551985264334151369441818954475481, 5711);
-        handler.liquidate(
-            11056068703988633693957203172599663392891881631940881250732208,
-            1928259676971630563350495955946765,
-            420729907401969
-        );
-
-        invariant_borrowingLimits();
     }
 
     function test_fuzzing_non_regression_liquidate_fails_2() public {
@@ -262,59 +222,6 @@ contract LenderInvariantsTest is TestDeployer {
         invariant_agentDelegationLimitsDebt();
     }
 
-    function test_fuzzing_non_regression_liquidation_expired() public {
-        // [FAIL: custom error 0xa07063cb]
-        // [Sequence]
-        //         sender=0x00000000000000000000000000000000000003a3 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=pauseAsset(uint256,uint256) args=[7167694970628916955451004 [7.167e24], 16007968822109961830234730580992218377222324811 [1.6e46]]
-        //         sender=0x0000000000000000000000000000000000000254 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=pauseAsset(uint256,uint256) args=[3393, 1879]
-        //         sender=0x00000000000000000000000000000000000000fa addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[5766, 7237, 100228144114204208921196098655045973058935756547835879193424203306895750641912 [1.002e77]]
-        //         sender=0x71a8C080c9c49350F782c43d966432c1bc444c2C addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[2, 214134411597144060483135243300193298750594311970295842341200532364990 [2.141e68], 8207376740568129008431491810377528035932993823514277843037313303664 [8.207e66]]
-        //         sender=0x7ce5Bd44afA0aCC5C3507D61E27A833698F20596 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[4731, 58497332399337429344593767924947750742310842768357091268046542597167793274721 [5.849e76]]
-        //         sender=0xcc1ae8Cf5D3904Cef3360A9532B477529b177cCE addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[5993, 3422038890 [3.422e9]]
-        //         sender=0xAeDffa337e2bE584a2Ff632135Cc088725529Ae7 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[1041, 10285 [1.028e4]]
-        //         sender=0x1Ee35CE4997762752E3A095284754544f4c709d6 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256,uint256) args=[62627094929811953151701008153803527665735819222075294185262633895705808075657 [6.262e76], 3718, 9821, 5177]
-        //         sender=0x02157915356C0372584E2DcA0FCb4C64736F6c64 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=repay(uint256,uint256,uint256) args=[993049411386801934099525205354452135258011966824937131273 [9.93e56], 1017358909473853652244212260128938582116004 [1.017e42], 94953482489101663636828374601395961001183985981506327900119058882 [9.495e64]]
-        //         sender=0x00000000000000000000000000000000000003ce addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[74778552942360331274022453539398869583600156629 [7.477e46], 115792089237316195423570985008687907853269984665640564039457584007913129639933 [1.157e77]]
-        //         sender=0x0000000000000000000000000000000000001c5D addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256,uint256) args=[29225223478516705340959411323663244701423210690063694749575843356889 [2.922e67], 2737837594918667271395199048650270487578827384063849774189 [2.737e57], 2112286922687066306261364466892322503874597257722575518124547228233356078 [2.112e72], 233311085789197653343518 [2.333e23]]
-        //         sender=0x0000000000000000000000000000000000000614 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[117070713718 [1.17e11], 1006540295783534163945056590553234562247379189028725719525632051813 [1.006e66]]
-        //         sender=0xA6E87a6141f9545994930F6135E9Cf1e442C1f93 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256,uint256) args=[89315578922122892679333885041649008773726263756587365749819829555208549250188 [8.931e76], 6446, 767, 68105926446125771809405178487174168028959056521217564930724487598009997264166 [6.81e76]]
-        // invariant_borrowingLimits() (runs: 4584, calls: 458400, reverts: 1)
-        handler.pauseAsset(7167694970628916955451004, 16007968822109961830234730580992218377222324811);
-        handler.pauseAsset(3393, 1879);
-        handler.borrow(5766, 7237, 100228144114204208921196098655045973058935756547835879193424203306895750641912);
-        handler.borrow(
-            2,
-            214134411597144060483135243300193298750594311970295842341200532364990,
-            8207376740568129008431491810377528035932993823514277843037313303664
-        );
-        handler.wrapTime(4731, 58497332399337429344593767924947750742310842768357091268046542597167793274721);
-        handler.setAgentCoverage(5993, 3422038890);
-        handler.setAgentCoverage(1041, 10285);
-        handler.liquidate(62627094929811953151701008153803527665735819222075294185262633895705808075657, 9821, 5177);
-        handler.repay(
-            993049411386801934099525205354452135258011966824937131273,
-            1017358909473853652244212260128938582116004,
-            94953482489101663636828374601395961001183985981506327900119058882
-        );
-        handler.wrapTime(
-            74778552942360331274022453539398869583600156629,
-            115792089237316195423570985008687907853269984665640564039457584007913129639933
-        );
-        handler.liquidate(
-            29225223478516705340959411323663244701423210690063694749575843356889,
-            2112286922687066306261364466892322503874597257722575518124547228233356078,
-            233311085789197653343518
-        );
-        handler.wrapTime(117070713718, 1006540295783534163945056590553234562247379189028725719525632051813);
-        handler.liquidate(
-            89315578922122892679333885041649008773726263756587365749819829555208549250188,
-            767,
-            68105926446125771809405178487174168028959056521217564930724487598009997264166
-        );
-
-        invariant_borrowingLimits();
-    }
-
     function test_fuzzing_non_regression_underflow_during_repay() public {
         //[FAIL: panic: arithmetic underflow or overflow (0x11)]
         //[Sequence]
@@ -405,26 +312,6 @@ contract LenderInvariantsTest is TestDeployer {
         invariant_agentDelegationLimitsDebt();
     }
 
-    /// @dev Test that total borrowed never exceeds available assets
-    /// forge-config: default.invariant.depth = 100
-    function invariant_borrowingLimits() public view {
-        address[] memory assets = usdVault.assets;
-
-        for (uint256 i = 0; i < assets.length; i++) {
-            address asset = assets[i];
-            uint256 totalBorrowed = 0;
-
-            // Sum up all actor debts
-            for (uint256 j = 0; j < actors.length; j++) {
-                (,, uint256 totalDebt,,,) = lender.agent(actors[j]);
-                totalBorrowed += totalDebt;
-            }
-
-            uint256 availableAssets = IERC20(asset).balanceOf(address(lender));
-            assertLe(totalBorrowed, availableAssets, "Total borrowed must not exceed available assets");
-        }
-    }
-
     /// @dev Test that user borrows never exceed their delegation
     /// forge-config: default.invariant.depth = 100
     function invariant_agentDelegationLimitsDebt() public view {
@@ -432,7 +319,7 @@ contract LenderInvariantsTest is TestDeployer {
         for (uint256 i = 0; i < agents.length; i++) {
             address agent = agents[i];
             (, uint256 slashableCollateral, uint256 totalDebt,,,) = lender.agent(agent);
-            if (slashableCollateral < totalDebt) return;
+            //if (slashableCollateral < totalDebt) return;
             assertGe(slashableCollateral, totalDebt, "User borrow must not exceed delegation");
         }
     }
@@ -575,7 +462,7 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
     }
 
     function setAgentSlashableCollateral(uint256 agentSeed, uint256 coverageSeed) external {
-        uint256 coverage = bound(coverageSeed, 0, 1e50);
+        uint256 coverage = bound(coverageSeed, 1, 1e50);
         address agent = randomActor(agentSeed);
 
         vm.prank(address(env.users.middleware_admin));

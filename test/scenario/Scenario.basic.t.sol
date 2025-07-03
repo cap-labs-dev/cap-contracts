@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
 
+import { IFeeReceiver } from "../../contracts/interfaces/IFeeReceiver.sol";
 import { IMinter } from "../../contracts/interfaces/IMinter.sol";
 import { IOracle } from "../../contracts/interfaces/IOracle.sol";
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
@@ -232,7 +233,7 @@ contract ScenarioBasicTest is TestDeployer {
             console.log("USDT balance of fee auction after buy", usdt_balance_after);
             console.log("cUSD balance of scUSD after buy", cUSD_balance_after);
 
-            scUSD.notify();
+            IFeeReceiver(env.usdVault.feeReceiver).distribute();
 
             console.log("Mev Bot's cUSD balance", cUSD.balanceOf(mev_bot));
             console.log("");
