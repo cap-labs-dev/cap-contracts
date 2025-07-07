@@ -49,6 +49,52 @@ contract LenderInvariantsTest is TestDeployer {
         vm.label(address(handler), "TestLenderHandler");
     }
 
+    function test_invariant_healthFactorConsistency_3() public {
+        /*[FAIL: invariant_healthFactorConsistency persisted failure revert]
+        [Sequence]
+                sender=0x00000000000000000000000000000000000009Da addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAssetOracleRate(uint256,uint256) args=[11543029381330672491860383985954805972857686344712689296545235 [1.154e61], 325150168437051263664132560797815973754326 [3.251e41]]
+                sender=0x00000000000000000000000000000000000039b1 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[30918474852994773316386233195 [3.091e28], 79769887225082621 [7.976e16]]
+                sender=0x000000000000000000000000000000006d4323a7 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[316122570517139326285190027269277357516886533069313938767621115840994 [3.161e68], 578845444545825921461613987212546383137608282288362114516139 [5.788e59], 17223189691 [1.722e10]]
+                sender=0x00000000000000000000000000000000000006C0 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[36973630434612940363545929218560651730622542486 [3.697e46], 2770920719821542088301911 [2.77e24]]
+                sender=0x000000000000000000000000000000000000261F addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[9045, 6404, 2140749424911443484501831106226770863824773013519896166431072913388269304815 [2.14e75]]
+                sender=0x6869Dfc68B096cbb4F34e174160ec52d38A19036 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[3782488891584455175432 [3.782e21], 1295581938205204099 [1.295e18]]
+                sender=0x00000000000000000000000000000000aEd2de9A addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[2169, 10024 [1.002e4]]
+                sender=0x00000000000000000000000000000000000004DF addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256) args=[58576265760596734945125070288970029512249135556046156107638 [5.857e58], 974801935338640506149480721317387285224631 [9.748e41], 115792089237316195423570985008687907853269984665640564039457584007913129639932 [1.157e77]]
+                sender=0x000000000000000000000000000000000000055F addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[82766052856927348954575688908830677982982928473109927503747768783016399837700 [8.276e76], 146729278930465342418334409999797869285940633234534 [1.467e50]]
+                sender=0x0000000000000000000000000000000000001790 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[163761943310006 [1.637e14], 827300394997468839928732996009111100818690293611814564984725 [8.273e59]]
+                sender=0xC2c1eC977F352B38b239c2eAaAAE194475024a83 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[10794383656069401322750723554756440261350332530727988235331024518065961345 [1.079e73], 9463830818159174000883846500573624111810028767009668635094261167107872095143 [9.463e75], 3]
+                sender=0x0000000000000000000000000000000000000173 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=repay(uint256,uint256,uint256) args=[31658 [3.165e4], 10217 [1.021e4], 2243]
+    invariant_healthFactorConsistency() (runs: 1, calls: 1, reverts: 1)*/
+        handler.setAssetOracleRate(
+            11543029381330672491860383985954805972857686344712689296545235, 325150168437051263664132560797815973754326
+        );
+        handler.wrapTime(30918474852994773316386233195, 79769887225082621);
+        handler.borrow(
+            316122570517139326285190027269277357516886533069313938767621115840994,
+            578845444545825921461613987212546383137608282288362114516139,
+            17223189691
+        );
+        handler.wrapTime(36973630434612940363545929218560651730622542486, 2770920719821542088301911);
+        handler.borrow(9045, 6404, 2140749424911443484501831106226770863824773013519896166431072913388269304815);
+        handler.setAgentCoverage(2169, 10024);
+        handler.liquidate(
+            58576265760596734945125070288970029512249135556046156107638,
+            974801935338640506149480721317387285224631,
+            115792089237316195423570985008687907853269984665640564039457584007913129639932
+        );
+        handler.wrapTime(
+            82766052856927348954575688908830677982982928473109927503747768783016399837700,
+            146729278930465342418334409999797869285940633234534
+        );
+        handler.wrapTime(163761943310006, 827300394997468839928732996009111100818690293611814564984725);
+        handler.borrow(
+            10794383656069401322750723554756440261350332530727988235331024518065961345,
+            9463830818159174000883846500573624111810028767009668635094261167107872095143,
+            3
+        );
+        handler.repay(31658, 10217, 2243);
+    }
+
     function test_invariant_delegation_limits() public {
         /*[FAIL: custom error 0x2075cc10]
         [Sequence]
@@ -67,20 +113,38 @@ contract LenderInvariantsTest is TestDeployer {
     }
 
     function test_invariant_agentDelegationLimitsDebt() public {
-        /*[FAIL: User borrow must not exceed delegation: 1141073119 < 1180790197300]
+        /*[FAIL: panic: arithmetic underflow or overflow (0x11)]
         [Sequence]
-                sender=0x0000000000000000000000000000000000002101 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=pauseAsset(uint256,uint256) args=[38145254775557791498646176898436841632124653007856760652291599459819267 [3.814e70], 48198435138581416212478657309045362533 [4.819e37]]
-                sender=0x0000000000000000000000000De0b6b3A763fFff addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[4045, 336, 4026]
-                sender=0x0726Be9cBd1FAB72446C9548F05a69204D3AE2Cb addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentSlashableCollateral(uint256,uint256) args=[4111, 1141073119 [1.141e9]]
-    invariant_agentDelegationLimitsDebt() (runs: 0, calls: 0, reverts: 0)*/
-
+                sender=0x0000000000000000000000000000000000d9f97D addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=pauseAsset(uint256,uint256) args=[115792089237316195423570985008687907853269984665640564039457584007913129639935 [1.157e77], 115792089237316195423570985008687907853269984665640564039457584007913129639933 [1.157e77]]
+                sender=0x0000000000000000000000000000000000002A1a addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[3367615319854044571765926111727417771 [3.367e36], 9444931486919565591144104295734349994025385376323998763410490057 [9.444e63], 3]
+                sender=0x0000000000000000000000000000000000001aC2 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[412896394253 [4.128e11], 161187999 [1.611e8]]
+                sender=0x0000000000000000000000000000000000001b41 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[12981501330535789221722834795442533481854771286190016700751667888339011749768 [1.298e76], 2597, 10371 [1.037e4]]
+                sender=0x00000000000000000000000000000000000021E1 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[21549341008237 [2.154e13], 4093175583371070136531 [4.093e21]]
+                sender=0x0000000000000000000000000000000000001F51 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=repay(uint256,uint256,uint256) args=[8749, 3706, 2930315383 [2.93e9]]
+                sender=0x00000000000000000000000000000000000014B1 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentSlashableCollateral(uint256,uint256) args=[843061418262239074063681229637552351985406862799 [8.43e47], 13025 [1.302e4]]
+                sender=0x0000000000000000000000000000000000003949 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[152681814734099437230546156483302637946156730621326868149229 [1.526e59], 156728883172907695715837169300975 [1.567e32]]
+                sender=0x3a89D0a042986FEF12303EC6Ea1A3576e5A96F1c addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256) args=[82345 [8.234e4], 235513213949267880952128946741894106674756 [2.355e41], 126446843 [1.264e8]]
+                sender=0xC0543a8Eb9CA4498BAf812C3002a050D598Dc659 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256) args=[1276824822346 [1.276e12], 509512 [5.095e5], 2555864510627623646387460251659661413 [2.555e36]]
+    invariant_agentDelegationLimitsDebt() (runs: 31, calls: 3100, reverts: 1)*/
         handler.pauseAsset(
-            38145254775557791498646176898436841632124653007856760652291599459819267,
-            48198435138581416212478657309045362533
+            115792089237316195423570985008687907853269984665640564039457584007913129639935,
+            115792089237316195423570985008687907853269984665640564039457584007913129639935
         );
-        handler.borrow(4045, 336, 4026);
-        handler.setAgentSlashableCollateral(4111, 1141073119);
-        //invariant_agentDelegationLimitsDebt();
+        handler.borrow(
+            3367615319854044571765926111727417771, 9444931486919565591144104295734349994025385376323998763410490057, 3
+        );
+        handler.wrapTime(28642, 1357271422759567711789040187190239685);
+        handler.borrow(12981501330535789221722834795442533481854771286190016700751667888339011749768, 2597, 10371);
+        handler.wrapTime(21549341008237, 4093175583371070136531);
+        handler.repay(8749, 3706, 2930315383);
+        handler.setAgentSlashableCollateral(843061418262239074063681229637552351985406862799, 13025);
+        handler.wrapTime(
+            152681814734099437230546156483302637946156730621326868149229, 156728883172907695715837169300975
+        );
+        handler.liquidate(82345, 235513213949267880952128946741894106674756, 126446843);
+        handler.liquidate(1276824822346, 509512, 2555864510627623646387460251659661413);
+
+        invariant_agentDelegationLimitsDebt();
     }
 
     function test_borrow_must_not_exceed_delegation() public {
@@ -503,15 +567,18 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
 
         // Bound amount to actual borrowed amount
         uint256 debt = lender.debt(agent, currentAsset);
+        console.log("debt", debt);
         uint256 amount = bound(amountSeed, 0, debt);
+        console.log("amount", amount);
 
         // If the debt is less than the minimum borrow, the full debt must be repaid
         (,,,,,, uint256 minBorrow) = lender.reservesData(currentAsset);
+        console.log("minBorrow", minBorrow);
 
         (,, address debtToken,,,,) = lender.reservesData(currentAsset);
         uint256 index = DebtToken(debtToken).index();
         if ((index / 1e27) > amount) return;
-        if (debt <= minBorrow) amount = debt;
+        if (debt - amount <= minBorrow) amount = debt;
         if (amount == 0) return;
 
         // Mint tokens to repay
@@ -531,10 +598,10 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         address agent = randomActor(agentSeed);
         address currentAsset = randomAsset(assetSeed);
         address liquidator = makeAddr("liquidator");
+        (,,,,,, uint256 minBorrow) = lender.reservesData(currentAsset);
 
-        // Bound amount to liquidatable amount
         uint256 amount = bound(amountSeed, 0, lender.maxLiquidatable(agent, currentAsset));
-        if (amount < 100) return;
+        if (amount < minBorrow) return;
 
         // Execute liquidation
         {
