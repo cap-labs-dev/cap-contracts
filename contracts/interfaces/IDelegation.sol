@@ -142,10 +142,12 @@ interface IDelegation is IRestakerRewardReceiver {
 
     /// @notice Get the epoch duration
     /// @return duration Epoch duration in seconds
+    /// @dev The duration between epochs. Pretty much the amount of time we have to slash the delegated collateral, if delegation is changed on the symbiotic vault.
     function epochDuration() external view returns (uint256 duration);
 
     /// @notice Get the current epoch
     /// @return currentEpoch Current epoch
+    /// @dev Returns an epoch which we use to fetch the a timestamp in which we had slashable collateral. Will be less than the epoch on the symbiotic vault.
     function epoch() external view returns (uint256 currentEpoch);
 
     /// @notice Get the ltv buffer
