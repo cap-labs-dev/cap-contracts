@@ -12,7 +12,7 @@
         ],
         "capOFTLockbox": "0x0000000000000000000000000000000000000000",
         "capToken": {
-            "address": "0xF79e8E7Ba2dDb5d0a7D98B1F57fCb8A50436E9aA",
+            "address": "0xCCccFf7F858dA3aDB1E2C7fbB5A5B32fA745CCCC",
             "decimals": 18,
             "name": "cap USD",
             "symbol": "cUSD"
@@ -21,18 +21,18 @@
         "debtTokens": [
             {
                 "debtToken": {
-                    "address": "0xe20fbE3467436bd6Dd7096aDf0770A0870bAe567",
+                    "address": "0xfa8C6D0b95d9191B5A1D51C868Da2BDFd6C04Ff9",
                     "decimals": 6,
                     "name": "Debt USD Coin",
                     "symbol": "debtUSDC"
                 }
             }
         ],
-        "feeAuction": "0x019B65850E3ad55939169845551f3D9C512E52Cd",
-        "feeReceiver": "0xfdeb31951781effbd2a0c5eb3f1da4da5c1b29ac",
+        "feeAuction": "0xa1a20aBdc873CF291c22Ce3C8968EC06277324D0",
+        "feeReceiver": "0x0036c7b9b62c53F47c804a5643F0c09f864beF0b",
         "stakedCapOFTLockbox": "0x0000000000000000000000000000000000000000",
         "stakedCapToken": {
-            "address": "0x5349937179F7B7e499FA58C797a27d000156A489",
+            "address": "0x8888F708fB2f12730DcD617aAaB39bAb47488888",
             "decimals": 18,
             "name": "Staked cap USD",
             "symbol": "stcUSD"
