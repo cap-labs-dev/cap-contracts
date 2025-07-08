@@ -30,6 +30,9 @@ interface IFeeAuction {
     /// @dev Set minimum start price
     event SetMinStartPrice(uint256 minStartPrice);
 
+    /// @dev Set payment token
+    event SetPaymentToken(address paymentToken);
+
     /// @dev Set start price
     event SetStartPrice(uint256 startPrice);
 
@@ -38,6 +41,9 @@ interface IFeeAuction {
 
     /// @dev Deadline must be in the future
     error InvalidDeadline();
+
+    /// @dev Payment token must be non-zero address
+    error InvalidPaymentToken();
 
     /// @dev Price must be less than maximum price
     error InvalidPrice();
@@ -97,6 +103,10 @@ interface IFeeAuction {
     /// @notice Set the minimum start price for future auctions
     /// @param _minStartPrice New minimum start price
     function setMinStartPrice(uint256 _minStartPrice) external;
+
+    /// @notice Set the payment token
+    /// @param _paymentToken New payment token
+    function setPaymentToken(address _paymentToken) external;
 
     /// @notice Current price in the payment token, linearly decays toward 0 over time
     /// @return price Current price

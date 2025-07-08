@@ -94,6 +94,14 @@ contract FeeAuction is IFeeAuction, UUPSUpgradeable, Access, FeeAuctionStorageUt
     }
 
     /// @inheritdoc IFeeAuction
+    function setPaymentToken(address _paymentToken) external checkAccess(this.setPaymentToken.selector) {
+        if (_paymentToken == address(0)) revert InvalidPaymentToken();
+        FeeAuctionStorage storage $ = getFeeAuctionStorage();
+        $.paymentToken = _paymentToken;
+        emit SetPaymentToken(_paymentToken);
+    }
+
+    /// @inheritdoc IFeeAuction
     function currentPrice() public view returns (uint256 price) {
         FeeAuctionStorage storage $ = getFeeAuctionStorage();
         uint256 elapsed = block.timestamp - $.startTimestamp;

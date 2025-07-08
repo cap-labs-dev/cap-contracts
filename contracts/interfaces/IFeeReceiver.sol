@@ -20,6 +20,9 @@ interface IFeeReceiver {
         uint256 protocolFeePercentage;
     }
 
+    /// @dev Emitted when the cap token is set
+    event CapTokenSet(address capToken);
+
     /// @dev Emitted when the fees are distributed
     event FeesDistributed(uint256 amount);
 
@@ -31,6 +34,9 @@ interface IFeeReceiver {
 
     /// @dev Emitted when the protocol fee receiver is set
     event ProtocolFeeReceiverSet(address protocolFeeReceiver);
+
+    /// @dev Emitted when the staked cap token is set
+    event StakedCapTokenSet(address stakedCapToken);
 
     /// @dev Invalid protocol fee percentage
     error InvalidProtocolFeePercentage();
@@ -49,6 +55,14 @@ interface IFeeReceiver {
 
     /// @notice Distribute fees to the staked cap token
     function distribute() external;
+
+    /// @notice Set cap token
+    /// @param _capToken Cap token address
+    function setCapToken(address _capToken) external;
+
+    /// @notice Set staked cap token
+    /// @param _stakedCapToken Staked cap token address
+    function setStakedCapToken(address _stakedCapToken) external;
 
     /// @notice Set protocol fee percentage
     /// @param _protocolFeePercentage Protocol fee percentage

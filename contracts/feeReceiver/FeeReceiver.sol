@@ -47,6 +47,22 @@ contract FeeReceiver is IFeeReceiver, UUPSUpgradeable, Access, FeeReceiverStorag
     }
 
     /// @inheritdoc IFeeReceiver
+    function setCapToken(address _capToken) external checkAccess(this.setCapToken.selector) {
+        if (_capToken == address(0)) revert ZeroAddressNotValid();
+        FeeReceiverStorage storage $ = getFeeReceiverStorage();
+        $.capToken = IERC20(_capToken);
+        emit CapTokenSet(_capToken);
+    }
+
+    /// @inheritdoc IFeeReceiver
+    function setStakedCapToken(address _stakedCapToken) external checkAccess(this.setStakedCapToken.selector) {
+        if (_stakedCapToken == address(0)) revert ZeroAddressNotValid();
+        FeeReceiverStorage storage $ = getFeeReceiverStorage();
+        $.stakedCapToken = IStakedCap(_stakedCapToken);
+        emit StakedCapTokenSet(_stakedCapToken);
+    }
+
+    /// @inheritdoc IFeeReceiver
     function setProtocolFeePercentage(uint256 _protocolFeePercentage)
         external
         checkAccess(this.setProtocolFeePercentage.selector)
