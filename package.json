@@ -13,6 +13,7 @@
     "postinstall": "lefthook install && forge remappings > remappings.txt",
     "compile": "forge build",
     "build": "forge build --skip Test",
+    "check-proxy-implem": "forge script script/manage/CheckProxyImplem.s.sol:CheckProxyImplem --via-ir --rpc-url ethereum",
     "check-access": "forge script script/manage/CheckAccess.s.sol:CheckAccess --via-ir --rpc-url ethereum",
     "check-access:save": "yarn --silent check-access > access.txt",
     "test": "forge test",
