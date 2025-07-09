@@ -8,7 +8,10 @@ import { Proxy } from "@openzeppelin/contracts/proxy/Proxy.sol";
 // import { NetworkMiddleware } from "../../contracts/delegation/providers/symbiotic/NetworkMiddleware.sol";
 import { ImplementationsConfig, InfraConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import { VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
-import { SymbioticNetworkAdapterConfig } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
+import {
+    SymbioticNetworkAdapterConfig,
+    SymbioticNetworkAdapterImplementationsConfig
+} from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 import { FeeAuction } from "../../contracts/feeAuction/FeeAuction.sol";
 import { FeeReceiver } from "../../contracts/feeReceiver/FeeReceiver.sol";
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
@@ -39,6 +42,7 @@ contract CheckProxyImplem is Script, InfraConfigSerializer, VaultConfigSerialize
     ImplementationsConfig implems;
     InfraConfig infra;
     VaultConfig vaultConfig;
+    SymbioticNetworkAdapterImplementationsConfig symbioticImplems;
     SymbioticNetworkAdapterConfig symbioticAdapter;
     AccessControl accessControl;
 
@@ -48,6 +52,7 @@ contract CheckProxyImplem is Script, InfraConfigSerializer, VaultConfigSerialize
         (implems,, infra) = _readInfraConfig();
         vaultConfig = _readVaultConfig("cUSD");
         accessControl = AccessControl(infra.accessControl);
+        (symbioticImplems, symbioticAdapter) = _readSymbioticConfig();
 
         namedProxies = [
             NamedProxy({
@@ -62,7 +67,13 @@ contract CheckProxyImplem is Script, InfraConfigSerializer, VaultConfigSerialize
             NamedProxy({ proxy: vaultConfig.capToken, implementation: implems.capToken, name: "Cap Token" }),
             NamedProxy({ proxy: vaultConfig.stakedCapToken, implementation: implems.stakedCap, name: "Staked Cap Token" }),
             NamedProxy({ proxy: vaultConfig.feeAuction, implementation: implems.feeAuction, name: "Fee Auction" }),
-            NamedProxy({ proxy: vaultConfig.feeReceiver, implementation: implems.feeReceiver, name: "Fee Receiver" })
+            NamedProxy({ proxy: vaultConfig.feeReceiver, implementation: implems.feeReceiver, name: "Fee Receiver" }),
+            NamedProxy({
+                proxy: symbioticAdapter.networkMiddleware,
+                implementation: symbioticImplems.networkMiddleware,
+                name: "Network Middleware"
+            }),
+            NamedProxy({ proxy: symbioticAdapter.network, implementation: symbioticImplems.network, name: "Network" })
         ];
 
         for (uint256 i = 0; i < vaultConfig.debtTokens.length; i++) {
