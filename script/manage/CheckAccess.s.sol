@@ -3,8 +3,9 @@ pragma solidity ^0.8.28;
 
 import { AccessControl } from "../../contracts/access/AccessControl.sol";
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
-import { Network } from "../../contracts/delegation/providers/symbiotic/Network.sol";
-import { NetworkMiddleware } from "../../contracts/delegation/providers/symbiotic/NetworkMiddleware.sol";
+import { SymbioticNetwork } from "../../contracts/delegation/providers/symbiotic/SymbioticNetwork.sol";
+import { SymbioticNetworkMiddleware } from
+    "../../contracts/delegation/providers/symbiotic/SymbioticNetworkMiddleware.sol";
 import { InfraConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import { VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import { SymbioticNetworkAdapterConfig } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
@@ -56,13 +57,25 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
         NamedSelector({ selector: Delegation.modifyAgent.selector, name: "Delegation.modifyAgent" }),
         NamedSelector({ selector: Delegation.registerNetwork.selector, name: "Delegation.registerNetwork" }),
         NamedSelector({ selector: Delegation.setLtvBuffer.selector, name: "Delegation.setLtvBuffer" }),
-        NamedSelector({ selector: Network.registerMiddleware.selector, name: "Network.registerMiddleware" }),
-        NamedSelector({ selector: Network.registerVault.selector, name: "Network.registerVault" }),
-        NamedSelector({ selector: NetworkMiddleware.registerAgent.selector, name: "NetworkMiddleware.registerAgent" }),
-        NamedSelector({ selector: NetworkMiddleware.registerVault.selector, name: "NetworkMiddleware.registerVault" }),
-        NamedSelector({ selector: NetworkMiddleware.setFeeAllowed.selector, name: "NetworkMiddleware.setFeeAllowed" }),
-        NamedSelector({ selector: NetworkMiddleware.slash.selector, name: "NetworkMiddleware.slash" }),
-        NamedSelector({ selector: NetworkMiddleware.distributeRewards.selector, name: "NetworkMiddleware.distributeRewards" }),
+        NamedSelector({ selector: SymbioticNetwork.registerMiddleware.selector, name: "Network.registerMiddleware" }),
+        NamedSelector({ selector: SymbioticNetwork.registerVault.selector, name: "Network.registerVault" }),
+        NamedSelector({
+            selector: SymbioticNetworkMiddleware.registerAgent.selector,
+            name: "NetworkMiddleware.registerAgent"
+        }),
+        NamedSelector({
+            selector: SymbioticNetworkMiddleware.registerVault.selector,
+            name: "NetworkMiddleware.registerVault"
+        }),
+        NamedSelector({
+            selector: SymbioticNetworkMiddleware.setFeeAllowed.selector,
+            name: "NetworkMiddleware.setFeeAllowed"
+        }),
+        NamedSelector({ selector: SymbioticNetworkMiddleware.slash.selector, name: "NetworkMiddleware.slash" }),
+        NamedSelector({
+            selector: SymbioticNetworkMiddleware.distributeRewards.selector,
+            name: "NetworkMiddleware.distributeRewards"
+        }),
         NamedSelector({ selector: FeeAuction.setStartPrice.selector, name: "FeeAuction.setStartPrice" }),
         NamedSelector({ selector: FeeAuction.setDuration.selector, name: "FeeAuction.setDuration" }),
         NamedSelector({ selector: FeeAuction.setMinStartPrice.selector, name: "FeeAuction.setMinStartPrice" }),
