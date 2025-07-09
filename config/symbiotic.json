@@ -1,4 +1,25 @@
 {
+    "1": {
+        "factories": {
+            "vaultFactory": "0xAEb6bdd95c502390db8f52c8909F703E9Af6a346",
+            "delegatorFactory": "0x985Ed57AF9D475f1d83c1c1c8826A0E5A34E8C7B",
+            "slasherFactory": "0x685c2eD7D59814d2a597409058Ee7a92F21e48Fd",
+            "defaultStakerRewardsFactory": "0xFEB871581C2ab2e1EEe6f7dDC7e6246cFa087A23",
+            "defaultOperatorRewardsFactory": "0x6D52fC402b2dA2669348Cc2682D85c61c122755D",
+            "burnerRouterFactory": "0x99F2B89fB3C363fBafD8d826E5AA77b28bAB70a0"
+        },
+        "registries": {
+            "networkRegistry": "0xC773b1011461e7314CF05f97d95aa8e92C1Fd8aA",
+            "vaultRegistry": "0xAEb6bdd95c502390db8f52c8909F703E9Af6a346",
+            "operatorRegistry": "0xAd817a6Bc954F678451A71363f04150FDD81Af9F"
+        },
+        "services": {
+            "networkMiddlewareService": "0xD7dC9B366c027743D90761F71858BCa83C6899Ad",
+            "vaultOptInService": "0xb361894bC06cbBA7Ea8098BF0e32EB1906A5F891",
+            "networkOptInService": "0x7133415b33B438843D581013f98A08704316633c",
+            "vaultConfigurator": "0x29300b1d3150B4E2b12fE80BE72f365E200441EC"
+        }
+    },
     "17000": {
         "factories": {
             "vaultFactory": "0x407A039D94948484D356eFB765b3c74382A050B4",
@@ -14,9 +35,7 @@
             "operatorRegistry": "0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548"
         },
         "services": {
-            "networkMetadataService": "0x0F7E58Cc4eA615E8B8BEB080dF8B8FDB63C21496",
             "networkMiddlewareService": "0x62a1ddfD86b4c1636759d9286D3A0EC722D086e3",
-            "operatorMetadataService": "0x0999048aB8eeAfa053bF8581D4Aa451ab45755c9",
             "vaultOptInService": "0x95CC0a052ae33941877c9619835A233D21D57351",
             "networkOptInService": "0x58973d16FFA900D11fC22e5e2B6840d9f7e13401",
             "vaultConfigurator": "0xD2191FE92987171691d552C219b8caEf186eb9cA"
@@ -47,9 +66,7 @@
             "operatorRegistry": "0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548"
         },
         "services": {
-            "networkMetadataService": "0x0F7E58Cc4eA615E8B8BEB080dF8B8FDB63C21496",
             "networkMiddlewareService": "0x62a1ddfD86b4c1636759d9286D3A0EC722D086e3",
-            "operatorMetadataService": "0x0999048aB8eeAfa053bF8581D4Aa451ab45755c9",
             "vaultOptInService": "0x95CC0a052ae33941877c9619835A233D21D57351",
             "networkOptInService": "0x58973d16FFA900D11fC22e5e2B6840d9f7e13401",
             "vaultConfigurator": "0xD2191FE92987171691d552C219b8caEf186eb9cA"
