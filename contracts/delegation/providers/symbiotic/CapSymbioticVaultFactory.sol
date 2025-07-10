@@ -7,9 +7,14 @@ import { IBurnerRouterFactory } from "@symbioticfi/burners/src/interfaces/router
 import { IVaultConfigurator } from "@symbioticfi/core/src/interfaces/IVaultConfigurator.sol";
 import { IBaseDelegator } from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
 import { INetworkRestakeDelegator } from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
+
 import { IBaseSlasher } from "@symbioticfi/core/src/interfaces/slasher/IBaseSlasher.sol";
 import { ISlasher } from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
 import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
+import { IDefaultStakerRewards } from
+    "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewards.sol";
+import { IDefaultStakerRewardsFactory } from
+    "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewardsFactory.sol";
 
 /// @title Cap Symbiotic Vault Factory
 /// @author Cap Labs
@@ -29,22 +34,25 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
 
     IVaultConfigurator public immutable vaultConfigurator;
     IBurnerRouterFactory public immutable burnerRouterFactory;
-
+    IDefaultStakerRewardsFactory public immutable defaultStakerRewardsFactory;
     address public immutable middleware;
-
-    mapping(address => address) public ownerToVault;
-
     uint48 public epochDuration;
 
-    constructor(address _vaultConfigurator, address _burnerRouterFactory, address _middleware) {
+    constructor(
+        address _vaultConfigurator,
+        address _burnerRouterFactory,
+        address _defaultStakerRewardsFactory,
+        address _middleware
+    ) {
         vaultConfigurator = IVaultConfigurator(_vaultConfigurator);
         burnerRouterFactory = IBurnerRouterFactory(_burnerRouterFactory);
+        defaultStakerRewardsFactory = IDefaultStakerRewardsFactory(_defaultStakerRewardsFactory);
         middleware = _middleware;
         epochDuration = 7 days;
     }
 
     /// @inheritdoc ICapSymbioticVaultFactory
-    function createVault(address _owner, address _asset) external returns (address vault) {
+    function createVault(address _owner, address _asset) external returns (address vault, address stakerRewards) {
         address burner = _deployBurner(_asset);
 
         address[] memory limitSetter = new address[](1);
@@ -86,6 +94,16 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
         });
 
         (vault,,) = vaultConfigurator.create(params);
+
+        stakerRewards = defaultStakerRewardsFactory.create(
+            IDefaultStakerRewards.InitParams({
+                vault: vault,
+                adminFee: 0,
+                defaultAdminRoleHolder: _owner,
+                adminFeeClaimRoleHolder: _owner,
+                adminFeeSetRoleHolder: _owner
+            })
+        );
     }
 
     // @dev Deploys a new burner router
