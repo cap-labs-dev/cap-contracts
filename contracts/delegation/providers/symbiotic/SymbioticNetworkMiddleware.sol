@@ -252,7 +252,10 @@ contract SymbioticNetworkMiddleware is
         address burner = IVault(_vault).burner();
         if (burner == address(0)) revert NoBurner();
         address receiver = IBurnerRouter(burner).networkReceiver($.network);
-        if (receiver != address(this)) revert InvalidBurnerRouter();
+        address globalReceiver = IBurnerRouter(burner).globalReceiver();
+        if (globalReceiver != address(this)) {
+            if (receiver != address(this)) revert InvalidBurnerRouter();
+        }
 
         address delegator = IVault(_vault).delegator();
         uint64 delegatorType = IEntity(delegator).TYPE();
