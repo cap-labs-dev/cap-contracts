@@ -16,6 +16,8 @@ import { IDefaultStakerRewards } from
 import { IDefaultStakerRewardsFactory } from
     "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewardsFactory.sol";
 
+import { NetworkRestakeDecreaseHook } from "../../../deploy/service/providers/symbiotic/NetworkRestakeDecreaseHook.sol";
+
 /// @title Cap Symbiotic Vault Factory
 /// @author Cap Labs
 /// @notice This contract creates new vaults compliant with the cap system
@@ -53,10 +55,22 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
 
     /// @inheritdoc ICapSymbioticVaultFactory
     function createVault(address _owner, address _asset) external returns (address vault, address stakerRewards) {
-        address burner = _deployBurner(_asset);
+        address burner = burnerRouterFactory.create(
+            IBurnerRouter.InitParams({
+                owner: address(0),
+                collateral: _asset,
+                delay: 0,
+                globalReceiver: middleware,
+                networkReceivers: new IBurnerRouter.NetworkReceiver[](0),
+                operatorNetworkReceivers: new IBurnerRouter.OperatorNetworkReceiver[](0)
+            })
+        );
 
-        address[] memory limitSetter = new address[](1);
+        NetworkRestakeDecreaseHook hook = new NetworkRestakeDecreaseHook();
+
+        address[] memory limitSetter = new address[](2);
         limitSetter[0] = _owner;
+        limitSetter[1] = address(hook);
 
         IVaultConfigurator.InitParams memory params = IVaultConfigurator.InitParams({
             version: 1,
@@ -80,9 +94,9 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
             delegatorParams: abi.encode(
                 INetworkRestakeDelegator.InitParams({
                     baseParams: IBaseDelegator.BaseParams({
-                        defaultAdminRoleHolder: address(0),
-                        hook: address(0),
-                        hookSetRoleHolder: address(0)
+                        defaultAdminRoleHolder: _owner,
+                        hook: address(hook),
+                        hookSetRoleHolder: _owner
                     }),
                     networkLimitSetRoleHolders: limitSetter,
                     operatorNetworkSharesSetRoleHolders: limitSetter
@@ -102,20 +116,6 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
                 defaultAdminRoleHolder: _owner,
                 adminFeeClaimRoleHolder: _owner,
                 adminFeeSetRoleHolder: _owner
-            })
-        );
-    }
-
-    // @dev Deploys a new burner router
-    function _deployBurner(address _collateral) internal returns (address) {
-        return burnerRouterFactory.create(
-            IBurnerRouter.InitParams({
-                owner: address(0),
-                collateral: _collateral,
-                delay: 1,
-                globalReceiver: middleware,
-                networkReceivers: new IBurnerRouter.NetworkReceiver[](0),
-                operatorNetworkReceivers: new IBurnerRouter.OperatorNetworkReceiver[](0)
             })
         );
     }
