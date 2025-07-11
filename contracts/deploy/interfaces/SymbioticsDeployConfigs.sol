@@ -30,6 +30,8 @@ struct SymbioticVaultParams {
     address collateral;
     uint48 vaultEpochDuration;
     uint48 burnerRouterDelay;
+    address agent;
+    address network;
 }
 
 struct SymbioticVaultConfig {

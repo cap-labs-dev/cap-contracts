@@ -10,7 +10,6 @@ import { MockERC20 } from "../mocks/MockERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IBaseDelegator } from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
 import { INetworkRestakeDelegator } from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
-
 import { ISlasher } from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
 import { console } from "forge-std/console.sol";
 
@@ -44,10 +43,9 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
         view
         returns (uint256)
     {
-        IBaseDelegator delegator = IBaseDelegator(_vault.delegator);
-        SymbioticNetworkMiddleware networkMiddleware =
-            SymbioticNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
-        return delegator.stakeAt(networkMiddleware.subnetwork(_agent), _agent, uint48(_timestamp), "");
+        bytes32 subnetwork =
+            SymbioticNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).subnetwork(_agent);
+        return IBaseDelegator(_vault.delegator).stakeAt(subnetwork, _agent, uint48(_timestamp), "");
     }
 
     function test_add_agent() public {

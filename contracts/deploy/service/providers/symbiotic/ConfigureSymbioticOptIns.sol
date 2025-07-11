@@ -20,9 +20,11 @@ import { TestUsersConfig } from "../../../../../test/deploy/interfaces/TestDeplo
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 
 import { SymbioticAddressbook } from "../../../utils/SymbioticUtils.sol";
+
 import { INetworkRegistry } from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
 import { IOperatorRegistry } from "@symbioticfi/core/src/interfaces/IOperatorRegistry.sol";
-import { INetworkRestakeDelegator } from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
+import { IOperatorNetworkSpecificDelegator } from
+    "@symbioticfi/core/src/interfaces/delegator/IOperatorNetworkSpecificDelegator.sol";
 import { INetworkMiddlewareService } from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
 import { IOptInService } from "@symbioticfi/core/src/interfaces/service/IOptInService.sol";
 import { IDefaultStakerRewards } from
@@ -73,13 +75,12 @@ contract ConfigureSymbioticOptIns {
         address agent,
         uint256 amount
     ) internal {
-        INetworkRestakeDelegator delegator = INetworkRestakeDelegator(vault.delegator);
-        SymbioticNetworkMiddleware middleware = SymbioticNetworkMiddleware(networkAdapter.networkMiddleware);
-        bytes32 subnetwork = middleware.subnetwork(agent);
-
-        delegator.setNetworkLimit(subnetwork, amount);
-        if (delegator.operatorNetworkShares(subnetwork, agent) != 1e18) {
-            delegator.setOperatorNetworkShares(subnetwork, agent, 1e18);
+        // avoid AlreadySet() errors that happens when setting the same amount twice
+        uint256 maxNetworkLimit = IOperatorNetworkSpecificDelegator(vault.delegator).maxNetworkLimit(
+            SymbioticNetworkMiddleware(networkAdapter.networkMiddleware).subnetwork(agent)
+        );
+        if (maxNetworkLimit != amount) {
+            SymbioticNetwork(networkAdapter.network).setDelegation(vault.vault, agent, amount);
         }
     }
 }

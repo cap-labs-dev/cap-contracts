@@ -13,6 +13,7 @@ import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurne
 
 import { ISymbioticNetworkMiddleware } from "../../../interfaces/ISymbioticNetworkMiddleware.sol";
 import { SymbioticNetworkMiddlewareStorageUtils } from "../../../storage/SymbioticNetworkMiddlewareStorageUtils.sol";
+
 import { Subnetwork } from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
 import { IEntity } from "@symbioticfi/core/src/interfaces/common/IEntity.sol";
 import { IRegistry } from "@symbioticfi/core/src/interfaces/common/IRegistry.sol";
@@ -259,7 +260,7 @@ contract SymbioticNetworkMiddleware is
 
         address delegator = IVault(_vault).delegator();
         uint64 delegatorType = IEntity(delegator).TYPE();
-        if (delegatorType != uint64(ISymbioticNetworkMiddleware.DelegatorType.NETWORK_RESTAKE)) {
+        if (delegatorType != uint64(ISymbioticNetworkMiddleware.DelegatorType.OPERATOR_NETWORK_SPECIFIC)) {
             revert InvalidDelegator();
         }
     }

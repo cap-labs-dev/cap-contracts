@@ -6,7 +6,8 @@ import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurne
 import { IBurnerRouterFactory } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouterFactory.sol";
 import { IVaultConfigurator } from "@symbioticfi/core/src/interfaces/IVaultConfigurator.sol";
 import { IBaseDelegator } from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
-import { INetworkRestakeDelegator } from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
+import { IOperatorNetworkSpecificDelegator } from
+    "@symbioticfi/core/src/interfaces/delegator/IOperatorNetworkSpecificDelegator.sol";
 
 import { IBaseSlasher } from "@symbioticfi/core/src/interfaces/slasher/IBaseSlasher.sol";
 import { ISlasher } from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
@@ -52,7 +53,10 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
     }
 
     /// @inheritdoc ICapSymbioticVaultFactory
-    function createVault(address _owner, address _asset) external returns (address vault, address stakerRewards) {
+    function createVault(address _owner, address _asset, address _agent, address _network)
+        external
+        returns (address vault, address stakerRewards)
+    {
         address burner = _deployBurner(_asset);
 
         address[] memory limitSetter = new address[](1);
@@ -76,16 +80,16 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
                     depositLimitSetRoleHolder: _owner
                 })
             ),
-            delegatorIndex: uint64(DelegatorType.NETWORK_RESTAKE),
+            delegatorIndex: uint64(DelegatorType.OPERATOR_NETWORK_SPECIFIC),
             delegatorParams: abi.encode(
-                INetworkRestakeDelegator.InitParams({
+                IOperatorNetworkSpecificDelegator.InitParams({
                     baseParams: IBaseDelegator.BaseParams({
                         defaultAdminRoleHolder: address(0),
                         hook: address(0),
                         hookSetRoleHolder: address(0)
                     }),
-                    networkLimitSetRoleHolders: limitSetter,
-                    operatorNetworkSharesSetRoleHolders: limitSetter
+                    network: _network,
+                    operator: _agent
                 })
             ),
             withSlasher: true,

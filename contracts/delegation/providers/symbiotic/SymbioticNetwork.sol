@@ -8,8 +8,10 @@ import { ISymbioticNetworkMiddleware } from "../../../interfaces/ISymbioticNetwo
 
 import { ISymbioticNetwork } from "../../../interfaces/ISymbioticNetwork.sol";
 import { SymbioticNetworkStorageUtils } from "../../../storage/SymbioticNetworkStorageUtils.sol";
+
 import { INetworkRegistry } from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
-import { INetworkRestakeDelegator } from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
+import { IOperatorNetworkSpecificDelegator } from
+    "@symbioticfi/core/src/interfaces/delegator/IOperatorNetworkSpecificDelegator.sol";
 import { INetworkMiddlewareService } from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
 import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 
@@ -40,9 +42,19 @@ contract SymbioticNetwork is ISymbioticNetwork, UUPSUpgradeable, Access, Symbiot
     /// @inheritdoc ISymbioticNetwork
     function registerVault(address _vault, address _agent) external checkAccess(this.registerVault.selector) {
         address delegator = IVault(_vault).delegator();
-        INetworkRestakeDelegator(delegator).setMaxNetworkLimit(
+        IOperatorNetworkSpecificDelegator(delegator).setMaxNetworkLimit(
             ISymbioticNetworkMiddleware(getSymbioticNetworkStorage().middleware).subnetworkIdentifier(_agent),
             type(uint256).max
+        );
+    }
+
+    function setDelegation(address _vault, address _agent, uint256 _amount) external 
+    // todo: enable access control
+    //checkAccess(this.setDelegation.selector)
+    {
+        address delegator = IVault(_vault).delegator();
+        IOperatorNetworkSpecificDelegator(delegator).setMaxNetworkLimit(
+            ISymbioticNetworkMiddleware(getSymbioticNetworkStorage().middleware).subnetworkIdentifier(_agent), _amount
         );
     }
 

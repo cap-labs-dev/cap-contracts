@@ -10,7 +10,7 @@ import { Upgrades } from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import { IOperatorRegistry } from "@symbioticfi/core/src/interfaces/IOperatorRegistry.sol";
 import { IOptInService } from "@symbioticfi/core/src/interfaces/service/IOptInService.sol";
 
-import { NetworkRestakeDecreaseHook } from "./NetworkRestakeDecreaseHook.sol";
+import { OperatorSpecificDecreaseHook } from "./OperatorSpecificDecreaseHook.sol";
 import { INetworkRegistry } from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
 import { IVaultConfigurator } from "@symbioticfi/core/src/interfaces/IVaultConfigurator.sol";
 import { IDelegatorHook } from "@symbioticfi/core/src/interfaces/delegator/IDelegatorHook.sol";
@@ -22,7 +22,8 @@ import { IDefaultStakerRewardsFactory } from
 
 import { ProxyUtils } from "../../../utils/ProxyUtils.sol";
 import { IBaseDelegator } from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
-import { INetworkRestakeDelegator } from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
+import { IOperatorNetworkSpecificDelegator } from
+    "@symbioticfi/core/src/interfaces/delegator/IOperatorNetworkSpecificDelegator.sol";
 import { INetworkMiddlewareService } from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
 import { IBaseSlasher } from "@symbioticfi/core/src/interfaces/slasher/IBaseSlasher.sol";
 import { ISlasher } from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
@@ -63,15 +64,7 @@ contract DeploySymbioticVault is ProxyUtils {
 
         // vault setup
         // https://docs.symbiotic.fi/guides/vault-deployment/#vault
-        NetworkRestakeDecreaseHook hook = new NetworkRestakeDecreaseHook();
-
-        address[] memory networkLimitSetRoleHolders = new address[](2);
-        networkLimitSetRoleHolders[0] = params.vault_admin;
-        networkLimitSetRoleHolders[1] = address(hook);
-
-        address[] memory operatorNetworkSharesSetRoleHolders = new address[](2);
-        operatorNetworkSharesSetRoleHolders[0] = params.vault_admin;
-        operatorNetworkSharesSetRoleHolders[1] = address(hook);
+        OperatorSpecificDecreaseHook hook = new OperatorSpecificDecreaseHook();
 
         (config.vault, config.delegator, config.slasher) = IVaultConfigurator(addressbook.services.vaultConfigurator)
             .create(
@@ -93,17 +86,17 @@ contract DeploySymbioticVault is ProxyUtils {
                         depositLimitSetRoleHolder: params.vault_admin // address of the deposit limit setter
                      })
                 ),
-                delegatorIndex: uint64(DelegatorType.NETWORK_RESTAKE), // Delegator’s type (= NetworkRestakeDelegator)
+                delegatorIndex: uint64(DelegatorType.OPERATOR_NETWORK_SPECIFIC), // Delegator’s type (= OperatorNetworkSpecificDelegator)
                 delegatorParams: abi.encode(
-                    INetworkRestakeDelegator.InitParams({
+                    IOperatorNetworkSpecificDelegator.InitParams({
                         baseParams: IBaseDelegator.BaseParams({
                             defaultAdminRoleHolder: params.vault_admin, // address of the Delegator’s admin (can manage all roles)
                             hook: address(hook), // address of the hook (if not zero, receives onSlash() call on each slashing)
                             hookSetRoleHolder: params.vault_admin // address of the hook setter
                          }),
-                        networkLimitSetRoleHolders: networkLimitSetRoleHolders, // array of addresses of the network limit setters
-                        operatorNetworkSharesSetRoleHolders: operatorNetworkSharesSetRoleHolders // array of addresses of the operator-network shares setters
-                     })
+                        network: params.network,
+                        operator: params.agent
+                    })
                 ),
                 withSlasher: true, // if enable Slasher module
                 slasherIndex: uint64(SlasherType.INSTANT), // Slasher’s type (0 = ImmediateSlasher, 1 = VetoSlasher)

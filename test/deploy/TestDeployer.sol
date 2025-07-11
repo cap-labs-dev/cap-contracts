@@ -94,7 +94,7 @@ contract TestDeployer is
             console.log("using sepolia as the test blockchain");
             // we need to fork the sepolia network to deploy the symbiotic network adapter
             // hardcoding the block number to benefit from the anvil cache
-            vm.createSelectFork("https://eth-sepolia.public.blastapi.io", 7699085);
+            vm.createSelectFork("ethereum-holesky", 4148834); // holesky needed to use OperatorNetworkSpecificDelegator
         }
 
         (env.users, env.testUsers) = _deployTestUsers();
@@ -240,10 +240,16 @@ contract TestDeployer is
             }
 
             console.log("deploying symbiotic WETH vault");
-            (SymbioticVaultConfig memory _vault, SymbioticNetworkRewardsConfig memory _rewards) =
-                _deployAndConfigureTestnetSymbioticVault(env.ethMocks[0], "WETH");
-            _symbioticVaultConfigToEnv(_vault);
-            _symbioticNetworkRewardsConfigToEnv(_rewards);
+
+            for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
+                address agent = env.testUsers.agents[i];
+                (SymbioticVaultConfig memory _vault, SymbioticNetworkRewardsConfig memory _rewards) =
+                    _deployAndConfigureTestnetSymbioticVault(env.ethMocks[0], "WETH", agent);
+                if (i == 0) {
+                    _symbioticVaultConfigToEnv(_vault);
+                    _symbioticNetworkRewardsConfigToEnv(_rewards);
+                }
+            }
 
             vm.stopPrank();
         }
@@ -257,7 +263,7 @@ contract TestDeployer is
         vm.stopPrank();
     }
 
-    function _deployAndConfigureTestnetSymbioticVault(address collateral, string memory assetSymbol)
+    function _deployAndConfigureTestnetSymbioticVault(address collateral, string memory assetSymbol, address agent)
         internal
         returns (SymbioticVaultConfig memory _vault, SymbioticNetworkRewardsConfig memory _rewards)
     {
@@ -270,7 +276,9 @@ contract TestDeployer is
                 vault_admin: env.symbiotic.users.vault_admin,
                 collateral: collateral,
                 vaultEpochDuration: 7 days,
-                burnerRouterDelay: 0
+                burnerRouterDelay: 0,
+                agent: agent,
+                network: env.symbiotic.networkAdapter.network
             })
         );
 
@@ -287,30 +295,19 @@ contract TestDeployer is
         vm.startPrank(env.users.middleware_admin);
 
         _registerVaultInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, _rewards);
-        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            _registerAgentInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, env.testUsers.agents[i]);
-        }
+        _registerAgentInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, agent);
 
         console.log("registering agents as operator");
-        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            vm.startPrank(env.testUsers.agents[i]);
-            _agentOptInToSymbioticVault(symbioticAb, _vault);
-        }
+        vm.startPrank(agent);
+        _agentOptInToSymbioticVault(symbioticAb, _vault);
 
         console.log("registering network in vaults");
         vm.startPrank(env.users.middleware_admin);
-        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            address _agent = env.testUsers.agents[i];
-            console.log("count", i);
-            _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, _vault, _agent);
-        }
+        _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, _vault, agent);
 
         console.log("vaults delegating to agents");
         vm.startPrank(env.symbiotic.users.vault_admin);
-        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            address _agent = env.testUsers.agents[i];
-            _symbioticVaultDelegateToAgent(_vault, env.symbiotic.networkAdapter, _agent, type(uint256).max);
-        }
+        _symbioticVaultDelegateToAgent(_vault, env.symbiotic.networkAdapter, agent, type(uint256).max);
     }
 
     function _applyTestnetLabels() internal {
