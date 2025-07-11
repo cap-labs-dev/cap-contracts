@@ -65,13 +65,9 @@ contract DeploySymbioticVault is ProxyUtils {
         // https://docs.symbiotic.fi/guides/vault-deployment/#vault
         NetworkRestakeDecreaseHook hook = new NetworkRestakeDecreaseHook();
 
-        address[] memory networkLimitSetRoleHolders = new address[](2);
-        networkLimitSetRoleHolders[0] = params.vault_admin;
-        networkLimitSetRoleHolders[1] = address(hook);
-
-        address[] memory operatorNetworkSharesSetRoleHolders = new address[](2);
-        operatorNetworkSharesSetRoleHolders[0] = params.vault_admin;
-        operatorNetworkSharesSetRoleHolders[1] = address(hook);
+        address[] memory limitSetter = new address[](2);
+        limitSetter[0] = params.vault_admin;
+        limitSetter[1] = address(hook);
 
         (config.vault, config.delegator, config.slasher) = IVaultConfigurator(addressbook.services.vaultConfigurator)
             .create(
@@ -101,9 +97,9 @@ contract DeploySymbioticVault is ProxyUtils {
                             hook: address(hook), // address of the hook (if not zero, receives onSlash() call on each slashing)
                             hookSetRoleHolder: params.vault_admin // address of the hook setter
                          }),
-                        networkLimitSetRoleHolders: networkLimitSetRoleHolders, // array of addresses of the network limit setters
-                        operatorNetworkSharesSetRoleHolders: operatorNetworkSharesSetRoleHolders // array of addresses of the operator-network shares setters
-                     })
+                        networkLimitSetRoleHolders: limitSetter,
+                        operatorNetworkSharesSetRoleHolders: limitSetter
+                    })
                 ),
                 withSlasher: true, // if enable Slasher module
                 slasherIndex: uint64(SlasherType.INSTANT), // Slasher’s type (0 = ImmediateSlasher, 1 = VetoSlasher)

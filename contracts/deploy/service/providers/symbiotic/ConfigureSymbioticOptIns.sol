@@ -20,6 +20,8 @@ import { TestUsersConfig } from "../../../../../test/deploy/interfaces/TestDeplo
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 
 import { SymbioticAddressbook } from "../../../utils/SymbioticUtils.sol";
+
+import { SymbioticIdentifierLib } from "../../../../delegation/providers/symbiotic/SymbioticIdentifierLib.sol";
 import { INetworkRegistry } from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
 import { IOperatorRegistry } from "@symbioticfi/core/src/interfaces/IOperatorRegistry.sol";
 import { INetworkRestakeDelegator } from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
@@ -32,6 +34,8 @@ import { IDefaultStakerRewardsFactory } from
 import { console } from "forge-std/console.sol";
 
 contract ConfigureSymbioticOptIns {
+    using SymbioticIdentifierLib for address;
+
     /// OPT-INS
     // https://docs.symbiotic.fi/modules/registries#opt-ins-in-symbiotic
 
@@ -74,8 +78,7 @@ contract ConfigureSymbioticOptIns {
         uint256 amount
     ) internal {
         INetworkRestakeDelegator delegator = INetworkRestakeDelegator(vault.delegator);
-        SymbioticNetworkMiddleware middleware = SymbioticNetworkMiddleware(networkAdapter.networkMiddleware);
-        bytes32 subnetwork = middleware.subnetwork(agent);
+        bytes32 subnetwork = agent.subnetwork(networkAdapter.network);
 
         delegator.setNetworkLimit(subnetwork, amount);
         if (delegator.operatorNetworkShares(subnetwork, agent) != 1e18) {

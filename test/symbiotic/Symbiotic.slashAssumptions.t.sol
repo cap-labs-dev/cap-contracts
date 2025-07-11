@@ -7,14 +7,16 @@ import { SymbioticVaultConfig } from "../../contracts/deploy/interfaces/Symbioti
 import { TestDeployer } from "../../test/deploy/TestDeployer.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
 
+import { SymbioticIdentifierLib } from "../../contracts/delegation/providers/symbiotic/SymbioticIdentifierLib.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IBaseDelegator } from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
 import { INetworkRestakeDelegator } from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
-
 import { ISlasher } from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
 import { console } from "forge-std/console.sol";
 
 contract SymbioticSlashAssumptionsTest is TestDeployer {
+    using SymbioticIdentifierLib for address;
+
     function setUp() public {
         _deployCapTestEnvironment();
         _initSymbioticVaultsLiquidity(env);
@@ -45,9 +47,8 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
         returns (uint256)
     {
         IBaseDelegator delegator = IBaseDelegator(_vault.delegator);
-        SymbioticNetworkMiddleware networkMiddleware =
-            SymbioticNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
-        return delegator.stakeAt(networkMiddleware.subnetwork(_agent), _agent, uint48(_timestamp), "");
+        address network = env.symbiotic.networkAdapter.network;
+        return delegator.stakeAt(_agent.subnetwork(network), _agent, uint48(_timestamp), "");
     }
 
     function test_add_agent() public {
@@ -80,6 +81,7 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
         SymbioticVaultConfig memory _vault = symbioticWethVault;
         SymbioticNetworkMiddleware _middleware =
             SymbioticNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
+        address network = env.symbiotic.networkAdapter.network;
 
         // we work from the perspective of the network
         address agent1 = env.testUsers.agents[0];
@@ -107,7 +109,7 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
         assertEq(_get_stake_at(_vault, agent1, block.timestamp - 5), 2e18);
 
         /// ==== try slashing
-        bytes32 agent1_subnetwork = _middleware.subnetwork(agent1);
+        bytes32 agent1_subnetwork = agent1.subnetwork(network);
         vm.startPrank(address(_middleware));
 
         // we cannot request a slash for "right now", even though there is a stake to slash
@@ -187,9 +189,10 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
         SymbioticVaultConfig memory _vault = symbioticWethVault;
         SymbioticNetworkMiddleware _middleware =
             SymbioticNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
+        address network = env.symbiotic.networkAdapter.network;
 
         address agent1 = _getRandomAgent();
-        bytes32 agent1_subnetwork = _middleware.subnetwork(agent1);
+        bytes32 agent1_subnetwork = agent1.subnetwork(network);
 
         assertEq(_get_stake_at(_vault, agent1, block.timestamp), 2e18);
 
