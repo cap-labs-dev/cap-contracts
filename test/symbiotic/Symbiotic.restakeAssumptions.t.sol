@@ -140,30 +140,30 @@ contract SymbioticRestakeAssumptionsTest is TestDeployer {
         (SymbioticVaultConfig memory _vault,) = _deployAndSetupVault(address(usdc), 100e6);
 
         // Register both agents with the vault and delegate different amounts
-        _registerAgentWithVault(_vault, agent1, 2e6);
-        _registerAgentWithVault(_vault, agent2, 3e6);
+        _registerAgentWithVault(_vault, agent1, 30e27);
+        _registerAgentWithVault(_vault, agent2, 70e27);
 
         // Verify both agents are registered with the same vault
         assertEq(middleware.vaults(agent1), _vault.vault, "Agent1 should be registered with the vault");
         assertEq(middleware.vaults(agent2), _vault.vault, "Agent2 should be registered with the vault");
 
-        // Verify both agents have the same vault but different subnetwork ids
-        assertNotEq(
+        // Verify both agents have the same vault and subnetwork id
+        assertEq(
             middleware.subnetwork(agent1),
             middleware.subnetwork(agent2),
-            "Each agent should have a unique subnetwork id"
+            "Each agent should have the same subnetwork id"
         );
 
         // Verify both agents can receive stake from the same vault
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp), 2e6, "Agent1 should have stake from the vault");
-        assertEq(_get_stake_at(_vault, agent2, block.timestamp), 3e6, "Agent2 should have stake from the vault");
+        assertEq(_get_stake_at(_vault, agent1, block.timestamp), 30e6, "Agent1 should have stake from the vault");
+        assertEq(_get_stake_at(_vault, agent2, block.timestamp), 70e6, "Agent2 should have stake from the vault");
     }
 
     /**
-     * Test Assumption 2b: Stake cannot be reused across operators
-     * This test verifies that each agent gets their own isolated subnetwork and stake allocation
+     * Test Assumption 2b: Vault stake is shared across operators with a system of shares
+     * This test verifies that the vault stake is shared across operators with a system of shares
      */
-    function test_assumption2b_stake_is_isolated_across_operators() public {
+    function test_assumption2b_vault_stake_is_shared_across_operators() public {
         address agent1 = makeAddr("agent1");
         address agent2 = makeAddr("agent2");
 
@@ -174,25 +174,25 @@ contract SymbioticRestakeAssumptionsTest is TestDeployer {
         console.log("deploying vault");
         (SymbioticVaultConfig memory _vault,) = _deployAndSetupVault(address(usdc), 10e6);
 
-        // Register both agents with the vault and delegate 4e6 to each
-        _registerAgentWithVault(_vault, agent1, 4e6);
-        _registerAgentWithVault(_vault, agent2, 4e6);
+        // Register both agents with the vault and delegate 4e6 shares to each
+        _registerAgentWithVault(_vault, agent1, 4e27);
+        _registerAgentWithVault(_vault, agent2, 4e27);
 
         // Verify each agent has their own isolated stake allocation
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp), 4e6, "Agent1 should have exactly 4e6 stake");
-        assertEq(_get_stake_at(_vault, agent2, block.timestamp), 4e6, "Agent2 should have exactly 4e6 stake");
+        assertEq(_get_stake_at(_vault, agent1, block.timestamp), 5e6, "Agent1 should have exactly 5e6 stake");
+        assertEq(_get_stake_at(_vault, agent2, block.timestamp), 5e6, "Agent2 should have exactly 5e6 stake");
 
         // Verify that each agent's stake is isolated - changing one doesn't affect the other
         // Let's reduce agent1's delegation and verify agent2's stake remains unchanged
         vm.startPrank(env.symbiotic.users.vault_admin);
-        _symbioticVaultDelegateToAgent(_vault, env.symbiotic.networkAdapter, agent1, 2e6); // Reduce to 2e6
+        _symbioticVaultDelegateToAgent(_vault, env.symbiotic.networkAdapter, agent1, 1e27); // Reduce to 1/5 th of the vault stake
         vm.stopPrank();
 
         // Verify agent2's stake is unaffected
-        assertEq(_get_stake_at(_vault, agent2, block.timestamp), 4e6, "Agent2's stake should remain unchanged");
+        assertEq(_get_stake_at(_vault, agent2, block.timestamp), 8e6, "Agent2's stake should remain unchanged");
 
         // Verify agent1's stake was updated
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp), 2e6, "Agent1's stake should be updated to 2e6");
+        assertEq(_get_stake_at(_vault, agent1, block.timestamp), 2e6, "Agent1's stake should be updated to 1e6");
     }
 
     /**
@@ -213,9 +213,9 @@ contract SymbioticRestakeAssumptionsTest is TestDeployer {
         (SymbioticVaultConfig memory _vault,) = _deployAndSetupVault(address(usdc), 10e6);
 
         // Register all three agents with the vault (but don't delegate yet)
-        _registerAgentWithVault(_vault, agent1, type(uint256).max);
-        _registerAgentWithVault(_vault, agent2, type(uint256).max);
-        _registerAgentWithVault(_vault, agent3, type(uint256).max);
+        _registerAgentWithVault(_vault, agent1, 1e27);
+        _registerAgentWithVault(_vault, agent2, 1e27);
+        _registerAgentWithVault(_vault, agent3, 1e27);
 
         // Verify that despite delegating max amounts, the actual stake received is constrained by vault collateral
         uint256 agent1Stake = _get_stake_at(_vault, agent1, block.timestamp);

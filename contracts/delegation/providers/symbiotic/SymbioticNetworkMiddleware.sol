@@ -184,14 +184,16 @@ contract SymbioticNetworkMiddleware is
     }
 
     /// @inheritdoc ISymbioticNetworkMiddleware
-    function subnetworkIdentifier(address _agent) public pure returns (uint96 id) {
-        bytes32 hash = keccak256(abi.encodePacked(_agent));
-        id = uint96(uint256(hash)); // Takes first 96 bits of hash
-    }
-
-    /// @inheritdoc ISymbioticNetworkMiddleware
     function subnetwork(address _agent) public view returns (bytes32 id) {
-        id = Subnetwork.subnetwork(getSymbioticNetworkMiddlewareStorage().network, subnetworkIdentifier(_agent));
+        SymbioticNetworkMiddlewareStorage storage $ = getSymbioticNetworkMiddlewareStorage();
+
+        // create one subnetwork per vault
+        // this, in combination with the NetworkRestakeDelegator, ensures that
+        // we cannot delegate the same backing asset twice
+        address _vault = $.agentsToVault[_agent];
+        uint96 identifier = uint96(uint256(keccak256(abi.encodePacked(_vault))));
+
+        id = Subnetwork.subnetwork($.network, identifier);
     }
 
     /// @inheritdoc ISymbioticNetworkMiddleware

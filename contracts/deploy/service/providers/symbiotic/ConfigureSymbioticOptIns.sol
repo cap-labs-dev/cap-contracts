@@ -77,9 +77,14 @@ contract ConfigureSymbioticOptIns {
         SymbioticNetworkMiddleware middleware = SymbioticNetworkMiddleware(networkAdapter.networkMiddleware);
         bytes32 subnetwork = middleware.subnetwork(agent);
 
-        delegator.setNetworkLimit(subnetwork, amount);
-        if (delegator.operatorNetworkShares(subnetwork, agent) != 1e18) {
-            delegator.setOperatorNetworkShares(subnetwork, agent, 1e18);
+        uint256 currentLimit = delegator.networkLimit(subnetwork);
+        if (currentLimit != type(uint256).max) {
+            delegator.setNetworkLimit(subnetwork, type(uint256).max);
+        }
+
+        // have 1 share = 1 of the collateral
+        if (delegator.operatorNetworkShares(subnetwork, agent) != amount) {
+            delegator.setOperatorNetworkShares(subnetwork, agent, amount);
         }
     }
 }
