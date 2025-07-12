@@ -241,7 +241,7 @@ contract TestDeployer is
 
             console.log("deploying symbiotic WETH vault");
             (SymbioticVaultConfig memory _vault, SymbioticNetworkRewardsConfig memory _rewards) =
-                _deployAndConfigureTestnetSymbioticVault(env.ethMocks[0], "WETH");
+                _deployAndConfigureTestnetSymbioticVault(env.ethMocks[0]);
             _symbioticVaultConfigToEnv(_vault);
             _symbioticNetworkRewardsConfigToEnv(_rewards);
 
@@ -257,13 +257,15 @@ contract TestDeployer is
         vm.stopPrank();
     }
 
-    function _deployAndConfigureTestnetSymbioticVault(address collateral, string memory assetSymbol)
+    function _deployTestnetSymbioticVault(address collateral)
         internal
         returns (SymbioticVaultConfig memory _vault, SymbioticNetworkRewardsConfig memory _rewards)
     {
+        IERC20Metadata collateralToken = IERC20Metadata(collateral);
+        string memory assetSymbol = collateralToken.symbol();
+
         console.log(string.concat("deploying symbiotic vault ", assetSymbol));
         vm.startPrank(env.symbiotic.users.vault_admin);
-
         _vault = _deploySymbioticVault(
             symbioticAb,
             SymbioticVaultParams({
@@ -273,11 +275,15 @@ contract TestDeployer is
                 burnerRouterDelay: 0
             })
         );
-
-        console.log("deploying symbiotic network rewards 0");
-        vm.startPrank(env.users.staker_rewards_admin);
-
         _rewards = _deploySymbioticRestakerRewardContract(symbioticAb, env.users, _vault);
+        vm.stopPrank();
+    }
+
+    function _deployAndConfigureTestnetSymbioticVault(address collateral)
+        internal
+        returns (SymbioticVaultConfig memory _vault, SymbioticNetworkRewardsConfig memory _rewards)
+    {
+        (_vault, _rewards) = _deployTestnetSymbioticVault(collateral);
 
         console.log("registering symbiotic network in vaults");
         vm.startPrank(env.symbiotic.users.vault_admin);
