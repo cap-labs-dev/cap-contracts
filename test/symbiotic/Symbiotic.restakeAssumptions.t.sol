@@ -8,6 +8,7 @@ import { SymbioticVaultConfig } from "../../contracts/deploy/interfaces/Symbioti
 import { SymbioticNetworkRewardsConfig } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 import { SymbioticVaultParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 
+import { SymbioticSubnetworkLib } from "../../contracts/delegation/providers/symbiotic/SymbioticSubnetworkLib.sol";
 import { ISymbioticNetworkMiddleware } from "../../contracts/interfaces/ISymbioticNetworkMiddleware.sol";
 import { TestDeployer } from "../../test/deploy/TestDeployer.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
@@ -19,6 +20,8 @@ import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 import { console } from "forge-std/console.sol";
 
 contract SymbioticRestakeAssumptionsTest is TestDeployer {
+    using SymbioticSubnetworkLib for address;
+
     SymbioticVaultConfig secondWethVault;
     SymbioticVaultConfig secondUsdcVault;
 
@@ -32,9 +35,9 @@ contract SymbioticRestakeAssumptionsTest is TestDeployer {
         returns (uint256)
     {
         IBaseDelegator delegator = IBaseDelegator(_vault.delegator);
-        SymbioticNetworkMiddleware networkMiddleware =
-            SymbioticNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
-        return delegator.stakeAt(networkMiddleware.subnetwork(_agent), _agent, uint48(_timestamp), "");
+        return delegator.stakeAt(
+            _vault.vault.vaultSubnetwork(env.symbiotic.networkAdapter.network), _agent, uint48(_timestamp), ""
+        );
     }
 
     function _onboardAgent(address _agent) internal {
@@ -85,7 +88,7 @@ contract SymbioticRestakeAssumptionsTest is TestDeployer {
 
         // Network opts in to vault for agent
         vm.startPrank(env.users.middleware_admin);
-        _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, vault, agent);
+        _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, vault);
         vm.stopPrank();
 
         // Delegate stake to agent
@@ -146,13 +149,6 @@ contract SymbioticRestakeAssumptionsTest is TestDeployer {
         // Verify both agents are registered with the same vault
         assertEq(middleware.vaults(agent1), _vault.vault, "Agent1 should be registered with the vault");
         assertEq(middleware.vaults(agent2), _vault.vault, "Agent2 should be registered with the vault");
-
-        // Verify both agents have the same vault and subnetwork id
-        assertEq(
-            middleware.subnetwork(agent1),
-            middleware.subnetwork(agent2),
-            "Each agent should have the same subnetwork id"
-        );
 
         // Verify both agents can receive stake from the same vault
         assertEq(_get_stake_at(_vault, agent1, block.timestamp), 30e6, "Agent1 should have stake from the vault");

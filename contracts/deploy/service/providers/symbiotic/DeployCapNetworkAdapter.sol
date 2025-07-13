@@ -18,6 +18,9 @@ import { SymbioticAddressbook } from "../../../utils/SymbioticUtils.sol";
 
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 
+import { Subnetwork } from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
+import { INetworkRestakeDelegator } from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
+
 import { IOperatorRegistry } from "@symbioticfi/core/src/interfaces/IOperatorRegistry.sol";
 import { IDefaultStakerRewards } from
     "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewards.sol";
@@ -25,6 +28,8 @@ import { IDefaultStakerRewardsFactory } from
     "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewardsFactory.sol";
 
 contract DeployCapNetworkAdapter is ProxyUtils {
+    using Subnetwork for bytes32;
+
     function _deploySymbioticNetworkAdapterImplems()
         internal
         returns (SymbioticNetworkAdapterImplementationsConfig memory d)

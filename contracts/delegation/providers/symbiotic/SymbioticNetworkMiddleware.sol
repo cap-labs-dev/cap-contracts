@@ -20,6 +20,8 @@ import { IBaseDelegator } from "@symbioticfi/core/src/interfaces/delegator/IBase
 import { ISlasher } from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
 import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 
+import { SymbioticSubnetworkLib } from "./SymbioticSubnetworkLib.sol";
+
 /// @title Symbiotic Network Middleware
 /// @author weso, Cap Labs
 /// @notice This contract manages the symbiotic collateral and slashing
@@ -29,6 +31,7 @@ contract SymbioticNetworkMiddleware is
     Access,
     SymbioticNetworkMiddlewareStorageUtils
 {
+    using SymbioticSubnetworkLib for address;
     using SafeERC20 for IERC20;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -102,7 +105,9 @@ contract SymbioticNetworkMiddleware is
             slashShareOfCollateral = totalSlashableCollateral;
         }
 
-        ISlasher(vault.slasher()).slash(subnetwork(_agent), _agent, slashShareOfCollateral, _timestamp, new bytes(0));
+        ISlasher(vault.slasher()).slash(
+            address(vault).vaultSubnetwork($.network), _agent, slashShareOfCollateral, _timestamp, new bytes(0)
+        );
 
         IBurnerRouter(vault.burner()).triggerTransfer(address(this));
         IERC20(vault.collateral()).safeTransfer(_recipient, slashShareOfCollateral);
@@ -130,12 +135,16 @@ contract SymbioticNetworkMiddleware is
         view
         returns (uint256 collateralValue, uint256 collateral)
     {
+        SymbioticNetworkMiddlewareStorage storage $ = getSymbioticNetworkMiddlewareStorage();
+
         (IBurnerRouter burnerRouter, uint8 decimals, uint256 collateralPrice) =
             _getVaultInfo(_network, _agent, _vault, _oracle);
 
         if (address(burnerRouter) == address(0)) return (0, 0);
 
-        collateral = IBaseDelegator(IVault(_vault).delegator()).stakeAt(subnetwork(_agent), _agent, _timestamp, "");
+        collateral = IBaseDelegator(IVault(_vault).delegator()).stakeAt(
+            _vault.vaultSubnetwork($.network), _agent, _timestamp, ""
+        );
         collateralValue = collateral * collateralPrice / (10 ** decimals);
     }
 
@@ -147,13 +156,15 @@ contract SymbioticNetworkMiddleware is
         address _oracle,
         uint48 _timestamp
     ) public view returns (uint256 collateralValue, uint256 collateral) {
+        SymbioticNetworkMiddlewareStorage storage $ = getSymbioticNetworkMiddlewareStorage();
+
         (IBurnerRouter burnerRouter, uint8 decimals, uint256 collateralPrice) =
             _getVaultInfo(_network, _agent, _vault, _oracle);
 
         if (address(burnerRouter) == address(0)) return (0, 0);
 
         ISlasher slasher = ISlasher(IVault(_vault).slasher());
-        collateral = slasher.slashableStake(subnetwork(_agent), _agent, _timestamp, "");
+        collateral = slasher.slashableStake(_vault.vaultSubnetwork($.network), _agent, _timestamp, "");
         collateralValue = collateral * collateralPrice / (10 ** decimals);
     }
 
@@ -181,19 +192,6 @@ contract SymbioticNetworkMiddleware is
         address _oracle = $.oracle;
 
         (_slashableCollateral,) = slashableCollateralByVault(_network, _agent, _vault, _oracle, _timestamp);
-    }
-
-    /// @inheritdoc ISymbioticNetworkMiddleware
-    function subnetwork(address _agent) public view returns (bytes32 id) {
-        SymbioticNetworkMiddlewareStorage storage $ = getSymbioticNetworkMiddlewareStorage();
-
-        // create one subnetwork per vault
-        // this, in combination with the NetworkRestakeDelegator, ensures that
-        // we cannot delegate the same backing asset twice
-        address _vault = $.agentsToVault[_agent];
-        uint96 identifier = uint96(uint256(keccak256(abi.encodePacked(_vault))));
-
-        id = Subnetwork.subnetwork($.network, identifier);
     }
 
     /// @inheritdoc ISymbioticNetworkMiddleware

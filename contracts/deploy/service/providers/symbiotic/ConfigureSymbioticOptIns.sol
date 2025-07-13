@@ -19,6 +19,7 @@ import { TestUsersConfig } from "../../../../../test/deploy/interfaces/TestDeplo
 
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 
+import { SymbioticSubnetworkLib } from "../../../../delegation/providers/symbiotic/SymbioticSubnetworkLib.sol";
 import { SymbioticAddressbook } from "../../../utils/SymbioticUtils.sol";
 import { INetworkRegistry } from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
 import { IOperatorRegistry } from "@symbioticfi/core/src/interfaces/IOperatorRegistry.sol";
@@ -32,6 +33,8 @@ import { IDefaultStakerRewardsFactory } from
 import { console } from "forge-std/console.sol";
 
 contract ConfigureSymbioticOptIns {
+    using SymbioticSubnetworkLib for address;
+
     /// OPT-INS
     // https://docs.symbiotic.fi/modules/registries#opt-ins-in-symbiotic
 
@@ -56,10 +59,9 @@ contract ConfigureSymbioticOptIns {
     // Networks can opt into vaults to set maximum stake limits they’re willing to accept. This is done using the setMaxNetworkLimit function of the vault’s delegator.
     function _networkOptInToSymbioticVault(
         SymbioticNetworkAdapterConfig memory networkAdapter,
-        SymbioticVaultConfig memory vault,
-        address agent
+        SymbioticVaultConfig memory vault
     ) internal {
-        SymbioticNetwork(networkAdapter.network).registerVault(vault.vault, agent);
+        SymbioticNetwork(networkAdapter.network).registerVault(vault.vault);
     }
 
     // 4. Vault to Agent Delegation
@@ -74,11 +76,9 @@ contract ConfigureSymbioticOptIns {
         uint256 amount
     ) internal {
         INetworkRestakeDelegator delegator = INetworkRestakeDelegator(vault.delegator);
-        SymbioticNetworkMiddleware middleware = SymbioticNetworkMiddleware(networkAdapter.networkMiddleware);
-        bytes32 subnetwork = middleware.subnetwork(agent);
+        bytes32 subnetwork = vault.vault.vaultSubnetwork(networkAdapter.network);
 
-        uint256 currentLimit = delegator.networkLimit(subnetwork);
-        if (currentLimit != type(uint256).max) {
+        if (delegator.networkLimit(subnetwork) != type(uint256).max) {
             delegator.setNetworkLimit(subnetwork, type(uint256).max);
         }
 

@@ -19,7 +19,7 @@ contract InitSymbioticVaultLiquidity is Test, SymbioticUtils, TimeUtils {
     function _initSymbioticVaultsLiquidity(TestEnvConfig memory env) internal {
         for (uint256 i = 0; i < env.symbiotic.vaults.length; i++) {
             address vault = env.symbiotic.vaults[i];
-            _initSymbioticVaultLiquidityForAgent(env.testUsers, vault, 30_000);
+            _initSymbioticVaultLiquidityForAgent(env.testUsers, vault, 2);
         }
 
         _timeTravel(28 days);

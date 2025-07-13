@@ -15,10 +15,13 @@ import { INetworkRestakeDelegator } from "@symbioticfi/core/src/interfaces/deleg
 import { INetworkMiddlewareService } from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
 import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 
+import { SymbioticSubnetworkLib } from "./SymbioticSubnetworkLib.sol";
+
 /// @title Symbiotic Network
 /// @author weso, Cap Labs
 /// @notice This contract manages the symbiotic network
 contract SymbioticNetwork is ISymbioticNetwork, UUPSUpgradeable, Access, SymbioticNetworkStorageUtils {
+    using SymbioticSubnetworkLib for address;
     using Subnetwork for bytes32;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -42,14 +45,12 @@ contract SymbioticNetwork is ISymbioticNetwork, UUPSUpgradeable, Access, Symbiot
     }
 
     /// @inheritdoc ISymbioticNetwork
-    function registerVault(address _vault, address _agent) external checkAccess(this.registerVault.selector) {
+    function registerVault(address _vault) external checkAccess(this.registerVault.selector) {
         address delegator = IVault(_vault).delegator();
-        bytes32 subnetwork = ISymbioticNetworkMiddleware(getSymbioticNetworkStorage().middleware).subnetwork(_agent);
+        bytes32 subnetwork = _vault.vaultSubnetwork(address(this));
 
-        uint256 newMaxLimit = type(uint256).max;
-        uint256 currentMaxLimit = INetworkRestakeDelegator(delegator).maxNetworkLimit(subnetwork);
-        if (currentMaxLimit != newMaxLimit) {
-            INetworkRestakeDelegator(delegator).setMaxNetworkLimit(subnetwork.identifier(), newMaxLimit);
+        if (INetworkRestakeDelegator(delegator).maxNetworkLimit(subnetwork) != type(uint256).max) {
+            INetworkRestakeDelegator(delegator).setMaxNetworkLimit(subnetwork.identifier(), type(uint256).max);
         }
     }
 

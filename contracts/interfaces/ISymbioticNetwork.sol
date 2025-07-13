@@ -23,6 +23,5 @@ interface ISymbioticNetwork {
 
     /// @notice Register vault with Symbiotic
     /// @param _vault Vault address
-    /// @param _agent Agent address
-    function registerVault(address _vault, address _agent) external;
+    function registerVault(address _vault) external;
 }

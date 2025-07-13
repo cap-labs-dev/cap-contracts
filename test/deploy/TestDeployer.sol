@@ -306,16 +306,14 @@ contract TestDeployer is
         console.log("registering network in vaults");
         vm.startPrank(env.users.middleware_admin);
         for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            address _agent = env.testUsers.agents[i];
-            console.log("count", i);
-            _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, _vault, _agent);
+            _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, _vault);
         }
 
         console.log("vaults delegating to agents");
         vm.startPrank(env.symbiotic.users.vault_admin);
         for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
             address _agent = env.testUsers.agents[i];
-            _symbioticVaultDelegateToAgent(_vault, env.symbiotic.networkAdapter, _agent, 1e42);
+            _symbioticVaultDelegateToAgent(_vault, env.symbiotic.networkAdapter, _agent, 1e27);
         }
     }
 

@@ -71,13 +71,9 @@ contract MockNetworkMiddleware is ISymbioticNetworkMiddleware {
         _slashableCollateral = mockSlashableCollateral[_agent];
     }
 
-    function subnetworkIdentifier(address _agent) public pure returns (uint96 id) {
-        bytes32 hash = keccak256(abi.encodePacked(_agent));
-        id = uint96(uint256(hash)); // Takes first 96 bits of hash
-    }
-
-    function subnetwork(address _agent) public view returns (bytes32 id) {
-        id = Subnetwork.subnetwork(_storage.network, subnetworkIdentifier(_agent));
+    function vaultSubnetwork(address _vault) public view returns (bytes32 id) {
+        uint96 identifier = uint96(uint256(keccak256(abi.encodePacked(_vault))));
+        id = Subnetwork.subnetwork(_storage.network, identifier);
     }
 
     function vaults(address _agent) external view returns (address vault) {

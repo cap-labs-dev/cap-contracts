@@ -180,11 +180,6 @@ interface ISymbioticNetworkMiddleware {
         view
         returns (uint256 _slashableCollateral);
 
-    /// @notice Subnetwork
-    /// @param _agent Agent address
-    /// @return id Subnetwork id
-    function subnetwork(address _agent) external view returns (bytes32 id);
-
     /// @notice Registered vault for an agent
     /// @param _agent Agent address
     /// @return vault Vault address
