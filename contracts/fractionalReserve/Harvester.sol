@@ -2,7 +2,6 @@
 pragma solidity 0.8.28;
 
 import { IFractionalReserve } from "../interfaces/IFractionalReserve.sol";
-
 import { IFractionalReserveStrategy } from "../interfaces/IFractionalReserveStrategy.sol";
 import { IFractionalReserveVault } from "../interfaces/IFractionalReserveVault.sol";
 import { IHarvester } from "../interfaces/IHarvester.sol";
@@ -27,6 +26,4 @@ contract Harvester is IHarvester {
         interest = fractionalReserve.claimableInterest(_asset);
         fractionalReserve.realizeInterest(_asset);
     }
-
-    function setKeeper(address _target, address _keeper) external { }
 }
