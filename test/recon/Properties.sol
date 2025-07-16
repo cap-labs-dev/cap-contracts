@@ -705,6 +705,13 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: asset balance is always >= stored total
+    function property_asset_balance_always_greater_than_stored_total() public {
+        uint256 assetBalance = MockERC20(stakedCap.asset()).balanceOf(address(stakedCap));
+        uint256 storedTotal = stakedCap.totalAssets() + stakedCap.lockedProfit(); // totalAssets = storedTotal - lockedProfit => storedTotal = totalAssets + lockedProfit
+        gte(assetBalance, storedTotal, "asset balance < stored total");
+    }
+
     /// === Optimization Properties === ///
 
     /// @dev test for optimizing the difference between the lender's ltv and the delegation's ltv
