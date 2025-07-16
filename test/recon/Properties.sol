@@ -666,12 +666,12 @@ abstract contract Properties is BeforeAfter, Asserts {
         gte(_after.debtTokenIndex[debtToken], _before.debtTokenIndex[debtToken], "debt token utilization decreases");
     }
 
-    /// @dev Property: storedTotal only increases after lockDuration
-    function property_storedTotal_only_increases_after_lockDuration() public {
-        // If storedTotal increased, verify sufficient time has passed
-        if (_after.stakedCapStoredTotal > _before.stakedCapStoredTotal) {
-            uint256 timeSinceLastNotify = block.timestamp - stakedCap.lastNotify();
-            gte(timeSinceLastNotify, stakedCap.lockDuration(), "storedTotal increased before lockDuration elapsed");
+    /// @dev Property: notify() can only update storedTotal after lockDuration has elapsed
+    function property_notify_only_after_lockDuration() public {
+        // If notify() was called (evidenced by lastNotify being updated to current timestamp)
+        if (stakedCap.lastNotify() == block.timestamp) {
+            uint256 timeSinceLastNotify = block.timestamp - _before.stakedCapLastNotify;
+            gte(timeSinceLastNotify, stakedCap.lockDuration(), "notify() called before lockDuration elapsed");
         }
     }
 

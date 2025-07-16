@@ -101,6 +101,6 @@
 | 99 | property_bonus_never_reverts | bonus should never revert due to arithmetic error | |
 | 100 | property_staked_cap_total_assets_never_reverts | staked cap total assets should never revert due to arithmetic error | |
 | 101 | property_debt_token_utilization_only_increases | debt token utilization only increases | |
-| 102 | property_storedTotal_only_increases_after_lockDuration | storedTotal only increases after lockDuration | |
+| 102 | property_notify_only_after_lockDuration | notify() can only update storedTotal after lockDuration has elapsed | |
 | 103 | property_lockedProfit_decreases_over_lockDuration | lockedProfit decreases over time within lockDuration | |
 | 104 | property_asset_balance_always_greater_than_stored_total | asset balance is always >= stored total | |
