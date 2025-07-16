@@ -102,3 +102,4 @@
 | 100 | property_staked_cap_total_assets_never_reverts | staked cap total assets should never revert due to arithmetic error | |
 | 101 | property_debt_token_utilization_only_increases | debt token utilization only increases | |
 | 102 | property_storedTotal_only_increases_after_lockDuration | storedTotal only increases after lockDuration | |
+| 103 | property_lockedProfit_decreases_over_lockDuration | lockedProfit decreases over time within lockDuration | |

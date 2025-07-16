@@ -675,6 +675,38 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: lockedProfit decreases over time within lockDuration
+    function property_lockedProfit_decreases_over_lockDuration() public {
+        uint256 lockDuration = stakedCap.lockDuration();
+
+        // Skip if lockDuration is 0 (instant vesting)
+        if (lockDuration == 0) {
+            return;
+        }
+
+        uint256 lastNotify = stakedCap.lastNotify();
+        uint256 elapsed = block.timestamp > lastNotify ? block.timestamp - lastNotify : 0;
+
+        // Skip if no time has elapsed (same block) or lockDuration has fully elapsed
+        if (elapsed == 0 || elapsed >= lockDuration) {
+            return;
+        }
+
+        // If we have before/after state and time has passed
+        if (_before.stakedCapLockedProfit > 0) {
+            // If the lastNotify hasn't changed (no new vesting started), locked profit should decrease or stay same
+            if (_after.stakedCapLastNotify == _before.stakedCapLastNotify) {
+                lte(
+                    _after.stakedCapLockedProfit,
+                    _before.stakedCapLockedProfit,
+                    "lockedProfit increased without new vesting"
+                );
+            }
+        }
+    }
+
+    /// === Optimization Properties === ///
+
     /// @dev test for optimizing the difference between the lender's ltv and the delegation's ltv
     /// @notice optimizing directly here because result requires time to have elapsed since the call to borrow to increase restaker interest
     function optimize_max_ltv_delta() public returns (int256) {
