@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import { MockERC20 } from "@recon/MockERC20.sol";
 
 import { ILender } from "contracts/interfaces/ILender.sol";
+import { DebtToken } from "contracts/lendingPool/tokens/DebtToken.sol";
 
 import { Setup } from "./Setup.sol";
 import { LenderWrapper } from "test/recon/helpers/LenderWrapper.sol";
@@ -34,6 +35,7 @@ abstract contract BeforeAfter is Setup {
         mapping(address => uint256) totalBorrows;
         mapping(address => uint256) agentBonus;
         mapping(address => uint256) fractionalReserveLoaned;
+        mapping(address => uint256) debtTokenIndex;
         mapping(address asset => uint256 reserve) fractionalReserveReserve;
         mapping(address asset => uint256 balance) vaultAssetBalance;
         mapping(address => mapping(address => uint256)) debtTokenBalance;
@@ -92,7 +94,8 @@ abstract contract BeforeAfter is Setup {
     function _updateVaultDebt(Vars storage vars) internal {
         (,, address debtToken,,,,) = lender.reservesData(_getAsset());
 
-        vars.debtTokenBalance[address(debtToken)][_getActor()] = MockERC20(address(debtToken)).balanceOf(_getActor());
+        vars.debtTokenBalance[address(debtToken)][_getActor()] = MockERC20(debtToken).balanceOf(_getActor());
+        vars.debtTokenIndex[address(debtToken)] = DebtToken(debtToken).index();
     }
 
     function _updateVaultBalances(Vars storage vars) internal {

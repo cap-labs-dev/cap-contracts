@@ -659,6 +659,13 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
+    /// @dev Property: debt token utilization only increases
+    function property_debt_token_utilization_only_increases() public {
+        (,, address debtToken,,,,) = lender.reservesData(_getAsset());
+
+        gte(_after.debtTokenIndex[debtToken], _before.debtTokenIndex[debtToken], "debt token utilization decreases");
+    }
+
     /// @dev test for optimizing the difference between the lender's ltv and the delegation's ltv
     /// @notice optimizing directly here because result requires time to have elapsed since the call to borrow to increase restaker interest
     function optimize_max_ltv_delta() public returns (int256) {
