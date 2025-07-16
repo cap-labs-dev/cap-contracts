@@ -25,6 +25,7 @@ abstract contract BeforeAfter is Setup {
         uint256 insuranceFundBalance;
         uint256 capTokenTotalSupply;
         uint256 stakedCapValuePerShare;
+        uint256 stakedCapStoredTotal;
         uint256[] redeemAmountsOut;
         mapping(address => uint256) vaultDebt;
         mapping(address => uint256) agentHealth;
@@ -75,6 +76,7 @@ abstract contract BeforeAfter is Setup {
         vars.capTokenTotalSupply = capToken.totalSupply();
         vars.fractionalReserveReserve[_getAsset()] = capToken.reserve(_getAsset());
         vars.fractionalReserveLoaned[_getAsset()] = capToken.loaned(_getAsset());
+        vars.stakedCapStoredTotal = stakedCap.totalAssets() + stakedCap.lockedProfit(); // totalAssets = storedTotal - lockedProfit
 
         vars.stakedCapValuePerShare = _getStakedCapValuePerShare();
         vars.redeemAmountsOut = _getRedeemAmounts(_getActor());

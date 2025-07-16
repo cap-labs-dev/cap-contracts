@@ -666,6 +666,15 @@ abstract contract Properties is BeforeAfter, Asserts {
         gte(_after.debtTokenIndex[debtToken], _before.debtTokenIndex[debtToken], "debt token utilization decreases");
     }
 
+    /// @dev Property: storedTotal only increases after lockDuration
+    function property_storedTotal_only_increases_after_lockDuration() public {
+        // If storedTotal increased, verify sufficient time has passed
+        if (_after.stakedCapStoredTotal > _before.stakedCapStoredTotal) {
+            uint256 timeSinceLastNotify = block.timestamp - stakedCap.lastNotify();
+            gte(timeSinceLastNotify, stakedCap.lockDuration(), "storedTotal increased before lockDuration elapsed");
+        }
+    }
+
     /// @dev test for optimizing the difference between the lender's ltv and the delegation's ltv
     /// @notice optimizing directly here because result requires time to have elapsed since the call to borrow to increase restaker interest
     function optimize_max_ltv_delta() public returns (int256) {
