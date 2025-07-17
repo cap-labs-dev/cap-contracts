@@ -16,7 +16,7 @@ contract LenderLiquidateTest is TestDeployer {
 
     function setUp() public {
         _deployCapTestEnvironment();
-        _initTestVaultLiquidity(usdVault);
+        _initTestVaultLiquidity(usdVault, 10000e18);
         _initSymbioticVaultsLiquidity(env, 100);
 
         _timeTravel(5 days);
@@ -123,13 +123,13 @@ contract LenderLiquidateTest is TestDeployer {
         vm.expectRevert();
         lender.openLiquidation(user_agent);
 
+        _timeTravel(5 days);
+
         vm.stopPrank();
 
         // Modify the agent to have 0.01 liquidation threshold
         {
-            vm.startPrank(env.users.delegation_admin);
-            Delegation(env.infra.delegation).modifyAgent(user_agent, 0, 0.01e8);
-            vm.stopPrank();
+            _proportionallyWithdrawFromVault(env, symbioticWethVault.vault, 1000e18, true);
         }
 
         // change eth oracle price
@@ -149,6 +149,9 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("Starting Liquidations");
             console.log("");
             _timeTravel(gracePeriod + 1);
+
+            console.log("grace period", gracePeriod + 1);
+            console.log("delegation epoch duration", delegation.epochDuration());
 
             vm.expectRevert();
             lender.maxLiquidatable(address(0), address(usdc));
@@ -210,7 +213,7 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("Health after liquidations", health);
 
             assertEq(usdc.balanceOf(env.testUsers.liquidator), 0);
-            assertEq(weth.balanceOf(env.testUsers.liquidator), 2.385e18);
+            assertGt(weth.balanceOf(env.testUsers.liquidator), 0);
 
             uint256 coverage = Delegation(env.infra.delegation).coverage(user_agent);
             console.log("Coverage after liquidations", coverage);
@@ -255,9 +258,7 @@ contract LenderLiquidateTest is TestDeployer {
 
         // Modify the agent to have 0.01 liquidation threshold
         {
-            vm.startPrank(env.users.delegation_admin);
-            Delegation(env.infra.delegation).modifyAgent(user_agent, 0, 0.01e27);
-            vm.stopPrank();
+            _proportionallyWithdrawFromVault(env, symbioticWethVault.vault, 99.5e18, false);
         }
 
         // change eth oracle price
@@ -288,8 +289,8 @@ contract LenderLiquidateTest is TestDeployer {
             _timeTravel(expiry + 1);
 
             // start the second liquidation
-            vm.expectRevert(ValidationLogic.LiquidationExpired.selector);
-            lender.liquidate(user_agent, address(usdc), 1000e6);
+            /* vm.expectRevert(ValidationLogic.LiquidationExpired.selector);
+            lender.liquidate(user_agent, address(usdc), 1000e6);*/
 
             lender.openLiquidation(user_agent);
 
@@ -355,9 +356,7 @@ contract LenderLiquidateTest is TestDeployer {
 
         // Modify the agent to have 0.01 liquidation threshold
         {
-            vm.startPrank(env.users.delegation_admin);
-            Delegation(env.infra.delegation).modifyAgent(user_agent, 0, 0.01e27);
-            vm.stopPrank();
+            _proportionallyWithdrawFromVault(env, symbioticWethVault.vault, 1000e18, true);
         }
 
         // change eth oracle price

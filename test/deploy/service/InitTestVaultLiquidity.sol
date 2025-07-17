@@ -13,6 +13,11 @@ import { Vm } from "forge-std/Vm.sol";
 
 contract InitTestVaultLiquidity is StdCheats {
     /// @dev Initialize the vault with some liquidity
+    function _initTestVaultLiquidity(VaultConfig memory vault, uint256 capTokenAmount) internal {
+        _initTestUserStakedCapToken(vault, makeAddr("random_user_1"), capTokenAmount);
+    }
+
+    /// @dev Initialize the vault with some liquidity
     function _initTestVaultLiquidity(VaultConfig memory vault) internal {
         _initTestUserStakedCapToken(vault, makeAddr("random_user_1"), 2000e18);
     }
