@@ -3,8 +3,12 @@ pragma solidity ^0.8.0;
 
 import { AccessControl } from "../../../../access/AccessControl.sol";
 
+import { CapSymbioticVaultFactory } from "../../../../delegation/providers/symbiotic/CapSymbioticVaultFactory.sol";
+import { OperatorNetworkSpecificDecreaseHook } from
+    "../../../../delegation/providers/symbiotic/OperatorNetworkSpecificDecreaseHook.sol";
 import { SymbioticNetwork } from "../../../../delegation/providers/symbiotic/SymbioticNetwork.sol";
 import { SymbioticNetworkMiddleware } from "../../../../delegation/providers/symbiotic/SymbioticNetworkMiddleware.sol";
+
 import { InfraConfig, UsersConfig } from "../../../interfaces/DeployConfigs.sol";
 import {
     SymbioticNetworkAdapterConfig,
@@ -51,24 +55,13 @@ contract DeployCapNetworkAdapter is ProxyUtils {
             params.vaultEpochDuration,
             params.feeAllowed
         );
-    }
 
-    function _deploySymbioticRestakerRewardContract(
-        SymbioticAddressbook memory addressbook,
-        UsersConfig memory users,
-        SymbioticVaultConfig memory vaultConfig
-    ) internal returns (SymbioticNetworkRewardsConfig memory d) {
-        d.stakerRewarder = address(
-            IDefaultStakerRewards(
-                IDefaultStakerRewardsFactory(addressbook.factories.defaultStakerRewardsFactory).create(
-                    IDefaultStakerRewards.InitParams({
-                        vault: vaultConfig.vault, // address of the deployed Vault
-                        adminFee: 1000, // admin fee percent to get from all the rewards distributions (10% = 1_000 | 100% = 10_000)
-                        defaultAdminRoleHolder: users.staker_rewards_admin, // address of the main admin (can manage all roles)
-                        adminFeeClaimRoleHolder: users.staker_rewards_admin, // address of the admin fee claimer
-                        adminFeeSetRoleHolder: users.staker_rewards_admin // address of the admin fee setter
-                     })
-                )
+        d.vaultFactory = address(
+            new CapSymbioticVaultFactory(
+                addressbook.services.vaultConfigurator,
+                addressbook.factories.burnerRouterFactory,
+                addressbook.factories.defaultStakerRewardsFactory,
+                d.networkMiddleware
             )
         );
     }
@@ -100,13 +93,6 @@ contract DeployCapNetworkAdapter is ProxyUtils {
         SymbioticNetwork(adapter.network).registerMiddleware(
             adapter.networkMiddleware, addressbook.services.networkMiddlewareService
         );
-    }
-
-    function _registerCapNetworkInVault(SymbioticNetworkAdapterConfig memory adapter, SymbioticVaultConfig memory vault)
-        internal
-    {
-        IBurnerRouter(vault.burnerRouter).setNetworkReceiver(adapter.network, address(adapter.networkMiddleware));
-        IBurnerRouter(vault.burnerRouter).acceptNetworkReceiver(adapter.network);
     }
 
     function _registerVaultInNetworkMiddleware(

@@ -48,16 +48,6 @@ contract SymbioticNetwork is ISymbioticNetwork, UUPSUpgradeable, Access, Symbiot
         );
     }
 
-    function setDelegation(address _vault, address _agent, uint256 _amount) external 
-    // todo: enable access control
-    //checkAccess(this.setDelegation.selector)
-    {
-        address delegator = IVault(_vault).delegator();
-        IOperatorNetworkSpecificDelegator(delegator).setMaxNetworkLimit(
-            ISymbioticNetworkMiddleware(getSymbioticNetworkStorage().middleware).subnetworkIdentifier(_agent), _amount
-        );
-    }
-
     /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }
 }

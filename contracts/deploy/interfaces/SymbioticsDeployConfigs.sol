@@ -10,6 +10,8 @@ struct SymbioticNetworkAdapterConfig {
     address network;
     address networkMiddleware;
     uint256 feeAllowed;
+    address vaultFactory;
+    address decreaseHook;
 }
 
 struct SymbioticNetworkRewardsConfig {

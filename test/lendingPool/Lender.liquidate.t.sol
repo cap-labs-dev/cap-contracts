@@ -17,13 +17,11 @@ contract LenderLiquidateTest is TestDeployer {
     function setUp() public {
         _deployCapTestEnvironment();
         _initTestVaultLiquidity(usdVault);
-        _initSymbioticVaultsLiquidity(env);
+        _initSymbioticVaultsLiquidity(env, 100);
+
+        _timeTravel(5 days);
 
         user_agent = _getRandomAgent();
-
-        vm.startPrank(env.symbiotic.users.vault_admin);
-        _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2.385e18);
-        vm.stopPrank();
 
         vm.startPrank(env.users.lender_admin);
         // Try removing and re-adding the asset

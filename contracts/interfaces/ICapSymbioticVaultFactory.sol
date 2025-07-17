@@ -10,5 +10,5 @@ interface ICapSymbioticVaultFactory {
     /// @return vault The address of the new vault
     function createVault(address _owner, address asset, address _agent, address _network)
         external
-        returns (address vault, address stakerRewards);
+        returns (address vault, address delegator, address burner, address slasher, address stakerRewards);
 }

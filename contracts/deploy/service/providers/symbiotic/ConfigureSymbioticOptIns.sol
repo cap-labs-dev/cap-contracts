@@ -63,24 +63,4 @@ contract ConfigureSymbioticOptIns {
     ) internal {
         SymbioticNetwork(networkAdapter.network).registerVault(vault.vault, agent);
     }
-
-    // 4. Vault to Agent Delegation
-    // > Vaults can opt into networks by setting non-zero limits.
-    // > https://docs.symbiotic.fi/modules/registries/#vault-allocation-to-networks
-    // Since CAP want agent isolation we have a subnetwork per agent
-    // this means that setting the network limit is the same as setting the agent delegation
-    function _symbioticVaultDelegateToAgent(
-        SymbioticVaultConfig memory vault,
-        SymbioticNetworkAdapterConfig memory networkAdapter,
-        address agent,
-        uint256 amount
-    ) internal {
-        // avoid AlreadySet() errors that happens when setting the same amount twice
-        uint256 maxNetworkLimit = IOperatorNetworkSpecificDelegator(vault.delegator).maxNetworkLimit(
-            SymbioticNetworkMiddleware(networkAdapter.networkMiddleware).subnetwork(agent)
-        );
-        if (maxNetworkLimit != amount) {
-            SymbioticNetwork(networkAdapter.network).setDelegation(vault.vault, agent, amount);
-        }
-    }
 }

@@ -55,9 +55,9 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
     /// @inheritdoc ICapSymbioticVaultFactory
     function createVault(address _owner, address _asset, address _agent, address _network)
         external
-        returns (address vault, address stakerRewards)
+        returns (address vault, address delegator, address burner, address slasher, address stakerRewards)
     {
-        address burner = _deployBurner(_asset);
+        burner = _deployBurner(_asset);
 
         address[] memory limitSetter = new address[](1);
         limitSetter[0] = _owner;
@@ -97,7 +97,7 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
             slasherParams: abi.encode(ISlasher.InitParams({ baseParams: IBaseSlasher.BaseParams({ isBurnerHook: true }) }))
         });
 
-        (vault,,) = vaultConfigurator.create(params);
+        (vault, delegator, slasher) = vaultConfigurator.create(params);
 
         stakerRewards = defaultStakerRewardsFactory.create(
             IDefaultStakerRewards.InitParams({
@@ -116,7 +116,7 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
             IBurnerRouter.InitParams({
                 owner: address(0),
                 collateral: _collateral,
-                delay: 1,
+                delay: 0,
                 globalReceiver: middleware,
                 networkReceivers: new IBurnerRouter.NetworkReceiver[](0),
                 operatorNetworkReceivers: new IBurnerRouter.OperatorNetworkReceiver[](0)

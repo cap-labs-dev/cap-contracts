@@ -9,8 +9,6 @@ contract DeployTestUsers is Test {
     function _deployTestUsers() internal returns (UsersConfig memory users, TestUsersConfig memory testUsers) {
         testUsers.agents = new address[](3);
         testUsers.agents[0] = makeAddr("agent_1");
-        testUsers.agents[1] = makeAddr("agent_2");
-        testUsers.agents[2] = makeAddr("agent_3");
 
         testUsers.restakers = new address[](3);
         testUsers.restakers[0] = makeAddr("restaker_1");
@@ -20,8 +18,6 @@ contract DeployTestUsers is Test {
         testUsers.stablecoin_minter = makeAddr("stablecoin_minter");
         testUsers.liquidator = makeAddr("liquidator");
         vm.deal(testUsers.agents[0], 100 ether);
-        vm.deal(testUsers.agents[1], 100 ether);
-        vm.deal(testUsers.agents[2], 100 ether);
         vm.deal(testUsers.stablecoin_minter, 100 ether);
         vm.deal(testUsers.liquidator, 100 ether);
 

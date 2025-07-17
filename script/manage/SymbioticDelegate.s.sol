@@ -26,11 +26,5 @@ contract SymbioticDelegate is
         (vault,) = _readSymbioticVaultConfig(vm.envAddress("VAULT"));
         address agent = vm.envAddress("AGENT");
         uint256 amount = vm.envUint("AMOUNT");
-
-        vm.startBroadcast();
-
-        _symbioticVaultDelegateToAgent(vault, networkAdapter, agent, amount);
-
-        vm.stopBroadcast();
     }
 }

@@ -55,10 +55,8 @@ contract DeployMocks {
         IDelegation(env.infra.delegation).registerNetwork(address(0));
         IDelegation(env.infra.delegation).registerNetwork(delegationNetwork);
 
-        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            address agent = env.testUsers.agents[i];
-            IDelegation(env.infra.delegation).addAgent(agent, delegationNetwork, 0.5e27, 0.7e27);
-        }
+        address agent = env.testUsers.agents[0];
+        IDelegation(env.infra.delegation).addAgent(agent, delegationNetwork, 0.5e27, 0.7e27);
     }
 
     function _setMockNetworkMiddlewareAgentCoverage(TestEnvConfig memory env, address agent, uint256 coverage)
