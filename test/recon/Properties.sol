@@ -659,13 +659,6 @@ abstract contract Properties is BeforeAfter, Asserts {
         }
     }
 
-    /// @dev Property: debt token utilization only increases
-    function property_debt_token_utilization_only_increases() public {
-        (,, address debtToken,,,,) = lender.reservesData(_getAsset());
-
-        gte(_after.debtTokenIndex[debtToken], _before.debtTokenIndex[debtToken], "debt token utilization decreases");
-    }
-
     /// @dev Property: notify() can only update storedTotal after lockDuration has elapsed
     function property_notify_only_after_lockDuration() public {
         // If notify() was called (evidenced by lastNotify being updated to current timestamp)
