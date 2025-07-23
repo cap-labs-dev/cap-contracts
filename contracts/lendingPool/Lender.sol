@@ -120,6 +120,15 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     }
 
     /// @inheritdoc ILender
+    function setInterestReceiver(address _asset, address _interestReceiver)
+        external
+        checkAccess(this.setInterestReceiver.selector)
+    {
+        if (_asset == address(0) || _interestReceiver == address(0)) revert ZeroAddressNotValid();
+        ReserveLogic.setInterestReceiver(getLenderStorage(), _asset, _interestReceiver);
+    }
+
+    /// @inheritdoc ILender
     function setMinBorrow(address _asset, uint256 _minBorrow) external checkAccess(this.setMinBorrow.selector) {
         if (_asset == address(0)) revert ZeroAddressNotValid();
         ReserveLogic.setMinBorrow(getLenderStorage(), _asset, _minBorrow);

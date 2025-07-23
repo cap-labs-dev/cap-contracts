@@ -206,6 +206,11 @@ interface ILender {
     /// @param _pause True if pausing or false if unpausing
     function pauseAsset(address _asset, bool _pause) external;
 
+    /// @notice Set the interest receiver for an asset
+    /// @param _asset Asset address
+    /// @param _interestReceiver Interest receiver address
+    function setInterestReceiver(address _asset, address _interestReceiver) external;
+
     /// @notice Set the minimum borrow amount for an asset
     /// @param _asset Asset address
     /// @param _minBorrow Minimum borrow amount in asset decimals
