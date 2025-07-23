@@ -24,6 +24,9 @@ library ReserveLogic {
     /// @dev Reserve asset pause state updated event
     event ReserveAssetPauseStateUpdated(address indexed asset, bool paused);
 
+    /// @dev Interest receiver updated event
+    event ReserveInterestReceiverUpdated(address indexed asset, address interestReceiver);
+
     /// @dev No more reserves allowed
     error NoMoreReservesAllowed();
 
@@ -65,6 +68,16 @@ library ReserveLogic {
         reserve.minBorrow = params.minBorrow;
 
         emit ReserveAssetAdded(params.asset, params.vault, params.debtToken, params.interestReceiver, id);
+    }
+
+    /// @notice Set the interest receiver for an asset
+    /// @param $ Lender storage
+    /// @param _asset Asset address
+    /// @param _interestReceiver Interest receiver address
+    function setInterestReceiver(ILender.LenderStorage storage $, address _asset, address _interestReceiver) external {
+        $.reservesData[_asset].interestReceiver = _interestReceiver;
+
+        emit ReserveInterestReceiverUpdated(_asset, _interestReceiver);
     }
 
     /// @notice Set the minimum borrow amount for an asset
