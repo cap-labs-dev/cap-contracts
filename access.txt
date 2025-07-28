@@ -1,4 +1,6 @@
-No files changed, compilation skipped
+Compiling 1 files with Solc 0.8.28
+Solc 0.8.28 finished in 1.82s
+Compiler run successful!
 Script ran successfully.
 
 == Logs ==
@@ -17,6 +19,7 @@ Script ran successfully.
   Lender.pauseAsset 🚨 Dev EOA 🚨
   Lender.setMinBorrow 🚨 Dev EOA 🚨
   Lender.liquidate 🚨 Dev EOA 🚨
+  Vault.borrow 🚨 Dev EOA 🚨
   Vault.removeAsset 🚨 Dev EOA 🚨
   Proxy.upgrade 🚨 Dev EOA 🚨
   
@@ -47,11 +50,23 @@ Script ran successfully.
   FeeAuction.setDuration 🚨 Dev EOA 🚨
   FeeAuction.setMinStartPrice Lender
   FeeAuction.setMinStartPrice 🚨 Dev EOA 🚨
+  FeeAuction.setPaymentToken 🚨 Dev EOA 🚨
+  FeeReceiver.setProtocolFeePercentage 🚨 Dev EOA 🚨
+  FeeReceiver.setProtocolFeeReceiver 🚨 Dev EOA 🚨
   Proxy.upgrade 🚨 Dev EOA 🚨
   
   Checking Access for Fee Receiver (cUSD) Contract...
+  FeeAuction.setStartPrice Lender
+  FeeAuction.setStartPrice 🚨 Dev EOA 🚨
+  FeeAuction.setDuration Lender
+  FeeAuction.setDuration 🚨 Dev EOA 🚨
+  FeeAuction.setMinStartPrice Lender
+  FeeAuction.setMinStartPrice 🚨 Dev EOA 🚨
+  FeeReceiver.setCapToken 🚨 Dev EOA 🚨
+  FeeReceiver.setStakedCapToken 🚨 Dev EOA 🚨
   FeeReceiver.setProtocolFeePercentage 🚨 Dev EOA 🚨
   FeeReceiver.setProtocolFeeReceiver 🚨 Dev EOA 🚨
+  Proxy.upgrade 🚨 Dev EOA 🚨
   
   Checking Access for Vault (cUSD) Contract...
   FractionalReserve.investAll 🚨 Dev EOA 🚨
@@ -61,6 +76,7 @@ Script ran successfully.
   Minter.setFeeData 🚨 Dev EOA 🚨
   Minter.setRedeemFee 🚨 Dev EOA 🚨
   Minter.setWhitelist 🚨 Dev EOA 🚨
+  Vault.borrow Lender
   Vault.repay Lender
   Vault.pauseAsset 🚨 Dev EOA 🚨
   Vault.unpauseAsset 🚨 Dev EOA 🚨
