@@ -16,6 +16,7 @@ import { DebtToken } from "../../contracts/lendingPool/tokens/DebtToken.sol";
 import { PriceOracle } from "../../contracts/oracle/PriceOracle.sol";
 import { RateOracle } from "../../contracts/oracle/RateOracle.sol";
 import { VaultAdapter } from "../../contracts/oracle/libraries/VaultAdapter.sol";
+import { Wrapper } from "../../contracts/token/Wrapper.sol";
 import { FractionalReserve } from "../../contracts/vault/FractionalReserve.sol";
 import { Minter } from "../../contracts/vault/Minter.sol";
 import { Vault } from "../../contracts/vault/Vault.sol";
@@ -79,6 +80,9 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
         NamedSelector({ selector: FeeAuction.setStartPrice.selector, name: "FeeAuction.setStartPrice" }),
         NamedSelector({ selector: FeeAuction.setDuration.selector, name: "FeeAuction.setDuration" }),
         NamedSelector({ selector: FeeAuction.setMinStartPrice.selector, name: "FeeAuction.setMinStartPrice" }),
+        NamedSelector({ selector: FeeAuction.setPaymentToken.selector, name: "FeeAuction.setPaymentToken" }),
+        NamedSelector({ selector: FeeReceiver.setCapToken.selector, name: "FeeReceiver.setCapToken" }),
+        NamedSelector({ selector: FeeReceiver.setStakedCapToken.selector, name: "FeeReceiver.setStakedCapToken" }),
         NamedSelector({
             selector: FeeReceiver.setProtocolFeePercentage.selector,
             name: "FeeReceiver.setProtocolFeePercentage"
@@ -87,7 +91,11 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
         NamedSelector({ selector: Lender.addAsset.selector, name: "Lender.addAsset" }),
         NamedSelector({ selector: Lender.removeAsset.selector, name: "Lender.removeAsset" }),
         NamedSelector({ selector: Lender.pauseAsset.selector, name: "Lender.pauseAsset" }),
+        NamedSelector({ selector: Lender.setInterestReceiver.selector, name: "Lender.setInterestReceiver" }),
         NamedSelector({ selector: Lender.setMinBorrow.selector, name: "Lender.setMinBorrow" }),
+        NamedSelector({ selector: Lender.setGrace.selector, name: "Lender.setGrace" }),
+        NamedSelector({ selector: Lender.setExpiry.selector, name: "Lender.setExpiry" }),
+        NamedSelector({ selector: Lender.setBonusCap.selector, name: "Lender.setBonusCap" }),
         NamedSelector({ selector: Lender.liquidate.selector, name: "Lender.liquidate" }),
         NamedSelector({ selector: DebtToken.mint.selector, name: "DebtToken.mint" }),
         NamedSelector({ selector: DebtToken.burn.selector, name: "DebtToken.burn" }),
@@ -103,6 +111,7 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
         NamedSelector({ selector: RateOracle.setRestakerRate.selector, name: "RateOracle.setRestakerRate" }),
         NamedSelector({ selector: VaultAdapter.setSlopes.selector, name: "VaultAdapter.setSlopes" }),
         NamedSelector({ selector: VaultAdapter.setLimits.selector, name: "VaultAdapter.setLimits" }),
+        NamedSelector({ selector: Wrapper.setDonationReceiver.selector, name: "Wrapper.setDonationReceiver" }),
         NamedSelector({ selector: FractionalReserve.investAll.selector, name: "FractionalReserve.investAll" }),
         NamedSelector({ selector: FractionalReserve.divestAll.selector, name: "FractionalReserve.divestAll" }),
         NamedSelector({
@@ -113,6 +122,7 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
         NamedSelector({ selector: Minter.setFeeData.selector, name: "Minter.setFeeData" }),
         NamedSelector({ selector: Minter.setRedeemFee.selector, name: "Minter.setRedeemFee" }),
         NamedSelector({ selector: Minter.setWhitelist.selector, name: "Minter.setWhitelist" }),
+        NamedSelector({ selector: Vault.borrow.selector, name: "Vault.borrow" }),
         NamedSelector({ selector: Vault.repay.selector, name: "Vault.repay" }),
         NamedSelector({ selector: Vault.addAsset.selector, name: "Vault.addAsset" }),
         NamedSelector({ selector: Vault.removeAsset.selector, name: "Vault.removeAsset" }),
