@@ -23,6 +23,8 @@ import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 /// @notice This contract manages the symbiotic network
 contract SymbioticNetwork is ISymbioticNetwork, UUPSUpgradeable, Access, SymbioticNetworkStorageUtils {
     event OperatorDeployed(address indexed agent, address indexed operator);
+
+    error OperatorAlreadyDeployed(address agent);
     /// @custom:oz-upgrades-unsafe-allow constructor
 
     constructor() {
@@ -73,6 +75,7 @@ contract SymbioticNetwork is ISymbioticNetwork, UUPSUpgradeable, Access, Symbiot
 
     /// @inheritdoc ISymbioticNetwork
     function deployOperator(address _agent) external returns (address operator) {
+        require(getOperator(_agent) == address(0), OperatorAlreadyDeployed(_agent));
         SymbioticNetworkStorage storage $ = getSymbioticNetworkStorage();
 
         operator = Clones.clone($.operatorImplementation);

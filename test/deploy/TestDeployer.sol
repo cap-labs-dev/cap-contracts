@@ -249,11 +249,9 @@ contract TestDeployer is
 
         console.log(env.symbiotic.users.vault_admin);
 
-        address operator = SymbioticNetwork(env.symbiotic.networkAdapter.network).deployOperator(agent);
-
         (address vault, address delegator, address burner, address slasher, address stakerRewarder) =
         CapSymbioticVaultFactory(env.symbiotic.networkAdapter.vaultFactory).createVault(
-            env.symbiotic.users.vault_admin, collateral, operator, env.symbiotic.networkAdapter.network
+            env.symbiotic.users.vault_admin, collateral, agent, env.symbiotic.networkAdapter.network
         );
 
         _vault.vault = vault;

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { ICapSymbioticVaultFactory } from "../../../interfaces/ICapSymbioticVaultFactory.sol";
+import { ISymbioticNetwork } from "../../../interfaces/ISymbioticNetwork.sol";
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 import { IBurnerRouterFactory } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouterFactory.sol";
 import { IVaultConfigurator } from "@symbioticfi/core/src/interfaces/IVaultConfigurator.sol";
@@ -59,6 +60,8 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
     {
         burner = _deployBurner(_asset);
 
+        address operator = ISymbioticNetwork(_network).deployOperator(_agent);
+
         address[] memory limitSetter = new address[](1);
         limitSetter[0] = _owner;
 
@@ -89,7 +92,7 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
                         hookSetRoleHolder: address(0)
                     }),
                     network: _network,
-                    operator: _agent
+                    operator: operator
                 })
             ),
             withSlasher: true,

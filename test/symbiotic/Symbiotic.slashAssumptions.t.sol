@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
+import { SymbioticNetwork } from "../../contracts/delegation/providers/symbiotic/SymbioticNetwork.sol";
 import { SymbioticNetworkMiddleware } from
     "../../contracts/delegation/providers/symbiotic/SymbioticNetworkMiddleware.sol";
 import { SymbioticVaultConfig } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
@@ -69,8 +70,9 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
 
         // we work from the perspective of the network
         address agent1 = env.testUsers.agents[0];
+        address operator = SymbioticNetwork(env.symbiotic.networkAdapter.network).getOperator(agent1);
         uint256 restakersDepositedAmount = 100e18 * 3;
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp), restakersDepositedAmount); // this is what the TestDeployer sets
+        assertEq(_get_stake_at(_vault, operator, block.timestamp), restakersDepositedAmount); // this is what the TestDeployer sets
 
         // now, the restaker completely undelegates from the usdt vault
         _timeTravel(1 days);
@@ -78,31 +80,31 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
         _proportionallyWithdrawFromVault(env, _vault.vault, restakersDepositedAmount / 3, true);
 
         // the stake should immediately drop to 0
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp), 0);
+        assertEq(_get_stake_at(_vault, operator, block.timestamp), 0);
 
         _timeTravel(3);
 
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp), 0);
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp - 1), 0);
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp - 2), 0);
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp - 3), 0);
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp - 4), restakersDepositedAmount);
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp - 5), restakersDepositedAmount);
+        assertEq(_get_stake_at(_vault, operator, block.timestamp), 0);
+        assertEq(_get_stake_at(_vault, operator, block.timestamp - 1), 0);
+        assertEq(_get_stake_at(_vault, operator, block.timestamp - 2), 0);
+        assertEq(_get_stake_at(_vault, operator, block.timestamp - 3), 0);
+        assertEq(_get_stake_at(_vault, operator, block.timestamp - 4), restakersDepositedAmount);
+        assertEq(_get_stake_at(_vault, operator, block.timestamp - 5), restakersDepositedAmount);
 
         /// ==== try slashing
-        bytes32 agent1_subnetwork = _middleware.subnetwork(agent1);
+        bytes32 agent1_subnetwork = _middleware.subnetwork(operator);
         vm.startPrank(address(_middleware));
 
         // we cannot request a slash for "right now", even though there is a stake to slash
         vm.expectRevert(ISlasher.InvalidCaptureTimestamp.selector);
-        ISlasher(_vault.slasher).slash(agent1_subnetwork, agent1, 10, uint48(block.timestamp), "");
+        ISlasher(_vault.slasher).slash(agent1_subnetwork, operator, 10, uint48(block.timestamp), "");
 
         // we cannot request a slash for a timestamp where there is no stake
         vm.expectRevert(ISlasher.InsufficientSlash.selector);
-        ISlasher(_vault.slasher).slash(agent1_subnetwork, agent1, 10, uint48(block.timestamp - 1), "");
+        ISlasher(_vault.slasher).slash(agent1_subnetwork, operator, 10, uint48(block.timestamp - 1), "");
 
         // we can slash for a timestamp where there is a stake
-        ISlasher(_vault.slasher).slash(agent1_subnetwork, agent1, 10, uint48(block.timestamp - 4), "");
+        ISlasher(_vault.slasher).slash(agent1_subnetwork, operator, 10, uint48(block.timestamp - 4), "");
     }
 
     function test_setting_shares_but_reading_stake() public {
@@ -110,14 +112,15 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
 
         // we work from the perspective of the network
         address agent1 = env.testUsers.agents[0];
+        address operator = SymbioticNetwork(env.symbiotic.networkAdapter.network).getOperator(agent1);
 
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp), 100e18 * 3); // this is what the TestDeployer sets
+        assertEq(_get_stake_at(_vault, operator, block.timestamp), 100e18 * 3); // this is what the TestDeployer sets
 
         _timeTravel(1);
 
         _proportionallyWithdrawFromVault(env, _vault.vault, 100e18, true);
 
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp), 0);
+        assertEq(_get_stake_at(_vault, operator, block.timestamp), 0);
 
         _timeTravel(1);
 
@@ -125,7 +128,7 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
 
         _timeTravel(1);
 
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp), 10e18);
+        assertEq(_get_stake_at(_vault, operator, block.timestamp), 10e18);
     }
 
     function test_slashing_decreases_the_operator_total_stake() public {
@@ -134,22 +137,19 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
             SymbioticNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
 
         address agent1 = _getRandomAgent();
-        bytes32 agent1_subnetwork = _middleware.subnetwork(agent1);
+        address operator = SymbioticNetwork(env.symbiotic.networkAdapter.network).getOperator(agent1);
+        bytes32 agent1_subnetwork = _middleware.subnetwork(operator);
 
-        address operator = IOperatorNetworkSpecificDelegator(_vault.delegator).operator();
-        console.log("operator", operator);
-        console.log("agent1", agent1);
-
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp), 100e18 * 3);
+        assertEq(_get_stake_at(_vault, operator, block.timestamp), 100e18 * 3);
 
         // slash 10% of the stake
         vm.startPrank(address(_middleware));
-        ISlasher(_vault.slasher).slash(agent1_subnetwork, agent1, 10e18, uint48(block.timestamp - 1), "");
+        ISlasher(_vault.slasher).slash(agent1_subnetwork, operator, 10e18, uint48(block.timestamp - 1), "");
         vm.stopPrank();
 
         _timeTravel(1);
 
         // the total stake should decrease by 10%
-        assertEq(_get_stake_at(_vault, agent1, block.timestamp), 100e18 * 2.9);
+        assertEq(_get_stake_at(_vault, operator, block.timestamp), 100e18 * 2.9);
     }
 }
