@@ -44,7 +44,13 @@ contract DeployCapNetworkAdapter is ProxyUtils {
         SymbioticNetworkAdapterParams memory params
     ) internal returns (SymbioticNetworkAdapterConfig memory d) {
         d.network = _proxy(address(implems.network));
-        SymbioticNetwork(d.network).initialize(infra.accessControl, addressbook.registries.networkRegistry);
+        SymbioticNetwork(d.network).initialize(
+            infra.accessControl,
+            addressbook.registries.networkRegistry,
+            addressbook.registries.operatorRegistry,
+            addressbook.services.networkOptInService,
+            addressbook.services.vaultOptInService
+        );
 
         d.networkMiddleware = _proxy(address(implems.networkMiddleware));
         SymbioticNetworkMiddleware(d.networkMiddleware).initialize(

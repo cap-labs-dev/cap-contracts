@@ -217,11 +217,6 @@ contract TestDeployer is
             vm.startPrank(env.users.middleware_admin);
             _registerCapNetwork(symbioticAb, env.symbiotic.networkAdapter);
 
-            console.log("registering agents as operator");
-            vm.startPrank(env.testUsers.agents[0]);
-            _agentRegisterAsOperator(symbioticAb);
-            _agentOptInToSymbioticNetwork(symbioticAb, env.symbiotic.networkAdapter);
-
             console.log("init agent delegation for symbiotic network");
             vm.startPrank(env.users.delegation_admin);
             address agent = env.testUsers.agents[0];
@@ -254,9 +249,11 @@ contract TestDeployer is
 
         console.log(env.symbiotic.users.vault_admin);
 
+        address operator = SymbioticNetwork(env.symbiotic.networkAdapter.network).deployOperator(agent);
+
         (address vault, address delegator, address burner, address slasher, address stakerRewarder) =
         CapSymbioticVaultFactory(env.symbiotic.networkAdapter.vaultFactory).createVault(
-            env.symbiotic.users.vault_admin, collateral, agent, env.symbiotic.networkAdapter.network
+            env.symbiotic.users.vault_admin, collateral, operator, env.symbiotic.networkAdapter.network
         );
 
         _vault.vault = vault;
@@ -273,10 +270,6 @@ contract TestDeployer is
 
         _registerVaultInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, _rewards);
         _registerAgentInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, agent);
-
-        console.log("registering agents as operator");
-        vm.startPrank(agent);
-        _agentOptInToSymbioticVault(symbioticAb, _vault);
 
         console.log("registering network in vaults");
         vm.startPrank(env.users.middleware_admin);

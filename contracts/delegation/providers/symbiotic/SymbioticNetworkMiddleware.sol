@@ -11,6 +11,7 @@ import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/Saf
 
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 
+import { ISymbioticNetwork } from "../../../interfaces/ISymbioticNetwork.sol";
 import { ISymbioticNetworkMiddleware } from "../../../interfaces/ISymbioticNetworkMiddleware.sol";
 import { SymbioticNetworkMiddlewareStorageUtils } from "../../../storage/SymbioticNetworkMiddlewareStorageUtils.sol";
 
@@ -103,7 +104,11 @@ contract SymbioticNetworkMiddleware is
             slashShareOfCollateral = totalSlashableCollateral;
         }
 
-        ISlasher(vault.slasher()).slash(subnetwork(_agent), _agent, slashShareOfCollateral, _timestamp, new bytes(0));
+        address operator = ISymbioticNetwork($.network).getOperator(_agent);
+
+        ISlasher(vault.slasher()).slash(
+            subnetwork(operator), operator, slashShareOfCollateral, _timestamp, new bytes(0)
+        );
 
         IBurnerRouter(vault.burner()).triggerTransfer(address(this));
         IERC20(vault.collateral()).safeTransfer(_recipient, slashShareOfCollateral);
@@ -136,7 +141,9 @@ contract SymbioticNetworkMiddleware is
 
         if (address(burnerRouter) == address(0)) return (0, 0);
 
-        collateral = IBaseDelegator(IVault(_vault).delegator()).stakeAt(subnetwork(_agent), _agent, _timestamp, "");
+        address operator = ISymbioticNetwork(_network).getOperator(_agent);
+
+        collateral = IBaseDelegator(IVault(_vault).delegator()).stakeAt(subnetwork(operator), operator, _timestamp, "");
         collateralValue = collateral * collateralPrice / (10 ** decimals);
     }
 
@@ -154,7 +161,8 @@ contract SymbioticNetworkMiddleware is
         if (address(burnerRouter) == address(0)) return (0, 0);
 
         ISlasher slasher = ISlasher(IVault(_vault).slasher());
-        collateral = slasher.slashableStake(subnetwork(_agent), _agent, _timestamp, "");
+        address operator = ISymbioticNetwork(_network).getOperator(_agent);
+        collateral = slasher.slashableStake(subnetwork(operator), operator, _timestamp, "");
         collateralValue = collateral * collateralPrice / (10 ** decimals);
     }
 
