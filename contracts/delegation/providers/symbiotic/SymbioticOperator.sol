@@ -26,11 +26,13 @@ contract SymbioticOperator is ISymbioticOperator, Initializable, SymbioticOperat
         _optIntoSymbiotic(_networkOptInService, _operatorRegistry, _network);
     }
 
+    /// @dev Opt into symbiotic
     function _optIntoSymbiotic(address _networkOptInService, address _operatorRegistry, address _network) internal {
         IOperatorRegistry(_operatorRegistry).registerOperator();
         IOptInService(_networkOptInService).optIn(_network);
     }
 
+    /// @inheritdoc ISymbioticOperator
     function optIntoVault(address _vaultOptInService, address _vault) external {
         if (msg.sender != getSymbioticOperatorStorage().network) {
             revert AccessDenied(msg.sender, getSymbioticOperatorStorage().network);

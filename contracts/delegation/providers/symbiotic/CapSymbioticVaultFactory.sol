@@ -62,9 +62,6 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
 
         address operator = ISymbioticNetwork(_network).deployOperator(_agent);
 
-        address[] memory limitSetter = new address[](1);
-        limitSetter[0] = _owner;
-
         IVaultConfigurator.InitParams memory params = IVaultConfigurator.InitParams({
             version: 1,
             owner: address(0),
