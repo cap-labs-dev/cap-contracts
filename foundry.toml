@@ -26,7 +26,8 @@ remappings = [
     "ds-test/=lib/layerzero-v2/lib/forge-std/lib/ds-test/src/",
     "forge-std/=lib/forge-std/src/",
     "@openzeppelin/=node_modules/@openzeppelin/",
-    "@tokenized-strategy/=lib/tokenized-strategy/src/"
+    "@tokenized-strategy/=lib/tokenized-strategy/src/",
+    "eigenlayer-middleware/=lib/eigenlayer-middleware/"
 ]
 fs_permissions = [
     { access = "read", path = "./config/symbiotic.json" },
