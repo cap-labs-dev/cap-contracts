@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { IRewardsCoordinator } from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
+
 interface IEigenServiceManager {
     /// @dev EigenServiceManager storage
     /// @param accessControl Access control address
@@ -25,4 +27,34 @@ interface IEigenServiceManager {
         address _registryCoordinator,
         address _stakeRegistry
     ) external;
+
+    /**
+     * @notice Updates the metadata URI for the AVS
+     * @param _metadataURI is the metadata URI for the AVS
+     * @dev only callable by the owner
+     */
+    function updateAVSMetadataURI(string memory _metadataURI) external;
+
+    /**
+     * @notice Creates a new rewards submission to the EigenLayer RewardsCoordinator contract, to be split amongst the
+     * set of stakers delegated to operators who are registered to this `avs`
+     * @param rewardsSubmissions The rewards submissions being created
+     * @dev Only callable by the permissioned rewardsInitiator address
+     * @dev The duration of the `rewardsSubmission` cannot exceed `MAX_REWARDS_DURATION`
+     * @dev The tokens are sent to the `RewardsCoordinator` contract
+     * @dev Strategies must be in ascending order of addresses to check for duplicates
+     * @dev This function will revert if the `rewardsSubmission` is malformed,
+     * e.g. if the `strategies` and `weights` arrays are of non-equal lengths
+     * @dev This function may fail to execute with a large number of submissions due to gas limits. Use a
+     * smaller array of submissions if necessary.
+     */
+    /* function createAVSRewardsSubmission(
+        IRewardsCoordinator.RewardsSubmission[] calldata rewardsSubmissions
+    ) external;*/
+
+    /**
+     * @notice Returns the EigenLayer AVSDirectory contract.
+     * @return The EigenLayer AVSDirectory contract.
+     */
+    function avsDirectory() external view returns (address);
 }
