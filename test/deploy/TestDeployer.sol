@@ -33,7 +33,6 @@ import { DeployVault } from "../../contracts/deploy/service/DeployVault.sol";
 import { ConfigureSymbioticOptIns } from
     "../../contracts/deploy/service/providers/symbiotic/ConfigureSymbioticOptIns.sol";
 import { DeployCapNetworkAdapter } from "../../contracts/deploy/service/providers/symbiotic/DeployCapNetworkAdapter.sol";
-import { DeploySymbioticVault } from "../../contracts/deploy/service/providers/symbiotic/DeploySymbioticVault.sol";
 import { ProxyUtils } from "../../contracts/deploy/utils/ProxyUtils.sol";
 import { SymbioticAddressbook, SymbioticUtils } from "../../contracts/deploy/utils/SymbioticUtils.sol";
 import { FeeAuction } from "../../contracts/feeAuction/FeeAuction.sol";
@@ -73,7 +72,6 @@ contract TestDeployer is
     ConfigureAccessControl,
     DeployTestUsers,
     InitTestVaultLiquidity,
-    DeploySymbioticVault,
     DeployCapNetworkAdapter,
     ConfigureSymbioticOptIns,
     InitSymbioticVaultLiquidity,
