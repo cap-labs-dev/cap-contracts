@@ -11,7 +11,7 @@ contract FeeAuctionBuyTest is TestDeployer {
     function setUp() public {
         _deployCapTestEnvironment();
         _initTestVaultLiquidity(usdVault);
-        _initSymbioticVaultsLiquidity(env);
+        _initSymbioticVaultsLiquidity(env, 100);
 
         // initialize the realizer
         realizer = makeAddr("interest_realizer");

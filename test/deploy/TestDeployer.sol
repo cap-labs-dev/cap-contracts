@@ -2,16 +2,23 @@
 pragma solidity ^0.8.0;
 
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
+
+import { CapSymbioticVaultFactory } from "../../contracts/delegation/providers/symbiotic/CapSymbioticVaultFactory.sol";
+import { SymbioticNetwork } from "../../contracts/delegation/providers/symbiotic/SymbioticNetwork.sol";
 import { SymbioticNetworkMiddleware } from
     "../../contracts/delegation/providers/symbiotic/SymbioticNetworkMiddleware.sol";
 import { FeeConfig, VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
+import { IOperatorNetworkSpecificDelegator } from
+    "@symbioticfi/core/src/interfaces/delegator/IOperatorNetworkSpecificDelegator.sol";
 
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
+import { MockNetworkMiddleware } from "../mocks/MockNetworkMiddleware.sol";
 
 import { AccessControl } from "../../contracts/access/AccessControl.sol";
 import { SymbioticVaultParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 import { SymbioticNetworkAdapterParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 import {
+    SymbioticNetworkAdapterConfig,
     SymbioticNetworkRewardsConfig,
     SymbioticUsersConfig,
     SymbioticVaultConfig
@@ -26,7 +33,6 @@ import { DeployVault } from "../../contracts/deploy/service/DeployVault.sol";
 import { ConfigureSymbioticOptIns } from
     "../../contracts/deploy/service/providers/symbiotic/ConfigureSymbioticOptIns.sol";
 import { DeployCapNetworkAdapter } from "../../contracts/deploy/service/providers/symbiotic/DeployCapNetworkAdapter.sol";
-import { DeploySymbioticVault } from "../../contracts/deploy/service/providers/symbiotic/DeploySymbioticVault.sol";
 import { ProxyUtils } from "../../contracts/deploy/utils/ProxyUtils.sol";
 import { SymbioticAddressbook, SymbioticUtils } from "../../contracts/deploy/utils/SymbioticUtils.sol";
 import { FeeAuction } from "../../contracts/feeAuction/FeeAuction.sol";
@@ -66,7 +72,6 @@ contract TestDeployer is
     ConfigureAccessControl,
     DeployTestUsers,
     InitTestVaultLiquidity,
-    DeploySymbioticVault,
     DeployCapNetworkAdapter,
     ConfigureSymbioticOptIns,
     InitSymbioticVaultLiquidity,
@@ -94,7 +99,7 @@ contract TestDeployer is
             console.log("using sepolia as the test blockchain");
             // we need to fork the sepolia network to deploy the symbiotic network adapter
             // hardcoding the block number to benefit from the anvil cache
-            vm.createSelectFork("https://eth-sepolia.public.blastapi.io", 7699085);
+            vm.createSelectFork("https://mainnet.gateway.tenderly.co", 22931785); // holesky needed to use OperatorNetworkSpecificDelegator
         }
 
         (env.users, env.testUsers) = _deployTestUsers();
@@ -112,7 +117,6 @@ contract TestDeployer is
 
         env.usdMocks = _deployUSDMocks();
         env.ethMocks = _deployEthMocks();
-
         env.usdOracleMocks = _deployOracleMocks(env.usdMocks);
         env.ethOracleMocks = _deployOracleMocks(env.ethMocks);
 
@@ -120,16 +124,11 @@ contract TestDeployer is
         env.usdVault =
             _deployVault(env.implems, env.infra, "Cap USD", "cUSD", env.usdOracleMocks.assets, env.users.insurance_fund);
 
-        console.log("deploying ethVault");
-        env.ethVault =
-            _deployVault(env.implems, env.infra, "Cap ETH", "cETH", env.ethOracleMocks.assets, env.users.insurance_fund);
-
         if (useMockBackingNetwork()) {
             console.log("skipping lzperiphery");
         } else {
             console.log("deploying lzperiphery");
             env.usdVault.lzperiphery = _deployVaultLzPeriphery(lzAb, zapAb, env.usdVault, env.users);
-            env.ethVault.lzperiphery = _deployVaultLzPeriphery(lzAb, zapAb, env.ethVault, env.users);
         }
 
         /// ACCESS CONTROL
@@ -137,15 +136,13 @@ contract TestDeployer is
         vm.startPrank(env.users.access_control_admin);
         _initInfraAccessControl(env.infra, env.users);
         _initVaultAccessControl(env.infra, env.usdVault, env.users);
-        _initVaultAccessControl(env.infra, env.ethVault, env.users);
 
         /// ORACLE
         console.log("deploying oracle");
         vm.startPrank(env.users.oracle_admin);
         _initOracleMocks(env.usdOracleMocks, 1e8, uint256(0.1e27)); // $1.00 with 8 decimals & 10% Annualized in ray decimals
-        _initOracleMocks(env.ethOracleMocks, 2600e8, uint256(0.1e27)); // $2600 with 8 decimals & 10% Annualized in ray decimals
+        _initOracleMocks(env.ethOracleMocks, 2600e8, uint256(0.1e27)); // $2600.00 with 8 decimals & 10% Annualized in ray decimals
         _initVaultOracle(env.libs, env.infra, env.usdVault);
-        _initVaultOracle(env.libs, env.infra, env.ethVault);
         for (uint256 i = 0; i < env.usdVault.assets.length; i++) {
             address asset = env.usdVault.assets[i];
             address priceFeed = env.usdOracleMocks.chainlinkPriceFeeds[i];
@@ -161,9 +158,6 @@ contract TestDeployer is
         vm.startPrank(env.users.rate_oracle_admin);
         for (uint256 i = 0; i < env.usdVault.assets.length; i++) {
             _initAaveRateOracle(env.libs, env.infra, env.usdVault.assets[i], env.usdOracleMocks.aaveDataProviders[i]);
-        }
-        for (uint256 i = 0; i < env.ethVault.assets.length; i++) {
-            _initAaveRateOracle(env.libs, env.infra, env.ethVault.assets[i], env.ethOracleMocks.aaveDataProviders[i]);
         }
         for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
             /// 0.05e27 is 5% per year
@@ -185,19 +179,17 @@ contract TestDeployer is
         });
 
         _initVaultLender(env.usdVault, env.infra, fee);
-        _initVaultLender(env.ethVault, env.infra, fee);
 
         if (useMockBackingNetwork()) {
             vm.startPrank(env.users.middleware_admin);
-            address networkMock = _deployDelegationNetworkMock();
-            env.symbiotic.networkAdapter.networkMiddleware = networkMock;
+            (address networkMiddleware, address network) = _deployDelegationNetworkMock();
+            env.symbiotic.networkAdapter.networkMiddleware = networkMiddleware;
+            MockNetworkMiddleware(networkMiddleware).setNetwork(network);
             vm.stopPrank();
 
-            _configureMockNetworkMiddleware(env, networkMock);
+            _configureMockNetworkMiddleware(env, networkMiddleware);
 
-            for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-                _setMockNetworkMiddlewareAgentCoverage(env, env.testUsers.agents[i], 1_000_000e8);
-            }
+            _setMockNetworkMiddlewareAgentCoverage(env, env.testUsers.agents[0], 1_000_000e8);
         } else {
             /// SYMBIOTIC NETWORK ADAPTER
             console.log("deploying symbiotic cap network address");
@@ -225,23 +217,14 @@ contract TestDeployer is
             vm.startPrank(env.users.middleware_admin);
             _registerCapNetwork(symbioticAb, env.symbiotic.networkAdapter);
 
-            console.log("registering agents as operator");
-            for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-                vm.startPrank(env.testUsers.agents[i]);
-                _agentRegisterAsOperator(symbioticAb);
-                _agentOptInToSymbioticNetwork(symbioticAb, env.symbiotic.networkAdapter);
-            }
-
             console.log("init agent delegation for symbiotic network");
             vm.startPrank(env.users.delegation_admin);
-            for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-                address agent = env.testUsers.agents[i];
-                _addAgentToDelegationContract(env.infra, agent, env.symbiotic.networkAdapter.networkMiddleware);
-            }
+            address agent = env.testUsers.agents[0];
+            _addAgentToDelegationContract(env.infra, agent, env.symbiotic.networkAdapter.networkMiddleware);
 
             console.log("deploying symbiotic WETH vault");
             (SymbioticVaultConfig memory _vault, SymbioticNetworkRewardsConfig memory _rewards) =
-                _deployAndConfigureTestnetSymbioticVault(env.ethMocks[0], "WETH");
+                _deployAndConfigureTestnetSymbioticVault(env.ethMocks[0], "WETH", agent);
             _symbioticVaultConfigToEnv(_vault);
             _symbioticNetworkRewardsConfigToEnv(_rewards);
 
@@ -257,60 +240,38 @@ contract TestDeployer is
         vm.stopPrank();
     }
 
-    function _deployAndConfigureTestnetSymbioticVault(address collateral, string memory assetSymbol)
+    function _deployAndConfigureTestnetSymbioticVault(address collateral, string memory assetSymbol, address agent)
         internal
         returns (SymbioticVaultConfig memory _vault, SymbioticNetworkRewardsConfig memory _rewards)
     {
         console.log(string.concat("deploying symbiotic vault ", assetSymbol));
         vm.startPrank(env.symbiotic.users.vault_admin);
 
-        _vault = _deploySymbioticVault(
-            symbioticAb,
-            SymbioticVaultParams({
-                vault_admin: env.symbiotic.users.vault_admin,
-                collateral: collateral,
-                vaultEpochDuration: 7 days,
-                burnerRouterDelay: 0
-            })
+        console.log(env.symbiotic.users.vault_admin);
+
+        (address vault, address delegator, address burner, address slasher, address stakerRewarder) =
+        CapSymbioticVaultFactory(env.symbiotic.networkAdapter.vaultFactory).createVault(
+            env.symbiotic.users.vault_admin, collateral, agent, env.symbiotic.networkAdapter.network
         );
 
-        console.log("deploying symbiotic network rewards 0");
-        vm.startPrank(env.users.staker_rewards_admin);
-
-        _rewards = _deploySymbioticRestakerRewardContract(symbioticAb, env.users, _vault);
-
-        console.log("registering symbiotic network in vaults");
-        vm.startPrank(env.symbiotic.users.vault_admin);
-        _registerCapNetworkInVault(env.symbiotic.networkAdapter, _vault);
+        _vault.vault = vault;
+        _vault.collateral = collateral;
+        _vault.globalReceiver = env.symbiotic.networkAdapter.networkMiddleware;
+        _vault.delegator = delegator;
+        _vault.burnerRouter = burner;
+        _vault.slasher = slasher;
+        _vault.vaultEpochDuration = 7 days;
+        _rewards.stakerRewarder = stakerRewarder;
 
         console.log("registering vaults in network middleware");
         vm.startPrank(env.users.middleware_admin);
 
         _registerVaultInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, _rewards);
-        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            _registerAgentInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, env.testUsers.agents[i]);
-        }
-
-        console.log("registering agents as operator");
-        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            vm.startPrank(env.testUsers.agents[i]);
-            _agentOptInToSymbioticVault(symbioticAb, _vault);
-        }
+        _registerAgentInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, agent);
 
         console.log("registering network in vaults");
         vm.startPrank(env.users.middleware_admin);
-        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            address _agent = env.testUsers.agents[i];
-            console.log("count", i);
-            _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, _vault, _agent);
-        }
-
-        console.log("vaults delegating to agents");
-        vm.startPrank(env.symbiotic.users.vault_admin);
-        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            address _agent = env.testUsers.agents[i];
-            _symbioticVaultDelegateToAgent(_vault, env.symbiotic.networkAdapter, _agent, type(uint256).max);
-        }
+        _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, _vault, agent);
     }
 
     function _applyTestnetLabels() internal {
@@ -335,22 +296,11 @@ contract TestDeployer is
             vm.label(address(debtToken), debtToken.symbol());
         }
 
-        for (uint256 i = 0; i < env.ethVault.assets.length; i++) {
-            IERC20Metadata asset = IERC20Metadata(env.ethVault.assets[i]);
-            IERC20Metadata debtToken = IERC20Metadata(env.ethVault.debtTokens[i]);
-            vm.label(address(asset), asset.symbol());
-            vm.label(address(debtToken), debtToken.symbol());
-        }
-
         // Label vault contracts
         vm.label(address(env.usdVault.capToken), "cUSD");
         vm.label(address(env.usdVault.stakedCapToken), "scUSD");
         vm.label(address(env.usdVault.feeAuction), "cUSD_FeeAuction");
         vm.label(address(env.usdVault.feeReceiver), "cUSD_FeeReceiver");
-        vm.label(address(env.ethVault.capToken), "cETH");
-        vm.label(address(env.ethVault.stakedCapToken), "scETH");
-        vm.label(address(env.ethVault.feeAuction), "cETH_FeeAuction");
-        vm.label(address(env.ethVault.feeReceiver), "cETH_FeeReceiver");
 
         // Label symbiotic contracts
         if (!useMockBackingNetwork()) {
@@ -375,7 +325,6 @@ contract TestDeployer is
         vm.label(address(usdVault.assets[0]), "USDT");
         vm.label(address(usdVault.assets[1]), "USDC");
         vm.label(address(usdVault.assets[2]), "USDX");
-        vm.label(address(ethVault.assets[0]), "WETH");
     }
 
     function _symbioticVaultConfigToEnv(SymbioticVaultConfig memory _vault) internal {
@@ -420,9 +369,6 @@ contract TestDeployer is
     CapToken cUSD;
     StakedCap scUSD;
     FeeAuction cUSDFeeAuction;
-    CapToken cETH;
-    StakedCap scETH;
-    FeeAuction cETHFeeAuction;
 
     SymbioticNetworkMiddleware middleware;
     SymbioticVaultConfig symbioticWethVault;
@@ -434,17 +380,13 @@ contract TestDeployer is
 
     function _unwrapEnvToMakeTestsReadable() internal {
         usdVault = env.usdVault;
-        ethVault = env.ethVault;
         usdt = MockERC20(usdVault.assets[0]);
         usdc = MockERC20(usdVault.assets[1]);
         usdx = MockERC20(usdVault.assets[2]);
-        weth = MockERC20(ethVault.assets[0]);
+        weth = MockERC20(env.ethMocks[0]);
         cUSD = CapToken(usdVault.capToken);
         scUSD = StakedCap(usdVault.stakedCapToken);
         cUSDFeeAuction = FeeAuction(usdVault.feeAuction);
-        cETH = CapToken(ethVault.capToken);
-        scETH = StakedCap(ethVault.stakedCapToken);
-        cETHFeeAuction = FeeAuction(ethVault.feeAuction);
 
         if (!useMockBackingNetwork()) {
             middleware = SymbioticNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware);
@@ -460,9 +402,7 @@ contract TestDeployer is
     // helpers
 
     function _getRandomAgent() internal view returns (address) {
-        return env.testUsers.agents[uint256(
-            keccak256(abi.encodePacked(block.timestamp, block.prevrandao, block.coinbase))
-        ) % env.testUsers.agents.length];
+        return env.testUsers.agents[0];
     }
 
     function _setAssetOraclePrice(address asset, int256 price) internal {

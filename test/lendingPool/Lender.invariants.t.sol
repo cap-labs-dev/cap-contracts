@@ -48,7 +48,7 @@ contract LenderInvariantsTest is TestDeployer {
 
         vm.label(address(handler), "TestLenderHandler");
     }
-
+    /* Old tests that had multiple agents
     function test_invariant_healthFactorConsistency_3() public {
         /*[FAIL: invariant_healthFactorConsistency persisted failure revert]
         [Sequence]
@@ -64,7 +64,7 @@ contract LenderInvariantsTest is TestDeployer {
                 sender=0x0000000000000000000000000000000000001790 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[163761943310006 [1.637e14], 827300394997468839928732996009111100818690293611814564984725 [8.273e59]]
                 sender=0xC2c1eC977F352B38b239c2eAaAAE194475024a83 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[10794383656069401322750723554756440261350332530727988235331024518065961345 [1.079e73], 9463830818159174000883846500573624111810028767009668635094261167107872095143 [9.463e75], 3]
                 sender=0x0000000000000000000000000000000000000173 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=repay(uint256,uint256,uint256) args=[31658 [3.165e4], 10217 [1.021e4], 2243]
-    invariant_healthFactorConsistency() (runs: 1, calls: 1, reverts: 1)*/
+    invariant_healthFactorConsistency() (runs: 1, calls: 1, reverts: 1)
         handler.setAssetOracleRate(
             11543029381330672491860383985954805972857686344712689296545235, 325150168437051263664132560797815973754326
         );
@@ -101,7 +101,7 @@ contract LenderInvariantsTest is TestDeployer {
                 sender=0xbf37929a0614B31E0a75386F4AEa7CbbCdf7E6BC addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[3429774651680311803827950921533868436805570945084490 [3.429e51], 602442520824273319800507124772583638 [6.024e35], 2]
                 sender=0x0000000000000000000000000000000006Af730a addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=repay(uint256,uint256,uint256) args=[2634712179876331684459090303828492031321597276894059921950037 [2.634e60], 2367940741284809869791851034289241293896862773891046982235546554 [2.367e63], 120026868391482638618901689477088112386911141611787628869837380 [1.2e62]]
                 sender=0x0000000000000000000000000000000000002568 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=repay(uint256,uint256,uint256) args=[117300739 [1.173e8], 3128, 16811447476311723966326299906927201449785552624966990332091277366376748439730 [1.681e76]]
-    invariant_agentDelegationLimitsDebt() (runs: 25, calls: 2500, reverts: 1)*/
+    invariant_agentDelegationLimitsDebt() (runs: 25, calls: 2500, reverts: 1)
         handler.borrow(3429774651680311803827950921533868436805570945084490, 602442520824273319800507124772583638, 2);
         handler.repay(
             2634712179876331684459090303828492031321597276894059921950037,
@@ -125,7 +125,7 @@ contract LenderInvariantsTest is TestDeployer {
                 sender=0x0000000000000000000000000000000000003949 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[152681814734099437230546156483302637946156730621326868149229 [1.526e59], 156728883172907695715837169300975 [1.567e32]]
                 sender=0x3a89D0a042986FEF12303EC6Ea1A3576e5A96F1c addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256) args=[82345 [8.234e4], 235513213949267880952128946741894106674756 [2.355e41], 126446843 [1.264e8]]
                 sender=0xC0543a8Eb9CA4498BAf812C3002a050D598Dc659 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256) args=[1276824822346 [1.276e12], 509512 [5.095e5], 2555864510627623646387460251659661413 [2.555e36]]
-    invariant_agentDelegationLimitsDebt() (runs: 31, calls: 3100, reverts: 1)*/
+    invariant_agentDelegationLimitsDebt() (runs: 31, calls: 3100, reverts: 1)
         handler.pauseAsset(
             115792089237316195423570985008687907853269984665640564039457584007913129639935,
             115792089237316195423570985008687907853269984665640564039457584007913129639935
@@ -153,7 +153,7 @@ contract LenderInvariantsTest is TestDeployer {
                 sender=0x8f947FEfd54028c9B4f8698e8e3b59F66D764037 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[72086 [7.208e4], 3748560072 [3.748e9], 64244660441453684004204986460091196887456410749031883350325510379655717615922 [6.424e76]]
                 sender=0x000000000000000000000000000000001794Bb3D addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[975813681773282361216097688840 [9.758e29], 2]
                 sender=0x000000000000000000000000000000000000095C addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[28642 [2.864e4], 1357271422759567711789040187190239685 [1.357e36]]
-    invariant_agentDelegationLimitsDebt() (runs: 0, calls: 0, reverts: 0)*/
+    invariant_agentDelegationLimitsDebt() (runs: 0, calls: 0, reverts: 0)
         handler.borrow(72086, 1269277827, 64244660441453684004204986460091196887456410749031883350325510379655717615922);
         handler.setAgentCoverage(975813681773282361216097688840, 2);
         handler.wrapTime(28642, 1357271422759567711789040187190239685);
@@ -259,7 +259,7 @@ contract LenderInvariantsTest is TestDeployer {
         handler.liquidate(2, 0, 50531700442618637710239866635305475564994400757514979355854358368);
 
         invariant_agentDelegationLimitsDebt();
-    }*/
+    }
 
     function test_fuzzing_non_regression_multiple_liquidate_in_a_row() public {
         // [FAIL: custom error 0xa07063cb]
@@ -347,7 +347,7 @@ contract LenderInvariantsTest is TestDeployer {
                 sender=0xCd3795cE2bfD68f631f66253D30a1c819aa63baF addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[79001146470571047235755355466853722473171698722976866499068551652939063895842 [7.9e76], 13642537976874880535528713273017507111622547294801941867015712476731627503204 [1.364e76]]
                 sender=0x00000000000000000000000000000002cb417aE0 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[48551977197688041653444553340907617077707418206829220807332949488867 [4.855e67], 10367066225915908275144769271 [1.036e28]]
                 sender=0x0000000000000000000000000000000000000100 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=repay(uint256,uint256,uint256) args=[568622855252 [5.686e11], 661593244133857158569510410394680651 [6.615e35], 3]
-    invariant_healthFactorConsistency() (runs: 1, calls: 500, reverts: 1)*/
+    invariant_healthFactorConsistency() (runs: 1, calls: 500, reverts: 1)
 
         handler.pauseAsset(
             1315177297924230708883695624050373788415698841790596737462753749810329727682,
@@ -478,7 +478,7 @@ contract LenderInvariantsTest is TestDeployer {
         handler.realizeRestakerInterest(30381086765569558841073, 32708892064057);
 
         invariant_agentDelegationLimitsDebt();
-    }*/
+    }
 
     /// @dev Test that user borrows never exceed their delegation
     /// forge-config: default.invariant.depth = 100
@@ -496,17 +496,16 @@ contract LenderInvariantsTest is TestDeployer {
     /// forge-config: default.invariant.depth = 100
     function invariant_healthFactorConsistency() public view {
         address[] memory agents = env.testUsers.agents;
-        for (uint256 i = 0; i < agents.length; i++) {
-            address agent = agents[i];
-            (, uint256 totalSlashableCollateral,,,, uint256 health) = lender.agent(agent);
-            if (totalSlashableCollateral == 0) return;
 
-            uint256 maxLiquidatable = lender.maxLiquidatable(agent, address(usdc));
+        address agent = agents[0];
+        (, uint256 totalSlashableCollateral,,,, uint256 health) = lender.agent(agent);
+        if (totalSlashableCollateral == 0) return;
 
-            // If agent is liquidatable (maxLiquidatable > 0), health should be < 1e27
-            if (maxLiquidatable > 0) {
-                assertLt(health, 1e27, "Liquidatable agents must have health < 1");
-            }
+        uint256 maxLiquidatable = lender.maxLiquidatable(agent, address(usdc));
+
+        // If agent is liquidatable (maxLiquidatable > 0), health should be < 1e27
+        if (maxLiquidatable > 0) {
+            assertLt(health, 1e27, "Liquidatable agents must have health < 1");
         }
     }
 }

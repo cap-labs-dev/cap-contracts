@@ -17,13 +17,9 @@ contract ScenarioBasicTest is TestDeployer {
     function setUp() public {
         _deployCapTestEnvironment();
         _initTestVaultLiquidity(usdVault);
-        _initSymbioticVaultsLiquidity(env);
+        _initSymbioticVaultsLiquidity(env, 1);
 
         user_agent = _getRandomAgent();
-
-        vm.startPrank(env.symbiotic.users.vault_admin);
-        _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 3e18);
-        vm.stopPrank();
 
         vm.startPrank(env.users.lender_admin);
 

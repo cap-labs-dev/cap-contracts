@@ -26,17 +26,14 @@ contract TestInfraUpgrade is TestDeployer {
     function setUp() public {
         _deployCapTestEnvironment();
         _initTestVaultLiquidity(usdVault);
-        _initSymbioticVaultsLiquidity(env);
+        _initSymbioticVaultsLiquidity(env, 100);
 
         user_agent = _getRandomAgent();
-
-        vm.startPrank(env.symbiotic.users.vault_admin);
-        _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e18);
     }
 
     function test_can_upgrade_infra_as_access_control_admin() public {
         // assert initial state
-        assertEq(Lender(env.infra.lender).maxBorrowable(user_agent, env.usdMocks[0]), 2600e6);
+        assertEq(Lender(env.infra.lender).maxBorrowable(user_agent, env.usdMocks[0]), 2000e6);
         // TODO assert more state, ideally one per contract
 
         // have new implementations
@@ -67,7 +64,7 @@ contract TestInfraUpgrade is TestDeployer {
         vm.etch(implems1.feeAuction, "");
 
         // assert new state is unchanged
-        assertEq(Lender(env.infra.lender).maxBorrowable(user_agent, env.usdMocks[0]), 2600e6);
+        assertEq(Lender(env.infra.lender).maxBorrowable(user_agent, env.usdMocks[0]), 2000e6);
         // TODO assert more state, ideally one per contract
     }
 

@@ -13,21 +13,7 @@ import { console } from "forge-std/console.sol";
 contract MiddlewareTest is TestDeployer {
     function setUp() public {
         _deployCapTestEnvironment();
-        _initSymbioticVaultsLiquidity(env);
-
-        // reset the initial stakes for this test
-        {
-            vm.startPrank(env.symbiotic.users.vault_admin);
-
-            for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-                address agent = env.testUsers.agents[i];
-                _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 2e18);
-            }
-
-            _timeTravel(symbioticWethVault.vaultEpochDuration + 1 days);
-
-            vm.stopPrank();
-        }
+        _initSymbioticVaultsLiquidity(env, 100);
     }
 
     function test_slash_sends_funds_to_middleware() public {
@@ -37,16 +23,16 @@ contract MiddlewareTest is TestDeployer {
         address agent = _getRandomAgent();
 
         // collateral in USDT (8 decimals)
-        assertEq(middleware.coverage(agent), 5200e8);
+        assertEq(middleware.coverage(agent), 780000e8);
 
         // slash 10% of agent collateral
         middleware.slash(agent, recipient, 0.1e18, uint48(block.timestamp) - 10);
 
         // all vaults have been slashed 10% and sent to the recipient
-        assertApproxEqAbs(IERC20(weth).balanceOf(recipient), 2e17, 1);
+        assertApproxEqAbs(IERC20(weth).balanceOf(recipient), 30e18, 1);
 
         // vaults have hooks that update the limits on slash
-        assertApproxEqAbs(middleware.coverage(agent), 4680e8, 1);
+        assertApproxEqAbs(middleware.coverage(agent), 702000e8, 1);
 
         vm.stopPrank();
     }
@@ -54,16 +40,9 @@ contract MiddlewareTest is TestDeployer {
     function test_slash_does_not_work_if_not_slashable() public {
         address agent = _getRandomAgent();
 
-        {
-            vm.startPrank(env.symbiotic.users.vault_admin);
+        _proportionallyWithdrawFromVault(env, symbioticWethVault.vault, 100, true);
 
-            // remove all delegations to our slashable agent
-            _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 0);
-
-            vm.stopPrank();
-        }
-
-        _timeTravel(symbioticWethVault.vaultEpochDuration + 1);
+        _timeTravel(symbioticWethVault.vaultEpochDuration * 2 + 1);
 
         {
             vm.startPrank(env.infra.delegation);
@@ -85,30 +64,9 @@ contract MiddlewareTest is TestDeployer {
     function test_can_slash_immediately_after_delegation() public {
         address agent = _getRandomAgent();
 
-        // reset the initial stakes for this test
-        {
-            vm.startPrank(env.symbiotic.users.vault_admin);
-
-            _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 0);
-            _timeTravel(symbioticWethVault.vaultEpochDuration + 1 days);
-
-            vm.stopPrank();
-        }
-
-        assertEq(middleware.coverage(agent), 0);
-
-        // delegate to the agent
-        {
-            vm.startPrank(env.symbiotic.users.vault_admin);
-
-            _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, agent, 2e18);
-
-            vm.stopPrank();
-        }
-
         // collateral is now active
         _timeTravel(3);
-        assertEq(middleware.coverage(agent), 5200e8);
+        assertEq(middleware.coverage(agent), 780000e8);
 
         // we should be able to slash immediately after delegation
         {
@@ -119,7 +77,7 @@ contract MiddlewareTest is TestDeployer {
             middleware.slash(agent, recipient, 0.1e18, uint48(block.timestamp) - 1);
 
             // all vaults have been slashed 10% and sent to the recipient
-            assertApproxEqAbs(IERC20(weth).balanceOf(recipient), 2e17, 1);
+            assertApproxEqAbs(IERC20(weth).balanceOf(recipient), 30e18, 1);
 
             vm.stopPrank();
         }

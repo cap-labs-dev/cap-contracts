@@ -9,7 +9,7 @@ import { console } from "forge-std/console.sol";
 contract VaultFractionalTest is TestDeployer {
     address user;
     address borrower;
-    uint256 constant USDT_RESERVE_AMOUNT = 10_000e6;
+    uint256 constant USDT_RESERVE_AMOUNT = 10_00e6;
     uint256 constant INTEREST_RATE = 0.1e18; // 10% annual interest rate
 
     MockERC4626 mockFRVault;

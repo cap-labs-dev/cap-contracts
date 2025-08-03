@@ -113,7 +113,6 @@ contract DeployTestnetSymbioticVault is
 
         console.log("registering vault to all agents");
         _networkOptInToSymbioticVault(networkAdapter, vault, agent);
-        _symbioticVaultDelegateToAgent(vault, networkAdapter, agent, 1e42);
 
         console.log("init delegation");
         _addAgentToDelegationContract(infra, agent, networkAdapter.networkMiddleware);

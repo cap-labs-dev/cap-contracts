@@ -19,12 +19,9 @@ contract LenderBorrowTest is TestDeployer {
     function setUp() public {
         _deployCapTestEnvironment();
         _initTestVaultLiquidity(usdVault);
-        _initSymbioticVaultsLiquidity(env);
+        _initSymbioticVaultsLiquidity(env, 100);
 
         user_agent = _getRandomAgent();
-
-        vm.startPrank(env.symbiotic.users.vault_admin);
-        _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e18);
 
         uint256 assetIndex = _getAssetIndex(usdVault, address(usdc));
         debtToken = DebtToken(usdVault.debtTokens[assetIndex]);
@@ -252,10 +249,6 @@ contract LenderBorrowTest is TestDeployer {
     }
 
     function test_borrow_utilization() public {
-        vm.startPrank(env.symbiotic.users.vault_admin);
-        _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e27);
-        vm.stopPrank();
-
         vm.startPrank(user_agent);
 
         uint256 totalSupply = cUSD.totalSupplies(address(usdt));

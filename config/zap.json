@@ -1,4 +1,9 @@
 {
+    "1": {
+        "zapRouter": "0x5Cc9400FfB4Da168Cf271e912F589462C3A00d1F",
+        "tokenManager": "0xEdFEc19ee32f5130084C0aCab91FeA604C137912",
+        "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3"
+    },
     "11155111": {
         "zapRouter": "0xC35a456138dE0634357eb47Ba5E74AFE9faE9a98",
         "tokenManager": "0x34D25ed76876993BdbF1d73507b5C0cd5495A34e",

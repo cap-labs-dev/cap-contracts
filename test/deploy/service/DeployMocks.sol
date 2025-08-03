@@ -7,6 +7,8 @@ import { TestEnvConfig } from "../interfaces/TestDeployConfig.sol";
 
 import { IDelegation } from "../../../contracts/interfaces/IDelegation.sol";
 import { MockERC20 } from "../../mocks/MockERC20.sol";
+
+import { MockNetwork } from "../../mocks/MockNetwork.sol";
 import { MockNetworkMiddleware } from "../../mocks/MockNetworkMiddleware.sol";
 import { OracleMocksConfig, TestUsersConfig } from "../interfaces/TestDeployConfig.sol";
 import { Vm } from "forge-std/Vm.sol";
@@ -43,22 +45,21 @@ contract DeployMocks {
         ethMocks[0] = address(new MockERC20("WETH", "WETH", 18));
     }
 
-    function _deployDelegationNetworkMock() internal returns (address delegationNetwork) {
-        delegationNetwork = address(new MockNetworkMiddleware());
+    function _deployDelegationNetworkMock() internal returns (address networkMiddleware, address network) {
+        networkMiddleware = address(new MockNetworkMiddleware());
+        network = address(new MockNetwork());
     }
 
-    function _configureMockNetworkMiddleware(TestEnvConfig memory env, address delegationNetwork) internal {
+    function _configureMockNetworkMiddleware(TestEnvConfig memory env, address networkMiddleware) internal {
         Vm vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
         vm.startPrank(env.users.delegation_admin);
         vm.expectRevert();
         IDelegation(env.infra.delegation).registerNetwork(address(0));
-        IDelegation(env.infra.delegation).registerNetwork(delegationNetwork);
+        IDelegation(env.infra.delegation).registerNetwork(networkMiddleware);
 
-        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            address agent = env.testUsers.agents[i];
-            IDelegation(env.infra.delegation).addAgent(agent, delegationNetwork, 0.5e27, 0.7e27);
-        }
+        address agent = env.testUsers.agents[0];
+        IDelegation(env.infra.delegation).addAgent(agent, networkMiddleware, 0.5e27, 0.7e27);
     }
 
     function _setMockNetworkMiddlewareAgentCoverage(TestEnvConfig memory env, address agent, uint256 coverage)

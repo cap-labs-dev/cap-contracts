@@ -12,12 +12,9 @@ contract DelegationSlashTest is TestDeployer {
     function setUp() public {
         _deployCapTestEnvironment();
         _initTestVaultLiquidity(usdVault);
-        _initSymbioticVaultsLiquidity(env);
+        _initSymbioticVaultsLiquidity(env, 100);
 
         user_agent = _getRandomAgent();
-
-        vm.startPrank(env.symbiotic.users.vault_admin);
-        _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 2e18);
 
         uint256 ltvBuffer = delegation.ltvBuffer();
         console.log("LTV Buffer", ltvBuffer);
@@ -29,8 +26,8 @@ contract DelegationSlashTest is TestDeployer {
     function test_delegation_view_functions() public view {
         assertEq(delegation.epochDuration(), 1 days);
         assertEq(delegation.epoch(), block.timestamp / 1 days);
-        assertEq(delegation.agents().length, 3);
-        assertEq(delegation.slashableCollateral(user_agent), 2 * 2600e8);
+        assertEq(delegation.agents().length, 1);
+        assertEq(delegation.slashableCollateral(user_agent), 780000e8);
     }
 
     function test_slash_delegation() public {
@@ -38,22 +35,20 @@ contract DelegationSlashTest is TestDeployer {
 
         address liquidator = makeAddr("liquidator");
 
-        /// USD Value of 260 of delegation
-        delegation.slash(user_agent, liquidator, 260e8);
+        /// USD Value of 100 eth of delegation
+        delegation.slash(user_agent, liquidator, 78000e8);
 
         // Since WETH is worth $2600 we expect 0.1 ETH
-        assertApproxEqAbs(weth.balanceOf(liquidator), 1e17, 1);
+        assertApproxEqAbs(weth.balanceOf(liquidator), 30e18, 1);
 
-        vm.startPrank(env.symbiotic.users.vault_admin);
-        _symbioticVaultDelegateToAgent(symbioticWethVault, env.symbiotic.networkAdapter, user_agent, 0);
-        vm.stopPrank();
+        _proportionallyWithdrawFromVault(env, symbioticWethVault.vault, 100e18, true);
 
         vm.startPrank(env.infra.lender);
 
         _timeTravel(30 days);
 
         vm.expectRevert(IDelegation.NoSlashableCollateral.selector);
-        delegation.slash(user_agent, liquidator, 260e8);
+        delegation.slash(user_agent, liquidator, 78000e8);
 
         vm.stopPrank();
     }

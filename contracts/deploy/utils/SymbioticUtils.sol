@@ -39,10 +39,15 @@ struct SymbioticServices {
     address vaultConfigurator;
 }
 
+struct SymbioticHooks {
+    address operatorSpecificDecreaseHook;
+}
+
 struct SymbioticAddressbook {
     SymbioticFactories factories;
     SymbioticRegistries registries;
     SymbioticServices services;
+    SymbioticHooks hooks;
 }
 
 struct VaultAddressbook {

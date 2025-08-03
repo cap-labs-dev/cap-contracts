@@ -2,11 +2,13 @@
 pragma solidity ^0.8.28;
 
 import { ICapSymbioticVaultFactory } from "../../../interfaces/ICapSymbioticVaultFactory.sol";
+import { ISymbioticNetwork } from "../../../interfaces/ISymbioticNetwork.sol";
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 import { IBurnerRouterFactory } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouterFactory.sol";
 import { IVaultConfigurator } from "@symbioticfi/core/src/interfaces/IVaultConfigurator.sol";
 import { IBaseDelegator } from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
-import { INetworkRestakeDelegator } from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
+import { IOperatorNetworkSpecificDelegator } from
+    "@symbioticfi/core/src/interfaces/delegator/IOperatorNetworkSpecificDelegator.sol";
 
 import { IBaseSlasher } from "@symbioticfi/core/src/interfaces/slasher/IBaseSlasher.sol";
 import { ISlasher } from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
@@ -52,11 +54,13 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
     }
 
     /// @inheritdoc ICapSymbioticVaultFactory
-    function createVault(address _owner, address _asset) external returns (address vault, address stakerRewards) {
-        address burner = _deployBurner(_asset);
+    function createVault(address _owner, address _asset, address _agent, address _network)
+        external
+        returns (address vault, address delegator, address burner, address slasher, address stakerRewards)
+    {
+        burner = _deployBurner(_asset);
 
-        address[] memory limitSetter = new address[](1);
-        limitSetter[0] = _owner;
+        address operator = ISymbioticNetwork(_network).deployOperator(_agent);
 
         IVaultConfigurator.InitParams memory params = IVaultConfigurator.InitParams({
             version: 1,
@@ -76,16 +80,16 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
                     depositLimitSetRoleHolder: _owner
                 })
             ),
-            delegatorIndex: uint64(DelegatorType.NETWORK_RESTAKE),
+            delegatorIndex: uint64(DelegatorType.OPERATOR_NETWORK_SPECIFIC),
             delegatorParams: abi.encode(
-                INetworkRestakeDelegator.InitParams({
+                IOperatorNetworkSpecificDelegator.InitParams({
                     baseParams: IBaseDelegator.BaseParams({
                         defaultAdminRoleHolder: address(0),
                         hook: address(0),
                         hookSetRoleHolder: address(0)
                     }),
-                    networkLimitSetRoleHolders: limitSetter,
-                    operatorNetworkSharesSetRoleHolders: limitSetter
+                    network: _network,
+                    operator: operator
                 })
             ),
             withSlasher: true,
@@ -93,7 +97,7 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
             slasherParams: abi.encode(ISlasher.InitParams({ baseParams: IBaseSlasher.BaseParams({ isBurnerHook: true }) }))
         });
 
-        (vault,,) = vaultConfigurator.create(params);
+        (vault, delegator, slasher) = vaultConfigurator.create(params);
 
         stakerRewards = defaultStakerRewardsFactory.create(
             IDefaultStakerRewards.InitParams({
@@ -112,7 +116,7 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
             IBurnerRouter.InitParams({
                 owner: address(0),
                 collateral: _collateral,
-                delay: 1,
+                delay: 0,
                 globalReceiver: middleware,
                 networkReceivers: new IBurnerRouter.NetworkReceiver[](0),
                 operatorNetworkReceivers: new IBurnerRouter.OperatorNetworkReceiver[](0)
