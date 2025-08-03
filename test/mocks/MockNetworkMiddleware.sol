@@ -111,4 +111,8 @@ contract MockNetworkMiddleware is ISymbioticNetworkMiddleware {
         mockCollateralByVault[_agent][_vault] += _coverage;
         mockSlashableCollateralByVault[_agent][_vault] += _coverage;
     }
+
+    function setNetwork(address _network) external {
+        _storage.network = _network;
+    }
 }

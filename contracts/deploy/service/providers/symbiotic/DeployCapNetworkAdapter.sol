@@ -4,8 +4,6 @@ pragma solidity ^0.8.0;
 import { AccessControl } from "../../../../access/AccessControl.sol";
 
 import { CapSymbioticVaultFactory } from "../../../../delegation/providers/symbiotic/CapSymbioticVaultFactory.sol";
-import { OperatorNetworkSpecificDecreaseHook } from
-    "../../../../delegation/providers/symbiotic/OperatorNetworkSpecificDecreaseHook.sol";
 import { SymbioticNetwork } from "../../../../delegation/providers/symbiotic/SymbioticNetwork.sol";
 import { SymbioticNetworkMiddleware } from "../../../../delegation/providers/symbiotic/SymbioticNetworkMiddleware.sol";
 

@@ -12,6 +12,7 @@ import { IOperatorNetworkSpecificDelegator } from
     "@symbioticfi/core/src/interfaces/delegator/IOperatorNetworkSpecificDelegator.sol";
 
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
+import { MockNetworkMiddleware } from "../mocks/MockNetworkMiddleware.sol";
 
 import { AccessControl } from "../../contracts/access/AccessControl.sol";
 import { SymbioticVaultParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
@@ -183,11 +184,12 @@ contract TestDeployer is
 
         if (useMockBackingNetwork()) {
             vm.startPrank(env.users.middleware_admin);
-            address networkMock = _deployDelegationNetworkMock();
-            env.symbiotic.networkAdapter.networkMiddleware = networkMock;
+            (address networkMiddleware, address network) = _deployDelegationNetworkMock();
+            env.symbiotic.networkAdapter.networkMiddleware = networkMiddleware;
+            MockNetworkMiddleware(networkMiddleware).setNetwork(network);
             vm.stopPrank();
 
-            _configureMockNetworkMiddleware(env, networkMock);
+            _configureMockNetworkMiddleware(env, networkMiddleware);
 
             _setMockNetworkMiddlewareAgentCoverage(env, env.testUsers.agents[0], 1_000_000e8);
         } else {

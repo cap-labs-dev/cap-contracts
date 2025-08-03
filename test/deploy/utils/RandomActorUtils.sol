@@ -14,12 +14,12 @@ contract RandomActorUtils is StdUtils, StdCheats {
         actors = _actors;
     }
 
-    function randomActor(uint256 actorIndexSeed) public view returns (address) {
-        return actors[bound(actorIndexSeed, 0, actors.length - 1)];
+    function randomActor(uint256) public view returns (address) {
+        return actors[0];
     }
 
-    function randomActor(address[] memory _actors, uint256 actorIndexSeed) public pure returns (address) {
-        return _actors[bound(actorIndexSeed, 0, _actors.length - 1)];
+    function randomActor(address[] memory _actors, uint256) public pure returns (address) {
+        return _actors[0];
     }
 
     function randomActor(uint256 actorIndexSeed, address actor1, address actor2) public pure returns (address) {
