@@ -12,6 +12,7 @@ interface IEigenServiceManager {
         address rewardsCoordinator;
         address registryCoordinator;
         address stakeRegistry;
+        mapping(address => address) agentToStrategy;
     }
 
     /// @notice Initialize the EigenServiceManager
@@ -48,9 +49,13 @@ interface IEigenServiceManager {
      * @dev This function may fail to execute with a large number of submissions due to gas limits. Use a
      * smaller array of submissions if necessary.
      */
-    /* function createAVSRewardsSubmission(
-        IRewardsCoordinator.RewardsSubmission[] calldata rewardsSubmissions
-    ) external;*/
+
+    /**
+     * @notice Distributes rewards to the agent
+     * @param _agent The agent to distribute rewards to
+     * @param _token The token to distribute rewards for
+     */
+    function distributeRewards(address _agent, address _token) external;
 
     /**
      * @notice Returns the EigenLayer AVSDirectory contract.
