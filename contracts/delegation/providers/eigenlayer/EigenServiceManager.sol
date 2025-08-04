@@ -89,6 +89,37 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         return totalSlashableShares;
     }
 
+    function slash(address _agent, address _recipient, uint256 _slashShare, uint48 _timestamp)
+        external
+        checkAccess(this.slash.selector)
+    {
+        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+
+        address _strategy = $.agentToStrategy[_agent];
+
+        uint256 slashableShares = getSlashableShares(_agent);
+
+        // Round up in favor of the liquidator
+        uint256 slashShareOfCollateral = (slashableShares * _slashShare / 1e18) + 1;
+
+        // If the slash share is greater than the total slashable collateral, set it to the total slashable collateral
+        if (slashShareOfCollateral > slashableShares) {
+            slashShareOfCollateral = slashableShares;
+        }
+
+        IAllocationManager.SlashingParams memory slashingParams = IAllocationManager.SlashingParams({
+            operator: _agent,
+            operatorSetId: 0,
+            strategies: new address[](1),
+            wadsToSlash: new uint256[](1),
+            description: "default"
+        });
+
+        IAllocationManager($.allocationManager).slashOperator(address(this), slashingParams);
+
+        //emit Slash(_agent, _recipient, slashShareOfCollateral);
+    }
+
     /// @inheritdoc IEigenServiceManager
     function distributeRewards(address _agent, address _token) external checkAccess(this.distributeRewards.selector) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
