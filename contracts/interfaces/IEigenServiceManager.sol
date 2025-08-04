@@ -8,7 +8,8 @@ interface IEigenServiceManager {
     /// @param accessControl Access control address
     struct EigenServiceManagerStorage {
         address accessControl;
-        address avsDirectory;
+        address allocationManager;
+        address delegationManager;
         address rewardsCoordinator;
         address registryCoordinator;
         address stakeRegistry;
@@ -17,13 +18,15 @@ interface IEigenServiceManager {
 
     /// @notice Initialize the EigenServiceManager
     /// @param _accessControl Access control contract
-    /// @param _avsDirectory AVS Directory contract
+    /// @param _allocationManager Allocation Manager contract
+    /// @param _delegationManager Delegation Manager contract
     /// @param _rewardsCoordinator Rewards Coordinator contract
     /// @param _registryCoordinator Registry Coordinator contract
     /// @param _stakeRegistry Stake Registry contract
     function initialize(
         address _accessControl,
-        address _avsDirectory,
+        address _allocationManager,
+        address _delegationManager,
         address _rewardsCoordinator,
         address _registryCoordinator,
         address _stakeRegistry
@@ -58,8 +61,10 @@ interface IEigenServiceManager {
     function distributeRewards(address _agent, address _token) external;
 
     /**
-     * @notice Returns the EigenLayer AVSDirectory contract.
-     * @return The EigenLayer AVSDirectory contract.
+     * @notice Returns the slashable collateral for an operator
+     * @param operator The operator to get the slashable collateral for
+     * @param timestamp The timestamp to get the slashable collateral for (unused for eigenlayer)
+     * @return The slashable collateral of the operator
      */
-    function avsDirectory() external view returns (address);
+    function slashableCollateral(address operator, uint256 timestamp) external view returns (uint256);
 }
