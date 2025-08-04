@@ -5,11 +5,12 @@ import { Access } from "../../../access/Access.sol";
 import { IEigenServiceManager } from "../../../interfaces/IEigenServiceManager.sol";
 import { EigenServiceManagerStorageUtils } from "../../../storage/EigenServiceManagerStorageUtils.sol";
 
+import { IAllocationManager } from "./interfaces/IAllocationManager.sol";
+import { IDelegationManager } from "./interfaces/IDelegationManager.sol";
 import { IRewardsCoordinator } from "./interfaces/IRewardsCoordinator.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IAVSDirectory } from "eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
-import { IDelegationManager } from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import { IStakeRegistry } from "eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 
 contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, EigenServiceManagerStorageUtils {
@@ -22,7 +23,8 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     /// @inheritdoc IEigenServiceManager
     function initialize(
         address _accessControl,
-        address _avsDirectory,
+        address _allocationManager,
+        address _delegationManager,
         address _rewardsCoordinator,
         address _registryCoordinator,
         address _stakeRegistry
@@ -30,7 +32,8 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         __Access_init(_accessControl);
         __UUPSUpgradeable_init();
-        $.avsDirectory = _avsDirectory;
+        $.allocationManager = _allocationManager;
+        $.delegationManager = _delegationManager;
         $.rewardsCoordinator = _rewardsCoordinator;
         $.registryCoordinator = _registryCoordinator;
         $.stakeRegistry = _stakeRegistry;
@@ -42,35 +45,44 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         checkAccess(this.updateAVSMetadataURI.selector)
     {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        IAVSDirectory($.avsDirectory).updateAVSMetadataURI(_metadataURI);
+        IAllocationManager($.allocationManager).updateAVSMetadataURI(address(this), _metadataURI);
     }
 
-    /*
+    /// @inheritdoc IEigenServiceManager
+    function slashableCollateral(address operator, uint256) external view returns (uint256) {
+        return getSlashableShares(operator);
+    }
+
     /// @notice Calculate the slashable shares for an operator at the current block
     /// @param operator The operator to calculate the slashable shares for
     /// @return The slashable shares of the operator
-    function calculateSlashableShares(
-        address operator
-    ) public view returns (uint256) {
+    function getSlashableShares(address operator) public view returns (uint256) {
+        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        address _strategy = $.agentToStrategy[operator];
         // Get the slashable shares for the operator/OperatorSet
+        IAllocationManager.OperatorSet memory operatorSet =
+            IAllocationManager.OperatorSet({ avs: address(this), id: 0 });
         address[] memory operators = new address[](1);
         operators[0] = operator;
-        IStrategy[] memory strategies = new IStrategy[](1);
-        strategies[0] = strategy;
-        uint256[][] memory slashableShares = allocationManager.getMinimumSlashableStake(operatorSet, operators, strategies, uint32(block.number));
+        address[] memory strategies = new address[](1);
+        strategies[0] = _strategy;
+        uint256[][] memory slashableShares = IAllocationManager($.allocationManager).getMinimumSlashableStake(
+            operatorSet, operators, strategies, uint32(block.number)
+        );
 
         // Get the shares in queue
-        uint256 sharesInQueue = delegationManager.getSlashableSharesInQueue(operator, strategy);
+        uint256 sharesInQueue = IDelegationManager($.delegationManager).getSlashableSharesInQueue(operator, _strategy);
 
         // Sum up the slashable shares and the shares in queue
         uint256 totalSlashableShares = slashableShares[0][0] + sharesInQueue;
 
         return totalSlashableShares;
-    }*/
+    }
 
     /// @inheritdoc IEigenServiceManager
     function distributeRewards(address _agent, address _token) external checkAccess(this.distributeRewards.selector) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        _checkApproval(_token, $.rewardsCoordinator);
         uint256 _amount = IERC20(_token).balanceOf(address(this));
         address _strategy = $.agentToStrategy[_agent];
 
@@ -96,17 +108,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     /// @param rewardsSubmissions The rewards submissions being created
     function _createAVSRewardsSubmission(IRewardsCoordinator.RewardsSubmission[] memory rewardsSubmissions) internal {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        for (uint256 i; i < rewardsSubmissions.length; ++i) {
-            _checkApproval(rewardsSubmissions[i].token, $.rewardsCoordinator);
-        }
-
         IRewardsCoordinator($.rewardsCoordinator).createAVSRewardsSubmission(rewardsSubmissions);
-    }
-
-    /// @inheritdoc IEigenServiceManager
-    function avsDirectory() external view override returns (address) {
-        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        return $.avsDirectory;
     }
 
     /// @notice Check if the token has enough allowance for the spender
