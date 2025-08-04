@@ -13,6 +13,16 @@ import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/Saf
 import { IAVSDirectory } from "eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
 import { IStakeRegistry } from "eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 
+////// TO DO {
+/* 
+ - Add coverage 
+ - Check reward duration with symbiotic
+ - check slashable coverage
+ - implement slash 
+ - add vault registration logic
+ - add agent registration logic 
+*/
+
 contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, EigenServiceManagerStorageUtils {
     using SafeERC20 for IERC20;
 
