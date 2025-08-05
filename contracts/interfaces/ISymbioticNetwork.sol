@@ -27,18 +27,17 @@ interface ISymbioticNetwork {
     /// @param _operatorRegistry Operator registry address
     /// @param _networkOptInService Network opt-in service address
     /// @param _vaultOptInService Vault opt-in service address
+    /// @param _middleware Middleware contract
+
     function initialize(
         address _accessControl,
         address _networkRegistry,
         address _operatorRegistry,
         address _networkOptInService,
-        address _vaultOptInService
+        address _vaultOptInService,
+        address _middleware,
+        address _middlewareService
     ) external;
-
-    /// @notice Register middleware contract
-    /// @param _middleware Middleware contract
-    /// @param _middlewareService Middleware service address
-    function registerMiddleware(address _middleware, address _middlewareService) external;
 
     /// @notice Register vault with Symbiotic
     /// @param _vault Vault address

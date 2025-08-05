@@ -42,15 +42,16 @@ contract DeployCapNetworkAdapter is ProxyUtils {
         SymbioticNetworkAdapterParams memory params
     ) internal returns (SymbioticNetworkAdapterConfig memory d) {
         d.network = _proxy(address(implems.network));
+        d.networkMiddleware = _proxy(address(implems.networkMiddleware));
         SymbioticNetwork(d.network).initialize(
             infra.accessControl,
             addressbook.registries.networkRegistry,
             addressbook.registries.operatorRegistry,
             addressbook.services.networkOptInService,
-            addressbook.services.vaultOptInService
+            addressbook.services.vaultOptInService,
+            d.networkMiddleware,
+            addressbook.services.networkMiddlewareService
         );
-
-        d.networkMiddleware = _proxy(address(implems.networkMiddleware));
         SymbioticNetworkMiddleware(d.networkMiddleware).initialize(
             infra.accessControl,
             d.network,
@@ -80,42 +81,19 @@ contract DeployCapNetworkAdapter is ProxyUtils {
         AccessControl accessControl = AccessControl(infra.accessControl);
 
         accessControl.grantAccess(middleware.registerVault.selector, address(middleware), users.middleware_admin);
-        accessControl.grantAccess(middleware.registerAgent.selector, address(middleware), users.middleware_admin);
         accessControl.grantAccess(middleware.setFeeAllowed.selector, address(middleware), users.middleware_admin);
         accessControl.grantAccess(middleware.slash.selector, address(middleware), infra.delegation);
         accessControl.grantAccess(middleware.distributeRewards.selector, address(middleware), infra.delegation);
 
-        accessControl.grantAccess(network.registerMiddleware.selector, address(network), users.middleware_admin);
-        accessControl.grantAccess(network.registerVault.selector, address(network), users.middleware_admin);
-
-        accessControl.grantAccess(middleware.registerVault.selector, address(middleware), address(network));
-    }
-
-    function _registerCapNetwork(SymbioticAddressbook memory addressbook, SymbioticNetworkAdapterConfig memory adapter)
-        internal
-    {
-        SymbioticNetwork(adapter.network).registerMiddleware(
-            adapter.networkMiddleware, addressbook.services.networkMiddlewareService
-        );
+        accessControl.grantAccess(network.registerVault.selector, address(network), address(middleware));
     }
 
     function _registerVaultInNetworkMiddleware(
         SymbioticNetworkAdapterConfig memory adapter,
         SymbioticVaultConfig memory vault,
-        SymbioticNetworkRewardsConfig memory rewards
-    ) internal {
-        SymbioticNetworkMiddleware(adapter.networkMiddleware).registerVault(vault.vault, rewards.stakerRewarder);
-    }
-
-    function _registerAgentInNetworkMiddleware(
-        SymbioticNetworkAdapterConfig memory adapter,
-        SymbioticVaultConfig memory vault,
+        SymbioticNetworkRewardsConfig memory rewards,
         address agent
     ) internal {
-        SymbioticNetworkMiddleware(adapter.networkMiddleware).registerAgent(vault.vault, agent);
-    }
-
-    function _agentRegisterAsOperator(SymbioticAddressbook memory addressbook) internal {
-        IOperatorRegistry(addressbook.registries.operatorRegistry).registerOperator();
+        SymbioticNetworkMiddleware(adapter.networkMiddleware).registerVault(vault.vault, rewards.stakerRewarder, agent);
     }
 }

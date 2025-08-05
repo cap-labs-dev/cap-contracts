@@ -43,26 +43,6 @@ contract SymbioticSlashAssumptionsTest is TestDeployer {
         return IBaseDelegator(_vault.delegator).stakeAt(subnetwork, _agent, uint48(_timestamp), "");
     }
 
-    function test_add_agent() public {
-        vm.startPrank(env.users.middleware_admin);
-        address agent = makeAddr("agent");
-
-        vm.expectRevert();
-        SymbioticNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).registerAgent(address(0), agent);
-
-        vm.expectRevert();
-        SymbioticNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).registerAgent(
-            symbioticWethVault.vault, address(0)
-        );
-
-        SymbioticNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).registerAgent(
-            symbioticWethVault.vault, agent
-        );
-        address vault = SymbioticNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).vaults(agent);
-        assertEq(vault, symbioticWethVault.vault);
-        vm.stopPrank();
-    }
-
     function test_can_slash_after_restaker_undelegation() public {
         SymbioticVaultConfig memory _vault = symbioticWethVault;
         SymbioticNetworkMiddleware _middleware =

@@ -213,10 +213,6 @@ contract TestDeployer is
             vm.startPrank(env.users.access_control_admin);
             _initSymbioticNetworkAdapterAccessControl(env.infra, env.symbiotic.networkAdapter, env.users);
 
-            console.log("registering symbiotic network");
-            vm.startPrank(env.users.middleware_admin);
-            _registerCapNetwork(symbioticAb, env.symbiotic.networkAdapter);
-
             console.log("init agent delegation for symbiotic network");
             vm.startPrank(env.users.delegation_admin);
             address agent = env.testUsers.agents[0];
@@ -266,12 +262,7 @@ contract TestDeployer is
         console.log("registering vaults in network middleware");
         vm.startPrank(env.users.middleware_admin);
 
-        _registerVaultInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, _rewards);
-        _registerAgentInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, agent);
-
-        console.log("registering network in vaults");
-        vm.startPrank(env.users.middleware_admin);
-        _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, _vault, agent);
+        _registerVaultInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, _rewards, agent);
     }
 
     function _applyTestnetLabels() internal {
