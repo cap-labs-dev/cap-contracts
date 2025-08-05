@@ -8,8 +8,4 @@ contract ConfigureDelegation {
     function _registerNetworkForCapDelegation(InfraConfig memory infra, address network) internal {
         Delegation(infra.delegation).registerNetwork(network);
     }
-
-    function _addAgentToDelegationContract(InfraConfig memory infra, address agent, address network) internal {
-        Delegation(infra.delegation).addAgent(agent, network, 0.5e27, 0.7e27);
-    }
 }
