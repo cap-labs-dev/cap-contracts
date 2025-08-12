@@ -7,7 +7,7 @@
             "delegation": "0x386C93f9f0A8a681c5A3E826063106A2474958ab",
             "feeAuction": "0x6c0a3cb3797691b5a702155F4FE507fd58b5D023",
             "feeReceiver": "0xFB39E573b033ECBd8f795369BDaB11F0E210992f",
-            "lender": "0x5e3b9F61585aa4648682B3F06D9eFBEeDBa21105",
+            "lender": "0x11742fC74A2F97585DF64EFa1c3F3A02e9bc2cDC",
             "oracle": "0xbFe4D64E61a3a02C4781a65FA343007de7ea9F14",
             "stakedCap": "0x9C3a8aA28E0388E89302390695478C8D00a7dBbB"
         },
@@ -15,7 +15,8 @@
             "accessControl": "0x7731129a10d51e18cDE607C5C115F26503D2c683",
             "delegation": "0xF3E3Eae671000612CE3Fd15e1019154C1a4d693F",
             "lender": "0x15622c3dbbc5614E6DFa9446603c1779647f01FC",
-            "oracle": "0xcD7f45566bc0E7303fB92A93969BB4D3f6e662bb"
+            "oracle": "0xcD7f45566bc0E7303fB92A93969BB4D3f6e662bb",
+            "harvester": "0xBF664De63168720b57f1c93581512E9580E3E6f8"
         },
         "libs": {
             "aaveAdapter": "0xf4DE2D82904D528E8F0fE9c374218aE6B0A86d7e",
