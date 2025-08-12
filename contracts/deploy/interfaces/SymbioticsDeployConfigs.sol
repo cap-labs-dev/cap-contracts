@@ -4,11 +4,13 @@ pragma solidity ^0.8.0;
 struct SymbioticNetworkAdapterImplementationsConfig {
     address network;
     address networkMiddleware;
+    address agentManager;
 }
 
 struct SymbioticNetworkAdapterConfig {
     address network;
     address networkMiddleware;
+    address agentManager;
     uint256 feeAllowed;
     address vaultFactory;
     address decreaseHook;

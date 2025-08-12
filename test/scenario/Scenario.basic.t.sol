@@ -396,12 +396,10 @@ contract ScenarioBasicTest is TestDeployer {
             console.log("Liquidation threshold of the operator", liquidationThreshold);
             console.log("Health of the operator", health);
             /// Bad actor so we set his liquidation threshold to 1%
-            Delegation(env.infra.delegation).modifyAgent(user_agent, 0, 0.01e27);
+            Delegation(env.infra.delegation).modifyAgent(user_agent, 0, 0.1e27);
             vm.stopPrank();
 
             vm.startPrank(env.testUsers.liquidator);
-            deal(address(usdc), env.testUsers.liquidator, 4000e6);
-            usdc.approve(address(lender), 4000e6);
             lender.openLiquidation(user_agent);
 
             vm.expectRevert();
@@ -410,7 +408,15 @@ contract ScenarioBasicTest is TestDeployer {
             vm.expectRevert();
             lender.openLiquidation(user_agent);
             _timeTravel(lender.grace() + 1);
-            lender.liquidate(user_agent, address(usdc), 4000e6);
+
+            (,, totalDebt,,,) = lender.agent(user_agent);
+            deal(address(usdc), env.testUsers.liquidator, totalDebt);
+            usdc.approve(address(lender), totalDebt);
+
+            lender.liquidate(user_agent, address(usdc), totalDebt);
+
+            (,, totalDebt,,,) = lender.agent(user_agent);
+            console.log("Total debt of the operator after liquidation", totalDebt);
 
             lender.closeLiquidation(user_agent);
             vm.stopPrank();

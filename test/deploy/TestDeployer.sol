@@ -4,10 +4,14 @@ pragma solidity ^0.8.0;
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
 
 import { CapSymbioticVaultFactory } from "../../contracts/delegation/providers/symbiotic/CapSymbioticVaultFactory.sol";
+
+import { SymbioticAgentManager } from "../../contracts/delegation/providers/symbiotic/SymbioticAgentManager.sol";
 import { SymbioticNetwork } from "../../contracts/delegation/providers/symbiotic/SymbioticNetwork.sol";
 import { SymbioticNetworkMiddleware } from
     "../../contracts/delegation/providers/symbiotic/SymbioticNetworkMiddleware.sol";
+
 import { FeeConfig, VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
+import { ISymbioticAgentManager } from "../../contracts/interfaces/ISymbioticAgentManager.sol";
 import { IOperatorNetworkSpecificDelegator } from
     "@symbioticfi/core/src/interfaces/delegator/IOperatorNetworkSpecificDelegator.sol";
 
@@ -205,6 +209,8 @@ contract TestDeployer is
                 SymbioticNetworkAdapterParams({ vaultEpochDuration: 7 days, feeAllowed: 1000 })
             );
 
+            address agent = env.testUsers.agents[0];
+
             console.log("registering delegation network");
             vm.startPrank(env.users.delegation_admin);
             _registerNetworkForCapDelegation(env.infra, env.symbiotic.networkAdapter.networkMiddleware);
@@ -213,18 +219,10 @@ contract TestDeployer is
             vm.startPrank(env.users.access_control_admin);
             _initSymbioticNetworkAdapterAccessControl(env.infra, env.symbiotic.networkAdapter, env.users);
 
-            console.log("registering symbiotic network");
-            vm.startPrank(env.users.middleware_admin);
-            _registerCapNetwork(symbioticAb, env.symbiotic.networkAdapter);
-
-            console.log("init agent delegation for symbiotic network");
-            vm.startPrank(env.users.delegation_admin);
-            address agent = env.testUsers.agents[0];
-            _addAgentToDelegationContract(env.infra, agent, env.symbiotic.networkAdapter.networkMiddleware);
-
             console.log("deploying symbiotic WETH vault");
             (SymbioticVaultConfig memory _vault, SymbioticNetworkRewardsConfig memory _rewards) =
                 _deployAndConfigureTestnetSymbioticVault(env.ethMocks[0], "WETH", agent);
+
             _symbioticVaultConfigToEnv(_vault);
             _symbioticNetworkRewardsConfigToEnv(_rewards);
 
@@ -266,12 +264,16 @@ contract TestDeployer is
         console.log("registering vaults in network middleware");
         vm.startPrank(env.users.middleware_admin);
 
-        _registerVaultInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, _rewards);
-        _registerAgentInNetworkMiddleware(env.symbiotic.networkAdapter, _vault, agent);
+        ISymbioticAgentManager.AgentConfig memory agentConfig = ISymbioticAgentManager.AgentConfig({
+            agent: agent,
+            vault: vault,
+            rewarder: stakerRewarder,
+            ltv: 0.5e27,
+            liquidationThreshold: 0.7e27,
+            delegationRate: 0.02e27
+        });
 
-        console.log("registering network in vaults");
-        vm.startPrank(env.users.middleware_admin);
-        _networkOptInToSymbioticVault(env.symbiotic.networkAdapter, _vault, agent);
+        SymbioticAgentManager(env.symbiotic.networkAdapter.agentManager).addAgent(agentConfig);
     }
 
     function _applyTestnetLabels() internal {

@@ -46,10 +46,7 @@ interface ISymbioticNetworkMiddleware {
     }
 
     /// @dev Vault registered
-    event VaultRegistered(address vault);
-
-    /// @dev Agent registered
-    event AgentRegistered(address agent);
+    event VaultRegistered(address vault, address agent);
 
     /// @dev Slash event
     event Slash(address indexed agent, address recipient, uint256 amount);
@@ -72,17 +69,11 @@ interface ISymbioticNetworkMiddleware {
     /// @dev Invalid burner router
     error InvalidBurnerRouter();
 
-    /// @dev No staker rewarder
-    error NoStakerRewarder();
-
     /// @dev Vault not initialized
     error VaultNotInitialized();
 
     /// @dev Vault exists
     error VaultExists();
-
-    /// @dev Vault does not exist
-    error VaultDoesNotExist();
 
     /// @dev Invalid epoch duration
     error InvalidEpochDuration(uint48 required, uint48 actual);
@@ -93,8 +84,8 @@ interface ISymbioticNetworkMiddleware {
     /// @dev Existing coverage
     error ExistingCoverage();
 
-    /// @dev Invalid agent
-    error InvalidAgent();
+    /// @dev Zero address
+    error ZeroAddress();
 
     /// @notice Initialize the Symbiotic Network Middleware
     /// @param _accessControl Access control address
@@ -112,15 +103,11 @@ interface ISymbioticNetworkMiddleware {
         uint256 _feeAllowed
     ) external;
 
-    /// @notice Register agent to be used as collateral within the CAP system
-    /// @param _vault Vault address
-    /// @param _agent Agent address
-    function registerAgent(address _vault, address _agent) external;
-
     /// @notice Register vault to be used as collateral within the CAP system
     /// @param _vault Vault address
     /// @param _stakerRewarder Staker rewarder address
-    function registerVault(address _vault, address _stakerRewarder) external;
+    /// @param _agent Agent address
+    function registerVault(address _vault, address _stakerRewarder, address _agent) external;
 
     /// @notice Set fee allowed
     /// @param _feeAllowed Fee allowed to be charged on rewards by restakers

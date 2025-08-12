@@ -29,8 +29,8 @@ contract SymbioticNetwork is ISymbioticNetwork, UUPSUpgradeable, Access, Symbiot
     /// @dev Operator already deployed
 
     error OperatorAlreadyDeployed(address agent);
-    /// @custom:oz-upgrades-unsafe-allow constructor
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
@@ -41,7 +41,9 @@ contract SymbioticNetwork is ISymbioticNetwork, UUPSUpgradeable, Access, Symbiot
         address _networkRegistry,
         address _operatorRegistry,
         address _networkOptInService,
-        address _vaultOptInService
+        address _vaultOptInService,
+        address _middleware,
+        address _middlewareService
     ) external initializer {
         __Access_init(_accessControl);
         INetworkRegistry(_networkRegistry).registerNetwork();
@@ -49,15 +51,12 @@ contract SymbioticNetwork is ISymbioticNetwork, UUPSUpgradeable, Access, Symbiot
         getSymbioticNetworkStorage().vaultOptInService = _vaultOptInService;
         getSymbioticNetworkStorage().operatorRegistry = _operatorRegistry;
         getSymbioticNetworkStorage().operatorImplementation = address(new SymbioticOperator());
+        _registerMiddleware(_middleware, _middlewareService);
     }
 
     /// @inheritdoc ISymbioticNetwork
-    function registerMiddleware(address _middleware, address _middlewareService)
-        external
-        checkAccess(this.registerMiddleware.selector)
-    {
-        getSymbioticNetworkStorage().middleware = _middleware;
-        INetworkMiddlewareService(_middlewareService).setMiddleware(_middleware);
+    function getOperator(address _agent) public view returns (address) {
+        return getSymbioticNetworkStorage().agentToOperator[_agent];
     }
 
     /// @inheritdoc ISymbioticNetwork
@@ -75,11 +74,6 @@ contract SymbioticNetwork is ISymbioticNetwork, UUPSUpgradeable, Access, Symbiot
     }
 
     /// @inheritdoc ISymbioticNetwork
-    function getOperator(address _agent) public view returns (address) {
-        return getSymbioticNetworkStorage().agentToOperator[_agent];
-    }
-
-    /// @inheritdoc ISymbioticNetwork
     function deployOperator(address _agent) external returns (address operator) {
         if (getOperator(_agent) != address(0)) revert OperatorAlreadyDeployed(_agent);
 
@@ -88,9 +82,16 @@ contract SymbioticNetwork is ISymbioticNetwork, UUPSUpgradeable, Access, Symbiot
         operator = Clones.clone($.operatorImplementation);
         ISymbioticOperator(operator).initialize(_agent, $.networkOptInService, $.operatorRegistry, address(this));
 
-        emit OperatorDeployed(_agent, operator);
-
         $.agentToOperator[_agent] = operator;
+        emit OperatorDeployed(_agent, operator);
+    }
+
+    /// @dev Register middleware contract
+    /// @param _middleware Middleware contract
+    /// @param _middlewareService Middleware service address
+    function _registerMiddleware(address _middleware, address _middlewareService) private {
+        getSymbioticNetworkStorage().middleware = _middleware;
+        INetworkMiddlewareService(_middlewareService).setMiddleware(_middleware);
     }
 
     /// @inheritdoc UUPSUpgradeable

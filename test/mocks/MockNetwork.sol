@@ -9,10 +9,10 @@ contract MockNetwork is ISymbioticNetwork {
         address _networkRegistry,
         address _operatorRegistry,
         address _networkOptInService,
-        address _vaultOptInService
+        address _vaultOptInService,
+        address _middleware,
+        address _middlewareService
     ) external { }
-
-    function registerMiddleware(address _middleware, address _middlewareService) external { }
 
     function registerVault(address _vault, address _agent) external { }
 

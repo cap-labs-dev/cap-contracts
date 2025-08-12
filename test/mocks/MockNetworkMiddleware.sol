@@ -22,14 +22,9 @@ contract MockNetworkMiddleware is ISymbioticNetworkMiddleware {
         uint256 _feeAllowed
     ) external { }
 
-    function registerAgent(address _agent, address _vault) external {
-        _storage.agentsToVault[_agent] = _vault;
-        emit AgentRegistered(_agent);
-    }
-
-    function registerVault(address _vault, address _stakerRewarder) external {
+    function registerVault(address _vault, address _stakerRewarder, address _agent) external {
         _storage.vaults[_vault] = Vault({ stakerRewarder: _stakerRewarder, exists: true });
-        emit VaultRegistered(_vault);
+        emit VaultRegistered(_vault, _agent);
     }
 
     function setFeeAllowed(uint256 _feeAllowed) external {
