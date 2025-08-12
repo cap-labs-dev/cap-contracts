@@ -73,7 +73,7 @@ contract CapSymbioticVaultFactory is ICapSymbioticVaultFactory {
                     depositWhitelist: false,
                     isDepositLimit: false,
                     depositLimit: 0,
-                    defaultAdminRoleHolder: address(0),
+                    defaultAdminRoleHolder: _owner,
                     depositWhitelistSetRoleHolder: _owner,
                     depositorWhitelistRoleHolder: _owner,
                     isDepositLimitSetRoleHolder: _owner,
