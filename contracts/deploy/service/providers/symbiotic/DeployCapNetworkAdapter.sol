@@ -42,6 +42,7 @@ contract DeployCapNetworkAdapter is ProxyUtils {
     }
 
     function _deploySymbioticNetworkAdapterInfra(
+        address capToken,
         InfraConfig memory infra,
         SymbioticAddressbook memory addressbook,
         SymbioticNetworkAdapterImplementationsConfig memory implems,
@@ -69,7 +70,7 @@ contract DeployCapNetworkAdapter is ProxyUtils {
         );
 
         SymbioticAgentManager(d.agentManager).initialize(
-            infra.accessControl, infra.delegation, d.networkMiddleware, infra.oracle
+            infra.accessControl, infra.lender, capToken, infra.delegation, d.networkMiddleware, infra.oracle
         );
 
         d.vaultFactory = address(

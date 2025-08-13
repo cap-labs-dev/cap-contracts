@@ -5,7 +5,7 @@
             "network": "0x98e52Ea7578F2088c152E81b17A9a459bF089f2a",
             "networkMiddleware": "0x09A3976d8D63728d20DCDFEe1e531C206Ba91225",
             "vaultFactory": "0x0B92300C8494833E504Ad7d36a301eA80DbBAE2e",
-            "agentManager": "0x6947A9417650C39581A20f5269e17765C73B9f62",
+            "agentManager": "0x08A728CF4E6b39f4AFa059c6eE376103722953eA",
             "decreaseHook": "0x0000000000000000000000000000000000000000"
         },
         "implems": {

@@ -203,6 +203,7 @@ contract TestDeployer is
             vm.startPrank(env.users.deployer);
             env.symbiotic.networkAdapterImplems = _deploySymbioticNetworkAdapterImplems();
             env.symbiotic.networkAdapter = _deploySymbioticNetworkAdapterInfra(
+                env.usdVault.capToken,
                 env.infra,
                 symbioticAb,
                 env.symbiotic.networkAdapterImplems,
