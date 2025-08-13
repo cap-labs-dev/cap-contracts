@@ -11,7 +11,7 @@
         "implems": {
             "network": "0x0c1A64E562E987e650EA82C7868eb96902B1B0d2",
             "networkMiddleware": "0xF3B32Aa21Ac382371c5d69bb7161f65Ac50f30aA",
-            "agentManager": "0xc623227b09ff0b33ca6abc9013d2c7000191a82c"
+            "agentManager": "0x3990D05A6a9e3E195DB90E11f7b0ea0Eb14f342D"
         }
     }
 }
