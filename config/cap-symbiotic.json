@@ -2,9 +2,10 @@
     "1": {
         "adapter": {
             "feeAllowed": 0,
-            "network": "0x44f7E678E8412DbeF1fD930f60AF2bD125095962",
-            "networkMiddleware": "0x8C9140Fe6650E56A0A07E86455D745f8F7843B6D",
-            "vaultFactory": "0x1a8629b14898C4e05479EFAb4155a3Fc372725b7"
+            "network": "0x98e52Ea7578F2088c152E81b17A9a459bF089f2a",
+            "networkMiddleware": "0x09A3976d8D63728d20DCDFEe1e531C206Ba91225",
+            "vaultFactory": "0x0B92300C8494833E504Ad7d36a301eA80DbBAE2e",
+            "agentManager": "0x6947A9417650C39581A20f5269e17765C73B9f62"
         },
         "implems": {
             "network": "0x0dC1a95D91B55b1a1a27B32B8e9D9Fc5A8f90bA8",
