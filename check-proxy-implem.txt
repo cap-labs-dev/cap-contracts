@@ -1,0 +1,48 @@
+No files changed, compilation skipped
+Script ran successfully.
+
+== Logs ==
+  Checking Proxy implementation for Known poisoned proxy Contract...
+  Implementation mismatch for Known poisoned proxy
+  Expected: 0xce2177833E400F91bb308308f7d9933e48982b01
+  Actual: 0x568AA6C21cCf558C47F2A01B60cc6D549cED2F59
+  
+  Checking Proxy implementation for Access Control Contract...
+  Implementation matches for Access Control
+  
+  Checking Proxy implementation for Lender Contract...
+  Implementation matches for Lender
+  
+  Checking Proxy implementation for Delegation Contract...
+  Implementation matches for Delegation
+  
+  Checking Proxy implementation for Oracle Contract...
+  Implementation matches for Oracle
+  
+  Checking Proxy implementation for Chainlink PoR Address List Contract...
+  Implementation matches for Chainlink PoR Address List
+  
+  Checking Proxy implementation for Network Middleware Contract...
+  Implementation matches for Network Middleware
+  
+  Checking Proxy implementation for Network Contract...
+  Implementation matches for Network
+  
+  Checking Proxy implementation for Agent Manager Contract...
+  Implementation matches for Agent Manager
+  
+  Checking Proxy implementation for Cap Token Contract...
+  Implementation matches for Cap Token
+  
+  Checking Proxy implementation for Staked Cap Token Contract...
+  Implementation matches for Staked Cap Token
+  
+  Checking Proxy implementation for Fee Auction Contract...
+  Implementation matches for Fee Auction
+  
+  Checking Proxy implementation for Fee Receiver Contract...
+  Implementation matches for Fee Receiver
+  
+  Checking Proxy implementation for Debt Token 0 of cUSD vault (Debt USD Coin) Contract...
+  Implementation matches for Debt Token 0 of cUSD vault (Debt USD Coin)
+  

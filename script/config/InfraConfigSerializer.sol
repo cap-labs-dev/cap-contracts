@@ -77,7 +77,8 @@ contract InfraConfigSerializer {
             oracle: json.readAddress(string.concat(implemsPrefix, "oracle")),
             debtToken: json.readAddress(string.concat(implemsPrefix, "debtToken")),
             feeAuction: json.readAddress(string.concat(implemsPrefix, "feeAuction")),
-            feeReceiver: json.readAddress(string.concat(implemsPrefix, "feeReceiver"))
+            feeReceiver: json.readAddress(string.concat(implemsPrefix, "feeReceiver")),
+            chainlinkPoRAddressList: json.readAddress(string.concat(implemsPrefix, "chainlinkPoRAddressList"))
         });
 
         string memory libsPrefix = string.concat(chainPrefix, "libs.");
@@ -93,7 +94,8 @@ contract InfraConfigSerializer {
             oracle: json.readAddress(string.concat(infraPrefix, "oracle")),
             accessControl: json.readAddress(string.concat(infraPrefix, "accessControl")),
             lender: json.readAddress(string.concat(infraPrefix, "lender")),
-            delegation: json.readAddress(string.concat(infraPrefix, "delegation"))
+            delegation: json.readAddress(string.concat(infraPrefix, "delegation")),
+            chainlinkPoRAddressList: json.readAddress(string.concat(infraPrefix, "chainlinkPoRAddressList"))
         });
     }
 }

@@ -1,6 +1,4 @@
-Compiling 1 files with Solc 0.8.28
-Solc 0.8.28 finished in 1.82s
-Compiler run successful!
+No files changed, compilation skipped
 Script ran successfully.
 
 == Logs ==
@@ -17,6 +15,7 @@ Script ran successfully.
   Lender.addAsset 🚨 Dev EOA 🚨
   Lender.removeAsset 🚨 Dev EOA 🚨
   Lender.pauseAsset 🚨 Dev EOA 🚨
+  Lender.setInterestReceiver 🚨 Dev EOA 🚨
   Lender.setMinBorrow 🚨 Dev EOA 🚨
   Lender.liquidate 🚨 Dev EOA 🚨
   Vault.borrow 🚨 Dev EOA 🚨
@@ -37,10 +36,19 @@ Script ran successfully.
   AccessControl.grantAccess 🚨 Dev EOA 🚨
   AccessControl.revokeAccess 🚨 Dev EOA 🚨
   
+  Checking Access for Chainlink PoR Address List Contract...
+  CapChainlinkPoRAddressList.addTokenPriceOracle 🚨 Dev EOA 🚨
+  
   Checking Access for Network Contract...
   Proxy.upgrade 🚨 Dev EOA 🚨
   
   Checking Access for Network Middleware Contract...
+  Proxy.upgrade 🚨 Dev EOA 🚨
+  
+  Checking Access for Agent Manager Contract...
+  Proxy.upgrade 🚨 Dev EOA 🚨
+  
+  Checking Access for Vault Factory Contract...
   Proxy.upgrade 🚨 Dev EOA 🚨
   
   Checking Access for Fee Auction (cUSD) Contract...
