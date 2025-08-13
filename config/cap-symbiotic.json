@@ -5,22 +5,13 @@
             "network": "0x98e52Ea7578F2088c152E81b17A9a459bF089f2a",
             "networkMiddleware": "0x09A3976d8D63728d20DCDFEe1e531C206Ba91225",
             "vaultFactory": "0x0B92300C8494833E504Ad7d36a301eA80DbBAE2e",
-            "agentManager": "0x6947A9417650C39581A20f5269e17765C73B9f62"
+            "agentManager": "0x6947A9417650C39581A20f5269e17765C73B9f62",
+            "decreaseHook": "0x0000000000000000000000000000000000000000"
         },
         "implems": {
             "network": "0x0c1A64E562E987e650EA82C7868eb96902B1B0d2",
-            "networkMiddleware": "0xF3B32Aa21Ac382371c5d69bb7161f65Ac50f30aA"
-        }
-    },
-    "17000": {
-        "adapter": {
-            "feeAllowed": 1000,
-            "network": "0x008CDb66a44A3c8E0077061337ae2964FDdd313E",
-            "networkMiddleware": "0xBC17ceAEDC9d789cC6C43fED13E321ddD28AD9ad"
-        },
-        "implems": {
-            "network": "0x290be688CC5CC060e48610Be10A43d92401E521f",
-            "networkMiddleware": "0x7f557D9945449F4221caF8C13fFc231E2B0F2892"
+            "networkMiddleware": "0xF3B32Aa21Ac382371c5d69bb7161f65Ac50f30aA",
+            "agentManager": "0xc623227b09ff0b33ca6abc9013d2c7000191a82c"
         }
     }
 }

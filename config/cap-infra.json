@@ -9,63 +9,16 @@
             "feeReceiver": "0xFB39E573b033ECBd8f795369BDaB11F0E210992f",
             "lender": "0x11742fC74A2F97585DF64EFa1c3F3A02e9bc2cDC",
             "oracle": "0xbFe4D64E61a3a02C4781a65FA343007de7ea9F14",
-            "stakedCap": "0x9C3a8aA28E0388E89302390695478C8D00a7dBbB"
+            "stakedCap": "0x9C3a8aA28E0388E89302390695478C8D00a7dBbB",
+            "chainlinkPoRAddressList": "0xc85d36c2a73caca3b4cb9a2640dbb9269f24614a"
         },
         "infra": {
             "accessControl": "0x7731129a10d51e18cDE607C5C115F26503D2c683",
             "delegation": "0xF3E3Eae671000612CE3Fd15e1019154C1a4d693F",
             "lender": "0x15622c3dbbc5614E6DFa9446603c1779647f01FC",
             "oracle": "0xcD7f45566bc0E7303fB92A93969BB4D3f6e662bb",
-            "harvester": "0xBF664De63168720b57f1c93581512E9580E3E6f8"
-        },
-        "libs": {
-            "aaveAdapter": "0xf4DE2D82904D528E8F0fE9c374218aE6B0A86d7e",
-            "capTokenAdapter": "0xAcc9ce4C15A0F6A2bec49C3F81261d60553D2Faf",
-            "chainlinkAdapter": "0xc850409DC3587039e87930008217B6622CC3B2E2",
-            "stakedCapAdapter": "0xdf48Eb321B38bc19E7F5b2CCA8242Cc6B9a6EcD0"
-        }
-    },
-    "17000": {
-        "implems": {
-            "accessControl": "0x6FC075b619ABEEC86A37f2a347C5147348c2033d",
-            "capToken": "0x976551eD6f311a99CC0b5f3a043C8C1Df5FF0227",
-            "debtToken": "0xF418C7c0D87A3e8771B7e2d3D78167eAbb27e433",
-            "delegation": "0xEB78Fbf924B832a5958b6a3C2393Ce8e003f5e34",
-            "feeAuction": "0x55b68200a65c7b10a200d0Ed0E91eAE329Cf8161",
-            "lender": "0x49e1641FFA904b08DC1787ca464189fd23D33d4a",
-            "oracle": "0xFD768AfbCDb08FaD1E2f916504686eb549d10a06",
-            "stakedCap": "0xC7Fe210404A44Eb9E82cD5FE56A024df9e3eC7E4"
-        },
-        "infra": {
-            "accessControl": "0x0d85A0Feb0f46Cc78a0b94634FB67F6951468870",
-            "delegation": "0x56236E56AEBA216111BC9f8638E33cC6872AF546",
-            "lender": "0x77083D1B1c7abF5f31dDbB2C755E1aF0DE389992",
-            "oracle": "0xE3165810D81173Ac899262451211AAF7e6BE01Fe"
-        },
-        "libs": {
-            "aaveAdapter": "0xE519A2875DC266bf96eB9b7Fa4DE32D9EB5C8623",
-            "capTokenAdapter": "0x0F46E2d7D80966CB819Ce0C5687C91C944dd86A9",
-            "chainlinkAdapter": "0x8d1347316b0dFAD60F144a5F3D841A86cB81De76",
-            "stakedCapAdapter": "0x5B4CB48aF23d6E7C594AC240BD076dAbDdEbC67F"
-        }
-    },
-    "31337": {
-        "implems": {
-            "accessControl": "0xe30D954acC050A0DD9095Cebf5B4257dd59CF4b9",
-            "capToken": "0x65721910DaeA0F28CBaa99964F952c68Cd9bBFef",
-            "debtToken": "0xA99C0AE66dd5131AE155F25F42ACEb1D1A00ff6F",
-            "delegation": "0x48C442cb3cC8503690D39582B0E9F36872126749",
-            "feeAuction": "0xFC606945b2FE1eB5BAe11A1206B50Df6Ba4bA6D3",
-            "feeReceiver": "0xbD12E50Bfaa25735D074DBfDCF73208b9ccD2e43",
-            "lender": "0xc162E91576246f90ff7E5A3B3c9a0daA05BF1Bd5",
-            "oracle": "0x32C08836d2873d1FFC958e3C57F3e08852b42a3D",
-            "stakedCap": "0x1054d0fEC6139B4Cd6f7703E37e109b1A069A3Df"
-        },
-        "infra": {
-            "accessControl": "0xdDAF4E33Ad99a9Ec7bB453dB0869E064A47255B0",
-            "delegation": "0xe23680f14214c4c9238411d2a85e74A9297ECEF0",
-            "lender": "0x32fd97A5196a6D98656a7F2f191Ae4732ad13170",
-            "oracle": "0x1036C242ccE7a6632E2f2649F293eaa881835772"
+            "harvester": "0xBF664De63168720b57f1c93581512E9580E3E6f8",
+            "chainlinkPoRAddressList": "0x69A22f0fc7b398e637BF830B862C75dd854b2BbF"
         },
         "libs": {
             "aaveAdapter": "0xf4DE2D82904D528E8F0fE9c374218aE6B0A86d7e",

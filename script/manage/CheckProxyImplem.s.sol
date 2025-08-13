@@ -64,17 +64,55 @@ contract CheckProxyImplem is Script, InfraConfigSerializer, VaultConfigSerialize
             NamedProxy({ proxy: infra.lender, implementation: implems.lender, name: "Lender" }),
             NamedProxy({ proxy: infra.delegation, implementation: implems.delegation, name: "Delegation" }),
             NamedProxy({ proxy: infra.oracle, implementation: implems.oracle, name: "Oracle" }),
-            NamedProxy({ proxy: vaultConfig.capToken, implementation: implems.capToken, name: "Cap Token" }),
-            NamedProxy({ proxy: vaultConfig.stakedCapToken, implementation: implems.stakedCap, name: "Staked Cap Token" }),
-            NamedProxy({ proxy: vaultConfig.feeAuction, implementation: implems.feeAuction, name: "Fee Auction" }),
-            NamedProxy({ proxy: vaultConfig.feeReceiver, implementation: implems.feeReceiver, name: "Fee Receiver" }),
+            NamedProxy({
+                proxy: infra.chainlinkPoRAddressList,
+                implementation: implems.chainlinkPoRAddressList,
+                name: "Chainlink PoR Address List"
+            }),
             NamedProxy({
                 proxy: symbioticAdapter.networkMiddleware,
                 implementation: symbioticImplems.networkMiddleware,
                 name: "Network Middleware"
             }),
-            NamedProxy({ proxy: symbioticAdapter.network, implementation: symbioticImplems.network, name: "Network" })
+            NamedProxy({ proxy: symbioticAdapter.network, implementation: symbioticImplems.network, name: "Network" }),
+            NamedProxy({
+                proxy: symbioticAdapter.agentManager,
+                implementation: symbioticImplems.agentManager,
+                name: "Agent Manager"
+            })
         ];
+
+        string[1] memory capTokenSymbols = ["cUSD"];
+        for (uint256 i = 0; i < capTokenSymbols.length; i++) {
+            string memory symbol = capTokenSymbols[i];
+            _addVault(symbol);
+        }
+
+        vm.startBroadcast();
+        for (uint256 i = 0; i < namedProxies.length; i++) {
+            console.log("Checking Proxy implementation for", namedProxies[i].name, "Contract...");
+            NamedProxy memory namedProxy = namedProxies[i];
+            checkImplementation(namedProxy);
+            console.log("");
+        }
+        vm.stopBroadcast();
+    }
+
+    function _addVault(string memory symbol) internal {
+        vaultConfig = _readVaultConfig(symbol);
+
+        namedProxies.push(
+            NamedProxy({ proxy: vaultConfig.capToken, implementation: implems.capToken, name: "Cap Token" })
+        );
+        namedProxies.push(
+            NamedProxy({ proxy: vaultConfig.stakedCapToken, implementation: implems.stakedCap, name: "Staked Cap Token" })
+        );
+        namedProxies.push(
+            NamedProxy({ proxy: vaultConfig.feeAuction, implementation: implems.feeAuction, name: "Fee Auction" })
+        );
+        namedProxies.push(
+            NamedProxy({ proxy: vaultConfig.feeReceiver, implementation: implems.feeReceiver, name: "Fee Receiver" })
+        );
 
         for (uint256 i = 0; i < vaultConfig.debtTokens.length; i++) {
             address debtToken = vaultConfig.debtTokens[i];
@@ -87,15 +125,6 @@ contract CheckProxyImplem is Script, InfraConfigSerializer, VaultConfigSerialize
                 })
             );
         }
-
-        vm.startBroadcast();
-        for (uint256 i = 0; i < namedProxies.length; i++) {
-            console.log("Checking Access for", namedProxies[i].name, "Contract...");
-            NamedProxy memory namedProxy = namedProxies[i];
-            checkImplementation(namedProxy);
-            console.log("");
-        }
-        vm.stopBroadcast();
     }
 
     // @dev This is the same as the implementation slot in ERC1967Utils.sol
@@ -110,6 +139,8 @@ contract CheckProxyImplem is Script, InfraConfigSerializer, VaultConfigSerialize
             console.log("Implementation mismatch for", namedProxy.name);
             console.log("Expected:", expectedImplementation);
             console.log("Actual:", implementation);
+        } else {
+            console.log("Implementation matches for", namedProxy.name);
         }
     }
 }

@@ -3,6 +3,8 @@ pragma solidity ^0.8.28;
 
 import { AccessControl } from "../../contracts/access/AccessControl.sol";
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
+
+import { SymbioticAgentManager } from "../../contracts/delegation/providers/symbiotic/SymbioticAgentManager.sol";
 import { SymbioticNetwork } from "../../contracts/delegation/providers/symbiotic/SymbioticNetwork.sol";
 import { SymbioticNetworkMiddleware } from
     "../../contracts/delegation/providers/symbiotic/SymbioticNetworkMiddleware.sol";
@@ -15,6 +17,7 @@ import { Lender } from "../../contracts/lendingPool/Lender.sol";
 import { DebtToken } from "../../contracts/lendingPool/tokens/DebtToken.sol";
 import { PriceOracle } from "../../contracts/oracle/PriceOracle.sol";
 import { RateOracle } from "../../contracts/oracle/RateOracle.sol";
+import { CapChainlinkPoRAddressList } from "../../contracts/oracle/chainlink/CapChainlinkPoRAddressList.sol";
 import { VaultAdapter } from "../../contracts/oracle/libraries/VaultAdapter.sol";
 import { Wrapper } from "../../contracts/token/Wrapper.sol";
 import { FractionalReserve } from "../../contracts/vault/FractionalReserve.sol";
@@ -58,12 +61,8 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
         NamedSelector({ selector: Delegation.modifyAgent.selector, name: "Delegation.modifyAgent" }),
         NamedSelector({ selector: Delegation.registerNetwork.selector, name: "Delegation.registerNetwork" }),
         NamedSelector({ selector: Delegation.setLtvBuffer.selector, name: "Delegation.setLtvBuffer" }),
-        NamedSelector({ selector: SymbioticNetwork.registerMiddleware.selector, name: "Network.registerMiddleware" }),
+        NamedSelector({ selector: SymbioticAgentManager.addAgent.selector, name: "AgentManager.addAgent" }),
         NamedSelector({ selector: SymbioticNetwork.registerVault.selector, name: "Network.registerVault" }),
-        NamedSelector({
-            selector: SymbioticNetworkMiddleware.registerAgent.selector,
-            name: "NetworkMiddleware.registerAgent"
-        }),
         NamedSelector({
             selector: SymbioticNetworkMiddleware.registerVault.selector,
             name: "NetworkMiddleware.registerVault"
@@ -109,6 +108,10 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
         NamedSelector({ selector: RateOracle.setUtilizationOracleData.selector, name: "RateOracle.setUtilizationOracleData" }),
         NamedSelector({ selector: RateOracle.setBenchmarkRate.selector, name: "RateOracle.setBenchmarkRate" }),
         NamedSelector({ selector: RateOracle.setRestakerRate.selector, name: "RateOracle.setRestakerRate" }),
+        NamedSelector({
+            selector: CapChainlinkPoRAddressList.addTokenPriceOracle.selector,
+            name: "CapChainlinkPoRAddressList.addTokenPriceOracle"
+        }),
         NamedSelector({ selector: VaultAdapter.setSlopes.selector, name: "VaultAdapter.setSlopes" }),
         NamedSelector({ selector: VaultAdapter.setLimits.selector, name: "VaultAdapter.setLimits" }),
         NamedSelector({ selector: Wrapper.setDonationReceiver.selector, name: "Wrapper.setDonationReceiver" }),
@@ -139,7 +142,6 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
 
     function run() external {
         (,, infra) = _readInfraConfig();
-        vaultConfig = _readVaultConfig("cUSD");
         accessControl = AccessControl(infra.accessControl);
 
         namedContracts = [
@@ -147,22 +149,17 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
             NamedContract({ contractAddress: infra.lender, name: "Lender" }),
             NamedContract({ contractAddress: infra.oracle, name: "Oracle" }),
             NamedContract({ contractAddress: infra.accessControl, name: "Access Control" }),
+            NamedContract({ contractAddress: infra.chainlinkPoRAddressList, name: "Chainlink PoR Address List" }),
             NamedContract({ contractAddress: symbioticAdapter.network, name: "Network" }),
             NamedContract({ contractAddress: symbioticAdapter.networkMiddleware, name: "Network Middleware" }),
-            NamedContract({ contractAddress: vaultConfig.feeAuction, name: "Fee Auction (cUSD)" }),
-            NamedContract({ contractAddress: vaultConfig.feeReceiver, name: "Fee Receiver (cUSD)" }),
-            NamedContract({ contractAddress: vaultConfig.capToken, name: "Vault (cUSD)" }),
-            NamedContract({ contractAddress: vaultConfig.stakedCapToken, name: "Staked Vault (cUSD)" })
+            NamedContract({ contractAddress: symbioticAdapter.agentManager, name: "Agent Manager" }),
+            NamedContract({ contractAddress: symbioticAdapter.vaultFactory, name: "Vault Factory" })
         ];
-        for (uint256 i = 0; i < vaultConfig.debtTokens.length; i++) {
-            address debtToken = vaultConfig.debtTokens[i];
-            string memory debtTokenName = IERC20Metadata(debtToken).name();
-            namedContracts.push(
-                NamedContract({
-                    contractAddress: debtToken,
-                    name: string.concat("Debt Token ", Strings.toString(i), " of cUSD vault (", debtTokenName, ")")
-                })
-            );
+
+        string[1] memory capTokenSymbols = ["cUSD"];
+        for (uint256 i = 0; i < capTokenSymbols.length; i++) {
+            string memory symbol = capTokenSymbols[i];
+            _addVault(symbol);
         }
 
         vm.startBroadcast();
@@ -173,6 +170,40 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
             console.log("");
         }
         vm.stopBroadcast();
+    }
+
+    function _addVault(string memory symbol) internal {
+        vaultConfig = _readVaultConfig(symbol);
+
+        namedContracts.push(
+            NamedContract({ contractAddress: vaultConfig.feeAuction, name: string.concat("Fee Auction (", symbol, ")") })
+        );
+        namedContracts.push(
+            NamedContract({
+                contractAddress: vaultConfig.feeReceiver,
+                name: string.concat("Fee Receiver (", symbol, ")")
+            })
+        );
+        namedContracts.push(
+            NamedContract({ contractAddress: vaultConfig.capToken, name: string.concat("Vault (", symbol, ")") })
+        );
+        namedContracts.push(
+            NamedContract({
+                contractAddress: vaultConfig.stakedCapToken,
+                name: string.concat("Staked Vault (", symbol, ")")
+            })
+        );
+
+        for (uint256 i = 0; i < vaultConfig.debtTokens.length; i++) {
+            address debtToken = vaultConfig.debtTokens[i];
+            string memory debtTokenName = IERC20Metadata(debtToken).name();
+            namedContracts.push(
+                NamedContract({
+                    contractAddress: debtToken,
+                    name: string.concat("Debt Token ", Strings.toString(i), " of cUSD vault (", debtTokenName, ")")
+                })
+            );
+        }
     }
 
     function checkAllRoles(address contractAddress) internal view {

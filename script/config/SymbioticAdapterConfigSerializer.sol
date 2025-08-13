@@ -61,14 +61,18 @@ contract SymbioticAdapterConfigSerializer {
         string memory implemsPrefix = string.concat(chainPrefix, "implems.");
         implems = SymbioticNetworkAdapterImplementationsConfig({
             network: json.readAddress(string.concat(implemsPrefix, "network")),
-            networkMiddleware: json.readAddress(string.concat(implemsPrefix, "networkMiddleware"))
+            networkMiddleware: json.readAddress(string.concat(implemsPrefix, "networkMiddleware")),
+            agentManager: json.readAddress(string.concat(implemsPrefix, "agentManager"))
         });
 
         string memory adapterPrefix = string.concat(chainPrefix, "adapter.");
         adapter = SymbioticNetworkAdapterConfig({
             network: json.readAddress(string.concat(adapterPrefix, "network")),
             networkMiddleware: json.readAddress(string.concat(adapterPrefix, "networkMiddleware")),
-            feeAllowed: json.readUint(string.concat(adapterPrefix, "feeAllowed"))
+            feeAllowed: json.readUint(string.concat(adapterPrefix, "feeAllowed")),
+            agentManager: json.readAddress(string.concat(adapterPrefix, "agentManager")),
+            vaultFactory: json.readAddress(string.concat(adapterPrefix, "vaultFactory")),
+            decreaseHook: json.readAddress(string.concat(adapterPrefix, "decreaseHook"))
         });
     }
 }

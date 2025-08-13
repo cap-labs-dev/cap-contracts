@@ -18,6 +18,7 @@ struct ImplementationsConfig {
     address debtToken;
     address feeAuction;
     address feeReceiver;
+    address chainlinkPoRAddressList;
 }
 
 struct InfraConfig {
@@ -25,6 +26,7 @@ struct InfraConfig {
     address accessControl;
     address lender;
     address delegation;
+    address chainlinkPoRAddressList;
 }
 
 struct PreMainnetInfraConfig {
