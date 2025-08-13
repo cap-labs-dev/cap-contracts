@@ -8,8 +8,8 @@
             "agentManager": "0x6947A9417650C39581A20f5269e17765C73B9f62"
         },
         "implems": {
-            "network": "0x0dC1a95D91B55b1a1a27B32B8e9D9Fc5A8f90bA8",
-            "networkMiddleware": "0x533b8161e03A1f30Fe127927b1375baa99779934"
+            "network": "0x0c1A64E562E987e650EA82C7868eb96902B1B0d2",
+            "networkMiddleware": "0xF3B32Aa21Ac382371c5d69bb7161f65Ac50f30aA"
         }
     },
     "17000": {
