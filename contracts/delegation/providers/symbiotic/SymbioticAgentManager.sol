@@ -64,7 +64,8 @@ contract SymbioticAgentManager is ISymbioticAgentManager, UUPSUpgradeable, Acces
         SymbioticAgentManagerStorage storage $ = getSymbioticAgentManagerStorage();
         address[] memory assets = IVault($.cusd).assets();
         for (uint256 i; i < assets.length; ++i) {
-            if (ILender($.lender).debt(_agent, assets[i]) > 0) {
+            (, uint256 unrealizedInterest) = ILender($.lender).maxRestakerRealization(_agent, assets[i]);
+            if (unrealizedInterest > 0) {
                 ILender($.lender).realizeRestakerInterest(_agent, assets[i]);
             }
         }
