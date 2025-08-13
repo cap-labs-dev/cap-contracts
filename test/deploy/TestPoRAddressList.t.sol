@@ -30,12 +30,11 @@ contract TestPoRAddressList is TestDeployer {
         vm.stopPrank();
     }
 
-    function test_getPoRAddressListLength() public {
+    function test_getPoRAddressListLength() public view {
         assertEq(porAddressList.getPoRAddressListLength(), 3);
     }
 
-    function test_getPoRAddressList() public {
-        assertEq(porAddressList.getPoRAddressListLength(), 3);
+    function test_getPoRAddressList() public view {
         ICapChainlinkPoRAddressList.PoRInfo[] memory addresses = porAddressList.getPoRAddressList(1, 2);
         console.log(addresses[0].chain);
         console.log(addresses[0].chainId);

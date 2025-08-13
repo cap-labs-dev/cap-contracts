@@ -43,4 +43,8 @@ interface IStakedCap {
     /// @notice Lock duration
     /// @return lockDuration Lock duration
     function lockDuration() external view returns (uint256 lockDuration);
+
+    /// @notice Total amount of the token locked
+    /// @return totalLocked Total amount of the token locked
+    function totalLocked() external view returns (uint256 totalLocked);
 }

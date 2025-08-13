@@ -73,6 +73,11 @@ contract StakedCap is
     }
 
     /// @inheritdoc IStakedCap
+    function totalLocked() external view returns (uint256 _totalLocked) {
+        _totalLocked = getStakedCapStorage().totalLocked;
+    }
+
+    /// @inheritdoc IStakedCap
     function lockDuration() external view returns (uint256 _lockDuration) {
         _lockDuration = getStakedCapStorage().lockDuration;
     }
