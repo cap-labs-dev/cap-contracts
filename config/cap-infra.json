@@ -2,14 +2,14 @@
     "1": {
         "implems": {
             "accessControl": "0x6681EB184c876D74eA3ddFaE0eCEE0C9C0f84bc1",
-            "capToken": "0xce2177833E400F91bb308308f7d9933e48982b01",
+            "capToken": "0xe35d17850ce59488Ae47ee5d66BAA06ABd100AAA",
             "debtToken": "0xaF2084df1Ff172b1D39a94680c9b8bd42b55E20C",
             "delegation": "0x386C93f9f0A8a681c5A3E826063106A2474958ab",
             "feeAuction": "0x6c0a3cb3797691b5a702155F4FE507fd58b5D023",
             "feeReceiver": "0xFB39E573b033ECBd8f795369BDaB11F0E210992f",
             "lender": "0x11742fC74A2F97585DF64EFa1c3F3A02e9bc2cDC",
             "oracle": "0xbFe4D64E61a3a02C4781a65FA343007de7ea9F14",
-            "stakedCap": "0x9C3a8aA28E0388E89302390695478C8D00a7dBbB",
+            "stakedCap": "0x42c0e0ef7C2F35de073F4d6f9c0e4483429c3D31",
             "chainlinkPoRAddressList": "0xc85d36c2a73caca3b4cb9a2640dbb9269f24614a"
         },
         "infra": {
