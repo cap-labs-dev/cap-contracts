@@ -83,14 +83,14 @@ library LiquidationLogic {
             ILender.RepayParams({ agent: params.agent, asset: params.asset, amount: liquidated, caller: params.caller })
         );
 
-        (,,,,, health) = ViewLogic.agent($, params.agent);
-        if (health >= 1e27) _closeLiquidation($, params.agent);
-
         liquidatedValue =
             (liquidated + (liquidated * bonus / 1e27)) * assetPrice / (10 ** $.reservesData[params.asset].decimals);
         if (totalSlashableCollateral < liquidatedValue) liquidatedValue = totalSlashableCollateral;
 
         if (liquidatedValue > 0) IDelegation($.delegation).slash(params.agent, params.caller, liquidatedValue);
+
+        (,,,,, health) = ViewLogic.agent($, params.agent);
+        if (health >= 1e27) _closeLiquidation($, params.agent);
 
         emit Liquidate(params.agent, params.caller, params.asset, liquidated, liquidatedValue);
     }
