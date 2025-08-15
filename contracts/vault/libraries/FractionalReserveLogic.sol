@@ -139,9 +139,10 @@ library FractionalReserveLogic {
     /// @param $ Storage pointer
     /// @param _asset Asset address
     function realizeInterest(IFractionalReserve.FractionalReserveStorage storage $, address _asset) external {
-        IERC4626($.vault[_asset]).withdraw(claimableInterest($, _asset), $.interestReceiver, address(this));
-
-        emit FractionalReserveInterestRealized(_asset);
+        if ($.vault[_asset] != address(0)) {
+            IERC4626($.vault[_asset]).withdraw(claimableInterest($, _asset), $.interestReceiver, address(this));
+            emit FractionalReserveInterestRealized(_asset);
+        }
     }
 
     /// @notice Interest from a fractional reserve vault
@@ -153,6 +154,8 @@ library FractionalReserveLogic {
         view
         returns (uint256 interest)
     {
+        if ($.vault[_asset] == address(0)) return 0;
+
         uint256 vaultShares = IERC4626($.vault[_asset]).balanceOf(address(this));
         uint256 shares = IERC4626($.vault[_asset]).previewWithdraw($.loaned[_asset]);
         if (vaultShares > shares) {
