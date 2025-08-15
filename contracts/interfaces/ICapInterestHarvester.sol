@@ -14,6 +14,7 @@ interface ICapInterestHarvester {
         address lender;
         address balancerVault;
         address excessReceiver;
+        uint256 lastharvest;
         bool flashInProgress;
     }
 
@@ -57,6 +58,9 @@ interface ICapInterestHarvester {
         uint256[] memory _feeAmounts,
         bytes memory _userData
     ) external;
+
+    /// @notice Last harvest timestamp
+    function lastHarvest() external view returns (uint256);
 
     /// @notice Gelato checker function
     /// @return canExec Whether the task can be executed

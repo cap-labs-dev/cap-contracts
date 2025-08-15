@@ -73,6 +73,8 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
         /// 4. Call distribute on fee receiver
         _distributeInterest($.feeReceiver);
 
+        $.lastharvest = block.timestamp;
+
         emit HarvestedInterest(block.timestamp);
     }
 
@@ -88,7 +90,8 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
     /// @param _lender Lender address
     /// @param _asset Asset address
     function _claimInterestFromLender(address _lender, address _asset) private {
-        ILender(_lender).realizeInterest(_asset);
+        uint256 maxRealization = ILender(_lender).maxRealization(_asset);
+        if (maxRealization > 0) ILender(_lender).realizeInterest(_asset);
     }
 
     /// @dev Flashloan buy all the interest
@@ -118,7 +121,9 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
     /// @dev Call distribute on fee receiver
     /// @param _feeReceiver Fee receiver address
     function _distributeInterest(address _feeReceiver) private {
-        IFeeReceiver(_feeReceiver).distribute();
+        CapInterestHarvesterStorage storage $ = getCapInterestHarvesterStorage();
+        uint256 cusdBalOfFeeReceiver = IERC20($.cusd).balanceOf($.feeReceiver);
+        if (cusdBalOfFeeReceiver > 0) IFeeReceiver(_feeReceiver).distribute();
     }
 
     /// @inheritdoc ICapInterestHarvester
@@ -166,6 +171,11 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
     }
 
     /// @inheritdoc ICapInterestHarvester
+    function lastHarvest() public view returns (uint256) {
+        return getCapInterestHarvesterStorage().lastharvest;
+    }
+
+    /// @inheritdoc ICapInterestHarvester
     function setExcessReceiver(address _excessReceiver) external checkAccess(this.setExcessReceiver.selector) {
         CapInterestHarvesterStorage storage $ = getCapInterestHarvesterStorage();
         $.excessReceiver = _excessReceiver;
@@ -177,11 +187,18 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
     function checker() external view returns (bool canExec, bytes memory execPayload) {
         CapInterestHarvesterStorage storage $ = getCapInterestHarvesterStorage();
 
+        // Just harvest if its been 24 hours since last harvest
+        if (block.timestamp - $.lastharvest > 24 hours) {
+            return (true, abi.encodeCall(this.harvestInterest, ()));
+        }
+
         uint256 assetBalOfFeeAuction = IERC20($.asset).balanceOf($.feeAuction);
         uint256 price = IFeeAuction($.feeAuction).currentPrice();
         (uint256 cusdAmountFromMint,) = IMinter($.cusd).getMintAmount($.asset, assetBalOfFeeAuction);
 
         canExec = cusdAmountFromMint > price;
+
+        if (!canExec) return (canExec, bytes("Not enough cUSD to mint"));
 
         execPayload = abi.encodeCall(this.harvestInterest, ());
     }
