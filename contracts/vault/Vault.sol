@@ -61,7 +61,11 @@ abstract contract Vault is
     {
         uint256 fee;
         (amountOut, fee) = getBurnAmount(_asset, _amountIn);
+
+        _burn(msg.sender, _amountIn);
+
         divest(_asset, amountOut + fee);
+
         VaultLogic.burn(
             getVaultStorage(),
             MintBurnParams({
@@ -74,7 +78,6 @@ abstract contract Vault is
                 fee: fee
             })
         );
-        _burn(msg.sender, _amountIn);
     }
 
     /// @inheritdoc IVault
@@ -85,12 +88,15 @@ abstract contract Vault is
     {
         uint256[] memory fees;
         (amountsOut, fees) = getRedeemAmount(_amountIn);
+
+        _burn(msg.sender, _amountIn);
+
         uint256[] memory totalDivestAmounts = new uint256[](amountsOut.length);
         for (uint256 i; i < amountsOut.length; i++) {
             totalDivestAmounts[i] = amountsOut[i] + fees[i];
         }
-
         divestMany(assets(), totalDivestAmounts);
+
         VaultLogic.redeem(
             getVaultStorage(),
             RedeemParams({
@@ -102,7 +108,6 @@ abstract contract Vault is
                 fees: fees
             })
         );
-        _burn(msg.sender, _amountIn);
     }
 
     /// @inheritdoc IVault
