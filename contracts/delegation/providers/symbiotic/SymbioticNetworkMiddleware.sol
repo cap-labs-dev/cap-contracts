@@ -95,7 +95,8 @@ contract SymbioticNetworkMiddleware is
             slashableCollateralByVault($.network, _agent, address(vault), $.oracle, _timestamp);
 
         // Round up in favor of the liquidator
-        uint256 slashShareOfCollateral = (totalSlashableCollateral * _slashShare / 1e18) + 1;
+        uint256 slashShareOfCollateral =
+            _slashShare == 1e18 ? totalSlashableCollateral : (totalSlashableCollateral * _slashShare / 1e18) + 1;
 
         // If the slash share is greater than the total slashable collateral, set it to the total slashable collateral
         if (slashShareOfCollateral > totalSlashableCollateral) {
