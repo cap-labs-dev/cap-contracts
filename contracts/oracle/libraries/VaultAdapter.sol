@@ -86,7 +86,7 @@ contract VaultAdapter is IVaultAdapter, UUPSUpgradeable, Access, VaultAdapterSto
         if (_utilization > slopes.kink) {
             uint256 excess = _utilization - slopes.kink;
             utilizationData.multiplier = utilizationData.multiplier
-                * (1e27 + (1e27 * excess / (1e27 - slopes.kink)) * (_elapsed * $.rate / 1e27)) / 1e27;
+                * (1e27 + (1e27 * excess / (1e27 - slopes.kink)) * _elapsed * $.rate / 1e27) / 1e27;
 
             if (utilizationData.multiplier > $.maxMultiplier) {
                 utilizationData.multiplier = $.maxMultiplier;
@@ -95,7 +95,7 @@ contract VaultAdapter is IVaultAdapter, UUPSUpgradeable, Access, VaultAdapterSto
             interestRate = (slopes.slope0 + (slopes.slope1 * excess / 1e27)) * utilizationData.multiplier / 1e27;
         } else {
             utilizationData.multiplier = utilizationData.multiplier * 1e27
-                / (1e27 + (1e27 * (slopes.kink - _utilization) / slopes.kink) * (_elapsed * $.rate / 1e27));
+                / (1e27 + (1e27 * (slopes.kink - _utilization) / slopes.kink) * _elapsed * $.rate / 1e27);
 
             if (utilizationData.multiplier < $.minMultiplier) {
                 utilizationData.multiplier = $.minMultiplier;

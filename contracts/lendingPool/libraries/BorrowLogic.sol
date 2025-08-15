@@ -214,8 +214,11 @@ library BorrowLogic {
         reserve.totalUnrealizedInterest += unrealizedInterest;
 
         IDebtToken(reserve.debtToken).mint(_agent, realizedInterest + unrealizedInterest);
-        IVault(reserve.vault).borrow(_asset, realizedInterest, $.delegation);
-        IDelegation($.delegation).distributeRewards(_agent, _asset);
+        if (realizedInterest > 0) {
+            IVault(reserve.vault).borrow(_asset, realizedInterest, $.delegation);
+            IDelegation($.delegation).distributeRewards(_agent, _asset);
+        }
+
         emit RealizeInterest(_asset, realizedInterest, $.delegation);
     }
 

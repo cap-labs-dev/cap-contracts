@@ -22,6 +22,9 @@ library LiquidationLogic {
     /// @notice An agent has been liquidated
     event Liquidate(address indexed agent, address indexed liquidator, address asset, uint256 amount, uint256 value);
 
+    /// @notice No debt to liquidate
+    error NoDebt();
+
     /// @dev Zero address not valid
     error ZeroAddressNotValid();
 
@@ -65,6 +68,8 @@ library LiquidationLogic {
         (uint256 totalDelegation, uint256 totalSlashableCollateral, uint256 totalDebt,,, uint256 health) =
             ViewLogic.agent($, params.agent);
 
+        if (totalDebt == 0) revert NoDebt();
+
         ValidationLogic.validateLiquidation(
             health,
             totalDelegation * $.emergencyLiquidationThreshold / totalDebt,
@@ -83,14 +88,14 @@ library LiquidationLogic {
             ILender.RepayParams({ agent: params.agent, asset: params.asset, amount: liquidated, caller: params.caller })
         );
 
-        (,,,,, health) = ViewLogic.agent($, params.agent);
-        if (health >= 1e27) _closeLiquidation($, params.agent);
-
         liquidatedValue =
             (liquidated + (liquidated * bonus / 1e27)) * assetPrice / (10 ** $.reservesData[params.asset].decimals);
         if (totalSlashableCollateral < liquidatedValue) liquidatedValue = totalSlashableCollateral;
 
         if (liquidatedValue > 0) IDelegation($.delegation).slash(params.agent, params.caller, liquidatedValue);
+
+        (,,,,, health) = ViewLogic.agent($, params.agent);
+        if (health >= 1e27) _closeLiquidation($, params.agent);
 
         emit Liquidate(params.agent, params.caller, params.asset, liquidated, liquidatedValue);
     }
