@@ -36,6 +36,9 @@ interface IFeeAuction {
     /// @dev Set start price
     event SetStartPrice(uint256 startPrice);
 
+    /// @dev Asset must be non-zero address
+    error InvalidAsset();
+
     /// @dev Assets must be non-zero length and have matching lengths
     error InvalidAssets();
 
