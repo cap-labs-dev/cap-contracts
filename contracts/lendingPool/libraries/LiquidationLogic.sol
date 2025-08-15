@@ -22,6 +22,9 @@ library LiquidationLogic {
     /// @notice An agent has been liquidated
     event Liquidate(address indexed agent, address indexed liquidator, address asset, uint256 amount, uint256 value);
 
+    /// @notice No debt to liquidate
+    error NoDebt();
+
     /// @dev Zero address not valid
     error ZeroAddressNotValid();
 
@@ -64,6 +67,8 @@ library LiquidationLogic {
     {
         (uint256 totalDelegation, uint256 totalSlashableCollateral, uint256 totalDebt,,, uint256 health) =
             ViewLogic.agent($, params.agent);
+
+        if (totalDebt == 0) revert NoDebt();
 
         ValidationLogic.validateLiquidation(
             health,
