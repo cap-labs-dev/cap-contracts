@@ -152,6 +152,7 @@ contract FeeAuction is IFeeAuction, UUPSUpgradeable, Access, FeeAuctionStorageUt
         balances = new uint256[](assetsLength);
         for (uint256 i; i < assetsLength; ++i) {
             address asset = _assets[i];
+            if (asset == address(0)) revert InvalidAsset();
             uint256 balance = IERC20(asset).balanceOf(address(this));
             balances[i] = balance;
             if (balance < _minAmounts[i]) revert InsufficientBalance(asset, balance, _minAmounts[i]);
