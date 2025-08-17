@@ -39,10 +39,11 @@ contract FeeReceiver is IFeeReceiver, UUPSUpgradeable, Access, FeeReceiverStorag
             if ($.protocolFeePercentage > 0) _claimProtocolFees();
             uint256 bal = $.capToken.balanceOf(address(this));
             $.capToken.safeTransfer(address($.stakedCapToken), bal);
-            if ($.stakedCapToken.lastNotify() + $.stakedCapToken.lockDuration() < block.timestamp) {
-                $.stakedCapToken.notify();
-            }
             emit FeesDistributed(bal);
+        }
+
+        if ($.stakedCapToken.lastNotify() + $.stakedCapToken.lockDuration() < block.timestamp) {
+            $.stakedCapToken.notify();
         }
     }
 
