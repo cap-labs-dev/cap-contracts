@@ -95,7 +95,9 @@ contract InfraConfigSerializer {
             accessControl: json.readAddress(string.concat(infraPrefix, "accessControl")),
             lender: json.readAddress(string.concat(infraPrefix, "lender")),
             delegation: json.readAddress(string.concat(infraPrefix, "delegation")),
-            chainlinkPoRAddressList: json.readAddress(string.concat(infraPrefix, "chainlinkPoRAddressList"))
+            chainlinkPoRAddressList: json.readAddress(string.concat(infraPrefix, "chainlinkPoRAddressList")),
+            gelatoHarvester: json.readAddress(string.concat(infraPrefix, "gelatoHarvester")),
+            gelatoSweeper: json.readAddress(string.concat(infraPrefix, "gelatoSweeper"))
         });
     }
 }

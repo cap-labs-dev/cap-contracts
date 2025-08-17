@@ -10,7 +10,7 @@
         },
         "implems": {
             "network": "0x0c1A64E562E987e650EA82C7868eb96902B1B0d2",
-            "networkMiddleware": "0xF3B32Aa21Ac382371c5d69bb7161f65Ac50f30aA",
+            "networkMiddleware": "0x76BaFb2C59ea83c32af8d42c2A65852dE0580006",
             "agentManager": "0x3990D05A6a9e3E195DB90E11f7b0ea0Eb14f342D"
         }
     }

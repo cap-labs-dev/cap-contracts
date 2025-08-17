@@ -27,6 +27,8 @@ struct InfraConfig {
     address lender;
     address delegation;
     address chainlinkPoRAddressList;
+    address gelatoHarvester;
+    address gelatoSweeper;
 }
 
 struct PreMainnetInfraConfig {
