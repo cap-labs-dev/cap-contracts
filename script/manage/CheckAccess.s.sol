@@ -67,6 +67,7 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
         NamedSelector({ selector: Delegation.registerNetwork.selector, name: "Delegation.registerNetwork" }),
         NamedSelector({ selector: Delegation.setLtvBuffer.selector, name: "Delegation.setLtvBuffer" }),
         NamedSelector({ selector: SymbioticAgentManager.addAgent.selector, name: "AgentManager.addAgent" }),
+        NamedSelector({ selector: SymbioticAgentManager.setRestakerRate.selector, name: "AgentManager.addAgent" }),
         NamedSelector({ selector: SymbioticNetwork.registerVault.selector, name: "Network.registerVault" }),
         NamedSelector({
             selector: SymbioticNetworkMiddleware.registerVault.selector,
@@ -92,6 +93,21 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
             name: "FeeReceiver.setProtocolFeePercentage"
         }),
         NamedSelector({ selector: FeeReceiver.setProtocolFeeReceiver.selector, name: "FeeReceiver.setProtocolFeeReceiver" }),
+        NamedSelector({
+            selector: CapInterestHarvester.harvestInterest.selector,
+            name: "CapInterestHarvester.harvestInterest"
+        }),
+        NamedSelector({
+            selector: CapInterestHarvester.receiveFlashLoan.selector,
+            name: "CapInterestHarvester.receiveFlashLoan"
+        }),
+        NamedSelector({
+            selector: CapInterestHarvester.setExcessReceiver.selector,
+            name: "CapInterestHarvester.setExcessReceiver"
+        }),
+        NamedSelector({ selector: CapSweeper.sweep.selector, name: "CapSweeper.sweep" }),
+        NamedSelector({ selector: CapSweeper.setSweepInterval.selector, name: "CapSweeper.setSweepInterval" }),
+        NamedSelector({ selector: CapSweeper.setMinSweepAmount.selector, name: "CapSweeper.setMinSweepAmount" }),
         NamedSelector({ selector: Lender.addAsset.selector, name: "Lender.addAsset" }),
         NamedSelector({ selector: Lender.removeAsset.selector, name: "Lender.removeAsset" }),
         NamedSelector({ selector: Lender.pauseAsset.selector, name: "Lender.pauseAsset" }),
@@ -140,17 +156,6 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
         NamedSelector({ selector: Vault.unpauseProtocol.selector, name: "Vault.unpauseProtocol" }),
         NamedSelector({ selector: Vault.setInsuranceFund.selector, name: "Vault.setInsuranceFund" }),
         NamedSelector({ selector: Vault.rescueERC20.selector, name: "Vault.rescueERC20" }),
-        NamedSelector({
-            selector: CapInterestHarvester.harvestInterest.selector,
-            name: "CapInterestHarvester.harvestInterest"
-        }),
-        NamedSelector({
-            selector: CapInterestHarvester.setExcessReceiver.selector,
-            name: "CapInterestHarvester.setExcessReceiver"
-        }),
-        NamedSelector({ selector: CapSweeper.sweep.selector, name: "CapSweeper.sweep" }),
-        NamedSelector({ selector: CapSweeper.setSweepInterval.selector, name: "CapSweeper.setSweepInterval" }),
-        NamedSelector({ selector: CapSweeper.setMinSweepAmount.selector, name: "CapSweeper.setMinSweepAmount" }),
         NamedSelector({ selector: bytes4(0), name: "Proxy.upgrade" })
     ];
 
