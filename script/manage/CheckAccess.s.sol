@@ -193,6 +193,16 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
             checkAllRoles(contractAddress);
             console.log("");
         }
+
+        console.log("Checking Access for AccessControl Contract...");
+        // Check default admin role
+        bytes32 role = 0x0000000000000000000000000000000000000000000000000000000000000000;
+        uint256 memberCount = accessControl.getRoleMemberCount(role);
+        for (uint256 j = 0; j < memberCount; j++) {
+            address member = accessControl.getRoleMember(role, j);
+            console.log("Default Admin Role", labelledAddress(member));
+            console.log("");
+        }
         vm.stopBroadcast();
     }
 
