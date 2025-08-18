@@ -55,6 +55,7 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
     address[] devEoas = [0xc1ab5a9593E6e1662A9a44F84Df4F31Fc8A76B52];
     address msig = address(0xb8FC49402dF3ee4f8587268FB89fda4d621a8793);
     address gelato = address(0xe84E4337c382cC8Ed57c6FB12919270228B6B7A3);
+    address balancerVault = address(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
 
     NamedSelector[] namedSelectors = [
         NamedSelector({ selector: AccessControl.grantAccess.selector, name: "AccessControl.grantAccess" }),
@@ -262,6 +263,11 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
             // unicode icecream emoji
             return unicode"🍦 Gelato 🍦";
         }
+
+        if (balancerVault == _address) {
+            return unicode"⚖️ Balancer ⚖️";
+        }
+
         return _address.toHexString();
     }
 }
