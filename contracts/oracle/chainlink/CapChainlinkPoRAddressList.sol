@@ -36,7 +36,26 @@ contract CapChainlinkPoRAddressList is
 
     /// @inheritdoc ICapChainlinkPoRAddressList
     function getPoRAddressListLength() external view returns (uint256) {
-        return _getcUSDAssets().length;
+        CapChainlinkPoRAddressListStorage storage $ = getCapChainlinkPoRAddressListStorage();
+        address[] memory addresses = $.cusd.assets();
+
+        if (addresses.length == 0) {
+            return 0;
+        }
+
+        // Count total entries (base entries + vault queue entries)
+        uint256 totalEntries;
+        for (uint256 i; i < addresses.length; ++i) {
+            totalEntries++; // Base entry for each address
+
+            address vault = IFractionalReserve(address($.cusd)).fractionalReserveVault(addresses[i]);
+            if (vault != address(0)) {
+                address[] memory queue = IFractionalReserveVault(vault).get_default_queue();
+                totalEntries += queue.length;
+            }
+        }
+
+        return totalEntries;
     }
 
     /// @inheritdoc ICapChainlinkPoRAddressList

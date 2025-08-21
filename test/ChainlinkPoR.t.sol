@@ -23,6 +23,7 @@ contract ChainlinkPoRTest is Test {
 
     function test_call_address_list() public view {
         chainlinkPoRAddressList.getPoRAddressListLength();
+        console.log(chainlinkPoRAddressList.getPoRAddressListLength());
         ICapChainlinkPoRAddressList.PoRInfo[] memory infos = chainlinkPoRAddressList.getPoRAddressList(0, 2);
         console.log(infos.length);
         assertEq(infos.length, 2);
