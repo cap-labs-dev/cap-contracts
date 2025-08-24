@@ -111,7 +111,9 @@ contract CapChainlinkPoRAddressList is
                         chain: "ethereum",
                         chainId: 1,
                         tokenSymbol: IERC20Metadata(addresses[currIdx]).symbol(),
-                        tokenAddress: addresses[currIdx],
+                        tokenAddress: $.tokenYieldAssets[addresses[currIdx]] != address(0)
+                            ? $.tokenYieldAssets[addresses[currIdx]]
+                            : addresses[currIdx],
                         tokenDecimals: IERC20Metadata(addresses[currIdx]).decimals(),
                         tokenPriceOracle: $.tokenPriceOracles[addresses[currIdx]],
                         yourVaultAddress: queue[i]
@@ -131,6 +133,15 @@ contract CapChainlinkPoRAddressList is
     {
         CapChainlinkPoRAddressListStorage storage $ = getCapChainlinkPoRAddressListStorage();
         $.tokenPriceOracles[_token] = _oracle;
+    }
+
+    /// @inheritdoc ICapChainlinkPoRAddressList
+    function addTokenYieldAsset(address _token, address _yieldAsset)
+        external
+        checkAccess(this.addTokenYieldAsset.selector)
+    {
+        CapChainlinkPoRAddressListStorage storage $ = getCapChainlinkPoRAddressListStorage();
+        $.tokenYieldAssets[_token] = _yieldAsset;
     }
 
     /// @dev Get the list of assets supported by the vault

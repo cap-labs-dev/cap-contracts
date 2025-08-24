@@ -10,6 +10,7 @@ interface ICapChainlinkPoRAddressList {
     struct CapChainlinkPoRAddressListStorage {
         IVault cusd;
         mapping(address => address) tokenPriceOracles;
+        mapping(address => address) tokenYieldAssets;
     }
 
     struct PoRInfo {
@@ -36,4 +37,9 @@ interface ICapChainlinkPoRAddressList {
     /// @param _token Token address
     /// @param _oracle Oracle address
     function addTokenPriceOracle(address _token, address _oracle) external;
+
+    /// @notice Add a token yield asset
+    /// @param _token Token address
+    /// @param _yieldAsset Yield asset address
+    function addTokenYieldAsset(address _token, address _yieldAsset) external;
 }
