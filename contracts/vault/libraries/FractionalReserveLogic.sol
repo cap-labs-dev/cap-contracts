@@ -96,13 +96,14 @@ library FractionalReserveLogic {
 
                 if (shares > vaultBalance) {
                     divestAmount = IERC4626($.vault[_asset]).redeem(vaultBalance, address(this), address(this));
-                    if (divestAmount > $.loaned[_asset]) {
-                        IERC20(_asset).safeTransfer($.interestReceiver, divestAmount - $.loaned[_asset]);
-                        emit FractionalReserveInterestRealized(_asset);
-                        divestAmount = $.loaned[_asset];
-                    }
                 } else {
                     IERC4626($.vault[_asset]).withdraw(divestAmount, address(this), address(this));
+                }
+
+                if (divestAmount > $.loaned[_asset]) {
+                    IERC20(_asset).safeTransfer($.interestReceiver, divestAmount - $.loaned[_asset]);
+                    emit FractionalReserveInterestRealized(_asset);
+                    divestAmount = $.loaned[_asset];
                 }
 
                 $.loaned[_asset] -= divestAmount;
