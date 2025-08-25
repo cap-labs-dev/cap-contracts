@@ -149,7 +149,12 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     /// @inheritdoc IDelegation
     function slashTimestamp(address _agent) public view returns (uint48 _slashTimestamp) {
         DelegationStorage storage $ = getDelegationStorage();
-        _slashTimestamp = uint48(Math.max((epoch() - 1) * $.epochDuration, $.agentData[_agent].lastBorrow));
+        _slashTimestamp = uint48(
+            Math.max(
+                (epoch() - 1) * $.epochDuration,
+                $.agentData[_agent].lastBorrow > 0 ? $.agentData[_agent].lastBorrow - 1 : 0
+            )
+        );
         if (_slashTimestamp == block.timestamp) _slashTimestamp -= 1;
     }
 
