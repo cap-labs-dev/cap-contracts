@@ -114,4 +114,21 @@ interface IAllocationManager {
      *         For non-redistributing operator sets, returns the `DEFAULT_BURN_ADDRESS`.
      */
     function getRedistributionRecipient(OperatorSet memory operatorSet) external view returns (address);
+
+    /**
+     * @notice Adds strategies to an operator set.
+     * @param avs The AVS address initiating the addition.
+     * @param operatorSetId The ID of the operator set to which strategies are being added.
+     * @param strategies The strategies to add to the operator set.
+     */
+    function addStrategiesToOperatorSet(address avs, uint32 operatorSetId, address[] calldata strategies) external;
+
+    /**
+     * @notice Allows an AVS to create new operator sets, defining strategies that the operator set uses
+     */
+    function createRedistributingOperatorSets(
+        address avs,
+        CreateSetParams[] calldata params,
+        address[] calldata redistributionRecipients
+    ) external;
 }

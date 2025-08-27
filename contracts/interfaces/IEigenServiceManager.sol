@@ -10,11 +10,14 @@ interface IEigenServiceManager {
         address accessControl;
         address allocationManager;
         address delegationManager;
+        address strategyManager;
         address rewardsCoordinator;
         address registryCoordinator;
         address stakeRegistry;
         address oracle;
         uint32 rewardDuration;
+        uint32 nextOperatorId;
+        uint256 minRewardAmount;
         mapping(address => mapping(address => uint256)) lastDistribution;
         mapping(address => address) operatorToStrategy;
         mapping(address => uint32) operatorSetIds;
@@ -24,6 +27,7 @@ interface IEigenServiceManager {
     /// @param _accessControl Access control contract
     /// @param _allocationManager Allocation Manager contract
     /// @param _delegationManager Delegation Manager contract
+    /// @param _strategyManager Strategy Manager contract
     /// @param _rewardsCoordinator Rewards Coordinator contract
     /// @param _registryCoordinator Registry Coordinator contract
     /// @param _stakeRegistry Stake Registry contract
@@ -33,6 +37,7 @@ interface IEigenServiceManager {
         address _accessControl,
         address _allocationManager,
         address _delegationManager,
+        address _strategyManager,
         address _rewardsCoordinator,
         address _registryCoordinator,
         address _stakeRegistry,
@@ -108,4 +113,16 @@ interface IEigenServiceManager {
      * @return The slashable collateral of the operator
      */
     function slashableCollateral(address operator, uint256 timestamp) external view returns (uint256);
+
+    /**
+     * @notice Sets the rewards duration
+     * @param _rewardDuration The rewards duration
+     */
+    function setRewardsDuration(uint32 _rewardDuration) external;
+
+    /**
+     * @notice Sets the min reward amount
+     * @param _minRewardAmount The min reward amount
+     */
+    function setMinRewardAmount(uint256 _minRewardAmount) external;
 }

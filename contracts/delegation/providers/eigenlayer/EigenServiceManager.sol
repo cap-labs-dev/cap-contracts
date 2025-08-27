@@ -3,7 +3,6 @@ pragma solidity ^0.8.28;
 
 import { Access } from "../../../access/Access.sol";
 import { IEigenServiceManager } from "../../../interfaces/IEigenServiceManager.sol";
-
 import { IOracle } from "../../../interfaces/IOracle.sol";
 import { EigenServiceManagerStorageUtils } from "../../../storage/EigenServiceManagerStorageUtils.sol";
 import { IAllocationManager } from "./interfaces/IAllocationManager.sol";
@@ -11,11 +10,10 @@ import { IDelegationManager } from "./interfaces/IDelegationManager.sol";
 
 import { IRewardsCoordinator } from "./interfaces/IRewardsCoordinator.sol";
 import { IStrategy } from "./interfaces/IStrategy.sol";
+import { IStrategyManager } from "./interfaces/IStrategyManager.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IAVSDirectory } from "eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
 
 /// @title EigenServiceManager
 /// @author weso, Cap Labs
@@ -37,6 +35,10 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     error ZeroAddress();
     /// @dev Rewards not ready
     error RewardsNotReady();
+    /// @dev Operator set already created
+    error OperatorSetAlreadyCreated();
+    /// @dev Min reward amount not met
+    error MinRewardAmountNotMet();
 
     /// @dev Operator registered
     event OperatorRegistered(address indexed operator, address indexed avs, uint32[] operatorSetIds);
@@ -46,6 +48,8 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     event StrategyRegistered(address indexed strategy, address indexed operator);
     /// @dev Rewards duration set
     event RewardsDurationSet(uint32 rewardDuration);
+    /// @dev Min reward amount set
+    event MinRewardAmountSet(uint256 minRewardAmount);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -57,6 +61,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         address _accessControl,
         address _allocationManager,
         address _delegationManager,
+        address _strategyManager,
         address _rewardsCoordinator,
         address _registryCoordinator,
         address _stakeRegistry,
@@ -67,12 +72,26 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         __Access_init(_accessControl);
         __UUPSUpgradeable_init();
         $.allocationManager = _allocationManager;
-        $.oracle = _oracle;
         $.delegationManager = _delegationManager;
+        $.strategyManager = _strategyManager;
         $.rewardsCoordinator = _rewardsCoordinator;
         $.registryCoordinator = _registryCoordinator;
         $.stakeRegistry = _stakeRegistry;
+        $.oracle = _oracle;
         $.rewardDuration = _rewardDuration;
+        $.nextOperatorId++;
+
+        string memory metadata = string(
+            abi.encodePacked(
+                '{"name": "cap",',
+                '"website": "https://cap.app/",',
+                '"description": "Stablecoin protocol with credible financial guarantees",',
+                '"logo": "https://cap.app/media-kit/cap_n_y.svg",',
+                '"twitter": "https://x.com/capmoney_"}'
+            )
+        );
+
+        IAllocationManager($.allocationManager).updateAVSMetadataURI(address(this), metadata);
     }
 
     /// @inheritdoc IEigenServiceManager
@@ -188,33 +207,26 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
 
         address _strategy = $.operatorToStrategy[_operator];
         IERC20 _slashedCollateral = IStrategy(_strategy).underlyingToken();
-        uint256 slashableShares = _getSlashableShares(_operator);
 
-        // Round up in favor of the liquidator
-        uint256 slashShareOfCollateral = (slashableShares * _slashShare / 1e18) + 1;
+        /// this is a share of the collateral so need to make sure sending correct amount.
+        _slash(_strategy, _operator, _slashShare);
+        uint256 slashedAmount = _slashedCollateral.balanceOf(address(this));
+        _slashedCollateral.safeTransfer(_recipient, slashedAmount);
 
-        // If the slash share is greater than the total slashable collateral, set it to the total slashable collateral
-        if (slashShareOfCollateral > slashableShares) {
-            slashShareOfCollateral = slashableShares;
-        }
-
-        _slash(_strategy, _operator, slashShareOfCollateral);
-        _slashedCollateral.safeTransfer(_recipient, slashShareOfCollateral);
-
-        emit Slash(_operator, _recipient, slashShareOfCollateral, uint48(block.timestamp));
+        emit Slash(_operator, _recipient, slashedAmount, uint48(block.timestamp));
     }
 
     /// @notice Slash the operator
     /// @param _strategy The strategy address
     /// @param _operator The operator address
-    /// @param _slashShareOfCollateral The slash share of collateral
-    function _slash(address _strategy, address _operator, uint256 _slashShareOfCollateral) private {
+    /// @param _slashShare The slash share
+    function _slash(address _strategy, address _operator, uint256 _slashShare) private {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         address[] memory strategies = new address[](1);
         strategies[0] = _strategy;
 
         uint256[] memory wadsToSlash = new uint256[](1);
-        wadsToSlash[0] = _slashShareOfCollateral;
+        wadsToSlash[0] = _slashShare;
 
         IAllocationManager.SlashingParams memory slashingParams = IAllocationManager.SlashingParams({
             operator: _operator,
@@ -224,7 +236,12 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
             description: "liquidation"
         });
 
-        IAllocationManager($.allocationManager).slashOperator(address(this), slashingParams);
+        (uint256 slashId,) = IAllocationManager($.allocationManager).slashOperator(address(this), slashingParams);
+
+        IAllocationManager.OperatorSet memory operatorSet =
+            IAllocationManager.OperatorSet({ avs: address(this), id: $.operatorSetIds[_operator] });
+
+        IStrategyManager($.strategyManager).clearBurnOrRedistributableSharesByStrategy(operatorSet, slashId, _strategy);
     }
 
     /// @inheritdoc IEigenServiceManager
@@ -236,6 +253,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         _checkApproval(_token, $.rewardsCoordinator);
         if ($.lastDistribution[_operator][_token] + $.rewardDuration > block.timestamp) revert RewardsNotReady();
         uint256 _amount = IERC20(_token).balanceOf(address(this));
+        if (_amount < $.minRewardAmount) revert MinRewardAmountNotMet();
         address _strategy = $.operatorToStrategy[_operator];
 
         IRewardsCoordinator.RewardsSubmission[] memory rewardsSubmissions =
@@ -280,18 +298,46 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         checkAccess(this.registerStrategy.selector)
     {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+
+        // Checks
         if ($.operatorToStrategy[_operator] != address(0)) revert AlreadyRegisteredOperator();
-        if ($.operatorSetIds[_operator] == 0) revert InvalidOperator();
+        if ($.operatorSetIds[_operator] != 0) revert OperatorSetAlreadyCreated();
+
+        IAllocationManager allocationManager = IAllocationManager($.allocationManager);
+
+        // Create the operator set params
+        IAllocationManager.CreateSetParams[] memory params = new IAllocationManager.CreateSetParams[](1);
+        address[] memory strategies = new address[](1);
+        strategies[0] = _strategy;
+        params[0] = IAllocationManager.CreateSetParams({ operatorSetId: $.nextOperatorId, strategies: strategies });
+
+        // Create the redistribution recipients
+        address[] memory redistributionRecipients = new address[](1);
+        redistributionRecipients[0] = address(this);
+
+        // Create the operator set
+        allocationManager.createRedistributingOperatorSets(address(this), params, redistributionRecipients);
         $.operatorToStrategy[_operator] = _strategy;
+        $.operatorSetIds[_operator] = $.nextOperatorId;
+        $.nextOperatorId++;
 
         emit StrategyRegistered(_strategy, _operator);
     }
 
+    /// @inheritdoc IEigenServiceManager
     function setRewardsDuration(uint32 _rewardDuration) external checkAccess(this.setRewardsDuration.selector) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         $.rewardDuration = _rewardDuration;
 
         emit RewardsDurationSet(_rewardDuration);
+    }
+
+    /// @inheritdoc IEigenServiceManager
+    function setMinRewardAmount(uint256 _minRewardAmount) external checkAccess(this.setMinRewardAmount.selector) {
+        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        $.minRewardAmount = _minRewardAmount;
+
+        emit MinRewardAmountSet(_minRewardAmount);
     }
 
     /// @notice Create a rewards submission for the AVS
