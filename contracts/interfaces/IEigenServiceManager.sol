@@ -46,13 +46,6 @@ interface IEigenServiceManager {
     ) external;
 
     /**
-     * @notice Updates the metadata URI for the AVS
-     * @param _metadataURI is the metadata URI for the AVS
-     * @dev only callable by the owner
-     */
-    function updateAVSMetadataURI(string memory _metadataURI) external;
-
-    /**
      * @notice Creates a new rewards submission to the EigenLayer RewardsCoordinator contract, to be split amongst the
      * set of stakers delegated to operators who are registered to this `avs`
      * @param rewardsSubmissions The rewards submissions being created
@@ -94,8 +87,9 @@ interface IEigenServiceManager {
      * @notice Registers a strategy to the AVS
      * @param _strategy The strategy to register
      * @param _operator The operator to register the strategy to
+     * @param _metadata The metadata for the strategy
      */
-    function registerStrategy(address _strategy, address _operator) external;
+    function registerStrategy(address _strategy, address _operator, string memory _metadata) external;
 
     /**
      * @notice Slashes an operator

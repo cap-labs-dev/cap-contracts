@@ -14,6 +14,8 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+////**TODO: Add in best practices for Operator Selection*/
+
 /// @title EigenServiceManager
 /// @author weso, Cap Labs
 /// @notice This contract manages the EigenServiceManager
@@ -85,21 +87,12 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
                 '{"name": "cap",',
                 '"website": "https://cap.app/",',
                 '"description": "Stablecoin protocol with credible financial guarantees",',
-                '"logo": "https://cap.app/media-kit/cap_n_y.svg",',
+                '"logo": "https://cap.app/media-kit/cap_b_y_882%C3%97848.png",',
                 '"twitter": "https://x.com/capmoney_"}'
             )
         );
 
-        IAllocationManager($.allocationManager).updateAVSMetadataURI(address(this), metadata);
-    }
-
-    /// @inheritdoc IEigenServiceManager
-    function updateAVSMetadataURI(string memory _metadataURI)
-        external
-        checkAccess(this.updateAVSMetadataURI.selector)
-    {
-        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        IAllocationManager($.allocationManager).updateAVSMetadataURI(address(this), _metadataURI);
+        _updateAVSMetadataURI(metadata);
     }
 
     /// @inheritdoc IEigenServiceManager
@@ -170,7 +163,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @inheritdoc IEigenServiceManager
-    function registerStrategy(address _strategy, address _operator)
+    function registerStrategy(address _strategy, address _operator, string memory _metadata)
         external
         checkAccess(this.registerStrategy.selector)
     {
@@ -196,6 +189,8 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         allocationManager.createRedistributingOperatorSets(address(this), params, redistributionRecipients);
         $.operatorToStrategy[_operator] = _strategy;
         $.operatorSetIds[_operator] = $.nextOperatorId;
+        _updateAVSMetadataURI(_metadata);
+
         $.nextOperatorId++;
 
         emit StrategyRegistered(_strategy, _operator);
@@ -231,6 +226,15 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         if ($.operatorToStrategy[operator] == address(0)) revert ZeroAddress();
         return slashableCollateralByStrategy(operator, $.operatorToStrategy[operator]);
+    }
+
+    /**
+     * @notice Updates the metadata URI for the AVS
+     * @param _metadataURI is the metadata URI for the AVS
+     */
+    function _updateAVSMetadataURI(string memory _metadataURI) private {
+        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        IAllocationManager($.allocationManager).updateAVSMetadataURI(address(this), _metadataURI);
     }
 
     /// @notice Slash the operator
