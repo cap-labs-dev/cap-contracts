@@ -13,7 +13,11 @@ interface IEigenServiceManager {
         address rewardsCoordinator;
         address registryCoordinator;
         address stakeRegistry;
-        mapping(address => address) agentToStrategy;
+        address oracle;
+        uint32 rewardDuration;
+        mapping(address => mapping(address => uint256)) lastDistribution;
+        mapping(address => address) operatorToStrategy;
+        mapping(address => uint32) operatorSetIds;
     }
 
     /// @notice Initialize the EigenServiceManager
@@ -23,13 +27,17 @@ interface IEigenServiceManager {
     /// @param _rewardsCoordinator Rewards Coordinator contract
     /// @param _registryCoordinator Registry Coordinator contract
     /// @param _stakeRegistry Stake Registry contract
+    /// @param _oracle Oracle contract
+    /// @param _rewardDuration Reward duration
     function initialize(
         address _accessControl,
         address _allocationManager,
         address _delegationManager,
         address _rewardsCoordinator,
         address _registryCoordinator,
-        address _stakeRegistry
+        address _stakeRegistry,
+        address _oracle,
+        uint32 _rewardDuration
     ) external;
 
     /**
@@ -54,11 +62,44 @@ interface IEigenServiceManager {
      */
 
     /**
-     * @notice Distributes rewards to the agent
-     * @param _agent The agent to distribute rewards to
+     * @notice Distributes rewards to the operator
+     * @param _operator The operator to distribute rewards to
      * @param _token The token to distribute rewards for
      */
-    function distributeRewards(address _agent, address _token) external;
+    function distributeRewards(address _operator, address _token) external;
+
+    /**
+     * @notice Returns the coverage for an operator
+     * @param operator The operator to get the coverage for
+     * @return The coverage of the operator
+     */
+    function coverage(address operator) external view returns (uint256);
+
+    /**
+     * @notice Registers an operator to the AVS
+     * @param _operator The operator to register
+     * @param _avs The AVS to register the operator to
+     * @param _operatorSetIds The operator set ids to register the operator to
+     * @param _data Additional data
+     */
+    function registerOperator(address _operator, address _avs, uint32[] calldata _operatorSetIds, bytes calldata _data)
+        external;
+
+    /**
+     * @notice Registers a strategy to the AVS
+     * @param _strategy The strategy to register
+     * @param _operator The operator to register the strategy to
+     */
+    function registerStrategy(address _strategy, address _operator) external;
+
+    /**
+     * @notice Slashes an operator
+     * @param _operator The operator to slash
+     * @param _recipient The recipient of the slashed collateral
+     * @param _slashShare The share of the slashable collateral to slash
+     * @param _timestamp The timestamp of the slash (unused for eigenlayer)
+     */
+    function slash(address _operator, address _recipient, uint256 _slashShare, uint48 _timestamp) external;
 
     /**
      * @notice Returns the slashable collateral for an operator

@@ -106,4 +106,12 @@ interface IAllocationManager {
         address[] memory strategies,
         uint32 futureBlock
     ) external view returns (uint256[][] memory slashableStake);
+
+    /**
+     * @notice Returns the address where slashed funds will be sent for a given operator set.
+     * @param operatorSet The Operator Set to query.
+     * @return For redistributing Operator Sets, returns the configured redistribution address set during Operator Set creation.
+     *         For non-redistributing operator sets, returns the `DEFAULT_BURN_ADDRESS`.
+     */
+    function getRedistributionRecipient(OperatorSet memory operatorSet) external view returns (address);
 }
