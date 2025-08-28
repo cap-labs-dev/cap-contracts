@@ -16,12 +16,8 @@ interface IEigenServiceManager {
     error InvalidRedistributionRecipient();
     /// @dev Zero address
     error ZeroAddress();
-    /// @dev Rewards not ready
-    error RewardsNotReady();
     /// @dev Operator set already created
     error OperatorSetAlreadyCreated();
-    /// @dev Min reward amount not met
-    error MinRewardAmountNotMet();
     /// @dev Min magnitude not met
     error MinMagnitudeNotMet();
     /// @dev Invalid decimals
