@@ -114,14 +114,14 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
             strategiesAndMultipliers: _strategiesAndMultipliers,
             token: _token,
             amount: _amount,
-            startTimestamp: uint32($.lastDistribution[_strategy][_token]),
-            duration: uint32(block.timestamp) - uint32($.lastDistribution[_strategy][_token])
+            startTimestamp: $.lastDistribution[_strategy][_token],
+            duration: uint32(block.timestamp) - $.lastDistribution[_strategy][_token]
         });
 
         _createAVSRewardsSubmission(rewardsSubmissions);
 
         $.pendingRewards[_strategy][_token] = 0;
-        $.lastDistribution[_strategy][_token] = block.timestamp;
+        $.lastDistribution[_strategy][_token] = uint32(block.timestamp);
 
         emit DistributedRewards(_strategy, _token, _amount);
     }
@@ -189,7 +189,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         _updateAVSMetadataURI(_metadata);
 
         $.nextOperatorId++;
-        $.lastDistribution[_strategy][address(IStrategy(_strategy).underlyingToken())] = block.timestamp;
+        $.lastDistribution[_strategy][address(IStrategy(_strategy).underlyingToken())] = uint32(block.timestamp);
 
         emit StrategyRegistered(_strategy, _operator);
     }

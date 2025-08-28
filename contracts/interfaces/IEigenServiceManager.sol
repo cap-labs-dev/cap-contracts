@@ -52,7 +52,7 @@ interface IEigenServiceManager {
         uint32 nextOperatorId;
         uint256 minRewardAmount;
         mapping(address => mapping(address => uint256)) pendingRewards;
-        mapping(address => mapping(address => uint256)) lastDistribution;
+        mapping(address => mapping(address => uint32)) lastDistribution;
         mapping(address => address) operatorToStrategy;
         mapping(address => uint32) operatorSetIds;
     }
