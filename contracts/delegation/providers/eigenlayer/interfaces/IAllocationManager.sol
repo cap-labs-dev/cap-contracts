@@ -131,4 +131,20 @@ interface IAllocationManager {
         CreateSetParams[] calldata params,
         address[] calldata redistributionRecipients
     ) external;
+
+    /**
+     * @notice Returns the maximum magnitude of a given operator and strategy.
+     * @param operator The operator address.
+     * @param strategy The strategy address.
+     * @return The maximum magnitude of the operator and strategy.
+     */
+    function getMaxMagnitude(address operator, address strategy) external view returns (uint64);
+
+    /**
+     * @notice Returns the allocatable magnitude of a given operator and strategy.
+     * @param operator The operator address.
+     * @param strategy The strategy address.
+     * @return The allocatable magnitude of the operator and strategy.
+     */
+    function getAllocatableMagnitude(address operator, address strategy) external view returns (uint64);
 }

@@ -14,8 +14,6 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-////**TODO: Add in best practices for Operator Selection*/
-
 /// @title EigenServiceManager
 /// @author weso, Cap Labs
 /// @notice This contract manages the EigenServiceManager
@@ -40,6 +38,16 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     error OperatorSetAlreadyCreated();
     /// @dev Min reward amount not met
     error MinRewardAmountNotMet();
+    /// @dev Min magnitude not met
+    error MinMagnitudeNotMet();
+    /// @dev Invalid decimals
+    error InvalidDecimals();
+    /// @dev Min share not met
+    error MinShareNotMet();
+    /// @dev Zero slash
+    error ZeroSlash();
+    /// @dev Slash share too small
+    error SlashShareTooSmall();
 
     /// @dev Operator registered
     event OperatorRegistered(address indexed operator, address indexed avs, uint32[] operatorSetIds);
@@ -102,6 +110,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         if ($.operatorToStrategy[_operator] == address(0)) revert ZeroAddress();
+        if (_slashShare < 1e15) revert SlashShareTooSmall();
 
         address _strategy = $.operatorToStrategy[_operator];
         IERC20 _slashedCollateral = IStrategy(_strategy).underlyingToken();
@@ -109,6 +118,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         /// this is a share of the collateral so need to make sure sending correct amount.
         _slash(_strategy, _operator, _slashShare);
         uint256 slashedAmount = _slashedCollateral.balanceOf(address(this));
+        if (slashedAmount == 0) revert ZeroSlash();
         _slashedCollateral.safeTransfer(_recipient, slashedAmount);
 
         emit Slash(_operator, _recipient, slashedAmount, uint48(block.timestamp));
@@ -153,6 +163,10 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         if ($.operatorToStrategy[_operator] != address(0)) revert AlreadyRegisteredOperator();
         if (_avs != address(this)) revert InvalidAVS();
         if (_operatorSetIds.length != 1) revert InvalidOperatorSetIds();
+        if (
+            IAllocationManager($.allocationManager).getAllocatableMagnitude(_operator, $.operatorToStrategy[_operator])
+                < 1e9
+        ) revert MinMagnitudeNotMet();
 
         IAllocationManager allocationManager = IAllocationManager($.allocationManager);
         IAllocationManager.OperatorSet memory operatorSet =
@@ -172,6 +186,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         // Checks
         if ($.operatorToStrategy[_operator] != address(0)) revert AlreadyRegisteredOperator();
         if ($.operatorSetIds[_operator] != 0) revert OperatorSetAlreadyCreated();
+        if (IERC20Metadata(address(IStrategy(_strategy).underlyingToken())).decimals() < 6) revert InvalidDecimals();
 
         IAllocationManager allocationManager = IAllocationManager($.allocationManager);
 
@@ -179,6 +194,11 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         IAllocationManager.CreateSetParams[] memory params = new IAllocationManager.CreateSetParams[](1);
         address[] memory strategies = new address[](1);
         strategies[0] = _strategy;
+
+        uint256[] memory operatorShares =
+            IDelegationManager($.delegationManager).getOperatorShares(_operator, strategies);
+        if (operatorShares[0] < 1e9) revert MinShareNotMet();
+
         params[0] = IAllocationManager.CreateSetParams({ operatorSetId: $.nextOperatorId, strategies: strategies });
 
         // Create the redistribution recipients
