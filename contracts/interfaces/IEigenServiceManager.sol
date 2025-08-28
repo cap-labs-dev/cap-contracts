@@ -184,9 +184,9 @@ interface IEigenServiceManager {
 
     /**
      * @notice Returns the pending rewards for an operator
-     * @param _operator The operator to get the pending rewards for
+     * @param _strategy The strategy to get the pending rewards for
      * @param _token The token to get the pending rewards for
-     * @return The pending rewards of the operator
+     * @return The pending rewards of the strategy
      */
-    function pendingRewards(address _operator, address _token) external view returns (uint256);
+    function pendingRewards(address _strategy, address _token) external view returns (uint256);
 }

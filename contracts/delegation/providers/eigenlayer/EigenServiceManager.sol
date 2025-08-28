@@ -84,24 +84,29 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         checkAccess(this.distributeRewards.selector)
     {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        _checkApproval(_token, $.eigen.rewardsCoordinator);
+
+        /// Fetch the strategy for the operator
+        address _strategy = $.operatorToStrategy[_operator];
 
         /// Check if rewards are ready and if the amount is above the minimum
         uint256 _amount = IERC20(_token).balanceOf(address(this));
-        if (_amount < $.minRewardAmount || $.lastDistribution[_operator][_token] + $.rewardDuration > block.timestamp) {
-            $.pendingRewards[_operator][_token] += _amount;
+        if (_amount < $.minRewardAmount || $.lastDistribution[_strategy][_token] + $.rewardDuration > block.timestamp) {
+            $.pendingRewards[_strategy][_token] += _amount;
             return;
         }
 
-        _amount += $.pendingRewards[_operator][_token];
-        $.pendingRewards[_operator][_token] = 0;
+        _checkApproval(_token, $.eigen.rewardsCoordinator);
+
+        /// include pending rewards
+        _amount += $.pendingRewards[_strategy][_token];
 
         /// Get the strategy for the operator and create the rewards submission
-        address _strategy = $.operatorToStrategy[_operator];
         IRewardsCoordinator.RewardsSubmission[] memory rewardsSubmissions =
             new IRewardsCoordinator.RewardsSubmission[](1);
         IRewardsCoordinator.StrategyAndMultiplier[] memory _strategiesAndMultipliers =
             new IRewardsCoordinator.StrategyAndMultiplier[](1);
+
+        /// Since there is only 1 strategy multiplier is just 1e18 everything goes to the strategy
         _strategiesAndMultipliers[0] =
             IRewardsCoordinator.StrategyAndMultiplier({ strategy: _strategy, multiplier: 1e18 });
 
@@ -114,6 +119,9 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         });
 
         _createAVSRewardsSubmission(rewardsSubmissions);
+
+        $.pendingRewards[_strategy][_token] = 0;
+        $.lastDistribution[_strategy][_token] = block.timestamp;
     }
 
     /// @inheritdoc IEigenServiceManager
@@ -246,9 +254,9 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @inheritdoc IEigenServiceManager
-    function pendingRewards(address _operator, address _token) external view returns (uint256) {
+    function pendingRewards(address _strategy, address _token) external view returns (uint256) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        return $.pendingRewards[$.operatorToStrategy[_operator]][_token];
+        return $.pendingRewards[_strategy][_token];
     }
 
     /**
