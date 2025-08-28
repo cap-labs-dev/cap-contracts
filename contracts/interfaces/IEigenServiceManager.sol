@@ -39,6 +39,8 @@ interface IEigenServiceManager {
     event RewardsDurationSet(uint32 rewardDuration);
     /// @dev Min reward amount set
     event MinRewardAmountSet(uint256 minRewardAmount);
+    /// @dev Distributed rewards
+    event DistributedRewards(address indexed strategy, address indexed token, uint256 amount);
 
     /// @dev EigenServiceManager storage
     /// @param accessControl Access control address

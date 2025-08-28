@@ -122,6 +122,8 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
 
         $.pendingRewards[_strategy][_token] = 0;
         $.lastDistribution[_strategy][_token] = block.timestamp;
+
+        emit DistributedRewards(_strategy, _token, _amount);
     }
 
     /// @inheritdoc IEigenServiceManager
