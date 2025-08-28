@@ -210,31 +210,31 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @inheritdoc IEigenServiceManager
-    function coverage(address operator) external view returns (uint256 delegation) {
+    function coverage(address _operator) external view returns (uint256 delegation) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        address _strategy = $.operatorToStrategy[operator];
+        address _strategy = $.operatorToStrategy[_operator];
         if (_strategy == address(0)) revert ZeroAddress();
         address _oracle = $.oracle;
-        (delegation,) = coverageByStrategy(operator, _strategy, _oracle);
+        (delegation,) = _coverageByStrategy(_operator, _strategy, _oracle);
     }
 
     /// @inheritdoc IEigenServiceManager
-    function slashableCollateral(address operator, uint256) external view returns (uint256) {
+    function slashableCollateral(address _operator, uint256) external view returns (uint256) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        if ($.operatorToStrategy[operator] == address(0)) revert ZeroAddress();
-        return slashableCollateralByStrategy(operator, $.operatorToStrategy[operator]);
+        if ($.operatorToStrategy[_operator] == address(0)) revert ZeroAddress();
+        return _slashableCollateralByStrategy(_operator, $.operatorToStrategy[_operator]);
     }
 
     /// @inheritdoc IEigenServiceManager
-    function operatorSetId(address operator) external view returns (uint32) {
+    function operatorSetId(address _operator) external view returns (uint32) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        return $.operatorSetIds[operator];
+        return $.operatorSetIds[_operator];
     }
 
     /// @inheritdoc IEigenServiceManager
-    function operatorToStrategy(address operator) external view returns (address) {
+    function operatorToStrategy(address _operator) external view returns (address) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        return $.operatorToStrategy[operator];
+        return $.operatorToStrategy[_operator];
     }
 
     /// @inheritdoc IEigenServiceManager
@@ -301,18 +301,18 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @notice Create a rewards submission for the AVS
-    /// @param rewardsSubmissions The rewards submissions being created
-    function _createAVSRewardsSubmission(IRewardsCoordinator.RewardsSubmission[] memory rewardsSubmissions) private {
+    /// @param _rewardsSubmissions The rewards submissions being created
+    function _createAVSRewardsSubmission(IRewardsCoordinator.RewardsSubmission[] memory _rewardsSubmissions) private {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        IRewardsCoordinator($.eigen.rewardsCoordinator).createAVSRewardsSubmission(rewardsSubmissions);
+        IRewardsCoordinator($.eigen.rewardsCoordinator).createAVSRewardsSubmission(_rewardsSubmissions);
     }
 
     /// @notice Check if the token has enough allowance for the spender
-    /// @param token The token to check
-    /// @param spender The spender to check
-    function _checkApproval(address token, address spender) private {
-        if (IERC20(token).allowance(spender, address(this)) == 0) {
-            IERC20(token).forceApprove(spender, type(uint256).max);
+    /// @param _token The token to check
+    /// @param _spender The spender to check
+    function _checkApproval(address _token, address _spender) private {
+        if (IERC20(_token).allowance(_spender, address(this)) == 0) {
+            IERC20(_token).forceApprove(_spender, type(uint256).max);
         }
     }
 
@@ -320,7 +320,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     /// @param _operator The operator address
     /// @param _strategy The strategy address
     /// @return The slashable collateral
-    function slashableCollateralByStrategy(address _operator, address _strategy) private view returns (uint256) {
+    function _slashableCollateralByStrategy(address _operator, address _strategy) private view returns (uint256) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         address collateralAddress = address(IStrategy(_strategy).underlyingToken());
         uint8 decimals = IERC20Metadata(collateralAddress).decimals();
@@ -338,7 +338,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     /// @param _oracle The oracle address
     /// @return collateralValue The collateral value
     /// @return collateral The collateral
-    function coverageByStrategy(address _operator, address _strategy, address _oracle)
+    function _coverageByStrategy(address _operator, address _strategy, address _oracle)
         private
         view
         returns (uint256 collateralValue, uint256 collateral)
@@ -352,15 +352,15 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @notice Get the slashable shares for a given operator and strategy
-    /// @param operator The operator address
+    /// @param _operator The operator address
     /// @return The slashable shares of the operator
-    function _getSlashableShares(address operator) private view returns (uint256) {
+    function _getSlashableShares(address _operator) private view returns (uint256) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        address _strategy = $.operatorToStrategy[operator];
+        address _strategy = $.operatorToStrategy[_operator];
         // Get the slashable shares for the operator/OperatorSet
-        uint256 slashableShares = _minimumSlashableStake(operator, _strategy);
+        uint256 slashableShares = _minimumSlashableStake(_operator, _strategy);
         // Get the shares in queue
-        uint256 sharesInQueue = _slashableSharesInQueue(operator, _strategy);
+        uint256 sharesInQueue = _slashableSharesInQueue(_operator, _strategy);
         // Sum up the slashable shares and the shares in queue
         uint256 totalSlashableShares = slashableShares + sharesInQueue;
 
@@ -368,26 +368,26 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @notice Get the slashable shares in queue for withdrawal from a given operator and strategy
-    /// @param operator The operator address
-    /// @param strategy The strategy address
+    /// @param _operator The operator address
+    /// @param _strategy The strategy address
     /// @return The slashable shares in queue for withdrawal
-    function _slashableSharesInQueue(address operator, address strategy) private view returns (uint256) {
+    function _slashableSharesInQueue(address _operator, address _strategy) private view returns (uint256) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        return IDelegationManager($.eigen.delegationManager).getSlashableSharesInQueue(operator, strategy);
+        return IDelegationManager($.eigen.delegationManager).getSlashableSharesInQueue(_operator, _strategy);
     }
 
     /// @notice Get the minimum slashable stake for a given operator and strategy
-    /// @param operator The operator address
-    /// @param strategy The strategy address
+    /// @param _operator The operator address
+    /// @param _strategy The strategy address
     /// @return The minimum slashable stake
-    function _minimumSlashableStake(address operator, address strategy) private view returns (uint256) {
+    function _minimumSlashableStake(address _operator, address _strategy) private view returns (uint256) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         IAllocationManager.OperatorSet memory operatorSet =
-            IAllocationManager.OperatorSet({ avs: address(this), id: $.operatorSetIds[operator] });
+            IAllocationManager.OperatorSet({ avs: address(this), id: $.operatorSetIds[_operator] });
         address[] memory operators = new address[](1);
-        operators[0] = operator;
+        operators[0] = _operator;
         address[] memory strategies = new address[](1);
-        strategies[0] = strategy;
+        strategies[0] = _strategy;
         uint256[][] memory slashableShares = IAllocationManager($.eigen.allocationManager).getMinimumSlashableStake(
             operatorSet, operators, strategies, uint32(block.number)
         );
