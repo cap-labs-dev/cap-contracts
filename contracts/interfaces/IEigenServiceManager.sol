@@ -7,13 +7,8 @@ interface IEigenServiceManager {
     /// @dev EigenServiceManager storage
     /// @param accessControl Access control address
     struct EigenServiceManagerStorage {
+        EigenAddresses eigen;
         address accessControl;
-        address allocationManager;
-        address delegationManager;
-        address strategyManager;
-        address rewardsCoordinator;
-        address registryCoordinator;
-        address stakeRegistry;
         address oracle;
         uint32 rewardDuration;
         uint32 nextOperatorId;
@@ -23,24 +18,23 @@ interface IEigenServiceManager {
         mapping(address => uint32) operatorSetIds;
     }
 
+    struct EigenAddresses {
+        address allocationManager;
+        address delegationManager;
+        address strategyManager;
+        address rewardsCoordinator;
+        address registryCoordinator;
+        address stakeRegistry;
+    }
+
     /// @notice Initialize the EigenServiceManager
     /// @param _accessControl Access control contract
-    /// @param _allocationManager Allocation Manager contract
-    /// @param _delegationManager Delegation Manager contract
-    /// @param _strategyManager Strategy Manager contract
-    /// @param _rewardsCoordinator Rewards Coordinator contract
-    /// @param _registryCoordinator Registry Coordinator contract
-    /// @param _stakeRegistry Stake Registry contract
+    /// @param _addresses Eigen addresses
     /// @param _oracle Oracle contract
     /// @param _rewardDuration Reward duration
     function initialize(
         address _accessControl,
-        address _allocationManager,
-        address _delegationManager,
-        address _strategyManager,
-        address _rewardsCoordinator,
-        address _registryCoordinator,
-        address _stakeRegistry,
+        EigenAddresses memory _addresses,
         address _oracle,
         uint32 _rewardDuration
     ) external;
@@ -119,4 +113,35 @@ interface IEigenServiceManager {
      * @param _minRewardAmount The min reward amount
      */
     function setMinRewardAmount(uint256 _minRewardAmount) external;
+
+    /**
+     * @notice Returns the eigen addresses
+     * @return The eigen addresses
+     */
+    function eigenAddresses() external view returns (EigenAddresses memory);
+
+    /**
+     * @notice Returns the operator to strategy mapping
+     * @return The operator to strategy mapping
+     */
+    function operatorToStrategy(address operator) external view returns (address);
+
+    /**
+     * @notice Returns the operator set id for an operator
+     * @param operator The operator to get the operator set id for
+     * @return The operator set id of the operator
+     */
+    function operatorSetId(address operator) external view returns (uint32);
+
+    /**
+     * @notice Returns the min reward amount
+     * @return The min reward amount
+     */
+    function minRewardAmount() external view returns (uint256);
+
+    /**
+     * @notice Returns the rewards duration
+     * @return The rewards duration
+     */
+    function rewardDuration() external view returns (uint32);
 }
