@@ -19,48 +19,8 @@ import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/Saf
 /// @notice This contract manages the EigenServiceManager
 contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, EigenServiceManagerStorageUtils {
     using SafeERC20 for IERC20;
-
-    /// @dev Invalid AVS
-    error InvalidAVS();
-    /// @dev Invalid operator set ids
-    error InvalidOperatorSetIds();
-    /// @dev Invalid operator
-    error InvalidOperator();
-    /// @dev Operator already registered
-    error AlreadyRegisteredOperator();
-    /// @dev Invalid redistribution recipient
-    error InvalidRedistributionRecipient();
-    /// @dev Zero address
-    error ZeroAddress();
-    /// @dev Rewards not ready
-    error RewardsNotReady();
-    /// @dev Operator set already created
-    error OperatorSetAlreadyCreated();
-    /// @dev Min reward amount not met
-    error MinRewardAmountNotMet();
-    /// @dev Min magnitude not met
-    error MinMagnitudeNotMet();
-    /// @dev Invalid decimals
-    error InvalidDecimals();
-    /// @dev Min share not met
-    error MinShareNotMet();
-    /// @dev Zero slash
-    error ZeroSlash();
-    /// @dev Slash share too small
-    error SlashShareTooSmall();
-
-    /// @dev Operator registered
-    event OperatorRegistered(address indexed operator, address indexed avs, uint32 operatorSetId);
-    /// @dev Emitted on slash
-    event Slash(address indexed agent, address indexed recipient, uint256 slashShare, uint48 timestamp);
-    /// @dev Strategy registered
-    event StrategyRegistered(address indexed strategy, address indexed operator);
-    /// @dev Rewards duration set
-    event RewardsDurationSet(uint32 rewardDuration);
-    /// @dev Min reward amount set
-    event MinRewardAmountSet(uint256 minRewardAmount);
-
     /// @custom:oz-upgrades-unsafe-allow constructor
+
     constructor() {
         _disableInitializers();
     }

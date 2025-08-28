@@ -4,6 +4,46 @@ pragma solidity ^0.8.28;
 import { IRewardsCoordinator } from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 
 interface IEigenServiceManager {
+    /// @dev Invalid AVS
+    error InvalidAVS();
+    /// @dev Invalid operator set ids
+    error InvalidOperatorSetIds();
+    /// @dev Invalid operator
+    error InvalidOperator();
+    /// @dev Operator already registered
+    error AlreadyRegisteredOperator();
+    /// @dev Invalid redistribution recipient
+    error InvalidRedistributionRecipient();
+    /// @dev Zero address
+    error ZeroAddress();
+    /// @dev Rewards not ready
+    error RewardsNotReady();
+    /// @dev Operator set already created
+    error OperatorSetAlreadyCreated();
+    /// @dev Min reward amount not met
+    error MinRewardAmountNotMet();
+    /// @dev Min magnitude not met
+    error MinMagnitudeNotMet();
+    /// @dev Invalid decimals
+    error InvalidDecimals();
+    /// @dev Min share not met
+    error MinShareNotMet();
+    /// @dev Zero slash
+    error ZeroSlash();
+    /// @dev Slash share too small
+    error SlashShareTooSmall();
+
+    /// @dev Operator registered
+    event OperatorRegistered(address indexed operator, address indexed avs, uint32 operatorSetId);
+    /// @dev Emitted on slash
+    event Slash(address indexed agent, address indexed recipient, uint256 slashShare, uint48 timestamp);
+    /// @dev Strategy registered
+    event StrategyRegistered(address indexed strategy, address indexed operator);
+    /// @dev Rewards duration set
+    event RewardsDurationSet(uint32 rewardDuration);
+    /// @dev Min reward amount set
+    event MinRewardAmountSet(uint256 minRewardAmount);
+
     /// @dev EigenServiceManager storage
     /// @param accessControl Access control address
     struct EigenServiceManagerStorage {
