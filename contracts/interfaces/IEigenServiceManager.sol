@@ -53,6 +53,7 @@ interface IEigenServiceManager {
         uint32 rewardDuration;
         uint32 nextOperatorId;
         uint256 minRewardAmount;
+        mapping(address => mapping(address => uint256)) pendingRewards;
         mapping(address => mapping(address => uint256)) lastDistribution;
         mapping(address => address) operatorToStrategy;
         mapping(address => uint32) operatorSetIds;
@@ -184,4 +185,12 @@ interface IEigenServiceManager {
      * @return The rewards duration
      */
     function rewardDuration() external view returns (uint32);
+
+    /**
+     * @notice Returns the pending rewards for an operator
+     * @param _operator The operator to get the pending rewards for
+     * @param _token The token to get the pending rewards for
+     * @return The pending rewards of the operator
+     */
+    function pendingRewards(address _operator, address _token) external view returns (uint256);
 }

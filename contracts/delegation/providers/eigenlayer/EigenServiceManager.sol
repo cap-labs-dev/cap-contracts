@@ -67,10 +67,11 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         IERC20 _slashedCollateral = IStrategy(_strategy).underlyingToken();
 
         /// Slash share is a percentage of total operators collateral, this is calculated in Delegation.sol
+        uint256 beforeSlash = _slashedCollateral.balanceOf(address(this));
         _slash(_strategy, _operator, _slashShare);
 
         /// Send slashed collateral to the liquidator
-        uint256 slashedAmount = _slashedCollateral.balanceOf(address(this));
+        uint256 slashedAmount = _slashedCollateral.balanceOf(address(this)) - beforeSlash;
         if (slashedAmount == 0) revert ZeroSlash();
         _slashedCollateral.safeTransfer(_recipient, slashedAmount);
 
@@ -86,9 +87,14 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         _checkApproval(_token, $.eigen.rewardsCoordinator);
 
         /// Check if rewards are ready and if the amount is above the minimum
-        if ($.lastDistribution[_operator][_token] + $.rewardDuration > block.timestamp) revert RewardsNotReady();
         uint256 _amount = IERC20(_token).balanceOf(address(this));
-        if (_amount < $.minRewardAmount) revert MinRewardAmountNotMet();
+        if (_amount < $.minRewardAmount || $.lastDistribution[_operator][_token] + $.rewardDuration > block.timestamp) {
+            $.pendingRewards[_operator][_token] += _amount;
+            return;
+        }
+
+        _amount += $.pendingRewards[_operator][_token];
+        $.pendingRewards[_operator][_token] = 0;
 
         /// Get the strategy for the operator and create the rewards submission
         address _strategy = $.operatorToStrategy[_operator];
@@ -237,6 +243,12 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     function rewardDuration() external view returns (uint32) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         return $.rewardDuration;
+    }
+
+    /// @inheritdoc IEigenServiceManager
+    function pendingRewards(address _operator, address _token) external view returns (uint256) {
+        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        return $.pendingRewards[$.operatorToStrategy[_operator]][_token];
     }
 
     /**
