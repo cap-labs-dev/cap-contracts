@@ -94,10 +94,15 @@ contract Lender is ILender, UUPSUpgradeable, Access, LenderStorageUtils {
     }
 
     /// @inheritdoc ILender
-    function liquidate(address _agent, address _asset, uint256 _amount) external returns (uint256 liquidatedValue) {
+    function liquidate(address _agent, address _asset, uint256 _amount, uint256 _minLiquidatedValue)
+        external
+        returns (uint256 liquidatedValue)
+    {
         if (_agent == address(0) || _asset == address(0)) revert ZeroAddressNotValid();
         liquidatedValue = LiquidationLogic.liquidate(
-            getLenderStorage(), RepayParams({ agent: _agent, asset: _asset, amount: _amount, caller: msg.sender })
+            getLenderStorage(),
+            RepayParams({ agent: _agent, asset: _asset, amount: _amount, caller: msg.sender }),
+            _minLiquidatedValue
         );
     }
 

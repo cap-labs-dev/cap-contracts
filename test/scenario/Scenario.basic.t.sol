@@ -413,7 +413,7 @@ contract ScenarioBasicTest is TestDeployer {
             deal(address(usdc), env.testUsers.liquidator, totalDebt);
             usdc.approve(address(lender), totalDebt);
 
-            lender.liquidate(user_agent, address(usdc), totalDebt);
+            lender.liquidate(user_agent, address(usdc), totalDebt, 0);
 
             (,, totalDebt,,,) = lender.agent(user_agent);
             console.log("Total debt of the operator after liquidation", totalDebt);

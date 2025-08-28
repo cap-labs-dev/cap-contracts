@@ -627,7 +627,7 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
                 _timeTravel(lender.grace() + 1);
             }
 
-            lender.liquidate(agent, currentAsset, amount);
+            lender.liquidate(agent, currentAsset, amount, 0);
             vm.stopPrank();
         }
     }
