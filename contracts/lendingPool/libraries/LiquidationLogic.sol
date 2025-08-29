@@ -28,6 +28,9 @@ library LiquidationLogic {
     /// @dev Zero address not valid
     error ZeroAddressNotValid();
 
+    /// @notice Insufficient liquidation value
+    error InsufficientLiquidationValue();
+
     /// @notice Open the liquidation window of an agent if unhealthy
     /// @param $ Lender storage
     /// @param _agent Agent address
@@ -60,8 +63,9 @@ library LiquidationLogic {
     /// All health factors, LTV ratios, and thresholds are in ray (1e27)
     /// @param $ Lender storage
     /// @param params Parameters to liquidate an agent
+    /// @param _minLiquidatedValue Minimum value of the liquidation returned to the liquidator
     /// @return liquidatedValue Value of the liquidation returned to the liquidator
-    function liquidate(ILender.LenderStorage storage $, ILender.RepayParams memory params)
+    function liquidate(ILender.LenderStorage storage $, ILender.RepayParams memory params, uint256 _minLiquidatedValue)
         external
         returns (uint256 liquidatedValue)
     {
@@ -91,6 +95,7 @@ library LiquidationLogic {
         liquidatedValue =
             (liquidated + (liquidated * bonus / 1e27)) * assetPrice / (10 ** $.reservesData[params.asset].decimals);
         if (totalSlashableCollateral < liquidatedValue) liquidatedValue = totalSlashableCollateral;
+        if (liquidatedValue < _minLiquidatedValue) revert InsufficientLiquidationValue();
 
         if (liquidatedValue > 0) IDelegation($.delegation).slash(params.agent, params.caller, liquidatedValue);
 
