@@ -11,7 +11,7 @@
             "oracle": "0xbFe4D64E61a3a02C4781a65FA343007de7ea9F14",
             "stakedCap": "0x42c0e0ef7C2F35de073F4d6f9c0e4483429c3D31",
             "chainlinkPoRAddressList": "0xc85d36c2a73caca3b4cb9a2640dbb9269f24614a",
-            "gelatoHarvester": "0x3c327A0DAe1470248FE96dA5b33c1DebD1c1FAD2",
+            "gelatoHarvester": "0x624504E11049EdD5f4754903E75D096AfceE46E3",
             "gelatoSweeper": "0x307C0C1F1A8b3a7153842922DfF239c66f308238",
             "vaultAdapter": "0xD212fA2cf56197dD79880681807Ce4d95C9Ffa2e"
         },
