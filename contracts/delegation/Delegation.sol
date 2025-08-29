@@ -163,7 +163,18 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         DelegationStorage storage $ = getDelegationStorage();
         uint256 _slashableCollateral = slashableCollateral(_agent);
         uint256 currentdelegation = ISymbioticNetworkMiddleware($.agentData[_agent].network).coverage(_agent);
-        delegation = Math.min(_slashableCollateral, currentdelegation);
+        uint256 lastBorrowMinusOneDelegation = _lastborrowMinusOneDelegation(_agent);
+        delegation = Math.min(_slashableCollateral, Math.min(currentdelegation, lastBorrowMinusOneDelegation));
+    }
+
+    /// @dev Returns the slashable collateral of the agent in the last epoch
+    /// @param _agent The agent address
+    /// @return delegation The slashable collateral of the agent in the last epoch
+    function _lastborrowMinusOneDelegation(address _agent) internal view returns (uint256 delegation) {
+        DelegationStorage storage $ = getDelegationStorage();
+        delegation = ISymbioticNetworkMiddleware($.agentData[_agent].network).slashableCollateral(
+            _agent, uint48(block.timestamp - 1)
+        );
     }
 
     /// @inheritdoc IDelegation
