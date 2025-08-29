@@ -57,7 +57,10 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         uint256 _amount = IERC20(_asset).balanceOf(address(this));
 
         uint256 totalCoverage = coverage(_agent);
-        if (totalCoverage == 0) return;
+        if (totalCoverage == 0) {
+            IERC20(_asset).safeTransfer($.feeRecipient, _amount);
+            return;
+        }
 
         address network = $.agentData[_agent].network;
         IERC20(_asset).safeTransfer(network, _amount);
@@ -130,6 +133,12 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     }
 
     /// @inheritdoc IDelegation
+    function setFeeRecipient(address _feeRecipient) external checkAccess(this.setFeeRecipient.selector) {
+        getDelegationStorage().feeRecipient = _feeRecipient;
+        emit SetFeeRecipient(_feeRecipient);
+    }
+
+    /// @inheritdoc IDelegation
     function epochDuration() external view returns (uint256 duration) {
         DelegationStorage storage $ = getDelegationStorage();
         duration = $.epochDuration;
@@ -197,6 +206,11 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     /// @inheritdoc IDelegation
     function networkExists(address _network) external view returns (bool) {
         return getDelegationStorage().networks.contains(_network);
+    }
+
+    /// @inheritdoc IDelegation
+    function feeRecipient() external view returns (address) {
+        return getDelegationStorage().feeRecipient;
     }
 
     /// @inheritdoc UUPSUpgradeable

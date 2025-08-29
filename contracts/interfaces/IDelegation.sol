@@ -22,6 +22,7 @@ interface IDelegation is IRestakerRewardReceiver {
         address oracle;
         uint256 epochDuration;
         uint256 ltvBuffer;
+        address feeRecipient;
     }
 
     /// @dev Agent data
@@ -66,6 +67,10 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @notice Set the ltv buffer
     /// @param ltvBuffer LTV buffer
     event SetLtvBuffer(uint256 ltvBuffer);
+
+    /// @notice Set the fee recipient
+    /// @param feeRecipient Fee recipient
+    event SetFeeRecipient(address feeRecipient);
 
     /// @notice Agent does not exist
     error AgentDoesNotExist();
@@ -140,6 +145,10 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @param _ltvBuffer LTV buffer
     function setLtvBuffer(uint256 _ltvBuffer) external;
 
+    /// @notice Set the fee recipient
+    /// @param _feeRecipient Fee recipient
+    function setFeeRecipient(address _feeRecipient) external;
+
     /// @notice Get the epoch duration
     /// @return duration Epoch duration in seconds
     /// @dev The duration between epochs. Pretty much the amount of time we have to slash the delegated collateral, if delegation is changed on the symbiotic vault.
@@ -192,4 +201,8 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @param _network Network address
     /// @return exists True if the network is registered
     function networkExists(address _network) external view returns (bool exists);
+
+    /// @notice Get the fee recipient
+    /// @return recipient Fee recipient
+    function feeRecipient() external view returns (address recipient);
 }
