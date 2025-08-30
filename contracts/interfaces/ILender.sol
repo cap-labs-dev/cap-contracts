@@ -190,8 +190,11 @@ interface ILender {
     /// @param _agent Agent address
     /// @param _asset Asset to repay
     /// @param _amount Amount of asset to repay on behalf of the agent
-    /// @param liquidatedValue Value of the liquidation returned to the liquidator
-    function liquidate(address _agent, address _asset, uint256 _amount) external returns (uint256 liquidatedValue);
+    /// @param _minLiquidatedValue Minimum value of the liquidation returned to the liquidator
+    /// @return liquidatedValue Value of the liquidation returned to the liquidator
+    function liquidate(address _agent, address _asset, uint256 _amount, uint256 _minLiquidatedValue)
+        external
+        returns (uint256 liquidatedValue);
 
     /// @notice Add an asset to the Lender
     /// @param _params Parameters to add an asset
