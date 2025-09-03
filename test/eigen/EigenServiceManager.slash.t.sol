@@ -24,10 +24,12 @@ contract EigenServiceManagerTest is TestDeployer {
         address recipient = makeAddr("recipient");
         address agent = env.testUsers.agents[1];
 
-        // collateral in USDT (8 decimals)
+        // collateral is in USD Value of the 100 eth collateral
         uint256 coverage = eigenServiceManager.coverage(agent);
+        uint256 slashableCollateral = eigenServiceManager.slashableCollateral(agent, 0);
         console.log("coverage", coverage);
-        //assertEq(coverage, 780000e8);
+        console.log("slashableCollateral", slashableCollateral);
+        assertEq(coverage, slashableCollateral);
 
         // slash 10% of agent collateral
         eigenServiceManager.slash(agent, recipient, 0.1e18, uint48(block.timestamp));
@@ -37,43 +39,55 @@ contract EigenServiceManagerTest is TestDeployer {
 
         // coverage should have been reduced by 10%
         uint256 approximatedPostSlashCoverage = coverage * 0.9e8 / 1e8;
+        uint256 coverageAfterSlash = eigenServiceManager.coverage(agent);
+        uint256 slashableCollateralAfterSlash = eigenServiceManager.slashableCollateral(agent, 0);
 
         assertApproxEqAbs(eigenServiceManager.coverage(agent), approximatedPostSlashCoverage, 1);
+        assertEq(slashableCollateralAfterSlash, coverageAfterSlash);
 
         vm.stopPrank();
     }
 
-    /*
     function test_slash_does_not_work_if_not_slashable() public {
-        address agent = _getRandomAgent();
+        address agent = env.testUsers.agents[1];
 
-        _proportionallyWithdrawFromVault(env, symbioticWethVault.vault, 100, true);
+        IERC20 collateral = IERC20(IStrategy(eigenAb.eigenAddresses.strategy).underlyingToken());
+        _proportionallyWithdrawFromStrategy(
+            eigenAb, env.testUsers.restakers[1], eigenAb.eigenAddresses.strategy, 100, true
+        );
 
-        _timeTravel(symbioticWethVault.vaultEpochDuration * 2 + 1);
+        // coverage should be 0
+        assertEq(eigenServiceManager.coverage(agent), 0);
+        assertGt(eigenServiceManager.slashableCollateral(agent, 0), 0);
 
         {
+            /// travel some time into the future after the epoch ends
+            _timeTravel(20 days);
             vm.startPrank(env.infra.delegation);
 
             address recipient = makeAddr("recipient");
-            assertEq(eigenServiceManager.coverage(agent), 0);
 
             // we request a slash for a timestamp where there is a stake to be slashed
             vm.expectRevert();
             eigenServiceManager.slash(agent, recipient, 0.1e18, uint48(block.timestamp));
 
             // slash should not have worked
-            assertEq(IERC20(weth).balanceOf(recipient), 0);
+            assertEq(collateral.balanceOf(recipient), 0);
             assertEq(eigenServiceManager.coverage(agent), 0);
             vm.stopPrank();
         }
     }
 
-    function test_can_slash_immediately_after_delegation() public {
-        address agent = _getRandomAgent();
+    function test_can_slash_everything() public {
+        address agent = env.testUsers.agents[1];
+
+        IERC20 collateral = IERC20(IStrategy(eigenAb.eigenAddresses.strategy).underlyingToken());
 
         // collateral is now active
-        _timeTravel(3);
-        assertEq(eigenServiceManager.coverage(agent), 780000e8);
+        assertEq(eigenServiceManager.coverage(agent), eigenServiceManager.slashableCollateral(agent, 0));
+        _proportionallyWithdrawFromStrategy(
+            eigenAb, env.testUsers.restakers[1], eigenAb.eigenAddresses.strategy, 100, true
+        );
 
         // we should be able to slash immediately after delegation
         {
@@ -81,14 +95,14 @@ contract EigenServiceManagerTest is TestDeployer {
 
             address recipient = makeAddr("recipient");
 
-            eigenServiceManager.slash(agent, recipient, 0.1e18, uint48(block.timestamp) - 1);
+            eigenServiceManager.slash(agent, recipient, 1e18, uint48(block.timestamp));
 
-            // all vaults have been slashed 10% and sent to the recipient
-            assertApproxEqAbs(IERC20(weth).balanceOf(recipient), 30e18, 1);
+            // strategy collateral has been slashed and sent to the recipient
+            assertApproxEqAbs(collateral.balanceOf(recipient), 10e18, 1);
 
             vm.stopPrank();
         }
-    }*/
+    }
 
     // ensure we can't slash if the vault epoch has ended
     // are funds active immediately after delegation?
