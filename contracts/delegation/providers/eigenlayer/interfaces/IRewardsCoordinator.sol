@@ -60,4 +60,6 @@ interface IRewardsCoordinator {
      * e.g. if the `strategies` and `weights` arrays are of non-equal lengths
      */
     function createAVSRewardsSubmission(RewardsSubmission[] calldata rewardsSubmissions) external;
+
+    function CALCULATION_INTERVAL_SECONDS() external pure returns (uint256);
 }

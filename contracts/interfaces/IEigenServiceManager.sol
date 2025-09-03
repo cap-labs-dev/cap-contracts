@@ -48,7 +48,6 @@ interface IEigenServiceManager {
     /// @param oracle Oracle address
     /// @param rewardDuration Reward duration
     /// @param nextOperatorId Next operator id
-    /// @param minRewardAmount Min reward amount
     /// @param pendingRewards Pending rewards
     /// @param lastDistribution Last distribution
     struct EigenServiceManagerStorage {
@@ -57,9 +56,8 @@ interface IEigenServiceManager {
         address oracle;
         uint32 rewardDuration;
         uint32 nextOperatorId;
-        uint256 minRewardAmount;
         mapping(address => mapping(address => uint256)) pendingRewards;
-        mapping(address => mapping(address => uint32)) lastDistribution;
+        mapping(address => mapping(address => uint32)) lastDistributionEpoch;
         mapping(address => address) operatorToStrategy;
         mapping(address => uint32) operatorSetIds;
     }
@@ -161,12 +159,6 @@ interface IEigenServiceManager {
     function setRewardsDuration(uint32 _rewardDuration) external;
 
     /**
-     * @notice Sets the min reward amount
-     * @param _minRewardAmount The min reward amount
-     */
-    function setMinRewardAmount(uint256 _minRewardAmount) external;
-
-    /**
      * @notice Returns the eigen addresses
      * @return The eigen addresses
      */
@@ -184,12 +176,6 @@ interface IEigenServiceManager {
      * @return The operator set id of the operator
      */
     function operatorSetId(address operator) external view returns (uint32);
-
-    /**
-     * @notice Returns the min reward amount
-     * @return The min reward amount
-     */
-    function minRewardAmount() external view returns (uint256);
 
     /**
      * @notice Returns the rewards duration

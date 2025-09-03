@@ -90,7 +90,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
 
         /// Check if rewards are ready and if the amount is above the minimum
         uint256 _amount = IERC20(_token).balanceOf(address(this));
-        if (_amount < $.minRewardAmount || $.lastDistribution[_strategy][_token] + $.rewardDuration > block.timestamp) {
+        if ($.lastDistributionEpoch[_strategy][_token] + $.rewardDuration > block.timestamp) {
             $.pendingRewards[_strategy][_token] += _amount;
             return;
         }
@@ -110,18 +110,24 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         _strategiesAndMultipliers[0] =
             IRewardsCoordinator.StrategyAndMultiplier({ strategy: _strategy, multiplier: 1e18 });
 
+        uint256 calcIntervalSeconds = IRewardsCoordinator($.eigen.rewardsCoordinator).CALCULATION_INTERVAL_SECONDS();
+        uint256 startTimestamp = $.lastDistributionEpoch[_strategy][_token] == 0
+            ? block.timestamp - $.rewardDuration
+            : $.lastDistributionEpoch[_strategy][_token];
+        uint256 roundedStartTimestamp = startTimestamp / calcIntervalSeconds * calcIntervalSeconds;
+
         rewardsSubmissions[0] = IRewardsCoordinator.RewardsSubmission({
             strategiesAndMultipliers: _strategiesAndMultipliers,
             token: _token,
             amount: _amount,
-            startTimestamp: $.lastDistribution[_strategy][_token],
-            duration: uint32(block.timestamp) - $.lastDistribution[_strategy][_token]
+            startTimestamp: uint32(roundedStartTimestamp),
+            duration: $.rewardDuration
         });
 
         _createAVSRewardsSubmission(rewardsSubmissions);
 
         $.pendingRewards[_strategy][_token] = 0;
-        $.lastDistribution[_strategy][_token] = uint32(block.timestamp);
+        $.lastDistributionEpoch[_strategy][_token] = uint32(block.timestamp);
 
         emit DistributedRewards(_strategy, _token, _amount);
     }
@@ -192,7 +198,6 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         _operatorSetId = $.nextOperatorId;
 
         $.nextOperatorId++;
-        $.lastDistribution[_strategy][address(IStrategy(_strategy).underlyingToken())] = uint32(block.timestamp);
         emit StrategyRegistered(_strategy, _operator);
     }
 
@@ -202,14 +207,6 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         $.rewardDuration = _rewardDuration;
 
         emit RewardsDurationSet(_rewardDuration);
-    }
-
-    /// @inheritdoc IEigenServiceManager
-    function setMinRewardAmount(uint256 _minRewardAmount) external checkAccess(this.setMinRewardAmount.selector) {
-        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        $.minRewardAmount = _minRewardAmount;
-
-        emit MinRewardAmountSet(_minRewardAmount);
     }
 
     /// @inheritdoc IEigenServiceManager
@@ -244,12 +241,6 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     function eigenAddresses() external view returns (EigenAddresses memory) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         return $.eigen;
-    }
-
-    /// @inheritdoc IEigenServiceManager
-    function minRewardAmount() external view returns (uint256) {
-        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        return $.minRewardAmount;
     }
 
     /// @inheritdoc IEigenServiceManager

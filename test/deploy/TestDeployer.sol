@@ -210,7 +210,7 @@ contract TestDeployer is
             address eigenAdmin = makeAddr("strategy_admin");
             env.eigen.eigenImplementations = _deployEigenImplementations();
             env.eigen.eigenConfig =
-                _deployEigenInfra(env.infra, env.eigen.eigenImplementations, eigenAb, uint32(24 hours));
+                _deployEigenInfra(env.infra, env.eigen.eigenImplementations, eigenAb, uint32(1 days));
             vm.startPrank(env.users.access_control_admin);
             _initEigenAccessControl(env.infra, env.eigen.eigenConfig, eigenAdmin, eigenAb);
             vm.stopPrank();

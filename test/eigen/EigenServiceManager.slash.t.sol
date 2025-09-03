@@ -8,7 +8,7 @@ import { MockERC20 } from "../mocks/MockERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { console } from "forge-std/console.sol";
 
-contract EigenServiceManagerTest is TestDeployer {
+contract EigenServiceManagerSlashTest is TestDeployer {
     EigenServiceManager eigenServiceManager;
 
     function setUp() public {
@@ -103,8 +103,4 @@ contract EigenServiceManagerTest is TestDeployer {
             vm.stopPrank();
         }
     }
-
-    // ensure we can't slash if the vault epoch has ended
-    // are funds active immediately after delegation?
-    // can someone undelegate right before the epoch ends so that we don't have many blocks to react?
 }
