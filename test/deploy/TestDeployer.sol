@@ -5,6 +5,8 @@ import { Delegation } from "../../contracts/delegation/Delegation.sol";
 
 import { CapSymbioticVaultFactory } from "../../contracts/delegation/providers/symbiotic/CapSymbioticVaultFactory.sol";
 
+import { EigenServiceManager } from "../../contracts/delegation/providers/eigenlayer/EigenServiceManager.sol";
+
 import { SymbioticAgentManager } from "../../contracts/delegation/providers/symbiotic/SymbioticAgentManager.sol";
 import { SymbioticNetwork } from "../../contracts/delegation/providers/symbiotic/SymbioticNetwork.sol";
 import { SymbioticNetworkMiddleware } from
@@ -19,6 +21,10 @@ import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
 import { MockNetworkMiddleware } from "../mocks/MockNetworkMiddleware.sol";
 
 import { AccessControl } from "../../contracts/access/AccessControl.sol";
+
+import {
+    EigenConfig, EigenUsersConfig, EigenVaultConfig
+} from "../../contracts/deploy/interfaces/EigenDeployConfig.sol";
 import { SymbioticVaultParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 import { SymbioticNetworkAdapterParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 import {
@@ -47,11 +53,14 @@ import { MockERC20 } from "../mocks/MockERC20.sol";
 import { SymbioticTestEnvConfig, TestEnvConfig } from "./interfaces/TestDeployConfig.sol";
 import { VaultConfigHelpers } from "./service/VaultConfigHelpers.sol";
 
+import { EigenAddressbook, EigenUtils } from "../../contracts/deploy/utils/EigenUtils.sol";
 import { LzAddressbook, LzUtils } from "../../contracts/deploy/utils/LzUtils.sol";
 import { ZapAddressbook, ZapUtils } from "../../contracts/deploy/utils/ZapUtils.sol";
 import { DeployMocks } from "./service/DeployMocks.sol";
 import { DeployTestUsers } from "./service/DeployTestUsers.sol";
 import { InitTestVaultLiquidity } from "./service/InitTestVaultLiquidity.sol";
+
+import { InitEigenDelegations } from "./service/provider/eigen/InitEigenDelegations.sol";
 import { InitSymbioticVaultLiquidity } from "./service/provider/symbiotic/InitSymbioticVaultLiquidity.sol";
 import { TimeUtils } from "./utils/TimeUtils.sol";
 
@@ -64,6 +73,7 @@ contract TestDeployer is
     Test,
     LzUtils,
     SymbioticUtils,
+    EigenUtils,
     TimeUtils,
     ZapUtils,
     DeployMocks,
@@ -79,10 +89,11 @@ contract TestDeployer is
     DeployCapNetworkAdapter,
     ConfigureSymbioticOptIns,
     InitSymbioticVaultLiquidity,
+    InitEigenDelegations,
     VaultConfigHelpers
 {
     TestEnvConfig env;
-
+    EigenAddressbook eigenAb;
     LzAddressbook lzAb;
     SymbioticAddressbook symbioticAb;
     ZapAddressbook zapAb;
@@ -103,7 +114,7 @@ contract TestDeployer is
             console.log("using sepolia as the test blockchain");
             // we need to fork the sepolia network to deploy the symbiotic network adapter
             // hardcoding the block number to benefit from the anvil cache
-            vm.createSelectFork("https://mainnet.gateway.tenderly.co", 22931785); // holesky needed to use OperatorNetworkSpecificDelegator
+            vm.createSelectFork("https://mainnet.gateway.tenderly.co", 23285216); // holesky needed to use OperatorNetworkSpecificDelegator
         }
 
         (env.users, env.testUsers) = _deployTestUsers();
@@ -114,6 +125,9 @@ contract TestDeployer is
         lzAb = _getLzAddressbook();
         symbioticAb = _getSymbioticAddressbook();
         zapAb = _getZapAddressbook();
+        if (!useMockBackingNetwork()) {
+            eigenAb = _getEigenAddressbook();
+        }
 
         env.implems = _deployImplementations();
         env.libs = _deployLibs();
@@ -158,6 +172,13 @@ contract TestDeployer is
             _initChainlinkPriceOracle(env.libs, env.infra, asset, priceFeed);
         }
 
+        if (!useMockBackingNetwork()) {
+            /// cbETH for Eigen test
+            address asset = 0xBe9895146f7AF43049ca1c1AE358B0541Ea49704;
+            address priceFeed = env.ethOracleMocks.chainlinkPriceFeeds[0];
+            _initChainlinkPriceOracle(env.libs, env.infra, asset, priceFeed);
+        }
+
         console.log("deploying rate oracle");
         vm.startPrank(env.users.rate_oracle_admin);
         for (uint256 i = 0; i < env.usdVault.assets.length; i++) {
@@ -184,6 +205,26 @@ contract TestDeployer is
 
         _initVaultLender(env.usdVault, env.infra, fee);
 
+        /// Deploy Eigen Network
+        if (!useMockBackingNetwork()) {
+            address eigenAdmin = makeAddr("strategy_admin");
+            env.eigen.eigenImplementations = _deployEigenImplementations();
+            env.eigen.eigenConfig =
+                _deployEigenInfra(env.infra, env.eigen.eigenImplementations, eigenAb, uint32(24 hours));
+            vm.startPrank(env.users.access_control_admin);
+            _initEigenAccessControl(env.infra, env.eigen.eigenConfig, eigenAdmin, eigenAb);
+            vm.stopPrank();
+            vm.startPrank(env.users.delegation_admin);
+            _registerNetworkForCapDelegation(env.infra, env.eigen.eigenConfig.eigenServiceManager);
+            vm.stopPrank();
+            _agentRegisterAsOperator(eigenAb, env.testUsers.agents[1]);
+            _initEigenDelegations(eigenAb, env.testUsers.agents[1], env.testUsers.restakers[1], 10);
+            _registerToEigenServiceManager(
+                eigenAb, eigenAdmin, env.eigen.eigenConfig.eigenServiceManager, env.testUsers.agents[1]
+            );
+        }
+
+        /// Deploy Symbiotic Network Adapter
         if (useMockBackingNetwork()) {
             vm.startPrank(env.users.middleware_admin);
             (address networkMiddleware, address network) = _deployDelegationNetworkMock();
@@ -319,6 +360,8 @@ contract TestDeployer is
 
         vm.label(address(env.symbiotic.networkAdapter.networkMiddleware), "SymbioticNetworkMiddleware");
         vm.label(address(env.symbiotic.networkAdapter.network), "Cap_SymbioticNetwork");
+
+        vm.label(address(env.eigen.eigenConfig.eigenServiceManager), "EigenServiceManager");
 
         vm.label(address(env.libs.aaveAdapter), "AaveAdapter");
         vm.label(address(env.libs.chainlinkAdapter), "ChainlinkAdapter");

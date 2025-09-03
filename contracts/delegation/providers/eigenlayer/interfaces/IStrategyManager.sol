@@ -13,4 +13,10 @@ interface IStrategyManager {
         uint256 slashId,
         address strategy
     ) external;
+
+    /// @notice Deposit tokens into a strategy
+    /// @param strategy The strategy
+    /// @param token The token
+    /// @param amount The amount
+    function depositIntoStrategy(address strategy, address token, uint256 amount) external;
 }

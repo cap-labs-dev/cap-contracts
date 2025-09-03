@@ -44,6 +44,13 @@ interface IEigenServiceManager {
 
     /// @dev EigenServiceManager storage
     /// @param accessControl Access control address
+    /// @param eigen Eigen addresses
+    /// @param oracle Oracle address
+    /// @param rewardDuration Reward duration
+    /// @param nextOperatorId Next operator id
+    /// @param minRewardAmount Min reward amount
+    /// @param pendingRewards Pending rewards
+    /// @param lastDistribution Last distribution
     struct EigenServiceManagerStorage {
         EigenAddresses eigen;
         address accessControl;
@@ -57,13 +64,16 @@ interface IEigenServiceManager {
         mapping(address => uint32) operatorSetIds;
     }
 
+    /// @dev Eigen addresses
+    /// @param allocationManager Allocation manager address
+    /// @param delegationManager Delegation manager address
+    /// @param strategyManager Strategy manager address
+    /// @param rewardsCoordinator Rewards coordinator address
     struct EigenAddresses {
         address allocationManager;
         address delegationManager;
         address strategyManager;
         address rewardsCoordinator;
-        address registryCoordinator;
-        address stakeRegistry;
     }
 
     /// @notice Initialize the EigenServiceManager
@@ -121,8 +131,11 @@ interface IEigenServiceManager {
      * @param _strategy The strategy to register
      * @param _operator The operator to register the strategy to
      * @param _metadata The metadata for the strategy
+     * @return _operatorSetId The operator set id
      */
-    function registerStrategy(address _strategy, address _operator, string memory _metadata) external;
+    function registerStrategy(address _strategy, address _operator, string memory _metadata)
+        external
+        returns (uint256 _operatorSetId);
 
     /**
      * @notice Slashes an operator

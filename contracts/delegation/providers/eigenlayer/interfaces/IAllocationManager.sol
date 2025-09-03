@@ -147,4 +147,48 @@ interface IAllocationManager {
      * @return The allocatable magnitude of the operator and strategy.
      */
     function getAllocatableMagnitude(address operator, address strategy) external view returns (uint64);
+
+    /**
+     * @notice Parameters used to register for an AVS's operator sets
+     * @param avs the AVS being registered for
+     * @param operatorSetIds the operator sets within the AVS to register for
+     * @param data extra data to be passed to the AVS to complete registration
+     */
+    struct RegisterParams {
+        address avs;
+        uint32[] operatorSetIds;
+        bytes data;
+    }
+
+    /**
+     * @notice Allows an operator to register for an operator set.
+     * @param operator The operator address.
+     * @param params The register parameters, containing:
+     *  - avs: The AVS being registered for.
+     *  - operatorSetIds: The operator sets within the AVS to register for.
+     *  - data: Extra data to be passed to the AVS to complete registration.
+     */
+    function registerForOperatorSets(address operator, RegisterParams calldata params) external;
+
+    /**
+     * @notice struct used to modify the allocation of slashable magnitude to an operator set
+     * @param operatorSet the operator set to modify the allocation for
+     * @param strategies the strategies to modify allocations for
+     * @param newMagnitudes the new magnitude to allocate for each strategy to this operator set
+     */
+    struct AllocateParams {
+        OperatorSet operatorSet;
+        address[] strategies;
+        uint64[] newMagnitudes;
+    }
+
+    /**
+     * @notice Modifies the proportions of slashable stake allocated to an operator set from a list of strategies
+     * Note that deallocations remain slashable for DEALLOCATION_DELAY blocks therefore when they are cleared they may
+     * free up less allocatable magnitude than initially deallocated.
+     * @param operator the operator to modify allocations for
+     * @param params array of magnitude adjustments for one or more operator sets
+     * @dev Updates encumberedMagnitude for the updated strategies
+     */
+    function modifyAllocations(address operator, AllocateParams[] calldata params) external;
 }

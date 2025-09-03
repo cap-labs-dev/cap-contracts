@@ -132,7 +132,6 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         checkAccess(this.registerOperator.selector)
     {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        if ($.operatorToStrategy[_operator] != address(0)) revert AlreadyRegisteredOperator();
         if (_avs != address(this)) revert InvalidAVS();
         if (_operatorSetIds.length != 1) revert InvalidOperatorSetIds();
 
@@ -157,10 +156,13 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     function registerStrategy(address _strategy, address _operator, string memory _metadata)
         external
         checkAccess(this.registerStrategy.selector)
+        returns (uint256 _operatorSetId)
     {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
 
-        // Checks
+        // Checks, no duplicate operators or operator set ids, a strategy can have many operators.
+        // Since restakers can only delegate to one operator, this is not a problem.
+        // https://docs.eigencloud.xyz/products/eigenlayer/restakers/restaking-guides/restaking-developer-guide#smart-contract-delegation-user-guide
         if ($.operatorToStrategy[_operator] != address(0)) revert AlreadyRegisteredOperator();
         if ($.operatorSetIds[_operator] != 0) revert OperatorSetAlreadyCreated();
         if (IERC20Metadata(address(IStrategy(_strategy).underlyingToken())).decimals() < 6) revert InvalidDecimals();
@@ -187,10 +189,10 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         $.operatorToStrategy[_operator] = _strategy;
         $.operatorSetIds[_operator] = $.nextOperatorId;
         _updateAVSMetadataURI(_metadata);
+        _operatorSetId = $.nextOperatorId;
 
         $.nextOperatorId++;
         $.lastDistribution[_strategy][address(IStrategy(_strategy).underlyingToken())] = uint32(block.timestamp);
-
         emit StrategyRegistered(_strategy, _operator);
     }
 

@@ -30,6 +30,7 @@ remappings = [
     "@tokenized-strategy/=lib/tokenized-strategy/src/",
 ]
 fs_permissions = [
+    { access = "read", path = "./config/eigen.json" },
     { access = "read", path = "./config/symbiotic.json" },
     { access = "read", path = "./config/layerzero-v2-deployments.json" },
     { access = "read", path = "./config/zap.json" },

@@ -15,6 +15,12 @@ import {
     SymbioticUsersConfig
 } from "../../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 
+import {
+    EigenConfig,
+    EigenImplementationsConfig,
+    EigenUsersConfig
+} from "../../../contracts/deploy/interfaces/EigenDeployConfig.sol";
+
 struct TestEnvConfig {
     // non-test specific
     LibsConfig libs;
@@ -31,6 +37,14 @@ struct TestEnvConfig {
     OracleMocksConfig ethOracleMocks;
     // symbiotic
     SymbioticTestEnvConfig symbiotic;
+    // eigen
+    EigenTestEnvConfig eigen;
+}
+
+struct EigenTestEnvConfig {
+    EigenConfig eigenConfig;
+    EigenImplementationsConfig eigenImplementations;
+    EigenUsersConfig eigenUsers;
 }
 
 struct SymbioticTestEnvConfig {
