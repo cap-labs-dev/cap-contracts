@@ -12,7 +12,6 @@ import { IRewardsCoordinator } from "./interfaces/IRewardsCoordinator.sol";
 import { IStrategy } from "./interfaces/IStrategy.sol";
 import { IStrategyManager } from "./interfaces/IStrategyManager.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-
 import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
