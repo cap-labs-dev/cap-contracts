@@ -43,23 +43,27 @@ interface IEigenServiceManager {
     event DistributedRewards(address indexed strategy, address indexed token, uint256 amount);
 
     /// @dev EigenServiceManager storage
-    /// @param accessControl Access control address
     /// @param eigen Eigen addresses
     /// @param oracle Oracle address
+    /// @param eigenOperatorImplementation Eigen operator implementation
     /// @param rewardDuration Reward duration
     /// @param nextOperatorId Next operator id
     /// @param pendingRewards Pending rewards
-    /// @param lastDistribution Last distribution
+    /// @param lastDistributionEpoch Last distribution
+    /// @param operatorToStrategy Operator to strategy mapping
+    /// @param operatorSetIds Operator set ids
+    /// @param operatorToEigenOperator Operator to eigen operator mapping
     struct EigenServiceManagerStorage {
         EigenAddresses eigen;
-        address accessControl;
         address oracle;
+        address eigenOperatorImplementation;
         uint32 rewardDuration;
         uint32 nextOperatorId;
         mapping(address => mapping(address => uint256)) pendingRewards;
         mapping(address => mapping(address => uint32)) lastDistributionEpoch;
         mapping(address => address) operatorToStrategy;
         mapping(address => uint32) operatorSetIds;
+        mapping(address => address) operatorToEigenOperator;
     }
 
     /// @dev Eigen addresses
@@ -129,11 +133,12 @@ interface IEigenServiceManager {
      * @param _strategy The strategy to register
      * @param _operator The operator to register the strategy to
      * @param _metadata The metadata for the strategy
+     * @param _avsMetadata The metadata for the AVS
      * @return _operatorSetId The operator set id
      */
-    function registerStrategy(address _strategy, address _operator, string memory _metadata)
+    function registerStrategy(address _strategy, address _operator, string memory _metadata, string memory _avsMetadata)
         external
-        returns (uint256 _operatorSetId);
+        returns (uint32 _operatorSetId);
 
     /**
      * @notice Slashes an operator
@@ -143,6 +148,12 @@ interface IEigenServiceManager {
      * @param _timestamp The timestamp of the slash (unused for eigenlayer)
      */
     function slash(address _operator, address _recipient, uint256 _slashShare, uint48 _timestamp) external;
+
+    /**
+     * @notice Allocates the operator set, is public and can be called permissionless.
+     * @param _operator Operator address
+     */
+    function allocate(address _operator) external;
 
     /**
      * @notice Returns the slashable collateral for an operator
@@ -190,4 +201,11 @@ interface IEigenServiceManager {
      * @return The pending rewards of the strategy
      */
     function pendingRewards(address _strategy, address _token) external view returns (uint256);
+
+    /**
+     * @notice Returns the eigen operator for an operator
+     * @param _operator The operator to get the eigen operator for
+     * @return The eigen operator of the operator
+     */
+    function getEigenOperator(address _operator) external view returns (address);
 }

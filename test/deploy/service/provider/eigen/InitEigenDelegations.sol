@@ -26,16 +26,19 @@ import { console } from "forge-std/console.sol";
 contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
     function _initEigenDelegations(
         EigenAddressbook memory eigenAb,
+        address eigenServiceManager,
         address agent,
         address restaker,
         uint256 amountNoDecimals
     ) internal {
-        _initEigenDelegationsForAgent(eigenAb, agent, restaker, amountNoDecimals);
+        _initEigenDelegationsForAgent(eigenAb, eigenServiceManager, agent, restaker, amountNoDecimals);
         _timeTravel(28 days);
+        EigenServiceManager(eigenServiceManager).allocate(agent);
     }
 
     function _initEigenDelegationsForAgent(
         EigenAddressbook memory eigenAb,
+        address eigenServiceManager,
         address agent,
         address restaker,
         uint256 amountNoDecimals
@@ -44,8 +47,10 @@ contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
         address collateral = address(IStrategy(strategy).underlyingToken());
         uint256 amount = amountNoDecimals * 10 ** MockERC20(collateral).decimals();
 
+        address eigenOperator = EigenServiceManager(eigenServiceManager).getEigenOperator(agent);
+
         (uint256 restakerDepositedAmount, uint256 restakerMintedShares) =
-            _eigenMintAndStakeInStrategy(eigenAb, strategy, agent, restaker, amount);
+            _eigenMintAndStakeInStrategy(eigenAb, strategy, eigenOperator, restaker, amount);
         depositedAmount = restakerDepositedAmount;
         mintedShares = restakerMintedShares;
     }
@@ -53,7 +58,7 @@ contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
     function _eigenMintAndStakeInStrategy(
         EigenAddressbook memory eigenAb,
         address strategy,
-        address agent,
+        address eigenOperator,
         address restaker,
         uint256 amount
     ) internal returns (uint256 depositedAmount, uint256 mintedShares) {
@@ -69,7 +74,9 @@ contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
 
         IDelegationManager.SignatureWithExpiry memory signatureWithExpiry =
             IDelegationManager.SignatureWithExpiry({ signature: "", expiry: 0 });
-        IDelegationManager(eigenAb.eigenAddresses.delegationManager).delegateTo(agent, signatureWithExpiry, bytes32(0));
+        IDelegationManager(eigenAb.eigenAddresses.delegationManager).delegateTo(
+            eigenOperator, signatureWithExpiry, bytes32(0)
+        );
         vm.stopPrank();
     }
 
@@ -111,6 +118,7 @@ contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
 
     function _completeWithdrawal(
         EigenAddressbook memory eigenAb,
+        address eigenServiceManager,
         address restaker,
         address operator,
         uint256 nonce,
@@ -123,9 +131,11 @@ contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
         strategies[0] = strategy;
         uint256[] memory scaledShares = new uint256[](1);
         scaledShares[0] = shares;
+
+        address eigenOperator = EigenServiceManager(eigenServiceManager).getEigenOperator(operator);
         IDelegationManager.Withdrawal memory withdrawal = IDelegationManager.Withdrawal({
             staker: restaker,
-            delegatedTo: operator,
+            delegatedTo: eigenOperator,
             withdrawer: restaker,
             nonce: nonce,
             startBlock: startBlock,
@@ -152,10 +162,10 @@ contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
         address agent
     ) internal {
         vm.startPrank(admin);
-        uint256 operatorId =
-            EigenServiceManager(eigenServiceManager).registerStrategy(eigenAb.eigenAddresses.strategy, agent, "");
+        EigenServiceManager(eigenServiceManager).registerStrategy(eigenAb.eigenAddresses.strategy, agent, "", "");
         vm.stopPrank();
 
+        /*
         vm.startPrank(agent);
         uint32[] memory operatorSetIds = new uint32[](1);
         operatorSetIds[0] = uint32(operatorId);
@@ -180,6 +190,6 @@ contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
         });
 
         IAllocationManager(eigenAb.eigenAddresses.allocationManager).modifyAllocations(agent, allocations);
-        vm.stopPrank();
+        vm.stopPrank();*/
     }
 }

@@ -191,4 +191,28 @@ interface IAllocationManager {
      * @dev Updates encumberedMagnitude for the updated strategies
      */
     function modifyAllocations(address operator, AllocateParams[] calldata params) external;
+
+    /**
+     * @notice Defines allocation information from a strategy to an operator set, for an operator
+     * @param currentMagnitude the current magnitude allocated from the strategy to the operator set
+     * @param pendingDiff a pending change in magnitude, if it exists (0 otherwise)
+     * @param effectBlock the block at which the pending magnitude diff will take effect
+     */
+    struct Allocation {
+        uint64 currentMagnitude;
+        int128 pendingDiff;
+        uint32 effectBlock;
+    }
+
+    /**
+     * @notice Returns the allocation information from a strategy to an operator set, for an operator
+     * @param operator the operator to get the allocation information for
+     * @param strategy the strategy to get the allocation information for
+     * @return operatorSet the operator set to which the strategy is allocated
+     * @return allocation the allocation information
+     */
+    function getStrategyAllocations(address operator, address strategy)
+        external
+        view
+        returns (OperatorSet[] memory, Allocation[] memory);
 }

@@ -61,5 +61,16 @@ interface IRewardsCoordinator {
      */
     function createAVSRewardsSubmission(RewardsSubmission[] calldata rewardsSubmissions) external;
 
+    /**
+     * @notice Sets the split for a specific operator for a specific avs
+     * @param operator The operator who is setting the split
+     * @param avs The avs for which the split is being set by the operator
+     * @param split The split for the operator for the specific avs in bips.
+     * @dev Only callable by the operator
+     * @dev Split has to be between 0 and 10000 bips (inclusive)
+     * @dev The split will be activated after the activation delay
+     */
+    function setOperatorAVSSplit(address operator, address avs, uint16 split) external;
+
     function CALCULATION_INTERVAL_SECONDS() external pure returns (uint256);
 }

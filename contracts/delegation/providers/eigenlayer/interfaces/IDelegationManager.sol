@@ -127,4 +127,12 @@ interface IDelegationManager {
     function isDelegated(address staker) external view returns (bool);
 
     function delegationApprover(address operator) external view returns (address);
+
+    /**
+     * @notice Called by an operator to emit an `OperatorMetadataURIUpdated` event indicating the information has updated.
+     * @param operator The operator to update metadata for
+     * @param metadataURI The URI for metadata associated with an operator
+     * @dev Note that the `metadataURI` is *never stored * and is only emitted in the `OperatorMetadataURIUpdated` event
+     */
+    function updateOperatorMetadataURI(address operator, string calldata metadataURI) external;
 }

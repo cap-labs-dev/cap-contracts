@@ -217,10 +217,16 @@ contract TestDeployer is
             vm.startPrank(env.users.delegation_admin);
             _registerNetworkForCapDelegation(env.infra, env.eigen.eigenConfig.eigenServiceManager);
             vm.stopPrank();
-            _agentRegisterAsOperator(eigenAb, env.testUsers.agents[1]);
-            _initEigenDelegations(eigenAb, env.testUsers.agents[1], env.testUsers.restakers[1], 10);
+            // _agentRegisterAsOperator(eigenAb, env.testUsers.agents[1]);
             _registerToEigenServiceManager(
                 eigenAb, eigenAdmin, env.eigen.eigenConfig.eigenServiceManager, env.testUsers.agents[1]
+            );
+            _initEigenDelegations(
+                eigenAb,
+                env.eigen.eigenConfig.eigenServiceManager,
+                env.testUsers.agents[1],
+                env.testUsers.restakers[1],
+                10
             );
         }
 

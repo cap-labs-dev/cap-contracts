@@ -11,7 +11,7 @@ abstract contract EigenServiceManagerStorageUtils {
     bytes32 private constant EigenServiceManagerStorageLocation =
         0x54b6f5557fb44acf280f59f684357ef1d216e247bba38a36a74ec93b2377e200;
 
-    /// @dev Get Delegation storage
+    /// @dev Get EigenServiceManager storage
     /// @return $ Storage pointer
     function getEigenServiceManagerStorage()
         internal

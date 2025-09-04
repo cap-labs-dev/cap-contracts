@@ -5,12 +5,15 @@ import { Access } from "../../../access/Access.sol";
 import { IEigenServiceManager } from "../../../interfaces/IEigenServiceManager.sol";
 import { IOracle } from "../../../interfaces/IOracle.sol";
 import { EigenServiceManagerStorageUtils } from "../../../storage/EigenServiceManagerStorageUtils.sol";
+import { EigenOperator } from "./EigenOperator.sol";
 import { IAllocationManager } from "./interfaces/IAllocationManager.sol";
 import { IDelegationManager } from "./interfaces/IDelegationManager.sol";
 import { IRewardsCoordinator } from "./interfaces/IRewardsCoordinator.sol";
 import { IStrategy } from "./interfaces/IStrategy.sol";
 import { IStrategyManager } from "./interfaces/IStrategyManager.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
+import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -19,8 +22,8 @@ import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/Saf
 /// @notice This contract manages the EigenServiceManager
 contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, EigenServiceManagerStorageUtils {
     using SafeERC20 for IERC20;
-    /// @custom:oz-upgrades-unsafe-allow constructor
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
@@ -39,6 +42,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         $.oracle = _oracle;
         $.rewardDuration = _rewardDuration;
         $.nextOperatorId++;
+        $.eigenOperatorImplementation = address(new EigenOperator());
 
         string memory metadata = string(
             abi.encodePacked(
@@ -68,6 +72,8 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
 
         /// Slash share is a percentage of total operators collateral, this is calculated in Delegation.sol
         uint256 beforeSlash = _slashedCollateral.balanceOf(address(this));
+
+        /// We map to the eigen operator address in this _slash function
         _slash(_strategy, _operator, _slashShare);
 
         /// Send slashed collateral to the liquidator
@@ -159,12 +165,18 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @inheritdoc IEigenServiceManager
-    function registerStrategy(address _strategy, address _operator, string memory _metadata)
-        external
-        checkAccess(this.registerStrategy.selector)
-        returns (uint256 _operatorSetId)
-    {
+    function registerStrategy(
+        address _strategy,
+        address _operator,
+        string memory _avsMetadata,
+        string memory _operatorMetadata
+    ) external checkAccess(this.registerStrategy.selector) returns (uint32 _operatorSetId) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+
+        // Deploy the operator clone that will act as the operator in the eigen system
+        address eigenOperator = _deployEigenOperator(_operator, _operatorMetadata);
+        $.operatorToEigenOperator[_operator] = eigenOperator;
+        _operatorSetId = $.nextOperatorId;
 
         // Checks, no duplicate operators or operator set ids, a strategy can have many operators.
         // Since restakers can only delegate to one operator, this is not a problem.
@@ -180,11 +192,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         address[] memory strategies = new address[](1);
         strategies[0] = _strategy;
 
-        uint256[] memory operatorShares =
-            IDelegationManager($.eigen.delegationManager).getOperatorShares(_operator, strategies);
-        if (operatorShares[0] < 1e9) revert MinShareNotMet();
-
-        params[0] = IAllocationManager.CreateSetParams({ operatorSetId: $.nextOperatorId, strategies: strategies });
+        params[0] = IAllocationManager.CreateSetParams({ operatorSetId: _operatorSetId, strategies: strategies });
 
         // Create the redistribution recipients
         address[] memory redistributionRecipients = new address[](1);
@@ -193,9 +201,11 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         // Create the operator set
         allocationManager.createRedistributingOperatorSets(address(this), params, redistributionRecipients);
         $.operatorToStrategy[_operator] = _strategy;
-        $.operatorSetIds[_operator] = $.nextOperatorId;
-        _updateAVSMetadataURI(_metadata);
-        _operatorSetId = $.nextOperatorId;
+        $.operatorSetIds[_operator] = _operatorSetId;
+        _updateAVSMetadataURI(_avsMetadata);
+
+        // Allocate to the strategy
+        EigenOperator(eigenOperator).registerOperatorSetToServiceManager(_operatorSetId);
 
         $.nextOperatorId++;
         emit StrategyRegistered(_strategy, _operator);
@@ -210,18 +220,41 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @inheritdoc IEigenServiceManager
+    function allocate(address _operator) external {
+        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        EigenOperator($.operatorToEigenOperator[_operator]).allocate(
+            $.operatorSetIds[_operator], $.operatorToStrategy[_operator]
+        );
+    }
+
+    /// @inheritdoc IEigenServiceManager
     function coverage(address _operator) external view returns (uint256 delegation) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         address _strategy = $.operatorToStrategy[_operator];
-        if (_strategy == address(0)) revert ZeroAddress();
+        if (_strategy == address(0)) return 0;
+
+        address[] memory strategies = new address[](1);
+        strategies[0] = _strategy;
+
+        uint256[] memory operatorShares = IDelegationManager($.eigen.delegationManager).getOperatorShares(
+            $.operatorToEigenOperator[_operator], strategies
+        );
+        if (operatorShares[0] < 1e9) return 0;
+
         address _oracle = $.oracle;
         (delegation,) = _coverageByStrategy(_operator, _strategy, _oracle);
     }
 
     /// @inheritdoc IEigenServiceManager
+    function getEigenOperator(address _operator) external view returns (address) {
+        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        return $.operatorToEigenOperator[_operator];
+    }
+
+    /// @inheritdoc IEigenServiceManager
     function slashableCollateral(address _operator, uint256) external view returns (uint256) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        if ($.operatorToStrategy[_operator] == address(0)) revert ZeroAddress();
+        if ($.operatorToStrategy[_operator] == address(0)) return 0;
         return _slashableCollateralByStrategy(_operator, $.operatorToStrategy[_operator]);
     }
 
@@ -255,6 +288,19 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         return $.pendingRewards[_strategy][_token];
     }
 
+    /// @dev Deploys an eigen operator
+    /// @param _operator The operator/borrower address
+    /// @param _operatorMetadata The operator metadata
+    /// @return _eigenOperator The eigen operator contract address
+    function _deployEigenOperator(address _operator, string memory _operatorMetadata)
+        private
+        returns (address _eigenOperator)
+    {
+        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        _eigenOperator = Clones.clone($.eigenOperatorImplementation);
+        EigenOperator(_eigenOperator).initialize(address(this), _operator, _operatorMetadata);
+    }
+
     /**
      * @notice Updates the metadata URI for the AVS
      * @param _metadataURI is the metadata URI for the AVS
@@ -277,7 +323,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         wadsToSlash[0] = _slashShare;
 
         IAllocationManager.SlashingParams memory slashingParams = IAllocationManager.SlashingParams({
-            operator: _operator,
+            operator: $.operatorToEigenOperator[_operator],
             operatorSetId: $.operatorSetIds[_operator],
             strategies: strategies,
             wadsToSlash: wadsToSlash,
@@ -337,11 +383,12 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         view
         returns (uint256 collateralValue, uint256 collateral)
     {
+        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         address collateralAddress = address(IStrategy(_strategy).underlyingToken());
         uint8 decimals = IERC20Metadata(collateralAddress).decimals();
         (uint256 collateralPrice,) = IOracle(_oracle).getPrice(collateralAddress);
 
-        collateral = _minimumSlashableStake(_operator, _strategy);
+        collateral = _minimumSlashableStake($.operatorToEigenOperator[_operator], _strategy);
         collateralValue = collateral * collateralPrice / (10 ** decimals);
     }
 
@@ -350,11 +397,12 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     /// @return The slashable shares of the operator
     function _getSlashableShares(address _operator) private view returns (uint256) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+
         address _strategy = $.operatorToStrategy[_operator];
         // Get the slashable shares for the operator/OperatorSet
-        uint256 slashableShares = _minimumSlashableStake(_operator, _strategy);
+        uint256 slashableShares = _minimumSlashableStake($.operatorToEigenOperator[_operator], _strategy);
         // Get the shares in queue
-        uint256 sharesInQueue = _slashableSharesInQueue(_operator, _strategy);
+        uint256 sharesInQueue = _slashableSharesInQueue($.operatorToEigenOperator[_operator], _strategy);
         // Sum up the slashable shares and the shares in queue
         uint256 totalSlashableShares = slashableShares + sharesInQueue;
 
