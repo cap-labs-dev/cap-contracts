@@ -9,7 +9,6 @@ import { IAllocationManager } from "./interfaces/IAllocationManager.sol";
 import { IDelegationManager } from "./interfaces/IDelegationManager.sol";
 import { IRewardsCoordinator } from "./interfaces/IRewardsCoordinator.sol";
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import { console } from "forge-std/console.sol";
 
 /// @title EigenOperator
 /// @author weso, Cap Labs
