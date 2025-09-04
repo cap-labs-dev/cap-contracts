@@ -23,6 +23,7 @@ contract EigenOperator is IEigenOperator, Initializable, EigenOperatorStorageUti
         EigenOperatorStorage storage $ = getEigenOperatorStorage();
         $.serviceManager = _serviceManager;
         $.operator = _operator;
+        $.totpPeriod = 14 days;
 
         // Fetch the eigen addresses
         IEigenServiceManager.EigenAddresses memory eigenAddresses =
@@ -32,13 +33,17 @@ contract EigenOperator is IEigenOperator, Initializable, EigenOperatorStorageUti
         $.rewardsCoordinator = eigenAddresses.rewardsCoordinator;
 
         // Register as an operator on delegation manager
-        IDelegationManager($.delegationManager).registerAsOperator(address(0), 0, _metadata);
+        IDelegationManager($.delegationManager).registerAsOperator(address(this), 0, _metadata);
     }
 
     /// @inheritdoc IEigenOperator
-    function registerOperatorSetToServiceManager(uint32 _operatorSetId) external {
+    function registerOperatorSetToServiceManager(uint32 _operatorSetId, address _staker) external {
         EigenOperatorStorage storage $ = getEigenOperatorStorage();
         if (msg.sender != $.serviceManager) revert NotServiceManager();
+
+        bytes32 digest = calculateTotpDigestHash(_staker, address(this));
+        $.allowlistedDigests[digest] = true;
+        $.restaker = _staker;
 
         // Build the register params
         uint32[] memory operatorSetIds = new uint32[](1);
@@ -85,12 +90,19 @@ contract EigenOperator is IEigenOperator, Initializable, EigenOperatorStorageUti
         IAllocationManager($.allocationManager).modifyAllocations(address(this), allocations);
     }
 
-    /// @notice Update the operator metadata URI
-    /// @param _metadataURI The new metadata URI
+    /// @inheritdoc IEigenOperator
     function updateOperatorMetadataURI(string calldata _metadataURI) external {
         EigenOperatorStorage storage $ = getEigenOperatorStorage();
         if (msg.sender != $.operator) revert NotOperator();
         IDelegationManager($.delegationManager).updateOperatorMetadataURI(address(this), _metadataURI);
+    }
+
+    /// @inheritdoc IEigenOperator
+    function advanceTotp() external {
+        EigenOperatorStorage storage $ = getEigenOperatorStorage();
+        if (msg.sender != $.restaker) revert NotRestaker();
+        bytes32 digest = calculateTotpDigestHash($.restaker, address(this));
+        $.allowlistedDigests[digest] = true;
     }
 
     /// @inheritdoc IEigenOperator
@@ -101,5 +113,41 @@ contract EigenOperator is IEigenOperator, Initializable, EigenOperatorStorageUti
     /// @inheritdoc IEigenOperator
     function operator() external view returns (address) {
         return getEigenOperatorStorage().operator;
+    }
+
+    /// @inheritdoc IEigenOperator
+    function restaker() external view returns (address) {
+        return getEigenOperatorStorage().restaker;
+    }
+
+    /// @inheritdoc IEigenOperator
+    function isValidSignature(bytes32 _digest, bytes memory) external view override returns (bytes4 magicValue) {
+        EigenOperatorStorage storage $ = getEigenOperatorStorage();
+        if ($.allowlistedDigests[_digest]) {
+            return bytes4(0x1626ba7e); // ERC1271 magic value for valid signatures
+        } else {
+            return bytes4(0xffffffff);
+        }
+    }
+
+    /// @inheritdoc IEigenOperator
+    function getCurrentTotpExpiryTimestamp() public view returns (uint256) {
+        EigenOperatorStorage storage $ = getEigenOperatorStorage();
+        uint256 current = block.timestamp / $.totpPeriod;
+        return (current + 1) * $.totpPeriod; // End of the current period
+    }
+
+    /// @inheritdoc IEigenOperator
+    function currentTotp() public view returns (uint256) {
+        EigenOperatorStorage storage $ = getEigenOperatorStorage();
+        return block.timestamp / $.totpPeriod;
+    }
+
+    /// @inheritdoc IEigenOperator
+    function calculateTotpDigestHash(address _staker, address _operator) public view returns (bytes32) {
+        uint256 expiryTimestamp = getCurrentTotpExpiryTimestamp();
+        return IDelegationManager(getEigenOperatorStorage().delegationManager).calculateDelegationApprovalDigestHash(
+            _staker, _operator, address(this), bytes32(uint256(expiryTimestamp)), expiryTimestamp
+        );
     }
 }

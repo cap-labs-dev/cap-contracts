@@ -3,7 +3,6 @@ pragma solidity ^0.8.28;
 
 import { Access } from "../../../access/Access.sol";
 import { IDelegation } from "../../../interfaces/IDelegation.sol";
-
 import { IEigenAgentManager } from "../../../interfaces/IEigenAgentManager.sol";
 import { IEigenServiceManager } from "../../../interfaces/IEigenServiceManager.sol";
 import { ILender } from "../../../interfaces/ILender.sol";
@@ -50,7 +49,11 @@ contract EigenAgentManager is IEigenAgentManager, UUPSUpgradeable, Access, Eigen
 
         /// 2. Add the agent to the network
         IEigenServiceManager($.serviceManager).registerStrategy(
-            _agentConfig.strategy, _agentConfig.agent, _agentConfig.avsMetadata, _agentConfig.operatorMetadata
+            _agentConfig.strategy,
+            _agentConfig.agent,
+            _agentConfig.restaker,
+            _agentConfig.avsMetadata,
+            _agentConfig.operatorMetadata
         );
 
         /// 3. Add the agent to the rate oracle

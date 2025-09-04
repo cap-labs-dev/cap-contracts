@@ -220,7 +220,11 @@ contract TestDeployer is
             vm.stopPrank();
             // _agentRegisterAsOperator(eigenAb, env.testUsers.agents[1]);
             _registerToEigenServiceManager(
-                eigenAb, eigenAdmin, env.eigen.eigenConfig.agentManager, env.testUsers.agents[1]
+                eigenAb,
+                eigenAdmin,
+                env.eigen.eigenConfig.agentManager,
+                env.testUsers.agents[1],
+                env.testUsers.restakers[1]
             );
             _initEigenDelegations(
                 eigenAb,

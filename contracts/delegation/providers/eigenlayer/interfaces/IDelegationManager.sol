@@ -135,4 +135,12 @@ interface IDelegationManager {
      * @dev Note that the `metadataURI` is *never stored * and is only emitted in the `OperatorMetadataURIUpdated` event
      */
     function updateOperatorMetadataURI(address operator, string calldata metadataURI) external;
+
+    function calculateDelegationApprovalDigestHash(
+        address staker,
+        address operator,
+        address approver,
+        bytes32 approverSalt,
+        uint256 expiry
+    ) external view returns (bytes32);
 }

@@ -132,13 +132,18 @@ interface IEigenServiceManager {
      * @notice Registers a strategy to the AVS
      * @param _strategy The strategy to register
      * @param _operator The operator to register the strategy to
+     * @param _restaker The restaker to register the strategy to
      * @param _metadata The metadata for the strategy
      * @param _avsMetadata The metadata for the AVS
      * @return _operatorSetId The operator set id
      */
-    function registerStrategy(address _strategy, address _operator, string memory _metadata, string memory _avsMetadata)
-        external
-        returns (uint32 _operatorSetId);
+    function registerStrategy(
+        address _strategy,
+        address _operator,
+        address _restaker,
+        string memory _metadata,
+        string memory _avsMetadata
+    ) external returns (uint32 _operatorSetId);
 
     /**
      * @notice Slashes an operator

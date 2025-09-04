@@ -27,6 +27,7 @@ interface IEigenAgentManager {
     struct AgentConfig {
         address agent;
         address strategy;
+        address restaker;
         string avsMetadata;
         string operatorMetadata;
         uint256 ltv;

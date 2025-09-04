@@ -167,6 +167,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     function registerStrategy(
         address _strategy,
         address _operator,
+        address _restaker,
         string memory _avsMetadata,
         string memory _operatorMetadata
     ) external checkAccess(this.registerStrategy.selector) returns (uint32 _operatorSetId) {
@@ -204,7 +205,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         _updateAVSMetadataURI(_avsMetadata);
 
         // Allocate to the strategy
-        EigenOperator(eigenOperator).registerOperatorSetToServiceManager(_operatorSetId);
+        EigenOperator(eigenOperator).registerOperatorSetToServiceManager(_operatorSetId, _restaker);
 
         $.nextOperatorId++;
         emit StrategyRegistered(_strategy, _operator);

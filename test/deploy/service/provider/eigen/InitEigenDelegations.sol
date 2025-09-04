@@ -12,6 +12,7 @@ import {
     EigenAgentManager,
     IEigenAgentManager
 } from "../../../../../contracts/delegation/providers/eigenlayer/EigenAgentManager.sol";
+
 import { EigenServiceManager } from "../../../../../contracts/delegation/providers/eigenlayer/EigenServiceManager.sol";
 import { IAllocationManager } from
     "../../../../../contracts/delegation/providers/eigenlayer/interfaces/IAllocationManager.sol";
@@ -20,6 +21,7 @@ import { IDelegationManager } from
 import { IStrategy } from "../../../../../contracts/delegation/providers/eigenlayer/interfaces/IStrategy.sol";
 import { IStrategyManager } from
     "../../../../../contracts/delegation/providers/eigenlayer/interfaces/IStrategyManager.sol";
+import { IEigenOperator } from "../../../../../contracts/interfaces/IEigenOperator.sol";
 import { InfraConfig } from "../../../interfaces/TestDeployConfig.sol";
 import { TimeUtils } from "../../../utils/TimeUtils.sol";
 
@@ -76,10 +78,12 @@ contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
             IDelegationManager(eigenAb.eigenAddresses.delegationManager).getDepositedShares(restaker);
         mintedShares = shares[0];
 
+        uint256 currentTotpExpiryTimestamp = IEigenOperator(eigenOperator).getCurrentTotpExpiryTimestamp();
+
         IDelegationManager.SignatureWithExpiry memory signatureWithExpiry =
-            IDelegationManager.SignatureWithExpiry({ signature: "", expiry: 0 });
+            IDelegationManager.SignatureWithExpiry({ signature: "", expiry: currentTotpExpiryTimestamp });
         IDelegationManager(eigenAb.eigenAddresses.delegationManager).delegateTo(
-            eigenOperator, signatureWithExpiry, bytes32(0)
+            eigenOperator, signatureWithExpiry, bytes32(currentTotpExpiryTimestamp)
         );
         vm.stopPrank();
     }
@@ -163,12 +167,14 @@ contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
         EigenAddressbook memory eigenAb,
         address admin,
         address eigenAgentManager,
-        address agent
+        address agent,
+        address restaker
     ) internal {
         vm.startPrank(admin);
         IEigenAgentManager.AgentConfig memory agentConfig = IEigenAgentManager.AgentConfig({
             agent: agent,
             strategy: eigenAb.eigenAddresses.strategy,
+            restaker: restaker,
             avsMetadata: "",
             operatorMetadata: "",
             ltv: 5e26, // 50%
