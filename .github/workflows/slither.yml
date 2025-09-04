@@ -11,10 +11,10 @@ jobs:
     env:
       FOUNDRY_PROFILE: slither
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Run Slither
-        uses: crytic/slither-action@v0.4.0
+        uses: crytic/slither-action@v0.4.1
         id: slither
         with:
           sarif: results.sarif

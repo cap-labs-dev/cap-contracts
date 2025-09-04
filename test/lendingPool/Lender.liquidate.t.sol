@@ -160,10 +160,10 @@ contract LenderLiquidateTest is TestDeployer {
             lender.maxLiquidatable(user_agent, address(0));
 
             vm.expectRevert();
-            lender.liquidate(address(0), address(usdc), 1000e6);
+            lender.liquidate(address(0), address(usdc), 1000e6, 0);
 
             vm.expectRevert();
-            lender.liquidate(user_agent, address(0), 1000e6);
+            lender.liquidate(user_agent, address(0), 1000e6, 0);
 
             uint256 emergencyLiquidationThreshold = lender.emergencyLiquidationThreshold();
             console.log("Emergency Liquidation Threshold", emergencyLiquidationThreshold);
@@ -178,7 +178,7 @@ contract LenderLiquidateTest is TestDeployer {
             // approve repay amount for liquidation
             usdc.approve(address(lender), type(uint256).max);
 
-            lender.liquidate(user_agent, address(usdc), 1000e6);
+            lender.liquidate(user_agent, address(usdc), 1000e6, 0);
 
             (,, uint256 totalDebt,,,) = lender.agent(user_agent);
             console.log("Debt prior to liquidation", totalDebt);
@@ -191,7 +191,7 @@ contract LenderLiquidateTest is TestDeployer {
 
             // start the second liquidation
             deal(address(usdc), env.testUsers.liquidator, 1000e6);
-            lender.liquidate(user_agent, address(usdc), 1000e6);
+            lender.liquidate(user_agent, address(usdc), 1000e6, 0);
 
             console.log("Liquidator usdt balance after second liquidation", usdt.balanceOf(env.testUsers.liquidator));
             console.log("Liquidator weth balance after second liquidation", weth.balanceOf(env.testUsers.liquidator));
@@ -200,7 +200,7 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("");
             // start the third liquidation
             deal(address(usdc), env.testUsers.liquidator, debtToken.balanceOf(user_agent));
-            lender.liquidate(user_agent, address(usdc), debtToken.balanceOf(user_agent));
+            lender.liquidate(user_agent, address(usdc), debtToken.balanceOf(user_agent), 0);
 
             console.log("Liquidator usdt balance after third liquidation", usdt.balanceOf(env.testUsers.liquidator));
             console.log("Liquidator weth balance after third liquidation", weth.balanceOf(env.testUsers.liquidator));
@@ -252,7 +252,7 @@ contract LenderLiquidateTest is TestDeployer {
             usdc.approve(address(lender), 1000e6);
 
             vm.expectRevert();
-            lender.liquidate(user_agent, address(usdc), 1000e6);
+            lender.liquidate(user_agent, address(usdc), 1000e6, 0);
             vm.stopPrank();
         }
 
@@ -280,7 +280,7 @@ contract LenderLiquidateTest is TestDeployer {
             _timeTravel(gracePeriod + 1);
             // approve repay amount for liquidation
             usdc.approve(address(lender), 3000e6);
-            lender.liquidate(user_agent, address(usdc), 1000e6);
+            lender.liquidate(user_agent, address(usdc), 1000e6, 0);
 
             console.log("Liquidator usdt balance after first liquidation", usdt.balanceOf(env.testUsers.liquidator));
             console.log("Liquidator weth balance after first liquidation", weth.balanceOf(env.testUsers.liquidator));
@@ -292,11 +292,11 @@ contract LenderLiquidateTest is TestDeployer {
             /* vm.expectRevert(ValidationLogic.LiquidationExpired.selector);
             lender.liquidate(user_agent, address(usdc), 1000e6);*/
 
-            lender.openLiquidation(user_agent);
+            /*lender.openLiquidation(user_agent);
 
             _timeTravel(gracePeriod + 1);
 
-            lender.liquidate(user_agent, address(usdc), 1000e6);
+            lender.liquidate(user_agent, address(usdc), 1000e6, 0);
 
             console.log("Liquidator usdt balance after second liquidation", usdt.balanceOf(env.testUsers.liquidator));
             console.log("Liquidator weth balance after second liquidation", weth.balanceOf(env.testUsers.liquidator));
@@ -327,6 +327,7 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("Coverage after liquidations", coverage);
             console.log("");
             //     assertEq(coverage, 0);
+            */
 
             (uint256 totalDelegation,, uint256 totalDebt,,, uint256 health) = lender.agent(user_agent);
 
@@ -336,7 +337,6 @@ contract LenderLiquidateTest is TestDeployer {
             assertGt(health, 1e27);
             //    assertEq(totalDelegation, 0);
             //    assertEq(totalDebt, 0);
-            */
             vm.stopPrank();
         }
     }
@@ -388,20 +388,20 @@ contract LenderLiquidateTest is TestDeployer {
 
             // approve repay amount for liquidation
             usdc.approve(address(lender), 3200e6);
-            lender.liquidate(user_agent, address(usdc), 1000e6);
+            lender.liquidate(user_agent, address(usdc), 1000e6, 0);
 
             console.log("Liquidator usdt balance after first liquidation", usdt.balanceOf(env.testUsers.liquidator));
             console.log("Liquidator weth balance after first liquidation", weth.balanceOf(env.testUsers.liquidator));
             console.log("");
 
             // start the second liquidation
-            lender.liquidate(user_agent, address(usdc), 1000e6);
+            lender.liquidate(user_agent, address(usdc), 1000e6, 0);
 
             console.log("Liquidator usdt balance after second liquidation", usdt.balanceOf(env.testUsers.liquidator));
             console.log("Liquidator weth balance after second liquidation", weth.balanceOf(env.testUsers.liquidator));
             console.log("");
             // start the third liquidation
-            lender.liquidate(user_agent, address(usdc), 1200e6);
+            lender.liquidate(user_agent, address(usdc), 1200e6, 0);
 
             console.log("Liquidator usdt balance after third liquidation", usdt.balanceOf(env.testUsers.liquidator));
             console.log("Liquidator weth balance after third liquidation", weth.balanceOf(env.testUsers.liquidator));
@@ -430,5 +430,20 @@ contract LenderLiquidateTest is TestDeployer {
 
             vm.stopPrank();
         }
+    }
+
+    function test_agent_evade_slash() public {
+        vm.startPrank(user_agent);
+        console.log("block.timestamp", block.timestamp);
+        lender.borrow(address(usdc), type(uint256).max, user_agent);
+        vm.stopPrank();
+
+        _proportionallyWithdrawFromVault(env, symbioticWethVault.vault, 1000e18, true);
+
+        _timeTravel(1);
+
+        uint256 slashableCollateral = delegation.slashableCollateral(user_agent);
+        (,, uint256 totalDebt,,,) = lender.agent(user_agent);
+        assertGt(slashableCollateral, totalDebt);
     }
 }

@@ -83,7 +83,7 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
     /// @param _asset Asset address
     /// @param _cusd cUSD address
     function _harvestFractionalReserve(address _harvester, address _asset, address _cusd) private {
-        try IHarvester(_harvester).harvest(_asset, _cusd) { } catch { } // ignore errors
+        try IHarvester(_harvester).harvest(_cusd, _asset) { } catch { } // ignore errors
     }
 
     /// @dev Claim interest from lender
