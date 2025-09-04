@@ -12,7 +12,9 @@ import { IRewardsCoordinator } from "./interfaces/IRewardsCoordinator.sol";
 import { IStrategy } from "./interfaces/IStrategy.sol";
 import { IStrategyManager } from "./interfaces/IStrategyManager.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
+
+import { BeaconProxy } from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -41,7 +43,10 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         $.oracle = _oracle;
         $.rewardDuration = _rewardDuration;
         $.nextOperatorId++;
-        $.eigenOperatorImplementation = address(new EigenOperator());
+
+        // Deploy a instance for the upgradeable beacon proxies
+        UpgradeableBeacon beacon = new UpgradeableBeacon(address(new EigenOperator()), address(this));
+        $.eigenOperatorInstance = address(beacon);
 
         string memory metadata = string(
             abi.encodePacked(
@@ -228,6 +233,16 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @inheritdoc IEigenServiceManager
+    function upgradeEigenOperatorImplementation(address _newImplementation)
+        external
+        checkAccess(this.upgradeEigenOperatorImplementation.selector)
+    {
+        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        UpgradeableBeacon beacon = UpgradeableBeacon($.eigenOperatorInstance);
+        beacon.upgradeTo(_newImplementation);
+    }
+
+    /// @inheritdoc IEigenServiceManager
     function coverage(address _operator) external view returns (uint256 delegation) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         address _strategy = $.operatorToStrategy[_operator];
@@ -297,14 +312,14 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         returns (address _eigenOperator)
     {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        _eigenOperator = Clones.clone($.eigenOperatorImplementation);
-        EigenOperator(_eigenOperator).initialize(address(this), _operator, _operatorMetadata);
+
+        bytes memory initdata =
+            abi.encodeWithSelector(EigenOperator.initialize.selector, address(this), _operator, _operatorMetadata);
+        _eigenOperator = address(new BeaconProxy($.eigenOperatorInstance, initdata));
     }
 
-    /**
-     * @notice Updates the metadata URI for the AVS
-     * @param _metadataURI is the metadata URI for the AVS
-     */
+    /// @notice Updates the metadata URI for the AVS
+    /// @param _metadataURI is the metadata URI for the AVS
     function _updateAVSMetadataURI(string memory _metadataURI) private {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         IAllocationManager($.eigen.allocationManager).updateAVSMetadataURI(address(this), _metadataURI);

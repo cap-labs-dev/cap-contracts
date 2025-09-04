@@ -9,7 +9,6 @@ import { ILender } from "../../../interfaces/ILender.sol";
 import { IOracle } from "../../../interfaces/IOracle.sol";
 import { IRateOracle } from "../../../interfaces/IRateOracle.sol";
 import { IVault } from "../../../interfaces/IVault.sol";
-
 import { EigenAgentManagerStorageUtils } from "../../../storage/EigenAgentManagerStorageUtils.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 

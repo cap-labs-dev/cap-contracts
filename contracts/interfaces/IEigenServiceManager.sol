@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import { IRewardsCoordinator } from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 
 interface IEigenServiceManager {
@@ -45,7 +46,7 @@ interface IEigenServiceManager {
     /// @dev EigenServiceManager storage
     /// @param eigen Eigen addresses
     /// @param oracle Oracle address
-    /// @param eigenOperatorImplementation Eigen operator implementation
+    /// @param eigenOperatorInstance Eigen operator instance
     /// @param rewardDuration Reward duration
     /// @param nextOperatorId Next operator id
     /// @param pendingRewards Pending rewards
@@ -56,7 +57,7 @@ interface IEigenServiceManager {
     struct EigenServiceManagerStorage {
         EigenAddresses eigen;
         address oracle;
-        address eigenOperatorImplementation;
+        address eigenOperatorInstance;
         uint32 rewardDuration;
         uint32 nextOperatorId;
         mapping(address => mapping(address => uint256)) pendingRewards;
@@ -173,6 +174,12 @@ interface IEigenServiceManager {
      * @param _rewardDuration The rewards duration
      */
     function setRewardsDuration(uint32 _rewardDuration) external;
+
+    /**
+     * @notice Upgrades the eigen operator implementation
+     * @param _newImplementation The new implementation
+     */
+    function upgradeEigenOperatorImplementation(address _newImplementation) external;
 
     /**
      * @notice Returns the eigen addresses
