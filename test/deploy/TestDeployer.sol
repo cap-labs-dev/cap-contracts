@@ -209,8 +209,9 @@ contract TestDeployer is
         if (!useMockBackingNetwork()) {
             address eigenAdmin = makeAddr("strategy_admin");
             env.eigen.eigenImplementations = _deployEigenImplementations();
-            env.eigen.eigenConfig =
-                _deployEigenInfra(env.infra, env.eigen.eigenImplementations, eigenAb, uint32(1 days));
+            env.eigen.eigenConfig = _deployEigenInfra(
+                env.infra, env.eigen.eigenImplementations, eigenAb, env.usdVault.capToken, uint32(1 days)
+            );
             vm.startPrank(env.users.access_control_admin);
             _initEigenAccessControl(env.infra, env.eigen.eigenConfig, eigenAdmin, eigenAb);
             vm.stopPrank();
@@ -219,7 +220,7 @@ contract TestDeployer is
             vm.stopPrank();
             // _agentRegisterAsOperator(eigenAb, env.testUsers.agents[1]);
             _registerToEigenServiceManager(
-                eigenAb, eigenAdmin, env.eigen.eigenConfig.eigenServiceManager, env.testUsers.agents[1]
+                eigenAb, eigenAdmin, env.eigen.eigenConfig.agentManager, env.testUsers.agents[1]
             );
             _initEigenDelegations(
                 eigenAb,

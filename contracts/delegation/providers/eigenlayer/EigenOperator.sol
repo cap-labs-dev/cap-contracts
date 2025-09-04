@@ -4,7 +4,6 @@ pragma solidity ^0.8.28;
 import { IEigenOperator } from "../../../interfaces/IEigenOperator.sol";
 import { IEigenServiceManager } from "../../../interfaces/IEigenServiceManager.sol";
 import { EigenOperatorStorageUtils } from "../../../storage/EigenOperatorStorageUtils.sol";
-
 import { IAllocationManager } from "./interfaces/IAllocationManager.sol";
 import { IDelegationManager } from "./interfaces/IDelegationManager.sol";
 import { IRewardsCoordinator } from "./interfaces/IRewardsCoordinator.sol";
@@ -12,7 +11,7 @@ import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/I
 
 /// @title EigenOperator
 /// @author weso, Cap Labs
-/// @notice This contract manages the eigen operator as proxy to disable some functionality
+/// @notice This contract manages the eigen operator as proxy to disable some functionality for operators
 contract EigenOperator is IEigenOperator, Initializable, EigenOperatorStorageUtils {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {

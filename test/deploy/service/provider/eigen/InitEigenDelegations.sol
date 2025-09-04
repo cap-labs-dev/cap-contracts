@@ -8,6 +8,10 @@ import { TestEnvConfig, UsersConfig } from "../../../interfaces/TestDeployConfig
 
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 
+import {
+    EigenAgentManager,
+    IEigenAgentManager
+} from "../../../../../contracts/delegation/providers/eigenlayer/EigenAgentManager.sol";
 import { EigenServiceManager } from "../../../../../contracts/delegation/providers/eigenlayer/EigenServiceManager.sol";
 import { IAllocationManager } from
     "../../../../../contracts/delegation/providers/eigenlayer/interfaces/IAllocationManager.sol";
@@ -158,11 +162,20 @@ contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
     function _registerToEigenServiceManager(
         EigenAddressbook memory eigenAb,
         address admin,
-        address eigenServiceManager,
+        address eigenAgentManager,
         address agent
     ) internal {
         vm.startPrank(admin);
-        EigenServiceManager(eigenServiceManager).registerStrategy(eigenAb.eigenAddresses.strategy, agent, "", "");
+        IEigenAgentManager.AgentConfig memory agentConfig = IEigenAgentManager.AgentConfig({
+            agent: agent,
+            strategy: eigenAb.eigenAddresses.strategy,
+            avsMetadata: "",
+            operatorMetadata: "",
+            ltv: 5e26, // 50%
+            liquidationThreshold: 8e26, // 80%
+            delegationRate: 2e25 // 2%
+         });
+        EigenAgentManager(eigenAgentManager).addEigenAgent(agentConfig);
         vm.stopPrank();
 
         /*
