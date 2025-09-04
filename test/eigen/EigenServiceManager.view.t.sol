@@ -16,7 +16,7 @@ contract EigenServiceManagerViewTest is TestDeployer {
         eigenServiceManager = EigenServiceManager(env.eigen.eigenConfig.eigenServiceManager);
     }
 
-    function test_eigen_service_manager_view_functions() public {
+    function test_eigen_service_manager_view_functions() public view {
         address agent = env.testUsers.agents[1];
 
         uint32 operatorSetId = eigenServiceManager.operatorSetId(agent);
