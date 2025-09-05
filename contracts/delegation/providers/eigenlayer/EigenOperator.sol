@@ -23,7 +23,7 @@ contract EigenOperator is IEigenOperator, Initializable, EigenOperatorStorageUti
         EigenOperatorStorage storage $ = getEigenOperatorStorage();
         $.serviceManager = _serviceManager;
         $.operator = _operator;
-        $.totpPeriod = 14 days;
+        $.totpPeriod = 14 days; // Arbitrary value
 
         // Fetch the eigen addresses
         IEigenServiceManager.EigenAddresses memory eigenAddresses =
@@ -41,7 +41,9 @@ contract EigenOperator is IEigenOperator, Initializable, EigenOperatorStorageUti
         EigenOperatorStorage storage $ = getEigenOperatorStorage();
         if (msg.sender != $.serviceManager) revert NotServiceManager();
 
+        /// @dev The digest is calculated using the staker and operator addresses
         bytes32 digest = calculateTotpDigestHash(_staker, address(this));
+        /// @dev Allowlist the digest for delegation approval from the staker
         $.allowlistedDigests[digest] = true;
         $.restaker = _staker;
 
@@ -64,6 +66,7 @@ contract EigenOperator is IEigenOperator, Initializable, EigenOperatorStorageUti
         EigenOperatorStorage storage $ = getEigenOperatorStorage();
         if (msg.sender != $.serviceManager) revert NotServiceManager();
 
+        // Check if the strategy is already allocated, since this only needs to happen once and at least one block after the operator is registered
         (, IAllocationManager.Allocation[] memory _allocations) =
             IAllocationManager($.allocationManager).getStrategyAllocations(address(this), _strategy);
         if (_allocations.length != 0) revert AlreadyAllocated();
@@ -101,6 +104,9 @@ contract EigenOperator is IEigenOperator, Initializable, EigenOperatorStorageUti
     function advanceTotp() external {
         EigenOperatorStorage storage $ = getEigenOperatorStorage();
         if (msg.sender != $.restaker) revert NotRestaker();
+
+        // If for some reason the delegation approval has expired, allowlist the new digest
+        // This shouldn't matter since only the restaker can call this function
         bytes32 digest = calculateTotpDigestHash($.restaker, address(this));
         $.allowlistedDigests[digest] = true;
     }
@@ -123,6 +129,8 @@ contract EigenOperator is IEigenOperator, Initializable, EigenOperatorStorageUti
     /// @inheritdoc IEigenOperator
     function isValidSignature(bytes32 _digest, bytes memory) external view override returns (bytes4 magicValue) {
         EigenOperatorStorage storage $ = getEigenOperatorStorage();
+
+        // This gets called by the delegation manager to check if the operator is allowed to delegate
         if ($.allowlistedDigests[_digest]) {
             return bytes4(0x1626ba7e); // ERC1271 magic value for valid signatures
         } else {

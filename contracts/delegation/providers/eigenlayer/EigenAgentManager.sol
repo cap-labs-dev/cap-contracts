@@ -12,6 +12,9 @@ import { IVault } from "../../../interfaces/IVault.sol";
 import { EigenAgentManagerStorageUtils } from "../../../storage/EigenAgentManagerStorageUtils.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
+/// @title EigenAgentManager
+/// @author weso, Cap Labs
+/// @notice Manages Eigen Agents
 contract EigenAgentManager is IEigenAgentManager, UUPSUpgradeable, Access, EigenAgentManagerStorageUtils {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
