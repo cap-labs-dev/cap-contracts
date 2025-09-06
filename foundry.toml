@@ -22,13 +22,15 @@ remappings = [
     "@layerzerolabs/lz-evm-v1-0.7/=lib/layerzero-v1/",
     "eigenlayer-contracts/=node_modules/eigenlayer-contracts/",
     "eigenlayer/=node_modules/eigenlayer/",
+    "eigenlayer-middleware/=lib/eigenlayer-middleware/",
     "solidity-bytes-utils/contracts/=lib/solidity-bytes-utils/contracts/",
     "ds-test/=lib/layerzero-v2/lib/forge-std/lib/ds-test/src/",
     "forge-std/=lib/forge-std/src/",
     "@openzeppelin/=node_modules/@openzeppelin/",
-    "@tokenized-strategy/=lib/tokenized-strategy/src/"
+    "@tokenized-strategy/=lib/tokenized-strategy/src/",
 ]
 fs_permissions = [
+    { access = "read", path = "./config/eigen.json" },
     { access = "read", path = "./config/symbiotic.json" },
     { access = "read", path = "./config/layerzero-v2-deployments.json" },
     { access = "read", path = "./config/zap.json" },
