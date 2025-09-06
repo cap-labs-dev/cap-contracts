@@ -104,7 +104,10 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
 
         /// Check if rewards are ready
         uint256 _amount = IERC20(_token).balanceOf(address(this)) - $.pendingRewardsByToken[_token];
-        if ($.lastDistributionEpoch[_operator][_token] + ($.epochDuration * calcIntervalSeconds) > block.timestamp) {
+        if (
+            ($.lastDistributionEpoch[_operator][_token] * calcIntervalSeconds) + ($.epochDuration * calcIntervalSeconds)
+                > block.timestamp
+        ) {
             $.pendingRewardsByToken[_token] += _amount;
             $.pendingRewards[_operator][_token] += _amount;
             return;
@@ -148,7 +151,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
 
         $.pendingRewardsByToken[_token] -= $.pendingRewards[_operator][_token];
         $.pendingRewards[_operator][_token] = 0;
-        $.lastDistributionEpoch[_operator][_token] = uint32(block.timestamp);
+        $.lastDistributionEpoch[_operator][_token] = uint32(block.timestamp) / uint32(calcIntervalSeconds);
 
         emit DistributedRewards(_operator, _token, _amount);
     }
