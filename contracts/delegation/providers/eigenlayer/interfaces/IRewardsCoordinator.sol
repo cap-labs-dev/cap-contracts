@@ -3,6 +3,16 @@ pragma solidity ^0.8.28;
 
 interface IRewardsCoordinator {
     /**
+     * @notice An operator set identified by the AVS address and an identifier
+     * @param avs The address of the AVS this operator set belongs to
+     * @param id The unique identifier for the operator set
+     */
+    struct OperatorSet {
+        address avs;
+        uint32 id;
+    }
+
+    /**
      * @notice A linear combination of strategies and multipliers for AVSs to weigh
      * EigenLayer strategies.
      * @param strategy The EigenLayer strategy to be used for the rewards submission
@@ -73,4 +83,37 @@ interface IRewardsCoordinator {
     function setOperatorAVSSplit(address operator, address avs, uint16 split) external;
 
     function CALCULATION_INTERVAL_SECONDS() external pure returns (uint256);
+
+    /**
+     * @notice A reward struct for an operator
+     * @param operator The operator to be rewarded
+     * @param amount The reward amount for the operator
+     */
+    struct OperatorReward {
+        address operator;
+        uint256 amount;
+    }
+
+    /**
+     * @notice OperatorDirectedRewardsSubmission struct submitted by AVSs when making operator-directed rewards for their operators and stakers.
+     * @param strategiesAndMultipliers The strategies and their relative weights.
+     * @param token The rewards token to be distributed.
+     * @param operatorRewards The rewards for the operators.
+     * @param startTimestamp The timestamp (seconds) at which the submission range is considered for distribution.
+     * @param duration The duration of the submission range in seconds.
+     * @param description Describes what the rewards submission is for.
+     */
+    struct OperatorDirectedRewardsSubmission {
+        StrategyAndMultiplier[] strategiesAndMultipliers;
+        address token;
+        OperatorReward[] operatorRewards;
+        uint32 startTimestamp;
+        uint32 duration;
+        string description;
+    }
+
+    function createOperatorDirectedOperatorSetRewardsSubmission(
+        OperatorSet calldata operatorSet,
+        OperatorDirectedRewardsSubmission[] calldata operatorDirectedRewardsSubmissions
+    ) external;
 }

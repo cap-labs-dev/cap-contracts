@@ -26,7 +26,7 @@ contract EigenServiceManagerRewardsTest is TestDeployer {
 
         deal(address(usdc), address(eigenServiceManager), 100e6);
         eigenServiceManager.distributeRewards(agent, address(usdc));
-        assertEq(eigenServiceManager.pendingRewards(eigenAb.eigenAddresses.strategy, address(usdc)), 100e6);
+        assertEq(eigenServiceManager.pendingRewards(agent, address(usdc)), 100e6);
         vm.stopPrank();
     }
 }

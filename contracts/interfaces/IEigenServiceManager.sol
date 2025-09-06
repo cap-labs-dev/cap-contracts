@@ -36,8 +36,8 @@ interface IEigenServiceManager {
     event Slash(address indexed agent, address indexed recipient, uint256 slashShare, uint48 timestamp);
     /// @dev Strategy registered
     event StrategyRegistered(address indexed strategy, address indexed operator);
-    /// @dev Rewards duration set
-    event RewardsDurationSet(uint32 rewardDuration);
+    /// @dev Epoch duration set
+    event EpochDurationSet(uint32 epochDuration);
     /// @dev Min reward amount set
     event MinRewardAmountSet(uint256 minRewardAmount);
     /// @dev Distributed rewards
@@ -47,7 +47,7 @@ interface IEigenServiceManager {
     /// @param eigen Eigen addresses
     /// @param oracle Oracle address
     /// @param eigenOperatorInstance Eigen operator instance
-    /// @param rewardDuration Reward duration
+    /// @param epochDuration Epoch duration
     /// @param nextOperatorId Next operator id
     /// @param pendingRewards Pending rewards
     /// @param lastDistributionEpoch Last distribution
@@ -58,9 +58,10 @@ interface IEigenServiceManager {
         EigenAddresses eigen;
         address oracle;
         address eigenOperatorInstance;
-        uint32 rewardDuration;
+        uint32 epochDuration;
         uint32 nextOperatorId;
         mapping(address => mapping(address => uint256)) pendingRewards;
+        mapping(address => uint256) pendingRewardsByToken;
         mapping(address => mapping(address => uint32)) lastDistributionEpoch;
         mapping(address => address) operatorToStrategy;
         mapping(address => uint32) operatorSetIds;
@@ -170,10 +171,10 @@ interface IEigenServiceManager {
     function slashableCollateral(address operator, uint256 timestamp) external view returns (uint256);
 
     /**
-     * @notice Sets the rewards duration
-     * @param _rewardDuration The rewards duration
+     * @notice Sets the epoch duration
+     * @param _epochDuration The epoch duration
      */
-    function setRewardsDuration(uint32 _rewardDuration) external;
+    function setEpochDuration(uint32 _epochDuration) external;
 
     /**
      * @notice Upgrades the eigen operator implementation
@@ -201,10 +202,10 @@ interface IEigenServiceManager {
     function operatorSetId(address operator) external view returns (uint32);
 
     /**
-     * @notice Returns the rewards duration
-     * @return The rewards duration
+     * @notice Returns the epoch duration
+     * @return The epoch duration
      */
-    function rewardDuration() external view returns (uint32);
+    function epochDuration() external view returns (uint32);
 
     /**
      * @notice Returns the pending rewards for an operator

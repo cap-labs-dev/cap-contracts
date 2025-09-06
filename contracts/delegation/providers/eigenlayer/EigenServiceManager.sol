@@ -33,14 +33,14 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         address _accessControl,
         EigenAddresses memory _eigenAddresses,
         address _oracle,
-        uint32 _rewardDuration
+        uint32 _epochDuration
     ) external initializer {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         __Access_init(_accessControl);
         __UUPSUpgradeable_init();
         $.eigen = _eigenAddresses;
         $.oracle = _oracle;
-        $.rewardDuration = _rewardDuration;
+        $.epochDuration = _epochDuration;
         $.nextOperatorId++;
 
         // Deploy a instance for the upgradeable beacon proxies
@@ -97,51 +97,60 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
 
+        uint256 calcIntervalSeconds = IRewardsCoordinator($.eigen.rewardsCoordinator).CALCULATION_INTERVAL_SECONDS();
+
         /// Fetch the strategy for the operator
         address _strategy = $.operatorToStrategy[_operator];
 
         /// Check if rewards are ready
-        uint256 _amount = IERC20(_token).balanceOf(address(this));
-        if ($.lastDistributionEpoch[_strategy][_token] + $.rewardDuration > block.timestamp) {
-            $.pendingRewards[_strategy][_token] = _amount;
+        uint256 _amount = IERC20(_token).balanceOf(address(this)) - $.pendingRewardsByToken[_token];
+        if ($.lastDistributionEpoch[_operator][_token] + ($.epochDuration * calcIntervalSeconds) > block.timestamp) {
+            $.pendingRewardsByToken[_token] += _amount;
+            $.pendingRewards[_operator][_token] += _amount;
             return;
         }
 
         _checkApproval(_token, $.eigen.rewardsCoordinator);
 
         /// include pending rewards
-        _amount += $.pendingRewards[_strategy][_token];
+        _amount += $.pendingRewards[_operator][_token];
 
         /// Get the strategy for the operator and create the rewards submission
-        IRewardsCoordinator.RewardsSubmission[] memory rewardsSubmissions =
-            new IRewardsCoordinator.RewardsSubmission[](1);
+        IRewardsCoordinator.OperatorDirectedRewardsSubmission[] memory rewardsSubmissions =
+            new IRewardsCoordinator.OperatorDirectedRewardsSubmission[](1);
         IRewardsCoordinator.StrategyAndMultiplier[] memory _strategiesAndMultipliers =
             new IRewardsCoordinator.StrategyAndMultiplier[](1);
+
+        IRewardsCoordinator.OperatorReward[] memory _operatorRewards = new IRewardsCoordinator.OperatorReward[](1);
+        _operatorRewards[0] =
+            IRewardsCoordinator.OperatorReward({ operator: $.operatorToEigenOperator[_operator], amount: _amount });
+
+        IRewardsCoordinator.OperatorSet memory operatorSet =
+            IRewardsCoordinator.OperatorSet({ avs: address(this), id: $.operatorSetIds[_operator] });
 
         /// Since there is only 1 strategy multiplier is just 1e18 everything goes to the strategy
         _strategiesAndMultipliers[0] =
             IRewardsCoordinator.StrategyAndMultiplier({ strategy: _strategy, multiplier: 1e18 });
 
-        uint256 calcIntervalSeconds = IRewardsCoordinator($.eigen.rewardsCoordinator).CALCULATION_INTERVAL_SECONDS();
-        uint256 startTimestamp = $.lastDistributionEpoch[_strategy][_token] == 0
-            ? block.timestamp - $.rewardDuration
-            : $.lastDistributionEpoch[_strategy][_token];
-        uint256 roundedStartTimestamp = startTimestamp / calcIntervalSeconds * calcIntervalSeconds;
+        uint256 roundedStartEpoch = (block.timestamp / calcIntervalSeconds) - $.epochDuration;
+        uint256 startTimestamp = roundedStartEpoch * calcIntervalSeconds;
 
-        rewardsSubmissions[0] = IRewardsCoordinator.RewardsSubmission({
+        rewardsSubmissions[0] = IRewardsCoordinator.OperatorDirectedRewardsSubmission({
             strategiesAndMultipliers: _strategiesAndMultipliers,
             token: _token,
-            amount: _amount,
-            startTimestamp: uint32(roundedStartTimestamp),
-            duration: $.rewardDuration
+            operatorRewards: _operatorRewards,
+            startTimestamp: uint32(startTimestamp),
+            duration: uint32($.epochDuration * calcIntervalSeconds),
+            description: "interest"
         });
 
-        _createAVSRewardsSubmission(rewardsSubmissions);
+        _createRewardsSubmission(operatorSet, rewardsSubmissions);
 
-        $.pendingRewards[_strategy][_token] = 0;
-        $.lastDistributionEpoch[_strategy][_token] = uint32(block.timestamp);
+        $.pendingRewardsByToken[_token] -= $.pendingRewards[_operator][_token];
+        $.pendingRewards[_operator][_token] = 0;
+        $.lastDistributionEpoch[_operator][_token] = uint32(block.timestamp);
 
-        emit DistributedRewards(_strategy, _token, _amount);
+        emit DistributedRewards(_operator, _token, _amount);
     }
 
     /// @inheritdoc IEigenServiceManager
@@ -219,11 +228,11 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @inheritdoc IEigenServiceManager
-    function setRewardsDuration(uint32 _rewardDuration) external checkAccess(this.setRewardsDuration.selector) {
+    function setEpochDuration(uint32 _epochDuration) external checkAccess(this.setEpochDuration.selector) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        $.rewardDuration = _rewardDuration;
+        $.epochDuration = _epochDuration;
 
-        emit RewardsDurationSet(_rewardDuration);
+        emit EpochDurationSet(_epochDuration);
     }
 
     /// @inheritdoc IEigenServiceManager
@@ -294,15 +303,15 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @inheritdoc IEigenServiceManager
-    function rewardDuration() external view returns (uint32) {
+    function epochDuration() external view returns (uint32) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        return $.rewardDuration;
+        return $.epochDuration;
     }
 
     /// @inheritdoc IEigenServiceManager
-    function pendingRewards(address _strategy, address _token) external view returns (uint256) {
+    function pendingRewards(address _operator, address _token) external view returns (uint256) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        return $.pendingRewards[_strategy][_token];
+        return $.pendingRewards[_operator][_token];
     }
 
     /// @dev Deploys an eigen operator
@@ -360,11 +369,17 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         );
     }
 
-    /// @notice Create a rewards submission for the AVS
+    /// @notice Create a rewards submission
+    /// @param _operatorSet The operator set
     /// @param _rewardsSubmissions The rewards submissions being created
-    function _createAVSRewardsSubmission(IRewardsCoordinator.RewardsSubmission[] memory _rewardsSubmissions) private {
+    function _createRewardsSubmission(
+        IRewardsCoordinator.OperatorSet memory _operatorSet,
+        IRewardsCoordinator.OperatorDirectedRewardsSubmission[] memory _rewardsSubmissions
+    ) private {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        IRewardsCoordinator($.eigen.rewardsCoordinator).createAVSRewardsSubmission(_rewardsSubmissions);
+        IRewardsCoordinator($.eigen.rewardsCoordinator).createOperatorDirectedOperatorSetRewardsSubmission(
+            _operatorSet, _rewardsSubmissions
+        );
     }
 
     /// @notice Check if the token has enough allowance for the spender

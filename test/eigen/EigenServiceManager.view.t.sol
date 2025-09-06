@@ -31,8 +31,8 @@ contract EigenServiceManagerViewTest is TestDeployer {
         assertEq(_eigenAddresses.allocationManager, eigenAb.eigenAddresses.allocationManager);
         assertEq(_eigenAddresses.rewardsCoordinator, eigenAb.eigenAddresses.rewardsCoordinator);
 
-        uint256 rewardDuration = eigenServiceManager.rewardDuration();
-        assertEq(rewardDuration, 24 hours);
+        uint256 epochDuration = eigenServiceManager.epochDuration();
+        assertEq(epochDuration, 7 days);
 
         uint256 pendingRewards = eigenServiceManager.pendingRewards(eigenAb.eigenAddresses.strategy, address(usdc));
         assertEq(pendingRewards, 0);
