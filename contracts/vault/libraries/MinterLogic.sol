@@ -4,8 +4,12 @@ pragma solidity ^0.8.28;
 import { IMinter } from "../../interfaces/IMinter.sol";
 import { IOracle } from "../../interfaces/IOracle.sol";
 import { IVault } from "../../interfaces/IVault.sol";
+
+import { MathHelper } from "../../periphery/MathHelper.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
+import { console } from "forge-std/console.sol";
 
 /// @title Amount Out Logic
 /// @author kexley, Cap Labs
@@ -13,6 +17,9 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 library MinterLogic {
     /// @dev Ray precision
     uint256 constant RAY_PRECISION = 1e27;
+
+    /// @dev Ray precision as an int256
+    int256 constant RAY_PRECISION_INT = int256(RAY_PRECISION);
 
     /// @dev Share precision
     uint256 constant SHARE_PRECISION = 1e33;
@@ -37,6 +44,14 @@ library MinterLogic {
                 IMinter.FeeSlopeParams({ mint: params.mint, amount: amountOutBeforeFee, ratio: newRatio })
             );
         }
+    }
+
+    function amountIn(IMinter.MinterStorage storage $, IMinter.AmountOutParams memory params)
+        external
+        view
+        returns (uint256 amount)
+    {
+        return _amountIn($, params);
     }
 
     /// @notice Calculate the output amounts for redeeming a cap token for a proportional weighting
@@ -146,5 +161,77 @@ library MinterLogic {
         if (rate > RAY_PRECISION) rate = RAY_PRECISION;
         fee = params.amount * rate / RAY_PRECISION;
         amount = params.amount - fee;
+    }
+
+    /// @notice Calculate the amount in for a swap
+    /// @param $ Storage pointer
+    /// @param params Parameters for a swap
+    /// @return amount Amount in
+    function _amountIn(IMinter.MinterStorage storage $, IMinter.AmountOutParams memory params)
+        internal
+        view
+        returns (uint256)
+    {
+        address _oracle = $.oracle;
+        (uint256 assetPrice,) = IOracle(_oracle).getPrice(params.asset);
+        (uint256 capPrice,) = IOracle(_oracle).getPrice(address(this));
+
+        uint256 assetDecimalsPow = 10 ** IERC20Metadata(params.asset).decimals();
+        uint256 capDecimalsPow = 10 ** IERC20Metadata(address(this)).decimals();
+
+        uint256 capSupply = IERC20(address(this)).totalSupply();
+        uint256 capValue = capSupply * capPrice / capDecimalsPow;
+        uint256 allocationValue = IVault(address(this)).totalSupplies(params.asset) * assetPrice / assetDecimalsPow;
+        IMinter.FeeData memory fees = $.fees[params.asset];
+
+        // check which slope to use
+        uint256 assetValue;
+        int256 c1;
+        int256 c0;
+        if (params.mint) {
+            assetValue = params.amount * capPrice / capDecimalsPow;
+            uint256 newRatio = (allocationValue + assetValue) * RAY_PRECISION / (capValue + assetValue);
+            if (newRatio < fees.mintKinkRatio) {
+                console.log("below mint kink ratio");
+                c1 = int256(fees.slope0) * RAY_PRECISION_INT / (int256(fees.mintKinkRatio) - int256(fees.optimalRatio));
+                c0 = int256(fees.minMintFee) * RAY_PRECISION_INT - c1 * int256(fees.optimalRatio) * RAY_PRECISION_INT;
+            } else {
+                console.log("above mint kink ratio");
+                c1 = int256(fees.slope1) * RAY_PRECISION_INT / (RAY_PRECISION_INT - int256(fees.mintKinkRatio));
+                c0 = (int256(fees.minMintFee) + int256(fees.slope0))
+                    - (c1 * int256(fees.mintKinkRatio) / RAY_PRECISION_INT);
+            }
+        } else {
+            assetValue = params.amount * assetPrice / assetDecimalsPow;
+            uint256 newRatio = (allocationValue - assetValue) * RAY_PRECISION / (capValue - assetValue);
+            if (newRatio > fees.burnKinkRatio) {
+                console.log("above burn kink ratio");
+                c1 = int256(fees.slope0) * RAY_PRECISION_INT / (int256(fees.burnKinkRatio) - int256(fees.optimalRatio));
+                c0 = -c1 * int256(fees.optimalRatio);
+            } else {
+                console.log("below burn kink ratio");
+                c1 = int256(fees.slope1) * RAY_PRECISION_INT / (RAY_PRECISION_INT - int256(fees.optimalRatio));
+                c0 = int256(fees.slope0) - c1 * int256(fees.optimalRatio);
+            }
+        }
+        console.log("c0", c0);
+        console.log("c1", c1);
+        console.log("fees.mintKinkRatio", fees.mintKinkRatio);
+        console.log("fees.optimalRatio", fees.optimalRatio);
+        console.log("fees.burnKinkRatio", fees.burnKinkRatio);
+        console.log("fees.minMintFee", fees.minMintFee);
+        console.log("fees.slope0", fees.slope0);
+        console.log("fees.slope1", fees.slope1);
+        console.log("RAY_PRECISION_INT", RAY_PRECISION_INT);
+
+        (int256 r1,) = MathHelper.quadratic(
+            (RAY_PRECISION_INT - c0 - c1),
+            (
+                ((RAY_PRECISION_INT - c0) * int256(capValue) - (c1 * int256(allocationValue)))
+                    - int256(assetValue) * RAY_PRECISION_INT
+            ),
+            -int256(assetValue) * int256(capValue)
+        );
+        return uint256(r1);
     }
 }
