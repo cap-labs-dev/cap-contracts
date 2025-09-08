@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { IMinter } from "../../contracts/interfaces/IMinter.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
+import { console } from "forge-std/console.sol";
 
 contract VaultMintTest is TestDeployer {
     address user;
@@ -137,5 +139,37 @@ contract VaultMintTest is TestDeployer {
         cUSD.mint(address(usdt), amountIn, minAmountOut, user, deadline);
         // We have .5% less because of fees
         assertEq(cUSD.balanceOf(user), 0.995e12);
+    }
+
+    function test_amount_in() public {
+        vm.startPrank(env.users.lender_admin);
+
+        cUSD.setFeeData(
+            address(usdt),
+            IMinter.FeeData({
+                minMintFee: 0.005e27,
+                slope0: 0.01e27,
+                slope1: 0.1e27,
+                mintKinkRatio: 0.85e27,
+                burnKinkRatio: 0.15e27,
+                optimalRatio: 0.33e27
+            })
+        );
+
+        vm.startPrank(user);
+
+        // Approve USDT spending
+        usdt.mint(user, 100e6);
+        usdt.approve(address(cUSD), 100e6);
+        cUSD.mint(address(usdt), 10e6, 0, user, block.timestamp + 1 hours);
+
+        // Mint cUSD with USDT
+        uint256 amountOut = 1e18;
+
+        uint256 amountIn = cUSD.getMintAmountIn(address(usdt), amountOut);
+        console.log(amountIn);
+
+        cUSD.mint(address(usdt), amountIn, 0, user, block.timestamp + 1 hours);
+        assertEq(usdt.balanceOf(address(cUSD)), amountIn);
     }
 }
