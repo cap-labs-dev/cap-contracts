@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.22;
 
-import { AccessControl } from "../contracts/access/AccessControl.sol";
-import { CapSweeper } from "../contracts/gelato/CapSweeper.sol";
-import { ICapSweeper } from "../contracts/interfaces/ICapSweeper.sol";
+import { AccessControl } from "../../contracts/access/AccessControl.sol";
+import { CapSweeper } from "../../contracts/gelato/CapSweeper.sol";
+import { ICapSweeper } from "../../contracts/interfaces/ICapSweeper.sol";
 
-import { IFractionalReserve } from "../contracts/interfaces/IFractionalReserve.sol";
-import { IVault } from "../contracts/interfaces/IVault.sol";
+import { IFractionalReserve } from "../../contracts/interfaces/IFractionalReserve.sol";
+import { IVault } from "../../contracts/interfaces/IVault.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import { Test } from "forge-std/Test.sol";

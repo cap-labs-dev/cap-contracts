@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.22;
 
-import { Harvester } from "../contracts/fractionalReserve/Harvester.sol";
+import { Harvester } from "../../contracts/fractionalReserve/Harvester.sol";
 
-import { IFractionalReserve } from "../contracts/interfaces/IFractionalReserve.sol";
-import { IFractionalReserveStrategy } from "../contracts/interfaces/IFractionalReserveStrategy.sol";
-import { IFractionalReserveVault } from "../contracts/interfaces/IFractionalReserveVault.sol";
+import { IFractionalReserve } from "../../contracts/interfaces/IFractionalReserve.sol";
+import { IFractionalReserveStrategy } from "../../contracts/interfaces/IFractionalReserveStrategy.sol";
+import { IFractionalReserveVault } from "../../contracts/interfaces/IFractionalReserveVault.sol";
 
 import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";

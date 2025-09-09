@@ -184,11 +184,6 @@ contract TestDeployer is
         for (uint256 i = 0; i < env.usdVault.assets.length; i++) {
             _initAaveRateOracle(env.libs, env.infra, env.usdVault.assets[i], env.usdOracleMocks.aaveDataProviders[i]);
         }
-        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-            /// 0.05e27 is 5% per year
-            uint256 increment = (i + 1) * 0.0001e27; // Vary the restakers rate by 1% each
-            _initRestakerRateForAgent(env.infra, env.testUsers.agents[i], uint256(0.05e27 + increment)); // Restakers rate is annualized in ray
-        }
 
         /// LENDER
         console.log("deploying lender");
@@ -229,6 +224,10 @@ contract TestDeployer is
         }
 
         /// Deploy Symbiotic Network Adapter
+        vm.startPrank(env.users.delegation_admin);
+        Delegation(env.infra.delegation).setFeeRecipient(env.usdVault.feeAuction);
+        vm.stopPrank();
+
         if (useMockBackingNetwork()) {
             vm.startPrank(env.users.middleware_admin);
             (address networkMiddleware, address network) = _deployDelegationNetworkMock();
