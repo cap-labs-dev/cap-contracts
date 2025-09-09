@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.22;
 
-import { AccessControl } from "../contracts/access/AccessControl.sol";
-import { ICapChainlinkPoRAddressList } from "../contracts/interfaces/ICapChainlinkPoRAddressList.sol";
-import { CapChainlinkPoRAddressList } from "../contracts/oracle/chainlink/CapChainlinkPoRAddressList.sol";
+import { AccessControl } from "../../contracts/access/AccessControl.sol";
+import { ICapChainlinkPoRAddressList } from "../../contracts/interfaces/ICapChainlinkPoRAddressList.sol";
+import { CapChainlinkPoRAddressList } from "../../contracts/oracle/chainlink/CapChainlinkPoRAddressList.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import { Test } from "forge-std/Test.sol";

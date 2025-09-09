@@ -123,12 +123,51 @@ contract VaultInvariantsTest is Test, ProxyUtils {
         vm.warp(block.timestamp + 1_000_000);
     }
 
+    function test_minting_increase_balance_01() public {
+        /* [Sequence] (original: 11, shrunk: 11)
+                sender=0x0000000000000000000000000000000000002707 addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=donateAsset(uint256,uint256) args=[11151 [1.115e4], 59149507 [5.914e7]]
+                sender=0xa70e4e7afc240f0e16cae3f510a522564A0BE6fd addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=removeAsset(uint256) args=[1295262338132459307341606 [1.295e24]]
+                sender=0x000000000000000000000000000000000000012D addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=removeAsset(uint256) args=[43613483 [4.361e7]]
+                sender=0x0000000000000000000000000000000000005a2a addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=investAll(uint256) args=[43589792651728058753842902464396686454947172922374906550312632829676195 [4.358e70]]
+                sender=0x8758FfBF47E1f3C3fBA87148370083b629aA284a addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=repay(uint256,uint256,uint256) args=[36, 119629514 [1.196e8], 17371500 [1.737e7]]
+                sender=0x0000000000000000000000000000000000001040 addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=addAsset(uint256) args=[120970478 [1.209e8]]
+                sender=0x957F661e0df49367CB5014c80b67D8d9a79d61a9 addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=setFractionalReserveVault(uint256) args=[9942]
+                sender=0xB290F8eDEE727412b6196C771f61bEdb41Cd53cB addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=addAsset(uint256) args=[11152 [1.115e4]]
+                sender=0x0000000000000000033b2e3C9FcfCA56E1530119 addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=investAll(uint256) args=[84112818 [8.411e7]]
+                sender=0x9e7E43d4d7a938F1041593fac68B6475906adbE2 addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=removeAsset(uint256) args=[15199774791377 [1.519e13]]
+                sender=0x9C7E6BEBd2875511e0D61CFCa3A81d939abd1814 addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=setFractionalReserveVault(uint256) args=[44743214 [4.474e7]]*/
+        // Execute the exact sequence that was found to trigger an issue
+        handler.donateAsset(11151, 59149507);
+
+        handler.removeAsset(1295262338132459307341606);
+
+        handler.removeAsset(43613483);
+
+        handler.investAll(43589792651728058753842902464396686454947172922374906550312632829676195);
+
+        handler.repay(36, 119629514, 17371500);
+
+        handler.addAsset(120970478);
+
+        handler.setFractionalReserveVault(9942);
+
+        handler.addAsset(11152);
+
+        handler.investAll(84112818);
+
+        handler.removeAsset(15199774791377);
+
+        handler.setFractionalReserveVault(44743214);
+
+        invariant_mintingIncreaseBalance();
+    }
+
     function test_fuzzing_non_regression_loss_from_fractional_reserve_1() public {
         //[FAIL: custom error 0x95969727: 0000000000000000000000002e234dae75c793f67a35089c9d99245e1c58470b000000000000000000000000d6bbde9174b1cdaa358d2cf4d57d1a9f7178fbff0000000000000000000000000000000000000000000000000000000000000001]
         //[Sequence]
         //        sender=0x8d8C714C6790785D0cD4C75935622498F1A76184 addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=pause(uint256) args=[7675797 [7.675e6]]
         //        sender=0x00000000000000000000000000000000dcD713EE addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=removeAsset(uint256) args=[14837635802857839438797466 [1.483e25]]
-        //        sender=0x000000000000000000000000000000000F6A916fd addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=donateAsset(uint256,uint256) args=[9745, 3022]
+        //        sender=0x000000000000000000000000000000000000F6A916fd addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=donateAsset(uint256,uint256) args=[9745, 3022]
         //        sender=0x0000000000000000000000000000000000001C71 addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=pause(uint256) args=[9929]
         //        sender=0x0000000000000000000000000000000000000EA1 addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=addAsset(uint256) args=[76715587 [7.671e7]]
         //        sender=0x3C9425bc7770077e68f6a1477D31a938683C316C addr=[test/vault/Vault.invariants.t.sol:TestVaultHandler]0x212224D2F2d262cd093eE13240ca4873fcCBbA3C calldata=investAll(uint256) args=[15078001 [1.507e7]]
@@ -336,9 +375,7 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         amount = bound(amount, 0, type(uint96).max); // Reasonable bound for approval
         if (amount == 0) return;
 
-        vm.startPrank(currentActor);
-        vault.approve(currentSpender, amount);
-        vm.stopPrank();
+        IERC20(address(vault)).approve(currentSpender, amount);
     }
 
     function borrow(uint256 actorSeed, uint256 assetSeed, uint256 amount) external {
@@ -351,9 +388,7 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         uint256 maxBorrow = vault.availableBalance(currentAsset);
         amount = bound(amount, 0, Math.min(maxBorrow, type(uint96).max)); // Reasonable bound for borrow
 
-        vm.startPrank(currentActor);
         vault.borrow(currentAsset, amount, currentActor);
-        vm.stopPrank();
     }
 
     function burn(uint256 actorSeed, uint256 assetSeed, uint256 amount) external {
@@ -368,9 +403,7 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
 
         amount = bound(amount, 1, Math.min(maxBurn, type(uint96).max)); // Reasonable bound for burn
 
-        vm.startPrank(currentActor);
         vault.burn(currentAsset, amount, 0, currentActor, block.timestamp);
-        vm.stopPrank();
     }
 
     function divestAll(uint256 assetSeed) external {
@@ -402,13 +435,10 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         if (maxMint == 0) return;
         uint256 amount = bound(amountSeed, 1, Math.min(maxMint, type(uint96).max)); // Reasonable bound for mint
 
-        vm.startPrank(currentActor);
-        // Mint tokens to the actor first
         MockERC20(currentAsset).mint(currentActor, amount);
 
         IERC20(currentAsset).approve(address(vault), amount);
         vault.mint(currentAsset, amount, 0, currentActor, block.timestamp);
-        vm.stopPrank();
     }
 
     function redeem(uint256 actorSeed, uint256 amount) external {
@@ -423,9 +453,7 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         uint256[] memory amountsOut = new uint256[](1);
         amountsOut[0] = 0;
 
-        vm.startPrank(currentActor);
         vault.redeem(amount, amountsOut, currentActor, block.timestamp);
-        vm.stopPrank();
     }
 
     function removeAsset(uint256 assetSeed) external {
@@ -445,8 +473,6 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         uint256 maxRepay = vault.availableBalance(currentAsset);
         amount = bound(amount, 0, Math.min(maxRepay, type(uint96).max)); // Reasonable bound for repay
 
-        vm.startPrank(currentActor);
-        // Mint tokens to the actor first
         MockERC20(currentAsset).mint(currentActor, amount);
 
         IERC20(currentAsset).approve(address(vault), amount);

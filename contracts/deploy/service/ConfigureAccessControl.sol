@@ -41,6 +41,7 @@ contract ConfigureAccessControl {
         accessControl.grantAccess(Delegation.setLastBorrow.selector, infra.delegation, infra.lender);
         accessControl.grantAccess(Delegation.slash.selector, infra.delegation, infra.lender);
         accessControl.grantAccess(Delegation.setLtvBuffer.selector, infra.delegation, users.delegation_admin);
+        accessControl.grantAccess(Delegation.setFeeRecipient.selector, infra.delegation, users.delegation_admin);
         accessControl.grantAccess(bytes4(0), infra.delegation, users.access_control_admin);
     }
 }
