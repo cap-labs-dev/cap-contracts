@@ -50,23 +50,30 @@ interface IEigenServiceManager {
     /// @param epochDuration Epoch duration
     /// @param nextOperatorId Next operator id
     /// @param pendingRewards Pending rewards
-    /// @param lastDistributionEpoch Last distribution
-    /// @param operatorToStrategy Operator to strategy mapping
-    /// @param operatorSetIds Operator set ids
-    /// @param operatorToEigenOperator Operator to eigen operator mapping
     struct EigenServiceManagerStorage {
         EigenAddresses eigen;
         address oracle;
         address eigenOperatorInstance;
+        address[] redistributionRecipients;
         uint32 epochDuration;
         uint32 nextOperatorId;
-        mapping(address => mapping(address => uint256)) pendingRewards;
         mapping(address => uint256) pendingRewardsByToken;
-        mapping(address => mapping(address => uint32)) lastDistributionEpoch;
-        mapping(address => address) operatorToStrategy;
-        mapping(address => uint32) operatorSetIds;
-        mapping(address => address) operatorToEigenOperator;
-        mapping(address => uint256) operatorCreatedAtEpoch;
+        mapping(address => CachedOperatorData) operators;
+    }
+
+    /// @dev Cached operator data
+    /// @param eigenOperator Eigen operator address
+    /// @param createdAtEpoch Epoch at which the operator was created
+    /// @param strategy Strategy address
+    /// @param operatorSetId Operator set id
+    /// @param pendingRewards Pending rewards
+    struct CachedOperatorData {
+        address eigenOperator;
+        uint32 createdAtEpoch;
+        address strategy;
+        uint32 operatorSetId;
+        mapping(address => uint256) pendingRewards;
+        mapping(address => uint32) lastDistributionEpoch;
     }
 
     /// @dev Eigen addresses
