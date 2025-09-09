@@ -66,6 +66,7 @@ interface IEigenServiceManager {
         mapping(address => address) operatorToStrategy;
         mapping(address => uint32) operatorSetIds;
         mapping(address => address) operatorToEigenOperator;
+        mapping(address => uint256) operatorCreatedAtEpoch;
     }
 
     /// @dev Eigen addresses

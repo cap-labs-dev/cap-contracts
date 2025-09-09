@@ -33,32 +33,36 @@ contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
     function _initEigenDelegations(
         EigenAddressbook memory eigenAb,
         address eigenServiceManager,
-        address agent,
-        address restaker,
+        address[] memory agents,
+        address[] memory restakers,
         uint256 amountNoDecimals
     ) internal {
-        _initEigenDelegationsForAgent(eigenAb, eigenServiceManager, agent, restaker, amountNoDecimals);
+        _initEigenDelegationsForAgent(eigenAb, eigenServiceManager, agents, restakers, amountNoDecimals);
         _timeTravel(28 days);
-        EigenServiceManager(eigenServiceManager).allocate(agent);
+        for (uint256 i = 0; i < agents.length; i++) {
+            EigenServiceManager(eigenServiceManager).allocate(agents[i]);
+        }
     }
 
     function _initEigenDelegationsForAgent(
         EigenAddressbook memory eigenAb,
         address eigenServiceManager,
-        address agent,
-        address restaker,
+        address[] memory agents,
+        address[] memory restakers,
         uint256 amountNoDecimals
     ) internal returns (uint256 depositedAmount, uint256 mintedShares) {
         address strategy = eigenAb.eigenAddresses.strategy;
         address collateral = address(IStrategy(strategy).underlyingToken());
         uint256 amount = amountNoDecimals * 10 ** MockERC20(collateral).decimals();
 
-        address eigenOperator = EigenServiceManager(eigenServiceManager).getEigenOperator(agent);
+        for (uint256 i = 0; i < agents.length; i++) {
+            address eigenOperator = EigenServiceManager(eigenServiceManager).getEigenOperator(agents[i]);
 
-        (uint256 restakerDepositedAmount, uint256 restakerMintedShares) =
-            _eigenMintAndStakeInStrategy(eigenAb, strategy, eigenOperator, restaker, amount);
-        depositedAmount = restakerDepositedAmount;
-        mintedShares = restakerMintedShares;
+            (uint256 restakerDepositedAmount, uint256 restakerMintedShares) =
+                _eigenMintAndStakeInStrategy(eigenAb, strategy, eigenOperator, restakers[i], amount);
+            depositedAmount = restakerDepositedAmount;
+            mintedShares = restakerMintedShares;
+        }
     }
 
     function _eigenMintAndStakeInStrategy(
@@ -167,21 +171,23 @@ contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
         EigenAddressbook memory eigenAb,
         address admin,
         address eigenAgentManager,
-        address agent,
-        address restaker
+        address[] memory agents,
+        address[] memory restakers
     ) internal {
         vm.startPrank(admin);
-        IEigenAgentManager.AgentConfig memory agentConfig = IEigenAgentManager.AgentConfig({
-            agent: agent,
-            strategy: eigenAb.eigenAddresses.strategy,
-            restaker: restaker,
-            avsMetadata: "",
-            operatorMetadata: "",
-            ltv: 5e26, // 50%
-            liquidationThreshold: 8e26, // 80%
-            delegationRate: 2e25 // 2%
-         });
-        EigenAgentManager(eigenAgentManager).addEigenAgent(agentConfig);
+        for (uint256 i = 0; i < agents.length; i++) {
+            IEigenAgentManager.AgentConfig memory agentConfig = IEigenAgentManager.AgentConfig({
+                agent: agents[i],
+                strategy: eigenAb.eigenAddresses.strategy,
+                restaker: restakers[i],
+                avsMetadata: "",
+                operatorMetadata: "",
+                ltv: 5e26, // 50%
+                liquidationThreshold: 8e26, // 80%
+                delegationRate: 2e25 // 2%
+             });
+            EigenAgentManager(eigenAgentManager).addEigenAgent(agentConfig);
+        }
         vm.stopPrank();
 
         /*

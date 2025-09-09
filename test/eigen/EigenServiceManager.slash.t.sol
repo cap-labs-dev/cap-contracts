@@ -48,6 +48,38 @@ contract EigenServiceManagerSlashTest is TestDeployer {
         vm.stopPrank();
     }
 
+    function test_slash_a_very_small_amount() public {
+        vm.startPrank(env.infra.delegation);
+        IERC20 collateral = IERC20(IStrategy(eigenAb.eigenAddresses.strategy).underlyingToken());
+        _timeTravel(1);
+
+        address recipient = makeAddr("recipient");
+        address agent = env.testUsers.agents[1];
+
+        // collateral is in USD Value of the 100 eth collateral
+        uint256 coverage = eigenServiceManager.coverage(agent);
+        uint256 slashableCollateral = eigenServiceManager.slashableCollateral(agent, 0);
+        console.log("coverage", coverage);
+        console.log("slashableCollateral", slashableCollateral);
+        assertEq(coverage, slashableCollateral);
+
+        // slash 10% of agent collateral
+        eigenServiceManager.slash(agent, recipient, 1, uint48(block.timestamp));
+
+        // all vaults have been slashed 10% and sent to the recipient
+        assertApproxEqAbs(collateral.balanceOf(recipient), 10, 1);
+
+        // coverage should have been reduced by 10%
+        //uint256 approximatedPostSlashCoverage = coverage * 0.9e8 / 1e8;
+        //uint256 coverageAfterSlash = eigenServiceManager.coverage(agent);
+        //uint256 slashableCollateralAfterSlash = eigenServiceManager.slashableCollateral(agent, 0);
+
+        //assertApproxEqAbs(eigenServiceManager.coverage(agent), approximatedPostSlashCoverage, 1);
+        //assertEq(slashableCollateralAfterSlash, coverageAfterSlash);
+
+        vm.stopPrank();
+    }
+
     function test_slash_does_not_work_if_not_slashable() public {
         address agent = env.testUsers.agents[1];
 

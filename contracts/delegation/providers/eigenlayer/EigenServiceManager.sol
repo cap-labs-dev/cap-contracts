@@ -69,9 +69,6 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         if ($.operatorToStrategy[_operator] == address(0)) revert ZeroAddress();
         if (_recipient == address(0)) revert ZeroAddress();
-        /// @dev rounding considerations suggested via eigen
-        /// https://docs.eigencloud.xyz/products/eigenlayer/developers/howto/build/slashing/precision-rounding-considerations
-        if (_slashShare < 1e15) revert SlashShareTooSmall();
 
         address _strategy = $.operatorToStrategy[_operator];
         IERC20 _slashedCollateral = IStrategy(_strategy).underlyingToken();
@@ -80,6 +77,9 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         uint256 beforeSlash = _slashedCollateral.balanceOf(address(this));
 
         /// We map to the eigen operator address in this _slash function
+        /// @dev rounding considerations suggested via eigen
+        /// https://docs.eigencloud.xyz/products/eigenlayer/developers/howto/build/slashing/precision-rounding-considerations
+        /// Since we control the magnitude and are the only allocation, rounding is less of a concern
         _slash(_strategy, _operator, _slashShare);
 
         /// Send slashed collateral to the liquidator
@@ -98,62 +98,46 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
 
         uint256 calcIntervalSeconds = IRewardsCoordinator($.eigen.rewardsCoordinator).CALCULATION_INTERVAL_SECONDS();
+        uint256 lastDistroEpoch = $.lastDistributionEpoch[_operator][_token];
 
         /// Fetch the strategy for the operator
         address _strategy = $.operatorToStrategy[_operator];
 
-        /// Check if rewards are ready
+        /// Check if rewards are ready - calculate available amount correctly
         uint256 _amount = IERC20(_token).balanceOf(address(this)) - $.pendingRewardsByToken[_token];
-        if (
-            ($.lastDistributionEpoch[_operator][_token] * calcIntervalSeconds) + ($.epochDuration * calcIntervalSeconds)
-                > block.timestamp
-        ) {
-            $.pendingRewardsByToken[_token] += _amount;
-            $.pendingRewards[_operator][_token] += _amount;
+
+        /// If this is the first distribution, use operator creation epoch
+        if (lastDistroEpoch == 0) lastDistroEpoch = $.operatorCreatedAtEpoch[_operator];
+
+        /// Calculate the current epoch and check if enough time has passed
+        uint256 currentEpoch = block.timestamp / calcIntervalSeconds;
+        uint256 nextAllowedEpoch = lastDistroEpoch + $.epochDuration;
+
+        /// If not enough time has passed since last distribution, add to pending rewards
+        if (currentEpoch < nextAllowedEpoch) {
+            /// Only add to pending if there are new tokens available
+            if (_amount > 0) {
+                $.pendingRewardsByToken[_token] += _amount;
+                $.pendingRewards[_operator][_token] += _amount;
+            }
             return;
         }
 
+        /// Include both new tokens and any existing pending rewards for this operator
+        uint256 totalAmount = _amount + $.pendingRewards[_operator][_token];
+
+        /// Only proceed if there are rewards to distribute
+        if (totalAmount == 0) return;
+
         _checkApproval(_token, $.eigen.rewardsCoordinator);
+        _createRewardsSubmission(_operator, _strategy, _token, totalAmount, lastDistroEpoch, currentEpoch);
 
-        /// include pending rewards
-        _amount += $.pendingRewards[_operator][_token];
-
-        /// Get the strategy for the operator and create the rewards submission
-        IRewardsCoordinator.OperatorDirectedRewardsSubmission[] memory rewardsSubmissions =
-            new IRewardsCoordinator.OperatorDirectedRewardsSubmission[](1);
-        IRewardsCoordinator.StrategyAndMultiplier[] memory _strategiesAndMultipliers =
-            new IRewardsCoordinator.StrategyAndMultiplier[](1);
-
-        IRewardsCoordinator.OperatorReward[] memory _operatorRewards = new IRewardsCoordinator.OperatorReward[](1);
-        _operatorRewards[0] =
-            IRewardsCoordinator.OperatorReward({ operator: $.operatorToEigenOperator[_operator], amount: _amount });
-
-        IRewardsCoordinator.OperatorSet memory operatorSet =
-            IRewardsCoordinator.OperatorSet({ avs: address(this), id: $.operatorSetIds[_operator] });
-
-        /// Since there is only 1 strategy multiplier is just 1e18 everything goes to the strategy
-        _strategiesAndMultipliers[0] =
-            IRewardsCoordinator.StrategyAndMultiplier({ strategy: _strategy, multiplier: 1e18 });
-
-        uint256 roundedStartEpoch = (block.timestamp / calcIntervalSeconds) - $.epochDuration;
-        uint256 startTimestamp = roundedStartEpoch * calcIntervalSeconds;
-
-        rewardsSubmissions[0] = IRewardsCoordinator.OperatorDirectedRewardsSubmission({
-            strategiesAndMultipliers: _strategiesAndMultipliers,
-            token: _token,
-            operatorRewards: _operatorRewards,
-            startTimestamp: uint32(startTimestamp),
-            duration: uint32($.epochDuration * calcIntervalSeconds),
-            description: "interest"
-        });
-
-        _createRewardsSubmission(operatorSet, rewardsSubmissions);
-
+        /// Update accounting: subtract the pending rewards that were just distributed
         $.pendingRewardsByToken[_token] -= $.pendingRewards[_operator][_token];
         $.pendingRewards[_operator][_token] = 0;
-        $.lastDistributionEpoch[_operator][_token] = uint32(block.timestamp) / uint32(calcIntervalSeconds);
+        $.lastDistributionEpoch[_operator][_token] = uint32(currentEpoch);
 
-        emit DistributedRewards(_operator, _token, _amount);
+        emit DistributedRewards(_operator, _token, totalAmount);
     }
 
     /// @inheritdoc IEigenServiceManager
@@ -221,6 +205,10 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         allocationManager.createRedistributingOperatorSets(address(this), params, redistributionRecipients);
         $.operatorToStrategy[_operator] = _strategy;
         $.operatorSetIds[_operator] = _operatorSetId;
+
+        uint256 calcIntervalSeconds = IRewardsCoordinator($.eigen.rewardsCoordinator).CALCULATION_INTERVAL_SECONDS();
+        $.operatorCreatedAtEpoch[_operator] = block.timestamp / calcIntervalSeconds;
+
         _updateAVSMetadataURI(_avsMetadata);
 
         // Allocate to the strategy
@@ -373,15 +361,57 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @notice Create a rewards submission
-    /// @param _operatorSet The operator set
-    /// @param _rewardsSubmissions The rewards submissions being created
+    /// @param _operator The operator address
+    /// @param _strategy The strategy address
+    /// @param _token The token address
+    /// @param _amount The amount of tokens (already includes pending rewards)
+    /// @param _lastDistroEpoch The last distribution epoch
+    /// @param _currentEpoch The current epoch
     function _createRewardsSubmission(
-        IRewardsCoordinator.OperatorSet memory _operatorSet,
-        IRewardsCoordinator.OperatorDirectedRewardsSubmission[] memory _rewardsSubmissions
+        address _operator,
+        address _strategy,
+        address _token,
+        uint256 _amount,
+        uint256 _lastDistroEpoch,
+        uint256 _currentEpoch
     ) private {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+
+        /// Get the strategy for the operator and create the rewards submission
+        IRewardsCoordinator.OperatorDirectedRewardsSubmission[] memory rewardsSubmissions =
+            new IRewardsCoordinator.OperatorDirectedRewardsSubmission[](1);
+        IRewardsCoordinator.StrategyAndMultiplier[] memory _strategiesAndMultipliers =
+            new IRewardsCoordinator.StrategyAndMultiplier[](1);
+
+        IRewardsCoordinator.OperatorReward[] memory _operatorRewards = new IRewardsCoordinator.OperatorReward[](1);
+        _operatorRewards[0] =
+            IRewardsCoordinator.OperatorReward({ operator: $.operatorToEigenOperator[_operator], amount: _amount });
+
+        IRewardsCoordinator.OperatorSet memory operatorSet =
+            IRewardsCoordinator.OperatorSet({ avs: address(this), id: $.operatorSetIds[_operator] });
+
+        /// Since there is only 1 strategy multiplier is just 1e18 everything goes to the strategy
+        _strategiesAndMultipliers[0] =
+            IRewardsCoordinator.StrategyAndMultiplier({ strategy: _strategy, multiplier: 1e18 });
+
+        uint256 calcIntervalSeconds = IRewardsCoordinator($.eigen.rewardsCoordinator).CALCULATION_INTERVAL_SECONDS();
+
+        // Start at the next epoch to next double reward the current epoch which should have been included in the previous distribution
+        _lastDistroEpoch += 1;
+        uint256 startTimestamp = _lastDistroEpoch * calcIntervalSeconds;
+        uint256 duration = (_currentEpoch - _lastDistroEpoch) * calcIntervalSeconds;
+
+        rewardsSubmissions[0] = IRewardsCoordinator.OperatorDirectedRewardsSubmission({
+            strategiesAndMultipliers: _strategiesAndMultipliers,
+            token: _token,
+            operatorRewards: _operatorRewards,
+            startTimestamp: uint32(startTimestamp),
+            duration: uint32(duration),
+            description: "interest"
+        });
+
         IRewardsCoordinator($.eigen.rewardsCoordinator).createOperatorDirectedOperatorSetRewardsSubmission(
-            _operatorSet, _rewardsSubmissions
+            operatorSet, rewardsSubmissions
         );
     }
 

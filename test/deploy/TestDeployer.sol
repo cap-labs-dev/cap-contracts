@@ -218,20 +218,14 @@ contract TestDeployer is
             _registerNetworkForCapDelegation(env.infra, env.eigen.eigenConfig.eigenServiceManager);
             vm.stopPrank();
             // _agentRegisterAsOperator(eigenAb, env.testUsers.agents[1]);
-            _registerToEigenServiceManager(
-                eigenAb,
-                eigenAdmin,
-                env.eigen.eigenConfig.agentManager,
-                env.testUsers.agents[1],
-                env.testUsers.restakers[1]
-            );
-            _initEigenDelegations(
-                eigenAb,
-                env.eigen.eigenConfig.eigenServiceManager,
-                env.testUsers.agents[1],
-                env.testUsers.restakers[1],
-                10
-            );
+            address[] memory _agents = new address[](2);
+            _agents[0] = env.testUsers.agents[1];
+            _agents[1] = env.testUsers.agents[2];
+            address[] memory _restakers = new address[](2);
+            _restakers[0] = env.testUsers.restakers[1];
+            _restakers[1] = env.testUsers.restakers[2];
+            _registerToEigenServiceManager(eigenAb, eigenAdmin, env.eigen.eigenConfig.agentManager, _agents, _restakers);
+            _initEigenDelegations(eigenAb, env.eigen.eigenConfig.eigenServiceManager, _agents, _restakers, 10);
         }
 
         /// Deploy Symbiotic Network Adapter
