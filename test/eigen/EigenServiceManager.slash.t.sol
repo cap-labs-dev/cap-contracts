@@ -413,8 +413,8 @@ contract EigenServiceManagerSlashTest is TestDeployer {
 
         // Test slashableCollateral view function with different timestamps
         uint256 slashable1 = eigenServiceManager.slashableCollateral(agent, 0);
-        uint256 slashable2 = eigenServiceManager.slashableCollateral(agent, block.timestamp);
-        uint256 slashable3 = eigenServiceManager.slashableCollateral(agent, block.timestamp + 1 days);
+        uint256 slashable2 = eigenServiceManager.slashableCollateral(agent, uint48(block.timestamp));
+        uint256 slashable3 = eigenServiceManager.slashableCollateral(agent, uint48(block.timestamp + 1 days));
 
         // All should return the same value for the same agent
         assertEq(slashable1, slashable2);

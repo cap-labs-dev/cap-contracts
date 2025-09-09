@@ -269,7 +269,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @inheritdoc IEigenServiceManager
-    function slashableCollateral(address _operator, uint256) external view returns (uint256) {
+    function slashableCollateral(address _operator, uint48) external view returns (uint256) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         if ($.operatorToStrategy[_operator] == address(0)) return 0;
         return _slashableCollateralByStrategy(_operator, $.operatorToStrategy[_operator]);
@@ -398,8 +398,10 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
 
         // Start at the next epoch to next double reward the current epoch which should have been included in the previous distribution
         _lastDistroEpoch += 1;
+        uint48 maxDuration = IRewardsCoordinator($.eigen.rewardsCoordinator).MAX_REWARDS_DURATION();
         uint256 startTimestamp = _lastDistroEpoch * calcIntervalSeconds;
         uint256 duration = (_currentEpoch - _lastDistroEpoch) * calcIntervalSeconds;
+        if (duration > maxDuration) duration = maxDuration;
 
         rewardsSubmissions[0] = IRewardsCoordinator.OperatorDirectedRewardsSubmission({
             strategiesAndMultipliers: _strategiesAndMultipliers,

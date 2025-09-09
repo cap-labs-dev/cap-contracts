@@ -116,4 +116,6 @@ interface IRewardsCoordinator {
         OperatorSet calldata operatorSet,
         OperatorDirectedRewardsSubmission[] calldata operatorDirectedRewardsSubmissions
     ) external;
+
+    function MAX_REWARDS_DURATION() external pure returns (uint32);
 }

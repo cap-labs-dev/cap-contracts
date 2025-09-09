@@ -169,7 +169,7 @@ interface IEigenServiceManager {
      * @param timestamp The timestamp to get the slashable collateral for (unused for eigenlayer)
      * @return The slashable collateral of the operator
      */
-    function slashableCollateral(address operator, uint256 timestamp) external view returns (uint256);
+    function slashableCollateral(address operator, uint48 timestamp) external view returns (uint256);
 
     /**
      * @notice Sets the epoch duration

@@ -210,6 +210,7 @@ contract TestDeployer is
             _initEigenAccessControl(env.infra, env.eigen.eigenConfig, eigenAdmin, eigenAb);
             vm.stopPrank();
             vm.startPrank(env.users.delegation_admin);
+            console.log(env.eigen.eigenConfig.eigenServiceManager);
             _registerNetworkForCapDelegation(env.infra, env.eigen.eigenConfig.eigenServiceManager);
             vm.stopPrank();
             // _agentRegisterAsOperator(eigenAb, env.testUsers.agents[1]);
@@ -451,7 +452,11 @@ contract TestDeployer is
     // helpers
 
     function _getRandomAgent() internal view returns (address) {
-        return env.testUsers.agents[0];
+        return _getAgent(0);
+    }
+
+    function _getAgent(uint256 index) internal view returns (address) {
+        return env.testUsers.agents[index];
     }
 
     function _setAssetOraclePrice(address asset, int256 price) internal {

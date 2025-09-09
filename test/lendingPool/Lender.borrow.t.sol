@@ -49,6 +49,29 @@ contract LenderBorrowTest is TestDeployer {
         assertDebtEq(0);
     }
 
+    function test_lender_borrow_and_repay_eigen() public {
+        address eigen_agent = _getAgent(1);
+        vm.startPrank(eigen_agent);
+
+        uint256 backingBefore = usdc.balanceOf(address(cUSD));
+
+        vm.expectRevert(ValidationLogic.MinBorrowAmount.selector);
+        lender.borrow(address(usdc), 99e6, eigen_agent);
+
+        lender.borrow(address(usdc), 1000e6, eigen_agent);
+        assertEq(usdc.balanceOf(eigen_agent), 1000e6);
+
+        // simulate yield
+        usdc.mint(eigen_agent, 1000e6);
+
+        // repay the debt
+        usdc.approve(env.infra.lender, 1000e6 + 10e6);
+        lender.repay(address(usdc), 1000e6, eigen_agent);
+        assertGe(usdc.balanceOf(address(cUSD)), backingBefore);
+
+        assertDebtEq(0);
+    }
+
     function test_lender_borrow_and_repay_with_another_asset() public {
         vm.startPrank(user_agent);
 
@@ -203,6 +226,34 @@ contract LenderBorrowTest is TestDeployer {
         assertEq(unrealizedInterest, 0);
         /// Rewards should not have increased
         assertEq(rewardsBalance, restakerInterestBefore);
+    }
+
+    function test_realize_restaker_interest_eigen() public {
+        address eigen_agent = _getAgent(1);
+        vm.startPrank(eigen_agent);
+
+        lender.borrow(address(usdc), 300e6, eigen_agent);
+        assertEq(usdc.balanceOf(eigen_agent), 300e6);
+
+        _timeTravel(1 days);
+
+        uint256 restakerInterestBefore = lender.accruedRestakerInterest(eigen_agent, address(usdc));
+
+        lender.realizeRestakerInterest(eigen_agent, address(usdc));
+
+        uint256 totalDebt = debtToken.balanceOf(eigen_agent) + restakerInterestBefore;
+
+        usdc.mint(eigen_agent, totalDebt);
+        usdc.approve(address(lender), totalDebt);
+        lender.repay(address(usdc), totalDebt, eigen_agent);
+
+        uint256 restakerInterest = lender.accruedRestakerInterest(eigen_agent, address(usdc));
+        uint256 unrealizedInterest = lender.unrealizedInterest(eigen_agent, address(usdc));
+
+        /// There should be no restaker interest left
+        assertEq(restakerInterest, 0);
+        /// There should be no unrealized interest left
+        assertEq(unrealizedInterest, 0);
     }
 
     function test_borrow_payback_debt_tokens() public {
