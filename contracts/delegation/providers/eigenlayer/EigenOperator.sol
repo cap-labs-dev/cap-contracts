@@ -40,6 +40,8 @@ contract EigenOperator is IEigenOperator, Initializable, EigenOperatorStorageUti
     function registerOperatorSetToServiceManager(uint32 _operatorSetId, address _staker) external {
         EigenOperatorStorage storage $ = getEigenOperatorStorage();
         if (msg.sender != $.serviceManager) revert NotServiceManager();
+        if ($.restaker != address(0)) revert AlreadyRegistered();
+        if (_staker == address(0)) revert ZeroAddress();
 
         /// @dev The digest is calculated using the staker and operator addresses
         bytes32 digest = calculateTotpDigestHash(_staker, address(this));

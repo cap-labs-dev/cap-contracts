@@ -10,6 +10,10 @@ interface IEigenOperator {
     error AlreadyAllocated();
     /// @dev Error thrown when the caller is not the restaker
     error NotRestaker();
+    /// @dev Error thrown when the operator is already registered
+    error AlreadyRegistered();
+    /// @dev Error thrown when the staker is the zero address
+    error ZeroAddress();
 
     /// @dev EigenOperator storage
     /// @param serviceManager EigenServiceManager address
