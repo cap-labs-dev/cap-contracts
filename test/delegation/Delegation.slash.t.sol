@@ -26,7 +26,7 @@ contract DelegationSlashTest is TestDeployer {
     function test_delegation_view_functions() public view {
         assertEq(delegation.epochDuration(), 1 days);
         assertEq(delegation.epoch(), block.timestamp / 1 days);
-        assertEq(delegation.agents().length, 1);
+        assertEq(delegation.agents().length, 3);
         assertEq(delegation.slashableCollateral(user_agent), 780000e8);
     }
 
