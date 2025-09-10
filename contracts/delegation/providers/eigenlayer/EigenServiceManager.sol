@@ -458,7 +458,6 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         view
         returns (uint256 collateralValue, uint256 collateral)
     {
-        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         address collateralAddress = address(IStrategy(_strategy).underlyingToken());
         uint8 decimals = IERC20Metadata(collateralAddress).decimals();
         (uint256 collateralPrice,) = IOracle(_oracle).getPrice(collateralAddress);

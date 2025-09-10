@@ -63,14 +63,14 @@ interface IEigenServiceManager {
 
     /// @dev Cached operator data
     /// @param eigenOperator Eigen operator address
-    /// @param createdAtEpoch Epoch at which the operator was created
     /// @param strategy Strategy address
+    /// @param createdAtEpoch Epoch at which the operator was created
     /// @param operatorSetId Operator set id
     /// @param pendingRewards Pending rewards
     struct CachedOperatorData {
         address eigenOperator;
-        uint32 createdAtEpoch;
         address strategy;
+        uint32 createdAtEpoch;
         uint32 operatorSetId;
         mapping(address => uint256) pendingRewards;
         mapping(address => uint32) lastDistributionEpoch;
