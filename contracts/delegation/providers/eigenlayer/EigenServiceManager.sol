@@ -441,7 +441,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         uint8 decimals = IERC20Metadata(collateralAddress).decimals();
         (uint256 collateralPrice,) = IOracle($.oracle).getPrice(collateralAddress);
 
-        uint256 collateral = _getSlashableShares(_operator);
+        uint256 collateral = _getSlashableStake(_operator);
         uint256 collateralValue = collateral * collateralPrice / (10 ** decimals);
 
         return collateralValue;
@@ -467,32 +467,34 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         collateralValue = collateral * collateralPrice / (10 ** decimals);
     }
 
-    /// @notice Get the slashable shares for a given operator and strategy
+    /// @notice Get the slashable stake for a given operator and strategy
     /// @param _operator The operator address
-    /// @return The slashable shares of the operator
-    function _getSlashableShares(address _operator) private view returns (uint256) {
+    /// @return The slashable stake of the operator
+    function _getSlashableStake(address _operator) private view returns (uint256) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         CachedOperatorData storage operatorData = $.operators[_operator];
 
         address _strategy = operatorData.strategy;
-        // Get the slashable shares for the operator/OperatorSet
-        uint256 slashableShares = _minimumSlashableStake(_operator, _strategy);
-        // Get the shares in queue
-        uint256 sharesInQueue = _slashableSharesInQueue(operatorData.eigenOperator, _strategy);
-        // Sum up the slashable shares and the shares in queue
-        uint256 totalSlashableShares = slashableShares + sharesInQueue;
+        // Get the slashable stake for the operator/OperatorSet
+        uint256 slashableStake = _minimumSlashableStake(_operator, _strategy);
+        // Get the stake in queue
+        uint256 stakeInQueue = _slashableStakeInQueue(operatorData.eigenOperator, _strategy);
+        // Sum up the slashable stake and the stake in queue
+        uint256 totalSlashableStake = slashableStake + stakeInQueue;
 
-        return totalSlashableShares;
+        return totalSlashableStake;
     }
 
-    /// @notice Get the slashable shares in queue for withdrawal from a given operator and strategy
+    /// @notice Get the slashable stake in queue for withdrawal from a given operator and strategy
     /// @param _operator The operator address
     /// @param _strategy The strategy address
-    /// @return The slashable shares in queue for withdrawal
-    function _slashableSharesInQueue(address _operator, address _strategy) private view returns (uint256) {
+    /// @return The slashable stake in queue for withdrawal
+    function _slashableStakeInQueue(address _operator, address _strategy) private view returns (uint256) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        // @dev get the slashable shares in queue which are waiting to be withdrawn
-        return IDelegationManager($.eigen.delegationManager).getSlashableSharesInQueue(_operator, _strategy);
+        // @dev get the slashable stake in queue which are waiting to be withdrawn
+        return IStrategy(_strategy).sharesToUnderlyingView(
+            IDelegationManager($.eigen.delegationManager).getSlashableSharesInQueue(_operator, _strategy)
+        );
     }
 
     /// @notice Get the minimum slashable stake for a given operator and strategy
@@ -513,7 +515,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         uint256[][] memory slashableShares = IAllocationManager($.eigen.allocationManager).getMinimumSlashableStake(
             operatorSet, operators, strategies, uint32(block.number)
         );
-        return slashableShares[0][0];
+        return IStrategy(_strategy).sharesToUnderlyingView(slashableShares[0][0]);
     }
 
     /// @inheritdoc UUPSUpgradeable

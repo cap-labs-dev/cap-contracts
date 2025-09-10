@@ -264,9 +264,6 @@ contract LenderLiquidateTest is TestDeployer {
             );
         }
 
-        // change eth oracle price
-        _setAssetOraclePrice(address(weth), 1000e8);
-
         // anyone can liquidate the debt
         {
             vm.startPrank(env.testUsers.liquidator);
@@ -316,7 +313,10 @@ contract LenderLiquidateTest is TestDeployer {
             console.log("Debt prior to liquidation", totalDebt);
 
             console.log("Liquidator usdt balance after first liquidation", usdt.balanceOf(env.testUsers.liquidator));
-            console.log("Liquidator weth balance after first liquidation", weth.balanceOf(env.testUsers.liquidator));
+            console.log(
+                "Liquidator collateral balance after first liquidation",
+                collateralToken.balanceOf(env.testUsers.liquidator)
+            );
             console.log("Liquidator usdc balance after first liquidation", usdc.balanceOf(env.testUsers.liquidator));
             console.log("User debt tokens after first liquidation", debtToken.balanceOf(user_agent));
             console.log("");
@@ -326,7 +326,10 @@ contract LenderLiquidateTest is TestDeployer {
             lender.liquidate(user_agent, address(usdc), 1000e6, 0);
 
             console.log("Liquidator usdt balance after second liquidation", usdt.balanceOf(env.testUsers.liquidator));
-            console.log("Liquidator weth balance after second liquidation", weth.balanceOf(env.testUsers.liquidator));
+            console.log(
+                "Liquidator collateral balance after second liquidation",
+                collateralToken.balanceOf(env.testUsers.liquidator)
+            );
             console.log("Liquidator usdc balance after second liquidation", usdc.balanceOf(env.testUsers.liquidator));
             console.log("User debt tokens after second liquidation", debtToken.balanceOf(user_agent));
             console.log("");
@@ -335,7 +338,10 @@ contract LenderLiquidateTest is TestDeployer {
             lender.liquidate(user_agent, address(usdc), debtToken.balanceOf(user_agent), 0);
 
             console.log("Liquidator usdt balance after third liquidation", usdt.balanceOf(env.testUsers.liquidator));
-            console.log("Liquidator weth balance after third liquidation", weth.balanceOf(env.testUsers.liquidator));
+            console.log(
+                "Liquidator collateral balance after third liquidation",
+                collateralToken.balanceOf(env.testUsers.liquidator)
+            );
             console.log("");
             console.log("Liquidator usdc balance after third liquidation", usdc.balanceOf(env.testUsers.liquidator));
             console.log("User debt tokens after third liquidation", debtToken.balanceOf(user_agent));

@@ -44,7 +44,10 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         uint256 networkSlashableCollateral =
             ISymbioticNetworkMiddleware(network).slashableCollateral(_agent, _slashTimestamp);
         if (networkSlashableCollateral == 0) revert NoSlashableCollateral();
-        uint256 slashShare = _amount * 1e18 / networkSlashableCollateral;
+
+        // We should round this to an 8 decimal share then convert to 18 decimals
+        uint256 roundedValue = (_amount * 1e8) / networkSlashableCollateral;
+        uint256 slashShare = (roundedValue * 1e18) / 1e8;
         if (slashShare > 1e18) slashShare = 1e18;
 
         ISymbioticNetworkMiddleware(network).slash(_agent, _liquidator, slashShare, _slashTimestamp);

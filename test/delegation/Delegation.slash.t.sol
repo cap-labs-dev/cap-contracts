@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { IStrategy } from "../../contracts/delegation/providers/eigenlayer/interfaces/IStrategy.sol";
 import { IDelegation } from "../../contracts/interfaces/IDelegation.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import { console } from "forge-std/console.sol";
 
@@ -48,6 +50,35 @@ contract DelegationSlashTest is TestDeployer {
         _timeTravel(30 days);
 
         vm.expectRevert(IDelegation.NoSlashableCollateral.selector);
+        delegation.slash(user_agent, liquidator, 78000e8);
+
+        vm.stopPrank();
+    }
+
+    function test_slash_delegation_eigen() public {
+        vm.startPrank(env.infra.lender);
+
+        // Eigen agent
+        user_agent = _getAgent(1);
+        IERC20 collateralToken = IERC20(IStrategy(eigenAb.eigenAddresses.strategy).underlyingToken());
+
+        address liquidator = makeAddr("liquidator");
+
+        /// USD Value of 100 eth of delegation
+        delegation.slash(user_agent, liquidator, 7800e8);
+
+        // Since WETH is worth $2600 we expect 0.1 ETH
+        assertApproxEqAbs(collateralToken.balanceOf(liquidator), 3e18, 1);
+
+        _proportionallyWithdrawFromStrategy(
+            eigenAb, env.testUsers.restakers[1], eigenAb.eigenAddresses.strategy, 100, true
+        );
+
+        vm.startPrank(env.infra.lender);
+
+        _timeTravel(30 days);
+
+        vm.expectRevert();
         delegation.slash(user_agent, liquidator, 78000e8);
 
         vm.stopPrank();
