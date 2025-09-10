@@ -31,7 +31,9 @@ interface IEigenServiceManager {
     error SlashShareTooSmall();
 
     /// @dev Operator registered
-    event OperatorRegistered(address indexed operator, address indexed avs, uint32 operatorSetId);
+    event OperatorRegistered(
+        address indexed operator, address indexed eigenOperator, address indexed avs, uint32 operatorSetId
+    );
     /// @dev Emitted on slash
     event Slash(address indexed agent, address indexed recipient, uint256 slashShare, uint48 timestamp);
     /// @dev Strategy registered
@@ -129,7 +131,7 @@ interface IEigenServiceManager {
     function coverage(address operator) external view returns (uint256);
 
     /**
-     * @notice Registers an operator to the AVS
+     * @notice Registers an operator to the AVS, called by the Allocation Manager contract (access control set for the allocation manager).
      * @param _operator The operator to register
      * @param _avs The AVS to register the operator to
      * @param _operatorSetIds The operator set ids to register the operator to
@@ -165,7 +167,7 @@ interface IEigenServiceManager {
     function slash(address _operator, address _recipient, uint256 _slashShare, uint48 _timestamp) external;
 
     /**
-     * @notice Allocates the operator set, is public and can be called permissionless.
+     * @notice Allocates the operator set, is public and can be called permissionless. We would have allocated on registerStrategy but it needs to wait at least a block.
      * @param _operator Operator address
      */
     function allocate(address _operator) external;

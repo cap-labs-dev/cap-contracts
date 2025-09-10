@@ -5,7 +5,7 @@ import { Access } from "../../../access/Access.sol";
 import { IEigenServiceManager } from "../../../interfaces/IEigenServiceManager.sol";
 import { IOracle } from "../../../interfaces/IOracle.sol";
 import { EigenServiceManagerStorageUtils } from "../../../storage/EigenServiceManagerStorageUtils.sol";
-import { EigenOperator } from "./EigenOperator.sol";
+import { EigenOperator, IEigenOperator } from "./EigenOperator.sol";
 import { IAllocationManager } from "./interfaces/IAllocationManager.sol";
 import { IDelegationManager } from "./interfaces/IDelegationManager.sol";
 import { IRewardsCoordinator } from "./interfaces/IRewardsCoordinator.sol";
@@ -71,6 +71,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         CachedOperatorData storage operatorData = $.operators[_operator];
         if (operatorData.strategy == address(0)) revert ZeroAddress();
         if (_recipient == address(0)) revert ZeroAddress();
+        if (_slashShare == 0) revert ZeroSlash();
 
         address _strategy = operatorData.strategy;
         IERC20 _slashedCollateral = IStrategy(_strategy).underlyingToken();
@@ -101,7 +102,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         CachedOperatorData storage operatorData = $.operators[_operator];
 
         uint256 calcIntervalSeconds = IRewardsCoordinator($.eigen.rewardsCoordinator).CALCULATION_INTERVAL_SECONDS();
-        uint256 lastDistroEpoch = operatorData.lastDistributionEpoch[_token];
+        uint32 lastDistroEpoch = operatorData.lastDistributionEpoch[_token];
 
         /// Fetch the strategy for the operator
         address _strategy = operatorData.strategy;
@@ -113,8 +114,8 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         if (lastDistroEpoch == 0) lastDistroEpoch = operatorData.createdAtEpoch;
 
         /// Calculate the current epoch and check if enough time has passed
-        uint256 currentEpoch = block.timestamp / calcIntervalSeconds;
-        uint256 nextAllowedEpoch = lastDistroEpoch + $.epochDuration;
+        uint32 currentEpoch = uint32(block.timestamp / calcIntervalSeconds);
+        uint32 nextAllowedEpoch = lastDistroEpoch + $.epochDuration;
 
         /// If not enough time has passed since last distribution, add to pending rewards
         if (currentEpoch < nextAllowedEpoch) {
@@ -138,35 +139,28 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         /// Update accounting: subtract the pending rewards that were just distributed
         $.pendingRewardsByToken[_token] -= operatorData.pendingRewards[_token];
         operatorData.pendingRewards[_token] = 0;
-        operatorData.lastDistributionEpoch[_token] = uint32(currentEpoch);
+        operatorData.lastDistributionEpoch[_token] = currentEpoch;
 
         emit DistributedRewards(_operator, _token, totalAmount);
     }
 
     /// @inheritdoc IEigenServiceManager
-    function registerOperator(address _operator, address _avs, uint32[] calldata _operatorSetIds, bytes calldata)
+    function registerOperator(address _eigenOperator, address _avs, uint32[] calldata _operatorSetIds, bytes calldata)
         external
         checkAccess(this.registerOperator.selector)
     {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        CachedOperatorData storage operatorData = $.operators[_operator];
         if (_avs != address(this)) revert InvalidAVS();
         if (_operatorSetIds.length != 1) revert InvalidOperatorSetIds();
-
-        /// Avoid precision errors
-        if (
-            IAllocationManager($.eigen.allocationManager).getAllocatableMagnitude(_operator, operatorData.strategy)
-                < 1e9
-        ) revert MinMagnitudeNotMet();
 
         IAllocationManager allocationManager = IAllocationManager($.eigen.allocationManager);
         IAllocationManager.OperatorSet memory operatorSet =
             IAllocationManager.OperatorSet({ avs: _avs, id: _operatorSetIds[0] });
+
         address redistributionRecipient = allocationManager.getRedistributionRecipient(operatorSet);
         if (redistributionRecipient != address(this)) revert InvalidRedistributionRecipient();
-        operatorData.operatorSetId = _operatorSetIds[0];
 
-        emit OperatorRegistered(_operator, _avs, _operatorSetIds[0]);
+        emit OperatorRegistered(IEigenOperator(_eigenOperator).operator(), _eigenOperator, _avs, _operatorSetIds[0]);
     }
 
     /// @inheritdoc IEigenServiceManager
@@ -209,11 +203,13 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         uint256 calcIntervalSeconds = IRewardsCoordinator($.eigen.rewardsCoordinator).CALCULATION_INTERVAL_SECONDS();
         operatorData.createdAtEpoch = uint32(block.timestamp / calcIntervalSeconds);
 
+        // This needs to be updated with the proper operators on it
         _updateAVSMetadataURI(_avsMetadata);
 
-        // Allocate to the strategy
+        // Callback the operator beacon and register to the operator set
         EigenOperator(eigenOperator).registerOperatorSetToServiceManager(_operatorSetId, _restaker);
 
+        // Increment the next operator id for the next operator set
         $.nextOperatorId++;
         emit StrategyRegistered(_strategy, _operator);
     }
@@ -230,6 +226,8 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     function allocate(address _operator) external {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         CachedOperatorData storage operatorData = $.operators[_operator];
+        if (operatorData.eigenOperator == address(0)) revert ZeroAddress();
+
         EigenOperator(operatorData.eigenOperator).allocate(operatorData.operatorSetId, operatorData.strategy);
     }
 
@@ -239,6 +237,8 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         checkAccess(this.upgradeEigenOperatorImplementation.selector)
     {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        if (_newImplementation == address(0)) revert ZeroAddress();
+
         UpgradeableBeacon beacon = UpgradeableBeacon($.eigenOperatorInstance);
         beacon.upgradeTo(_newImplementation);
     }
@@ -253,6 +253,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         address[] memory strategies = new address[](1);
         strategies[0] = _strategy;
 
+        /// Reject small shares for coverage because of rounding concerns
         uint256[] memory operatorShares =
             IDelegationManager($.eigen.delegationManager).getOperatorShares(operatorData.eigenOperator, strategies);
         if (operatorShares[0] < 1e9) return 0;
@@ -318,6 +319,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
 
+        // Best practice initialize on deployment
         bytes memory initdata =
             abi.encodeWithSelector(EigenOperator.initialize.selector, address(this), _operator, _operatorMetadata);
         _eigenOperator = address(new BeaconProxy($.eigenOperatorInstance, initdata));
