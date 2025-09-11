@@ -80,10 +80,19 @@ interface IMinter {
     /// @dev Invalid optimal ratio
     error InvalidOptimalRatio();
 
+    /// @notice Get the fee data for an asset
+    /// @param _asset Asset address
+    /// @return feeData Fee data for the asset
+    function getFeeData(address _asset) external view returns (FeeData memory feeData);
+
     /// @notice Set the allocation slopes and ratios for an asset
     /// @param _asset Asset address
     /// @param _feeData Fee slopes and ratios for the asset in the vault
     function setFeeData(address _asset, FeeData calldata _feeData) external;
+
+    /// @notice Get the redeem fee
+    /// @return redeemFee Redeem fee amount
+    function getRedeemFee() external view returns (uint256 redeemFee);
 
     /// @notice Set the redeem fee
     /// @param _redeemFee Redeem fee amount

@@ -15,6 +15,11 @@ import { MinterLogic } from "./libraries/MinterLogic.sol";
 /// slope. Redeem can be used to avoid these fees by burning for the current ratio of assets.
 abstract contract Minter is IMinter, Access, MinterStorageUtils {
     /// @inheritdoc IMinter
+    function getFeeData(address _asset) external view returns (FeeData memory feeData) {
+        feeData = getMinterStorage().fees[_asset];
+    }
+
+    /// @inheritdoc IMinter
     function setFeeData(address _asset, FeeData calldata _feeData) external checkAccess(this.setFeeData.selector) {
         if (_feeData.minMintFee >= 0.05e27) revert InvalidMinMintFee();
         if (_feeData.mintKinkRatio >= 1e27 || _feeData.mintKinkRatio == 0) revert InvalidMintKinkRatio();
@@ -25,6 +30,11 @@ abstract contract Minter is IMinter, Access, MinterStorageUtils {
         }
         getMinterStorage().fees[_asset] = _feeData;
         emit SetFeeData(_asset, _feeData);
+    }
+
+    /// @inheritdoc IMinter
+    function getRedeemFee() external view returns (uint256 redeemFee) {
+        redeemFee = getMinterStorage().redeemFee;
     }
 
     /// @inheritdoc IMinter
