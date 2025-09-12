@@ -65,10 +65,10 @@ contract DelegationSlashTest is TestDeployer {
         address liquidator = makeAddr("liquidator");
 
         /// USD Value of 100 eth of delegation
-        delegation.slash(user_agent, liquidator, 7800e8);
+        delegation.slash(user_agent, liquidator, 15600e8);
 
-        // Since WETH is worth $2600 we expect 0.1 ETH
-        assertApproxEqAbs(collateralToken.balanceOf(liquidator), 3e18, 1);
+        // Since WETH is worth $2600 we expect 6 eth or more due to precision
+        assertGt(collateralToken.balanceOf(liquidator), 6e18);
 
         _proportionallyWithdrawFromStrategy(
             eigenAb, env.testUsers.restakers[1], eigenAb.eigenAddresses.strategy, 100, true

@@ -145,17 +145,12 @@ interface IEigenServiceManager {
      * @param _strategy The strategy to register
      * @param _operator The operator to register the strategy to
      * @param _restaker The restaker to register the strategy to
-     * @param _metadata The metadata for the strategy
-     * @param _avsMetadata The metadata for the AVS
+     * @param _operatorMetadata The metadata for the operator
      * @return _operatorSetId The operator set id
      */
-    function registerStrategy(
-        address _strategy,
-        address _operator,
-        address _restaker,
-        string memory _metadata,
-        string memory _avsMetadata
-    ) external returns (uint32 _operatorSetId);
+    function registerStrategy(address _strategy, address _operator, address _restaker, string memory _operatorMetadata)
+        external
+        returns (uint32 _operatorSetId);
 
     /**
      * @notice Slashes an operator
@@ -185,6 +180,12 @@ interface IEigenServiceManager {
      * @param _epochDuration The epoch duration
      */
     function setEpochDuration(uint32 _epochDuration) external;
+
+    /**
+     * @notice Updates the AVS metadata URI
+     * @param _metadataURI The new metadata URI
+     */
+    function updateAVSMetadataURI(string calldata _metadataURI) external;
 
     /**
      * @notice Upgrades the eigen operator implementation

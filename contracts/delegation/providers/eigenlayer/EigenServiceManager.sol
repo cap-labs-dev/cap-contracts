@@ -49,15 +49,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         $.eigenOperatorInstance = address(beacon);
 
         // Starting metadata for the avs, can be updated later and should be updated when adding new operators
-        string memory metadata = string(
-            abi.encodePacked(
-                '{"name": "cap",',
-                '"website": "https://cap.app/",',
-                '"description": "Stablecoin protocol with credible financial guarantees",',
-                '"logo": "https://cap.app/media-kit/cap_b_y_882%C3%97848.png",',
-                '"twitter": "https://x.com/capmoney_"}'
-            )
-        );
+        string memory metadata = "https://cap.app/meta/eigen-avs.json";
 
         _updateAVSMetadataURI(metadata);
     }
@@ -164,13 +156,11 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @inheritdoc IEigenServiceManager
-    function registerStrategy(
-        address _strategy,
-        address _operator,
-        address _restaker,
-        string memory _avsMetadata,
-        string memory _operatorMetadata
-    ) external checkAccess(this.registerStrategy.selector) returns (uint32 _operatorSetId) {
+    function registerStrategy(address _strategy, address _operator, address _restaker, string memory _operatorMetadata)
+        external
+        checkAccess(this.registerStrategy.selector)
+        returns (uint32 _operatorSetId)
+    {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         CachedOperatorData storage operatorData = $.operators[_operator];
 
@@ -203,15 +193,20 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         uint256 calcIntervalSeconds = IRewardsCoordinator($.eigen.rewardsCoordinator).CALCULATION_INTERVAL_SECONDS();
         operatorData.createdAtEpoch = uint32(block.timestamp / calcIntervalSeconds);
 
-        // This needs to be updated with the proper operators on it
-        _updateAVSMetadataURI(_avsMetadata);
-
         // Callback the operator beacon and register to the operator set
         EigenOperator(eigenOperator).registerOperatorSetToServiceManager(_operatorSetId, _restaker);
 
         // Increment the next operator id for the next operator set
         $.nextOperatorId++;
         emit StrategyRegistered(_strategy, _operator);
+    }
+
+    /// @inheritdoc IEigenServiceManager
+    function updateAVSMetadataURI(string calldata _metadataURI)
+        external
+        checkAccess(this.updateAVSMetadataURI.selector)
+    {
+        _updateAVSMetadataURI(_metadataURI);
     }
 
     /// @inheritdoc IEigenServiceManager
@@ -341,6 +336,9 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         CachedOperatorData storage operatorData = $.operators[_operator];
         address[] memory strategies = new address[](1);
         strategies[0] = _strategy;
+
+        _slashShare += 1;
+        _slashShare = _slashShare > 1e18 ? 1e18 : _slashShare;
 
         // @dev wads are a percentage of collateral in 1e18
         uint256[] memory wadsToSlash = new uint256[](1);

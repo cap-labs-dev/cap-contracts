@@ -51,11 +51,7 @@ contract EigenAgentManager is IEigenAgentManager, UUPSUpgradeable, Access, Eigen
 
         /// 2. Add the agent to the network
         IEigenServiceManager($.serviceManager).registerStrategy(
-            _agentConfig.strategy,
-            _agentConfig.agent,
-            _agentConfig.restaker,
-            _agentConfig.avsMetadata,
-            _agentConfig.operatorMetadata
+            _agentConfig.strategy, _agentConfig.agent, _agentConfig.restaker, _agentConfig.operatorMetadata
         );
 
         /// 3. Add the agent to the rate oracle
