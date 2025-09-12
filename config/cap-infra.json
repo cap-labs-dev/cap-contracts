@@ -2,7 +2,7 @@
     "1": {
         "implems": {
             "accessControl": "0x6681EB184c876D74eA3ddFaE0eCEE0C9C0f84bc1",
-            "capToken": "0x589e7EA76ABc1ff9b809bCaacE3D32328eb993f6",
+            "capToken": "0xE5009c352B0EbA16CcD990084B81E03E0c6D05f5",
             "debtToken": "0xaF2084df1Ff172b1D39a94680c9b8bd42b55E20C",
             "delegation": "0x386C93f9f0A8a681c5A3E826063106A2474958ab",
             "feeAuction": "0x57e1E8e5576c5CFbBB0000Ef3f1aF24E3a452074",
