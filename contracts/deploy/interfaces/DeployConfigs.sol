@@ -53,6 +53,12 @@ struct UsersConfig {
     address middleware_admin;
     address staker_rewards_admin;
     address insurance_fund;
+    address strategy_admin;
+}
+
+struct EigenAddresses {
+    address eigenServiceManager;
+    address agentManager;
 }
 
 struct VaultConfig {
