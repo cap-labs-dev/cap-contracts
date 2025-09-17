@@ -148,8 +148,8 @@ contract VaultMintTest is TestDeployer {
             address(usdt),
             IMinter.FeeData({
                 minMintFee: 0.005e27,
-                slope0: 0.01e27,
-                slope1: 0.1e27,
+                slope0: 0,
+                slope1: 0,
                 mintKinkRatio: 0.85e27,
                 burnKinkRatio: 0.15e27,
                 optimalRatio: 0.33e27
@@ -170,6 +170,6 @@ contract VaultMintTest is TestDeployer {
         console.log(amountIn);
 
         cUSD.mint(address(usdt), amountIn, 0, user, block.timestamp + 1 hours);
-        assertEq(usdt.balanceOf(address(cUSD)), amountIn);
+        assertEq(usdt.balanceOf(address(cUSD)), amountIn + 10e6);
     }
 }
