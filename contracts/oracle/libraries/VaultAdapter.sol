@@ -50,6 +50,26 @@ contract VaultAdapter is IVaultAdapter, UUPSUpgradeable, Access, VaultAdapterSto
     }
 
     /// @inheritdoc IVaultAdapter
+    function slopes(address _asset) external view returns (SlopeData memory) {
+        return getVaultAdapterStorage().slopeData[_asset];
+    }
+
+    /// @inheritdoc IVaultAdapter
+    function maxMultiplier() external view returns (uint256) {
+        return getVaultAdapterStorage().maxMultiplier;
+    }
+
+    /// @inheritdoc IVaultAdapter
+    function minMultiplier() external view returns (uint256) {
+        return getVaultAdapterStorage().minMultiplier;
+    }
+
+    /// @inheritdoc IVaultAdapter
+    function multiplierRate() external view returns (uint256) {
+        return getVaultAdapterStorage().rate;
+    }
+
+    /// @inheritdoc IVaultAdapter
     function setSlopes(address _asset, SlopeData memory _slopes) external checkAccess(this.setSlopes.selector) {
         if (_slopes.kink >= 1e27 || _slopes.kink == 0) revert InvalidKink();
         getVaultAdapterStorage().slopeData[_asset] = _slopes;
@@ -82,26 +102,26 @@ contract VaultAdapter is IVaultAdapter, UUPSUpgradeable, Access, VaultAdapterSto
     {
         VaultAdapterStorage storage $ = getVaultAdapterStorage();
         UtilizationData storage utilizationData = $.utilizationData[_vault][_asset];
-        SlopeData memory slopes = $.slopeData[_asset];
-        if (_utilization > slopes.kink) {
-            uint256 excess = _utilization - slopes.kink;
+        SlopeData memory _slopes = $.slopeData[_asset];
+        if (_utilization > _slopes.kink) {
+            uint256 excess = _utilization - _slopes.kink;
             utilizationData.multiplier = utilizationData.multiplier
-                * (1e27 + (1e27 * excess / (1e27 - slopes.kink)) * _elapsed * $.rate / 1e27) / 1e27;
+                * (1e27 + (1e27 * excess / (1e27 - _slopes.kink)) * _elapsed * $.rate / 1e27) / 1e27;
 
             if (utilizationData.multiplier > $.maxMultiplier) {
                 utilizationData.multiplier = $.maxMultiplier;
             }
 
-            interestRate = (slopes.slope0 + (slopes.slope1 * excess / 1e27)) * utilizationData.multiplier / 1e27;
+            interestRate = (_slopes.slope0 + (_slopes.slope1 * excess / 1e27)) * utilizationData.multiplier / 1e27;
         } else {
             utilizationData.multiplier = utilizationData.multiplier * 1e27
-                / (1e27 + (1e27 * (slopes.kink - _utilization) / slopes.kink) * _elapsed * $.rate / 1e27);
+                / (1e27 + (1e27 * (_slopes.kink - _utilization) / _slopes.kink) * _elapsed * $.rate / 1e27);
 
             if (utilizationData.multiplier < $.minMultiplier) {
                 utilizationData.multiplier = $.minMultiplier;
             }
 
-            interestRate = (slopes.slope0 * _utilization / slopes.kink) * utilizationData.multiplier / 1e27;
+            interestRate = (_slopes.slope0 * _utilization / _slopes.kink) * utilizationData.multiplier / 1e27;
         }
     }
 

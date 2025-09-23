@@ -63,6 +63,23 @@ interface IVaultAdapter {
     /// @return latestAnswer Borrow rate
     function rate(address _vault, address _asset) external returns (uint256 latestAnswer);
 
+    /// @notice Fetch slopes for an asset
+    /// @param _asset Asset to fetch slopes for
+    /// @return slopes Slope data
+    function slopes(address _asset) external view returns (SlopeData memory slopes);
+
+    /// @notice Fetch maximum multiplier
+    /// @return maxMultiplier Maximum multiplier
+    function maxMultiplier() external view returns (uint256 maxMultiplier);
+
+    /// @notice Fetch minimum multiplier
+    /// @return minMultiplier Minimum multiplier
+    function minMultiplier() external view returns (uint256 minMultiplier);
+
+    /// @notice Fetch the rate at which the multiplier shifts
+    /// @return multiplierRate Multiplier rate
+    function multiplierRate() external view returns (uint256 multiplierRate);
+
     /// @notice Set utilization slopes for an asset
     /// @param _asset Asset address
     /// @param _slopes Slope data
