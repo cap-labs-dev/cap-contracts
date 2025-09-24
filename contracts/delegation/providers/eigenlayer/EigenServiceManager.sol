@@ -191,7 +191,8 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         operatorData.operatorSetId = _operatorSetId;
 
         uint256 calcIntervalSeconds = IRewardsCoordinator($.eigen.rewardsCoordinator).CALCULATION_INTERVAL_SECONDS();
-        operatorData.createdAtEpoch = uint32(block.timestamp / calcIntervalSeconds);
+        uint256 activationDelay = IRewardsCoordinator($.eigen.rewardsCoordinator).activationDelay();
+        operatorData.createdAtEpoch = uint32((block.timestamp + activationDelay) / calcIntervalSeconds);
 
         // Callback the operator beacon and register to the operator set
         EigenOperator(eigenOperator).registerOperatorSetToServiceManager(_operatorSetId, _restaker);
