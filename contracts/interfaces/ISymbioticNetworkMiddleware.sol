@@ -181,4 +181,9 @@ interface ISymbioticNetworkMiddleware {
     /// @param _agent Agent address
     /// @return vault Vault address
     function vaults(address _agent) external view returns (address vault);
+
+    /// @notice Collateral address of an agent
+    /// @param _agent Agent address
+    /// @return collateral Collateral address
+    function collateralAddress(address _agent) external view returns (address collateral);
 }

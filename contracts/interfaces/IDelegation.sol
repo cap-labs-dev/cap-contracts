@@ -205,4 +205,9 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @notice Get the fee recipient
     /// @return recipient Fee recipient
     function feeRecipient() external view returns (address recipient);
+
+    /// @notice Get the collateral address of an agent
+    /// @param _agent Agent address
+    /// @return collateral Collateral address
+    function collateralAddress(address _agent) external view returns (address collateral);
 }

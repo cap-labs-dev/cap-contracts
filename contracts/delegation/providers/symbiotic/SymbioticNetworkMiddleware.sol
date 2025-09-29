@@ -235,9 +235,9 @@ contract SymbioticNetworkMiddleware is
             return (IBurnerRouter(address(0)), 0, 0);
         }
 
-        address collateralAddress = IVault(_vault).collateral();
-        decimals = IERC20Metadata(collateralAddress).decimals();
-        (collateralPrice,) = IOracle(_oracle).getPrice(collateralAddress);
+        address collateral = IVault(_vault).collateral();
+        decimals = IERC20Metadata(collateral).decimals();
+        (collateralPrice,) = IOracle(_oracle).getPrice(collateral);
     }
 
     /// @dev Verify a vault has the required specifications
@@ -271,6 +271,15 @@ contract SymbioticNetworkMiddleware is
         if (delegatorType != uint64(ISymbioticNetworkMiddleware.DelegatorType.OPERATOR_NETWORK_SPECIFIC)) {
             revert InvalidDelegator();
         }
+    }
+
+    /// @notice Get the collateral address of an agent
+    /// @param _agent Agent address
+    /// @return collateral The collateral address of the agent
+    function collateralAddress(address _agent) external view returns (address) {
+        SymbioticNetworkMiddlewareStorage storage $ = getSymbioticNetworkMiddlewareStorage();
+        if ($.agentsToVault[_agent] == address(0)) return address(0);
+        else return IVault($.agentsToVault[_agent]).collateral();
     }
 
     /// @inheritdoc UUPSUpgradeable

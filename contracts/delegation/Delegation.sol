@@ -224,6 +224,14 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         return getDelegationStorage().feeRecipient;
     }
 
+    /// @inheritdoc IDelegation
+    function collateralAddress(address _agent) external view returns (address) {
+        DelegationStorage storage $ = getDelegationStorage();
+        address network = $.agentData[_agent].network;
+        if (network == address(0)) return address(0);
+        else return ISymbioticNetworkMiddleware(network).collateralAddress(_agent);
+    }
+
     /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }
 }
