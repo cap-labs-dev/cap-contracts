@@ -28,7 +28,7 @@ library FractionalReserveLogic {
     event FractionalReserveReserveUpdated(address indexed asset, uint256 reserve);
 
     /// @dev Fractional reserve interest realized event
-    event FractionalReserveInterestRealized(address indexed asset);
+    event FractionalReserveInterestRealized(address indexed asset, uint256 amount);
 
     /// @dev Full divest required
     error FullDivestRequired(address asset, uint256 loss);
@@ -101,8 +101,9 @@ library FractionalReserveLogic {
                 }
 
                 if (divestAmount > $.loaned[_asset]) {
-                    IERC20(_asset).safeTransfer($.interestReceiver, divestAmount - $.loaned[_asset]);
-                    emit FractionalReserveInterestRealized(_asset);
+                    uint256 interest = divestAmount - $.loaned[_asset];
+                    IERC20(_asset).safeTransfer($.interestReceiver, interest);
+                    emit FractionalReserveInterestRealized(_asset, interest);
                     divestAmount = $.loaned[_asset];
                 }
 
@@ -146,8 +147,9 @@ library FractionalReserveLogic {
     /// @param _asset Asset address
     function realizeInterest(IFractionalReserve.FractionalReserveStorage storage $, address _asset) external {
         if ($.vault[_asset] != address(0)) {
-            IERC4626($.vault[_asset]).withdraw(claimableInterest($, _asset), $.interestReceiver, address(this));
-            emit FractionalReserveInterestRealized(_asset);
+            uint256 interest = claimableInterest($, _asset);
+            IERC4626($.vault[_asset]).withdraw(interest, $.interestReceiver, address(this));
+            emit FractionalReserveInterestRealized(_asset, interest);
         }
     }
 
