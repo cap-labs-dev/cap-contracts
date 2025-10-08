@@ -1,0 +1,297 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity >=0.8.22 <0.9.0;
+
+import { Test } from "forge-std/Test.sol";
+
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import { MockAaveDataProvider } from "./mocks/aave/MockAaveDataProvider.sol";
+import { MockChainlinkPriceFeed } from "./mocks/chainlink/MockChainlinkPriceFeed.sol";
+import { ERC20MissingReturn } from "./mocks/erc20/ERC20MissingReturn.sol";
+import { ERC20Mock } from "./mocks/erc20/ERC20Mock.sol";
+import { ERC4626Mock } from "./mocks/erc4626/ERC4626Mock.sol";
+
+import { AaveAdapter } from "../libraries/AaveAdapter.sol";
+import { ChainlinkAdapter } from "../libraries/ChainlinkAdapter.sol";
+
+import { AccessControl } from "../contracts/AccessControl.sol";
+
+import { CapToken } from "../contracts/CapToken.sol";
+
+import { DebtToken } from "../contracts/DebtToken.sol";
+import { Delegation } from "../contracts/Delegation.sol";
+import { FeeAuction } from "../contracts/FeeAuction.sol";
+import { FeeReceiver } from "../contracts/FeeReceiver.sol";
+import { Lender } from "../contracts/Lender.sol";
+import { Oracle } from "../contracts/Oracle.sol";
+import { StakedCap } from "../contracts/StakedCap.sol";
+
+/// @notice Base test contract with common logic needed by all tests.
+abstract contract Base is Test {
+    /// USERS
+    address internal accessControlAdmin;
+    address internal insuranceFund;
+    address internal restaker;
+    address internal agent;
+
+    /// MOCKS
+    ERC20Mock internal usdc;
+    ERC20MissingReturn internal usdt;
+    ERC20Mock internal weth;
+    ERC4626Mock internal yusdc;
+    ERC4626Mock internal yusdt;
+    MockChainlinkPriceFeed internal usdcPriceFeed;
+    MockChainlinkPriceFeed internal usdtPriceFeed;
+    MockChainlinkPriceFeed internal wethPriceFeed;
+    MockAaveDataProvider internal aaveDataProvider;
+    MockSymbioticVault internal symbioticVault;
+
+    /// LIBRARIES
+    ChainlinkAdapter internal chainlinkAdapter;
+    AaveAdapter internal aaveAdapter;
+
+    /// CONTRACTS
+    AccessControl internal accessControl;
+    Lender internal lender;
+    Delegation internal delegation;
+    CapToken internal capToken;
+    StakedCap internal stakedCap;
+    Oracle internal oracle;
+    DebtToken internal usdcDebtToken;
+    DebtToken internal usdtDebtToken;
+    FeeAuction internal feeAuction;
+    FeeReceiver internal feeReceiver;
+
+    struct Roles {
+        bytes4 selector;
+        address target;
+        address account;
+    }
+
+    /// ROLES
+    Roles[] internal allRoles;
+
+    /// @notice Set up the test environment
+    function setUp() public virtual {
+        /// DEPLOY USERS
+        accessControlAdmin = makeAddr("access_control_admin");
+        insuranceFund = makeAddr("insurance_fund");
+        restaker = makeAddr("restaker");
+        agent = makeAddr("agent");
+        vm.deal(accessControlAdmin, 100 ether);
+        vm.deal(insuranceFund, 100 ether);
+        vm.deal(restaker, 100 ether);
+        vm.deal(agent, 100 ether);
+
+        /// DEPLOY MOCKS
+        usdc = new ERC20Mock("USDC", "USDC", 6);
+        usdt = new ERC20MissingReturn("Tether USD", "USDT", 6);
+        weth = new ERC20Mock("Wrapped Ether", "WETH", 18);
+        yusdc = new ERC4626Mock(address(usdc));
+        yusdt = new ERC4626Mock(address(usdt));
+        usdcPriceFeed = new MockChainlinkPriceFeed(1e8);
+        usdtPriceFeed = new MockChainlinkPriceFeed(1e8);
+        wethPriceFeed = new MockChainlinkPriceFeed(4000e8);
+        address[] memory assets = new address[](2);
+        assets[0] = address(usdc);
+        assets[1] = address(usdt);
+        aaveDataProvider = new MockAaveDataProvider(assets);
+        symbioticVault = new MockSymbioticVault(restaker, agent, weth);
+
+        /// DEPLOY LIBRARIES
+        chainlinkAdapter = new ChainlinkAdapter();
+        aaveAdapter = new AaveAdapter();
+
+        /// DEPLOY CAP CONTRACTS
+        accessControl = _proxy(address(new AccessControl()));
+        lender = _proxy(address(new Lender()));
+        delegation = _proxy(address(new Delegation()));
+        capToken = _proxy(address(new CapToken()));
+        stakedCap = _proxy(address(new StakedCap()));
+        oracle = _proxy(address(new Oracle()));
+        usdcDebtToken = _proxy(address(new DebtToken()));
+        usdtDebtToken = _proxy(address(new DebtToken()));
+        feeAuction = _proxy(address(new FeeAuction()));
+        feeReceiver = _proxy(address(new FeeReceiver()));
+
+        labelContracts();
+
+        /// INITIALIZE
+        accessControl.initialize(accessControlAdmin);
+        lender.initialize(
+            address(accessControl), address(delegation), address(oracle), 1.25e27, 1 hours, 1 days, 0.1e27, 0.9e27
+        );
+        oracle.initialize(address(accessControl));
+        delegation.initialize(address(accessControl), address(oracle), 1 days);
+        capToken.initialize(
+            "Cap USD", "cUSD", address(accessControl), address(feeAuction), address(oracle), assets, insuranceFund
+        );
+        stakedCap.initialize(address(accessControl), address(capToken), 1 days);
+        usdcDebtToken.initialize(address(accessControl), address(usdc), address(oracle));
+        usdtDebtToken.initialize(address(accessControl), address(usdt), address(oracle));
+        feeAuction.initialize(address(accessControl), address(capToken), address(feeReceiver), 1 days, 1e18);
+        feeReceiver.initialize(address(accessControl), address(capToken), address(stakedCap));
+
+        /// GRANT ACCESS
+        grantAccess();
+
+        /// LINK ORACLE TO MOCK PRICE FEEDS
+        oracle.setPriceOracleData(
+            address(usdc),
+            IOracleTypes.OracleData({
+                adapter: address(chainlinkAdapter),
+                payload: abi.encodeWithSelector(MockChainlinkPriceFeed.price.selector, address(usdcPriceFeed))
+            })
+        );
+        oracle.setPriceOracleData(
+            address(usdt),
+            IOracleTypes.OracleData({
+                adapter: address(chainlinkAdapter),
+                payload: abi.encodeWithSelector(MockChainlinkPriceFeed.price.selector, address(usdtPriceFeed))
+            })
+        );
+        oracle.setPriceOracleData(
+            address(weth),
+            IOracleTypes.OracleData({
+                adapter: address(chainlinkAdapter),
+                payload: abi.encodeWithSelector(MockChainlinkPriceFeed.price.selector, address(wethPriceFeed))
+            })
+        );
+
+        /// LINK ORACLE TO MOCK AAVE DATA PROVIDER
+        oracle.setMarketOracleData(
+            address(usdc),
+            IOracleTypes.OracleData({
+                adapter: address(aaveAdapter),
+                payload: abi.encodeWithSelector(
+                    MockAaveDataProvider.rate.selector, address(aaveDataProvider), address(usdc)
+                )
+            })
+        );
+        oracle.setMarketOracleData(
+            address(usdt),
+            IOracleTypes.OracleData({
+                adapter: address(aaveAdapter),
+                payload: abi.encodeWithSelector(
+                    MockAaveDataProvider.rate.selector, address(aaveDataProvider), address(usdt)
+                )
+            })
+        );
+
+        /// SET MINT AND BURN FEE DATA
+        capToken.setFeeData(
+            address(usdc),
+            IMinter.FeeData({
+                minMintFee: 0.005e27,
+                slope0: 0,
+                slope1: 0,
+                mintKinkRatio: 0.85e27,
+                burnKinkRatio: 0.15e27,
+                optimalRatio: 0.33e27
+            })
+        );
+        capToken.setFeeData(
+            address(usdt),
+            IMinter.FeeData({
+                minMintFee: 0.005e27,
+                slope0: 0,
+                slope1: 0,
+                mintKinkRatio: 0.85e27,
+                burnKinkRatio: 0.15e27,
+                optimalRatio: 0.33e27
+            })
+        );
+        capToken.setRedeemFee(0.001e27);
+
+        /// ADD ASSETS TO LENDER
+        lender.addAsset(
+            ILender.AddAssetParams({
+                asset: address(usdc),
+                vault: address(capToken),
+                debtToken: address(usdcDebtToken),
+                interestReceiver: address(feeAuction),
+                bonusCap: 0.1e27,
+                minBorrow: 100e6
+            })
+        );
+        lender.addAsset(
+            ILender.AddAssetParams({
+                asset: address(usdt),
+                vault: address(capToken),
+                debtToken: address(usdtDebtToken),
+                interestReceiver: address(feeAuction),
+                bonusCap: 0.1e27,
+                minBorrow: 100e6
+            })
+        );
+        lender.pauseAsset(address(usdc), false);
+        lender.pauseAsset(address(usdt), false);
+
+        // WARP
+        vm.warp({ newTimestamp: JULY_1_2024 });
+    }
+
+    /// @dev Label the contracts
+    function labelContracts() internal virtual {
+        vm.label({ account: address(usdc), newLabel: "USDC" });
+        vm.label({ account: address(usdt), newLabel: "USDT" });
+        vm.label({ account: address(weth), newLabel: "WETH" });
+        vm.label({ account: address(yusdc), newLabel: "yUSDC" });
+        vm.label({ account: address(yusdt), newLabel: "yUSDT" });
+        vm.label({ account: address(aaveDataProvider), newLabel: "Aave Data Provider" });
+        vm.label({ account: address(chainlinkAdapter), newLabel: "Chainlink Adapter" });
+        vm.label({ account: address(aaveAdapter), newLabel: "Aave Adapter" });
+        vm.label({ account: address(accessControl), newLabel: "Access Control" });
+        vm.label({ account: address(lender), newLabel: "Lender" });
+        vm.label({ account: address(delegation), newLabel: "Delegation" });
+        vm.label({ account: address(capToken), newLabel: "Cap Token" });
+        vm.label({ account: address(stakedCap), newLabel: "Staked Cap" });
+        vm.label({ account: address(oracle), newLabel: "Oracle" });
+        vm.label({ account: address(usdcDebtToken), newLabel: "USDC Debt Token" });
+        vm.label({ account: address(usdtDebtToken), newLabel: "USDT Debt Token" });
+        vm.label({ account: address(feeAuction), newLabel: "Fee Auction" });
+        vm.label({ account: address(feeReceiver), newLabel: "Fee Receiver" });
+    }
+
+    /*//////////////////////////////////////////////////////////////////////////
+                                      HELPERS
+    //////////////////////////////////////////////////////////////////////////*/
+
+    /// @dev Approve `spender` to spend tokens from `from`
+    /// @param _token Address of the token
+    /// @param _from Address of the account
+    /// @param _spender Address of the spender
+    function approveContract(IERC20 _token, address _from, address _spender) internal {
+        vm.startPrank(_from);
+        IERC20(_token).approve(_spender, type(uint256).max);
+        vm.stopPrank();
+    }
+
+    /// @dev Set the price of an asset
+    /// @param _asset Address of the asset
+    /// @param _price Price of the asset
+    function setPrice(address _asset, int256 _price) internal {
+        IOracleTypes.OracleData memory oracleData = oracle.priceOracleData(_asset);
+        IMockChainlinkPriceFeed(oracleData.adapter).setLatestAnswer(_price);
+    }
+
+    /// @dev Grant access to a contract function for an account
+    /// @param _selector Function selector
+    /// @param _contract Address of the contract
+    /// @param _account Address to grant access to
+    function grantAccess(bytes4 _selector, address _contract, address _account) internal {
+        vm.startPrank(accessControlAdmin);
+        accessControl.grantAccess(_selector, _contract, _account);
+        vm.stopPrank();
+    }
+
+    /// @dev Grant access to a contract function for an account
+    /// @param _roles Array of roles to grant access to
+    function grantAccess() internal {
+        vm.startPrank(accessControlAdmin);
+        for (uint256 i; i < allRoles.length; ++i) {
+            accessControl.grantAccess(allRoles[i].selector, allRoles[i].target, allRoles[i].account);
+        }
+        vm.stopPrank();
+    }
+}
