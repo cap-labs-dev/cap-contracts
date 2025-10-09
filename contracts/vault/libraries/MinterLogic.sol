@@ -39,6 +39,24 @@ library MinterLogic {
         }
     }
 
+    /// @notice Estimate the amount in for a swap
+    /// @dev May round down and only considers the minimum mint fee, will not always be accurate
+    /// @param $ Storage pointer
+    /// @param params Parameters for a swap
+    /// @return amount Amount in for a swap
+    function amountIn(IMinter.MinterStorage storage $, IMinter.AmountOutParams memory params)
+        external
+        view
+        returns (uint256 amount)
+    {
+        /// Assuming the only fee is the minimum mint fee
+        if (!$.whitelist[msg.sender] && params.mint) {
+            params.amount = params.amount * RAY_PRECISION / (RAY_PRECISION - $.fees[params.asset].minMintFee);
+        }
+
+        amount = _amountIn($, params);
+    }
+
     /// @notice Calculate the output amounts for redeeming a cap token for a proportional weighting
     /// @param $ Storage pointer
     /// @param params Parameters for redeeming
@@ -107,6 +125,33 @@ library MinterLogic {
                 }
                 amount = assetValue * assetDecimalsPow / assetPrice;
             }
+        }
+    }
+
+    /// @notice Estimate the amount in for a swap
+    /// @param $ Storage pointer
+    /// @param params Parameters for a swap
+    /// @return amount Amount in for a swap
+    function _amountIn(IMinter.MinterStorage storage $, IMinter.AmountOutParams memory params)
+        internal
+        view
+        returns (uint256 amount)
+    {
+        address oracle = $.oracle;
+
+        (uint256 assetPrice,) = IOracle(oracle).getPrice(params.asset);
+        (uint256 capPrice,) = IOracle(oracle).getPrice(address(this));
+
+        uint256 assetDecimalsPow = 10 ** IERC20Metadata(params.asset).decimals();
+        uint256 capDecimalsPow = 10 ** IERC20Metadata(address(this)).decimals();
+
+        uint256 assetValue;
+        if (params.mint) {
+            assetValue = params.amount * capPrice / capDecimalsPow;
+            amount = assetValue * assetDecimalsPow / assetPrice;
+        } else {
+            assetValue = params.amount * assetPrice / assetDecimalsPow;
+            amount = assetValue * capDecimalsPow / capPrice;
         }
     }
 

@@ -110,12 +110,24 @@ interface IMinter {
     /// @return fee Fee applied
     function getMintAmount(address _asset, uint256 _amountIn) external view returns (uint256 amountOut, uint256 fee);
 
+    /// @notice Estimate the mint amount in for a given asset
+    /// @param _asset Asset address
+    /// @param _amountOut Amount of cap token to mint
+    /// @return amountIn Amount of asset to use
+    function getMintAmountIn(address _asset, uint256 _amountOut) external view returns (uint256 amountIn);
+
     /// @notice Get the burn amount for a given asset
     /// @param _asset Asset address to withdraw
     /// @param _amountIn Amount of cap token to burn
     /// @return amountOut Amount of the asset withdrawn
     /// @return fee Fee applied
     function getBurnAmount(address _asset, uint256 _amountIn) external view returns (uint256 amountOut, uint256 fee);
+
+    /// @notice Estimate the burn amount in for a given asset
+    /// @param _asset Asset address
+    /// @param _amountOut Amount of cap token to burn
+    /// @return amountIn Amount of asset to use
+    function getBurnAmountIn(address _asset, uint256 _amountOut) external view returns (uint256 amountIn);
 
     /// @notice Get the redeem amount
     /// @param _amountIn Amount of cap token to burn

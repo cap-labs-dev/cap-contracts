@@ -56,9 +56,22 @@ abstract contract Minter is IMinter, Access, MinterStorageUtils {
     }
 
     /// @inheritdoc IMinter
+    function getMintAmountIn(address _asset, uint256 _amountOut) public view returns (uint256 amountIn) {
+        amountIn =
+            MinterLogic.amountIn(getMinterStorage(), AmountOutParams({ mint: true, asset: _asset, amount: _amountOut }));
+    }
+
+    /// @inheritdoc IMinter
     function getBurnAmount(address _asset, uint256 _amountIn) public view returns (uint256 amountOut, uint256 fee) {
         (amountOut, fee) = MinterLogic.amountOut(
             getMinterStorage(), AmountOutParams({ mint: false, asset: _asset, amount: _amountIn })
+        );
+    }
+
+    /// @inheritdoc IMinter
+    function getBurnAmountIn(address _asset, uint256 _amountOut) public view returns (uint256 amountIn) {
+        amountIn = MinterLogic.amountIn(
+            getMinterStorage(), AmountOutParams({ mint: false, asset: _asset, amount: _amountOut })
         );
     }
 
