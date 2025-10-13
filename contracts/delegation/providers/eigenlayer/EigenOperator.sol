@@ -68,7 +68,6 @@ contract EigenOperator is IEigenOperator, Initializable, EigenOperatorStorageUti
         EigenOperatorStorage storage $ = getEigenOperatorStorage();
         if (msg.sender != $.serviceManager) revert NotServiceManager();
 
-        // Check if the strategy is already allocated, since this only needs to happen once and at least one block after the operator is registered
         (, IAllocationManager.Allocation[] memory _allocations) =
             IAllocationManager($.allocationManager).getStrategyAllocations(address(this), _strategy);
         if (_allocations.length != 0) revert AlreadyAllocated();
@@ -91,7 +90,7 @@ contract EigenOperator is IEigenOperator, Initializable, EigenOperatorStorageUti
             newMagnitudes: magnitudes
         });
 
-        // Set the allocation for the operator set to the strategy
+        // Allocates the operator set. Can only be called after ALLOCATION_CONFIGURATION_DELAY (approximately 17.5 days) has passed since registration.
         IAllocationManager($.allocationManager).modifyAllocations(address(this), allocations);
     }
 
