@@ -2,7 +2,9 @@
 pragma solidity ^0.8.28;
 
 import { ISymbioticNetworkMiddleware } from "../../contracts/interfaces/ISymbioticNetworkMiddleware.sol";
+
 import { Subnetwork } from "@symbioticfi/core/src/contracts/libraries/Subnetwork.sol";
+import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 
 contract MockNetworkMiddleware is ISymbioticNetworkMiddleware {
     SymbioticNetworkMiddlewareStorage internal _storage;
@@ -77,6 +79,10 @@ contract MockNetworkMiddleware is ISymbioticNetworkMiddleware {
 
     function vaults(address _agent) external view returns (address vault) {
         return _storage.agentsToVault[_agent];
+    }
+
+    function collateralAddress(address _agent) external view returns (address collateral) {
+        return IVault(_storage.agentsToVault[_agent]).collateral();
     }
 
     function distributeRewards(address _agent, address _token) external {
