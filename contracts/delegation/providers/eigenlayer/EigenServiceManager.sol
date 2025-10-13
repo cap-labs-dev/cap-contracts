@@ -144,6 +144,9 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         if (_avs != address(this)) revert InvalidAVS();
         if (_operatorSetIds.length != 1) revert InvalidOperatorSetIds();
+        if ($.operators[IEigenOperator(_eigenOperator).operator()].eigenOperator == address(0)) {
+            revert OperatorDoesntExist();
+        }
 
         IAllocationManager allocationManager = IAllocationManager($.eigen.allocationManager);
         IAllocationManager.OperatorSet memory operatorSet =

@@ -19,6 +19,8 @@ interface IEigenServiceManager {
     error ZeroAddress();
     /// @dev Operator set already created
     error OperatorSetAlreadyCreated();
+    /// @dev Operator doesn't exist
+    error OperatorDoesntExist();
     /// @dev Min magnitude not met
     error MinMagnitudeNotMet();
     /// @dev Invalid decimals
