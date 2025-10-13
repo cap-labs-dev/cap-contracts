@@ -299,6 +299,18 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @inheritdoc IEigenServiceManager
+    function createdAtEpoch(address _operator) external view returns (uint32) {
+        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        return $.operators[_operator].createdAtEpoch;
+    }
+
+    /// @inheritdoc IEigenServiceManager
+    function calculationIntervalSeconds() external view returns (uint256) {
+        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        return IRewardsCoordinator($.eigen.rewardsCoordinator).CALCULATION_INTERVAL_SECONDS();
+    }
+
+    /// @inheritdoc IEigenServiceManager
     function pendingRewards(address _operator, address _token) external view returns (uint256) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         CachedOperatorData storage operatorData = $.operators[_operator];

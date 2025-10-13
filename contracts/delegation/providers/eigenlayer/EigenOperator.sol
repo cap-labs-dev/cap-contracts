@@ -23,7 +23,7 @@ contract EigenOperator is IEigenOperator, Initializable, EigenOperatorStorageUti
         EigenOperatorStorage storage $ = getEigenOperatorStorage();
         $.serviceManager = _serviceManager;
         $.operator = _operator;
-        $.totpPeriod = 14 days; // Arbitrary value
+        $.totpPeriod = 28 days; // Arbitrary value
 
         // Fetch the eigen addresses
         IEigenServiceManager.EigenAddresses memory eigenAddresses =
@@ -131,6 +131,13 @@ contract EigenOperator is IEigenOperator, Initializable, EigenOperatorStorageUti
     /// @inheritdoc IEigenOperator
     function isValidSignature(bytes32 _digest, bytes memory) external view override returns (bytes4 magicValue) {
         EigenOperatorStorage storage $ = getEigenOperatorStorage();
+
+        /// If the created at epoch is > the current epoch, the operator is not allowed to delegate
+        uint32 createdAtEpoch = IEigenServiceManager($.serviceManager).createdAtEpoch($.operator);
+        uint256 calcIntervalSeconds = IEigenServiceManager($.serviceManager).calculationIntervalSeconds();
+        uint32 currentEpoch = uint32(block.timestamp / calcIntervalSeconds);
+
+        if (createdAtEpoch > currentEpoch) return bytes4(0xffffffff);
 
         // This gets called by the delegation manager to check if the operator is allowed to delegate
         if ($.allowlistedDigests[_digest]) {
