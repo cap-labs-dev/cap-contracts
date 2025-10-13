@@ -164,17 +164,17 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         CachedOperatorData storage operatorData = $.operators[_operator];
 
-        // Deploy the operator clone that will act as the operator in the eigen system
-        address eigenOperator = _deployEigenOperator(_operator, _operatorMetadata);
-        operatorData.eigenOperator = eigenOperator;
-        _operatorSetId = $.nextOperatorId;
-
         // Checks, no duplicate operators or operator set ids, a strategy can have many operators.
         // Since restakers can only delegate to one operator, this is not a problem.
         // https://docs.eigencloud.xyz/products/eigenlayer/restakers/restaking-guides/restaking-developer-guide#smart-contract-delegation-user-guide
         if (operatorData.strategy != address(0)) revert AlreadyRegisteredOperator();
         if (operatorData.operatorSetId != 0) revert OperatorSetAlreadyCreated();
         if (IERC20Metadata(address(IStrategy(_strategy).underlyingToken())).decimals() < 6) revert InvalidDecimals();
+
+        // Deploy the operator clone that will act as the operator in the eigen system
+        address eigenOperator = _deployEigenOperator(_operator, _operatorMetadata);
+        operatorData.eigenOperator = eigenOperator;
+        _operatorSetId = $.nextOperatorId;
 
         IAllocationManager allocationManager = IAllocationManager($.eigen.allocationManager);
 
