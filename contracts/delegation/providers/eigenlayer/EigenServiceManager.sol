@@ -144,6 +144,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         if (_avs != address(this)) revert InvalidAVS();
         if (_operatorSetIds.length != 1) revert InvalidOperatorSetIds();
+        if ($.eigenOperatorToOperator[_eigenOperator] == address(0)) revert OperatorDoesntExist();
 
         IAllocationManager allocationManager = IAllocationManager($.eigen.allocationManager);
         IAllocationManager.OperatorSet memory operatorSet =
@@ -164,17 +165,18 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         CachedOperatorData storage operatorData = $.operators[_operator];
 
+        // Deploy the operator clone that will act as the operator in the eigen system
+        address eigenOperator = _deployEigenOperator(_operator, _operatorMetadata);
+        operatorData.eigenOperator = eigenOperator;
+        _operatorSetId = $.nextOperatorId;
+        $.eigenOperatorToOperator[eigenOperator] = _operator;
+
         // Checks, no duplicate operators or operator set ids, a strategy can have many operators.
         // Since restakers can only delegate to one operator, this is not a problem.
         // https://docs.eigencloud.xyz/products/eigenlayer/restakers/restaking-guides/restaking-developer-guide#smart-contract-delegation-user-guide
         if (operatorData.strategy != address(0)) revert AlreadyRegisteredOperator();
         if (operatorData.operatorSetId != 0) revert OperatorSetAlreadyCreated();
         if (IERC20Metadata(address(IStrategy(_strategy).underlyingToken())).decimals() < 6) revert InvalidDecimals();
-
-        // Deploy the operator clone that will act as the operator in the eigen system
-        address eigenOperator = _deployEigenOperator(_operator, _operatorMetadata);
-        operatorData.eigenOperator = eigenOperator;
-        _operatorSetId = $.nextOperatorId;
 
         IAllocationManager allocationManager = IAllocationManager($.eigen.allocationManager);
 
