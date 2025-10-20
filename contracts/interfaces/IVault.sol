@@ -79,6 +79,7 @@ interface IVault {
 
     /// @notice Mint the cap token using an asset
     /// @dev This contract must have approval to move asset from msg.sender
+    /// @dev The amount in is capped by the deposit cap of the asset
     /// @param _asset Whitelisted asset to deposit
     /// @param _amountIn Amount of asset to use in the minting
     /// @param _minAmountOut Minimum amount to mint
