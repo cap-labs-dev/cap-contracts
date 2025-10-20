@@ -49,7 +49,10 @@ import { FeeAuction } from "../../contracts/feeAuction/FeeAuction.sol";
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
 import { CapToken } from "../../contracts/token/CapToken.sol";
 import { StakedCap } from "../../contracts/token/StakedCap.sol";
+
+import { Wrapper } from "../../contracts/token/Wrapper.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
+import { MockPermissionedERC20 } from "../mocks/MockPermissionedERC20.sol";
 import { SymbioticTestEnvConfig, TestEnvConfig } from "./interfaces/TestDeployConfig.sol";
 import { VaultConfigHelpers } from "./service/VaultConfigHelpers.sol";
 
@@ -135,8 +138,11 @@ contract TestDeployer is
 
         env.usdMocks = _deployUSDMocks();
         env.ethMocks = _deployEthMocks();
+        env.permissionedMocks =
+            _deployPermissionedMocks(env.infra.accessControl, env.implems.wrapper, env.users.insurance_fund);
         env.usdOracleMocks = _deployOracleMocks(env.usdMocks);
         env.ethOracleMocks = _deployOracleMocks(env.ethMocks);
+        env.permissionedOracleMocks = _deployOracleMocks(env.permissionedMocks);
 
         console.log("deploying usdVault");
         env.usdVault =
@@ -160,6 +166,7 @@ contract TestDeployer is
         vm.startPrank(env.users.oracle_admin);
         _initOracleMocks(env.usdOracleMocks, 1e8, uint256(0.1e27)); // $1.00 with 8 decimals & 10% Annualized in ray decimals
         _initOracleMocks(env.ethOracleMocks, 2600e8, uint256(0.1e27)); // $2600.00 with 8 decimals & 10% Annualized in ray decimals
+        _initOracleMocks(env.permissionedOracleMocks, 1e8, uint256(0.1e27)); // $1.00 with 8 decimals & 10% Annualized in ray decimals
         _initVaultOracle(env.libs, env.infra, env.usdVault);
         for (uint256 i = 0; i < env.usdVault.assets.length; i++) {
             address asset = env.usdVault.assets[i];
@@ -169,6 +176,11 @@ contract TestDeployer is
         for (uint256 i = 0; i < env.ethOracleMocks.assets.length; i++) {
             address asset = env.ethOracleMocks.assets[i];
             address priceFeed = env.ethOracleMocks.chainlinkPriceFeeds[i];
+            _initChainlinkPriceOracle(env.libs, env.infra, asset, priceFeed);
+        }
+        for (uint256 i = 0; i < env.permissionedOracleMocks.assets.length; i++) {
+            address asset = env.permissionedOracleMocks.assets[i];
+            address priceFeed = env.permissionedOracleMocks.chainlinkPriceFeeds[i];
             _initChainlinkPriceOracle(env.libs, env.infra, asset, priceFeed);
         }
 
@@ -331,6 +343,7 @@ contract TestDeployer is
         vm.label(address(env.implems.lender), "LenderImplem");
         vm.label(address(env.implems.stakedCap), "StakedCapImplem");
         vm.label(address(env.implems.capToken), "CapTokenImplem");
+        vm.label(address(env.implems.wrapper), "WrapperImplem");
 
         vm.label(address(env.infra.accessControl), "AccessControlProxy");
         vm.label(address(env.infra.delegation), "DelegationProxy");
@@ -375,6 +388,8 @@ contract TestDeployer is
         vm.label(address(usdVault.assets[0]), "USDT");
         vm.label(address(usdVault.assets[1]), "USDC");
         vm.label(address(usdVault.assets[2]), "USDX");
+        vm.label(address(env.permissionedMocks[0]), "USDP");
+        vm.label(address(env.permissionedMocks[1]), "WUSDP");
     }
 
     function _symbioticVaultConfigToEnv(SymbioticVaultConfig memory _vault) internal {
@@ -415,6 +430,8 @@ contract TestDeployer is
     MockERC20 usdt;
     MockERC20 usdc;
     MockERC20 usdx;
+    MockPermissionedERC20 usdp;
+    Wrapper wusdp;
     MockERC20 weth;
     CapToken cUSD;
     StakedCap scUSD;
@@ -433,6 +450,8 @@ contract TestDeployer is
         usdt = MockERC20(usdVault.assets[0]);
         usdc = MockERC20(usdVault.assets[1]);
         usdx = MockERC20(usdVault.assets[2]);
+        usdp = MockPermissionedERC20(env.permissionedMocks[0]);
+        wusdp = Wrapper(env.permissionedMocks[1]);
         weth = MockERC20(env.ethMocks[0]);
         cUSD = CapToken(usdVault.capToken);
         scUSD = StakedCap(usdVault.stakedCapToken);

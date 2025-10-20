@@ -33,8 +33,10 @@ struct TestEnvConfig {
     TestUsersConfig testUsers;
     address[] usdMocks;
     address[] ethMocks;
+    address[] permissionedMocks;
     OracleMocksConfig usdOracleMocks;
     OracleMocksConfig ethOracleMocks;
+    OracleMocksConfig permissionedOracleMocks;
     // symbiotic
     SymbioticTestEnvConfig symbiotic;
     // eigen

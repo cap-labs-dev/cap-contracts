@@ -19,6 +19,7 @@ struct ImplementationsConfig {
     address feeAuction;
     address feeReceiver;
     address chainlinkPoRAddressList;
+    address wrapper;
 }
 
 struct InfraConfig {

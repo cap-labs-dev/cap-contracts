@@ -13,6 +13,7 @@ import { FeeReceiver } from "../../feeReceiver/FeeReceiver.sol";
 import { Oracle } from "../../oracle/Oracle.sol";
 import { CapToken } from "../../token/CapToken.sol";
 import { StakedCap } from "../../token/StakedCap.sol";
+import { Wrapper } from "../../token/Wrapper.sol";
 
 import { ImplementationsConfig } from "../interfaces/DeployConfigs.sol";
 
@@ -27,5 +28,6 @@ contract DeployImplems {
         d.debtToken = address(new DebtToken());
         d.feeAuction = address(new FeeAuction());
         d.feeReceiver = address(new FeeReceiver());
+        d.wrapper = address(new Wrapper());
     }
 }

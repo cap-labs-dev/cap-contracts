@@ -5,15 +5,18 @@ import { MockAaveDataProvider } from "../../mocks/MockAaveDataProvider.sol";
 import { MockChainlinkPriceFeed } from "../../mocks/MockChainlinkPriceFeed.sol";
 import { TestEnvConfig } from "../interfaces/TestDeployConfig.sol";
 
+import { ProxyUtils } from "../../../contracts/deploy/utils/ProxyUtils.sol";
 import { IDelegation } from "../../../contracts/interfaces/IDelegation.sol";
+import { Wrapper } from "../../../contracts/token/Wrapper.sol";
 import { MockERC20 } from "../../mocks/MockERC20.sol";
+import { MockPermissionedERC20 } from "../../mocks/MockPermissionedERC20.sol";
 
 import { MockNetwork } from "../../mocks/MockNetwork.sol";
 import { MockNetworkMiddleware } from "../../mocks/MockNetworkMiddleware.sol";
 import { OracleMocksConfig, TestUsersConfig } from "../interfaces/TestDeployConfig.sol";
 import { Vm } from "forge-std/Vm.sol";
 
-contract DeployMocks {
+contract DeployMocks is ProxyUtils {
     function _deployOracleMocks(address[] memory assets) internal returns (OracleMocksConfig memory d) {
         d.assets = assets;
         d.aaveDataProviders = new address[](assets.length);
@@ -43,6 +46,16 @@ contract DeployMocks {
     function _deployEthMocks() internal returns (address[] memory ethMocks) {
         ethMocks = new address[](1);
         ethMocks[0] = address(new MockERC20("WETH", "WETH", 18));
+    }
+
+    function _deployPermissionedMocks(address accessControl, address wrapperImplem, address usersInsuranceFund)
+        internal
+        returns (address[] memory permissionedMocks)
+    {
+        permissionedMocks = new address[](2);
+        permissionedMocks[0] = address(new MockPermissionedERC20("USDP", "USDP", 18));
+        permissionedMocks[1] = _proxy(wrapperImplem);
+        Wrapper(permissionedMocks[1]).initialize(accessControl, usersInsuranceFund, permissionedMocks[0]);
     }
 
     function _deployDelegationNetworkMock() internal returns (address networkMiddleware, address network) {
