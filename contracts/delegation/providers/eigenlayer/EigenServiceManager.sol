@@ -33,14 +33,14 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         address _accessControl,
         EigenAddresses memory _eigenAddresses,
         address _oracle,
-        uint32 _epochDuration
+        uint32 _epochsBetweenDistributions
     ) external initializer {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         __Access_init(_accessControl);
         __UUPSUpgradeable_init();
         $.eigen = _eigenAddresses;
         $.oracle = _oracle;
-        $.epochDuration = _epochDuration;
+        $.epochsBetweenDistributions = _epochsBetweenDistributions;
         $.nextOperatorId++;
         $.redistributionRecipients.push(address(this));
 
@@ -107,7 +107,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
 
         /// Calculate the current epoch and check if enough time has passed
         uint32 currentEpoch = uint32(block.timestamp / calcIntervalSeconds);
-        uint32 nextAllowedEpoch = lastDistroEpoch + $.epochDuration;
+        uint32 nextAllowedEpoch = lastDistroEpoch + $.epochsBetweenDistributions;
 
         /// If not enough time has passed since last distribution, add to pending rewards
         if (currentEpoch < nextAllowedEpoch) {
@@ -211,11 +211,14 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @inheritdoc IEigenServiceManager
-    function setEpochDuration(uint32 _epochDuration) external checkAccess(this.setEpochDuration.selector) {
+    function setEpochsBetweenDistributions(uint32 _epochsBetweenDistributions)
+        external
+        checkAccess(this.setEpochsBetweenDistributions.selector)
+    {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        $.epochDuration = _epochDuration;
+        $.epochsBetweenDistributions = _epochsBetweenDistributions;
 
-        emit EpochDurationSet(_epochDuration);
+        emit EpochsBetweenDistributionsSet(_epochsBetweenDistributions);
     }
 
     /// @inheritdoc IEigenServiceManager
@@ -293,9 +296,9 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @inheritdoc IEigenServiceManager
-    function epochDuration() external view returns (uint32) {
+    function epochsBetweenDistributions() external view returns (uint32) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
-        return $.epochDuration;
+        return $.epochsBetweenDistributions;
     }
 
     /// @inheritdoc IEigenServiceManager
