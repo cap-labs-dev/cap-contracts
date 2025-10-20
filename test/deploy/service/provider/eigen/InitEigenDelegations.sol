@@ -82,6 +82,10 @@ contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
             IDelegationManager(eigenAb.eigenAddresses.delegationManager).getDepositedShares(restaker);
         mintedShares = shares[0];
 
+        _timeTravel(18 days);
+        vm.startPrank(restaker);
+
+        IEigenOperator(eigenOperator).advanceTotp();
         uint256 currentTotpExpiryTimestamp = IEigenOperator(eigenOperator).getCurrentTotpExpiryTimestamp();
 
         IDelegationManager.SignatureWithExpiry memory signatureWithExpiry =

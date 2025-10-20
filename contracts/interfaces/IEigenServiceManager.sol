@@ -40,8 +40,8 @@ interface IEigenServiceManager {
     event Slash(address indexed agent, address indexed recipient, uint256 slashShare, uint48 timestamp);
     /// @dev Strategy registered
     event StrategyRegistered(address indexed strategy, address indexed operator);
-    /// @dev Epoch duration set
-    event EpochDurationSet(uint32 epochDuration);
+    /// @dev Epochs between distributions set
+    event EpochsBetweenDistributionsSet(uint32 epochsBetweenDistributions);
     /// @dev Min reward amount set
     event MinRewardAmountSet(uint256 minRewardAmount);
     /// @dev Distributed rewards
@@ -51,7 +51,7 @@ interface IEigenServiceManager {
     /// @param eigen Eigen addresses
     /// @param oracle Oracle address
     /// @param eigenOperatorInstance Eigen operator instance
-    /// @param epochDuration Epoch duration
+    /// @param epochsBetweenDistributions Epochs between distributions
     /// @param nextOperatorId Next operator id
     /// @param pendingRewards Pending rewards
     /// @param eigenOperatorToOperator Mapping from eigen operator to operator
@@ -60,7 +60,7 @@ interface IEigenServiceManager {
         address oracle;
         address eigenOperatorInstance;
         address[] redistributionRecipients;
-        uint32 epochDuration;
+        uint32 epochsBetweenDistributions;
         uint32 nextOperatorId;
         mapping(address => uint256) pendingRewardsByToken;
         mapping(address => CachedOperatorData) operators;
@@ -180,10 +180,10 @@ interface IEigenServiceManager {
     function slashableCollateral(address operator, uint48 timestamp) external view returns (uint256);
 
     /**
-     * @notice Sets the epoch duration
-     * @param _epochDuration The epoch duration
+     * @notice Sets the epochs between distributions
+     * @param _epochsBetweenDistributions The epochs between distributions
      */
-    function setEpochDuration(uint32 _epochDuration) external;
+    function setEpochsBetweenDistributions(uint32 _epochsBetweenDistributions) external;
 
     /**
      * @notice Updates the AVS metadata URI
@@ -217,10 +217,23 @@ interface IEigenServiceManager {
     function operatorSetId(address operator) external view returns (uint32);
 
     /**
-     * @notice Returns the epoch duration
-     * @return The epoch duration
+     * @notice Returns the epochs between distributions
+     * @return The epochs between distributions
      */
-    function epochDuration() external view returns (uint32);
+    function epochsBetweenDistributions() external view returns (uint32);
+
+    /**
+     * @notice Returns the created at epoch for an operator
+     * @param operator The operator to get the created at epoch for
+     * @return The created at epoch of the operator
+     */
+    function createdAtEpoch(address operator) external view returns (uint32);
+
+    /**
+     * @notice Returns the calculation interval seconds
+     * @return The calculation interval seconds
+     */
+    function calculationIntervalSeconds() external view returns (uint256);
 
     /**
      * @notice Returns the pending rewards for an operator
