@@ -1,0 +1,11 @@
+{
+    "1": {
+        "allocationManager": "0x948a420b8CC1d6BFd0B6087C2E7c344a2CD0bc39",
+        "delegationManager": "0x39053D51B77DC0d36036Fc1fCc8Cb819df8Ef37A",
+        "strategyManager": "0x858646372CC42E1A627fcE94aa7A7033e7CF075A",
+        "rewardsCoordinator": "0x7750d328b314EfFa365A0402CcfD489B80B0adda",
+        "permissionsController": "0x25E5F8B1E7aDf44518d35D5B2271f114e081f0E5",
+        "strategyFactory": "0x5e4C39Ad7A3E881585e383dB9827EB4811f6F647",
+        "strategy": "0x54945180dB7943c0ed0FEE7EdaB2Bd24620256bc"
+    }
+}
