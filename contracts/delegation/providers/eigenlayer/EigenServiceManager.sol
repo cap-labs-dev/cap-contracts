@@ -144,6 +144,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         if (_avs != address(this)) revert InvalidAVS();
         if (_operatorSetIds.length != 1) revert InvalidOperatorSetIds();
+        if ($.eigenOperatorToOperator[_eigenOperator] == address(0)) revert OperatorDoesntExist();
 
         IAllocationManager allocationManager = IAllocationManager($.eigen.allocationManager);
         IAllocationManager.OperatorSet memory operatorSet =
@@ -168,6 +169,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         address eigenOperator = _deployEigenOperator(_operator, _operatorMetadata);
         operatorData.eigenOperator = eigenOperator;
         _operatorSetId = $.nextOperatorId;
+        $.eigenOperatorToOperator[eigenOperator] = _operator;
 
         // Checks, no duplicate operators or operator set ids, a strategy can have many operators.
         // Since restakers can only delegate to one operator, this is not a problem.

@@ -19,6 +19,8 @@ interface IEigenServiceManager {
     error ZeroAddress();
     /// @dev Operator set already created
     error OperatorSetAlreadyCreated();
+    /// @dev Operator doesn't exist
+    error OperatorDoesntExist();
     /// @dev Min magnitude not met
     error MinMagnitudeNotMet();
     /// @dev Invalid decimals
@@ -52,6 +54,7 @@ interface IEigenServiceManager {
     /// @param epochDuration Epoch duration
     /// @param nextOperatorId Next operator id
     /// @param pendingRewards Pending rewards
+    /// @param eigenOperatorToOperator Mapping from eigen operator to operator
     struct EigenServiceManagerStorage {
         EigenAddresses eigen;
         address oracle;
@@ -61,6 +64,7 @@ interface IEigenServiceManager {
         uint32 nextOperatorId;
         mapping(address => uint256) pendingRewardsByToken;
         mapping(address => CachedOperatorData) operators;
+        mapping(address => address) eigenOperatorToOperator;
     }
 
     /// @dev Cached operator data
