@@ -219,6 +219,19 @@ interface IEigenServiceManager {
     function epochDuration() external view returns (uint32);
 
     /**
+     * @notice Returns the created at epoch for an operator
+     * @param operator The operator to get the created at epoch for
+     * @return The created at epoch of the operator
+     */
+    function createdAtEpoch(address operator) external view returns (uint32);
+
+    /**
+     * @notice Returns the calculation interval seconds
+     * @return The calculation interval seconds
+     */
+    function calculationIntervalSeconds() external view returns (uint256);
+
+    /**
      * @notice Returns the pending rewards for an operator
      * @param _strategy The strategy to get the pending rewards for
      * @param _token The token to get the pending rewards for

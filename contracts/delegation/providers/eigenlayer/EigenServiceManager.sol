@@ -191,7 +191,8 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         operatorData.operatorSetId = _operatorSetId;
 
         uint256 calcIntervalSeconds = IRewardsCoordinator($.eigen.rewardsCoordinator).CALCULATION_INTERVAL_SECONDS();
-        operatorData.createdAtEpoch = uint32(block.timestamp / calcIntervalSeconds);
+        uint256 activationDelay = IRewardsCoordinator($.eigen.rewardsCoordinator).activationDelay();
+        operatorData.createdAtEpoch = uint32((block.timestamp + activationDelay) / calcIntervalSeconds);
 
         // Callback the operator beacon and register to the operator set
         EigenOperator(eigenOperator).registerOperatorSetToServiceManager(_operatorSetId, _restaker);
@@ -295,6 +296,18 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     function epochDuration() external view returns (uint32) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         return $.epochDuration;
+    }
+
+    /// @inheritdoc IEigenServiceManager
+    function createdAtEpoch(address _operator) external view returns (uint32) {
+        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        return $.operators[_operator].createdAtEpoch;
+    }
+
+    /// @inheritdoc IEigenServiceManager
+    function calculationIntervalSeconds() external view returns (uint256) {
+        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        return IRewardsCoordinator($.eigen.rewardsCoordinator).CALCULATION_INTERVAL_SECONDS();
     }
 
     /// @inheritdoc IEigenServiceManager

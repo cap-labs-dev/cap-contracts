@@ -118,4 +118,6 @@ interface IRewardsCoordinator {
     ) external;
 
     function MAX_REWARDS_DURATION() external pure returns (uint32);
+
+    function activationDelay() external pure returns (uint256);
 }
