@@ -40,14 +40,14 @@ contract EigenOperatorTest is TestDeployer {
 
     function test_totp_calculation() public view {
         uint256 currentTotp = eigenOperator.currentTotp();
-        uint256 expectedTotp = block.timestamp / (14 days);
+        uint256 expectedTotp = block.timestamp / (28 days);
         assertEq(currentTotp, expectedTotp);
     }
 
     function test_totp_expiry_timestamp() public view {
         uint256 expiryTimestamp = eigenOperator.getCurrentTotpExpiryTimestamp();
         uint256 currentTotp = eigenOperator.currentTotp();
-        uint256 expectedExpiry = (currentTotp + 1) * (14 days);
+        uint256 expectedExpiry = (currentTotp + 1) * (28 days);
         assertEq(expiryTimestamp, expectedExpiry);
     }
 
@@ -55,7 +55,7 @@ contract EigenOperatorTest is TestDeployer {
         uint256 initialTotp = eigenOperator.currentTotp();
 
         // Travel to just before the next TOTP period
-        uint256 nextPeriodStart = (initialTotp + 1) * (14 days);
+        uint256 nextPeriodStart = (initialTotp + 1) * (28 days);
         vm.warp(nextPeriodStart - 1);
 
         assertEq(eigenOperator.currentTotp(), initialTotp);
@@ -192,20 +192,20 @@ contract EigenOperatorTest is TestDeployer {
     // ============ TOTP EDGE CASES ============
 
     function test_totp_at_exact_period_boundary() public {
-        uint256 periodStart = (block.timestamp / (14 days)) * (14 days);
+        uint256 periodStart = (block.timestamp / (28 days)) * (28 days);
         vm.warp(periodStart);
 
         uint256 totp1 = eigenOperator.currentTotp();
         uint256 expiry1 = eigenOperator.getCurrentTotpExpiryTimestamp();
 
         // Move to next period exactly
-        vm.warp(periodStart + 14 days);
+        vm.warp(periodStart + 28 days);
 
         uint256 totp2 = eigenOperator.currentTotp();
         uint256 expiry2 = eigenOperator.getCurrentTotpExpiryTimestamp();
 
         assertEq(totp2, totp1 + 1);
-        assertEq(expiry2, expiry1 + 14 days);
+        assertEq(expiry2, expiry1 + 28 days);
     }
 
     function test_totp_with_zero_timestamp() public {
@@ -215,7 +215,7 @@ contract EigenOperatorTest is TestDeployer {
         uint256 expiry = eigenOperator.getCurrentTotpExpiryTimestamp();
 
         assertEq(totp, 0);
-        assertEq(expiry, 14 days);
+        assertEq(expiry, 28 days);
     }
 
     function test_totp_with_large_timestamp() public {
@@ -223,7 +223,7 @@ contract EigenOperatorTest is TestDeployer {
         vm.warp(largeTimestamp);
 
         uint256 totp = eigenOperator.currentTotp();
-        uint256 expectedTotp = largeTimestamp / (14 days);
+        uint256 expectedTotp = largeTimestamp / (28 days);
 
         assertEq(totp, expectedTotp);
     }
