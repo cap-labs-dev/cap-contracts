@@ -5,8 +5,8 @@
             "agentManager": "0x18f8b29f3AF949c71f7780d7F5159e199A9c355d"
         },
         "implems": {
-            "serviceManager": "0x1eC4896a6910769C645639f5857984523Af74BEc",
-            "operator": "0xe8eADA12ad4EAA28163ad794ca27884dF64E7e46",
+            "serviceManager": "0x56368Ff64fABfd8c7c8B70FaBCCD57878aB796E8",
+            "operator": "0x5a3e9F4fd0f4815A7106dFBE0a44AAC339244eE6",
             "agentManager": "0xd549c4f1087A8cFFFD949f13EC5BdD299Cf3A42B"
         }
     }
