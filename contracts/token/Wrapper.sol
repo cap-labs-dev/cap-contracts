@@ -10,12 +10,13 @@ import {
     IERC20,
     IERC20Metadata
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20WrapperUpgradeable.sol";
+import { IERC721Receiver } from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 
 /// @title Wrapper
 /// @author kexley, Cap Labs
 /// @notice Token wrapper where any donations are skimmed to the donation receiver
-contract Wrapper is IWrapper, UUPSUpgradeable, ERC20WrapperUpgradeable, Access, WrapperStorageUtils {
+contract Wrapper is IWrapper, IERC721Receiver, UUPSUpgradeable, ERC20WrapperUpgradeable, Access, WrapperStorageUtils {
     using Strings for string;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -57,6 +58,11 @@ contract Wrapper is IWrapper, UUPSUpgradeable, ERC20WrapperUpgradeable, Access, 
     /// @inheritdoc IWrapper
     function donationReceiver() public view returns (address donationReceiverAddress) {
         donationReceiverAddress = getWrapperStorage().donationReceiver;
+    }
+
+    /// @inheritdoc IERC721Receiver
+    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+        return this.onERC721Received.selector;
     }
 
     /// @inheritdoc IWrapper
