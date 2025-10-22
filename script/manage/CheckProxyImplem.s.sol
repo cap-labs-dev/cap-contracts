@@ -8,6 +8,7 @@ import { Proxy } from "@openzeppelin/contracts/proxy/Proxy.sol";
 // import { NetworkMiddleware } from "../../contracts/delegation/providers/symbiotic/NetworkMiddleware.sol";
 import { ImplementationsConfig, InfraConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import { VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
+import { EigenConfig, EigenImplementationsConfig } from "../../contracts/deploy/interfaces/EigenDeployConfig.sol";
 import {
     SymbioticNetworkAdapterConfig,
     SymbioticNetworkAdapterImplementationsConfig
@@ -22,6 +23,8 @@ import { VaultAdapter } from "../../contracts/oracle/libraries/VaultAdapter.sol"
 import { FractionalReserve } from "../../contracts/vault/FractionalReserve.sol";
 import { Minter } from "../../contracts/vault/Minter.sol";
 import { Vault } from "../../contracts/vault/Vault.sol";
+
+import { EigenAdapterConfigSerializer } from "../config/EigenAdapterConfigSerializer.sol";
 import { InfraConfigSerializer } from "../config/InfraConfigSerializer.sol";
 import { SymbioticAdapterConfigSerializer } from "../config/SymbioticAdapterConfigSerializer.sol";
 import { VaultConfigSerializer } from "../config/VaultConfigSerializer.sol";
@@ -36,7 +39,13 @@ struct NamedProxy {
     string name;
 }
 
-contract CheckProxyImplem is Script, InfraConfigSerializer, VaultConfigSerializer, SymbioticAdapterConfigSerializer {
+contract CheckProxyImplem is
+    Script,
+    InfraConfigSerializer,
+    VaultConfigSerializer,
+    SymbioticAdapterConfigSerializer,
+    EigenAdapterConfigSerializer
+{
     using Strings for address;
 
     ImplementationsConfig implems;
@@ -44,6 +53,8 @@ contract CheckProxyImplem is Script, InfraConfigSerializer, VaultConfigSerialize
     VaultConfig vaultConfig;
     SymbioticNetworkAdapterImplementationsConfig symbioticImplems;
     SymbioticNetworkAdapterConfig symbioticAdapter;
+    EigenImplementationsConfig eigenImplems;
+    EigenConfig eigenAdapter;
     AccessControl accessControl;
 
     NamedProxy[] namedProxies;
@@ -53,7 +64,7 @@ contract CheckProxyImplem is Script, InfraConfigSerializer, VaultConfigSerialize
         vaultConfig = _readVaultConfig("cUSD");
         accessControl = AccessControl(infra.accessControl);
         (symbioticImplems, symbioticAdapter) = _readSymbioticConfig();
-
+        (eigenImplems, eigenAdapter) = _readEigenConfig();
         namedProxies = [
             NamedProxy({
                 proxy: 0xCCccFf7F858dA3aDB1E2C7fbB5A5B32fA745CCCC,
@@ -79,7 +90,13 @@ contract CheckProxyImplem is Script, InfraConfigSerializer, VaultConfigSerialize
                 proxy: symbioticAdapter.agentManager,
                 implementation: symbioticImplems.agentManager,
                 name: "Agent Manager"
-            })
+            }),
+            NamedProxy({
+                proxy: eigenAdapter.eigenServiceManager,
+                implementation: eigenImplems.eigenServiceManager,
+                name: "Service Manager"
+            }),
+            NamedProxy({ proxy: eigenAdapter.agentManager, implementation: eigenImplems.agentManager, name: "Agent Manager" })
         ];
 
         string[1] memory capTokenSymbols = ["cUSD"];

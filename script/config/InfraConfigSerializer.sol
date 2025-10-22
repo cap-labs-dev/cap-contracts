@@ -27,6 +27,7 @@ contract InfraConfigSerializer {
         implemsJson.serialize("oracle", implems.oracle);
         implemsJson.serialize("debtToken", implems.debtToken);
         implemsJson.serialize("feeAuction", implems.feeAuction);
+        implemsJson.serialize("wrapper", implems.wrapper);
         implemsJson = implemsJson.serialize("feeReceiver", implems.feeReceiver);
         console.log(implemsJson);
 
@@ -78,7 +79,8 @@ contract InfraConfigSerializer {
             debtToken: json.readAddress(string.concat(implemsPrefix, "debtToken")),
             feeAuction: json.readAddress(string.concat(implemsPrefix, "feeAuction")),
             feeReceiver: json.readAddress(string.concat(implemsPrefix, "feeReceiver")),
-            chainlinkPoRAddressList: json.readAddress(string.concat(implemsPrefix, "chainlinkPoRAddressList"))
+            chainlinkPoRAddressList: json.readAddress(string.concat(implemsPrefix, "chainlinkPoRAddressList")),
+            wrapper: json.readAddress(string.concat(implemsPrefix, "wrapper"))
         });
 
         string memory libsPrefix = string.concat(chainPrefix, "libs.");

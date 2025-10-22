@@ -1,11 +1,17 @@
+No files changed, compilation skipped
+Script ran successfully.
+
 == Logs ==
+  block.chainid 1
   Checking Access for Delegation Contract...
-  Delegation.slash Lender
-  Delegation.setLastBorrow Lender
-  Delegation.addAgent Agent Manager
+  Delegation.slash ✅Lender✅
+  Delegation.setLastBorrow ✅Lender✅
+  Delegation.addAgent ✅Agent Manager✅
+  Delegation.addAgent ✅Eigen Agent Manager✅
   Delegation.modifyAgent ✅ Dev MSIG ✅
   Delegation.registerNetwork ✅ Dev MSIG ✅
   Delegation.setLtvBuffer ✅ Dev MSIG ✅
+  Delegation.setFeeRecipient ✅ Dev MSIG ✅
   Proxy.upgrade ✅ Dev MSIG ✅
   
   Checking Access for Lender Contract...
@@ -19,14 +25,18 @@
   Proxy.upgrade ✅ Dev MSIG ✅
   
   Checking Access for Oracle Contract...
-  AgentManager.addAgent Agent Manager
+  EigenAgentManager.setRestakerRate ✅Agent Manager✅
+  EigenAgentManager.setRestakerRate ✅Eigen Agent Manager✅
+  AgentManager.addAgent ✅Agent Manager✅
+  AgentManager.addAgent ✅Eigen Agent Manager✅
   PriceOracle.setPriceOracleData ✅ Dev MSIG ✅
   PriceOracle.setPriceBackupOracleData ✅ Dev MSIG ✅
   PriceOracle.setStaleness ✅ Dev MSIG ✅
   RateOracle.setMarketOracleData ✅ Dev MSIG ✅
   RateOracle.setUtilizationOracleData ✅ Dev MSIG ✅
   RateOracle.setBenchmarkRate ✅ Dev MSIG ✅
-  RateOracle.setRestakerRate Agent Manager
+  RateOracle.setRestakerRate ✅Agent Manager✅
+  RateOracle.setRestakerRate ✅Eigen Agent Manager✅
   Proxy.upgrade ✅ Dev MSIG ✅
   
   Checking Access for Access Control Contract...
@@ -51,20 +61,41 @@
   Proxy.upgrade ✅ Dev MSIG ✅
   
   Checking Access for Network Contract...
-  Network.registerVault Network Middleware
+  Network.registerVault ✅Network Middleware✅
   Proxy.upgrade ✅ Dev MSIG ✅
   
   Checking Access for Network Middleware Contract...
-  NetworkMiddleware.registerVault Agent Manager
+  EigenServiceManager.slash ✅Delegation✅
+  EigenServiceManager.distributeRewards ✅Delegation✅
+  NetworkMiddleware.registerVault ✅Agent Manager✅
   NetworkMiddleware.setFeeAllowed ✅ Dev MSIG ✅
-  NetworkMiddleware.slash Delegation
-  NetworkMiddleware.distributeRewards Delegation
+  NetworkMiddleware.slash ✅Delegation✅
+  NetworkMiddleware.distributeRewards ✅Delegation✅
   Proxy.upgrade ✅ Dev MSIG ✅
   
   Checking Access for Agent Manager Contract...
+  EigenAgentManager.setRestakerRate ✅ Dev MSIG ✅
   AgentManager.addAgent ✅ Dev MSIG ✅
   AgentManager.addAgent ✅ Dev MSIG ✅
   RateOracle.setRestakerRate ✅ Dev MSIG ✅
+  Proxy.upgrade ✅ Dev MSIG ✅
+  
+  Checking Access for Eigen Agent Manager Contract...
+  EigenAgentManager.addEigenAgent ✅ Dev MSIG ✅
+  EigenAgentManager.setRestakerRate ✅ Dev MSIG ✅
+  AgentManager.addAgent ✅ Dev MSIG ✅
+  RateOracle.setRestakerRate ✅ Dev MSIG ✅
+  Proxy.upgrade ✅ Dev MSIG ✅
+  
+  Checking Access for Eigen Service Manager Contract...
+  EigenServiceManager.slash ✅Delegation✅
+  EigenServiceManager.distributeRewards ✅Delegation✅
+  EigenServiceManager.registerOperator ✅ Eigen Allocation Manager ✅
+  EigenServiceManager.registerStrategy ✅Eigen Agent Manager✅
+  EigenServiceManager.updateAVSMetadataURI ✅ Dev MSIG ✅
+  EigenServiceManager.upgradeEigenOperatorImplementation ✅ Dev MSIG ✅
+  NetworkMiddleware.slash ✅Delegation✅
+  NetworkMiddleware.distributeRewards ✅Delegation✅
   Proxy.upgrade ✅ Dev MSIG ✅
   
   Checking Access for Fee Auction (cUSD) Contract...
@@ -84,15 +115,15 @@
   Checking Access for Vault (cUSD) Contract...
   Lender.removeAsset ✅ Dev MSIG ✅
   FractionalReserve.investAll ✅ Dev MSIG ✅
-  FractionalReserve.investAll Gelato Sweeper
+  FractionalReserve.investAll ✅Gelato Sweeper✅
   FractionalReserve.divestAll ✅ Dev MSIG ✅
   FractionalReserve.setFractionalReserveVault ✅ Dev MSIG ✅
   FractionalReserve.setReserve ✅ Dev MSIG ✅
   Minter.setFeeData ✅ Dev MSIG ✅
   Minter.setRedeemFee ✅ Dev MSIG ✅
   Minter.setWhitelist ✅ Dev MSIG ✅
-  Vault.borrow Lender
-  Vault.repay Lender
+  Vault.borrow ✅Lender✅
+  Vault.repay ✅Lender✅
   Vault.addAsset ✅ Dev MSIG ✅
   Vault.removeAsset ✅ Dev MSIG ✅
   Vault.pauseAsset ✅ Dev MSIG ✅
@@ -108,9 +139,10 @@
   Proxy.upgrade ✅ Dev MSIG ✅
   
   Checking Access for Debt Token 0 of cUSD vault (Debt USD Coin) Contract...
-  DebtToken.mint Lender
-  DebtToken.burn Lender
+  DebtToken.mint ✅Lender✅
+  DebtToken.burn ✅Lender✅
   Proxy.upgrade ✅ Dev MSIG ✅
   
   Checking Access for AccessControl Contract...
   Default Admin Role ✅ Dev MSIG ✅
+  

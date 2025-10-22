@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 struct EigenImplementationsConfig {
     address eigenServiceManager;
     address agentManager;
+    address operator;
 }
 
 struct EigenConfig {

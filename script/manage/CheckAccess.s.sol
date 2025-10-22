@@ -3,17 +3,20 @@ pragma solidity ^0.8.28;
 
 import { AccessControl } from "../../contracts/access/AccessControl.sol";
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
-
+import { EigenAgentManager } from "../../contracts/delegation/providers/eigenlayer/EigenAgentManager.sol";
+import { EigenServiceManager } from "../../contracts/delegation/providers/eigenlayer/EigenServiceManager.sol";
 import { SymbioticAgentManager } from "../../contracts/delegation/providers/symbiotic/SymbioticAgentManager.sol";
 import { SymbioticNetwork } from "../../contracts/delegation/providers/symbiotic/SymbioticNetwork.sol";
 import { SymbioticNetworkMiddleware } from
     "../../contracts/delegation/providers/symbiotic/SymbioticNetworkMiddleware.sol";
 import { InfraConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import { VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
+import { EigenConfig } from "../../contracts/deploy/interfaces/EigenDeployConfig.sol";
 import { SymbioticNetworkAdapterConfig } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
+
+import { EigenAddressbook, EigenUtils } from "../../contracts/deploy/utils/EigenUtils.sol";
 import { FeeAuction } from "../../contracts/feeAuction/FeeAuction.sol";
 import { FeeReceiver } from "../../contracts/feeReceiver/FeeReceiver.sol";
-
 import { CapInterestHarvester } from "../../contracts/gelato/CapInterestHarvester.sol";
 import { CapSweeper } from "../../contracts/gelato/CapSweeper.sol";
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
@@ -26,6 +29,7 @@ import { Wrapper } from "../../contracts/token/Wrapper.sol";
 import { FractionalReserve } from "../../contracts/vault/FractionalReserve.sol";
 import { Minter } from "../../contracts/vault/Minter.sol";
 import { Vault } from "../../contracts/vault/Vault.sol";
+import { EigenAdapterConfigSerializer } from "../config/EigenAdapterConfigSerializer.sol";
 import { InfraConfigSerializer } from "../config/InfraConfigSerializer.sol";
 import { SymbioticAdapterConfigSerializer } from "../config/SymbioticAdapterConfigSerializer.sol";
 import { VaultConfigSerializer } from "../config/VaultConfigSerializer.sol";
@@ -44,12 +48,21 @@ struct NamedContract {
     string name;
 }
 
-contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, SymbioticAdapterConfigSerializer {
+contract CheckAccess is
+    Script,
+    InfraConfigSerializer,
+    VaultConfigSerializer,
+    SymbioticAdapterConfigSerializer,
+    EigenAdapterConfigSerializer,
+    EigenUtils
+{
     using Strings for address;
 
+    EigenAddressbook eigenAb;
     InfraConfig infra;
     VaultConfig vaultConfig;
     SymbioticNetworkAdapterConfig symbioticAdapter;
+    EigenConfig eigenAdapter;
     AccessControl accessControl;
 
     address[] devEoas = [0xc1ab5a9593E6e1662A9a44F84Df4F31Fc8A76B52];
@@ -67,6 +80,34 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
         NamedSelector({ selector: Delegation.modifyAgent.selector, name: "Delegation.modifyAgent" }),
         NamedSelector({ selector: Delegation.registerNetwork.selector, name: "Delegation.registerNetwork" }),
         NamedSelector({ selector: Delegation.setLtvBuffer.selector, name: "Delegation.setLtvBuffer" }),
+        NamedSelector({ selector: Delegation.setFeeRecipient.selector, name: "Delegation.setFeeRecipient" }),
+        NamedSelector({ selector: EigenAgentManager.addEigenAgent.selector, name: "EigenAgentManager.addEigenAgent" }),
+        NamedSelector({ selector: EigenAgentManager.setRestakerRate.selector, name: "EigenAgentManager.setRestakerRate" }),
+        NamedSelector({ selector: EigenServiceManager.slash.selector, name: "EigenServiceManager.slash" }),
+        NamedSelector({
+            selector: EigenServiceManager.distributeRewards.selector,
+            name: "EigenServiceManager.distributeRewards"
+        }),
+        NamedSelector({
+            selector: EigenServiceManager.registerOperator.selector,
+            name: "EigenServiceManager.registerOperator"
+        }),
+        NamedSelector({
+            selector: EigenServiceManager.registerStrategy.selector,
+            name: "EigenServiceManager.registerStrategy"
+        }),
+        NamedSelector({
+            selector: EigenServiceManager.updateAVSMetadataURI.selector,
+            name: "EigenServiceManager.updateAVSMetadataURI"
+        }),
+        NamedSelector({
+            selector: EigenServiceManager.setEpochsBetweenDistributions.selector,
+            name: "EigenServiceManager.setEpochsBetweenDistributions"
+        }),
+        NamedSelector({
+            selector: EigenServiceManager.upgradeEigenOperatorImplementation.selector,
+            name: "EigenServiceManager.upgradeEigenOperatorImplementation"
+        }),
         NamedSelector({ selector: SymbioticAgentManager.addAgent.selector, name: "AgentManager.addAgent" }),
         NamedSelector({ selector: SymbioticAgentManager.setRestakerRate.selector, name: "AgentManager.addAgent" }),
         NamedSelector({ selector: SymbioticNetwork.registerVault.selector, name: "Network.registerVault" }),
@@ -117,7 +158,6 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
         NamedSelector({ selector: Lender.setGrace.selector, name: "Lender.setGrace" }),
         NamedSelector({ selector: Lender.setExpiry.selector, name: "Lender.setExpiry" }),
         NamedSelector({ selector: Lender.setBonusCap.selector, name: "Lender.setBonusCap" }),
-        NamedSelector({ selector: Lender.liquidate.selector, name: "Lender.liquidate" }),
         NamedSelector({ selector: DebtToken.mint.selector, name: "DebtToken.mint" }),
         NamedSelector({ selector: DebtToken.burn.selector, name: "DebtToken.burn" }),
         NamedSelector({ selector: PriceOracle.setPriceOracleData.selector, name: "PriceOracle.setPriceOracleData" }),
@@ -163,8 +203,10 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
     NamedContract[] namedContracts;
 
     function run() external {
+        eigenAb = _getEigenAddressbook();
         (,, infra) = _readInfraConfig();
         (, symbioticAdapter) = _readSymbioticConfig();
+        (, eigenAdapter) = _readEigenConfig();
         accessControl = AccessControl(infra.accessControl);
 
         namedContracts = [
@@ -177,7 +219,9 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
             NamedContract({ contractAddress: infra.gelatoSweeper, name: "Gelato Sweeper" }),
             NamedContract({ contractAddress: symbioticAdapter.network, name: "Network" }),
             NamedContract({ contractAddress: symbioticAdapter.networkMiddleware, name: "Network Middleware" }),
-            NamedContract({ contractAddress: symbioticAdapter.agentManager, name: "Agent Manager" })
+            NamedContract({ contractAddress: symbioticAdapter.agentManager, name: "Agent Manager" }),
+            NamedContract({ contractAddress: eigenAdapter.agentManager, name: "Eigen Agent Manager" }),
+            NamedContract({ contractAddress: eigenAdapter.eigenServiceManager, name: "Eigen Service Manager" })
         ];
 
         string[1] memory capTokenSymbols = ["cUSD"];
@@ -255,8 +299,12 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
     function labelledAddress(address _address) internal view returns (string memory) {
         for (uint256 i = 0; i < namedContracts.length; i++) {
             if (namedContracts[i].contractAddress == _address) {
-                return namedContracts[i].name;
+                return string.concat(unicode"✅", namedContracts[i].name, unicode"✅");
             }
+        }
+
+        if (eigenAb.eigenAddresses.allocationManager == _address) {
+            return unicode"✅ Eigen Allocation Manager ✅";
         }
 
         for (uint256 i = 0; i < devEoas.length; i++) {
@@ -278,6 +326,6 @@ contract CheckAccess is Script, InfraConfigSerializer, VaultConfigSerializer, Sy
             return unicode"⚖️ Balancer ⚖️";
         }
 
-        return _address.toHexString();
+        return string.concat(unicode"🚨", _address.toHexString(), unicode"🚨");
     }
 }
