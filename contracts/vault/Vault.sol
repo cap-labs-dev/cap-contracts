@@ -35,6 +35,9 @@ abstract contract Vault is
         whenNotPaused
         returns (uint256 amountOut)
     {
+        uint256 totalSupply = totalSupplies(_asset);
+        uint256 cap = depositCap(_asset);
+        if (_amountIn + totalSupply > cap) _amountIn = cap - totalSupply;
         uint256 fee;
         (amountOut, fee) = getMintAmount(_asset, _amountIn);
         VaultLogic.mint(
@@ -171,7 +174,7 @@ abstract contract Vault is
     }
 
     /// @inheritdoc IVault
-    function totalSupplies(address _asset) external view returns (uint256 _totalSupply) {
+    function totalSupplies(address _asset) public view returns (uint256 _totalSupply) {
         _totalSupply = getVaultStorage().totalSupplies[_asset];
     }
 
