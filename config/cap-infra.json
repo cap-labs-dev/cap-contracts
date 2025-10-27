@@ -26,7 +26,7 @@
             "gelatoHarvester": "0x1388B2dc1Fe408741E48145F87Fd79f01bca7e16",
             "gelatoSweeper": "0x51da1eC8dC52F146e644F5F759D399038CCf7aB4",
             "vaultAdapter": "0xC6504C2c918c8C17eE2F1e01AEFa43b1f27849eC",
-            "wrapper": "0x0000000000000000000000000000000000000000"
+            "fixedPriceOracle": "0xC96d5EC90B07fe2a96253990Dc7eF2df22FDe0b3"
         },
         "libs": {
             "aaveAdapter": "0xf4DE2D82904D528E8F0fE9c374218aE6B0A86d7e",

@@ -75,5 +75,11 @@ contract EigenAgentManager is IEigenAgentManager, UUPSUpgradeable, Access, Eigen
         IRateOracle($.oracle).setRestakerRate(_agent, _delegationRate);
     }
 
+    /// @inheritdoc IEigenAgentManager
+    function setServiceManager(address _serviceManager) external checkAccess(this.setServiceManager.selector) {
+        EigenAgentManagerStorage storage $ = getEigenAgentManagerStorage();
+        $.serviceManager = _serviceManager;
+    }
+
     function _authorizeUpgrade(address) internal override checkAccess(bytes4(0)) { }
 }

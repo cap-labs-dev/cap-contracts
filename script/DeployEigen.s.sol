@@ -25,7 +25,7 @@ contract DeployContract is Script {
             rewardsCoordinator: 0x7750d328b314EfFa365A0402CcfD489B80B0adda
         });
         address _oracle = 0xcD7f45566bc0E7303fB92A93969BB4D3f6e662bb;
-        uint32 _epochDuration = uint32(7 days);
+        uint32 _epochDuration = uint32(7);
 
         vm.startBroadcast();
         EigenServiceManager eigenServiceManager = new EigenServiceManager();
@@ -36,7 +36,7 @@ contract DeployContract is Script {
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(eigenServiceManager), initParams);
         console.log("EigenServiceManager proxy deployed to:", address(proxy));
-        vm.startBroadcast();
+
         EigenAgentManager eigenAgentManager = new EigenAgentManager();
         console.log("EigenAgentManagerImplementation deployed to:", address(eigenAgentManager));
 
@@ -60,8 +60,8 @@ contract DeployContract is Script {
         console.logBytes4(EigenServiceManager.registerOperator.selector);
         console.log("EigenServiceManager.registerStrategy");
         console.logBytes4(EigenServiceManager.registerStrategy.selector);
-        console.log("EigenServiceManager.setEpochDuration");
-        console.logBytes4(EigenServiceManager.setEpochDuration.selector);
+        console.log("EigenServiceManager.setEpochsBetweenDistributions");
+        console.logBytes4(EigenServiceManager.setEpochsBetweenDistributions.selector);
         console.log("EigenServiceManager.upgradeEigenOperatorImplementation");
         console.logBytes4(EigenServiceManager.upgradeEigenOperatorImplementation.selector);
 
