@@ -1,13 +1,13 @@
 {
     "1": {
         "adapters": {
-            "serviceManager": "0xBde7c8DB7a546526dD99d23796bAa24c80c5036b",
-            "agentManager": "0x18f8b29f3AF949c71f7780d7F5159e199A9c355d"
+            "serviceManager": "0xE65c3eccd18879E103dBC96D854e376Ced4cC7dd",
+            "agentManager": "0xa82f6f9E67E127621F3e5F3953bEEf926b4B5bA9"
         },
         "implems": {
-            "serviceManager": "0x56368Ff64fABfd8c7c8B70FaBCCD57878aB796E8",
+            "serviceManager": "0xf2ded7286C54a5Ca077Df40c0C21c5a555885Ca1",
             "operator": "0x5a3e9F4fd0f4815A7106dFBE0a44AAC339244eE6",
-            "agentManager": "0xd549c4f1087A8cFFFD949f13EC5BdD299Cf3A42B"
+            "agentManager": "0xE1B49F83873F12C45427057Ce98c4b246d2CF630"
         }
     }
 }

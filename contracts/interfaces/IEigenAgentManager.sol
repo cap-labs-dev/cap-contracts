@@ -59,4 +59,8 @@ interface IEigenAgentManager {
     /// @param _agent Agent address
     /// @param _delegationRate Delegation rate
     function setRestakerRate(address _agent, uint256 _delegationRate) external;
+
+    /// @notice Set the service manager
+    /// @param _serviceManager Service manager address
+    function setServiceManager(address _serviceManager) external;
 }
