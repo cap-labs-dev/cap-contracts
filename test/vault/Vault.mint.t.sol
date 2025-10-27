@@ -153,8 +153,13 @@ contract VaultMintTest is TestDeployer {
         // Mint cUSD with USDT over the deposit cap
         uint256 amountIn = 100e6;
         cUSD.mint(address(usdt), amountIn, 0, user, block.timestamp + 1 hours);
+        uint256 userBalance = cUSD.balanceOf(user);
         // Only up to the cap is minted
-        assertEq(cUSD.balanceOf(user), 9.95e18);
+        assertEq(userBalance, 9.95e18);
+
+        /// Should revert as amountOut is 0 and we revert on 0.
+        vm.expectRevert();
+        cUSD.mint(address(usdt), 90e6, 0, user, block.timestamp + 1 hours);
 
         vm.startPrank(env.users.vault_config_admin);
         cUSD.setDepositCap(address(usdt), 0);
@@ -171,5 +176,9 @@ contract VaultMintTest is TestDeployer {
         vm.startPrank(user);
         // Should mint the full amount because the deposit cap is max
         cUSD.mint(address(usdt), 90e6, 0, user, block.timestamp + 1 hours);
+
+        /// TODO: get fee from getMintAmount
+
+        assertEq(cUSD.balanceOf(user) - userBalance, 89.55e18);
     }
 }
