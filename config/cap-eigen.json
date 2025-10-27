@@ -1,13 +1,14 @@
 {
     "1": {
-        "adapters": {
-            "serviceManager": "0xE65c3eccd18879E103dBC96D854e376Ced4cC7dd",
-            "agentManager": "0xa82f6f9E67E127621F3e5F3953bEEf926b4B5bA9"
+        "adapter": {
+            "eigenServiceManager": "0xE65c3eccd18879E103dBC96D854e376Ced4cC7dd",
+            "agentManager": "0xa82f6f9E67E127621F3e5F3953bEEf926b4B5bA9",
+            "rewardDuration": 0
         },
         "implems": {
-            "serviceManager": "0xf2ded7286C54a5Ca077Df40c0C21c5a555885Ca1",
+            "eigenServiceManager": "0xf2ded7286C54a5Ca077Df40c0C21c5a555885Ca1",
             "operator": "0x5a3e9F4fd0f4815A7106dFBE0a44AAC339244eE6",
-            "agentManager": "0xE1B49F83873F12C45427057Ce98c4b246d2CF630"
+            "agentManager": "0x0FC2153D1455D5A02555413D88A352787ABE0268"
         }
     }
 }

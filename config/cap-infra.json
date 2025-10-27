@@ -4,16 +4,17 @@
             "accessControl": "0x6681EB184c876D74eA3ddFaE0eCEE0C9C0f84bc1",
             "capToken": "0xE5009c352B0EbA16CcD990084B81E03E0c6D05f5",
             "debtToken": "0xaF2084df1Ff172b1D39a94680c9b8bd42b55E20C",
-            "delegation": "0x386C93f9f0A8a681c5A3E826063106A2474958ab",
+            "delegation": "0x69EbEB382b0e82127CC77E7b2679bEB0E0Be7184",
             "feeAuction": "0x57e1E8e5576c5CFbBB0000Ef3f1aF24E3a452074",
             "feeReceiver": "0xB61E527D88831f6Cb7a4C2d43be9805438ecc44F",
             "lender": "0x68c4F03b8640C0393a832987147BaE7A0b27aaa7",
             "oracle": "0xbFe4D64E61a3a02C4781a65FA343007de7ea9F14",
             "stakedCap": "0x42c0e0ef7C2F35de073F4d6f9c0e4483429c3D31",
-            "chainlinkPoRAddressList": "0xc85d36c2a73caca3b4cb9a2640dbb9269f24614a",
+            "chainlinkPoRAddressList": "0x69a8749544fF825741979D03e33F06edC6a66f3e",
             "gelatoHarvester": "0x624504E11049EdD5f4754903E75D096AfceE46E3",
             "gelatoSweeper": "0x307C0C1F1A8b3a7153842922DfF239c66f308238",
-            "vaultAdapter": "0xD212fA2cf56197dD79880681807Ce4d95C9Ffa2e"
+            "vaultAdapter": "0xD212fA2cf56197dD79880681807Ce4d95C9Ffa2e",
+            "wrapper": "0x0000000000000000000000000000000000000000"
         },
         "infra": {
             "accessControl": "0x7731129a10d51e18cDE607C5C115F26503D2c683",
