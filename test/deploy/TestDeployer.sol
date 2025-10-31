@@ -161,6 +161,15 @@ contract TestDeployer is
         _initInfraAccessControl(env.infra, env.users);
         _initVaultAccessControl(env.infra, env.usdVault, env.users);
 
+        /// SET DEPOSIT CAP
+        console.log("setting deposit caps");
+        vm.startPrank(env.users.vault_config_admin);
+        for (uint256 i = 0; i < env.usdVault.assets.length; i++) {
+            address asset = env.usdVault.assets[i];
+            CapToken(env.usdVault.capToken).setDepositCap(asset, type(uint256).max);
+        }
+        vm.stopPrank();
+
         /// ORACLE
         console.log("deploying oracle");
         vm.startPrank(env.users.oracle_admin);

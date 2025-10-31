@@ -50,6 +50,12 @@ abstract contract Minter is IMinter, Access, MinterStorageUtils {
     }
 
     /// @inheritdoc IMinter
+    function setDepositCap(address _asset, uint256 _cap) external checkAccess(this.setDepositCap.selector) {
+        getMinterStorage().depositCap[_asset] = _cap;
+        emit SetDepositCap(_asset, _cap);
+    }
+
+    /// @inheritdoc IMinter
     function getMintAmount(address _asset, uint256 _amountIn) public view returns (uint256 amountOut, uint256 fee) {
         (amountOut, fee) =
             MinterLogic.amountOut(getMinterStorage(), AmountOutParams({ mint: true, asset: _asset, amount: _amountIn }));
@@ -75,6 +81,11 @@ abstract contract Minter is IMinter, Access, MinterStorageUtils {
     /// @inheritdoc IMinter
     function whitelisted(address _user) external view returns (bool isWhitelisted) {
         isWhitelisted = getMinterStorage().whitelist[_user];
+    }
+
+    /// @inheritdoc IMinter
+    function depositCap(address _asset) public view returns (uint256 cap) {
+        cap = getMinterStorage().depositCap[_asset];
     }
 
     /// @dev Initialize unchained

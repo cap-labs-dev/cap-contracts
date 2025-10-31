@@ -8,8 +8,9 @@ import { VaultStorageUtils } from "../storage/VaultStorageUtils.sol";
 import { FractionalReserve } from "./FractionalReserve.sol";
 import { Minter } from "./Minter.sol";
 import { VaultLogic } from "./libraries/VaultLogic.sol";
-import { ERC20PermitUpgradeable } from
-    "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
+import {
+    ERC20PermitUpgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -36,7 +37,7 @@ abstract contract Vault is
         returns (uint256 amountOut)
     {
         uint256 fee;
-        (amountOut, fee) = getMintAmount(_asset, _amountIn);
+        (_amountIn, amountOut, fee) = getCappedMintAmount(_asset, _amountIn);
         VaultLogic.mint(
             getVaultStorage(),
             MintBurnParams({
@@ -171,7 +172,7 @@ abstract contract Vault is
     }
 
     /// @inheritdoc IVault
-    function totalSupplies(address _asset) external view returns (uint256 _totalSupply) {
+    function totalSupplies(address _asset) public view returns (uint256 _totalSupply) {
         _totalSupply = getVaultStorage().totalSupplies[_asset];
     }
 
@@ -203,6 +204,22 @@ abstract contract Vault is
     /// @inheritdoc IVault
     function insuranceFund() external view returns (address) {
         return getVaultStorage().insuranceFund;
+    }
+
+    /// @inheritdoc IVault
+    function getCappedMintAmount(address _asset, uint256 _amountIn)
+        public
+        view
+        returns (uint256 newAmountIn, uint256 amountOut, uint256 fee)
+    {
+        newAmountIn = _amountIn;
+        uint256 totalSupply = totalSupplies(_asset);
+        uint256 cap = depositCap(_asset);
+        if (_amountIn + totalSupply >= cap) {
+            if (totalSupply >= cap) return (newAmountIn, 0, 0);
+            newAmountIn = cap - totalSupply;
+        }
+        (amountOut, fee) = getMintAmount(_asset, newAmountIn);
     }
 
     /// @dev Initialize the assets
