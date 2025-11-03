@@ -215,8 +215,8 @@ abstract contract Vault is
         newAmountIn = _amountIn;
         uint256 totalSupply = totalSupplies(_asset);
         uint256 cap = depositCap(_asset);
-        if (_amountIn + totalSupply >= cap) {
-            if (totalSupply >= cap) return (newAmountIn, 0, 0);
+        if (_amountIn + totalSupply > cap) {
+            if (totalSupply >= cap) return (0, 0, 0);
             newAmountIn = cap - totalSupply;
         }
         (amountOut, fee) = getMintAmount(_asset, newAmountIn);
