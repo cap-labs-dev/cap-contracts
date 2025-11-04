@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import { Access } from "../access/Access.sol";
 
+import { IMinter } from "../interfaces/IMinter.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import { VaultStorageUtils } from "../storage/VaultStorageUtils.sol";
 import { FractionalReserve } from "./FractionalReserve.sol";
@@ -37,7 +38,9 @@ abstract contract Vault is
         returns (uint256 amountOut)
     {
         uint256 fee;
-        (_amountIn, amountOut, fee) = getCappedMintAmount(_asset, _amountIn);
+        uint256 remainingMintCapacity = getRemainingMintCapacity(_asset);
+        if (_amountIn > remainingMintCapacity) _amountIn = remainingMintCapacity;
+        (amountOut, fee) = Minter.getMintAmount(_asset, _amountIn);
         VaultLogic.mint(
             getVaultStorage(),
             MintBurnParams({
@@ -206,20 +209,23 @@ abstract contract Vault is
         return getVaultStorage().insuranceFund;
     }
 
-    /// @inheritdoc IVault
-    function getCappedMintAmount(address _asset, uint256 _amountIn)
+    /// @inheritdoc IMinter
+    function getMintAmount(address _asset, uint256 _amountIn)
         public
         view
-        returns (uint256 newAmountIn, uint256 amountOut, uint256 fee)
+        override
+        returns (uint256 amountOut, uint256 fee)
     {
-        newAmountIn = _amountIn;
+        uint256 remainingMintCapacity = getRemainingMintCapacity(_asset);
+        if (_amountIn > remainingMintCapacity) _amountIn = remainingMintCapacity;
+        (amountOut, fee) = Minter.getMintAmount(_asset, _amountIn);
+    }
+
+    /// @inheritdoc IVault
+    function getRemainingMintCapacity(address _asset) public view returns (uint256 remainingMintCapacity) {
         uint256 totalSupply = totalSupplies(_asset);
         uint256 cap = depositCap(_asset);
-        if (_amountIn + totalSupply > cap) {
-            if (totalSupply >= cap) return (0, 0, 0);
-            newAmountIn = cap - totalSupply;
-        }
-        (amountOut, fee) = getMintAmount(_asset, newAmountIn);
+        if (cap > totalSupply) remainingMintCapacity = cap - totalSupply;
     }
 
     /// @dev Initialize the assets

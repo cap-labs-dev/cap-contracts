@@ -178,11 +178,10 @@ contract VaultMintTest is TestDeployer {
         // Should mint the full amount because the deposit cap is max
         cUSD.mint(address(usdt), 90e6, 0, user, block.timestamp + 1 hours);
 
-        /// TODO: get fee from getMintAmount
         vm.startPrank(env.users.vault_config_admin);
         cUSD.setDepositCap(address(usdt), 110e6);
         console.log("totalSupply", cUSD.totalSupplies(address(usdt)));
-        (uint256 newAmountIn, uint256 amountOut, uint256 fee) = cUSD.getCappedMintAmount(address(usdt), 90e6);
+        (uint256 amountOut, uint256 fee) = cUSD.getMintAmount(address(usdt), 90e6);
         assertEq(amountOut, 9.95e18);
     }
 }

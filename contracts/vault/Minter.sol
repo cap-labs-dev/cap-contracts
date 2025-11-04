@@ -56,9 +56,15 @@ abstract contract Minter is IMinter, Access, MinterStorageUtils {
     }
 
     /// @inheritdoc IMinter
-    function getMintAmount(address _asset, uint256 _amountIn) public view returns (uint256 amountOut, uint256 fee) {
-        (amountOut, fee) =
-            MinterLogic.amountOut(getMinterStorage(), AmountOutParams({ mint: true, asset: _asset, amount: _amountIn }));
+    function getMintAmount(address _asset, uint256 _amountIn)
+        public
+        view
+        virtual
+        returns (uint256 amountOut, uint256 fee)
+    {
+        (amountOut, fee) = MinterLogic.amountOut(
+            getMinterStorage(), AmountOutParams({ mint: true, asset: _asset, amount: _amountIn })
+        );
     }
 
     /// @inheritdoc IMinter
@@ -74,8 +80,9 @@ abstract contract Minter is IMinter, Access, MinterStorageUtils {
         view
         returns (uint256[] memory amountsOut, uint256[] memory fees)
     {
-        (amountsOut, fees) =
-            MinterLogic.redeemAmountOut(getMinterStorage(), RedeemAmountOutParams({ amount: _amountIn }));
+        (amountsOut, fees) = MinterLogic.redeemAmountOut(
+            getMinterStorage(), RedeemAmountOutParams({ amount: _amountIn })
+        );
     }
 
     /// @inheritdoc IMinter

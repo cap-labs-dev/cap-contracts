@@ -194,14 +194,8 @@ interface IVault {
     /// @return insuranceFund Insurance fund
     function insuranceFund() external view returns (address);
 
-    /// @notice Get the capped mint amount for a given asset
+    /// @notice Get the remaining mint capacity of an asset
     /// @param _asset Asset address
-    /// @param _amountIn Amount of asset to use
-    /// @return newAmountIn Amount of asset to use
-    /// @return amountOut Amount minted
-    /// @return fee Fee applied
-    function getCappedMintAmount(address _asset, uint256 _amountIn)
-        external
-        view
-        returns (uint256 newAmountIn, uint256 amountOut, uint256 fee);
+    /// @return remainingMintCapacity Remaining mint capacity
+    function getRemainingMintCapacity(address _asset) external view returns (uint256 remainingMintCapacity);
 }
