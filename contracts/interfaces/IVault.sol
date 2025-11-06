@@ -79,6 +79,7 @@ interface IVault {
 
     /// @notice Mint the cap token using an asset
     /// @dev This contract must have approval to move asset from msg.sender
+    /// @dev The amount in is capped by the deposit cap of the asset
     /// @param _asset Whitelisted asset to deposit
     /// @param _amountIn Amount of asset to use in the minting
     /// @param _minAmountOut Minimum amount to mint
@@ -192,4 +193,9 @@ interface IVault {
     /// @notice Get the insurance fund
     /// @return insuranceFund Insurance fund
     function insuranceFund() external view returns (address);
+
+    /// @notice Get the remaining mint capacity of an asset
+    /// @param _asset Asset address
+    /// @return remainingMintCapacity Remaining mint capacity
+    function getRemainingMintCapacity(address _asset) external view returns (uint256 remainingMintCapacity);
 }

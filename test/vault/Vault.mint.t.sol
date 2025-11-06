@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
+import { console } from "forge-std/console.sol";
 
 contract VaultMintTest is TestDeployer {
     address user;
@@ -137,5 +138,50 @@ contract VaultMintTest is TestDeployer {
         cUSD.mint(address(usdt), amountIn, minAmountOut, user, deadline);
         // We have .5% less because of fees
         assertEq(cUSD.balanceOf(user), 0.995e12);
+    }
+
+    function test_mint_with_deposit_cap() public {
+        vm.startPrank(env.users.vault_config_admin);
+        cUSD.setDepositCap(address(usdt), 10e6);
+
+        vm.startPrank(user);
+
+        // Approve USDT spending
+        usdt.mint(user, 200e6);
+        usdt.approve(address(cUSD), 200e6);
+
+        // Mint cUSD with USDT over the deposit cap
+        uint256 amountIn = 100e6;
+        cUSD.mint(address(usdt), amountIn, 0, user, block.timestamp + 1 hours);
+        uint256 userBalance = cUSD.balanceOf(user);
+        // Only up to the cap is minted
+        assertEq(userBalance, 9.95e18);
+        console.log("totalSupply", cUSD.totalSupplies(address(usdt)));
+
+        /// Should revert as amountOut is 0 and we revert on 0.
+        vm.expectRevert();
+        cUSD.mint(address(usdt), 90e6, 0, user, block.timestamp + 1 hours);
+
+        vm.startPrank(env.users.vault_config_admin);
+        cUSD.setDepositCap(address(usdt), 0);
+
+        vm.startPrank(user);
+
+        // Should revert because the deposit cap is 0
+        vm.expectRevert();
+        cUSD.mint(address(usdt), 10e6, 0, user, block.timestamp + 1 hours);
+
+        vm.startPrank(env.users.vault_config_admin);
+        cUSD.setDepositCap(address(usdt), type(uint256).max);
+
+        vm.startPrank(user);
+        // Should mint the full amount because the deposit cap is max
+        cUSD.mint(address(usdt), 90e6, 0, user, block.timestamp + 1 hours);
+
+        vm.startPrank(env.users.vault_config_admin);
+        cUSD.setDepositCap(address(usdt), 110e6);
+        console.log("totalSupply", cUSD.totalSupplies(address(usdt)));
+        (uint256 amountOut, uint256 fee) = cUSD.getMintAmount(address(usdt), 90e6);
+        assertEq(amountOut, 9.95e18);
     }
 }

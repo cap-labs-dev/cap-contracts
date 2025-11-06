@@ -10,11 +10,13 @@ interface IMinter {
     /// @param redeemFee Redeem fee
     /// @param fees Fees for each asset
     /// @param whitelist Whitelist for users
+    /// @param depositCap Deposit cap for each asset
     struct MinterStorage {
         address oracle;
         uint256 redeemFee;
         mapping(address => FeeData) fees;
         mapping(address => bool) whitelist;
+        mapping(address => uint256) depositCap;
     }
 
     /// @dev Fee data set for an asset in a vault
@@ -68,6 +70,9 @@ interface IMinter {
     /// @dev Whitelist set
     event SetWhitelist(address user, bool whitelisted);
 
+    /// @dev Deposit cap set
+    event SetDepositCap(address asset, uint256 cap);
+
     /// @dev Invalid minimum mint fee
     error InvalidMinMintFee();
 
@@ -103,6 +108,11 @@ interface IMinter {
     /// @param _whitelisted Whitelist state
     function setWhitelist(address _user, bool _whitelisted) external;
 
+    /// @notice Set the deposit cap for an asset
+    /// @param _asset Asset address
+    /// @param _cap Deposit cap for the asset
+    function setDepositCap(address _asset, uint256 _cap) external;
+
     /// @notice Get the mint amount for a given asset
     /// @param _asset Asset address
     /// @param _amountIn Amount of asset to use
@@ -130,4 +140,9 @@ interface IMinter {
     /// @param _user User address
     /// @return isWhitelisted Whitelist state
     function whitelisted(address _user) external view returns (bool isWhitelisted);
+
+    /// @notice Get the deposit cap for an asset
+    /// @param _asset Asset address
+    /// @return cap Deposit cap for the asset
+    function depositCap(address _asset) external view returns (uint256 cap);
 }

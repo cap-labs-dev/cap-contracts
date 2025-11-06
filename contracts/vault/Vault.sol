@@ -3,13 +3,15 @@ pragma solidity ^0.8.28;
 
 import { Access } from "../access/Access.sol";
 
+import { IMinter } from "../interfaces/IMinter.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import { VaultStorageUtils } from "../storage/VaultStorageUtils.sol";
 import { FractionalReserve } from "./FractionalReserve.sol";
 import { Minter } from "./Minter.sol";
 import { VaultLogic } from "./libraries/VaultLogic.sol";
-import { ERC20PermitUpgradeable } from
-    "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
+import {
+    ERC20PermitUpgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -36,7 +38,9 @@ abstract contract Vault is
         returns (uint256 amountOut)
     {
         uint256 fee;
-        (amountOut, fee) = getMintAmount(_asset, _amountIn);
+        uint256 remainingMintCapacity = getRemainingMintCapacity(_asset);
+        if (_amountIn > remainingMintCapacity) _amountIn = remainingMintCapacity;
+        (amountOut, fee) = Minter.getMintAmount(_asset, _amountIn);
         VaultLogic.mint(
             getVaultStorage(),
             MintBurnParams({
@@ -171,7 +175,7 @@ abstract contract Vault is
     }
 
     /// @inheritdoc IVault
-    function totalSupplies(address _asset) external view returns (uint256 _totalSupply) {
+    function totalSupplies(address _asset) public view returns (uint256 _totalSupply) {
         _totalSupply = getVaultStorage().totalSupplies[_asset];
     }
 
@@ -203,6 +207,25 @@ abstract contract Vault is
     /// @inheritdoc IVault
     function insuranceFund() external view returns (address) {
         return getVaultStorage().insuranceFund;
+    }
+
+    /// @inheritdoc IMinter
+    function getMintAmount(address _asset, uint256 _amountIn)
+        public
+        view
+        override
+        returns (uint256 amountOut, uint256 fee)
+    {
+        uint256 remainingMintCapacity = getRemainingMintCapacity(_asset);
+        if (_amountIn > remainingMintCapacity) _amountIn = remainingMintCapacity;
+        (amountOut, fee) = Minter.getMintAmount(_asset, _amountIn);
+    }
+
+    /// @inheritdoc IVault
+    function getRemainingMintCapacity(address _asset) public view returns (uint256 remainingMintCapacity) {
+        uint256 totalSupply = totalSupplies(_asset);
+        uint256 cap = depositCap(_asset);
+        if (cap > totalSupply) remainingMintCapacity = cap - totalSupply;
     }
 
     /// @dev Initialize the assets
