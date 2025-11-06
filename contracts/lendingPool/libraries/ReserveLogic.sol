@@ -53,7 +53,7 @@ library ReserveLogic {
         }
 
         if (!filled) {
-            if ($.reservesCount + 1 >= 256) revert NoMoreReservesAllowed();
+            if ($.reservesCount >= 128) revert NoMoreReservesAllowed();
             id = $.reservesCount;
             $.reservesList[$.reservesCount] = params.asset;
         }
