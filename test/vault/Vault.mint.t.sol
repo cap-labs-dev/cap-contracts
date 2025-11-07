@@ -181,7 +181,7 @@ contract VaultMintTest is TestDeployer {
         vm.startPrank(env.users.vault_config_admin);
         cUSD.setDepositCap(address(usdt), 110e6);
         console.log("totalSupply", cUSD.totalSupplies(address(usdt)));
-        (uint256 amountOut, uint256 fee) = cUSD.getMintAmount(address(usdt), 90e6);
+        (uint256 amountOut,) = cUSD.getMintAmount(address(usdt), 90e6);
         assertEq(amountOut, 9.95e18);
     }
 }
