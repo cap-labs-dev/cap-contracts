@@ -11,7 +11,7 @@ jobs:
     env:
       FOUNDRY_PROFILE: slither
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       
       - name: Run Slither
         uses: crytic/slither-action@v0.4.1
