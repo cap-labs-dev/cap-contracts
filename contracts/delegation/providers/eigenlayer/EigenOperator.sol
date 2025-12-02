@@ -104,10 +104,8 @@ contract EigenOperator is IEigenOperator, Initializable, EigenOperatorStorageUti
     /// @inheritdoc IEigenOperator
     function advanceTotp() external {
         EigenOperatorStorage storage $ = getEigenOperatorStorage();
-        if (msg.sender != $.restaker) revert NotRestaker();
 
         // If for some reason the delegation approval has expired, allowlist the new digest
-        // This shouldn't matter since only the restaker can call this function
         bytes32 digest = calculateTotpDigestHash($.restaker, address(this));
         $.allowlistedDigests[digest] = true;
     }
