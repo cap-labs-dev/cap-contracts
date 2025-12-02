@@ -67,6 +67,7 @@ contract CheckAccess is
 
     address[] devEoas = [0xc1ab5a9593E6e1662A9a44F84Df4F31Fc8A76B52];
     address msig = address(0xb8FC49402dF3ee4f8587268FB89fda4d621a8793);
+    address timelock = address(0xD8236031d8279d82E615aF2BFab5FC0127A329ab);
     address gelato = address(0xe84E4337c382cC8Ed57c6FB12919270228B6B7A3);
     address balancerVault = address(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
 
@@ -324,6 +325,10 @@ contract CheckAccess is
 
         if (balancerVault == _address) {
             return unicode"⚖️ Balancer ⚖️";
+        }
+
+        if (timelock == _address) {
+            return unicode"🔒 Timelock 🔒";
         }
 
         return string.concat(unicode"🚨", _address.toHexString(), unicode"🚨");
