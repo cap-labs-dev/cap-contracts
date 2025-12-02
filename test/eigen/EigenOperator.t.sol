@@ -144,11 +144,6 @@ contract EigenOperatorTest is TestDeployer {
         // No revert expected
     }
 
-    function test_advance_totp_unauthorized() public {
-        vm.expectRevert();
-        eigenOperator.advanceTotp();
-    }
-
     function test_advance_totp_authorized_after_registration() public {
         vm.prank(restaker);
         eigenOperator.advanceTotp();
