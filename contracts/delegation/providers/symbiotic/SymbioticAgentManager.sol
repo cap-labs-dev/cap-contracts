@@ -43,14 +43,12 @@ contract SymbioticAgentManager is ISymbioticAgentManager, UUPSUpgradeable, Acces
         SymbioticAgentManagerStorage storage $ = getSymbioticAgentManagerStorage();
 
         /// 1. Add the agent to the delegation
-        IDelegation($.delegation).addAgent(
-            _agentConfig.agent, $.networkMiddleware, _agentConfig.ltv, _agentConfig.liquidationThreshold
-        );
+        IDelegation($.delegation)
+            .addAgent(_agentConfig.agent, $.networkMiddleware, _agentConfig.ltv, _agentConfig.liquidationThreshold);
 
         /// 2. Add the agent to the network
-        ISymbioticNetworkMiddleware($.networkMiddleware).registerVault(
-            _agentConfig.vault, _agentConfig.rewarder, _agentConfig.agent
-        );
+        ISymbioticNetworkMiddleware($.networkMiddleware)
+            .registerVault(_agentConfig.vault, _agentConfig.rewarder, _agentConfig.agent);
 
         /// 3. Add the agent to the rate oracle
         IRateOracle($.oracle).setRestakerRate(_agentConfig.agent, _agentConfig.delegationRate);
@@ -64,8 +62,12 @@ contract SymbioticAgentManager is ISymbioticAgentManager, UUPSUpgradeable, Acces
         SymbioticAgentManagerStorage storage $ = getSymbioticAgentManagerStorage();
         address[] memory assets = IVault($.cusd).assets();
         for (uint256 i; i < assets.length; ++i) {
-            (, uint256 unrealizedInterest) = ILender($.lender).maxRestakerRealization(_agent, assets[i]);
-            if (unrealizedInterest > 0) {
+            (,, address debtToken,,,,) = ILender($.lender).reservesData(assets[i]);
+            if (debtToken == address(0)) continue;
+
+            (uint256 realizedInterest, uint256 unrealizedInterest) =
+                ILender($.lender).maxRestakerRealization(_agent, assets[i]);
+            if (realizedInterest > 0 || unrealizedInterest > 0) {
                 ILender($.lender).realizeRestakerInterest(_agent, assets[i]);
             }
         }
