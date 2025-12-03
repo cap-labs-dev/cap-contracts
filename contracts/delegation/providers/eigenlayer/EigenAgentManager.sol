@@ -45,14 +45,14 @@ contract EigenAgentManager is IEigenAgentManager, UUPSUpgradeable, Access, Eigen
         EigenAgentManagerStorage storage $ = getEigenAgentManagerStorage();
 
         /// 1. Add the agent to the delegation
-        IDelegation($.delegation).addAgent(
-            _agentConfig.agent, $.serviceManager, _agentConfig.ltv, _agentConfig.liquidationThreshold
-        );
+        IDelegation($.delegation)
+            .addAgent(_agentConfig.agent, $.serviceManager, _agentConfig.ltv, _agentConfig.liquidationThreshold);
 
         /// 2. Add the agent to the network
-        IEigenServiceManager($.serviceManager).registerStrategy(
-            _agentConfig.strategy, _agentConfig.agent, _agentConfig.restaker, _agentConfig.operatorMetadata
-        );
+        IEigenServiceManager($.serviceManager)
+            .registerStrategy(
+                _agentConfig.strategy, _agentConfig.agent, _agentConfig.restaker, _agentConfig.operatorMetadata
+            );
 
         /// 3. Add the agent to the rate oracle
         IRateOracle($.oracle).setRestakerRate(_agentConfig.agent, _agentConfig.delegationRate);
@@ -66,8 +66,12 @@ contract EigenAgentManager is IEigenAgentManager, UUPSUpgradeable, Access, Eigen
         EigenAgentManagerStorage storage $ = getEigenAgentManagerStorage();
         address[] memory assets = IVault($.cusd).assets();
         for (uint256 i; i < assets.length; ++i) {
-            (, uint256 unrealizedInterest) = ILender($.lender).maxRestakerRealization(_agent, assets[i]);
-            if (unrealizedInterest > 0) {
+            (,, address debtToken,,,,) = ILender($.lender).reservesData(assets[i]);
+            if (debtToken == address(0)) continue;
+
+            (uint256 realizedInterest, uint256 unrealizedInterest) =
+                ILender($.lender).maxRestakerRealization(_agent, assets[i]);
+            if (realizedInterest > 0 || unrealizedInterest > 0) {
                 ILender($.lender).realizeRestakerInterest(_agent, assets[i]);
             }
         }
