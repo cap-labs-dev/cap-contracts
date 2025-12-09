@@ -15,6 +15,8 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @param oracle Oracle address
     /// @param epochDuration Epoch duration
     /// @param ltvBuffer LTV buffer from LT
+    /// @param feeRecipient Fee recipient
+    /// @param coverageCap Coverage cap for an agent
     struct DelegationStorage {
         EnumerableSet.AddressSet agents;
         mapping(address => AgentData) agentData;
