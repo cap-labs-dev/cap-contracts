@@ -139,12 +139,9 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     }
 
     /// @inheritdoc IDelegation
-    function setCoverageCap(address _collateral, uint256 _coverageCap)
-        external
-        checkAccess(this.setCoverageCap.selector)
-    {
-        getDelegationStorage().coverageCap[_collateral] = _coverageCap;
-        emit SetCoverageCap(_collateral, _coverageCap);
+    function setCoverageCap(address _agent, uint256 _coverageCap) external checkAccess(this.setCoverageCap.selector) {
+        getDelegationStorage().coverageCap[_agent] = _coverageCap;
+        emit SetCoverageCap(_agent, _coverageCap);
     }
 
     /// @inheritdoc IDelegation
@@ -181,7 +178,7 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         DelegationStorage storage $ = getDelegationStorage();
         uint256 _slashableCollateral = slashableCollateral(_agent);
         uint256 currentdelegation = ISymbioticNetworkMiddleware($.agentData[_agent].network).coverage(_agent);
-        uint256 cap = $.coverageCap[collateral(_agent)];
+        uint256 cap = $.coverageCap[_agent];
         uint256 lastBorrowMinusOneDelegation = _lastborrowMinusOneDelegation(_agent);
         delegation =
             Math.min(Math.min(_slashableCollateral, cap), Math.min(currentdelegation, lastBorrowMinusOneDelegation));
@@ -243,8 +240,8 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     }
 
     /// @inheritdoc IDelegation
-    function coverageCap(address _collateral) external view returns (uint256 cap) {
-        cap = getDelegationStorage().coverageCap[_collateral];
+    function coverageCap(address _agent) external view returns (uint256 cap) {
+        cap = getDelegationStorage().coverageCap[_agent];
     }
 
     /// @inheritdoc UUPSUpgradeable

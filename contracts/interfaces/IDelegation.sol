@@ -73,10 +73,10 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @param feeRecipient Fee recipient
     event SetFeeRecipient(address feeRecipient);
 
-    /// @notice Set the coverage cap
-    /// @param collateral Collateral address
+    /// @notice Set the coverage cap for an agent
+    /// @param agent Agent address
     /// @param coverageCap Coverage cap in USD (8 decimals)
-    event SetCoverageCap(address collateral, uint256 coverageCap);
+    event SetCoverageCap(address agent, uint256 coverageCap);
 
     /// @notice Agent does not exist
     error AgentDoesNotExist();
@@ -155,10 +155,10 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @param _feeRecipient Fee recipient
     function setFeeRecipient(address _feeRecipient) external;
 
-    /// @notice Set the coverage cap
-    /// @param _collateral Collateral address
+    /// @notice Set the coverage cap for an agent
+    /// @param _agent Agent address
     /// @param _coverageCap Coverage cap in USD (8 decimals)
-    function setCoverageCap(address _collateral, uint256 _coverageCap) external;
+    function setCoverageCap(address _agent, uint256 _coverageCap) external;
 
     /// @notice Get the epoch duration
     /// @return duration Epoch duration in seconds
@@ -222,8 +222,8 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @return recipient Fee recipient
     function feeRecipient() external view returns (address recipient);
 
-    /// @notice Get the coverage cap for a collateral
-    /// @param _collateral Collateral address
+    /// @notice Get the coverage cap for an agent
+    /// @param _agent Agent address
     /// @return cap Coverage cap in USD (8 decimals)
-    function coverageCap(address _collateral) external view returns (uint256 cap);
+    function coverageCap(address _agent) external view returns (uint256 cap);
 }

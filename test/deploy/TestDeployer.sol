@@ -251,15 +251,6 @@ contract TestDeployer is
             _restakers[1] = env.testUsers.restakers[2];
             _registerToEigenServiceManager(eigenAb, eigenAdmin, env.eigen.eigenConfig.agentManager, _agents, _restakers);
             _initEigenDelegations(eigenAb, env.eigen.eigenConfig.eigenServiceManager, _agents, _restakers, 10);
-
-            // Set coverage cap for Eigen collateral
-            vm.startPrank(env.users.delegation_admin);
-            for (uint256 i = 0; i < _agents.length; i++) {
-                address agent = _agents[i];
-                address eigenCollateral = Delegation(env.infra.delegation).collateral(agent);
-                Delegation(env.infra.delegation).setCoverageCap(eigenCollateral, 1_000_000_000_000e8);
-            }
-            vm.stopPrank();
         }
 
         /// Deploy Symbiotic Network Adapter
@@ -312,11 +303,8 @@ contract TestDeployer is
 
             vm.startPrank(env.users.delegation_admin);
             for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-                address symbioticAgent = env.testUsers.agents[i];
-                address symbioticCollateral = Delegation(env.infra.delegation).collateral(symbioticAgent);
-                Delegation(env.infra.delegation).setCoverageCap(symbioticCollateral, 1_000_000_000_000e8);
+                Delegation(env.infra.delegation).setCoverageCap(env.testUsers.agents[i], 1_000_000_000_000e8);
             }
-
             vm.stopPrank();
         }
 
