@@ -132,11 +132,11 @@ interface ISymbioticNetworkMiddleware {
     /// @param _oracle Oracle address
     /// @param _timestamp Timestamp to check coverage at
     /// @return collateralValue Coverage value in USD (8 decimals)
-    /// @return collateral Coverage amount in the vault's collateral token decimals
+    /// @return collateralAmount Coverage amount in the vault's collateral token decimals
     function coverageByVault(address _network, address _agent, address _vault, address _oracle, uint48 _timestamp)
         external
         view
-        returns (uint256 collateralValue, uint256 collateral);
+        returns (uint256 collateralValue, uint256 collateralAmount);
 
     /// @notice Slashable collateral of an agent by a specific vault at a given timestamp
     /// @param _network Network address
@@ -145,13 +145,14 @@ interface ISymbioticNetworkMiddleware {
     /// @param _oracle Oracle address
     /// @param _timestamp Timestamp to check slashable collateral at
     /// @return collateralValue Slashable collateral value in USD (8 decimals)
+    /// @return collateralAmount Slashable collateral amount in the vault's collateral token decimals
     function slashableCollateralByVault(
         address _network,
         address _agent,
         address _vault,
         address _oracle,
         uint48 _timestamp
-    ) external view returns (uint256 collateralValue, uint256 collateral);
+    ) external view returns (uint256 collateralValue, uint256 collateralAmount);
 
     /// @notice Coverage of an agent by Symbiotic vaults
     /// @param _agent Agent address
@@ -162,10 +163,7 @@ interface ISymbioticNetworkMiddleware {
     /// @param _agent Agent address
     /// @param _timestamp Timestamp to check slashable collateral at
     /// @return _slashableCollateral Slashable collateral amount in USD (8 decimals)
-    function slashableCollateral(address _agent, uint48 _timestamp)
-        external
-        view
-        returns (uint256 _slashableCollateral);
+    function slashableCollateral(address _agent, uint48 _timestamp) external view returns (uint256 _slashableCollateral);
 
     /// @notice Subnetwork identifier
     /// @param _agent Agent address
@@ -181,4 +179,9 @@ interface ISymbioticNetworkMiddleware {
     /// @param _agent Agent address
     /// @return vault Vault address
     function vaults(address _agent) external view returns (address vault);
+
+    /// @notice Collateral of an agent
+    /// @param _agent Agent address
+    /// @return collateralAddress Collateral address
+    function collateral(address _agent) external view returns (address collateralAddress);
 }

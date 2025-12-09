@@ -144,4 +144,28 @@ contract DelegationSlashTest is TestDeployer {
 
         vm.stopPrank();
     }
+
+    function test_slash_delegation_coverage_cap() public {
+        vm.startPrank(env.infra.lender);
+
+        uint256 coverageBefore = delegation.coverage(user_agent);
+        address collateral = delegation.collateral(user_agent);
+        uint256 coverageCap = delegation.coverageCap(collateral);
+
+        /// Set coverage cap to 100 USD of collateral
+        vm.startPrank(env.users.delegation_admin);
+        delegation.setCoverageCap(collateral, 100e8);
+        vm.stopPrank();
+
+        uint256 coverageAfter = delegation.coverage(user_agent);
+        assertEq(coverageAfter, 100e8);
+
+        /// Set coverage cap to a large number
+        vm.startPrank(env.users.delegation_admin);
+        delegation.setCoverageCap(collateral, 1_000_000_000_000e8);
+        vm.stopPrank();
+
+        coverageAfter = delegation.coverage(user_agent);
+        assertEq(coverageAfter, coverageBefore);
+    }
 }

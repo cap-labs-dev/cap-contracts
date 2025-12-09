@@ -278,6 +278,14 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     }
 
     /// @inheritdoc IEigenServiceManager
+    function collateral(address _operator) external view returns (address collateralAddress) {
+        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        CachedOperatorData storage operatorData = $.operators[_operator];
+        if (operatorData.strategy == address(0)) return address(0);
+        collateralAddress = address(IStrategy(operatorData.strategy).underlyingToken());
+    }
+
+    /// @inheritdoc IEigenServiceManager
     function operatorSetId(address _operator) external view returns (uint32) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         CachedOperatorData storage operatorData = $.operators[_operator];
@@ -377,9 +385,8 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
             IAllocationManager.OperatorSet({ avs: address(this), id: operatorData.operatorSetId });
 
         // @dev clear the burn or redistributable shares, this sends them to the service manager
-        IStrategyManager($.eigen.strategyManager).clearBurnOrRedistributableSharesByStrategy(
-            operatorSet, slashId, _strategy
-        );
+        IStrategyManager($.eigen.strategyManager)
+            .clearBurnOrRedistributableSharesByStrategy(operatorSet, slashId, _strategy);
     }
 
     /// @notice Create a rewards submission
@@ -435,9 +442,8 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
             description: "interest"
         });
 
-        IRewardsCoordinator($.eigen.rewardsCoordinator).createOperatorDirectedOperatorSetRewardsSubmission(
-            operatorSet, rewardsSubmissions
-        );
+        IRewardsCoordinator($.eigen.rewardsCoordinator)
+            .createOperatorDirectedOperatorSetRewardsSubmission(operatorSet, rewardsSubmissions);
     }
 
     /// @notice Check if the token has enough allowance for the spender
@@ -459,8 +465,8 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         uint8 decimals = IERC20Metadata(collateralAddress).decimals();
         (uint256 collateralPrice,) = IOracle($.oracle).getPrice(collateralAddress);
 
-        uint256 collateral = _getSlashableStake(_operator);
-        uint256 collateralValue = collateral * collateralPrice / (10 ** decimals);
+        uint256 collateralAmount = _getSlashableStake(_operator);
+        uint256 collateralValue = collateralAmount * collateralPrice / (10 ** decimals);
 
         return collateralValue;
     }
@@ -470,19 +476,19 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     /// @param _strategy The strategy address
     /// @param _oracle The oracle address
     /// @return collateralValue The collateral value
-    /// @return collateral The collateral
+    /// @return collateralAmount The collateral amount
     function _coverageByStrategy(address _operator, address _strategy, address _oracle)
         private
         view
-        returns (uint256 collateralValue, uint256 collateral)
+        returns (uint256 collateralValue, uint256 collateralAmount)
     {
         address collateralAddress = address(IStrategy(_strategy).underlyingToken());
         uint8 decimals = IERC20Metadata(collateralAddress).decimals();
         (uint256 collateralPrice,) = IOracle(_oracle).getPrice(collateralAddress);
 
         // @dev get the minimum slashable stake
-        collateral = _minimumSlashableStake(_operator, _strategy);
-        collateralValue = collateral * collateralPrice / (10 ** decimals);
+        collateralAmount = _minimumSlashableStake(_operator, _strategy);
+        collateralValue = collateralAmount * collateralPrice / (10 ** decimals);
     }
 
     /// @notice Get the slashable stake for a given operator and strategy
@@ -510,9 +516,10 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     function _slashableStakeInQueue(address _operator, address _strategy) private view returns (uint256) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         // @dev get the slashable stake in queue which are waiting to be withdrawn
-        return IStrategy(_strategy).sharesToUnderlyingView(
-            IDelegationManager($.eigen.delegationManager).getSlashableSharesInQueue(_operator, _strategy)
-        );
+        return IStrategy(_strategy)
+            .sharesToUnderlyingView(
+                IDelegationManager($.eigen.delegationManager).getSlashableSharesInQueue(_operator, _strategy)
+            );
     }
 
     /// @notice Get the minimum slashable stake for a given operator and strategy
@@ -530,9 +537,8 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         strategies[0] = _strategy;
 
         // @dev get the minimum slashable stake at the current block
-        uint256[][] memory slashableShares = IAllocationManager($.eigen.allocationManager).getMinimumSlashableStake(
-            operatorSet, operators, strategies, uint32(block.number)
-        );
+        uint256[][] memory slashableShares = IAllocationManager($.eigen.allocationManager)
+            .getMinimumSlashableStake(operatorSet, operators, strategies, uint32(block.number));
         return IStrategy(_strategy).sharesToUnderlyingView(slashableShares[0][0]);
     }
 

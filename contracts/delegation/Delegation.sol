@@ -139,6 +139,15 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     }
 
     /// @inheritdoc IDelegation
+    function setCoverageCap(address _collateral, uint256 _coverageCap)
+        external
+        checkAccess(this.setCoverageCap.selector)
+    {
+        getDelegationStorage().coverageCap[_collateral] = _coverageCap;
+        emit SetCoverageCap(_collateral, _coverageCap);
+    }
+
+    /// @inheritdoc IDelegation
     function epochDuration() external view returns (uint256 duration) {
         DelegationStorage storage $ = getDelegationStorage();
         duration = $.epochDuration;
@@ -172,8 +181,10 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         DelegationStorage storage $ = getDelegationStorage();
         uint256 _slashableCollateral = slashableCollateral(_agent);
         uint256 currentdelegation = ISymbioticNetworkMiddleware($.agentData[_agent].network).coverage(_agent);
+        uint256 cap = $.coverageCap[collateral(_agent)];
         uint256 lastBorrowMinusOneDelegation = _lastborrowMinusOneDelegation(_agent);
-        delegation = Math.min(_slashableCollateral, Math.min(currentdelegation, lastBorrowMinusOneDelegation));
+        delegation =
+            Math.min(Math.min(_slashableCollateral, cap), Math.min(currentdelegation, lastBorrowMinusOneDelegation));
     }
 
     /// @dev Returns the slashable collateral of the agent in the last epoch
@@ -181,9 +192,8 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     /// @return delegation The slashable collateral of the agent in the last epoch
     function _lastborrowMinusOneDelegation(address _agent) internal view returns (uint256 delegation) {
         DelegationStorage storage $ = getDelegationStorage();
-        delegation = ISymbioticNetworkMiddleware($.agentData[_agent].network).slashableCollateral(
-            _agent, uint48(block.timestamp - 1)
-        );
+        delegation = ISymbioticNetworkMiddleware($.agentData[_agent].network)
+            .slashableCollateral(_agent, uint48(block.timestamp - 1));
     }
 
     /// @inheritdoc IDelegation
@@ -192,6 +202,14 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         uint48 _slashTimestamp = slashTimestamp(_agent);
         _slashableCollateral =
             ISymbioticNetworkMiddleware($.agentData[_agent].network).slashableCollateral(_agent, _slashTimestamp);
+    }
+
+    /// @inheritdoc IDelegation
+    function collateral(address _agent) public view returns (address collateralAddress) {
+        DelegationStorage storage $ = getDelegationStorage();
+        address network = $.agentData[_agent].network;
+        if (network == address(0)) return address(0);
+        collateralAddress = ISymbioticNetworkMiddleware(network).collateral(_agent);
     }
 
     /// @inheritdoc IDelegation
@@ -222,6 +240,11 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     /// @inheritdoc IDelegation
     function feeRecipient() external view returns (address) {
         return getDelegationStorage().feeRecipient;
+    }
+
+    /// @inheritdoc IDelegation
+    function coverageCap(address _collateral) external view returns (uint256 cap) {
+        cap = getDelegationStorage().coverageCap[_collateral];
     }
 
     /// @inheritdoc UUPSUpgradeable

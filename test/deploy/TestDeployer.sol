@@ -9,13 +9,15 @@ import { EigenServiceManager } from "../../contracts/delegation/providers/eigenl
 
 import { SymbioticAgentManager } from "../../contracts/delegation/providers/symbiotic/SymbioticAgentManager.sol";
 import { SymbioticNetwork } from "../../contracts/delegation/providers/symbiotic/SymbioticNetwork.sol";
-import { SymbioticNetworkMiddleware } from
-    "../../contracts/delegation/providers/symbiotic/SymbioticNetworkMiddleware.sol";
+import {
+    SymbioticNetworkMiddleware
+} from "../../contracts/delegation/providers/symbiotic/SymbioticNetworkMiddleware.sol";
 
 import { FeeConfig, VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import { ISymbioticAgentManager } from "../../contracts/interfaces/ISymbioticAgentManager.sol";
-import { IOperatorNetworkSpecificDelegator } from
-    "@symbioticfi/core/src/interfaces/delegator/IOperatorNetworkSpecificDelegator.sol";
+import {
+    IOperatorNetworkSpecificDelegator
+} from "@symbioticfi/core/src/interfaces/delegator/IOperatorNetworkSpecificDelegator.sol";
 
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
 import { MockNetworkMiddleware } from "../mocks/MockNetworkMiddleware.sol";
@@ -23,7 +25,9 @@ import { MockNetworkMiddleware } from "../mocks/MockNetworkMiddleware.sol";
 import { AccessControl } from "../../contracts/access/AccessControl.sol";
 
 import {
-    EigenConfig, EigenUsersConfig, EigenVaultConfig
+    EigenConfig,
+    EigenUsersConfig,
+    EigenVaultConfig
 } from "../../contracts/deploy/interfaces/EigenDeployConfig.sol";
 import { SymbioticVaultParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 import { SymbioticNetworkAdapterParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
@@ -40,9 +44,12 @@ import { DeployImplems } from "../../contracts/deploy/service/DeployImplems.sol"
 import { DeployInfra } from "../../contracts/deploy/service/DeployInfra.sol";
 import { DeployLibs } from "../../contracts/deploy/service/DeployLibs.sol";
 import { DeployVault } from "../../contracts/deploy/service/DeployVault.sol";
-import { ConfigureSymbioticOptIns } from
-    "../../contracts/deploy/service/providers/symbiotic/ConfigureSymbioticOptIns.sol";
-import { DeployCapNetworkAdapter } from "../../contracts/deploy/service/providers/symbiotic/DeployCapNetworkAdapter.sol";
+import {
+    ConfigureSymbioticOptIns
+} from "../../contracts/deploy/service/providers/symbiotic/ConfigureSymbioticOptIns.sol";
+import {
+    DeployCapNetworkAdapter
+} from "../../contracts/deploy/service/providers/symbiotic/DeployCapNetworkAdapter.sol";
 import { ProxyUtils } from "../../contracts/deploy/utils/ProxyUtils.sol";
 import { SymbioticAddressbook, SymbioticUtils } from "../../contracts/deploy/utils/SymbioticUtils.sol";
 import { FeeAuction } from "../../contracts/feeAuction/FeeAuction.sol";
@@ -145,8 +152,9 @@ contract TestDeployer is
         env.permissionedOracleMocks = _deployOracleMocks(env.permissionedMocks);
 
         console.log("deploying usdVault");
-        env.usdVault =
-            _deployVault(env.implems, env.infra, "Cap USD", "cUSD", env.usdOracleMocks.assets, env.users.insurance_fund);
+        env.usdVault = _deployVault(
+            env.implems, env.infra, "Cap USD", "cUSD", env.usdOracleMocks.assets, env.users.insurance_fund
+        );
 
         if (useMockBackingNetwork()) {
             console.log("skipping lzperiphery");
@@ -243,6 +251,15 @@ contract TestDeployer is
             _restakers[1] = env.testUsers.restakers[2];
             _registerToEigenServiceManager(eigenAb, eigenAdmin, env.eigen.eigenConfig.agentManager, _agents, _restakers);
             _initEigenDelegations(eigenAb, env.eigen.eigenConfig.eigenServiceManager, _agents, _restakers, 10);
+
+            // Set coverage cap for Eigen collateral
+            vm.startPrank(env.users.delegation_admin);
+            for (uint256 i = 0; i < _agents.length; i++) {
+                address agent = _agents[i];
+                address eigenCollateral = Delegation(env.infra.delegation).collateral(agent);
+                Delegation(env.infra.delegation).setCoverageCap(eigenCollateral, 1_000_000_000_000e8);
+            }
+            vm.stopPrank();
         }
 
         /// Deploy Symbiotic Network Adapter
@@ -293,6 +310,13 @@ contract TestDeployer is
             _symbioticVaultConfigToEnv(_vault);
             _symbioticNetworkRewardsConfigToEnv(_rewards);
 
+            vm.startPrank(env.users.delegation_admin);
+            for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
+                address symbioticAgent = env.testUsers.agents[i];
+                address symbioticCollateral = Delegation(env.infra.delegation).collateral(symbioticAgent);
+                Delegation(env.infra.delegation).setCoverageCap(symbioticCollateral, 1_000_000_000_000e8);
+            }
+
             vm.stopPrank();
         }
 
@@ -314,10 +338,9 @@ contract TestDeployer is
 
         console.log(env.symbiotic.users.vault_admin);
 
-        (address vault, address delegator, address burner, address slasher, address stakerRewarder) =
-        CapSymbioticVaultFactory(env.symbiotic.networkAdapter.vaultFactory).createVault(
-            env.symbiotic.users.vault_admin, collateral, agent, env.symbiotic.networkAdapter.network
-        );
+        (address vault, address delegator, address burner, address slasher, address stakerRewarder) = CapSymbioticVaultFactory(
+                env.symbiotic.networkAdapter.vaultFactory
+            ).createVault(env.symbiotic.users.vault_admin, collateral, agent, env.symbiotic.networkAdapter.network);
 
         _vault.vault = vault;
         _vault.collateral = collateral;
