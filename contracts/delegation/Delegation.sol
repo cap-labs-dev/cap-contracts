@@ -202,7 +202,7 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     }
 
     /// @inheritdoc IDelegation
-    function collateral(address _agent) public view returns (address collateralAddress) {
+    function collateral(address _agent) external view returns (address collateralAddress) {
         DelegationStorage storage $ = getDelegationStorage();
         address network = $.agentData[_agent].network;
         if (network == address(0)) return address(0);
