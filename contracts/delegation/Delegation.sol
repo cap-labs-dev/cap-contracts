@@ -181,32 +181,16 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         uint256 currentdelegation = ISymbioticNetworkMiddleware($.agentData[_agent].network).coverage(_agent);
         uint256 lastBorrowMinusOneDelegation = _lastborrowMinusOneDelegation(_agent);
         uint256 cap = $.coverageCap[_agent];
+        uint48 currentEpochStart = uint48(epoch() * $.epochDuration);
 
-        uint256 lastBorrowTime = $.agentData[_agent].lastBorrow;
+        // Query coverage at the current epoch boundary
+        uint256 currentEpochCoverage =
+            ISymbioticNetworkMiddleware($.agentData[_agent].network).slashableCollateral(_agent, currentEpochStart);
 
-        // If we have debt, check if the CURRENT epoch start has coverage
-        if (lastBorrowTime > 0) {
-            uint48 currentEpochStart = uint48(epoch() * $.epochDuration);
-
-            // Query coverage at the current epoch boundary
-            uint256 currentEpochCoverage =
-                ISymbioticNetworkMiddleware($.agentData[_agent].network).slashableCollateral(_agent, currentEpochStart);
-
-            // If current epoch coverage is less than lastBorrow coverage, use current epoch as ceiling
-            if (currentEpochCoverage < lastBorrowMinusOneDelegation) {
-                delegation = Math.min(
-                    cap,
-                    Math.min(
-                        currentEpochCoverage,
-                        Math.min(_slashableCollateral, Math.min(currentdelegation, lastBorrowMinusOneDelegation))
-                    )
-                );
-                return delegation;
-            }
-        }
-
-        delegation =
-            Math.min(Math.min(_slashableCollateral, cap), Math.min(currentdelegation, lastBorrowMinusOneDelegation));
+        delegation = Math.min(
+            Math.min(currentEpochCoverage, _slashableCollateral),
+            Math.min(cap, Math.min(currentdelegation, lastBorrowMinusOneDelegation))
+        );
     }
 
     /// @dev Returns the slashable collateral of the agent in the last epoch
