@@ -176,10 +176,35 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     /// @inheritdoc IDelegation
     function coverage(address _agent) public view returns (uint256 delegation) {
         DelegationStorage storage $ = getDelegationStorage();
+
         uint256 _slashableCollateral = slashableCollateral(_agent);
         uint256 currentdelegation = ISymbioticNetworkMiddleware($.agentData[_agent].network).coverage(_agent);
-        uint256 cap = $.coverageCap[_agent];
         uint256 lastBorrowMinusOneDelegation = _lastborrowMinusOneDelegation(_agent);
+        uint256 cap = $.coverageCap[_agent];
+
+        uint256 lastBorrowTime = $.agentData[_agent].lastBorrow;
+
+        // If we have debt, check if the CURRENT epoch start has coverage
+        if (lastBorrowTime > 0) {
+            uint48 currentEpochStart = uint48(epoch() * $.epochDuration);
+
+            // Query coverage at the current epoch boundary
+            uint256 currentEpochCoverage =
+                ISymbioticNetworkMiddleware($.agentData[_agent].network).slashableCollateral(_agent, currentEpochStart);
+
+            // If current epoch coverage is less than lastBorrow coverage, use current epoch as ceiling
+            if (currentEpochCoverage < lastBorrowMinusOneDelegation) {
+                delegation = Math.min(
+                    cap,
+                    Math.min(
+                        currentEpochCoverage,
+                        Math.min(_slashableCollateral, Math.min(currentdelegation, lastBorrowMinusOneDelegation))
+                    )
+                );
+                return delegation;
+            }
+        }
+
         delegation =
             Math.min(Math.min(_slashableCollateral, cap), Math.min(currentdelegation, lastBorrowMinusOneDelegation));
     }
@@ -189,8 +214,9 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
     /// @return delegation The slashable collateral of the agent in the last epoch
     function _lastborrowMinusOneDelegation(address _agent) internal view returns (uint256 delegation) {
         DelegationStorage storage $ = getDelegationStorage();
-        delegation = ISymbioticNetworkMiddleware($.agentData[_agent].network)
-            .slashableCollateral(_agent, uint48(block.timestamp - 1));
+        delegation = ISymbioticNetworkMiddleware($.agentData[_agent].network).slashableCollateral(
+            _agent, uint48(block.timestamp - 1)
+        );
     }
 
     /// @inheritdoc IDelegation
