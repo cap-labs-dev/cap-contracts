@@ -9,7 +9,9 @@ import { FeeReceiver } from "../../feeReceiver/FeeReceiver.sol";
 import { Lender } from "../../lendingPool/Lender.sol";
 import { Oracle } from "../../oracle/Oracle.sol";
 
-import { L2Token } from "../../token/L2Token.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+
+import { L2TokenUpgradeable } from "../../token/L2TokenUpgradeable.sol";
 import { Vault } from "../../vault/Vault.sol";
 
 import { PreMainnetVault } from "../../testnetCampaign/PreMainnetVault.sol";
@@ -70,10 +72,15 @@ contract DeployInfra is ProxyUtils {
 
         name = Vault(l1Vault.capToken).name();
         symbol = Vault(l1Vault.capToken).symbol();
-        d.bridgedCapToken = address(new L2Token(name, symbol, lzEndpoint, delegate));
+        address l2CapTokenImplementation = address(new L2TokenUpgradeable(lzEndpoint));
+        bytes memory capTokenInitData = abi.encodeCall(L2TokenUpgradeable.initialize, (name, symbol, delegate));
+        d.bridgedCapToken = address(new ERC1967Proxy(address(l2CapTokenImplementation), capTokenInitData));
 
         name = Vault(l1Vault.stakedCapToken).name();
         symbol = Vault(l1Vault.stakedCapToken).symbol();
-        d.bridgedStakedCapToken = address(new L2Token(name, symbol, lzEndpoint, delegate));
+        address l2StakedCapTokenImplementation = address(new L2TokenUpgradeable(lzEndpoint));
+        bytes memory stakedCapTokenInitData = abi.encodeCall(L2TokenUpgradeable.initialize, (name, symbol, delegate));
+        d.bridgedStakedCapToken =
+            address(new ERC1967Proxy(address(l2StakedCapTokenImplementation), stakedCapTokenInitData));
     }
 }

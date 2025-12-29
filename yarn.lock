@@ -209,6 +209,11 @@
     lodash.isundefined "^3.0.1"
     lodash.uniq "^4.5.0"
 
+"@layerzerolabs/oft-evm-upgradeable@^4.0.2":
+  version "4.0.2"
+  resolved "https://registry.yarnpkg.com/@layerzerolabs/oft-evm-upgradeable/-/oft-evm-upgradeable-4.0.2.tgz#921396a52a13d74a99470436939ff3b5f71ef5b5"
+  integrity sha512-YOfo6WuyavNxKio5hfbD1KAqc1B4GcSj2T68/k4c2NQ6gRQWQ6poAQMoYenCfKlg+TIN1Hv4AXtDIN6eMOStfA==
+
 "@morenabarboni/sumo@^2.5.4":
   version "2.5.4"
   resolved "https://registry.yarnpkg.com/@morenabarboni/sumo/-/sumo-2.5.4.tgz#74d45c066c01a61fe5a17f3d67909d7d079ee8f4"
