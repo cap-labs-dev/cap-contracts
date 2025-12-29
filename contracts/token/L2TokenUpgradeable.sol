@@ -20,7 +20,7 @@ contract L2TokenUpgradeable is OFTUpgradeable, ERC20PermitUpgradeable, UUPSUpgra
     /// @param _name The name of the token
     /// @param _symbol The symbol of the token
     /// @param _delegate The delegate to be set
-    function initialize(string memory _name, string memory _symbol, address _delegate) public initializer {
+    function initialize(string memory _name, string memory _symbol, address _delegate) external initializer {
         // Initialize ownership first
         __Ownable_init(_delegate);
 
