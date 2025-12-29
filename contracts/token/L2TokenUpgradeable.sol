@@ -1,19 +1,33 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { OFTPermitUpgradeable } from "./OFTPermitUpgradeable.sol";
+import { OFTUpgradeable } from "@layerzerolabs/oft-evm-upgradeable/contracts/oft/OFTUpgradeable.sol";
+
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { ERC20PermitUpgradeable } from
+    "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 
 /// @title L2 Token
 /// @author kexley & weso, Cap Labs, LayerZero Labs
 /// @notice L2 Token with permit functions
-contract L2TokenUpgradeable is OFTPermitUpgradeable, UUPSUpgradeable {
+contract L2TokenUpgradeable is OFTUpgradeable, ERC20PermitUpgradeable, UUPSUpgradeable {
     /// @dev Initialize the L2 token
-    constructor(address _lzEndpoint) OFTPermitUpgradeable(_lzEndpoint) { }
-
-    function initialize(string memory _name, string memory _symbol, address _delegate) public initializer {
-        __OFTPermit_init(_name, _symbol, _delegate);
+    /// @param _lzEndpoint The LayerZero endpoint address
+    constructor(address _lzEndpoint) OFTUpgradeable(_lzEndpoint) {
+        _disableInitializers();
     }
 
+    /// @dev Initialize the L2 token
+    /// @param _name The name of the token
+    /// @param _symbol The symbol of the token
+    /// @param _delegate The delegate capable of making OApp configurations inside of the endpoint
+    function initialize(string memory _name, string memory _symbol, address _delegate) public initializer {
+        __ERC20Permit_init(_name);
+        __OFT_init(_name, _symbol, _delegate);
+        __UUPSUpgradeable_init();
+        __Ownable_init(msg.sender);
+    }
+
+    /// @dev Authorize the upgrade
     function _authorizeUpgrade(address) internal view override onlyOwner { }
 }
