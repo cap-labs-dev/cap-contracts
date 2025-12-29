@@ -41,5 +41,15 @@ contract L2TokenTest is TestDeployer {
         l2cap.upgradeToAndCall(newImplementation, "");
         l2StakedCap.upgradeToAndCall(newImplementation, "");
         vm.stopPrank();
+
+        vm.startPrank(user);
+        newImplementation = address(new L2TokenUpgradeable(address(lzAb.endpointV2)));
+
+        vm.expectRevert();
+        l2cap.upgradeToAndCall(newImplementation, "");
+
+        vm.expectRevert();
+        l2StakedCap.upgradeToAndCall(newImplementation, "");
+        vm.stopPrank();
     }
 }
