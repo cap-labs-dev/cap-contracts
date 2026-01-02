@@ -10,7 +10,7 @@
                 }
             }
         ],
-        "capOFTLockbox": "0x0000000000000000000000000000000000000000",
+        "capOFTLockbox": "0xA62571EbdFfAbC3051a2e5B9e1f57b23D830c8Fd",
         "capToken": {
             "address": "0xcCcc62962d17b8914c62D74FfB843d73B2a3cccC",
             "decimals": 18,
@@ -30,7 +30,7 @@
         ],
         "feeAuction": "0xa1a20aBdc873CF291c22Ce3C8968EC06277324D0",
         "feeReceiver": "0x0036c7b9b62c53F47c804a5643F0c09f864beF0b",
-        "stakedCapOFTLockbox": "0x0000000000000000000000000000000000000000",
+        "stakedCapOFTLockbox": "0x983AEAaA0d0426839158435C43725EA7F45d4137",
         "stakedCapToken": {
             "address": "0x88887bE419578051FF9F4eb6C858A951921D8888",
             "decimals": 18,
