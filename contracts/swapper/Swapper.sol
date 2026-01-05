@@ -119,11 +119,6 @@ contract Swapper is ISwapper, UUPSUpgradeable, Access, SwapperStorageUtils {
             data = _insertData(data, swapData.amountIndex, abi.encode(_amountIn));
         }
 
-        // If the min index is greater than 0, insert the minimum amount into the data
-        if (swapData.minIndex > 0) {
-            data = _insertData(data, swapData.minIndex, abi.encode(_minAmountOut));
-        }
-
         IERC20Metadata(_fromToken).forceApprove(router, type(uint256).max);
         (bool success,) = router.call(data);
         if (!success) revert SwapFailed(router, data);

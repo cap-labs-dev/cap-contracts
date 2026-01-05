@@ -11,14 +11,11 @@ interface ISwapper {
     /// @param router Target address that will handle the swap
     /// @param data Payload of a template swap between the two tokens
     /// @param amountIndex Location in the data byte string where the amount should be overwritten
-    /// @param minIndex Location in the data byte string where the min amount to swap should be
-    /// overwritten
     /// @param slippage Slippage tolerance for the swap (in 18 decimals)
     struct SwapInfo {
         address router;
         bytes data;
         uint256 amountIndex;
-        uint256 minIndex;
         uint256 slippage;
     }
 
