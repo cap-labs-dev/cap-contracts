@@ -47,6 +47,7 @@
   "dependencies": {
     "@morenabarboni/sumo": "^2.5.4",
     "@openzeppelin/foundry-upgrades": "^0.3.7",
+    "@uniswap/v3-core": "^1.0.0",
     "eigenlayer": "^2.1.5"
   }
 }
