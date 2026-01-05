@@ -105,9 +105,8 @@ contract SymbioticNetworkMiddleware is
 
         address operator = ISymbioticNetwork($.network).getOperator(_agent);
 
-        ISlasher(vault.slasher()).slash(
-            subnetwork(operator), operator, slashShareOfCollateral, _timestamp, new bytes(0)
-        );
+        ISlasher(vault.slasher())
+            .slash(subnetwork(operator), operator, slashShareOfCollateral, _timestamp, new bytes(0));
 
         IBurnerRouter(vault.burner()).triggerTransfer(address(this));
         IERC20(vault.collateral()).safeTransfer(_recipient, slashShareOfCollateral);
@@ -124,16 +123,17 @@ contract SymbioticNetworkMiddleware is
         address stakerRewarder = $.vaults[_vault].stakerRewarder;
 
         IERC20(_token).forceApprove(stakerRewarder, _amount);
-        IStakerRewards(stakerRewarder).distributeRewards(
-            $.network, _token, _amount, abi.encode(uint48(block.timestamp - 1), $.feeAllowed, "", "")
-        );
+        IStakerRewards(stakerRewarder)
+            .distributeRewards(
+                $.network, _token, _amount, abi.encode(uint48(block.timestamp - 1), $.feeAllowed, "", "")
+            );
     }
 
     /// @inheritdoc ISymbioticNetworkMiddleware
     function coverageByVault(address _network, address _agent, address _vault, address _oracle, uint48 _timestamp)
         public
         view
-        returns (uint256 collateralValue, uint256 collateral)
+        returns (uint256 collateralValue, uint256 collateralAmount)
     {
         (IBurnerRouter burnerRouter, uint8 decimals, uint256 collateralPrice) =
             _getVaultInfo(_network, _agent, _vault, _oracle);
@@ -142,8 +142,9 @@ contract SymbioticNetworkMiddleware is
 
         address operator = ISymbioticNetwork(_network).getOperator(_agent);
 
-        collateral = IBaseDelegator(IVault(_vault).delegator()).stakeAt(subnetwork(operator), operator, _timestamp, "");
-        collateralValue = collateral * collateralPrice / (10 ** decimals);
+        collateralAmount =
+            IBaseDelegator(IVault(_vault).delegator()).stakeAt(subnetwork(operator), operator, _timestamp, "");
+        collateralValue = collateralAmount * collateralPrice / (10 ** decimals);
     }
 
     /// @inheritdoc ISymbioticNetworkMiddleware
@@ -153,7 +154,7 @@ contract SymbioticNetworkMiddleware is
         address _vault,
         address _oracle,
         uint48 _timestamp
-    ) public view returns (uint256 collateralValue, uint256 collateral) {
+    ) public view returns (uint256 collateralValue, uint256 collateralAmount) {
         (IBurnerRouter burnerRouter, uint8 decimals, uint256 collateralPrice) =
             _getVaultInfo(_network, _agent, _vault, _oracle);
 
@@ -161,8 +162,8 @@ contract SymbioticNetworkMiddleware is
 
         ISlasher slasher = ISlasher(IVault(_vault).slasher());
         address operator = ISymbioticNetwork(_network).getOperator(_agent);
-        collateral = slasher.slashableStake(subnetwork(operator), operator, _timestamp, "");
-        collateralValue = collateral * collateralPrice / (10 ** decimals);
+        collateralAmount = slasher.slashableStake(subnetwork(operator), operator, _timestamp, "");
+        collateralValue = collateralAmount * collateralPrice / (10 ** decimals);
     }
 
     /// @inheritdoc ISymbioticNetworkMiddleware
@@ -178,11 +179,7 @@ contract SymbioticNetworkMiddleware is
     }
 
     /// @inheritdoc ISymbioticNetworkMiddleware
-    function slashableCollateral(address _agent, uint48 _timestamp)
-        public
-        view
-        returns (uint256 _slashableCollateral)
-    {
+    function slashableCollateral(address _agent, uint48 _timestamp) public view returns (uint256 _slashableCollateral) {
         SymbioticNetworkMiddlewareStorage storage $ = getSymbioticNetworkMiddlewareStorage();
         address _vault = $.agentsToVault[_agent];
         address _network = $.network;
@@ -205,6 +202,14 @@ contract SymbioticNetworkMiddleware is
     /// @inheritdoc ISymbioticNetworkMiddleware
     function vaults(address _agent) external view returns (address vaultAddress) {
         vaultAddress = getSymbioticNetworkMiddlewareStorage().agentsToVault[_agent];
+    }
+
+    /// @inheritdoc ISymbioticNetworkMiddleware
+    function collateral(address _agent) external view returns (address collateralAddress) {
+        SymbioticNetworkMiddlewareStorage storage $ = getSymbioticNetworkMiddlewareStorage();
+        address vault = $.agentsToVault[_agent];
+        if (vault == address(0)) return address(0);
+        collateralAddress = IVault(vault).collateral();
     }
 
     /// @dev Get vault info

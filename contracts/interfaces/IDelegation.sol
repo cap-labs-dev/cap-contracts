@@ -15,6 +15,8 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @param oracle Oracle address
     /// @param epochDuration Epoch duration
     /// @param ltvBuffer LTV buffer from LT
+    /// @param feeRecipient Fee recipient
+    /// @param coverageCap Coverage cap for an agent
     struct DelegationStorage {
         EnumerableSet.AddressSet agents;
         mapping(address => AgentData) agentData;
@@ -23,6 +25,7 @@ interface IDelegation is IRestakerRewardReceiver {
         uint256 epochDuration;
         uint256 ltvBuffer;
         address feeRecipient;
+        mapping(address => uint256) coverageCap;
     }
 
     /// @dev Agent data
@@ -71,6 +74,11 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @notice Set the fee recipient
     /// @param feeRecipient Fee recipient
     event SetFeeRecipient(address feeRecipient);
+
+    /// @notice Set the coverage cap for an agent
+    /// @param agent Agent address
+    /// @param coverageCap Coverage cap in USD (8 decimals)
+    event SetCoverageCap(address agent, uint256 coverageCap);
 
     /// @notice Agent does not exist
     error AgentDoesNotExist();
@@ -149,6 +157,11 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @param _feeRecipient Fee recipient
     function setFeeRecipient(address _feeRecipient) external;
 
+    /// @notice Set the coverage cap for an agent
+    /// @param _agent Agent address
+    /// @param _coverageCap Coverage cap in USD (8 decimals)
+    function setCoverageCap(address _agent, uint256 _coverageCap) external;
+
     /// @notice Get the epoch duration
     /// @return duration Epoch duration in seconds
     /// @dev The duration between epochs. Pretty much the amount of time we have to slash the delegated collateral, if delegation is changed on the symbiotic vault.
@@ -178,6 +191,11 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @return _slashableCollateral Amount in USD (8 decimals) that a agent has provided as slashable collateral from the delegators
     function slashableCollateral(address _agent) external view returns (uint256 _slashableCollateral);
 
+    /// @notice Get the collateral address for an agent
+    /// @param _agent Agent address
+    /// @return collateralAddress Collateral address
+    function collateral(address _agent) external view returns (address collateralAddress);
+
     /// @notice Fetch active network address
     /// @param _agent Agent address
     /// @return networkAddress network address
@@ -205,4 +223,9 @@ interface IDelegation is IRestakerRewardReceiver {
     /// @notice Get the fee recipient
     /// @return recipient Fee recipient
     function feeRecipient() external view returns (address recipient);
+
+    /// @notice Get the coverage cap for an agent
+    /// @param _agent Agent address
+    /// @return cap Coverage cap in USD (8 decimals)
+    function coverageCap(address _agent) external view returns (uint256 cap);
 }

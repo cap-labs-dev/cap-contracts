@@ -180,6 +180,13 @@ interface IEigenServiceManager {
     function slashableCollateral(address operator, uint48 timestamp) external view returns (uint256);
 
     /**
+     * @notice Collateral of an agent
+     * @param _operator Operator address
+     * @return collateralAddress Collateral address
+     */
+    function collateral(address _operator) external view returns (address collateralAddress);
+
+    /**
      * @notice Sets the epochs between distributions
      * @param _epochsBetweenDistributions The epochs between distributions
      */
