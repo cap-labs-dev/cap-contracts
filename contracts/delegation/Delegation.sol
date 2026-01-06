@@ -183,6 +183,8 @@ contract Delegation is IDelegation, UUPSUpgradeable, Access, DelegationStorageUt
         uint256 cap = $.coverageCap[_agent];
         uint48 currentEpochStart = uint48(epoch() * $.epochDuration);
 
+        if (currentEpochStart == block.timestamp) currentEpochStart -= 1;
+
         // Query coverage at the current epoch boundary
         uint256 currentEpochCoverage =
             ISymbioticNetworkMiddleware($.agentData[_agent].network).slashableCollateral(_agent, currentEpochStart);
