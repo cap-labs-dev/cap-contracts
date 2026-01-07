@@ -98,7 +98,11 @@ contract Swapper is ISwapper, UUPSUpgradeable, Access, SwapperStorageUtils {
         amountOut = IERC20Metadata(_toToken).balanceOf(address(this));
         if (amountOut < _minAmountOut) revert SlippageExceeded(amountOut, _minAmountOut);
         if (amountOut == 0) revert NoAmountOut();
+
         IERC20Metadata(_toToken).safeTransfer(msg.sender, amountOut);
+        if (IERC20Metadata(_fromToken).balanceOf(address(this)) > 0) {
+            IERC20Metadata(_fromToken).safeTransfer(msg.sender, IERC20Metadata(_fromToken).balanceOf(address(this)));
+        }
         emit Swap(msg.sender, _fromToken, _toToken, _amountIn, amountOut);
     }
 
