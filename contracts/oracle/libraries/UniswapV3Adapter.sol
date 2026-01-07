@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import { IOracle } from "../../interfaces/IOracle.sol";
-import { IUniswapV3Pool, UniswapV3OracleLibrary } from "./UniswapV3OracleLibrary.sol";
+import { IUniswapV3Pool, TickMath, UniswapV3OracleLibrary } from "./UniswapV3OracleLibrary.sol";
 
 /// @title UniswapV3 Adapter
 /// @author kexley, Cap Labs
@@ -36,7 +36,7 @@ library UniswapV3Adapter {
         int256 chainedTick = UniswapV3OracleLibrary.getChainedPrice(tokens, ticks);
 
         // Do not let the conversion overflow
-        if (chainedTick > type(int24).max) return (0, 0);
+        if (chainedTick > int256(TickMath.MAX_TICK) || chainedTick < -int256(TickMath.MAX_TICK)) return (0, 0);
 
         uint256 amountOut =
             UniswapV3OracleLibrary.getQuoteAtTick(int24(chainedTick), 10 ** IERC20Metadata(tokens[0]).decimals());

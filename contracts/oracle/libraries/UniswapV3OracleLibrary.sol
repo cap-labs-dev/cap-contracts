@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import { FullMath } from "./FullMath.sol";
 import "./TickMath.sol";
 import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
@@ -46,13 +47,13 @@ library UniswapV3OracleLibrary {
     function getQuoteAtTick(int24 tick, uint256 baseAmount) internal pure returns (uint256 quoteAmount) {
         uint160 sqrtRatioX96 = TickMath.getSqrtRatioAtTick(tick);
 
-        // Calculate quoteAmount with better precision if it doesn't overflow when multiplied by itself
-        if (sqrtRatioX96 * baseAmount <= type(uint128).max) {
+        // Calculate quoteAmount with better precision if sqrtPrice doesn't overflow when multiplied by itself
+        if (sqrtRatioX96 <= type(uint128).max) {
             uint256 ratioX192 = uint256(sqrtRatioX96) * sqrtRatioX96;
-            quoteAmount = ratioX192 * baseAmount / (1 << 192);
+            quoteAmount = FullMath.mulDiv(ratioX192, baseAmount, (1 << 192));
         } else {
-            uint256 ratioX128 = uint256(sqrtRatioX96) * sqrtRatioX96 / (1 << 64);
-            quoteAmount = ratioX128 * baseAmount / (1 << 128);
+            uint256 ratioX128 = FullMath.mulDiv(uint256(sqrtRatioX96), uint256(sqrtRatioX96), (1 << 64));
+            quoteAmount = FullMath.mulDiv(ratioX128, baseAmount, (1 << 128));
         }
     }
 
