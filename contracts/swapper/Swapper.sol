@@ -78,8 +78,8 @@ contract Swapper is ISwapper, UUPSUpgradeable, Access, SwapperStorageUtils {
         uint8 decimals0 = IERC20Metadata(_fromToken).decimals();
         uint8 decimals1 = IERC20Metadata(_toToken).decimals();
         uint256 slippage = getSwapperStorage().swapInfo[_fromToken][_toToken].slippage;
-        uint256 slippedAmountIn = _amountIn * slippage / 1 ether;
-        amountOut = _calculateAmountOut(slippedAmountIn, fromPrice, toPrice, decimals0, decimals1);
+        amountOut = _calculateAmountOut(_amountIn, fromPrice, toPrice, decimals0, decimals1);
+        amountOut = amountOut * slippage / 1 ether;
     }
 
     /// @dev _fromToken is pulled into this contract from the caller, swap is executed according to
