@@ -37,7 +37,12 @@ library UniswapV3OracleLibrary {
 
         // We are multiplying here instead of shifting to ensure that harmonicMeanLiquidity doesn't overflow uint128
         uint192 secondsAgoX160 = uint192(secondsAgo) * type(uint160).max;
-        harmonicMeanLiquidity = uint128(secondsAgoX160 / (uint192(secondsPerLiquidityCumulativesDelta) << 32));
+        if (secondsPerLiquidityCumulativesDelta == 0) {
+            // Zero in-range liquidity across the window; avoid division by zero and return 0 liquidity
+            harmonicMeanLiquidity = 0;
+        } else {
+            harmonicMeanLiquidity = uint128(secondsAgoX160 / (uint192(secondsPerLiquidityCumulativesDelta) << 32));
+        }
     }
 
     /// @notice Given a tick and a token amount, calculates the amount of token received in exchange
