@@ -44,6 +44,7 @@ library UniswapV3Adapter {
         (uint256 basePrice, uint256 lastBaseUpdated) = IOracle(msg.sender).getPrice(tokens[0]);
         uint8 decimals = IERC20Metadata(tokens[tokens.length - 1]).decimals();
         amountOut = decimals == 18 ? amountOut : amountOut * 10 ** 18 / 10 ** decimals;
+        if (amountOut == 0) return (0, 0);
         latestAnswer = basePrice * 1 ether / amountOut;
 
         if (latestAnswer != 0) lastUpdated = lastBaseUpdated;
