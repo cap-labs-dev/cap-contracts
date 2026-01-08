@@ -63,14 +63,35 @@ abstract contract Minter is IMinter, Access, MinterStorageUtils {
         returns (uint256 amountOut, uint256 fee)
     {
         (amountOut, fee) = MinterLogic.amountOut(
-            getMinterStorage(), AmountOutParams({ mint: true, asset: _asset, amount: _amountIn })
+            msg.sender, getMinterStorage(), AmountOutParams({ mint: true, asset: _asset, amount: _amountIn })
+        );
+    }
+
+    function getMintAmount(address user, address _asset, uint256 _amountIn)
+        public
+        view
+        virtual
+        returns (uint256 amountOut, uint256 fee)
+    {
+        (amountOut, fee) = MinterLogic.amountOut(
+            user, getMinterStorage(), AmountOutParams({ mint: true, asset: _asset, amount: _amountIn })
         );
     }
 
     /// @inheritdoc IMinter
     function getBurnAmount(address _asset, uint256 _amountIn) public view returns (uint256 amountOut, uint256 fee) {
         (amountOut, fee) = MinterLogic.amountOut(
-            getMinterStorage(), AmountOutParams({ mint: false, asset: _asset, amount: _amountIn })
+            msg.sender, getMinterStorage(), AmountOutParams({ mint: false, asset: _asset, amount: _amountIn })
+        );
+    }
+
+    function getBurnAmount(address user, address _asset, uint256 _amountIn)
+        public
+        view
+        returns (uint256 amountOut, uint256 fee)
+    {
+        (amountOut, fee) = MinterLogic.amountOut(
+            user, getMinterStorage(), AmountOutParams({ mint: false, asset: _asset, amount: _amountIn })
         );
     }
 
@@ -81,8 +102,18 @@ abstract contract Minter is IMinter, Access, MinterStorageUtils {
         returns (uint256[] memory amountsOut, uint256[] memory fees)
     {
         (amountsOut, fees) = MinterLogic.redeemAmountOut(
-            getMinterStorage(), RedeemAmountOutParams({ amount: _amountIn })
+            msg.sender, getMinterStorage(), RedeemAmountOutParams({ amount: _amountIn })
         );
+    }
+
+    /// @inheritdoc IMinter
+    function getRedeemAmount(address user, uint256 _amountIn)
+        public
+        view
+        returns (uint256[] memory amountsOut, uint256[] memory fees)
+    {
+        (amountsOut, fees) =
+            MinterLogic.redeemAmountOut(user, getMinterStorage(), RedeemAmountOutParams({ amount: _amountIn }));
     }
 
     /// @inheritdoc IMinter
