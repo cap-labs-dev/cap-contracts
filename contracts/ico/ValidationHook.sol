@@ -12,9 +12,10 @@ import { ValidationHookStorageUtils } from "../storage/ValidationHookStorageUtil
 
 /// @title ValidationHook
 /// @author kexley, Cap Labs
-/// @notice Validation hook using a soulbound ERC721 token and a time gate
+/// @notice Validation hook using a soulbound ERC721 token, a time gate and attestations from Predicate.
 /// @dev This hook validates that the sender is the owner of a specific ERC721 token or the time gate has passed.
-/// The auction address is set after initialization since this contract address is used in the auction constructor.
+/// Attestations are used to validate that the sender is KYC/KYB compliant. The auction address is set after
+/// initialization since this contract address is used in the auction constructor.
 contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Access, ValidationHookStorageUtils {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
