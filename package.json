@@ -39,7 +39,8 @@
     "@symbioticfi/hooks": "^1.0.0-devnet.1",
     "@symbioticfi/rewards": "^1.0.0-devnet.6",
     "eigenlayer-contracts": "^1.0.4",
-    "lefthook": "^1.10.10"
+    "lefthook": "^1.10.10",
+    "@predicate/contracts": "^2.2.0"
   },
   "resolutions": {
     "@openzeppelin/contracts": "^5.2.0"
