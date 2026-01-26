@@ -17,6 +17,9 @@ interface ISoulboundERC721Merkle {
     /// @dev Address already owns a token
     error AlreadyMinted();
 
+    /// @dev Invalid Merkle proof
+    error InvalidProof();
+
     /// @dev Token is soulbound
     error Soulbound();
 
