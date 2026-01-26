@@ -5,6 +5,7 @@ pragma solidity ^0.8.28;
 /// @author kexley, Cap Labs
 /// @notice Interface for CCA token
 interface ICCAToken {
+    /// @custom:storage-location erc7201:cap.storage.CCAToken
     /// @dev CCA token storage
     /// @param whitelist Whitelist of addresses
     /// @param zap Zap address
