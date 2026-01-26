@@ -25,6 +25,11 @@ contract SoulboundERC721Merkle is
     Access,
     SoulboundERC721MerkleStorageUtils
 {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /// @inheritdoc ISoulboundERC721Merkle
     function initialize(address _accessControl, string memory _name, string memory _symbol) external initializer {
         if (_accessControl == address(0)) revert ZeroAddressNotValid();
@@ -57,8 +62,8 @@ contract SoulboundERC721Merkle is
     }
 
     /// @inheritdoc ISoulboundERC721Merkle
-    function setBaseURI(string memory _baseURI) external checkAccess(this.setBaseURI.selector) {
-        getSoulboundERC721MerkleStorage().baseURI = _baseURI;
+    function setBaseURI(string memory baseURI_) external checkAccess(this.setBaseURI.selector) {
+        getSoulboundERC721MerkleStorage().baseURI = baseURI_;
     }
 
     /// @inheritdoc ISoulboundERC721Merkle

@@ -48,8 +48,8 @@ interface ISoulboundERC721Merkle {
     function setRoot(bytes32 _root) external;
 
     /// @notice Set the base URI for token metadata
-    /// @param _baseURI Base URI
-    function setBaseURI(string memory _baseURI) external;
+    /// @param baseURI_ Base URI
+    function setBaseURI(string memory baseURI_) external;
 
     /// @notice Pause minting
     function pause() external;
