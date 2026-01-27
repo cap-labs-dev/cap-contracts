@@ -43,7 +43,7 @@ contract SoulboundERC721Merkle is
     /// @inheritdoc ISoulboundERC721Merkle
     function mint(address _to, bytes32[] memory _proofs) external whenNotPaused {
         if (balanceOf(_to) > 0) revert AlreadyMinted();
-        bytes32 leaf = keccak256(abi.encode(_to));
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(_to))));
         if (!MerkleProof.verify(_proofs, getSoulboundERC721MerkleStorage().root, leaf)) revert InvalidProof();
         _safeMint(_to, totalSupply());
     }
