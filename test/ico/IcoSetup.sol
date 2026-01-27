@@ -15,6 +15,7 @@ import { Test } from "forge-std/Test.sol";
 contract IcoSetup is Test {
     address public admin;
     address public user;
+    address public auction;
 
     AccessControl public accessControl;
     SoulboundERC721Merkle public erc721;
@@ -28,6 +29,7 @@ contract IcoSetup is Test {
         vm.deal(admin, 1 ether);
         user = makeAddr("user");
         vm.deal(user, 1 ether);
+        auction = makeAddr("auction");
 
         accessControl = AccessControl(
             address(
@@ -99,5 +101,6 @@ contract IcoSetup is Test {
         accessControl.grantAccess(validationHook.setPolicyID.selector, address(validationHook), admin);
 
         erc721.setRoot(0x41d61debd9c625d62e0aff28c0fd0609344c9f5abff5eb7a28570885491bdbcb);
+        validationHook.setAuction(auction);
     }
 }
