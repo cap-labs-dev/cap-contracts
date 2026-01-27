@@ -7,7 +7,7 @@ import { Attestation } from "@predicate/interfaces/IPredicateRegistry.sol";
 import { PredicateClient } from "@predicate/mixins/PredicateClient.sol";
 
 import { Access } from "../access/Access.sol";
-import { IPredicateClient, IValidationHook } from "../interfaces/IValidationHook.sol";
+import { IERC165, IPredicateClient, IValidationHook } from "../interfaces/IValidationHook.sol";
 import { ValidationHookStorageUtils } from "../storage/ValidationHookStorageUtils.sol";
 
 /// @title ValidationHook
@@ -109,6 +109,12 @@ contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Ac
     /// @inheritdoc IValidationHook
     function gate() external view returns (uint256) {
         return getValidationHookStorage().gate;
+    }
+
+    /// @inheritdoc IERC165
+    function supportsInterface(bytes4 interfaceId) public view returns (bool) {
+        return interfaceId == type(IValidationHook).interfaceId || interfaceId == type(IPredicateClient).interfaceId
+            || interfaceId == type(IERC165).interfaceId;
     }
 
     /// @inheritdoc UUPSUpgradeable
