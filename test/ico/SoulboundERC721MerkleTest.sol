@@ -10,23 +10,22 @@ contract SoulboundERC721MerkleTest is IcoSetup {
     function setUp() public override {
         super.setUp();
 
-        recipient = 0x23d0f8944468F79FB06850c136a0E6B3Ee4a450F;
-        proofs = new bytes32[](15);
-        proofs[0] = bytes32(0x3d2f248c0da803bb3220242883533fb09e2c965a100a3fe656e7b7849871175c);
-        proofs[1] = bytes32(0x61d0c3d954ddad08ffd9b454ab7fca1b70fac9b5b6fd62f3904b53bacaeeb908);
-        proofs[2] = bytes32(0x8936f87a56934008dd248074790ee7ec02bf94b1c98b7b7fca2aa135700029b7);
-        proofs[3] = bytes32(0x4e9d5e84445460da1d80a6fe64f9b1a835f9bc810a2f20ee04722fe7ee792e62);
-        proofs[4] = bytes32(0x483349a1b6197a09050553d284931fc10fd6709407dbf95ae10db90fe5192e5f);
-        proofs[5] = bytes32(0x7dfcca1043d6ac54e21de746da6dd486c768048401e828470cfc3b9acf0d9541);
-        proofs[6] = bytes32(0x5d65ba18b54ebf7ca135d686c638938eb8cf5df15fef1278b3054e1f397a71c8);
-        proofs[7] = bytes32(0x4185773ee38f75af360fef7693f902ab8725159f797430a118b39307413ec51e);
-        proofs[8] = bytes32(0x13bf537badcf896c81aa9f293cf3ee09075e601e2b8bcf8a568d5aa3a1c66ba9);
-        proofs[9] = bytes32(0xe79323be115eac08b2114a6f512db7bb95458a9d749139d2de6a336975977ccd);
-        proofs[10] = bytes32(0x1d7c3d3bc3ee70a4e1f6450706ec576962cffcbea57b5f32e55b64c5df7e5a29);
-        proofs[11] = bytes32(0x9e7760200a4302d98d10c314c4f6dade611d66137afb3d4acc5739e3cc1c99f4);
-        proofs[12] = bytes32(0x51dd39f225eab883378a14a429ba5b502f11fa9159bb3753f6bc489f85d5bbce);
-        proofs[13] = bytes32(0x502cd90d7171bfeb1db55e8ece299e3d75fdd5de91d249f37ef3db7db273294e);
-        proofs[14] = bytes32(0xb9189d76b22a31f2bf5586adc5c10223281ce677b77d074ca005b290d7d367ff);
+        recipient = 0x815f5BB257e88b67216a344C7C83a3eA4EE74748;
+        proofs = new bytes32[](14);
+        proofs[0] = bytes32(0xe8e039d64c641a82c044042612ca920a8777a1c454e5858e703c44105ce94179);
+        proofs[1] = bytes32(0x0acc6722d5fc3f8e81be5da53eda26522102a56a7d3795bd82f4214d0254b742);
+        proofs[2] = bytes32(0x691dff85343fc17606046c76418dc548ddf47094233c907a7977307b5fe7a513);
+        proofs[3] = bytes32(0xb3ed2e9854ff3376170388333df9d6f45b32255f5eec2f7443ba2522fbedf625);
+        proofs[4] = bytes32(0x10cdeff5852b8d023f5b02b7a6759ab728a085b39fdf1473380ce3b22e9a4018);
+        proofs[5] = bytes32(0xc48bda43d35eb36ba0bd757de85c0ef705548f0ccb40ab4ac5a888bc7903393a);
+        proofs[6] = bytes32(0x5c088a2c9b367b1085515cddbd656750a6c55d453fb2e21013f67cbbd850d19a);
+        proofs[7] = bytes32(0x4a1f4406451c642fe4b91127fc381b3bd555615063779423be3825eb459caa9e);
+        proofs[8] = bytes32(0xc035784032cf84cde9276f5e60e6f6045134a5c1ab9ba984303a7ef67f8ea529);
+        proofs[9] = bytes32(0x9615df8885f4c0f26ca28fb23f122366a1b439aab816dadfaf520b63d8f72750);
+        proofs[10] = bytes32(0x30fb5af36a5fd0c676715b628fe1ba932beef488b3e5da55b7c0f8aa6bc3ce02);
+        proofs[11] = bytes32(0xa44cfbe18321905148110005eed16e2ab95fe54b742db8418691640accdb89af);
+        proofs[12] = bytes32(0xbfcc3d8154e486877a1e92b9b8404d51ff73881e884d26a0417c8d87d1303e05);
+        proofs[13] = bytes32(0xfa522b5f5a2fa8dbcd97ba29a398a575d4775602cde1190ee615baba1a2015d1);
     }
 
     function test_soulbound_erc721_owner_mint() public {
@@ -65,7 +64,7 @@ contract SoulboundERC721MerkleTest is IcoSetup {
     }
 
     function test_soulbound_erc721_mint_wrong_proof() public {
-        // first digit of proof is wrong
+        // first proof is wrong
         proofs[0] = bytes32(0x0d2f248c0da803bb3220242883533fb09e2c965a100a3fe656e7b7849871175c);
 
         vm.startPrank(admin);
