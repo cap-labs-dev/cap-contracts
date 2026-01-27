@@ -101,7 +101,7 @@ contract IcoSetup is Test {
         accessControl.grantAccess(validationHook.setRegistry.selector, address(validationHook), admin);
         accessControl.grantAccess(validationHook.setPolicyID.selector, address(validationHook), admin);
 
-        erc1155.setRoot(0x008d8adca5d827f5973e6bcc54120a476aa0c76161b0b87e15f66d0e739f8726);
+        erc1155.setRoot(0x41d61debd9c625d62e0aff28c0fd0609344c9f5abff5eb7a28570885491bdbcb);
         validationHook.setAuction(auction);
     }
 }
