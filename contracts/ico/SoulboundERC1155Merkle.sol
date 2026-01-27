@@ -42,7 +42,7 @@ contract SoulboundERC1155Merkle is
     function mint(address _to, bytes32[] calldata _proofs) external whenNotPaused {
         if (balanceOf(_to, 0) > 0) revert AlreadyMinted();
         bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(_to))));
-        if (!MerkleProof.verify(_proofs, getSoulboundERC1155MerkleStorage().root, leaf)) revert InvalidProof();
+        if (!MerkleProof.verifyCalldata(_proofs, getSoulboundERC1155MerkleStorage().root, leaf)) revert InvalidProof();
         _mint(_to, 0, 1, "");
     }
 
