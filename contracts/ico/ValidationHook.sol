@@ -2,12 +2,17 @@
 pragma solidity ^0.8.28;
 
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import { IERC1155 } from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import { Attestation } from "@predicate/interfaces/IPredicateRegistry.sol";
 import { PredicateClient } from "@predicate/mixins/PredicateClient.sol";
 
 import { Access } from "../access/Access.sol";
-import { IERC165, IPredicateClient, IValidationHook } from "../interfaces/IValidationHook.sol";
+import {
+    IERC165,
+    IGatedERC1155ValidationHook,
+    IPredicateClient,
+    IValidationHook
+} from "../interfaces/IValidationHook.sol";
 import { ValidationHookStorageUtils } from "../storage/ValidationHookStorageUtils.sol";
 
 /// @title ValidationHook
@@ -25,7 +30,8 @@ contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Ac
     /// @inheritdoc IValidationHook
     function initialize(
         address _accessControl,
-        address _token,
+        address _erc1155,
+        uint256 _tokenId,
         uint256 _expirationBlock,
         address _registry,
         string memory _policyID
@@ -33,9 +39,10 @@ contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Ac
         if (_accessControl == address(0)) revert ZeroAddressNotValid();
         __Access_init(_accessControl);
 
-        if (_token == address(0)) revert ZeroAddressNotValid();
+        if (_erc1155 == address(0)) revert ZeroAddressNotValid();
         ValidationHookStorage storage $ = getValidationHookStorage();
-        $.token = _token;
+        $.erc1155 = _erc1155;
+        $.tokenId = _tokenId;
 
         if (_expirationBlock < block.number) revert InvalidExpirationBlock();
         $.expirationBlock = _expirationBlock;
@@ -55,9 +62,9 @@ contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Ac
         // the sender must be the owner of the bid
         if (_sender != _owner) revert SenderMustBeOwner();
 
-        // if expiration block is not passed, the sender must be the owner of the ERC721 token
+        // if expiration block is not passed, the sender must be the owner of the ERC1155 token
         if (block.number < $.expirationBlock) {
-            if (IERC721($.token).balanceOf(_sender) == 0) revert NotOwnerOfERC721Token();
+            if (IERC1155($.erc1155).balanceOf(_sender, $.tokenId) == 0) revert NotOwnerOfERC1155Token();
         }
 
         // attestation is decoded from the hook data
@@ -76,9 +83,14 @@ contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Ac
     }
 
     /// @inheritdoc IValidationHook
-    function setToken(address _token) external checkAccess(this.setToken.selector) {
-        if (_token == address(0)) revert ZeroAddressNotValid();
-        getValidationHookStorage().token = _token;
+    function setErc1155(address _erc1155) external checkAccess(this.setErc1155.selector) {
+        if (_erc1155 == address(0)) revert ZeroAddressNotValid();
+        getValidationHookStorage().erc1155 = _erc1155;
+    }
+
+    /// @inheritdoc IValidationHook
+    function setTokenId(uint256 _tokenId) external checkAccess(this.setTokenId.selector) {
+        getValidationHookStorage().tokenId = _tokenId;
     }
 
     /// @inheritdoc IValidationHook
@@ -101,12 +113,17 @@ contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Ac
         return getValidationHookStorage().auction;
     }
 
-    /// @inheritdoc IValidationHook
-    function token() external view returns (address) {
-        return getValidationHookStorage().token;
+    /// @inheritdoc IGatedERC1155ValidationHook
+    function erc1155() external view returns (IERC1155) {
+        return IERC1155(getValidationHookStorage().erc1155);
     }
 
-    /// @inheritdoc IValidationHook
+    /// @inheritdoc IGatedERC1155ValidationHook
+    function tokenId() external view returns (uint256) {
+        return getValidationHookStorage().tokenId;
+    }
+
+    /// @inheritdoc IGatedERC1155ValidationHook
     function expirationBlock() external view returns (uint256) {
         return getValidationHookStorage().expirationBlock;
     }
@@ -114,7 +131,7 @@ contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Ac
     /// @inheritdoc IERC165
     function supportsInterface(bytes4 interfaceId) public view returns (bool) {
         return interfaceId == type(IValidationHook).interfaceId || interfaceId == type(IPredicateClient).interfaceId
-            || interfaceId == type(IERC165).interfaceId;
+            || interfaceId == type(IGatedERC1155ValidationHook).interfaceId || interfaceId == type(IERC165).interfaceId;
     }
 
     /// @inheritdoc UUPSUpgradeable

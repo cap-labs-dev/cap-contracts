@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { IcoSetup } from "./IcoSetup.sol";
 
-contract SoulboundERC721MerkleTest is IcoSetup {
+contract SoulboundERC1155MerkleTest is IcoSetup {
     address public recipient;
     bytes32[] public proofs;
 
@@ -28,71 +28,71 @@ contract SoulboundERC721MerkleTest is IcoSetup {
         proofs[13] = bytes32(0xfa522b5f5a2fa8dbcd97ba29a398a575d4775602cde1190ee615baba1a2015d1);
     }
 
-    function test_soulbound_erc721_owner_mint() public {
+    function test_soulbound_erc1155_owner_mint() public {
         address[] memory recipients = new address[](2);
         recipients[0] = admin;
         recipients[1] = user;
 
         vm.startPrank(user);
         vm.expectRevert(); // Only owner can mint
-        erc721.ownerMint(recipients);
+        erc1155.ownerMint(recipients);
 
         vm.startPrank(admin);
-        erc721.ownerMint(recipients);
-        assertEq(erc721.balanceOf(admin), 1);
-        assertEq(erc721.balanceOf(user), 1);
+        erc1155.ownerMint(recipients);
+        assertEq(erc1155.balanceOf(admin, 0), 1);
+        assertEq(erc1155.balanceOf(user, 0), 1);
 
         vm.expectRevert(); // Only one mint per address
-        erc721.ownerMint(recipients);
+        erc1155.ownerMint(recipients);
     }
 
-    function test_soulbound_erc721_mint() public {
+    function test_soulbound_erc1155_mint() public {
         vm.startPrank(user);
 
         vm.expectRevert(); // Minting is not unpaused
-        erc721.mint(recipient, proofs);
+        erc1155.mint(recipient, proofs);
 
         vm.startPrank(admin);
-        erc721.unpause();
+        erc1155.unpause();
 
         vm.startPrank(user);
-        erc721.mint(recipient, proofs);
-        assertEq(erc721.balanceOf(recipient), 1);
+        erc1155.mint(recipient, proofs);
+        assertEq(erc1155.balanceOf(recipient, 0), 1);
 
         vm.expectRevert(); // Only one mint per address
-        erc721.mint(recipient, proofs);
+        erc1155.mint(recipient, proofs);
     }
 
-    function test_soulbound_erc721_mint_wrong_proof() public {
+    function test_soulbound_erc1155_mint_wrong_proof() public {
         // first proof is wrong
         proofs[0] = bytes32(0x0d2f248c0da803bb3220242883533fb09e2c965a100a3fe656e7b7849871175c);
 
         vm.startPrank(admin);
-        erc721.unpause();
+        erc1155.unpause();
 
         vm.startPrank(user);
         vm.expectRevert(); // Invalid proof
-        erc721.mint(recipient, proofs);
+        erc1155.mint(recipient, proofs);
     }
 
-    function test_soulbound_erc721_transfer() public {
+    function test_soulbound_erc1155_transfer() public {
         vm.startPrank(admin);
         address[] memory recipients = new address[](1);
         recipients[0] = user;
-        erc721.ownerMint(recipients);
-        assertEq(erc721.balanceOf(user), 1);
+        erc1155.ownerMint(recipients);
+        assertEq(erc1155.balanceOf(user, 0), 1);
 
         vm.startPrank(user);
         vm.expectRevert(); // Soulbound
-        erc721.transferFrom(user, admin, 0);
+        erc1155.safeTransferFrom(user, admin, 0, 1, "");
 
         vm.expectRevert(); // Invalid recipient
-        erc721.transferFrom(user, address(0), 0);
+        erc1155.safeTransferFrom(user, address(0), 0, 1, "");
 
         vm.expectRevert(); // Invalid owner
-        erc721.transferFrom(admin, user, 0);
+        erc1155.safeTransferFrom(admin, user, 0, 1, "");
 
         vm.expectRevert(); // Transfer to any address, including self, is not allowed
-        erc721.transferFrom(user, user, 0);
+        erc1155.safeTransferFrom(user, user, 0, 1, "");
     }
 }

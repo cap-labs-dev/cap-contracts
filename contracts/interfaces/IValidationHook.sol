@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { IGatedERC1155ValidationHook } from "./IGatedERC1155ValidationHook.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { IPredicateClient } from "@predicate/interfaces/IPredicateClient.sol";
 
 /// @title IValidationHook
 /// @notice Interface for the validation hook
 /// @author kexley, Cap Labs
-interface IValidationHook is IPredicateClient, IERC165 {
+interface IValidationHook is IPredicateClient, IGatedERC1155ValidationHook, IERC165 {
     /// @custom:storage-location erc7201:cap.storage.ValidationHook
     /// @dev Validation hook storage
     /// @param auction Auction address
@@ -15,7 +16,8 @@ interface IValidationHook is IPredicateClient, IERC165 {
     /// @param expirationBlock Expiration block number
     struct ValidationHookStorage {
         address auction;
-        address token;
+        address erc1155;
+        uint256 tokenId;
         uint256 expirationBlock;
     }
 
@@ -28,8 +30,8 @@ interface IValidationHook is IPredicateClient, IERC165 {
     /// @notice Error thrown when the expiration block is invalid
     error InvalidExpirationBlock();
 
-    /// @notice Error thrown when the sender is not the owner of the required ERC721 token
-    error NotOwnerOfERC721Token();
+    /// @notice Error thrown when the sender is not the owner of the required ERC1155 token
+    error NotOwnerOfERC1155Token();
 
     /// @notice Error thrown when the sender is not the owner of the bid
     error SenderMustBeOwner();
@@ -44,13 +46,15 @@ interface IValidationHook is IPredicateClient, IERC165 {
 
     /// @notice Initialize the validation hook
     /// @param _accessControl Access control address
-    /// @param _token ERC721 token address
+    /// @param _erc1155 ERC1155 token contract address
+    /// @param _tokenId ERC1155 tokenId
     /// @param _expirationBlock Expiration block number
     /// @param _registry Predicate registry address
     /// @param _policyID Predicate policy ID
     function initialize(
         address _accessControl,
-        address _token,
+        address _erc1155,
+        uint256 _tokenId,
         uint256 _expirationBlock,
         address _registry,
         string memory _policyID
@@ -71,10 +75,15 @@ interface IValidationHook is IPredicateClient, IERC165 {
     /// @param _auction Auction address
     function setAuction(address _auction) external;
 
-    /// @notice Set the ERC721 token address
-    /// @dev This function can be called by the admin to change the required ERC721 token address
-    /// @param _token ERC721 token address
-    function setToken(address _token) external;
+    /// @notice Set the ERC1155 token contract address
+    /// @dev This function can be called by the admin to change the required ERC1155 token contract address
+    /// @param _erc1155 ERC1155 token contract address
+    function setErc1155(address _erc1155) external;
+
+    /// @notice Set the ERC1155 tokenId
+    /// @dev This function can be called by the admin to change the required ERC1155 tokenId
+    /// @param _tokenId ERC1155 tokenId
+    function setTokenId(uint256 _tokenId) external;
 
     /// @notice Set the expiration block, can be set in the past to allow for immediate validation
     /// @dev This function can be called by the admin to change the expiration block, even to the past to allow for immediate validation
@@ -84,12 +93,4 @@ interface IValidationHook is IPredicateClient, IERC165 {
     /// @notice Get the auction address
     /// @return . The auction address
     function auction() external view returns (address);
-
-    /// @notice Get the ERC721 token address
-    /// @return . The ERC721 token address
-    function token() external view returns (address);
-
-    /// @notice Get the expiration block
-    /// @return . The expiration block
-    function expirationBlock() external view returns (uint256);
 }
