@@ -29,7 +29,7 @@ contract SoulboundERC1155Merkle is
     }
 
     /// @inheritdoc ISoulboundERC1155Merkle
-    function initialize(address _accessControl, string memory _uri) external initializer {
+    function initialize(address _accessControl, string calldata _uri) external initializer {
         if (_accessControl == address(0)) revert ZeroAddressNotValid();
         __Access_init(_accessControl);
         __ERC1155_init(_uri);
@@ -39,7 +39,7 @@ contract SoulboundERC1155Merkle is
     }
 
     /// @inheritdoc ISoulboundERC1155Merkle
-    function mint(address _to, bytes32[] memory _proofs) external whenNotPaused {
+    function mint(address _to, bytes32[] calldata _proofs) external whenNotPaused {
         if (balanceOf(_to, 0) > 0) revert AlreadyMinted();
         bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(_to))));
         if (!MerkleProof.verify(_proofs, getSoulboundERC1155MerkleStorage().root, leaf)) revert InvalidProof();
@@ -60,7 +60,7 @@ contract SoulboundERC1155Merkle is
     }
 
     /// @inheritdoc ISoulboundERC1155Merkle
-    function setURI(string memory _uri) external checkAccess(this.setURI.selector) {
+    function setURI(string calldata _uri) external checkAccess(this.setURI.selector) {
         _setURI(_uri);
     }
 

@@ -30,13 +30,13 @@ interface ISoulboundERC1155Merkle is IERC1155 {
     /// @dev Minting using Merkle proofs is paused by default
     /// @param _accessControl Access control address
     /// @param _uri URI for token metadata
-    function initialize(address _accessControl, string memory _uri) external;
+    function initialize(address _accessControl, string calldata _uri) external;
 
     /// @notice Mint a token to an address using Merkle proofs
     /// @dev Anyone can mint a token to an approved address using Merkle proofs on behalf of that address
     /// @param _to Address to mint the token to
     /// @param _proofs Merkle proofs for the address
-    function mint(address _to, bytes32[] memory _proofs) external;
+    function mint(address _to, bytes32[] calldata _proofs) external;
 
     /// @notice Mint a token to multiple addresses using owner privileges without Merkle proofs
     /// @param _to Addresses to mint the token to
@@ -48,7 +48,7 @@ interface ISoulboundERC1155Merkle is IERC1155 {
 
     /// @notice Set the URI for token metadata
     /// @param _uri Base URI
-    function setURI(string memory _uri) external;
+    function setURI(string calldata _uri) external;
 
     /// @notice Pause minting
     function pause() external;
