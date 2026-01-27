@@ -71,7 +71,7 @@ contract IcoSetup is Test {
                         ValidationHook.initialize.selector,
                         address(accessControl),
                         address(erc721),
-                        block.timestamp + 2 days,
+                        block.number + 1000,
                         address(predicateRegistry),
                         "test"
                     )
@@ -94,7 +94,7 @@ contract IcoSetup is Test {
         accessControl.grantAccess(ccaToken.setWhitelist.selector, address(ccaToken), admin);
         accessControl.grantAccess(validationHook.setAuction.selector, address(validationHook), admin);
         accessControl.grantAccess(validationHook.setToken.selector, address(validationHook), admin);
-        accessControl.grantAccess(validationHook.setGate.selector, address(validationHook), admin);
+        accessControl.grantAccess(validationHook.setExpirationBlock.selector, address(validationHook), admin);
         accessControl.grantAccess(validationHook.setRegistry.selector, address(validationHook), admin);
         accessControl.grantAccess(validationHook.setPolicyID.selector, address(validationHook), admin);
 

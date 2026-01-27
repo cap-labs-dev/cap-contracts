@@ -26,7 +26,7 @@ contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Ac
     function initialize(
         address _accessControl,
         address _token,
-        uint256 _gate,
+        uint256 _expirationBlock,
         address _registry,
         string memory _policyID
     ) external initializer {
@@ -37,8 +37,8 @@ contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Ac
         ValidationHookStorage storage $ = getValidationHookStorage();
         $.token = _token;
 
-        if (_gate < block.timestamp) revert InvalidGate();
-        $.gate = _gate;
+        if (_expirationBlock < block.number) revert InvalidExpirationBlock();
+        $.expirationBlock = _expirationBlock;
 
         _initPredicateClient(_registry, _policyID);
 
@@ -55,8 +55,8 @@ contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Ac
         // the sender must be the owner of the bid
         if (_sender != _owner) revert SenderMustBeOwner();
 
-        // if time gate is not passed, the sender must be the owner of the ERC721 token
-        if (block.timestamp < $.gate) {
+        // if expiration block is not passed, the sender must be the owner of the ERC721 token
+        if (block.number < $.expirationBlock) {
             if (IERC721($.token).balanceOf(_sender) == 0) revert NotOwnerOfERC721Token();
         }
 
@@ -82,8 +82,8 @@ contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Ac
     }
 
     /// @inheritdoc IValidationHook
-    function setGate(uint256 _gate) external checkAccess(this.setGate.selector) {
-        getValidationHookStorage().gate = _gate;
+    function setExpirationBlock(uint256 _expirationBlock) external checkAccess(this.setExpirationBlock.selector) {
+        getValidationHookStorage().expirationBlock = _expirationBlock;
     }
 
     /// @inheritdoc IPredicateClient
@@ -107,8 +107,8 @@ contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Ac
     }
 
     /// @inheritdoc IValidationHook
-    function gate() external view returns (uint256) {
-        return getValidationHookStorage().gate;
+    function expirationBlock() external view returns (uint256) {
+        return getValidationHookStorage().expirationBlock;
     }
 
     /// @inheritdoc IERC165

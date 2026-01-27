@@ -12,11 +12,11 @@ interface IValidationHook is IPredicateClient, IERC165 {
     /// @dev Validation hook storage
     /// @param auction Auction address
     /// @param token ERC721 token address
-    /// @param gateUntil Time gate timestamp
+    /// @param expirationBlock Expiration block number
     struct ValidationHookStorage {
         address auction;
         address token;
-        uint256 gate;
+        uint256 expirationBlock;
     }
 
     /// @notice Error thrown when the caller is not the auction
@@ -25,8 +25,8 @@ interface IValidationHook is IPredicateClient, IERC165 {
     /// @notice Error thrown when the attestation is invalid
     error InvalidAttestation();
 
-    /// @notice Error thrown when the gate timestamp is invalid
-    error InvalidGate();
+    /// @notice Error thrown when the expiration block is invalid
+    error InvalidExpirationBlock();
 
     /// @notice Error thrown when the sender is not the owner of the required ERC721 token
     error NotOwnerOfERC721Token();
@@ -45,13 +45,13 @@ interface IValidationHook is IPredicateClient, IERC165 {
     /// @notice Initialize the validation hook
     /// @param _accessControl Access control address
     /// @param _token ERC721 token address
-    /// @param _gate Time gate timestamp
+    /// @param _expirationBlock Expiration block number
     /// @param _registry Predicate registry address
     /// @param _policyID Predicate policy ID
     function initialize(
         address _accessControl,
         address _token,
-        uint256 _gate,
+        uint256 _expirationBlock,
         address _registry,
         string memory _policyID
     ) external;
@@ -76,10 +76,10 @@ interface IValidationHook is IPredicateClient, IERC165 {
     /// @param _token ERC721 token address
     function setToken(address _token) external;
 
-    /// @notice Set the gate timestamp, can be set in the past to allow for immediate validation
-    /// @dev This function can be called by the admin to change the time gate, even to the past to allow for immediate validation
-    /// @param _gate Time gate timestamp
-    function setGate(uint256 _gate) external;
+    /// @notice Set the expiration block, can be set in the past to allow for immediate validation
+    /// @dev This function can be called by the admin to change the expiration block, even to the past to allow for immediate validation
+    /// @param _expirationBlock Expiration block number
+    function setExpirationBlock(uint256 _expirationBlock) external;
 
     /// @notice Get the auction address
     /// @return . The auction address
@@ -89,7 +89,7 @@ interface IValidationHook is IPredicateClient, IERC165 {
     /// @return . The ERC721 token address
     function token() external view returns (address);
 
-    /// @notice Get the time gate timestamp
-    /// @return . The time gate timestamp
-    function gate() external view returns (uint256);
+    /// @notice Get the expiration block
+    /// @return . The expiration block
+    function expirationBlock() external view returns (uint256);
 }
