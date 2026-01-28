@@ -12,7 +12,8 @@ interface IValidationHook is IPredicateClient, IGatedERC1155ValidationHook, IERC
     /// @custom:storage-location erc7201:cap.storage.ValidationHook
     /// @dev Validation hook storage
     /// @param auction Auction address
-    /// @param token ERC721 token address
+    /// @param erc1155 ERC1155 token address
+    /// @param tokenId ERC1155 tokenId
     /// @param expirationBlock Expiration block number
     struct ValidationHookStorage {
         address auction;
