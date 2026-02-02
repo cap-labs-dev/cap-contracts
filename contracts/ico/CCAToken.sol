@@ -3,7 +3,9 @@ pragma solidity ^0.8.28;
 
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {
-    ERC20PermitUpgradeable
+    EIP712Upgradeable,
+    ERC20PermitUpgradeable,
+    ERC20Upgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -74,6 +76,11 @@ contract CCAToken is
     }
 
     /// @inheritdoc ICCAToken
+    function burn(uint256 _amount) external checkAccess(this.burn.selector) {
+        _burn(_msgSender(), _amount);
+    }
+
+    /// @inheritdoc ICCAToken
     function pause() external checkAccess(this.pause.selector) {
         _pause();
     }
@@ -122,6 +129,16 @@ contract CCAToken is
     /// @inheritdoc ICCAToken
     function zap() public view returns (address zapAddress) {
         zapAddress = getCCATokenStorage().zap;
+    }
+
+    /// @inheritdoc ERC20Upgradeable
+    function name() public pure override returns (string memory) {
+        return "Cap Redeemable Token";
+    }
+
+    /// @inheritdoc EIP712Upgradeable
+    function _EIP712Name() internal pure override returns (string memory) {
+        return "Cap Redeemable Token";
     }
 
     /// @dev Exchange CCA tokens for the asset at a 1:1 value

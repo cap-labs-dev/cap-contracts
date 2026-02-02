@@ -78,6 +78,10 @@ interface ICCAToken {
     /// @param _amount Amount of tokens to mint
     function mint(address _to, uint256 _amount) external;
 
+    /// @notice Permissioned function to burn CCA tokens from the caller
+    /// @param _amount Amount of tokens to burn
+    function burn(uint256 _amount) external;
+
     /// @notice Pause exchange functionality
     function pause() external;
 
