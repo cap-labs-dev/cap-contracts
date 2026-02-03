@@ -79,8 +79,7 @@ contract Stabledrop is IStabledrop, UUPSUpgradeable, PausableUpgradeable, Access
 
     /// @inheritdoc IStabledrop
     function fund(uint256 _amount) external {
-        StabledropStorage storage $ = getStabledropStorage();
-        IERC20($.token).safeTransferFrom(msg.sender, address(this), _amount);
+        IERC20(getStabledropStorage().token).safeTransferFrom(msg.sender, address(this), _amount);
         emit Fund(_amount);
     }
 
