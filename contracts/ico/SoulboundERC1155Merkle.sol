@@ -76,6 +76,11 @@ contract SoulboundERC1155Merkle is
         _unpause();
     }
 
+    /// @inheritdoc ISoulboundERC1155Merkle
+    function root() external view returns (bytes32) {
+        return getSoulboundERC1155MerkleStorage().root;
+    }
+
     /// @dev Override to prevent transfers after minting
     /// @param _from Sender address
     /// @param _to Receiver address

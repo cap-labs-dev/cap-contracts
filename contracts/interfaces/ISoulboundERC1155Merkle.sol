@@ -61,4 +61,8 @@ interface ISoulboundERC1155Merkle is IERC1155 {
 
     /// @notice Unpause minting
     function unpause() external;
+
+    /// @notice Get the Merkle root
+    /// @return root Merkle root
+    function root() external view returns (bytes32);
 }
