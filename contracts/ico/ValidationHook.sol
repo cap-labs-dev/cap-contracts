@@ -87,22 +87,26 @@ contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Ac
         ) revert InvalidAuctionBlock();
 
         $.auction = _auction;
+        emit SetAuction(_auction);
     }
 
     /// @inheritdoc IValidationHook
     function setErc1155(address _erc1155) external checkAccess(this.setErc1155.selector) {
         if (_erc1155 == address(0)) revert ZeroAddressNotValid();
         getValidationHookStorage().erc1155 = _erc1155;
+        emit SetErc1155(_erc1155);
     }
 
     /// @inheritdoc IValidationHook
     function setTokenId(uint256 _tokenId) external checkAccess(this.setTokenId.selector) {
         getValidationHookStorage().tokenId = _tokenId;
+        emit SetTokenId(_tokenId);
     }
 
     /// @inheritdoc IValidationHook
     function setExpirationBlock(uint256 _expirationBlock) external checkAccess(this.setExpirationBlock.selector) {
         getValidationHookStorage().expirationBlock = _expirationBlock;
+        emit SetExpirationBlock(_expirationBlock);
     }
 
     /// @inheritdoc IPredicateClient

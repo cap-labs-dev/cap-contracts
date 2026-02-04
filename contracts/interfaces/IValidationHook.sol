@@ -48,6 +48,22 @@ interface IValidationHook is IPredicateClient, IGatedERC1155ValidationHook, IERC
     /// @param uuid The UUID of the attestation
     event AttestationValidated(address indexed sender, string uuid);
 
+    /// @notice Event emitted when the auction address is set
+    /// @param auction Auction address
+    event SetAuction(address auction);
+
+    /// @notice Event emitted when the ERC1155 token contract address is set
+    /// @param erc1155 ERC1155 token contract address
+    event SetErc1155(address erc1155);
+
+    /// @notice Event emitted when the ERC1155 tokenId is set
+    /// @param tokenId ERC1155 tokenId
+    event SetTokenId(uint256 tokenId);
+
+    /// @notice Event emitted when the expiration block is set
+    /// @param expirationBlock Expiration block number
+    event SetExpirationBlock(uint256 expirationBlock);
+
     /// @notice Initialize the validation hook
     /// @param _accessControl Access control address
     /// @param _erc1155 ERC1155 token contract address
