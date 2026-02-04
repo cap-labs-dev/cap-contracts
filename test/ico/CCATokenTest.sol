@@ -60,13 +60,13 @@ contract CCATokenTest is IcoSetup {
 
         vm.startPrank(user);
         vm.expectRevert(); // Not unpaused
-        ccaToken.exchange(user);
+        ccaToken.exchange(user, 1_000);
 
         vm.startPrank(admin);
         ccaToken.unpause();
 
         vm.startPrank(user);
-        ccaToken.exchange(user);
+        ccaToken.exchange(user, 1_000);
         assertEq(ccaToken.balanceOf(user), 0);
         assertEq(asset.balanceOf(user), 1_000);
 
@@ -74,20 +74,20 @@ contract CCATokenTest is IcoSetup {
         ccaToken.mint(user, 1_000);
 
         vm.expectRevert(); // Not approved by user
-        ccaToken.exchangeFrom(user, user);
+        ccaToken.exchangeFrom(user, user, 1_000);
 
         vm.startPrank(user);
         ccaToken.approve(admin, 1_000);
 
         vm.startPrank(admin);
-        ccaToken.exchangeFrom(user, user);
+        ccaToken.exchangeFrom(user, user, 1_000);
         assertEq(ccaToken.balanceOf(user), 0);
         assertEq(asset.balanceOf(user), 2_000);
 
         ccaToken.mint(user, 10_000); // simulate user exchanging more CCA tokens than the asset balance
         vm.startPrank(user);
         vm.expectRevert(); // Insufficient balance
-        ccaToken.exchange(user);
+        ccaToken.exchange(user, 1_000);
 
         asset.mint(address(ccaToken), 2_000); // match the asset balance with the CCA tokens
         // simulate zap exchanging tokens for user
@@ -97,7 +97,7 @@ contract CCATokenTest is IcoSetup {
         vm.startPrank(tokenManager);
         ccaToken.transferFrom(address(user), address(zapRouter), 10_000);
         vm.startPrank(address(zapRouter));
-        ccaToken.exchange(user);
+        ccaToken.exchange(user, 10_000);
         assertEq(ccaToken.balanceOf(address(zapRouter)), 0);
         assertEq(asset.balanceOf(user), 12_000);
     }

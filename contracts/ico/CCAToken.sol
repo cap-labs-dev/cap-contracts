@@ -56,16 +56,14 @@ contract CCAToken is
     }
 
     /// @inheritdoc ICCAToken
-    function exchange(address _to) external whenNotPaused {
-        uint256 amount = balanceOf(_msgSender());
-        _exchange(_msgSender(), _to, amount);
+    function exchange(address _to, uint256 _amount) external whenNotPaused {
+        _exchange(_msgSender(), _to, _amount);
     }
 
     /// @inheritdoc ICCAToken
-    function exchangeFrom(address _from, address _to) external whenNotPaused {
-        uint256 amount = balanceOf(_from);
-        _spendAllowance(_from, _msgSender(), amount);
-        _exchange(_from, _to, amount);
+    function exchangeFrom(address _from, address _to, uint256 _amount) external whenNotPaused {
+        _spendAllowance(_from, _msgSender(), _amount);
+        _exchange(_from, _to, _amount);
     }
 
     /// @inheritdoc ICCAToken

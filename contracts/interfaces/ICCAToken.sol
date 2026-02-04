@@ -55,16 +55,18 @@ interface ICCAToken {
     /// @param whitelisted Whitelist state
     event SetWhitelist(address indexed user, bool whitelisted);
 
-    /// @notice Exchange the caller's full balance of CCA tokens for the asset when available
+    /// @notice Exchange CCA tokens for the asset when available
     /// @dev Left permissionless intentionally
     /// @param _to Receiver address
-    function exchange(address _to) external;
+    /// @param _amount Amount of tokens to exchange
+    function exchange(address _to, uint256 _amount) external;
 
-    /// @notice Exchange the full balance of CCA tokens for the asset on behalf of another address when available
+    /// @notice Exchange CCA tokens for the asset on behalf of another address when available
     /// @dev Spender must have allowance for the owner. Left permissionless intentionally
     /// @param _from Sender address
     /// @param _to Receiver address
-    function exchangeFrom(address _from, address _to) external;
+    /// @param _amount Amount of tokens to exchange
+    function exchangeFrom(address _from, address _to, uint256 _amount) external;
 
     /// @notice Initialize the CCA token
     /// @param _accessControl Access control address
