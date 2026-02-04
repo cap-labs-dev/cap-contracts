@@ -68,7 +68,6 @@ contract CCAToken is
 
     /// @inheritdoc ICCAToken
     function mint(address _to, uint256 _amount) external checkAccess(this.mint.selector) {
-        if (_to == address(0)) revert ZeroAddressNotValid();
         if (_amount == 0) revert ZeroAmountNotValid();
         _mint(_to, _amount);
     }
