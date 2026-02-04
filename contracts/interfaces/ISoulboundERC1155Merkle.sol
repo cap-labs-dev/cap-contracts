@@ -26,6 +26,12 @@ interface ISoulboundERC1155Merkle is IERC1155 {
     /// @dev Zero address not valid
     error ZeroAddressNotValid();
 
+    /// @dev Emitted when the Merkle root is set
+    event SetRoot(bytes32 root);
+
+    /// @dev Emitted when the URI is set
+    event SetURI(string uri);
+
     /// @notice Initialize the SoulboundERC1155Merkle token
     /// @dev Minting using Merkle proofs is paused by default
     /// @param _accessControl Access control address

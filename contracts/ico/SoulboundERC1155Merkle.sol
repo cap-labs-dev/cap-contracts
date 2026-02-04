@@ -57,11 +57,13 @@ contract SoulboundERC1155Merkle is
     /// @inheritdoc ISoulboundERC1155Merkle
     function setRoot(bytes32 _root) external checkAccess(this.setRoot.selector) {
         getSoulboundERC1155MerkleStorage().root = _root;
+        emit SetRoot(_root);
     }
 
     /// @inheritdoc ISoulboundERC1155Merkle
     function setURI(string calldata _uri) external checkAccess(this.setURI.selector) {
         _setURI(_uri);
+        emit SetURI(_uri);
     }
 
     /// @inheritdoc ISoulboundERC1155Merkle
