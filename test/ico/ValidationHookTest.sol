@@ -26,7 +26,7 @@ contract ValidationHookTest is IcoSetup {
     }
 
     function test_validation_hook_validate() public {
-        vm.startPrank(auction);
+        vm.startPrank(address(auction));
         Attestation memory attestation =
             Attestation({ uuid: "123", expiration: 0, attester: address(0), signature: hex"" });
         validationHook.validate(1000, 1000, user, user, abi.encode(attestation));
@@ -38,7 +38,7 @@ contract ValidationHookTest is IcoSetup {
         vm.expectRevert(); // Only auction can call validate
         validationHook.validate(1000, 1000, user, user, abi.encode(attestation));
 
-        vm.startPrank(auction);
+        vm.startPrank(address(auction));
         vm.expectRevert(); // User must own the ERC721 token
         validationHook.validate(1000, 1000, admin, admin, abi.encode(attestation));
 

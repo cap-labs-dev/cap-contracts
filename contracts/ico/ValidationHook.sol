@@ -7,6 +7,7 @@ import { Attestation } from "@predicate/interfaces/IPredicateRegistry.sol";
 import { PredicateClient } from "@predicate/mixins/PredicateClient.sol";
 
 import { Access } from "../access/Access.sol";
+import { IContinuousClearingAuction } from "../interfaces/IContinuousClearingAuction.sol";
 import {
     IERC165,
     IGatedERC1155ValidationHook,
@@ -78,8 +79,14 @@ contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Ac
 
     /// @inheritdoc IValidationHook
     function setAuction(address _auction) external checkAccess(this.setAuction.selector) {
+        ValidationHookStorage storage $ = getValidationHookStorage();
         if (_auction == address(0)) revert ZeroAddressNotValid();
-        getValidationHookStorage().auction = _auction;
+        if (
+            IContinuousClearingAuction(_auction).startBlock() > $.expirationBlock
+                || IContinuousClearingAuction(_auction).endBlock() < $.expirationBlock
+        ) revert InvalidAuctionBlock();
+
+        $.auction = _auction;
     }
 
     /// @inheritdoc IValidationHook

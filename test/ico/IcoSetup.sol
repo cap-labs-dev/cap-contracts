@@ -7,6 +7,7 @@ import { AccessControl } from "../../contracts/access/AccessControl.sol";
 import { CCAToken } from "../../contracts/ico/CCAToken.sol";
 import { SoulboundERC1155Merkle } from "../../contracts/ico/SoulboundERC1155Merkle.sol";
 import { ValidationHook } from "../../contracts/ico/ValidationHook.sol";
+import { MockAuction } from "../mocks/MockAuction.sol";
 import { MockPredicateRegistry } from "../mocks/MockPredicateRegistry.sol";
 import { MockZapRouter } from "../mocks/MockZapRouter.sol";
 
@@ -15,7 +16,6 @@ import { Test } from "forge-std/Test.sol";
 contract IcoSetup is Test {
     address public admin;
     address public user;
-    address public auction;
 
     AccessControl public accessControl;
     SoulboundERC1155Merkle public erc1155;
@@ -23,13 +23,13 @@ contract IcoSetup is Test {
     CCAToken public ccaToken;
     MockPredicateRegistry public predicateRegistry;
     ValidationHook public validationHook;
+    MockAuction public auction;
 
     function setUp() public virtual {
         admin = makeAddr("admin");
         vm.deal(admin, 1 ether);
         user = makeAddr("user");
         vm.deal(user, 1 ether);
-        auction = makeAddr("auction");
 
         accessControl = AccessControl(
             address(
@@ -82,6 +82,8 @@ contract IcoSetup is Test {
             )
         );
 
+        auction = new MockAuction(block.number, block.number + 2000);
+
         vm.startPrank(admin);
         accessControl.grantAccess(erc1155.setRoot.selector, address(erc1155), admin);
         accessControl.grantAccess(erc1155.setURI.selector, address(erc1155), admin);
@@ -102,6 +104,6 @@ contract IcoSetup is Test {
         accessControl.grantAccess(validationHook.setPolicyID.selector, address(validationHook), admin);
 
         erc1155.setRoot(0x41d61debd9c625d62e0aff28c0fd0609344c9f5abff5eb7a28570885491bdbcb);
-        validationHook.setAuction(auction);
+        validationHook.setAuction(address(auction));
     }
 }

@@ -25,6 +25,9 @@ interface IValidationHook is IPredicateClient, IGatedERC1155ValidationHook, IERC
     /// @notice Error thrown when the caller is not the auction
     error CallerMustBeAuction();
 
+    /// @notice Error thrown when the auction block is invalid
+    error InvalidAuctionBlock();
+
     /// @notice Error thrown when the attestation is invalid
     error InvalidAttestation();
 
