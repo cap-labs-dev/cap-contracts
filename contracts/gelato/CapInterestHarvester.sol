@@ -191,21 +191,15 @@ contract CapInterestHarvester is
     }
 
     /// @inheritdoc ICapInterestHarvester
-    function whenProfitable(uint256 secondsPerBlock, uint256 transactionCost)
-        external
-        view
-        returns (uint256 nextProfitableBlock, uint256 nextProfitableTimestamp)
-    {
+    function whenProfitable(uint256 secondsPerBlock, uint256 transactionCost) external view returns (uint256, uint256) {
         CapInterestHarvesterStorage storage $ = getCapInterestHarvesterStorage();
-        uint256 cusdAmountFromMint;
-        {
-            uint256 assetBalOfFeeAuction = IERC20($.asset).balanceOf($.feeAuction);
-            uint256 amountIn = transactionCost > assetBalOfFeeAuction ? 0 : assetBalOfFeeAuction - transactionCost;
-            (cusdAmountFromMint,) = IMinter($.cusd).getMintAmount($.asset, amountIn);
-        }
 
         uint256 nextProfitableTimestamp;
         {
+            uint256 assetBalOfFeeAuction = IERC20($.asset).balanceOf($.feeAuction);
+            uint256 amountIn = transactionCost > assetBalOfFeeAuction ? 0 : assetBalOfFeeAuction - transactionCost;
+            (uint256 cusdAmountFromMint,) = IMinter($.cusd).getMintAmount($.asset, amountIn);
+
             uint256 startPrice = IFeeAuction($.feeAuction).startPrice();
             uint256 startTimestamp = IFeeAuction($.feeAuction).startTimestamp();
             uint256 duration = IFeeAuction($.feeAuction).duration();
