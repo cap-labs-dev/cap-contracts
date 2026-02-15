@@ -51,7 +51,7 @@ contract HarvesterTest is Test {
     }
 
     function test_gelatoHarvest() public {
-        int256 expectedProfit = ICapInterestHarvester(address(proxy)).expectedHarvestProfit(1);
+        int256 expectedProfit = ICapInterestHarvester(address(proxy)).expectedProfit(1);
         console.log("expectedProfit", int256(expectedProfit));
 
         vm.prank(gelato);

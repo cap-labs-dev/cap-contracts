@@ -59,14 +59,14 @@ interface ICapInterestHarvester {
 
     /// @notice Expected profit from harvesting (CUSD from minting fee-asset minus auction price).
     /// @param transactionCost Cost in asset terms deducted from the fee auction balance before mint
-    /// @return expectedProfit Profit in CUSD terms (can be negative)
-    function expectedHarvestProfit(uint256 transactionCost) external view returns (int256 expectedProfit);
+    /// @return expectedHarvestProfit Profit in CUSD terms (can be negative)
+    function expectedProfit(uint256 transactionCost) external view returns (int256 expectedHarvestProfit);
 
     /// @notice First block at which harvesting is profitable, or sentinel values.
     /// @param secondsPerBlock Estimated seconds per block for block-offset calculation
     /// @param transactionCost Cost in asset terms deducted from the fee auction balance before mint
     /// @return nextProfitableBlock Block number when profitable; -1 if already profitable; 0 if now or never profitable
-    function whenProfitable(uint256 secondsPerBlock, uint256 transactionCost)
+    function nextProfitable(uint256 secondsPerBlock, uint256 transactionCost)
         external
         view
         returns (uint256 nextProfitableBlock, uint256 nextProfitableTimestamp);

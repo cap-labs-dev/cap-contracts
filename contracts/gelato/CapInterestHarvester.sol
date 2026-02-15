@@ -179,7 +179,7 @@ contract CapInterestHarvester is
     }
 
     /// @inheritdoc ICapInterestHarvester
-    function expectedHarvestProfit(uint256 transactionCost) external view returns (int256) {
+    function expectedProfit(uint256 transactionCost) external view returns (int256) {
         CapInterestHarvesterStorage storage $ = getCapInterestHarvesterStorage();
 
         uint256 assetBalOfFeeAuction = IERC20($.asset).balanceOf($.feeAuction);
@@ -191,7 +191,7 @@ contract CapInterestHarvester is
     }
 
     /// @inheritdoc ICapInterestHarvester
-    function whenProfitable(uint256 secondsPerBlock, uint256 transactionCost) external view returns (uint256, uint256) {
+    function nextProfitable(uint256 secondsPerBlock, uint256 transactionCost) external view returns (uint256, uint256) {
         CapInterestHarvesterStorage storage $ = getCapInterestHarvesterStorage();
 
         uint256 nextProfitableTimestamp;
