@@ -191,30 +191,39 @@ contract CapInterestHarvester is
     }
 
     /// @inheritdoc ICapInterestHarvester
-    function nextProfitableBlock(uint256 secondsPerBlock, uint256 transactionCost) external view returns (int256) {
+    function whenProfitable(uint256 secondsPerBlock, uint256 transactionCost)
+        external
+        view
+        returns (uint256 nextProfitableBlock, uint256 nextProfitableTimestamp)
+    {
         CapInterestHarvesterStorage storage $ = getCapInterestHarvesterStorage();
-        uint256 assetBalOfFeeAuction = IERC20($.asset).balanceOf($.feeAuction);
-        uint256 amountIn = transactionCost > assetBalOfFeeAuction ? 0 : assetBalOfFeeAuction - transactionCost;
-        (uint256 cusdAmountFromMint,) = IMinter($.cusd).getMintAmount($.asset, amountIn);
+        uint256 cusdAmountFromMint;
+        {
+            uint256 assetBalOfFeeAuction = IERC20($.asset).balanceOf($.feeAuction);
+            uint256 amountIn = transactionCost > assetBalOfFeeAuction ? 0 : assetBalOfFeeAuction - transactionCost;
+            (cusdAmountFromMint,) = IMinter($.cusd).getMintAmount($.asset, amountIn);
+        }
 
-        uint256 startPrice = IFeeAuction($.feeAuction).startPrice();
-        uint256 startTimestamp = IFeeAuction($.feeAuction).startTimestamp();
-        uint256 duration = IFeeAuction($.feeAuction).duration();
+        uint256 nextProfitableTimestamp;
+        {
+            uint256 startPrice = IFeeAuction($.feeAuction).startPrice();
+            uint256 startTimestamp = IFeeAuction($.feeAuction).startTimestamp();
+            uint256 duration = IFeeAuction($.feeAuction).duration();
 
-        // Profitable when price < cusdAmountFromMint. Solve for elapsed.
-        // price(elapsed) = startPrice * (1e27 - (elapsed * 0.9e27 / duration)) / 1e27 < cusdAmountFromMint
-        // => elapsed > (1e27 - cusdAmountFromMint * 1e27 / startPrice) * duration / 0.9e27
-        // Price floors at 0.1 * startPrice after duration; if cusdAmountFromMint < that, never profitable.
-        uint256 term = 1e27 - (cusdAmountFromMint * 1e27 / startPrice);
-        uint256 elapsedNeeded = (term * duration + 0.9e27 - 1) / 0.9e27; // ceiling
-        if (elapsedNeeded >= duration) return -1;
+            // Profitable when price < cusdAmountFromMint. Solve for elapsed.
+            // price(elapsed) = startPrice * (1e27 - (elapsed * 0.9e27 / duration)) / 1e27 < cusdAmountFromMint
+            // => elapsed > (1e27 - cusdAmountFromMint * 1e27 / startPrice) * duration / 0.9e27
+            // Price floors at 0.1 * startPrice after duration; if cusdAmountFromMint < that, never profitable.
+            uint256 term = 1e27 - (cusdAmountFromMint * 1e27 / startPrice);
+            uint256 elapsedNeeded = (term * duration + 0.9e27 - 1) / 0.9e27; // ceiling
+            if (elapsedNeeded >= duration) return (0, type(uint256).max);
 
-        uint256 nextProfitableTimestamp = startTimestamp + elapsedNeeded;
-
-        if (nextProfitableTimestamp <= block.timestamp) return 0; // already profitable
+            nextProfitableTimestamp = startTimestamp + elapsedNeeded;
+            if (nextProfitableTimestamp <= block.timestamp) return (block.number, block.timestamp); // already profitable
+        }
 
         uint256 blockOffset = (nextProfitableTimestamp - block.timestamp + secondsPerBlock - 1) / secondsPerBlock;
-        return int256(uint256(block.number) + blockOffset);
+        return (uint256(block.number) + blockOffset, nextProfitableTimestamp);
     }
 
     /// @inheritdoc UUPSUpgradeable

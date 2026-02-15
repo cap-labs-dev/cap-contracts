@@ -66,8 +66,8 @@ interface ICapInterestHarvester {
     /// @param secondsPerBlock Estimated seconds per block for block-offset calculation
     /// @param transactionCost Cost in asset terms deducted from the fee auction balance before mint
     /// @return nextProfitableBlock Block number when profitable; -1 if already profitable; 0 if now or never profitable
-    function nextProfitableBlock(uint256 secondsPerBlock, uint256 transactionCost)
+    function whenProfitable(uint256 secondsPerBlock, uint256 transactionCost)
         external
         view
-        returns (int256 nextProfitableBlock);
+        returns (uint256 nextProfitableBlock, uint256 nextProfitableTimestamp);
 }
