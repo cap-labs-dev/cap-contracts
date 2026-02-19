@@ -260,7 +260,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         if (operatorShares[0] < 1e9) return 0;
 
         address _oracle = $.oracle;
-        (delegation,) = _coverageByStrategy(_operator, _strategy, _oracle);
+        (delegation,) = coverageByStrategy(_operator, _strategy, _oracle);
     }
 
     /// @inheritdoc IEigenServiceManager
@@ -274,7 +274,7 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         CachedOperatorData storage operatorData = $.operators[_operator];
         if (operatorData.strategy == address(0)) return 0;
-        return _slashableCollateralByStrategy(_operator, operatorData.strategy);
+        return slashableCollateralByStrategy(_operator, operatorData.strategy);
     }
 
     /// @inheritdoc IEigenServiceManager
@@ -297,6 +297,11 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         CachedOperatorData storage operatorData = $.operators[_operator];
         return operatorData.strategy;
+    }
+
+    /// @inheritdoc IEigenServiceManager
+    function oracle() external view returns (address) {
+        return getEigenServiceManagerStorage().oracle;
     }
 
     /// @inheritdoc IEigenServiceManager
@@ -455,11 +460,8 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         }
     }
 
-    /// @notice Get the slashable collateral for a given operator and strategy
-    /// @param _operator The operator address
-    /// @param _strategy The strategy address
-    /// @return The slashable collateral
-    function _slashableCollateralByStrategy(address _operator, address _strategy) private view returns (uint256) {
+    /// @inheritdoc IEigenServiceManager
+    function slashableCollateralByStrategy(address _operator, address _strategy) public view returns (uint256) {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         address collateralAddress = address(IStrategy(_strategy).underlyingToken());
         uint8 decimals = IERC20Metadata(collateralAddress).decimals();
@@ -471,14 +473,9 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         return collateralValue;
     }
 
-    /// @notice Get the coverage for a given operator and strategy
-    /// @param _operator The operator address
-    /// @param _strategy The strategy address
-    /// @param _oracle The oracle address
-    /// @return collateralValue The collateral value
-    /// @return collateralAmount The collateral amount
-    function _coverageByStrategy(address _operator, address _strategy, address _oracle)
-        private
+    /// @inheritdoc IEigenServiceManager
+    function coverageByStrategy(address _operator, address _strategy, address _oracle)
+        public
         view
         returns (uint256 collateralValue, uint256 collateralAmount)
     {

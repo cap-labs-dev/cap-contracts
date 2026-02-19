@@ -212,6 +212,16 @@ contract SymbioticNetworkMiddleware is
         collateralAddress = IVault(vault).collateral();
     }
 
+    /// @inheritdoc ISymbioticNetworkMiddleware
+    function network() external view returns (address) {
+        return getSymbioticNetworkMiddlewareStorage().network;
+    }
+
+    /// @inheritdoc ISymbioticNetworkMiddleware
+    function oracle() external view returns (address) {
+        return getSymbioticNetworkMiddlewareStorage().oracle;
+    }
+
     /// @dev Get vault info
     /// @param _network Network address
     /// @param _agent Agent address

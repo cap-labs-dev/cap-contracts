@@ -135,6 +135,27 @@ interface IEigenServiceManager {
     function coverage(address operator) external view returns (uint256);
 
     /**
+     * @notice Get the coverage for a given operator and strategy
+     * @param _operator The operator address
+     * @param _strategy The strategy address
+     * @param _oracle The oracle address
+     * @return collateralValue The collateral value
+     * @return collateral The collateral
+     */
+    function coverageByStrategy(address _operator, address _strategy, address _oracle)
+        external
+        view
+        returns (uint256 collateralValue, uint256 collateral);
+
+    /**
+     * @notice Get the slashable collateral for a given operator and strategy
+     * @param _operator The operator address
+     * @param _strategy The strategy address
+     * @return The slashable collateral
+     */
+    function slashableCollateralByStrategy(address _operator, address _strategy) external view returns (uint256);
+
+    /**
      * @notice Registers an operator to the AVS, called by the Allocation Manager contract (access control set for the allocation manager).
      * @param _operator The operator to register
      * @param _avs The AVS to register the operator to
@@ -215,6 +236,11 @@ interface IEigenServiceManager {
      * @return The operator to strategy mapping
      */
     function operatorToStrategy(address operator) external view returns (address);
+
+    /**
+     * @notice Returns the oracle address used for pricing
+     */
+    function oracle() external view returns (address);
 
     /**
      * @notice Returns the operator set id for an operator
