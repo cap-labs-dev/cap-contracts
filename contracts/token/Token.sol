@@ -20,17 +20,14 @@ contract Token is ERC20PermitUpgradeable, OwnableUpgradeable, UUPSUpgradeable {
     /// @param name Name of the token
     /// @param symbol Symbol of the token
     /// @param owner Owner of the token
-    /// @param initialSupply Initial supply of the token
-    function initialize(string memory name, string memory symbol, address owner, uint256 initialSupply)
-        external
-        initializer
-    {
+    /// @param supply Supply of the token (18 decimals)
+    function initialize(string memory name, string memory symbol, address owner, uint256 supply) external initializer {
         __ERC20_init(name, symbol);
         __ERC20Permit_init(name);
         __Ownable_init(owner);
         __UUPSUpgradeable_init();
 
-        _mint(owner, initialSupply);
+        _mint(owner, supply);
     }
 
     /// @inheritdoc UUPSUpgradeable
