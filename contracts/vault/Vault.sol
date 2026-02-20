@@ -221,6 +221,18 @@ abstract contract Vault is
         (amountOut, fee) = Minter.getMintAmount(_asset, _amountIn);
     }
 
+    /// @inheritdoc IMinter
+    function getMintAmount(address _user, address _asset, uint256 _amountIn)
+        public
+        view
+        override
+        returns (uint256 amountOut, uint256 fee)
+    {
+        uint256 remainingMintCapacity = getRemainingMintCapacity(_asset);
+        if (_amountIn > remainingMintCapacity) _amountIn = remainingMintCapacity;
+        (amountOut, fee) = Minter.getMintAmount(_user, _asset, _amountIn);
+    }
+
     /// @inheritdoc IVault
     function getRemainingMintCapacity(address _asset) public view returns (uint256 remainingMintCapacity) {
         uint256 totalSupply = totalSupplies(_asset);
