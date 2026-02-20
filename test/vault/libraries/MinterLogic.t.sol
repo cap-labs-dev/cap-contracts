@@ -77,7 +77,9 @@ contract MinterLogicTest is Test {
         vault.mockRedeemFee(0);
         vault.mockFees(
             address(asset),
-            IMinter.FeeData({ minMintFee: 0, slope0: 0, slope1: 0, mintKinkRatio: 0, burnKinkRatio: 0, optimalRatio: 0 })
+            IMinter.FeeData({
+                minMintFee: 0, slope0: 0, slope1: 0, mintKinkRatio: 0, burnKinkRatio: 0, optimalRatio: 0
+            })
         );
         vault.mockDecimals(18);
     }
@@ -89,7 +91,7 @@ contract MinterLogicTest is Test {
         oracle.setPrice(address(vault), 0); // there is no price for the vault at that point
 
         IMinter.AmountOutParams memory params =
-            IMinter.AmountOutParams({ asset: address(asset), amount: 1000e18, mint: true });
+            IMinter.AmountOutParams({ asset: address(asset), amount: 1000e18, mint: true, user: msg.sender });
         uint256 amount = vault.minter_getAmountOut(params);
 
         assertEq(amount, 1000e18, "Amount should be equal to input for first deposit");
@@ -102,7 +104,7 @@ contract MinterLogicTest is Test {
         vault.mockTotalSupplies(address(vault), 1000e18);
 
         IMinter.AmountOutParams memory params =
-            IMinter.AmountOutParams({ asset: address(asset), amount: 500e18, mint: true });
+            IMinter.AmountOutParams({ asset: address(asset), amount: 500e18, mint: true, user: msg.sender });
         uint256 amount = vault.minter_getAmountOut(params);
 
         assertApproxEqAbs(amount, 500e18, 2, "Amount should be proportional to existing supply");
@@ -115,7 +117,7 @@ contract MinterLogicTest is Test {
         vault.mockTotalSupplies(address(vault), 1000e18);
 
         IMinter.AmountOutParams memory params =
-            IMinter.AmountOutParams({ asset: address(asset), amount: 300e18, mint: false });
+            IMinter.AmountOutParams({ asset: address(asset), amount: 300e18, mint: false, user: msg.sender });
 
         uint256 amount = vault.minter_getAmountOut(params);
 
@@ -129,7 +131,7 @@ contract MinterLogicTest is Test {
         vault.mockTotalSupplies(address(vault), 1000e18);
 
         IMinter.AmountOutParams memory params =
-            IMinter.AmountOutParams({ asset: address(asset), amount: 1000e18, mint: false });
+            IMinter.AmountOutParams({ asset: address(asset), amount: 1000e18, mint: false, user: msg.sender });
 
         uint256 amount = vault.minter_getAmountOut(params);
 
@@ -147,7 +149,7 @@ contract MinterLogicTest is Test {
         vault.mockTotalSupplies(address(vault), 1000e18);
 
         IMinter.AmountOutParams memory params =
-            IMinter.AmountOutParams({ asset: address(asset), amount: 100e18, mint: true });
+            IMinter.AmountOutParams({ asset: address(asset), amount: 100e18, mint: true, user: msg.sender });
 
         uint256 amount = vault.minter_getAmountOut(params);
 
@@ -161,7 +163,7 @@ contract MinterLogicTest is Test {
         vault.mockTotalSupplies(address(vault), 1000e18);
 
         IMinter.AmountOutParams memory params =
-            IMinter.AmountOutParams({ asset: address(asset), amount: 0, mint: true });
+            IMinter.AmountOutParams({ asset: address(asset), amount: 0, mint: true, user: msg.sender });
 
         uint256 amount = vault.minter_getAmountOut(params);
 
@@ -182,11 +184,13 @@ contract MinterLogicTest is Test {
         vault.mockTotalSupplies(address(vault), 1000e18);
         vault.mockFees(
             address(asset6Dec),
-            IMinter.FeeData({ minMintFee: 0, slope0: 0, slope1: 0, mintKinkRatio: 0, burnKinkRatio: 0, optimalRatio: 0 })
+            IMinter.FeeData({
+                minMintFee: 0, slope0: 0, slope1: 0, mintKinkRatio: 0, burnKinkRatio: 0, optimalRatio: 0
+            })
         );
 
         IMinter.AmountOutParams memory params =
-            IMinter.AmountOutParams({ asset: address(asset6Dec), amount: 100e6, mint: true });
+            IMinter.AmountOutParams({ asset: address(asset6Dec), amount: 100e6, mint: true, user: msg.sender });
         uint256 amount = vault.minter_getAmountOut(params);
 
         assertApproxEqAbs(amount, 100e18, 2, "Amount should be scaled to 18 decimals");

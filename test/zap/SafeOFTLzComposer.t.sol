@@ -76,7 +76,7 @@ contract SafeOFTLzComposerTest is Test {
         uint256 initialUserBalance = oft.balanceOf(user);
         uint256 initialComposerBalance = oft.balanceOf(address(composer));
 
-        bytes memory message = _encodeComposeMessage(user, amountLd, false, false, user, 42);
+        bytes memory message = _encodeComposeMessage(user, amountLd, false, false, user, amountLd);
 
         vm.prank(endpoint);
         composer.lzCompose(address(oft), bytes32(0), message, address(0), bytes(""));
@@ -84,8 +84,9 @@ contract SafeOFTLzComposerTest is Test {
 
         uint256 finalComposerBalance = oft.balanceOf(address(composer));
         uint256 finalUserBalance = oft.balanceOf(user);
-        assertEq(finalComposerBalance, initialComposerBalance - 42);
-        assertEq(finalUserBalance, initialUserBalance + 42);
+        // Only amountLD should be consumed
+        assertEq(finalComposerBalance, initialComposerBalance - amountLd);
+        assertEq(finalUserBalance, initialUserBalance + amountLd);
     }
 
     function test_lzCompose_FailAndRefund() public {
@@ -94,7 +95,7 @@ contract SafeOFTLzComposerTest is Test {
         uint256 initialComposerBalance = oft.balanceOf(address(composer));
         uint256 initialUserBalance = user.balance;
 
-        bytes memory message = _encodeComposeMessage(user, amountLd, false, true, user, 42);
+        bytes memory message = _encodeComposeMessage(user, amountLd, false, true, user, amountLd);
 
         vm.prank(endpoint);
         composer.lzCompose(address(oft), bytes32(0), message, address(0), bytes(""));
@@ -112,7 +113,7 @@ contract SafeOFTLzComposerTest is Test {
         uint256 initialComposerBalance = oft.balanceOf(address(composer));
         uint256 initialUserBalance = user.balance;
 
-        bytes memory message = _encodeComposeMessage(user, amountLd, false, true, user, 42);
+        bytes memory message = _encodeComposeMessage(user, amountLd, false, true, user, amountLd);
 
         vm.prank(endpoint);
         composer.lzCompose{ gas: 100_000 }(address(oft), bytes32(0), message, address(0), bytes(""));
@@ -125,14 +126,14 @@ contract SafeOFTLzComposerTest is Test {
     }
 
     function test_RevertWhen_CallerNotEndpoint() public {
-        bytes memory message = _encodeComposeMessage(user, 1e18, false, false, user, 42);
+        bytes memory message = _encodeComposeMessage(user, 1e18, false, false, user, 1e18);
 
         vm.expectRevert(SafeOFTLzComposer.SafeOFTLzComposer_InvalidEndpoint.selector);
         composer.lzCompose(address(oft), bytes32(0), message, address(0), bytes(""));
     }
 
     function test_RevertWhen_InvalidOApp() public {
-        bytes memory message = _encodeComposeMessage(user, 1e18, false, false, user, 42);
+        bytes memory message = _encodeComposeMessage(user, 1e18, false, false, user, 1e18);
 
         vm.prank(endpoint);
         vm.expectRevert(SafeOFTLzComposer.SafeOFTLzComposer_InvalidOApp.selector);
@@ -140,10 +141,34 @@ contract SafeOFTLzComposerTest is Test {
     }
 
     function test_RevertWhen_CallingFromNonThis() public {
-        bytes memory message = _encodeComposeMessage(user, 1e18, false, false, user, 42);
+        bytes memory message = _encodeComposeMessage(user, 1e18, false, false, user, 1e18);
 
         vm.expectRevert(SafeOFTLzComposer.SafeOFTLzComposer_Unauthorized.selector);
         composer.safeLzCompose(address(oft), bytes32(0), message, address(0), bytes(""));
+    }
+
+    function test_RevertWhen_InvalidAmountConsumed() public {
+        uint256 amountLd = 100e18;
+        oft.mint(address(composer), amountLd * 2);
+
+        // Use amountToUse that is different from amountLD (for negative testing)
+        bytes memory message = _encodeComposeMessage(user, amountLd, false, false, user, amountLd + 1);
+
+        vm.prank(endpoint);
+        vm.expectRevert(SafeOFTLzComposer.SafeOFTLzComposer_InvalidAmountConsumed.selector);
+        composer.lzCompose(address(oft), bytes32(0), message, address(0), bytes(""));
+    }
+
+    function test_RevertWhen_InvalidAmountConsumed_LessThanAmountLD() public {
+        uint256 amountLd = 100e18;
+        oft.mint(address(composer), amountLd);
+
+        // Use amountToUse that is less than amountLD (for negative testing)
+        bytes memory message = _encodeComposeMessage(user, amountLd, false, false, user, amountLd - 1);
+
+        vm.prank(endpoint);
+        vm.expectRevert(SafeOFTLzComposer.SafeOFTLzComposer_InvalidAmountConsumed.selector);
+        composer.lzCompose(address(oft), bytes32(0), message, address(0), bytes(""));
     }
 
     function _encodeComposeMessage(
@@ -157,10 +182,7 @@ contract SafeOFTLzComposerTest is Test {
         uint64 _nonce = 0;
         uint32 _srcEid = 0;
         TestMessage memory message = TestMessage({
-            shouldRevert: shouldRevert,
-            consumeAllGas: consumeAllGas,
-            sendTo: sendTo,
-            amountToSend: amountToSend
+            shouldRevert: shouldRevert, consumeAllGas: consumeAllGas, sendTo: sendTo, amountToSend: amountToSend
         });
         bytes memory payload =
             abi.encodePacked(OFTComposeMsgCodec.addressToBytes32(srcChainSender), abi.encode(message));

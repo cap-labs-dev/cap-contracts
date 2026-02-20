@@ -29,7 +29,7 @@ library MinterLogic {
     {
         (uint256 amountOutBeforeFee, uint256 newRatio) = _amountOutBeforeFee($.oracle, params);
 
-        if ($.whitelist[msg.sender]) {
+        if ($.whitelist[params.user]) {
             amount = amountOutBeforeFee;
         } else {
             (amount, fee) = _applyFeeSlopes(
@@ -49,7 +49,7 @@ library MinterLogic {
         view
         returns (uint256[] memory amounts, uint256[] memory fees)
     {
-        uint256 redeemFee = $.whitelist[msg.sender] ? 0 : $.redeemFee;
+        uint256 redeemFee = $.whitelist[params.user] ? 0 : $.redeemFee;
         uint256 shares = params.amount * SHARE_PRECISION / IERC20(address(this)).totalSupply();
         address[] memory assets = IVault(address(this)).assets();
         uint256 assetLength = assets.length;
