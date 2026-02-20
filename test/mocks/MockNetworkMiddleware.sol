@@ -86,6 +86,14 @@ contract MockNetworkMiddleware is ISymbioticNetworkMiddleware {
         return _storage.agentsToVault[_agent];
     }
 
+    function network() external view returns (address) {
+        return _storage.network;
+    }
+
+    function oracle() external view returns (address) {
+        return _storage.oracle;
+    }
+
     function distributeRewards(address _agent, address _token) external {
         // Mock implementation - no-op
     }

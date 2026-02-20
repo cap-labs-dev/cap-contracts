@@ -184,4 +184,10 @@ interface ISymbioticNetworkMiddleware {
     /// @param _agent Agent address
     /// @return collateralAddress Collateral address
     function collateral(address _agent) external view returns (address collateralAddress);
+
+    /// @notice Symbiotic network address
+    function network() external view returns (address);
+
+    /// @notice Oracle address used for pricing
+    function oracle() external view returns (address);
 }
