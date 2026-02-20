@@ -18,19 +18,18 @@ library MinterLogic {
     uint256 constant SHARE_PRECISION = 1e33;
 
     /// @notice Calculate the amount out from a swap including fees
-    /// @param user User address that is minting or burning
     /// @param $ Storage pointer
     /// @param params Parameters for a swap
     /// @return amount Amount out from a swap
     /// @return fee Fee applied
-    function amountOut(address user, IMinter.MinterStorage storage $, IMinter.AmountOutParams memory params)
+    function amountOut(IMinter.MinterStorage storage $, IMinter.AmountOutParams memory params)
         external
         view
         returns (uint256 amount, uint256 fee)
     {
         (uint256 amountOutBeforeFee, uint256 newRatio) = _amountOutBeforeFee($.oracle, params);
 
-        if ($.whitelist[user]) {
+        if ($.whitelist[params.user]) {
             amount = amountOutBeforeFee;
         } else {
             (amount, fee) = _applyFeeSlopes(
@@ -45,12 +44,12 @@ library MinterLogic {
     /// @param params Parameters for redeeming
     /// @return amounts Amount of underlying assets withdrawn
     /// @return fees Amount of fees applied
-    function redeemAmountOut(address user, IMinter.MinterStorage storage $, IMinter.RedeemAmountOutParams memory params)
+    function redeemAmountOut(IMinter.MinterStorage storage $, IMinter.RedeemAmountOutParams memory params)
         external
         view
         returns (uint256[] memory amounts, uint256[] memory fees)
     {
-        uint256 redeemFee = $.whitelist[user] ? 0 : $.redeemFee;
+        uint256 redeemFee = $.whitelist[params.user] ? 0 : $.redeemFee;
         uint256 shares = params.amount * SHARE_PRECISION / IERC20(address(this)).totalSupply();
         address[] memory assets = IVault(address(this)).assets();
         uint256 assetLength = assets.length;

@@ -49,16 +49,19 @@ interface IMinter {
     /// @param mint True if minting, false if burning
     /// @param asset Asset address
     /// @param amount Amount of asset to mint or burn
+    /// @param user User address
     struct AmountOutParams {
         bool mint;
         address asset;
         uint256 amount;
+        address user;
     }
 
     /// @dev Parameters for redeeming
     /// @param amount Amount of cap token to redeem
     struct RedeemAmountOutParams {
         uint256 amount;
+        address user;
     }
 
     /// @dev Fee data set for an asset in a vault
@@ -121,12 +124,12 @@ interface IMinter {
     function getMintAmount(address _asset, uint256 _amountIn) external view returns (uint256 amountOut, uint256 fee);
 
     /// @notice Get the mint amount for a given asset
-    /// @param user User address
+    /// @param _user User address
     /// @param _asset Asset address
     /// @param _amountIn Amount of asset to use
     /// @return amountOut Amount minted
     /// @return fee Fee applied
-    function getMintAmount(address user, address _asset, uint256 _amountIn)
+    function getMintAmount(address _user, address _asset, uint256 _amountIn)
         external
         view
         returns (uint256 amountOut, uint256 fee);
@@ -139,12 +142,12 @@ interface IMinter {
     function getBurnAmount(address _asset, uint256 _amountIn) external view returns (uint256 amountOut, uint256 fee);
 
     /// @notice Get the burn amount for a given asset
-    /// @param user User address
+    /// @param _user User address
     /// @param _asset Asset address to withdraw
     /// @param _amountIn Amount of cap token to burn
     /// @return amountOut Amount of the asset withdrawn
     /// @return fee Fee applied
-    function getBurnAmount(address user, address _asset, uint256 _amountIn)
+    function getBurnAmount(address _user, address _asset, uint256 _amountIn)
         external
         view
         returns (uint256 amountOut, uint256 fee);
@@ -159,11 +162,11 @@ interface IMinter {
         returns (uint256[] memory amountsOut, uint256[] memory redeemFees);
 
     /// @notice Get the redeem amount
-    /// @param user User address
+    /// @param _user User address
     /// @param _amountIn Amount of cap token to burn
     /// @return amountsOut Amounts of assets to be withdrawn
     /// @return redeemFees Amounts of redeem fees to be applied
-    function getRedeemAmount(address user, uint256 _amountIn)
+    function getRedeemAmount(address _user, uint256 _amountIn)
         external
         view
         returns (uint256[] memory amountsOut, uint256[] memory redeemFees);
