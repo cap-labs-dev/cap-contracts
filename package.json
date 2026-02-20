@@ -6,6 +6,7 @@
   "author": "Cap Labs Inc.",
   "license": "MIT",
   "private": true,
+  "type": "module",
   "engines": {
     "node": "^20.18.0"
   },
@@ -29,7 +30,8 @@
     "test:build": "forge build ./contracts ./test ./script --via-ir",
     "gas:flamegraph": "forge test --flamegraph --match-path 'test/**/*.gas.t.sol'",
     "coverage:forge": "forge coverage --report summary --ir-minimum",
-    "coverage:forge:report": "forge coverage --report lcov --ir-minimum && lcov --remove lcov.info \"*test/*\" \"lendingPool/libraries/math\" \"*/contracts/deploy/*\" \"*script/*\" \"*node_modules/*\" --output-file lcov.info --rc lcov_branch_coverage=1 --ignore-errors inconsistent --ignore-errors unused && genhtml lcov.info --branch-coverage --output-dir coverage --ignore-errors inconsistent --ignore-errors unused"
+    "coverage:forge:report": "forge coverage --report lcov --ir-minimum && lcov --remove lcov.info \"*test/*\" \"lendingPool/libraries/math\" \"*/contracts/deploy/*\" \"*script/*\" \"*node_modules/*\" --output-file lcov.info --rc lcov_branch_coverage=1 --ignore-errors inconsistent --ignore-errors unused && genhtml lcov.info --branch-coverage --output-dir coverage --ignore-errors inconsistent --ignore-errors unused",
+    "merkle:proof": "cd script/merkle && node MerkleProof.js"
   },
   "devDependencies": {
     "@openzeppelin/contracts": "npm:@openzeppelin/contracts",
@@ -39,7 +41,8 @@
     "@symbioticfi/hooks": "^1.0.0-devnet.1",
     "@symbioticfi/rewards": "^1.0.0-devnet.6",
     "eigenlayer-contracts": "^1.0.4",
-    "lefthook": "^1.10.10"
+    "lefthook": "^1.10.10",
+    "@predicate/contracts": "^2.2.0"
   },
   "resolutions": {
     "@openzeppelin/contracts": "^5.2.0"

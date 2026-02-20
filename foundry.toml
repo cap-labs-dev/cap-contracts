@@ -28,6 +28,7 @@ remappings = [
     "forge-std/=lib/forge-std/src/",
     "@openzeppelin/=node_modules/@openzeppelin/",
     "@tokenized-strategy/=lib/tokenized-strategy/src/",
+    "@predicate/=node_modules/@predicate/contracts/src/"
 ]
 fs_permissions = [
     { access = "read", path = "./config/eigen.json" },

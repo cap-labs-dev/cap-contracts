@@ -19,3 +19,6 @@
 [submodule "lib/tokenized-strategy"]
 	path = lib/tokenized-strategy
 	url = https://github.com/yearn/tokenized-strategy
+[submodule "lib/predicate-contracts"]
+	path = lib/predicate-contracts
+	url = https://github.com/predicatelabs/predicate-contracts
