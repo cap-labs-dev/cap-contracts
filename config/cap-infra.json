@@ -21,7 +21,7 @@
             "delegation": "0xF3E3Eae671000612CE3Fd15e1019154C1a4d693F",
             "lender": "0x15622c3dbbc5614E6DFa9446603c1779647f01FC",
             "oracle": "0xcD7f45566bc0E7303fB92A93969BB4D3f6e662bb",
-            "harvester": "0xBF664De63168720b57f1c93581512E9580E3E6f8",
+            "harvester": "0xb90dE8357ee4f5c145c159f8e3822bA9b17BE4F1",
             "chainlinkPoRAddressList": "0x69A22f0fc7b398e637BF830B862C75dd854b2BbF",
             "gelatoHarvester": "0x1388B2dc1Fe408741E48145F87Fd79f01bca7e16",
             "gelatoSweeper": "0x51da1eC8dC52F146e644F5F759D399038CCf7aB4",

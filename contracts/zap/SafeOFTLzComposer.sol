@@ -27,6 +27,9 @@ abstract contract SafeOFTLzComposer is ILayerZeroComposer {
     /// @dev Unauthorized
     error SafeOFTLzComposer_Unauthorized();
 
+    /// @dev Invalid amount consumed
+    error SafeOFTLzComposer_InvalidAmountConsumed();
+
     /// @dev Initialize the SafeOFTLzComposer
     /// @param _oApp OApp address
     /// @param _endpoint LayerZero endpoint
@@ -47,16 +50,25 @@ abstract contract SafeOFTLzComposer is ILayerZeroComposer {
         if (_oApp != oApp) revert SafeOFTLzComposer_InvalidOApp();
         if (msg.sender != endpoint) revert SafeOFTLzComposer_InvalidEndpoint();
 
+        // Extract amountLD to ensure only this amount is consumed
+        uint256 amountLD = OFTComposeMsgCodec.amountLD(_message);
+        address token = IOFT(oApp).token();
+        uint256 balanceBefore = IERC20(token).balanceOf(address(this));
+
         // execute the handler and send back the oft asset to the recipient if the handler fails
         // 35000 is the gas limit for the fallback handler in case of a revert
         try SafeOFTLzComposer(address(this)).safeLzCompose{ gas: gasleft() - fallbackGas }(
             _oApp, _guid, _message, _executor, _extraData
-        ) { } catch (bytes memory) {
+        ) {
+            // Verify that exactly amountLD was consumed
+            uint256 balanceAfter = IERC20(token).balanceOf(address(this));
+            uint256 consumed = balanceBefore - balanceAfter;
+            if (consumed != amountLD) revert SafeOFTLzComposer_InvalidAmountConsumed();
+        } catch (bytes memory) {
+            // Refund exactly amountLD to the recipient
             address fallbackRecipient = OFTComposeMsgCodec.bytes32ToAddress(OFTComposeMsgCodec.composeFrom(_message));
-            address token = IOFT(oApp).token();
-            uint256 amount = OFTComposeMsgCodec.amountLD(_message);
-            if (amount > 0) {
-                IERC20(token).safeTransfer(fallbackRecipient, amount);
+            if (amountLD > 0) {
+                IERC20(token).safeTransfer(fallbackRecipient, amountLD);
             }
         }
     }

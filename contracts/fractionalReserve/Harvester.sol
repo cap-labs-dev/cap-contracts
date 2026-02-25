@@ -24,6 +24,8 @@ contract Harvester is IHarvester {
         }
 
         interest = fractionalReserve.claimableInterest(_asset);
-        fractionalReserve.realizeInterest(_asset);
+        if (interest > 0) {
+            fractionalReserve.realizeInterest(_asset);
+        }
     }
 }

@@ -12,6 +12,7 @@ contract MockNetworkMiddleware is ISymbioticNetworkMiddleware {
     mapping(address => uint256) public mockSlashableCollateral;
     mapping(address => mapping(address => uint256)) public mockCollateralByVault;
     mapping(address => mapping(address => uint256)) public mockSlashableCollateralByVault;
+    mapping(address => mapping(address => address)) public mockCollateralAddressByVault;
 
     function initialize(
         address _accessControl,
@@ -37,15 +38,15 @@ contract MockNetworkMiddleware is ISymbioticNetworkMiddleware {
 
         address _vault = _storage.agentsToVault[_agent];
         mockCollateralByVault[_agent][_vault] -= mockCollateralByVault[_agent][_vault] * _slashShare / 1e18;
-        mockSlashableCollateralByVault[_agent][_vault] -=
-            mockSlashableCollateralByVault[_agent][_vault] * _slashShare / 1e18;
+        mockSlashableCollateralByVault[_agent][_vault] -= mockSlashableCollateralByVault[_agent][_vault] * _slashShare
+        / 1e18;
         emit Slash(_agent, _recipient, _slashShare);
     }
 
     function coverageByVault(address, address _agent, address _vault, address, uint48)
         external
         view
-        returns (uint256 collateralValue, uint256 collateral)
+        returns (uint256 collateralValue, uint256 collateralAmount)
     {
         return (mockCollateralByVault[_agent][_vault], mockCollateralByVault[_agent][_vault]);
     }
@@ -53,7 +54,7 @@ contract MockNetworkMiddleware is ISymbioticNetworkMiddleware {
     function slashableCollateralByVault(address, address _agent, address _vault, address, uint48)
         external
         view
-        returns (uint256 collateralValue, uint256 collateral)
+        returns (uint256 collateralValue, uint256 collateralAmount)
     {
         return (mockSlashableCollateralByVault[_agent][_vault], mockSlashableCollateralByVault[_agent][_vault]);
     }
@@ -64,6 +65,12 @@ contract MockNetworkMiddleware is ISymbioticNetworkMiddleware {
 
     function slashableCollateral(address _agent, uint48) external view returns (uint256 _slashableCollateral) {
         _slashableCollateral = mockSlashableCollateral[_agent];
+    }
+
+    function collateral(address _agent) external view returns (address collateralAddress) {
+        address vault = _storage.agentsToVault[_agent];
+        if (vault == address(0)) return address(0);
+        collateralAddress = mockCollateralAddressByVault[_agent][vault];
     }
 
     function subnetworkIdentifier(address _agent) public pure returns (uint96 id) {
