@@ -16,6 +16,14 @@ interface ISymbioticAgentManager {
         address cusd;
     }
 
+    /// @dev Agent configuration
+    /// @param agent Agent address
+    /// @param vault Vault address
+    /// @param rewarder Rewarder address
+    /// @param ltv LTV
+    /// @param liquidationThreshold Liquidation threshold
+    /// @param delegationRate Delegation rate
+    /// @param coverageCap Coverage cap
     struct AgentConfig {
         address agent;
         address vault;
@@ -23,6 +31,7 @@ interface ISymbioticAgentManager {
         uint256 ltv;
         uint256 liquidationThreshold;
         uint256 delegationRate;
+        uint256 coverageCap;
     }
 
     /// @notice Initialize the agent manager
