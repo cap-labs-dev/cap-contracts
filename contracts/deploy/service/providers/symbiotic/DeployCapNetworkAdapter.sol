@@ -41,10 +41,12 @@ import { SymbioticAddressbook } from "../../../utils/SymbioticUtils.sol";
 import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 
 import { IOperatorRegistry } from "@symbioticfi/core/src/interfaces/IOperatorRegistry.sol";
-import { IDefaultStakerRewards } from
-    "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewards.sol";
-import { IDefaultStakerRewardsFactory } from
-    "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewardsFactory.sol";
+import {
+    IDefaultStakerRewards
+} from "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewards.sol";
+import {
+    IDefaultStakerRewardsFactory
+} from "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewardsFactory.sol";
 import { console } from "forge-std/console.sol";
 
 contract DeployCapNetworkAdapter is ProxyUtils {
@@ -72,21 +74,21 @@ contract DeployCapNetworkAdapter is ProxyUtils {
         d.eigenServiceManager = _proxy(implems.eigenServiceManager);
         d.agentManager = _proxy(implems.agentManager);
         console.log("chainId: ", block.chainid);
-        EigenServiceManager(d.eigenServiceManager).initialize(
-            infra.accessControl,
-            IEigenServiceManager.EigenAddresses({
-                allocationManager: eigenAb.eigenAddresses.allocationManager,
-                delegationManager: eigenAb.eigenAddresses.delegationManager,
-                strategyManager: eigenAb.eigenAddresses.strategyManager,
-                rewardsCoordinator: eigenAb.eigenAddresses.rewardsCoordinator
-            }),
-            infra.oracle,
-            rewardDuration
-        );
+        EigenServiceManager(d.eigenServiceManager)
+            .initialize(
+                infra.accessControl,
+                IEigenServiceManager.EigenAddresses({
+                    allocationManager: eigenAb.eigenAddresses.allocationManager,
+                    delegationManager: eigenAb.eigenAddresses.delegationManager,
+                    strategyManager: eigenAb.eigenAddresses.strategyManager,
+                    rewardsCoordinator: eigenAb.eigenAddresses.rewardsCoordinator
+                }),
+                infra.oracle,
+                rewardDuration
+            );
 
-        EigenAgentManager(d.agentManager).initialize(
-            infra.accessControl, infra.lender, cusd, infra.delegation, d.eigenServiceManager, infra.oracle
-        );
+        EigenAgentManager(d.agentManager)
+            .initialize(infra.accessControl, infra.lender, cusd, infra.delegation, d.eigenServiceManager, infra.oracle);
     }
 
     function _deploySymbioticNetworkAdapterInfra(
@@ -99,27 +101,30 @@ contract DeployCapNetworkAdapter is ProxyUtils {
         d.network = _proxy(address(implems.network));
         d.networkMiddleware = _proxy(address(implems.networkMiddleware));
         d.agentManager = _proxy(address(implems.agentManager));
-        SymbioticNetwork(d.network).initialize(
-            infra.accessControl,
-            addressbook.registries.networkRegistry,
-            addressbook.registries.operatorRegistry,
-            addressbook.services.networkOptInService,
-            addressbook.services.vaultOptInService,
-            d.networkMiddleware,
-            addressbook.services.networkMiddlewareService
-        );
-        SymbioticNetworkMiddleware(d.networkMiddleware).initialize(
-            infra.accessControl,
-            d.network,
-            addressbook.registries.vaultRegistry,
-            infra.oracle,
-            params.vaultEpochDuration,
-            params.feeAllowed
-        );
+        SymbioticNetwork(d.network)
+            .initialize(
+                infra.accessControl,
+                addressbook.registries.networkRegistry,
+                addressbook.registries.operatorRegistry,
+                addressbook.services.networkOptInService,
+                addressbook.services.vaultOptInService,
+                d.networkMiddleware,
+                addressbook.services.networkMiddlewareService
+            );
+        SymbioticNetworkMiddleware(d.networkMiddleware)
+            .initialize(
+                infra.accessControl,
+                d.network,
+                addressbook.registries.vaultRegistry,
+                infra.oracle,
+                params.vaultEpochDuration,
+                params.feeAllowed
+            );
 
-        SymbioticAgentManager(d.agentManager).initialize(
-            infra.accessControl, infra.lender, capToken, infra.delegation, d.networkMiddleware, infra.oracle
-        );
+        SymbioticAgentManager(d.agentManager)
+            .initialize(
+                infra.accessControl, infra.lender, capToken, infra.delegation, d.networkMiddleware, infra.oracle
+            );
 
         d.vaultFactory = address(
             new CapSymbioticVaultFactory(
@@ -153,6 +158,9 @@ contract DeployCapNetworkAdapter is ProxyUtils {
         accessControl.grantAccess(
             IRateOracle(infra.oracle).setRestakerRate.selector, infra.oracle, address(agentManager)
         );
+        accessControl.grantAccess(
+            IDelegation(infra.delegation).setCoverageCap.selector, infra.delegation, address(agentManager)
+        );
         accessControl.grantAccess(agentManager.addAgent.selector, address(agentManager), users.middleware_admin);
     }
 
@@ -184,6 +192,9 @@ contract DeployCapNetworkAdapter is ProxyUtils {
         accessControl.grantAccess(eigenAgentManager.setRestakerRate.selector, address(eigenAgentManager), admin);
         accessControl.grantAccess(
             IRateOracle(infra.oracle).setRestakerRate.selector, infra.oracle, address(eigenAgentManager)
+        );
+        accessControl.grantAccess(
+            IDelegation(infra.delegation).setCoverageCap.selector, infra.delegation, address(eigenAgentManager)
         );
         accessControl.grantAccess(
             IDelegation(infra.delegation).addAgent.selector, infra.delegation, address(eigenAgentManager)

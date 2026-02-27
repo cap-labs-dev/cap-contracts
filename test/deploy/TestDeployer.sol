@@ -348,7 +348,8 @@ contract TestDeployer is
             rewarder: stakerRewarder,
             ltv: 0.5e27,
             liquidationThreshold: 0.7e27,
-            delegationRate: 0.02e27
+            delegationRate: 0.02e27,
+            coverageCap: type(uint256).max
         });
 
         SymbioticAgentManager(env.symbiotic.networkAdapter.agentManager).addAgent(agentConfig);
