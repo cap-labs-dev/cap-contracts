@@ -56,6 +56,9 @@ contract EigenAgentManager is IEigenAgentManager, UUPSUpgradeable, Access, Eigen
 
         /// 3. Add the agent to the rate oracle
         IRateOracle($.oracle).setRestakerRate(_agentConfig.agent, _agentConfig.delegationRate);
+
+        /// 4. Set the coverage cap for the agent
+        IDelegation($.delegation).setCoverageCap(_agentConfig.agent, _agentConfig.coverageCap);
     }
 
     /// @inheritdoc IEigenAgentManager

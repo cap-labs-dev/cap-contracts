@@ -14,13 +14,16 @@ import {
 } from "../../../../../contracts/delegation/providers/eigenlayer/EigenAgentManager.sol";
 
 import { EigenServiceManager } from "../../../../../contracts/delegation/providers/eigenlayer/EigenServiceManager.sol";
-import { IAllocationManager } from
-    "../../../../../contracts/delegation/providers/eigenlayer/interfaces/IAllocationManager.sol";
-import { IDelegationManager } from
-    "../../../../../contracts/delegation/providers/eigenlayer/interfaces/IDelegationManager.sol";
+import {
+    IAllocationManager
+} from "../../../../../contracts/delegation/providers/eigenlayer/interfaces/IAllocationManager.sol";
+import {
+    IDelegationManager
+} from "../../../../../contracts/delegation/providers/eigenlayer/interfaces/IDelegationManager.sol";
 import { IStrategy } from "../../../../../contracts/delegation/providers/eigenlayer/interfaces/IStrategy.sol";
-import { IStrategyManager } from
-    "../../../../../contracts/delegation/providers/eigenlayer/interfaces/IStrategyManager.sol";
+import {
+    IStrategyManager
+} from "../../../../../contracts/delegation/providers/eigenlayer/interfaces/IStrategyManager.sol";
 import { IEigenOperator } from "../../../../../contracts/interfaces/IEigenOperator.sol";
 import { InfraConfig } from "../../../interfaces/TestDeployConfig.sol";
 import { TimeUtils } from "../../../utils/TimeUtils.sol";
@@ -90,9 +93,8 @@ contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
 
         IDelegationManager.SignatureWithExpiry memory signatureWithExpiry =
             IDelegationManager.SignatureWithExpiry({ signature: "", expiry: currentTotpExpiryTimestamp });
-        IDelegationManager(eigenAb.eigenAddresses.delegationManager).delegateTo(
-            eigenOperator, signatureWithExpiry, bytes32(currentTotpExpiryTimestamp)
-        );
+        IDelegationManager(eigenAb.eigenAddresses.delegationManager)
+            .delegateTo(eigenOperator, signatureWithExpiry, bytes32(currentTotpExpiryTimestamp));
         vm.stopPrank();
     }
 
@@ -188,8 +190,9 @@ contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
                 operatorMetadata: "",
                 ltv: 5e26, // 50%
                 liquidationThreshold: 8e26, // 80%
-                delegationRate: 2e25 // 2%
-             });
+                delegationRate: 2e25, // 2%
+                coverageCap: type(uint256).max // unlimited
+            });
             EigenAgentManager(eigenAgentManager).addEigenAgent(agentConfig);
         }
         vm.stopPrank();
