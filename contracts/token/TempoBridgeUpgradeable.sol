@@ -9,22 +9,34 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 /// @author kexley, Cap Labs
 /// @notice A bridge using LayerZero for sending tokens to and from Tempo
 contract TempoBridgeUpgradeable is OFTCoreUpgradeable, UUPSUpgradeable {
-    /// @dev The underlying TIP20 token.
-    ITIP20 internal immutable underlyingToken;
+    struct TempoBridgeStorage {
+        // The underlying TIP20 token.
+        ITIP20 underlyingToken;
+    }
 
-    /// @dev Constructor for the Tempo Bridge contract.
-    /// @param _underlyingToken The address of the TIP20 token to bridge.
+    // keccak256(abi.encode(uint256(keccak256("cap.storage.TempoBridge")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant TempoBridgeStorageLocation =
+        0xaff443d40d9449d0bb041d5986df9cd3a11be6e711f780b1d135421cee639900;
+
+    /// @dev Get the tempo bridge storage.
+    /// @return $ Storage pointer
+    function _getTempoBridgeStorage() internal pure returns (TempoBridgeStorage storage $) {
+        assembly {
+            $.slot := TempoBridgeStorageLocation
+        }
+    }
+
+    /// @dev Constructor for the Tempo Bridge contract. All TIP20 tokens have 6 decimals.
     /// @param _lzEndpoint The LayerZero endpoint address.
-    constructor(address _underlyingToken, address _lzEndpoint)
-        OFTCoreUpgradeable(ITIP20(_underlyingToken).decimals(), _lzEndpoint)
-    {
-        underlyingToken = ITIP20(_underlyingToken);
+    constructor(address _lzEndpoint) OFTCoreUpgradeable(6, _lzEndpoint) {
         _disableInitializers();
     }
 
     /// @dev Initialize the Tempo Bridge contract.
+    /// @param _underlyingToken The address of the TIP20 token to bridge.
     /// @param _delegate The delegate address for OApp configuration.
-    function initialize(address _delegate) external initializer {
+    function initialize(address _underlyingToken, address _delegate) external initializer {
+        _getTempoBridgeStorage().underlyingToken = ITIP20(_underlyingToken);
         __OFTCore_init(_delegate);
         __Ownable_init(_delegate);
         __UUPSUpgradeable_init();
@@ -33,7 +45,7 @@ contract TempoBridgeUpgradeable is OFTCoreUpgradeable, UUPSUpgradeable {
     /// @notice Retrieves the address of the underlying TIP20 token.
     /// @return tokenAddress The address of the underlying TIP20 token.
     function token() public view returns (address tokenAddress) {
-        tokenAddress = address(underlyingToken);
+        tokenAddress = address(_getTempoBridgeStorage().underlyingToken);
     }
 
     /// @notice Indicates whether approval is required to transfer tokens to the bridge for burning.
@@ -56,6 +68,7 @@ contract TempoBridgeUpgradeable is OFTCoreUpgradeable, UUPSUpgradeable {
         returns (uint256 amountSentLD, uint256 amountReceivedLD)
     {
         (amountSentLD, amountReceivedLD) = _debitView(_amountLD, _minAmountLD, _dstEid);
+        ITIP20 underlyingToken = _getTempoBridgeStorage().underlyingToken;
         // Transfers tokens from the sender to the bridge since `burnFrom` is not supported on TIP20 tokens.
         underlyingToken.transferFrom(_from, address(this), amountSentLD);
         // Burn tokens from the bridge.
@@ -79,7 +92,7 @@ contract TempoBridgeUpgradeable is OFTCoreUpgradeable, UUPSUpgradeable {
     {
         if (_to == address(0x0)) _to = address(0xdead); // _mint(...) does not support address(0x0)
         // Mints the tokens and transfers to the recipient.
-        underlyingToken.mint(_to, _amountLD);
+        _getTempoBridgeStorage().underlyingToken.mint(_to, _amountLD);
         // In the case of Tempo Bridge, the amountLD is equal to amountReceivedLD.
         return _amountLD;
     }
