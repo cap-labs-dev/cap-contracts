@@ -45,18 +45,17 @@ contract HarvesterTest is Test {
         vm.stopPrank();
 
         vm.prank(admin);
-        AccessControl(accessControl).grantAccess(
-            ICapInterestHarvester.receiveFlashLoan.selector, address(proxy), balancerVault
-        );
+        AccessControl(accessControl)
+            .grantAccess(ICapInterestHarvester.receiveFlashLoan.selector, address(proxy), balancerVault);
         vm.stopPrank();
     }
 
     function test_gelatoHarvest() public {
-        (bool canExec,) = CapInterestHarvester(address(proxy)).checker();
-        console.log("canExec", canExec);
+        int256 expectedProfit = ICapInterestHarvester(address(proxy)).expectedProfit(1);
+        console.log("expectedProfit", int256(expectedProfit));
 
         vm.prank(gelato);
-        if (canExec) ICapInterestHarvester(address(proxy)).harvestInterest();
+        if (expectedProfit > 0) ICapInterestHarvester(address(proxy)).harvestInterest();
         vm.stopPrank();
     }
 }

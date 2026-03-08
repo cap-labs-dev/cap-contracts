@@ -11,6 +11,7 @@ import { ILender } from "../interfaces/ILender.sol";
 import { IMinter } from "../interfaces/IMinter.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import { CapInterestHarvesterStorageUtils } from "../storage/CapInterestHarvesterStorageUtils.sol";
+import { FlashLoanTransientState } from "./FlashLoanTansientState.sol";
 import { IBalancerVault } from "./interfaces/IBalancerVault.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -18,7 +19,13 @@ import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/Saf
 /// @title Cap Interest Harvester
 /// @author weso, Cap Labs
 /// @notice Harvests interest from borrow and the fractional reserve, sends to fee auction, buys interest, calls distribute on fee receiver
-contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access, CapInterestHarvesterStorageUtils {
+contract CapInterestHarvester is
+    ICapInterestHarvester,
+    UUPSUpgradeable,
+    Access,
+    CapInterestHarvesterStorageUtils,
+    FlashLoanTransientState
+{
     using SafeERC20 for IERC20;
 
     error InvalidFlashLoan();
@@ -73,8 +80,6 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
         /// 4. Call distribute on fee receiver
         _distributeInterest($.feeReceiver);
 
-        $.lastharvest = block.timestamp;
-
         emit HarvestedInterest(block.timestamp);
     }
 
@@ -96,10 +101,7 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
 
     /// @dev Flashloan buy all the interest
     /// @param _asset Asset address
-    function _flashloanBuyInterest(address _balancerVault, address _cusd, address _feeAuction, address _asset)
-        private
-    {
-        CapInterestHarvesterStorage storage $ = getCapInterestHarvesterStorage();
+    function _flashloanBuyInterest(address _balancerVault, address _cusd, address _feeAuction, address _asset) private {
         uint256 assetBalOfFeeAuction = IERC20(_asset).balanceOf(_feeAuction);
         uint256 price = IFeeAuction(_feeAuction).currentPrice();
         (uint256 cusdAmountFromMint,) = IMinter(_cusd).getMintAmount(_asset, assetBalOfFeeAuction);
@@ -111,10 +113,9 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
             uint256[] memory amounts = new uint256[](1);
             amounts[0] = assetBalOfFeeAuction;
 
-            IBalancerVault balancerVault = IBalancerVault(_balancerVault);
-            $.flashInProgress = true;
+            setFlashLoanInProgress(true);
 
-            balancerVault.flashLoan(address(this), assets, amounts, "");
+            IBalancerVault(_balancerVault).flashLoan(address(this), assets, amounts, "");
         }
     }
 
@@ -132,7 +133,7 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
         checkAccess(this.receiveFlashLoan.selector)
     {
         CapInterestHarvesterStorage storage $ = getCapInterestHarvesterStorage();
-        if (!$.flashInProgress) revert InvalidFlashLoan();
+        if (!isFlashLoanInProgress()) revert InvalidFlashLoan();
         _checkApproval($.asset, $.cusd);
         _checkApproval($.cusd, $.feeAuction);
 
@@ -157,7 +158,6 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
         IERC20($.asset).safeTransfer($.balancerVault, amounts[0] + feeAmounts[0]);
         uint256 excessAmount = IERC20($.asset).balanceOf(address(this));
         if (excessAmount > 0) IERC20($.asset).safeTransfer($.excessReceiver, excessAmount);
-        $.flashInProgress = false;
     }
 
     /// @dev Check approval
@@ -171,11 +171,6 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
     }
 
     /// @inheritdoc ICapInterestHarvester
-    function lastHarvest() public view returns (uint256) {
-        return getCapInterestHarvesterStorage().lastharvest;
-    }
-
-    /// @inheritdoc ICapInterestHarvester
     function setExcessReceiver(address _excessReceiver) external checkAccess(this.setExcessReceiver.selector) {
         CapInterestHarvesterStorage storage $ = getCapInterestHarvesterStorage();
         $.excessReceiver = _excessReceiver;
@@ -184,23 +179,45 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
     }
 
     /// @inheritdoc ICapInterestHarvester
-    function checker() external view returns (bool canExec, bytes memory execPayload) {
+    function expectedProfit(uint256 transactionCost) external view returns (int256) {
         CapInterestHarvesterStorage storage $ = getCapInterestHarvesterStorage();
 
-        // Just harvest if its been 24 hours since last harvest
-        if (block.timestamp - $.lastharvest > 24 hours) {
-            return (true, abi.encodeCall(this.harvestInterest, ()));
+        uint256 assetBalOfFeeAuction = IERC20($.asset).balanceOf($.feeAuction);
+        uint256 amountIn = transactionCost > assetBalOfFeeAuction ? 0 : assetBalOfFeeAuction - transactionCost;
+        uint256 price = IFeeAuction($.feeAuction).currentPrice();
+        (uint256 cusdAmountFromMint,) = IMinter($.cusd).getMintAmount($.asset, amountIn);
+
+        return int256(cusdAmountFromMint) - int256(price);
+    }
+
+    /// @inheritdoc ICapInterestHarvester
+    function nextProfitable(uint256 secondsPerBlock, uint256 transactionCost) external view returns (uint256, uint256) {
+        CapInterestHarvesterStorage storage $ = getCapInterestHarvesterStorage();
+
+        uint256 nextProfitableTimestamp;
+        {
+            uint256 assetBalOfFeeAuction = IERC20($.asset).balanceOf($.feeAuction);
+            uint256 amountIn = transactionCost > assetBalOfFeeAuction ? 0 : assetBalOfFeeAuction - transactionCost;
+            (uint256 cusdAmountFromMint,) = IMinter($.cusd).getMintAmount($.asset, amountIn);
+
+            uint256 startPrice = IFeeAuction($.feeAuction).startPrice();
+            uint256 startTimestamp = IFeeAuction($.feeAuction).startTimestamp();
+            uint256 duration = IFeeAuction($.feeAuction).duration();
+
+            // Profitable when price < cusdAmountFromMint. Solve for elapsed.
+            // price(elapsed) = startPrice * (1e27 - (elapsed * 0.9e27 / duration)) / 1e27 < cusdAmountFromMint
+            // => elapsed > (1e27 - cusdAmountFromMint * 1e27 / startPrice) * duration / 0.9e27
+            // Price floors at 0.1 * startPrice after duration; if cusdAmountFromMint < that, never profitable.
+            uint256 term = 1e27 - (cusdAmountFromMint * 1e27 / startPrice);
+            uint256 elapsedNeeded = (term * duration + 0.9e27 - 1) / 0.9e27; // ceiling
+            if (elapsedNeeded >= duration) return (0, type(uint256).max);
+
+            nextProfitableTimestamp = startTimestamp + elapsedNeeded;
+            if (nextProfitableTimestamp <= block.timestamp) return (block.number, block.timestamp); // already profitable
         }
 
-        uint256 assetBalOfFeeAuction = IERC20($.asset).balanceOf($.feeAuction);
-        uint256 price = IFeeAuction($.feeAuction).currentPrice();
-        (uint256 cusdAmountFromMint,) = IMinter($.cusd).getMintAmount($.asset, assetBalOfFeeAuction);
-
-        canExec = cusdAmountFromMint > price;
-
-        if (!canExec) return (canExec, bytes("Not enough cUSD to mint"));
-
-        execPayload = abi.encodeCall(this.harvestInterest, ());
+        uint256 blockOffset = (nextProfitableTimestamp - block.timestamp + secondsPerBlock - 1) / secondsPerBlock;
+        return (uint256(block.number) + blockOffset, nextProfitableTimestamp);
     }
 
     /// @inheritdoc UUPSUpgradeable

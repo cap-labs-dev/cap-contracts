@@ -14,8 +14,6 @@ interface ICapInterestHarvester {
         address lender;
         address balancerVault;
         address excessReceiver;
-        uint256 lastharvest;
-        bool flashInProgress;
     }
 
     /// @notice Initialize the CapInterestHarvester contract
@@ -59,11 +57,17 @@ interface ICapInterestHarvester {
         bytes memory _userData
     ) external;
 
-    /// @notice Last harvest timestamp
-    function lastHarvest() external view returns (uint256);
+    /// @notice Expected profit from harvesting (CUSD from minting fee-asset minus auction price).
+    /// @param transactionCost Cost in asset terms deducted from the fee auction balance before mint
+    /// @return expectedHarvestProfit Profit in CUSD terms (can be negative)
+    function expectedProfit(uint256 transactionCost) external view returns (int256 expectedHarvestProfit);
 
-    /// @notice Gelato checker function
-    /// @return canExec Whether the task can be executed
-    /// @return execPayload The payload to execute
-    function checker() external view returns (bool canExec, bytes memory execPayload);
+    /// @notice First block at which harvesting is profitable, or sentinel values.
+    /// @param secondsPerBlock Estimated seconds per block for block-offset calculation
+    /// @param transactionCost Cost in asset terms deducted from the fee auction balance before mint
+    /// @return nextProfitableBlock Block number when profitable; -1 if already profitable; 0 if now or never profitable
+    function nextProfitable(uint256 secondsPerBlock, uint256 transactionCost)
+        external
+        view
+        returns (uint256 nextProfitableBlock, uint256 nextProfitableTimestamp);
 }
