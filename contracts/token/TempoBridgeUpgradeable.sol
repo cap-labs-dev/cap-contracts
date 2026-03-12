@@ -2,13 +2,13 @@
 pragma solidity ^0.8.28;
 
 import { ITIP20 } from "../interfaces/ITIP20.sol";
-import { OFTCoreUpgradeable } from "@layerzerolabs/oft-evm-upgradeable/contracts/oft/OFTCoreUpgradeable.sol";
+import { OFTAltCoreUpgradeable } from "@layerzerolabs/oft-alt-evm/contracts/OFTAltCoreUpgradeable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 /// @title Tempo Bridge
 /// @author kexley, Cap Labs
 /// @notice A bridge using LayerZero for sending tokens to and from Tempo
-contract TempoBridgeUpgradeable is OFTCoreUpgradeable, UUPSUpgradeable {
+contract TempoBridgeUpgradeable is OFTAltCoreUpgradeable, UUPSUpgradeable {
     struct TempoBridgeStorage {
         // The underlying TIP20 token.
         ITIP20 underlyingToken;
@@ -28,7 +28,7 @@ contract TempoBridgeUpgradeable is OFTCoreUpgradeable, UUPSUpgradeable {
 
     /// @dev Constructor for the Tempo Bridge contract. All TIP20 tokens have 6 decimals.
     /// @param _lzEndpoint The LayerZero endpoint address.
-    constructor(address _lzEndpoint) OFTCoreUpgradeable(6, _lzEndpoint) {
+    constructor(address _lzEndpoint) OFTAltCoreUpgradeable(6, _lzEndpoint) {
         _disableInitializers();
     }
 
@@ -37,7 +37,7 @@ contract TempoBridgeUpgradeable is OFTCoreUpgradeable, UUPSUpgradeable {
     /// @param _delegate The delegate address for OApp configuration.
     function initialize(address _underlyingToken, address _delegate) external initializer {
         _getTempoBridgeStorage().underlyingToken = ITIP20(_underlyingToken);
-        __OFTCore_init(_delegate);
+        __OFTAltCore_init(_delegate);
         __Ownable_init(_delegate);
         __UUPSUpgradeable_init();
     }

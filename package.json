@@ -48,6 +48,8 @@
     "@openzeppelin/contracts": "^5.2.0"
   },
   "dependencies": {
+    "@layerzerolabs/oapp-alt-evm": "^0.0.5",
+    "@layerzerolabs/oft-alt-evm": "^0.0.5",
     "@layerzerolabs/oft-evm-upgradeable": "^4.0.2",
     "@morenabarboni/sumo": "^2.5.4",
     "@openzeppelin/foundry-upgrades": "^0.3.7",
