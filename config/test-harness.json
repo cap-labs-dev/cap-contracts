@@ -1,0 +1,90 @@
+{
+  "1": {
+    "fork": {
+      "useMockBackingNetwork": false,
+      "mockChainId": 11155111,
+      "rpcUrl": "https://mainnet.gateway.tenderly.co",
+      "blockNumber": 23285216
+    },
+    "infra": {
+      "delegationEpochDuration": 86400
+    },
+    "oracle": {
+      "usdPrice8": 100000000,
+      "usdRateRay": 100000000000000000000000000,
+      "ethPrice8": 260000000000,
+      "ethRateRay": 100000000000000000000000000,
+      "permissionedPrice8": 100000000,
+      "permissionedRateRay": 100000000000000000000000000,
+      "extraChainlinkAsset": "0x0000000000000000000000000000000000000000"
+    },
+    "fee": {
+      "minMintFee": 5000000000000000000000000,
+      "slope0": 0,
+      "slope1": 0,
+      "mintKinkRatio": 850000000000000000000000000,
+      "burnKinkRatio": 150000000000000000000000000,
+      "optimalRatio": 330000000000000000000000000
+    },
+    "symbiotic": {
+      "vaultEpochDuration": 604800,
+      "feeAllowed": 1000,
+      "defaultAgentLtvRay": 500000000000000000000000000,
+      "defaultAgentLiquidationThresholdRay": 700000000000000000000000000,
+      "defaultDelegationRateRay": 20000000000000000000000000,
+      "defaultCoverageCapUsd8": 100000000000000000000,
+      "mockAgentCoverageUsd8": 100000000000000
+    },
+    "eigen": {
+      "rewardDuration": 7,
+      "delegationAmountNoDecimals": 10
+    },
+    "scenario": {
+      "postDeployTimeSkip": 2419200
+    }
+  },
+  "11155111": {
+    "fork": {
+      "useMockBackingNetwork": true,
+      "mockChainId": 11155111,
+      "rpcUrl": "",
+      "blockNumber": 0
+    },
+    "infra": {
+      "delegationEpochDuration": 86400
+    },
+    "oracle": {
+      "usdPrice8": 100000000,
+      "usdRateRay": 100000000000000000000000000,
+      "ethPrice8": 260000000000,
+      "ethRateRay": 100000000000000000000000000,
+      "permissionedPrice8": 100000000,
+      "permissionedRateRay": 100000000000000000000000000,
+      "extraChainlinkAsset": "0xBe9895146f7AF43049ca1c1AE358B0541Ea49704"
+    },
+    "fee": {
+      "minMintFee": 5000000000000000000000000,
+      "slope0": 0,
+      "slope1": 0,
+      "mintKinkRatio": 850000000000000000000000000,
+      "burnKinkRatio": 150000000000000000000000000,
+      "optimalRatio": 330000000000000000000000000
+    },
+    "symbiotic": {
+      "vaultEpochDuration": 604800,
+      "feeAllowed": 1000,
+      "defaultAgentLtvRay": 500000000000000000000000000,
+      "defaultAgentLiquidationThresholdRay": 700000000000000000000000000,
+      "defaultDelegationRateRay": 20000000000000000000000000,
+      "defaultCoverageCapUsd8": 100000000000000000000,
+      "mockAgentCoverageUsd8": 100000000000000
+    },
+    "eigen": {
+      "rewardDuration": 7,
+      "delegationAmountNoDecimals": 10
+    },
+    "scenario": {
+      "postDeployTimeSkip": 2419200
+    }
+  }
+}
