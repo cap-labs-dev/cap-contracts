@@ -7,43 +7,40 @@ import { Vault } from "../../contracts/vault/Vault.sol";
 import { DebtToken } from "../../contracts/lendingPool/tokens/DebtToken.sol";
 
 import { ValidationLogic } from "../../contracts/lendingPool/libraries/ValidationLogic.sol";
-import { TestDeployer } from "../deploy/TestDeployer.sol";
+import { LenderFixture } from "../fixtures/LenderFixture.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
-import { console } from "forge-std/console.sol";
 
-contract LenderBorrowTest is TestDeployer {
-    address user_agent;
+/// @dev Borrow/repay tests for `Lender` against the CAP vault + Symbiotic backing liquidity.
+contract LenderBorrowTest is LenderFixture {
+    address agent;
 
     DebtToken debtToken;
 
     function setUp() public {
-        _deployCapTestEnvironment();
-        _initTestVaultLiquidity(usdVault);
-        _initSymbioticVaultsLiquidity(env, 100);
-
-        user_agent = _getRandomAgent();
+        _setUpLenderFixture();
+        agent = _getRandomAgent();
 
         uint256 assetIndex = _getAssetIndex(usdVault, address(usdc));
         debtToken = DebtToken(usdVault.debtTokens[assetIndex]);
     }
 
     function test_lender_borrow_and_repay() public {
-        vm.startPrank(user_agent);
+        vm.startPrank(agent);
 
         uint256 backingBefore = usdc.balanceOf(address(cUSD));
 
         vm.expectRevert(ValidationLogic.MinBorrowAmount.selector);
-        lender.borrow(address(usdc), 99e6, user_agent);
+        lender.borrow(address(usdc), 99e6, agent);
 
-        lender.borrow(address(usdc), 1000e6, user_agent);
-        assertEq(usdc.balanceOf(user_agent), 1000e6);
+        lender.borrow(address(usdc), 1000e6, agent);
+        assertEq(usdc.balanceOf(agent), 1000e6);
 
         // simulate yield
-        usdc.mint(user_agent, 1000e6);
+        usdc.mint(agent, 1000e6);
 
         // repay the debt
         usdc.approve(env.infra.lender, 1000e6 + 10e6);
-        lender.repay(address(usdc), 1000e6, user_agent);
+        lender.repay(address(usdc), 1000e6, agent);
         assertGe(usdc.balanceOf(address(cUSD)), backingBefore);
 
         assertDebtEq(0);
@@ -73,34 +70,34 @@ contract LenderBorrowTest is TestDeployer {
     }
 
     function test_lender_borrow_and_repay_with_another_asset() public {
-        vm.startPrank(user_agent);
+        vm.startPrank(agent);
 
-        lender.borrow(address(usdc), 1000e6, user_agent);
-        assertEq(usdc.balanceOf(user_agent), 1000e6);
+        lender.borrow(address(usdc), 1000e6, agent);
+        assertEq(usdc.balanceOf(agent), 1000e6);
 
         // simulate yield
-        usdt.mint(user_agent, 1000e6);
+        usdt.mint(agent, 1000e6);
 
         // repay the debt
         usdt.approve(env.infra.lender, 1000e6 + 10e6);
         vm.expectRevert();
-        lender.repay(address(usdt), 1000e6, user_agent);
+        lender.repay(address(usdt), 1000e6, agent);
     }
 
     function test_lender_borrow_and_repay_more_than_borrowed() public {
-        vm.startPrank(user_agent);
+        vm.startPrank(agent);
 
-        lender.borrow(address(usdc), 1000e6, user_agent);
-        assertEq(usdc.balanceOf(user_agent), 1000e6);
+        lender.borrow(address(usdc), 1000e6, agent);
+        assertEq(usdc.balanceOf(agent), 1000e6);
 
         // simulate yield
-        usdc.mint(user_agent, 1000e6);
+        usdc.mint(agent, 1000e6);
 
         // repay the debt
         usdc.approve(env.infra.lender, 2000e6 + 10e6);
-        lender.repay(address(usdc), 2000e6, user_agent);
+        lender.repay(address(usdc), 2000e6, agent);
 
-        assertEq(usdc.balanceOf(user_agent), 1000e6);
+        assertEq(usdc.balanceOf(agent), 1000e6);
     }
 
     function test_borrow_paused_asset() public {
@@ -109,23 +106,23 @@ contract LenderBorrowTest is TestDeployer {
         lender.pauseAsset(address(usdc), true);
         vm.stopPrank();
 
-        vm.startPrank(user_agent);
+        vm.startPrank(agent);
 
         vm.expectRevert();
-        lender.borrow(address(usdc), 1000e6, user_agent);
+        lender.borrow(address(usdc), 1000e6, agent);
         vm.stopPrank();
 
         vm.startPrank(env.users.lender_admin);
         lender.pauseAsset(address(usdc), false);
         vm.stopPrank();
 
-        vm.startPrank(user_agent);
+        vm.startPrank(agent);
 
         vm.expectRevert();
         lender.borrow(address(usdc), 1000e6, address(0));
 
         vm.expectRevert();
-        lender.borrow(address(0), 1000e6, user_agent);
+        lender.borrow(address(0), 1000e6, agent);
         vm.stopPrank();
     }
 
@@ -138,51 +135,51 @@ contract LenderBorrowTest is TestDeployer {
         lender.setMinBorrow(address(usdc), 150e6);
         vm.stopPrank();
 
-        vm.startPrank(user_agent);
+        vm.startPrank(agent);
 
         vm.expectRevert();
-        lender.borrow(address(usdc), 100e6, user_agent);
+        lender.borrow(address(usdc), 100e6, agent);
 
-        lender.borrow(address(usdc), 150e6, user_agent);
-        assertEq(usdc.balanceOf(user_agent), 150e6);
+        lender.borrow(address(usdc), 150e6, agent);
+        assertEq(usdc.balanceOf(agent), 150e6);
         vm.stopPrank();
     }
 
     function test_borrow_an_invalid_asset() public {
-        vm.startPrank(user_agent);
+        vm.startPrank(agent);
 
         vm.expectRevert();
-        lender.borrow(address(0), 1000e6, user_agent);
+        lender.borrow(address(0), 1000e6, agent);
 
         MockERC20 invalidAsset = new MockERC20("InvalidAsset", "INV", 18);
 
-        invalidAsset.mint(user_agent, 1000e6);
+        invalidAsset.mint(agent, 1000e6);
 
         vm.expectRevert();
-        lender.borrow(address(invalidAsset), 1000e6, user_agent);
+        lender.borrow(address(invalidAsset), 1000e6, agent);
     }
 
     function test_borrow_more_than_one_asset() public {
-        vm.startPrank(user_agent);
+        vm.startPrank(agent);
 
-        lender.borrow(address(usdc), 1000e6, user_agent);
-        assertEq(usdc.balanceOf(user_agent), 1000e6);
+        lender.borrow(address(usdc), 1000e6, agent);
+        assertEq(usdc.balanceOf(agent), 1000e6);
 
         _timeTravel(10);
 
-        lender.borrow(address(usdt), 1000e6, user_agent);
-        assertEq(usdt.balanceOf(user_agent), 1000e6);
+        lender.borrow(address(usdt), 1000e6, agent);
+        assertEq(usdt.balanceOf(agent), 1000e6);
     }
 
     function test_lender_realize_interest() public {
-        vm.startPrank(user_agent);
+        vm.startPrank(agent);
 
-        lender.borrow(address(usdc), 300e6, user_agent);
-        assertEq(usdc.balanceOf(user_agent), 300e6);
+        lender.borrow(address(usdc), 300e6, agent);
+        assertEq(usdc.balanceOf(agent), 300e6);
 
         _timeTravel(1 days);
 
-        uint256 debt = debtToken.balanceOf(user_agent);
+        uint256 debt = debtToken.balanceOf(agent);
         assertGt(debt, 300e6);
 
         uint256 feeAuctionBalBefore = usdc.balanceOf(address(cUSDFeeAuction));
@@ -195,30 +192,30 @@ contract LenderBorrowTest is TestDeployer {
     }
 
     function test_realize_restaker_interest() public {
-        vm.startPrank(user_agent);
+        vm.startPrank(agent);
 
-        lender.borrow(address(usdc), 300e6, user_agent);
-        assertEq(usdc.balanceOf(user_agent), 300e6);
+        lender.borrow(address(usdc), 300e6, agent);
+        assertEq(usdc.balanceOf(agent), 300e6);
 
         _timeTravel(1 days);
 
         address networkRewards = env.symbiotic.networkRewards[0];
 
-        uint256 restakerInterestBefore = lender.accruedRestakerInterest(user_agent, address(usdc));
+        uint256 restakerInterestBefore = lender.accruedRestakerInterest(agent, address(usdc));
 
-        lender.realizeRestakerInterest(user_agent, address(usdc));
+        lender.realizeRestakerInterest(agent, address(usdc));
 
         uint256 rewardsBalance = usdc.balanceOf(networkRewards);
         assertEq(rewardsBalance, restakerInterestBefore);
 
-        uint256 totalDebt = debtToken.balanceOf(user_agent) + restakerInterestBefore;
+        uint256 totalDebt = debtToken.balanceOf(agent) + restakerInterestBefore;
 
-        usdc.mint(user_agent, totalDebt);
+        usdc.mint(agent, totalDebt);
         usdc.approve(address(lender), totalDebt);
-        lender.repay(address(usdc), totalDebt, user_agent);
+        lender.repay(address(usdc), totalDebt, agent);
 
-        uint256 restakerInterest = lender.accruedRestakerInterest(user_agent, address(usdc));
-        uint256 unrealizedInterest = lender.unrealizedInterest(user_agent, address(usdc));
+        uint256 restakerInterest = lender.accruedRestakerInterest(agent, address(usdc));
+        uint256 unrealizedInterest = lender.unrealizedInterest(agent, address(usdc));
 
         /// There should be no restaker interest left
         assertEq(restakerInterest, 0);
@@ -257,68 +254,65 @@ contract LenderBorrowTest is TestDeployer {
     }
 
     function test_borrow_payback_debt_tokens() public {
-        vm.startPrank(user_agent);
+        vm.startPrank(agent);
 
         vm.expectRevert();
         lender.maxBorrowable(address(0), address(usdc));
 
         vm.expectRevert();
-        lender.maxBorrowable(user_agent, address(0));
+        lender.maxBorrowable(agent, address(0));
 
-        lender.borrow(address(usdc), 300e6, user_agent);
-        assertEq(usdc.balanceOf(user_agent), 300e6);
+        lender.borrow(address(usdc), 300e6, agent);
+        assertEq(usdc.balanceOf(agent), 300e6);
 
         _timeTravel(1 days);
 
-        uint256 totalDebt = lender.debt(address(user_agent), address(usdc));
-        uint256 debt = debtToken.balanceOf(user_agent);
-        uint256 restakerInterest = lender.accruedRestakerInterest(user_agent, address(usdc));
-
-        console.log("Principal Debt tokens:", debt);
-        console.log("Restaker Debt tokens:", restakerInterest);
+        uint256 totalDebt = lender.debt(address(agent), address(usdc));
+        uint256 debt = debtToken.balanceOf(agent);
+        uint256 restakerInterest = lender.accruedRestakerInterest(agent, address(usdc));
 
         assertEq(totalDebt, debt + restakerInterest);
 
-        usdc.mint(user_agent, totalDebt);
+        usdc.mint(agent, totalDebt);
 
         // repay the debt
         usdc.approve(address(lender), totalDebt);
 
         vm.expectRevert();
-        lender.repay(address(0), debt, user_agent);
+        lender.repay(address(0), debt, agent);
 
         vm.expectRevert();
         lender.repay(address(usdc), debt, address(0));
 
-        lender.repay(address(usdc), debt, user_agent);
+        lender.repay(address(usdc), debt, agent);
 
         (,,,,,, uint256 minBorrow) = lender.reservesData(address(usdc));
 
-        lender.repay(address(usdc), restakerInterest + minBorrow, user_agent);
+        lender.repay(address(usdc), restakerInterest + minBorrow, agent);
 
         assertDebtEq(0);
     }
 
     function test_borrow_utilization() public {
-        vm.startPrank(user_agent);
+        vm.startPrank(agent);
 
         uint256 totalSupply = cUSD.totalSupplies(address(usdt));
 
-        lender.borrow(address(usdt), totalSupply, user_agent);
-        assertEq(usdt.balanceOf(user_agent), totalSupply);
+        lender.borrow(address(usdt), totalSupply, agent);
+        assertEq(usdt.balanceOf(agent), totalSupply);
 
         assertEq(cUSD.utilization(address(usdt)), 1e27);
         assertEq(cUSD.totalBorrows(address(usdt)), totalSupply);
         assertEq(cUSD.availableBalance(address(usdt)), 0);
 
         usdt.approve(address(lender), totalSupply);
-        lender.repay(address(usdt), totalSupply, user_agent);
+        lender.repay(address(usdt), totalSupply, agent);
 
         assertEq(cUSD.utilization(address(usdt)), 0);
         assertEq(cUSD.totalBorrows(address(usdt)), 0);
         assertEq(cUSD.availableBalance(address(usdt)), totalSupply);
 
-        lender.borrow(address(usdt), totalSupply / 2, user_agent);
+        lender.borrow(address(usdt), totalSupply / 2, agent);
         assertEq(cUSD.utilization(address(usdt)), 0.5e27);
         assertEq(cUSD.totalBorrows(address(usdt)), totalSupply / 2);
         assertEq(cUSD.availableBalance(address(usdt)), totalSupply / 2);
@@ -328,6 +322,6 @@ contract LenderBorrowTest is TestDeployer {
     }
 
     function assertDebtEq(uint256 totalDebt) internal view {
-        assertEq(debtToken.balanceOf(user_agent) + lender.accruedRestakerInterest(user_agent, address(usdc)), totalDebt);
+        assertEq(debtToken.balanceOf(agent) + lender.accruedRestakerInterest(agent, address(usdc)), totalDebt);
     }
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.28;
 
 import { AccessControl } from "../../contracts/access/AccessControl.sol";
 import { CapInterestHarvester } from "../../contracts/gelato/CapInterestHarvester.sol";
@@ -7,11 +7,14 @@ import { ICapInterestHarvester } from "../../contracts/interfaces/ICapInterestHa
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import { Test } from "forge-std/Test.sol";
-import { console } from "forge-std/console.sol";
 
-contract HarvesterTest is Test {
+/// @dev Manual suite for simulating Gelato interest harvesting flows.
+/// Intentionally contains no `test*` functions so it never runs in CI.
+contract GelatoInterestHarvesterManual is Test {
     CapInterestHarvester public impl;
     ERC1967Proxy public proxy;
+
+    // Mainnet addresses; requires `--fork-url` to run.
     address public accessControl = address(0x7731129a10d51e18cDE607C5C115F26503D2c683);
     address public asset = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
     address public cusd = address(0xcCcc62962d17b8914c62D74FfB843d73B2a3cccC);
@@ -42,21 +45,18 @@ contract HarvesterTest is Test {
 
         vm.prank(admin);
         AccessControl(accessControl).grantAccess(ICapInterestHarvester.harvestInterest.selector, address(proxy), gelato);
-        vm.stopPrank();
 
         vm.prank(admin);
-        AccessControl(accessControl).grantAccess(
-            ICapInterestHarvester.receiveFlashLoan.selector, address(proxy), balancerVault
-        );
-        vm.stopPrank();
+        AccessControl(accessControl)
+            .grantAccess(ICapInterestHarvester.receiveFlashLoan.selector, address(proxy), balancerVault);
     }
 
-    function test_gelatoHarvest() public {
+    function manual_gelatoHarvest() public {
         (bool canExec,) = CapInterestHarvester(address(proxy)).checker();
-        console.log("canExec", canExec);
+        if (!canExec) return;
 
         vm.prank(gelato);
-        if (canExec) ICapInterestHarvester(address(proxy)).harvestInterest();
-        vm.stopPrank();
+        ICapInterestHarvester(address(proxy)).harvestInterest();
     }
 }
+

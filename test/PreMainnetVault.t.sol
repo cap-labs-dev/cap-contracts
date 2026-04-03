@@ -15,8 +15,8 @@ import { MockVault } from "./mocks/MockVault.sol";
 import { MessagingFee, SendParam } from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
 import { TestHelperOz5 } from "@layerzerolabs/test-devtools-evm-foundry/contracts/TestHelperOz5.sol";
 import { Test } from "forge-std/Test.sol";
-import { console } from "forge-std/console.sol";
 
+/// @dev E2E-style tests for the LayerZero-enabled `PreMainnetVault` used in the testnet campaign.
 contract PreMainnetVaultTest is Test, TestHelperOz5, ProxyUtils, PermitUtils, TimeUtils {
     L2Token public dstOFT;
     PreMainnetVault public vault;

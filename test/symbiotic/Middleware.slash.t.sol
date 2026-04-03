@@ -1,18 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.28;
 
-import { SymbioticNetwork } from "../../contracts/delegation/providers/symbiotic/SymbioticNetwork.sol";
-import { SymbioticNetworkMiddleware } from
-    "../../contracts/delegation/providers/symbiotic/SymbioticNetworkMiddleware.sol";
-import { TestDeployer } from "../../test/deploy/TestDeployer.sol";
-import { MockERC20 } from "../mocks/MockERC20.sol";
+import { CapIntegrationFixture } from "../fixtures/CapIntegrationFixture.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IBurnerRouter } from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
-import { console } from "forge-std/console.sol";
 
-contract MiddlewareTest is TestDeployer {
+/// @dev Slash behavior for the Symbiotic middleware wrapper used by CAP.
+contract MiddlewareTest is CapIntegrationFixture {
     function setUp() public {
-        _deployCapTestEnvironment();
+        _setUpCap();
         _initSymbioticVaultsLiquidity(env, 100);
     }
 

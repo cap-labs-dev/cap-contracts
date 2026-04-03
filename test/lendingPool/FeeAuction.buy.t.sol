@@ -2,16 +2,14 @@
 pragma solidity ^0.8.28;
 
 import { IFeeAuction } from "../../contracts/interfaces/IFeeAuction.sol";
-import { TestDeployer } from "../deploy/TestDeployer.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { LenderFixture } from "../fixtures/LenderFixture.sol";
 
-contract FeeAuctionBuyTest is TestDeployer {
+/// @dev FeeAuction should clear realized interest in exchange for cUSD.
+contract FeeAuctionBuyTest is LenderFixture {
     address realizer;
 
     function setUp() public {
-        _deployCapTestEnvironment();
-        _initTestVaultLiquidity(usdVault);
-        _initSymbioticVaultsLiquidity(env, 100);
+        _setUpLenderFixture();
 
         // initialize the realizer
         realizer = makeAddr("interest_realizer");

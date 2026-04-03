@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.28;
 
 import { SafeOFTLzComposer } from "../../contracts/zap/SafeOFTLzComposer.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
@@ -9,7 +9,6 @@ import { OFTComposeMsgCodec } from "@layerzerolabs/oft-evm/contracts/libs/OFTCom
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Test } from "forge-std/Test.sol";
-import { console } from "forge-std/console.sol";
 
 struct TestMessage {
     bool shouldRevert;
@@ -29,7 +28,6 @@ contract SafeOFTLzComposer_TestImplementation is SafeOFTLzComposer {
     function _lzCompose(address _oApp, bytes32, bytes calldata _message, address, bytes calldata) internal override {
         bytes memory payload = OFTComposeMsgCodec.composeMsg(_message);
         TestMessage memory testMessage = abi.decode(payload, (TestMessage));
-        console.log("consumeAllGas", testMessage.consumeAllGas);
         if (testMessage.shouldRevert) {
             revert("revert");
         }

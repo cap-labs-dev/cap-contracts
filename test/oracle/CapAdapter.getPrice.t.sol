@@ -3,12 +3,12 @@ pragma solidity ^0.8.28;
 
 import { IOracle } from "../../contracts/interfaces/IOracle.sol";
 
-import { TestDeployer } from "../deploy/TestDeployer.sol";
+import { OracleFixture } from "../fixtures/OracleFixture.sol";
 
-contract CapAdapterGetPriceTest is TestDeployer {
+/// @dev Proves the adapter pricing path returns sane prices for CAP-issued vault tokens.
+contract CapAdapterGetPriceTest is OracleFixture {
     function setUp() public {
-        _deployCapTestEnvironment();
-        _initTestVaultLiquidity(usdVault);
+        _setUpOracleFixture();
     }
 
     function test_cap_adapter_get_price() public view {

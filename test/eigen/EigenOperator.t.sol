@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.28;
 
 import { EigenOperator } from "../../contracts/delegation/providers/eigenlayer/EigenOperator.sol";
 import { EigenServiceManager } from "../../contracts/delegation/providers/eigenlayer/EigenServiceManager.sol";
 import { IAllocationManager } from "../../contracts/delegation/providers/eigenlayer/interfaces/IAllocationManager.sol";
 import { IDelegationManager } from "../../contracts/delegation/providers/eigenlayer/interfaces/IDelegationManager.sol";
-import { IRewardsCoordinator } from "../../contracts/delegation/providers/eigenlayer/interfaces/IRewardsCoordinator.sol";
-import { TestDeployer } from "../../test/deploy/TestDeployer.sol";
-import { console } from "forge-std/console.sol";
+import {
+    IRewardsCoordinator
+} from "../../contracts/delegation/providers/eigenlayer/interfaces/IRewardsCoordinator.sol";
+import { CapIntegrationFixture } from "../fixtures/CapIntegrationFixture.sol";
 
-contract EigenOperatorTest is TestDeployer {
+/// @dev Focused tests for the per-operator Eigen proxy that gates allocations via a TOTP-like window.
+contract EigenOperatorTest is CapIntegrationFixture {
     EigenOperator eigenOperator;
     EigenServiceManager eigenServiceManager;
     address operator;
@@ -18,7 +20,7 @@ contract EigenOperatorTest is TestDeployer {
     string constant METADATA = "test-operator-metadata";
 
     function setUp() public {
-        _deployCapTestEnvironment();
+        _setUpCap();
         eigenServiceManager = EigenServiceManager(env.eigen.eigenConfig.eigenServiceManager);
         serviceManager = address(eigenServiceManager);
         operator = env.testUsers.agents[1];

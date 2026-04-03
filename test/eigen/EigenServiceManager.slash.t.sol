@@ -1,18 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.28;
 
 import { EigenServiceManager } from "../../contracts/delegation/providers/eigenlayer/EigenServiceManager.sol";
 import { IStrategy } from "../../contracts/delegation/providers/eigenlayer/interfaces/IStrategy.sol";
-import { TestDeployer } from "../../test/deploy/TestDeployer.sol";
-import { MockERC20 } from "../mocks/MockERC20.sol";
+import { CapIntegrationFixture } from "../fixtures/CapIntegrationFixture.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { console } from "forge-std/console.sol";
 
-contract EigenServiceManagerSlashTest is TestDeployer {
+/// @dev Slash behavior: ensures collateral is pulled from Eigen strategy positions and forwarded.
+contract EigenServiceManagerSlashTest is CapIntegrationFixture {
     EigenServiceManager eigenServiceManager;
 
     function setUp() public {
-        _deployCapTestEnvironment();
+        _setUpCap();
         eigenServiceManager = EigenServiceManager(env.eigen.eigenConfig.eigenServiceManager);
     }
 
@@ -27,8 +26,6 @@ contract EigenServiceManagerSlashTest is TestDeployer {
         // collateral is in USD Value of the 100 eth collateral
         uint256 coverage = eigenServiceManager.coverage(agent);
         uint256 slashableCollateral = eigenServiceManager.slashableCollateral(agent, 0);
-        console.log("coverage", coverage);
-        console.log("slashableCollateral", slashableCollateral);
         assertEq(coverage, slashableCollateral);
 
         // slash 10% of agent collateral
@@ -59,8 +56,6 @@ contract EigenServiceManagerSlashTest is TestDeployer {
         // collateral is in USD Value of the 100 eth collateral
         uint256 coverage = eigenServiceManager.coverage(agent);
         uint256 slashableCollateral = eigenServiceManager.slashableCollateral(agent, 0);
-        console.log("coverage", coverage);
-        console.log("slashableCollateral", slashableCollateral);
         assertEq(coverage, slashableCollateral);
 
         // slash 10% of agent collateral

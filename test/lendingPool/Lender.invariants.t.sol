@@ -5,6 +5,7 @@ import { DebtToken } from "../../contracts/lendingPool/tokens/DebtToken.sol";
 
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { TestEnvConfig } from "../deploy/interfaces/TestDeployConfig.sol";
+import { TestHarnessConfig } from "../deploy/interfaces/TestHarnessConfig.sol";
 import { InitTestVaultLiquidity } from "../deploy/service/InitTestVaultLiquidity.sol";
 
 import { MockNetworkMiddleware } from "../mocks/MockNetworkMiddleware.sol";
@@ -21,7 +22,6 @@ import { MockERC20 } from "../mocks/MockERC20.sol";
 import { StdUtils } from "forge-std/StdUtils.sol";
 import { Test } from "forge-std/Test.sol";
 import { Vm } from "forge-std/Vm.sol";
-import { console } from "forge-std/console.sol";
 
 contract LenderInvariantsTest is TestDeployer {
     TestLenderHandler public handler;
@@ -34,8 +34,14 @@ contract LenderInvariantsTest is TestDeployer {
     uint256 private constant EXPIRY_PERIOD = 7 days;
     uint256 private constant EMERGENCY_LIQUIDATION_THRESHOLD = 0.91e27; // CR <110% have no grace periods
 
-    function useMockBackingNetwork() internal pure override returns (bool) {
-        return true;
+    function _harnessConfig() internal view override returns (TestHarnessConfig memory cfg) {
+        cfg = super._harnessConfig();
+        // Invariant suites must be hermetic and should never hit an RPC provider.
+        cfg.fork.useMockBackingNetwork = true;
+        // Use a chain id that exists in our addressbooks/config JSON.
+        cfg.fork.mockChainId = 11155111;
+        cfg.fork.blockNumber = 0;
+        cfg.fork.rpcUrl = "";
     }
 
     function setUp() public {
@@ -335,161 +341,161 @@ contract LenderInvariantsTest is TestDeployer {
 
     function test_invariant_healthFactorConsistency() public {
         /*[FAIL: custom error 0x2075cc10]
-        [Sequence]
-                sender=0x0e948CBCe7CDd9607da82C84C3D4d0e9719eC514 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=pauseAsset(uint256,uint256) args=[1315177297924230708883695624050373788415698841790596737462753749810329727682 [1.315e75], 67557032855543473017406071261492806732060887986030702783 [6.755e55]]
-                sender=0xE72dAF09180fc5DC873BEfa78eCb7295f71ac9Df addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAssetOraclePrice(uint256,uint256) args=[2929500122602730939646666447515737960569336351328648 [2.929e51], 1708504436447866796317617615450196935393362285728606837532482019428232567 [1.708e72]]
-                sender=0x00000000000000000000000000000000000005B9 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentSlashableCollateral(uint256,uint256) args=[301528190170530050348117962558348445 [3.015e35], 1290473791601614377603174010112957019113190434108572182557075975394401421164 [1.29e75]]
-                sender=0x000000000000000000000000000000000000156b addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[4494171017251127260467600252333868056941985300802389309506 [4.494e57], 36074597447209559264794152367 [3.607e28]]
-                sender=0x000000000000000000000000000000000000208F addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[115792089237316195423570985008687907853269984665640564039457584007913129639935 [1.157e77], 131338979855732879195787 [1.313e23], 16347563896172173072993435014062759898220838390 [1.634e46]]
-                sender=0x00000000000000000000000000000000000034D1 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAssetOracleRate(uint256,uint256) args=[50345934214 [5.034e10], 635603660156381398442234217424111020034598460963584060894549511760057 [6.356e68]]
-                sender=0x51a834881Bf50da98F1E1411C804f3B83aB4B893 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[31623252912650126113073736373363156229425461424826824259627721825501493434653 [3.162e76], 12469 [1.246e4], 2781]
-                sender=0x1aF04B52BDD40B9B51275F279Ea47E93547B631e addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[7051438432506718349492872536867720907 [7.051e36], 741725 [7.417e5]]
-                sender=0xCd3795cE2bfD68f631f66253D30a1c819aa63baF addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[79001146470571047235755355466853722473171698722976866499068551652939063895842 [7.9e76], 13642537976874880535528713273017507111622547294801941867015712476731627503204 [1.364e76]]
-                sender=0x00000000000000000000000000000002cb417aE0 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[48551977197688041653444553340907617077707418206829220807332949488867 [4.855e67], 10367066225915908275144769271 [1.036e28]]
-                sender=0x0000000000000000000000000000000000000100 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=repay(uint256,uint256,uint256) args=[568622855252 [5.686e11], 661593244133857158569510410394680651 [6.615e35], 3]
-    invariant_healthFactorConsistency() (runs: 1, calls: 500, reverts: 1)
+            [Sequence]
+                    sender=0x0e948CBCe7CDd9607da82C84C3D4d0e9719eC514 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=pauseAsset(uint256,uint256) args=[1315177297924230708883695624050373788415698841790596737462753749810329727682 [1.315e75], 67557032855543473017406071261492806732060887986030702783 [6.755e55]]
+                    sender=0xE72dAF09180fc5DC873BEfa78eCb7295f71ac9Df addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAssetOraclePrice(uint256,uint256) args=[2929500122602730939646666447515737960569336351328648 [2.929e51], 1708504436447866796317617615450196935393362285728606837532482019428232567 [1.708e72]]
+                    sender=0x00000000000000000000000000000000000005B9 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentSlashableCollateral(uint256,uint256) args=[301528190170530050348117962558348445 [3.015e35], 1290473791601614377603174010112957019113190434108572182557075975394401421164 [1.29e75]]
+                    sender=0x000000000000000000000000000000000000156b addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[4494171017251127260467600252333868056941985300802389309506 [4.494e57], 36074597447209559264794152367 [3.607e28]]
+                    sender=0x000000000000000000000000000000000000208F addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[115792089237316195423570985008687907853269984665640564039457584007913129639935 [1.157e77], 131338979855732879195787 [1.313e23], 16347563896172173072993435014062759898220838390 [1.634e46]]
+                    sender=0x00000000000000000000000000000000000034D1 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAssetOracleRate(uint256,uint256) args=[50345934214 [5.034e10], 635603660156381398442234217424111020034598460963584060894549511760057 [6.356e68]]
+                    sender=0x51a834881Bf50da98F1E1411C804f3B83aB4B893 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[31623252912650126113073736373363156229425461424826824259627721825501493434653 [3.162e76], 12469 [1.246e4], 2781]
+                    sender=0x1aF04B52BDD40B9B51275F279Ea47E93547B631e addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[7051438432506718349492872536867720907 [7.051e36], 741725 [7.417e5]]
+                    sender=0xCd3795cE2bfD68f631f66253D30a1c819aa63baF addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[79001146470571047235755355466853722473171698722976866499068551652939063895842 [7.9e76], 13642537976874880535528713273017507111622547294801941867015712476731627503204 [1.364e76]]
+                    sender=0x00000000000000000000000000000002cb417aE0 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[48551977197688041653444553340907617077707418206829220807332949488867 [4.855e67], 10367066225915908275144769271 [1.036e28]]
+                    sender=0x0000000000000000000000000000000000000100 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=repay(uint256,uint256,uint256) args=[568622855252 [5.686e11], 661593244133857158569510410394680651 [6.615e35], 3]
+        invariant_healthFactorConsistency() (runs: 1, calls: 500, reverts: 1)
 
-        handler.pauseAsset(
-            1315177297924230708883695624050373788415698841790596737462753749810329727682,
-            67557032855543473017406071261492806732060887986030702783
-        );
+            handler.pauseAsset(
+                1315177297924230708883695624050373788415698841790596737462753749810329727682,
+                67557032855543473017406071261492806732060887986030702783
+            );
 
-        handler.setAssetOraclePrice(
-            2929500122602730939646666447515737960569336351328648,
-            1708504436447866796317617615450196935393362285728606837532482019428232567
-        );
+            handler.setAssetOraclePrice(
+                2929500122602730939646666447515737960569336351328648,
+                1708504436447866796317617615450196935393362285728606837532482019428232567
+            );
 
-        handler.setAgentSlashableCollateral(
-            301528190170530050348117962558348445,
-            1290473791601614377603174010112957019113190434108572182557075975394401421164
-        );
+            handler.setAgentSlashableCollateral(
+                301528190170530050348117962558348445,
+                1290473791601614377603174010112957019113190434108572182557075975394401421164
+            );
 
-        handler.setAgentCoverage(
-            4494171017251127260467600252333868056941985300802389309506, 36074597447209559264794152367
-        );
+            handler.setAgentCoverage(
+                4494171017251127260467600252333868056941985300802389309506, 36074597447209559264794152367
+            );
 
-        handler.borrow(
-            115792089237316195423570985008687907853269984665640564039457584007913129639935,
-            131338979855732879195787,
-            16347563896172173072993435014062759898220838390
-        );
+            handler.borrow(
+                115792089237316195423570985008687907853269984665640564039457584007913129639935,
+                131338979855732879195787,
+                16347563896172173072993435014062759898220838390
+            );
 
-        handler.setAssetOracleRate(50345934214, 635603660156381398442234217424111020034598460963584060894549511760057);
+            handler.setAssetOracleRate(50345934214, 635603660156381398442234217424111020034598460963584060894549511760057);
 
-        handler.borrow(31623252912650126113073736373363156229425461424826824259627721825501493434653, 12469, 2781);
+            handler.borrow(31623252912650126113073736373363156229425461424826824259627721825501493434653, 12469, 2781);
 
-        handler.wrapTime(7051438432506718349492872536867720907, 741725);
+            handler.wrapTime(7051438432506718349492872536867720907, 741725);
 
-        handler.wrapTime(
-            79001146470571047235755355466853722473171698722976866499068551652939063895842,
-            13642537976874880535528713273017507111622547294801941867015712476731627503204
-        );
+            handler.wrapTime(
+                79001146470571047235755355466853722473171698722976866499068551652939063895842,
+                13642537976874880535528713273017507111622547294801941867015712476731627503204
+            );
 
-        handler.wrapTime(
-            48551977197688041653444553340907617077707418206829220807332949488867, 10367066225915908275144769271
-        );
+            handler.wrapTime(
+                48551977197688041653444553340907617077707418206829220807332949488867, 10367066225915908275144769271
+            );
 
-        handler.repay(568622855252, 661593244133857158569510410394680651, 3);
+            handler.repay(568622855252, 661593244133857158569510410394680651, 3);
 
-        invariant_healthFactorConsistency();
-    }
+            invariant_healthFactorConsistency();
+        }
 
-    function test_fuzzing_non_regression_underflow_during_repay() public {
-        //[FAIL: panic: arithmetic underflow or overflow (0x11)]
-        //[Sequence]
-        //        sender=0x0000000000000000000000000000000000001e15 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=pauseAsset(uint256,uint256) args=[4611, 301558938428973070126939301804606805648145228621 [3.015e47]]
-        //        sender=0x0000000000000000000000000000000000001698 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[6380, 797]
-        //        sender=0xE7c18DB3A1380112A12852BB20727D66b3733d66 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[51946260829083333090225987510697998094631287232885111889496298996662922239 [5.194e73], 28885794824022426100270309757210068697930911 [2.888e43], 221695383241280572125260234538147301138 [2.216e38]]
-        //        sender=0x0000000000000000000000000000000000002F71 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[4543, 6817, 1033229307689458575493127100 [1.033e27]]
-        //        sender=0x000000000000000000000000000000000000017E addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=pauseAsset(uint256,uint256) args=[508819697998377563480940 [5.088e23], 938356271150 [9.383e11]]
-        //        sender=0xC93a64B65cd148612018EBEc63C0d58bCC10a2ea addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[774, 6729]
-        //        sender=0x000000000000000000000000000000000000064f addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[5876, 3839, 1756325542 [1.756e9]]
-        //        sender=0x00000000000000000000000000000000000016F0 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[115792089237316195423570985008687907853269984665640564039457584007913129639935 [1.157e77], 208080990996592096134026189609052055919097100680707475950990946 [2.08e62]]
-        //        sender=0x9D886EC885A2bd4F88C329654Ec9d3528b58D63e addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[270978798284222674110526935662381000756974677873833176 [2.709e53], 332028795435522 [3.32e14]]
-        //        sender=0x00000000000000000000000000000000000001CB addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[5415319662477480108092514012249780312523474260177048431428694681044564049920 [5.415e75], 9694]
-        //        sender=0x0000000000000000000000000000000000001A17 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=realizeRestakerInterest(uint256,uint256) args=[88817841970012523233890533447265625 [8.881e34], 1718]
-        //        sender=0x30eB4Be5Df16b48e660fd697C1ac4322C48204D7 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=repay(uint256,uint256,uint256) args=[2024, 13241 [1.324e4], 9613]
-        //        sender=0x0000000000000000000000000000000000000e49 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256,uint256) args=[1, 2248555321168870210062882036951 [2.248e30], 2949686183 [2.949e9], 7032555 [7.032e6]]
-        //        sender=0x3681a57C9d444Cc705d5511715Ca973d778Bf838 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[318284390023772899530867194944432 [3.182e32], 343765214748883997984555 [3.437e23]]
-        //        sender=0x00000000000000000000000000000000000007e8 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=repay(uint256,uint256,uint256) args=[2300272910690880168785711543248788602439053704 [2.3e45], 115792089237316195423570985008687907853269984665640564039457584007913129639935 [1.157e77], 410786894793195309777267255152695316800989372 [4.107e44]]
-        // invariant_healthFactorConsistency() (runs: 2424, calls: 242400, reverts: 1)
+        function test_fuzzing_non_regression_underflow_during_repay() public {
+            //[FAIL: panic: arithmetic underflow or overflow (0x11)]
+            //[Sequence]
+            //        sender=0x0000000000000000000000000000000000001e15 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=pauseAsset(uint256,uint256) args=[4611, 301558938428973070126939301804606805648145228621 [3.015e47]]
+            //        sender=0x0000000000000000000000000000000000001698 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[6380, 797]
+            //        sender=0xE7c18DB3A1380112A12852BB20727D66b3733d66 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[51946260829083333090225987510697998094631287232885111889496298996662922239 [5.194e73], 28885794824022426100270309757210068697930911 [2.888e43], 221695383241280572125260234538147301138 [2.216e38]]
+            //        sender=0x0000000000000000000000000000000000002F71 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[4543, 6817, 1033229307689458575493127100 [1.033e27]]
+            //        sender=0x000000000000000000000000000000000000017E addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=pauseAsset(uint256,uint256) args=[508819697998377563480940 [5.088e23], 938356271150 [9.383e11]]
+            //        sender=0xC93a64B65cd148612018EBEc63C0d58bCC10a2ea addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[774, 6729]
+            //        sender=0x000000000000000000000000000000000000064f addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[5876, 3839, 1756325542 [1.756e9]]
+            //        sender=0x00000000000000000000000000000000000016F0 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[115792089237316195423570985008687907853269984665640564039457584007913129639935 [1.157e77], 208080990996592096134026189609052055919097100680707475950990946 [2.08e62]]
+            //        sender=0x9D886EC885A2bd4F88C329654Ec9d3528b58D63e addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[270978798284222674110526935662381000756974677873833176 [2.709e53], 332028795435522 [3.32e14]]
+            //        sender=0x00000000000000000000000000000000000001CB addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAgentCoverage(uint256,uint256) args=[5415319662477480108092514012249780312523474260177048431428694681044564049920 [5.415e75], 9694]
+            //        sender=0x0000000000000000000000000000000000001A17 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=realizeRestakerInterest(uint256,uint256) args=[88817841970012523233890533447265625 [8.881e34], 1718]
+            //        sender=0x30eB4Be5Df16b48e660fd697C1ac4322C48204D7 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=repay(uint256,uint256,uint256) args=[2024, 13241 [1.324e4], 9613]
+            //        sender=0x0000000000000000000000000000000000000e49 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=liquidate(uint256,uint256,uint256,uint256) args=[1, 2248555321168870210062882036951 [2.248e30], 2949686183 [2.949e9], 7032555 [7.032e6]]
+            //        sender=0x3681a57C9d444Cc705d5511715Ca973d778Bf838 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[318284390023772899530867194944432 [3.182e32], 343765214748883997984555 [3.437e23]]
+            //        sender=0x00000000000000000000000000000000000007e8 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=repay(uint256,uint256,uint256) args=[2300272910690880168785711543248788602439053704 [2.3e45], 115792089237316195423570985008687907853269984665640564039457584007913129639935 [1.157e77], 410786894793195309777267255152695316800989372 [4.107e44]]
+            // invariant_healthFactorConsistency() (runs: 2424, calls: 242400, reverts: 1)
 
-        handler.pauseAsset(4611, 301558938428973070126939301804606805648145228621);
-        handler.wrapTime(6380, 797);
-        handler.borrow(
-            51946260829083333090225987510697998094631287232885111889496298996662922239,
-            28885794824022426100270309757210068697930911,
-            221695383241280572125260234538147301138
-        );
-        handler.wrapTime(12769927, 90644);
-        handler.wrapTime(1823, 6110);
-        handler.realizeInterest(24880451351733217867336194017097599624676548);
-        handler.borrow(4543, 6817, 1033229307689458575493127100);
-        handler.pauseAsset(508819697998377563480940, 938356271150);
-        handler.wrapTime(774, 6729);
-        handler.borrow(5876, 3839, 1756325542);
-        handler.wrapTime(
-            115792089237316195423570985008687907853269984665640564039457584007913129639935,
-            208080990996592096134026189609052055919097100680707475950990946
-        );
-        handler.wrapTime(270978798284222674110526935662381000756974677873833176, 332028795435522);
-        handler.setAgentCoverage(5415319662477480108092514012249780312523474260177048431428694681044564049920, 9694);
-        handler.realizeRestakerInterest(88817841970012523233890533447265625, 1718);
-        handler.repay(2024, 13241, 9613);
-        handler.liquidate(1, 2949686183, 7032555);
-        handler.wrapTime(318284390023772899530867194944432, 343765214748883997984555);
-        handler.repay(
-            2300272910690880168785711543248788602439053704,
-            115792089237316195423570985008687907853269984665640564039457584007913129639935,
-            410786894793195309777267255152695316800989372
-        );
+            handler.pauseAsset(4611, 301558938428973070126939301804606805648145228621);
+            handler.wrapTime(6380, 797);
+            handler.borrow(
+                51946260829083333090225987510697998094631287232885111889496298996662922239,
+                28885794824022426100270309757210068697930911,
+                221695383241280572125260234538147301138
+            );
+            handler.wrapTime(12769927, 90644);
+            handler.wrapTime(1823, 6110);
+            handler.realizeInterest(24880451351733217867336194017097599624676548);
+            handler.borrow(4543, 6817, 1033229307689458575493127100);
+            handler.pauseAsset(508819697998377563480940, 938356271150);
+            handler.wrapTime(774, 6729);
+            handler.borrow(5876, 3839, 1756325542);
+            handler.wrapTime(
+                115792089237316195423570985008687907853269984665640564039457584007913129639935,
+                208080990996592096134026189609052055919097100680707475950990946
+            );
+            handler.wrapTime(270978798284222674110526935662381000756974677873833176, 332028795435522);
+            handler.setAgentCoverage(5415319662477480108092514012249780312523474260177048431428694681044564049920, 9694);
+            handler.realizeRestakerInterest(88817841970012523233890533447265625, 1718);
+            handler.repay(2024, 13241, 9613);
+            handler.liquidate(1, 2949686183, 7032555);
+            handler.wrapTime(318284390023772899530867194944432, 343765214748883997984555);
+            handler.repay(
+                2300272910690880168785711543248788602439053704,
+                115792089237316195423570985008687907853269984665640564039457584007913129639935,
+                410786894793195309777267255152695316800989372
+            );
 
-        // invariant_healthFactorConsistency();
-    }
-    /*   function test_fuzzing_non_regression_invalid_mint_amount() public {
-        // [FAIL: custom error 0xccfad018]
-        // [Sequence]
-        //         sender=0x000000000000000000000000000000002F2Ff15e addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[76498957001221115804749462804484550218113997355 [7.649e46], 9726581552124933505508433278538844698208150901475038549391127569925 [9.726e66], 40661555025 [4.066e10]]
-        //         sender=0x4f5d14ab80Db8c0aba20B6F27aA0Ce8A9Bf8e7Aa addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAssetOracleRate(uint256,uint256) args=[1828, 125495589141809103235484775698666667527023024116 [1.254e47]]
-        //         sender=0x0000000000000000000000000000000000001677 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=repay(uint256,uint256,uint256) args=[252001301228870591710579731 [2.52e26], 115792089237316195423570985008687907853269984665640564039457584007913129639934 [1.157e77], 115792089237316195423570985008687907853269984665640564039457584007913129639933 [1.157e77]]
-        //         sender=0x00000000000000000000000000000000d00dcBB4 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[19098569564278718395870197373 [1.909e28], 36604309705 [3.66e10]]
-        //         sender=0x3728Cd133E2094FD49F3250aAe15eaA313e89091 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[11012 [1.101e4], 3483]
-        //         sender=0x0000000000000000000000000000000000001315 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[4407, 36586103949722484344623567795906609450635333850039381504879703780864807093073 [3.658e76]]
-        //         sender=0x00000000000000000000000000000000000022F7 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[32294392690743 [3.229e13], 2548363385182726588743536355632246380700545068825698181466763406875374210 [2.548e72]]
-        //         sender=0x0000000000000000000000000000000000001D26 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[50531700442618637710239866635305475564994400757514979355854358368 [5.053e64], 3291575894 [3.291e9]]
-        //         sender=0x00000000000000000000000000000000C709Ad17 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=realizeRestakerInterest(uint256,uint256) args=[30381086765569558841073 [3.038e22], 32708892064057 [3.27e13]]
-        // invariant_agentDelegationLimitsDebt() (runs: 251, calls: 25100, reverts: 1)
+            // invariant_healthFactorConsistency();
+        }
+        /*   function test_fuzzing_non_regression_invalid_mint_amount() public {
+            // [FAIL: custom error 0xccfad018]
+            // [Sequence]
+            //         sender=0x000000000000000000000000000000002F2Ff15e addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=borrow(uint256,uint256,uint256) args=[76498957001221115804749462804484550218113997355 [7.649e46], 9726581552124933505508433278538844698208150901475038549391127569925 [9.726e66], 40661555025 [4.066e10]]
+            //         sender=0x4f5d14ab80Db8c0aba20B6F27aA0Ce8A9Bf8e7Aa addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setAssetOracleRate(uint256,uint256) args=[1828, 125495589141809103235484775698666667527023024116 [1.254e47]]
+            //         sender=0x0000000000000000000000000000000000001677 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=repay(uint256,uint256,uint256) args=[252001301228870591710579731 [2.52e26], 115792089237316195423570985008687907853269984665640564039457584007913129639934 [1.157e77], 115792089237316195423570985008687907853269984665640564039457584007913129639933 [1.157e77]]
+            //         sender=0x00000000000000000000000000000000d00dcBB4 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[19098569564278718395870197373 [1.909e28], 36604309705 [3.66e10]]
+            //         sender=0x3728Cd133E2094FD49F3250aAe15eaA313e89091 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[11012 [1.101e4], 3483]
+            //         sender=0x0000000000000000000000000000000000001315 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[4407, 36586103949722484344623567795906609450635333850039381504879703780864807093073 [3.658e76]]
+            //         sender=0x00000000000000000000000000000000000022F7 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[32294392690743 [3.229e13], 2548363385182726588743536355632246380700545068825698181466763406875374210 [2.548e72]]
+            //         sender=0x0000000000000000000000000000000000001D26 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=wrapTime(uint256,uint256) args=[50531700442618637710239866635305475564994400757514979355854358368 [5.053e64], 3291575894 [3.291e9]]
+            //         sender=0x00000000000000000000000000000000C709Ad17 addr=[test/lendingPool/Lender.invariants.t.sol:TestLenderHandler]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=realizeRestakerInterest(uint256,uint256) args=[30381086765569558841073 [3.038e22], 32708892064057 [3.27e13]]
+            // invariant_agentDelegationLimitsDebt() (runs: 251, calls: 25100, reverts: 1)
 
-        handler.borrow(
-            76498957001221115804749462804484550218113997355,
-            9726581552124933505508433278538844698208150901475038549391127569925,
-            40661555025
-        );
-        handler.setAssetOracleRate(1828, 125495589141809103235484775698666667527023024116);
-        handler.repay(
-            252001301228870591710579731,
-            115792089237316195423570985008687907853269984665640564039457584007913129639934,
-            115792089237316195423570985008687907853269984665640564039457584007913129639933
-        );
-        handler.wrapTime(19098569564278718395870197373, 36604309705);
-        handler.wrapTime(4407, 36586103949722484344623567795906609450635333850039381504879703780864807093073);
-        handler.wrapTime(32294392690743, 2548363385182726588743536355632246380700545068825698181466763406875374210);
-        handler.wrapTime(50531700442618637710239866635305475564994400757514979355854358368, 3291575894);
-        handler.realizeRestakerInterest(30381086765569558841073, 32708892064057);
+            handler.borrow(
+                76498957001221115804749462804484550218113997355,
+                9726581552124933505508433278538844698208150901475038549391127569925,
+                40661555025
+            );
+            handler.setAssetOracleRate(1828, 125495589141809103235484775698666667527023024116);
+            handler.repay(
+                252001301228870591710579731,
+                115792089237316195423570985008687907853269984665640564039457584007913129639934,
+                115792089237316195423570985008687907853269984665640564039457584007913129639933
+            );
+            handler.wrapTime(19098569564278718395870197373, 36604309705);
+            handler.wrapTime(4407, 36586103949722484344623567795906609450635333850039381504879703780864807093073);
+            handler.wrapTime(32294392690743, 2548363385182726588743536355632246380700545068825698181466763406875374210);
+            handler.wrapTime(50531700442618637710239866635305475564994400757514979355854358368, 3291575894);
+            handler.realizeRestakerInterest(30381086765569558841073, 32708892064057);
 
-        invariant_agentDelegationLimitsDebt();
-    }
+            invariant_agentDelegationLimitsDebt();
+        }
 
-    /// @dev Test that user borrows never exceed their delegation
-    /// forge-config: default.invariant.depth = 100
-    function invariant_agentDelegationLimitsDebt() public view {
-        /*  address[] memory agents = env.testUsers.agents;
-        for (uint256 i = 0; i < agents.length; i++) {
-            address agent = agents[i];
-            (, uint256 slashableCollateral, uint256 totalDebt,,,) = lender.agent(agent);
-            //if (slashableCollateral < totalDebt) return;
-            assertGe(slashableCollateral, totalDebt, "User borrow must not exceed delegation");
-        }*/
+        /// @dev Test that user borrows never exceed their delegation
+        /// forge-config: default.invariant.depth = 100
+        function invariant_agentDelegationLimitsDebt() public view {
+            /*  address[] memory agents = env.testUsers.agents;
+            for (uint256 i = 0; i < agents.length; i++) {
+                address agent = agents[i];
+                (, uint256 slashableCollateral, uint256 totalDebt,,,) = lender.agent(agent);
+                //if (slashableCollateral < totalDebt) return;
+                assertGe(slashableCollateral, totalDebt, "User borrow must not exceed delegation");
+            }*/
     }
 
     /// @dev Test that liquidatable agents always have health factor < 1
@@ -566,13 +572,10 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
 
         // Bound amount to actual borrowed amount
         uint256 debt = lender.debt(agent, currentAsset);
-        console.log("debt", debt);
         uint256 amount = bound(amountSeed, 0, debt);
-        console.log("amount", amount);
 
         // If the debt is less than the minimum borrow, the full debt must be repaid
         (,,,,,, uint256 minBorrow) = lender.reservesData(currentAsset);
-        console.log("minBorrow", minBorrow);
 
         (,, address debtToken,,,,) = lender.reservesData(currentAsset);
         uint256 index = DebtToken(debtToken).index();
@@ -650,9 +653,8 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         if (coverage < totalDebt) coverage = totalDebt;
 
         vm.prank(address(env.users.middleware_admin));
-        MockNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).setMockSlashableCollateral(
-            agent, coverage
-        );
+        MockNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware)
+            .setMockSlashableCollateral(agent, coverage);
         vm.stopPrank();
     }
 
@@ -723,7 +725,10 @@ contract TestLenderHandler is StdUtils, TimeUtils, InitTestVaultLiquidity, Rando
         uint256 amount = bound(amountSeed, 1, 1e50);
         address target = randomActor(targetSeed, address(env.usdVault.capToken), address(lender));
 
-        vm.deal(target, amount /* we need gas to send gas */ );
+        vm.deal(
+            target,
+            amount /* we need gas to send gas */
+        );
     }
 
     function setAssetOraclePrice(uint256 assetSeed, uint256 priceSeed) external {

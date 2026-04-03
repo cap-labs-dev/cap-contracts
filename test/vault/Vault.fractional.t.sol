@@ -2,11 +2,11 @@
 pragma solidity ^0.8.28;
 
 import { IAccessControl } from "../../contracts/interfaces/IAccessControl.sol";
-import { TestDeployer } from "../deploy/TestDeployer.sol";
+import { VaultFixture } from "../fixtures/VaultFixture.sol";
 import { MockERC4626 } from "../mocks/MockERC4626.sol";
-import { console } from "forge-std/console.sol";
 
-contract VaultFractionalTest is TestDeployer {
+/// @dev Tests for fractional reserve mechanics: invest/divest/interest realization and vault switching.
+contract VaultFractionalTest is VaultFixture {
     address user;
     address borrower;
     uint256 constant USDT_RESERVE_AMOUNT = 10_00e6;
@@ -17,7 +17,7 @@ contract VaultFractionalTest is TestDeployer {
     MockERC4626 newFRVault;
 
     function setUp() public {
-        _deployCapTestEnvironment();
+        _setUpVaultWithLiquidity();
 
         // Setup test user
         user = makeAddr("test_user");
@@ -27,9 +27,6 @@ contract VaultFractionalTest is TestDeployer {
         vm.prank(env.users.access_control_admin);
         IAccessControl(env.infra.accessControl).grantAccess(cUSD.borrow.selector, address(cUSD), borrower);
         vm.stopPrank();
-
-        // Initialize vault with some liquidity
-        _initTestVaultLiquidity(usdVault);
 
         // Set initial reserve amount
         vm.prank(env.users.vault_config_admin);
@@ -112,7 +109,12 @@ contract VaultFractionalTest is TestDeployer {
         );
 
         // Verify FR vault is empty
-        assertEq(usdt.balanceOf(address(mockFRVault)), 1, /* rounding error */ "FR vault should be empty after divest");
+        assertEq(
+            usdt.balanceOf(address(mockFRVault)),
+            1,
+            /* rounding error */
+            "FR vault should be empty after divest"
+        );
 
         vm.stopPrank();
     }

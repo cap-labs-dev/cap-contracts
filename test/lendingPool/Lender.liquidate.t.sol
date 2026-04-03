@@ -8,16 +8,18 @@ import { IStrategy } from "../../contracts/delegation/providers/eigenlayer/inter
 import { ILender } from "../../contracts/interfaces/ILender.sol";
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
 import { ValidationLogic } from "../../contracts/lendingPool/libraries/ValidationLogic.sol";
-import { TestDeployer } from "../deploy/TestDeployer.sol";
+import { CapIntegrationFixture } from "../fixtures/CapIntegrationFixture.sol";
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { console } from "forge-std/console.sol";
 
-contract LenderLiquidateTest is TestDeployer {
+/// @dev Liquidation-path integration tests.
+/// This suite is intentionally verbose and logs a lot of intermediate state to make liquidation math regressions debuggable.
+contract LenderLiquidateTest is CapIntegrationFixture {
     address user_agent;
 
     function setUp() public {
-        _deployCapTestEnvironment();
+        _setUpCap();
         _initTestVaultLiquidity(usdVault, 10000e18);
         _initSymbioticVaultsLiquidity(env, 100);
 

@@ -7,16 +7,16 @@ import { IFeeReceiver } from "../../contracts/interfaces/IFeeReceiver.sol";
 import { IMinter } from "../../contracts/interfaces/IMinter.sol";
 import { IOracle } from "../../contracts/interfaces/IOracle.sol";
 import { Lender } from "../../contracts/lendingPool/Lender.sol";
-import { TestDeployer } from "../deploy/TestDeployer.sol";
-import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
+import { CapIntegrationFixture } from "../fixtures/CapIntegrationFixture.sol";
 import { console } from "forge-std/console.sol";
 
-contract ScenarioBasicTest is TestDeployer {
+/// @dev A "happy path" end-to-end scenario that exercises mint → stake → borrow → realize/buy fees → repay → withdraw.
+/// This is intentionally verbose (it reads like a walkthrough) and includes debug logging for manual review.
+contract ScenarioBasicTest is CapIntegrationFixture {
     address user_agent;
 
     function setUp() public {
-        _deployCapTestEnvironment();
-        _initTestVaultLiquidity(usdVault);
+        _setUpCapWithUsdVaultLiquidity();
         _initSymbioticVaultsLiquidity(env, 1);
 
         user_agent = _getRandomAgent();

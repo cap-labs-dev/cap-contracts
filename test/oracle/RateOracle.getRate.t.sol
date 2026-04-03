@@ -2,12 +2,12 @@
 pragma solidity ^0.8.28;
 
 import { IOracle } from "../../contracts/interfaces/IOracle.sol";
-import { TestDeployer } from "../deploy/TestDeployer.sol";
+import { OracleFixture } from "../fixtures/OracleFixture.sol";
 
-contract RateOracleGetRateTest is TestDeployer {
+/// @dev Sanity-check that mock Aave rates surface through CAP's oracle in ray decimals.
+contract RateOracleGetRateTest is OracleFixture {
     function setUp() public {
-        _deployCapTestEnvironment();
-        _initTestVaultLiquidity(usdVault);
+        _setUpOracleFixture();
     }
 
     function test_rate_oracle_get_rate() public {
