@@ -375,201 +375,111 @@ contract LenderLiquidateTest is CapIntegrationFixture {
     }
 
     function test_lender_liquidate_to_health_is_less_than_liquidation_threshold() public {
-        // borrow some assets
-        {
-            vm.startPrank(user_agent);
-            lender.borrow(address(usdc), 3000e6, user_agent);
-            assertEq(usdc.balanceOf(user_agent), 3000e6);
+        uint256 borrowAmount = 3000e6;
+        uint256 repayAmount = 1000e6;
 
-            vm.stopPrank();
-        }
+        // Create debt for the agent.
+        vm.startPrank(user_agent);
+        lender.borrow(address(usdc), borrowAmount, user_agent);
+        vm.stopPrank();
+        assertEq(usdc.balanceOf(user_agent), borrowAmount);
 
-        {
-            vm.startPrank(env.testUsers.liquidator);
+        // While the agent is not liquidatable, liquidation must revert (even if a liquidator has funds/approval).
+        deal(address(usdc), env.testUsers.liquidator, borrowAmount);
+        vm.startPrank(env.testUsers.liquidator);
+        usdc.approve(address(lender), repayAmount);
+        vm.expectRevert();
+        lender.liquidate(user_agent, address(usdc), repayAmount, 0);
+        vm.stopPrank();
 
-            deal(address(usdc), env.testUsers.liquidator, 3000e6);
-
-            usdc.approve(address(lender), 1000e6);
-
-            vm.expectRevert();
-            lender.liquidate(user_agent, address(usdc), 1000e6, 0);
-            vm.stopPrank();
-        }
-
-        // Modify the agent to have 0.01 liquidation threshold
-        {
-            _proportionallyWithdrawFromVault(env, symbioticWethVault.vault, 99.5e18, false);
-        }
-
-        // change eth oracle price
+        // Reduce the agent’s backing so its health drops below the liquidation threshold, then re-price WETH.
+        _proportionallyWithdrawFromVault(env, symbioticWethVault.vault, 99.5e18, false);
         _setAssetOraclePrice(address(weth), 2000e8);
 
-        // anyone can liquidate the debt
-        {
-            vm.startPrank(env.testUsers.liquidator);
+        // Once liquidatable, liquidation is gated by the grace window: open -> wait grace -> liquidate.
+        deal(address(usdc), env.testUsers.liquidator, borrowAmount);
+        vm.startPrank(env.testUsers.liquidator);
+        lender.openLiquidation(user_agent);
+        uint256 gracePeriod = lender.grace();
+        uint256 expiry = lender.expiry();
 
-            deal(address(usdc), env.testUsers.liquidator, 3000e6);
+        _timeTravel(gracePeriod + 1);
+        usdc.approve(address(lender), borrowAmount);
+        lender.liquidate(user_agent, address(usdc), repayAmount, 0);
 
-            // start the first liquidation
-            lender.openLiquidation(user_agent);
-            uint256 gracePeriod = lender.grace();
-            uint256 expiry = lender.expiry();
-
-            console.log("Starting Liquidations");
-            console.log("");
-            _timeTravel(gracePeriod + 1);
-            // approve repay amount for liquidation
-            usdc.approve(address(lender), 3000e6);
-            lender.liquidate(user_agent, address(usdc), 1000e6, 0);
-
-            console.log("Liquidator usdt balance after first liquidation", usdt.balanceOf(env.testUsers.liquidator));
-            console.log("Liquidator weth balance after first liquidation", weth.balanceOf(env.testUsers.liquidator));
-            console.log("");
-
-            _timeTravel(expiry + 1);
-
-            // start the second liquidation
-            /* vm.expectRevert(ValidationLogic.LiquidationExpired.selector);
-            lender.liquidate(user_agent, address(usdc), 1000e6);*/
-
-            /*lender.openLiquidation(user_agent);
-
-            _timeTravel(gracePeriod + 1);
-
-            lender.liquidate(user_agent, address(usdc), 1000e6, 0);
-
-            console.log("Liquidator usdt balance after second liquidation", usdt.balanceOf(env.testUsers.liquidator));
-            console.log("Liquidator weth balance after second liquidation", weth.balanceOf(env.testUsers.liquidator));
-            console.log("");
-            /*
-            _setAssetOraclePrice(address(weth), 1035e8);
-
-            // start the third liquidation
-
-            _timeTravel(expiry + 1);
-
-            vm.startPrank(env.testUsers.liquidator);
-
-            lender.openLiquidation(user_agent);
-            lender.liquidate(user_agent, address(usdc), 1000e6);
-
-            console.log("Liquidator usdt balance after third liquidation", usdt.balanceOf(env.testUsers.liquidator));
-            console.log("Liquidator weth balance after third liquidation", weth.balanceOf(env.testUsers.liquidator));
-            console.log("");
-            console.log("Liquidator usdc balance after third liquidation", usdc.balanceOf(env.testUsers.liquidator));
-            console.log("");
-
-            //    assertEq(usdc.balanceOf(env.testUsers.liquidator), 0);
-            //    assertEq(usdt.balanceOf(env.testUsers.liquidator), 1000e6);
-            //    assertEq(weth.balanceOf(env.testUsers.liquidator), 2e18);
-
-            uint256 coverage = Delegation(env.infra.delegation).coverage(user_agent);
-            console.log("Coverage after liquidations", coverage);
-            console.log("");
-            //     assertEq(coverage, 0);
-            */
-
-            (uint256 totalDelegation,, uint256 totalDebt,,, uint256 health) = lender.agent(user_agent);
-
-            console.log("Total debt after liquidations", totalDebt);
-            console.log("Total delegation after liquidations", totalDelegation);
-            console.log("Health after liquidations", health);
-            assertGt(health, 1e27);
-            //    assertEq(totalDelegation, 0);
-            //    assertEq(totalDebt, 0);
-            vm.stopPrank();
-        }
+        // Move past the liquidation window and assert we’re “healthy enough” after the liquidation step.
+        _timeTravel(expiry + 1);
+        (,,,,, uint256 health) = lender.agent(user_agent);
+        assertGt(health, 1e27);
+        vm.stopPrank();
     }
 
     function test_lender_liquidate_in_the_future() public {
-        // borrow some assets
-        {
-            vm.startPrank(user_agent);
-            lender.borrow(address(usdc), 3000e6, user_agent);
-            assertEq(usdc.balanceOf(user_agent), 3000e6);
+        uint256 borrowAmount = 3000e6;
 
-            /// well past all epochs
-            _timeTravel(60 days);
+        // Borrow and let 60 days pass so interest accrues on the debt.
+        vm.startPrank(user_agent);
+        lender.borrow(address(usdc), borrowAmount, user_agent);
+        assertEq(usdc.balanceOf(user_agent), borrowAmount);
+        _timeTravel(60 days);
+        vm.stopPrank();
 
-            vm.stopPrank();
-        }
-
-        // Modify the agent to have 0.01 liquidation threshold
-        {
-            _proportionallyWithdrawFromVault(env, symbioticWethVault.vault, 1000e18, true);
-        }
-
-        // change eth oracle price
+        // Drain the agent's symbiotic backing and drop WETH price to trigger liquidatability.
+        _proportionallyWithdrawFromVault(env, symbioticWethVault.vault, 1000e18, true);
         _setAssetOraclePrice(address(weth), 2000e8);
 
-        // anyone can liquidate the debt
-        {
-            vm.startPrank(env.testUsers.liquidator);
+        // Confirm interest has accrued: outstanding debt must exceed the original borrow amount.
+        (,, uint256 debtWithInterest,,, uint256 healthBefore) = lender.agent(user_agent);
+        assertGt(debtWithInterest, borrowAmount, "Interest must have accrued over 60 days");
+        assertLt(healthBefore, 1e27, "Agent must be unhealthy before liquidation");
 
-            // dealing a bit more since now we cover the interest
-            deal(address(usdc), env.testUsers.liquidator, 3200e6);
+        uint256 assetIndex = _getAssetIndex(usdVault, address(usdc));
+        DebtToken debtToken = DebtToken(usdVault.debtTokens[assetIndex]);
 
-            // start the first liquidation
-            lender.openLiquidation(user_agent);
-            uint256 gracePeriod = lender.grace();
+        vm.startPrank(env.testUsers.liquidator);
 
-            console.log("Starting Liquidations");
-            console.log("");
-            _timeTravel(gracePeriod + 1);
+        // Cannot liquidate before the grace window is open.
+        vm.expectRevert();
+        lender.liquidate(user_agent, address(usdc), 1000e6, 0);
 
-            (uint256 totalDelegation,, uint256 totalDebt, uint256 ltv, uint256 liquidationThreshold, uint256 health) =
-                lender.agent(user_agent);
+        lender.openLiquidation(user_agent);
+        _timeTravel(lender.grace() + 1);
 
-            console.log("Total debt after 60 days", totalDebt);
-            console.log("Total delegation after 60 days", totalDelegation);
-            console.log("LTV after 60 days", ltv);
-            console.log("Liquidation threshold after 60 days", liquidationThreshold);
-            console.log("Health after 60 days", health);
+        usdc.approve(address(lender), type(uint256).max);
 
-            // approve repay amount for liquidation
-            usdc.approve(address(lender), 3200e6);
-            lender.liquidate(user_agent, address(usdc), 1000e6, 0);
+        // First liquidation pass.
+        deal(address(usdc), env.testUsers.liquidator, 1000e6);
+        lender.liquidate(user_agent, address(usdc), 1000e6, 0);
+        assertEq(usdc.balanceOf(env.testUsers.liquidator), 0, "All USDC spent in first liquidation");
+        assertGt(debtToken.balanceOf(user_agent), 0, "Debt remains after first liquidation");
 
-            console.log("Liquidator usdt balance after first liquidation", usdt.balanceOf(env.testUsers.liquidator));
-            console.log("Liquidator weth balance after first liquidation", weth.balanceOf(env.testUsers.liquidator));
-            console.log("");
+        // Second liquidation pass.
+        deal(address(usdc), env.testUsers.liquidator, 1000e6);
+        lender.liquidate(user_agent, address(usdc), 1000e6, 0);
+        assertEq(usdc.balanceOf(env.testUsers.liquidator), 0, "All USDC spent in second liquidation");
+        assertGt(debtToken.balanceOf(user_agent), 0, "Debt remains after second liquidation");
 
-            // start the second liquidation
-            lender.liquidate(user_agent, address(usdc), 1000e6, 0);
+        // Third liquidation pass: repay the exact remaining debt token balance to clear debt fully.
+        uint256 remaining = debtToken.balanceOf(user_agent);
+        deal(address(usdc), env.testUsers.liquidator, remaining);
+        lender.liquidate(user_agent, address(usdc), remaining, 0);
+        assertEq(usdc.balanceOf(env.testUsers.liquidator), 0, "All USDC spent in third liquidation");
 
-            console.log("Liquidator usdt balance after second liquidation", usdt.balanceOf(env.testUsers.liquidator));
-            console.log("Liquidator weth balance after second liquidation", weth.balanceOf(env.testUsers.liquidator));
-            console.log("");
-            // start the third liquidation
-            lender.liquidate(user_agent, address(usdc), 1200e6, 0);
+        // Liquidator received WETH as the collateral slash bonus.
+        assertGt(weth.balanceOf(env.testUsers.liquidator), 0, "Liquidator must receive WETH collateral");
 
-            console.log("Liquidator usdt balance after third liquidation", usdt.balanceOf(env.testUsers.liquidator));
-            console.log("Liquidator weth balance after third liquidation", weth.balanceOf(env.testUsers.liquidator));
-            console.log("");
-            console.log("Liquidator usdc balance after third liquidation", usdc.balanceOf(env.testUsers.liquidator));
-            console.log("");
+        // Backing is fully drained.
+        assertEq(
+            Delegation(env.infra.delegation).coverage(user_agent), 0, "Coverage must be zero after full liquidation"
+        );
 
-            //    assertEq(usdc.balanceOf(env.testUsers.liquidator), 0);
-            //    assertEq(usdt.balanceOf(env.testUsers.liquidator), 1000e6);
-            //    assertEq(weth.balanceOf(env.testUsers.liquidator), 2e18);
+        // Debt is fully cleared and agent is restored to healthy.
+        (uint256 totalDelegationAfter,, uint256 debtAfter,,, uint256 healthAfter) = lender.agent(user_agent);
+        assertEq(debtAfter, 0, "Debt must be fully repaid");
+        assertEq(totalDelegationAfter, 0, "Delegation must be zero after full drain");
+        assertGt(healthAfter, 1e27, "Agent must be healthy after full liquidation");
 
-            uint256 coverage = Delegation(env.infra.delegation).coverage(user_agent);
-            console.log("Coverage after liquidations", coverage);
-            console.log("");
-            //     assertEq(coverage, 0);
-
-            (totalDelegation,, totalDebt, ltv, liquidationThreshold, health) = lender.agent(user_agent);
-
-            console.log("Health after liquidations", health);
-
-            console.log("Total debt after liquidations", totalDebt);
-            console.log("Total delegation after liquidations", totalDelegation);
-            assertGt(health, 1e27);
-            //    assertEq(totalDelegation, 0);
-            //    assertEq(totalDebt, 0);
-
-            vm.stopPrank();
-        }
+        vm.stopPrank();
     }
 
     function test_agent_evade_slash() public {
