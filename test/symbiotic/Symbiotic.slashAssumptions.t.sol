@@ -1,25 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.28;
 
 import { SymbioticNetwork } from "../../contracts/delegation/providers/symbiotic/SymbioticNetwork.sol";
-import { SymbioticNetworkMiddleware } from
-    "../../contracts/delegation/providers/symbiotic/SymbioticNetworkMiddleware.sol";
+import {
+    SymbioticNetworkMiddleware
+} from "../../contracts/delegation/providers/symbiotic/SymbioticNetworkMiddleware.sol";
 import { SymbioticVaultConfig } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 
-import { TestDeployer } from "../../test/deploy/TestDeployer.sol";
-import { MockERC20 } from "../mocks/MockERC20.sol";
-import { IOperatorNetworkSpecificDelegator } from
-    "@symbioticfi/core/src/interfaces/delegator/IOperatorNetworkSpecificDelegator.sol";
-
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { CapIntegrationFixture } from "../fixtures/CapIntegrationFixture.sol";
 import { IBaseDelegator } from "@symbioticfi/core/src/interfaces/delegator/IBaseDelegator.sol";
-import { INetworkRestakeDelegator } from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
 import { ISlasher } from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
-import { console } from "forge-std/console.sol";
 
-contract SymbioticSlashAssumptionsTest is TestDeployer {
+/// @dev Tests that document/lock in time-window assumptions around Symbiotic `stakeAt` and slashing capture timestamps.
+contract SymbioticSlashAssumptionsTest is CapIntegrationFixture {
     function setUp() public {
-        _deployCapTestEnvironment();
+        _setUpCap();
         _initSymbioticVaultsLiquidity(env, 100);
 
         // reset the initial stakes for this test

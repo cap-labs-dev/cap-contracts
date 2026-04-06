@@ -8,7 +8,6 @@ import { MinterLogic } from "../../../contracts/vault/libraries/MinterLogic.sol"
 import { MinterStorageUtils } from "../../../contracts/storage/MinterStorageUtils.sol";
 import { MockERC20 } from "../../mocks/MockERC20.sol";
 import { Test } from "forge-std/Test.sol";
-import { console } from "forge-std/console.sol";
 
 contract MockVault is MockERC20, MinterStorageUtils {
     mapping(address => uint256) public _totalSupplies;

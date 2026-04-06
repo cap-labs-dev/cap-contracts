@@ -4,18 +4,18 @@ pragma solidity ^0.8.28;
 import { Vault } from "../../contracts/vault/Vault.sol";
 
 import { VaultLogic } from "../../contracts/vault/libraries/VaultLogic.sol";
-import { TestDeployer } from "../deploy/TestDeployer.sol";
+import { VaultFixture } from "../fixtures/VaultFixture.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
 
-contract VaultRescueTest is TestDeployer {
+/// @dev `rescueERC20` should only be usable by authorized accounts and must refuse rescuing underlying assets.
+contract VaultRescueTest is VaultFixture {
     address admin;
     address user;
     MockERC20 token;
     uint256 rescueAmount;
 
     function setUp() public {
-        _deployCapTestEnvironment();
-        _initTestVaultLiquidity(usdVault);
+        _setUpVaultWithLiquidity();
 
         admin = makeAddr("admin");
         user = makeAddr("test_user");
@@ -40,7 +40,6 @@ contract VaultRescueTest is TestDeployer {
         {
             vm.prank(admin);
             cUSD.rescueERC20(address(token), user);
-            vm.stopPrank();
         }
 
         // Verify final balances
@@ -54,7 +53,6 @@ contract VaultRescueTest is TestDeployer {
             vm.prank(user);
             vm.expectRevert(); // Should revert due to missing role
             cUSD.rescueERC20(address(token), user);
-            vm.stopPrank();
         }
 
         // balance are unchanged
@@ -68,7 +66,6 @@ contract VaultRescueTest is TestDeployer {
             vm.prank(admin);
             vm.expectRevert(abi.encodeWithSelector(VaultLogic.AssetNotRescuable.selector, address(usdt)));
             cUSD.rescueERC20(address(usdt), user);
-            vm.stopPrank();
         }
         assertEq(usdt.balanceOf(user), 0, "User should have 0 usdt");
     }
@@ -79,7 +76,6 @@ contract VaultRescueTest is TestDeployer {
             _initTestUserMintCapToken(usdVault, user, 1000e18);
             vm.prank(user);
             cUSD.transfer(address(cUSD), 1000e18);
-            vm.stopPrank();
         }
 
         assertEq(cUSD.balanceOf(address(cUSD)), 1000e18, "Vault should have some cUSD");
@@ -90,7 +86,6 @@ contract VaultRescueTest is TestDeployer {
         {
             vm.prank(admin);
             cUSD.rescueERC20(address(cUSD), user);
-            vm.stopPrank();
         }
 
         assertEq(cUSD.balanceOf(address(cUSD)), 0, "Vault should have 0 cUSD");

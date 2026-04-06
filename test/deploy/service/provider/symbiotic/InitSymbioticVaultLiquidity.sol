@@ -1,21 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
-import { SymbioticUtils } from "../../../../../contracts/deploy/utils/SymbioticUtils.sol";
 import { MockERC20 } from "../../../../mocks/MockERC20.sol";
 import { TestEnvConfig, TestUsersConfig } from "../../../interfaces/TestDeployConfig.sol";
 
-import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
-
-import { InfraConfig } from "../../../interfaces/TestDeployConfig.sol";
 import { TimeUtils } from "../../../utils/TimeUtils.sol";
 import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 
-import { Test } from "forge-std/Test.sol";
 import { Vm } from "forge-std/Vm.sol";
-import { console } from "forge-std/console.sol";
 
-contract InitSymbioticVaultLiquidity is Test, SymbioticUtils, TimeUtils {
+contract InitSymbioticVaultLiquidity is TimeUtils {
+    Vm internal constant _vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+
+    /// @dev Seeds each Symbiotic vault in the `env` with deposits from all `testUsers.restakers`.
+    /// Assumes vault collateral is a `MockERC20` (we mint directly).
     function _initSymbioticVaultsLiquidity(TestEnvConfig memory env, uint256 amountNoDecimals) internal {
         for (uint256 i = 0; i < env.symbiotic.vaults.length; i++) {
             address vault = env.symbiotic.vaults[i];
@@ -25,6 +23,7 @@ contract InitSymbioticVaultLiquidity is Test, SymbioticUtils, TimeUtils {
         _timeTravel(28 days);
     }
 
+    /// @dev Deposits into a single Symbiotic vault for every restaker in `testUsers`.
     function _initSymbioticVaultLiquidityForAgent(
         TestUsersConfig memory testUsers,
         address vault,
@@ -42,38 +41,41 @@ contract InitSymbioticVaultLiquidity is Test, SymbioticUtils, TimeUtils {
         }
     }
 
+    /// @dev Mints vault collateral to `restaker` (mock-only) then deposits into the Symbiotic vault.
     function _symbioticMintAndStakeInVault(address vault, address restaker, uint256 amount)
         internal
         returns (uint256 depositedAmount, uint256 mintedShares)
     {
-        vm.startPrank(restaker);
+        _vm.startPrank(restaker);
         address collateral = IVault(vault).collateral();
         MockERC20(collateral).mint(restaker, amount);
         MockERC20(collateral).approve(address(vault), amount);
         (depositedAmount, mintedShares) = IVault(vault).deposit(restaker, amount);
-        vm.stopPrank();
+        _vm.stopPrank();
     }
 
+    /// @dev Withdraws proportionally from a vault for every restaker.
     function _proportionallyWithdrawFromVault(TestEnvConfig memory env, address vault, uint256 amount, bool all)
         internal
     {
         for (uint256 i = 0; i < env.testUsers.restakers.length; i++) {
             if (all) {
                 amount = IVault(vault).activeSharesOf(env.testUsers.restakers[i]);
-                vm.startPrank(env.testUsers.restakers[i]);
+                _vm.startPrank(env.testUsers.restakers[i]);
                 IVault(vault).redeem(env.testUsers.restakers[i], amount);
-                vm.stopPrank();
+                _vm.stopPrank();
             } else {
-                vm.startPrank(env.testUsers.restakers[i]);
+                _vm.startPrank(env.testUsers.restakers[i]);
                 IVault(vault).withdraw(env.testUsers.restakers[i], amount);
-                vm.stopPrank();
+                _vm.stopPrank();
             }
         }
     }
 
+    /// @dev Withdraw a single restaker from a vault.
     function _withdrawFromVault(address vault, address restaker, uint256 amount) internal {
-        vm.startPrank(restaker);
+        _vm.startPrank(restaker);
         IVault(vault).withdraw(restaker, amount);
-        vm.stopPrank();
+        _vm.stopPrank();
     }
 }

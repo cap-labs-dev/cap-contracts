@@ -37,6 +37,7 @@ fs_permissions = [
     { access = "read", path = "./config/symbiotic.json" },
     { access = "read", path = "./config/layerzero-v2-deployments.json" },
     { access = "read", path = "./config/zap.json" },
+    { access = "read", path = "./config/test-harness.json" },
     { access = "read-write", path = "./config/cap-infra.json" },
     { access = "read-write", path = "./config/cap-symbiotic.json" },
     { access = "read-write", path = "./config/cap-eigen.json" },

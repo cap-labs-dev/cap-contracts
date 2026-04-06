@@ -3,7 +3,6 @@ pragma solidity ^0.8.28;
 
 import { stdJson } from "forge-std/StdJson.sol";
 import { Vm } from "forge-std/Vm.sol";
-import { console } from "forge-std/console.sol";
 
 enum SlasherType {
     INSTANT,
@@ -50,7 +49,7 @@ struct SymbioticAddressbook {
     SymbioticHooks hooks;
 }
 
-struct VaultAddressbook {
+struct SymbioticVaultAddressbook {
     address vault;
     address curator;
     address delegator;
@@ -67,8 +66,6 @@ contract SymbioticUtils {
 
         string memory configJson = vm.readFile(SYMBIOTIC_CONFIG_PATH_FROM_PROJECT_ROOT);
         string memory selectorPrefix = string.concat("$['", vm.toString(block.chainid), "']");
-
-        console.log("block.chainid", block.chainid);
 
         // ethereum sepolia
         ab.factories.vaultFactory = configJson.readAddress(string.concat(selectorPrefix, ".factories.vaultFactory"));
@@ -98,7 +95,7 @@ contract SymbioticUtils {
             configJson.readAddress(string.concat(selectorPrefix, ".services.vaultConfigurator"));
     }
 
-    function _getSymbioticVaultAddressbook(address asset) internal view returns (VaultAddressbook memory ab) {
+    function _getSymbioticVaultAddressbook(address asset) internal view returns (SymbioticVaultAddressbook memory ab) {
         Vm vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
         string memory configJson = vm.readFile(SYMBIOTIC_CONFIG_PATH_FROM_PROJECT_ROOT);

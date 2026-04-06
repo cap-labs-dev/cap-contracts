@@ -3,33 +3,26 @@ pragma solidity ^0.8.28;
 
 import { IStrategy } from "../../contracts/delegation/providers/eigenlayer/interfaces/IStrategy.sol";
 import { IDelegation } from "../../contracts/interfaces/IDelegation.sol";
-import { TestDeployer } from "../deploy/TestDeployer.sol";
+import { LenderFixture } from "../fixtures/LenderFixture.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import { console } from "forge-std/console.sol";
-
-contract DelegationSlashTest is TestDeployer {
-    address user_agent;
+/// @dev Delegation slashing and admin-path regression tests.
+contract DelegationSlashTest is LenderFixture {
+    address agent;
 
     function setUp() public {
-        _deployCapTestEnvironment();
-        _initTestVaultLiquidity(usdVault);
-        _initSymbioticVaultsLiquidity(env, 100);
+        _setUpLenderFixture();
 
-        user_agent = _getRandomAgent();
-
-        uint256 ltvBuffer = delegation.ltvBuffer();
-        console.log("LTV Buffer", ltvBuffer);
+        agent = _getRandomAgent();
 
         _timeTravel(30 days);
-        vm.stopPrank();
     }
 
     function test_delegation_view_functions() public view {
         assertEq(delegation.epochDuration(), 1 days);
         assertEq(delegation.epoch(), block.timestamp / 1 days);
         assertEq(delegation.agents().length, 3);
-        assertEq(delegation.slashableCollateral(user_agent), 780000e8);
+        assertEq(delegation.slashableCollateral(agent), 780000e8);
     }
 
     function test_slash_delegation() public {
@@ -38,7 +31,7 @@ contract DelegationSlashTest is TestDeployer {
         address liquidator = makeAddr("liquidator");
 
         /// USD Value of 100 eth of delegation
-        delegation.slash(user_agent, liquidator, 78000e8);
+        delegation.slash(agent, liquidator, 78000e8);
 
         // Since WETH is worth $2600 we expect 0.1 ETH
         assertApproxEqAbs(weth.balanceOf(liquidator), 30e18, 1);
@@ -50,7 +43,7 @@ contract DelegationSlashTest is TestDeployer {
         _timeTravel(30 days);
 
         vm.expectRevert(IDelegation.NoSlashableCollateral.selector);
-        delegation.slash(user_agent, liquidator, 78000e8);
+        delegation.slash(agent, liquidator, 78000e8);
 
         vm.stopPrank();
     }
@@ -59,13 +52,13 @@ contract DelegationSlashTest is TestDeployer {
         vm.startPrank(env.infra.lender);
 
         // Eigen agent
-        user_agent = _getAgent(1);
+        agent = _getAgent(1);
         IERC20 collateralToken = IERC20(IStrategy(eigenAb.eigenAddresses.strategy).underlyingToken());
 
         address liquidator = makeAddr("liquidator");
 
         /// USD Value of 100 eth of delegation
-        delegation.slash(user_agent, liquidator, 15600e8);
+        delegation.slash(agent, liquidator, 15600e8);
 
         // Since WETH is worth $2600 we expect 6 eth or more due to precision
         assertGt(collateralToken.balanceOf(liquidator), 6e18);
@@ -79,7 +72,7 @@ contract DelegationSlashTest is TestDeployer {
         _timeTravel(30 days);
 
         vm.expectRevert();
-        delegation.slash(user_agent, liquidator, 78000e8);
+        delegation.slash(agent, liquidator, 78000e8);
 
         vm.stopPrank();
     }
@@ -148,22 +141,22 @@ contract DelegationSlashTest is TestDeployer {
     function test_slash_delegation_coverage_cap() public {
         vm.startPrank(env.infra.lender);
 
-        uint256 coverageBefore = delegation.coverage(user_agent);
+        uint256 coverageBefore = delegation.coverage(agent);
 
         /// Set coverage cap to 100 USD of collateral
         vm.startPrank(env.users.delegation_admin);
-        delegation.setCoverageCap(user_agent, 100e8);
+        delegation.setCoverageCap(agent, 100e8);
         vm.stopPrank();
 
-        uint256 coverageAfter = delegation.coverage(user_agent);
+        uint256 coverageAfter = delegation.coverage(agent);
         assertEq(coverageAfter, 100e8);
 
         /// Set coverage cap to a large number
         vm.startPrank(env.users.delegation_admin);
-        delegation.setCoverageCap(user_agent, 1_000_000_000_000e8);
+        delegation.setCoverageCap(agent, 1_000_000_000_000e8);
         vm.stopPrank();
 
-        coverageAfter = delegation.coverage(user_agent);
+        coverageAfter = delegation.coverage(agent);
         assertEq(coverageAfter, coverageBefore);
     }
 }

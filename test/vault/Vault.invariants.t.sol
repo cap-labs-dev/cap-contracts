@@ -23,7 +23,6 @@ import { StdUtils } from "forge-std/StdUtils.sol";
 import { Test } from "forge-std/Test.sol";
 
 import { Vm } from "forge-std/Vm.sol";
-import { console } from "forge-std/console.sol";
 
 import { RandomActorUtils } from "../deploy/utils/RandomActorUtils.sol";
 import { RandomAssetUtils } from "../deploy/utils/RandomAssetUtils.sol";
@@ -241,6 +240,64 @@ contract VaultInvariantsTest is Test, ProxyUtils {
         }
     }
 
+    /// @dev Physical token balance in the vault must be >= the reported available balance for each asset.
+    ///      Donations can push physical balance above available balance, but accounting must never
+    ///      report more availability than the vault physically holds.
+    /// forge-config: default.invariant.depth = 100
+    function invariant_physicalBalanceGeAvailable() public view {
+        address[] memory vaultAssets = vault.assets();
+        for (uint256 i = 0; i < vaultAssets.length; i++) {
+            address asset = vaultAssets[i];
+            assertGe(
+                IERC20(asset).balanceOf(address(vault)),
+                vault.availableBalance(asset),
+                "Physical balance must be >= available balance"
+            );
+        }
+    }
+
+    /// @dev The sum of all asset allocations must cover totalSupplies — no value may be destroyed.
+    ///      physical + totalBorrows + loaned >= totalSupplies
+    ///      Donations (direct transfers) increase the left side without touching totalSupplies,
+    ///      so the invariant direction is physical+borrows+loaned >= totalSupplies, not the reverse.
+    /// forge-config: default.invariant.depth = 100
+    function invariant_totalSuppliesCoversAllAllocations() public view {
+        address[] memory vaultAssets = vault.assets();
+        for (uint256 i = 0; i < vaultAssets.length; i++) {
+            address asset = vaultAssets[i];
+            assertGe(
+                IERC20(asset).balanceOf(address(vault)) + vault.totalBorrows(asset) + vault.loaned(asset),
+                vault.totalSupplies(asset),
+                "physical + totalBorrows + loaned must cover totalSupplies"
+            );
+        }
+    }
+
+    /// @dev Burning vault shares must strictly decrease the cap token total supply.
+    ///      This mirrors invariant_mintingIncreaseBalance for the burn direction.
+    /// forge-config: default.invariant.depth = 100
+    function invariant_burningDecreasesCapTokenSupply() public {
+        address[] memory unpausedAssets = handler.getVaultUnpausedAssets();
+        if (unpausedAssets.length == 0) return;
+        address mintAsset = unpausedAssets[0];
+
+        uint256 amount = 1000 * (10 ** IERC20Metadata(mintAsset).decimals());
+
+        MockERC20(mintAsset).mint(address(this), amount);
+        IERC20(mintAsset).approve(address(vault), amount);
+        (uint256 amountOut,) = vault.getMintAmount(address(this), mintAsset, amount);
+        if (amountOut == 0) return;
+        vault.mint(mintAsset, amount, 0, address(this), block.timestamp);
+
+        uint256 supplyBefore = vault.totalSupply();
+        uint256 shares = vault.balanceOf(address(this));
+        if (shares == 0) return;
+
+        vault.burn(mintAsset, shares, 0, address(this), block.timestamp);
+
+        assertLt(vault.totalSupply(), supplyBefore, "Burning shares must decrease cap token total supply");
+    }
+
     /// @dev Test that minting increases asset balance correctly
     function invariant_mintingIncreaseBalance() public {
         address[] memory unpausedAssets = handler.getVaultUnpausedAssets();
@@ -259,6 +316,13 @@ contract VaultInvariantsTest is Test, ProxyUtils {
 
             vm.startPrank(minter);
             IERC20(asset).approve(address(vault), amount);
+            // Some fuzzed fee configurations can make `amountOut == 0`, in which case `VaultLogic` reverts.
+            // This is not a safety invariant we want to enforce; skip mint attempts that would be a no-op.
+            (uint256 amountOut,) = vault.getMintAmount(minter, asset, amount);
+            if (amountOut == 0) {
+                vm.stopPrank();
+                continue;
+            }
             vault.mint(asset, amount, 0, minter, block.timestamp);
             vm.stopPrank();
 
@@ -375,7 +439,9 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         amount = bound(amount, 0, type(uint96).max); // Reasonable bound for approval
         if (amount == 0) return;
 
+        vm.startPrank(currentActor);
         IERC20(address(vault)).approve(currentSpender, amount);
+        vm.stopPrank();
     }
 
     function borrow(uint256 actorSeed, uint256 assetSeed, uint256 amount) external {
@@ -387,6 +453,7 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
 
         uint256 maxBorrow = vault.availableBalance(currentAsset);
         amount = bound(amount, 0, Math.min(maxBorrow, type(uint96).max)); // Reasonable bound for borrow
+        if (amount == 0) return;
 
         vault.borrow(currentAsset, amount, currentActor);
     }
@@ -403,7 +470,10 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
 
         amount = bound(amount, 1, Math.min(maxBurn, type(uint96).max)); // Reasonable bound for burn
 
+        // `burn` pulls/burns shares from the caller, so run it as the actor.
+        vm.startPrank(currentActor);
         vault.burn(currentAsset, amount, 0, currentActor, block.timestamp);
+        vm.stopPrank();
     }
 
     function divestAll(uint256 assetSeed) external {
@@ -431,14 +501,20 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         address currentActor = randomActor(actorSeed);
         if (currentActor == address(0)) return;
 
-        uint256 maxMint = vault.availableBalance(currentAsset);
-        if (maxMint == 0) return;
-        uint256 amount = bound(amountSeed, 1, Math.min(maxMint, type(uint96).max)); // Reasonable bound for mint
+        uint256 amount = bound(amountSeed, 1, type(uint96).max);
 
         MockERC20(currentAsset).mint(currentActor, amount);
 
+        vm.startPrank(currentActor);
         IERC20(currentAsset).approve(address(vault), amount);
+        // If fee configuration produces `amountOut == 0`, `VaultLogic` will revert; treat as a no-op for invariants.
+        (uint256 amountOut,) = vault.getMintAmount(currentActor, currentAsset, amount);
+        if (amountOut == 0) {
+            vm.stopPrank();
+            return;
+        }
         vault.mint(currentAsset, amount, 0, currentActor, block.timestamp);
+        vm.stopPrank();
     }
 
     function redeem(uint256 actorSeed, uint256 amount) external {
@@ -450,10 +526,11 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
 
         amount = bound(amount, 1, Math.min(maxRedeem, type(uint96).max)); // Reasonable bound for redeem
 
-        uint256[] memory amountsOut = new uint256[](1);
-        amountsOut[0] = 0;
-
-        vault.redeem(amount, amountsOut, currentActor, block.timestamp);
+        address[] memory vaultAssets = vault.assets();
+        uint256[] memory minAmountsOut = new uint256[](vaultAssets.length);
+        vm.startPrank(currentActor);
+        vault.redeem(amount, minAmountsOut, currentActor, block.timestamp);
+        vm.stopPrank();
     }
 
     function removeAsset(uint256 assetSeed) external {
@@ -472,11 +549,14 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
 
         uint256 maxRepay = vault.availableBalance(currentAsset);
         amount = bound(amount, 0, Math.min(maxRepay, type(uint96).max)); // Reasonable bound for repay
+        if (amount == 0) return;
 
         MockERC20(currentAsset).mint(currentActor, amount);
 
+        vm.startPrank(currentActor);
         IERC20(currentAsset).approve(address(vault), amount);
         vault.repay(currentAsset, amount);
+        vm.stopPrank();
     }
 
     function pause(uint256 assetSeed) external {
@@ -487,8 +567,9 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
     }
 
     function unpause(uint256 assetSeed) external {
-        address currentAsset = randomAsset(getVaultUnpausedAssets(), assetSeed);
+        address currentAsset = randomAsset(vault.assets(), assetSeed);
         if (currentAsset == address(0)) return;
+        if (!vault.paused(currentAsset)) return;
 
         vault.unpauseAsset(currentAsset);
     }
@@ -513,8 +594,12 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         uint256 burnKinkRatio = bound(burnKinkRatioSeed, 0.0000000000001e27, 0.9999999999999e27);
         uint256 optimalRatio = bound(optimalRatioSeed, 0.0000000000001e27, 0.9999999999999e27);
 
-        // Ensure optimalRatio is not equal to mintKinkRatio or burnKinkRatio
-        if (optimalRatio == mintKinkRatio || optimalRatio == burnKinkRatio) optimalRatio += 1;
+        // Ensure optimalRatio is not equal to mintKinkRatio or burnKinkRatio.
+        // A single +1 is insufficient when the two kink ratios are consecutive (e.g. K and K+1),
+        // so loop until the condition is satisfied. At most 2 iterations are ever needed.
+        while (optimalRatio == mintKinkRatio || optimalRatio == burnKinkRatio) {
+            optimalRatio = (optimalRatio + 1 < 1e27) ? optimalRatio + 1 : 1;
+        }
 
         vault.setFeeData(
             currentAsset,
@@ -572,7 +657,10 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
 
     function donateGasToken(uint256 amountSeed) external {
         uint256 amount = bound(amountSeed, 1, 1e50);
-        vm.deal(address(vault), amount /* we need gas to send gas */ );
+        vm.deal(
+            address(vault),
+            amount /* we need gas to send gas */
+        );
     }
 
     function setAssetOraclePrice(uint256 assetSeed, uint256 priceSeed) external {
