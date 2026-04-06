@@ -31,7 +31,11 @@
     "gas:flamegraph": "forge test --flamegraph --match-path 'test/**/*.gas.t.sol'",
     "coverage:forge": "forge coverage --report summary --ir-minimum",
     "coverage:forge:report": "forge coverage --report lcov --ir-minimum && lcov --remove lcov.info \"*test/*\" \"lendingPool/libraries/math\" \"*/contracts/deploy/*\" \"*script/*\" \"*node_modules/*\" --output-file lcov.info --rc lcov_branch_coverage=1 --ignore-errors inconsistent --ignore-errors unused && genhtml lcov.info --branch-coverage --output-dir coverage --ignore-errors inconsistent --ignore-errors unused",
-    "merkle:proof": "cd script/merkle && node MerkleProof.js"
+    "merkle:proof": "cd script/merkle && node MerkleProof.js",
+    "claude": "bash .claude/claude-docker.sh run",
+    "claude:audit": "bash .claude/claude-docker.sh audit",
+    "claude:build": "bash .claude/claude-docker.sh build",
+    "claude:test-file": "bash .claude/claude-docker.sh test-file"
   },
   "devDependencies": {
     "@openzeppelin/contracts": "npm:@openzeppelin/contracts",

@@ -1,0 +1,2 @@
+# Build context is only .claude/; keep local container home out of the context
+docker-home/

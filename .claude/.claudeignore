@@ -1,0 +1,23 @@
+# claude-docker.sh reads only this file (no defaults in the shell).
+#
+# Lines ending with /  → find prunes these directories (no descent; no per-file mounts).
+#   - foo/               → any directory named foo (-name foo)
+#   - path/to/dir/       → that path under the repo root (-path)
+#
+# Any other non-comment line → .claude/maskfile mounted read-only over matching files.
+# Keep maskfile empty (0 bytes) so masked paths stay non-secret for claude:test-file.
+#   - no / in the line   → basename match anywhere
+#   - contains /         → path under repo root (find -path; globs ok)
+
+.git/
+.pnpm-store/
+.claude/docker-home/
+broadcast/
+cache/
+out/
+lcov.info
+.venv
+
+.env
+.env.*
+*.log
