@@ -50,16 +50,16 @@ contract DeployVault is ProxyUtils {
         d.feeAuction = _proxy(implementations.feeAuction);
 
         FeeReceiver(d.feeReceiver).initialize(infra.accessControl, d.capToken, d.stakedCapToken);
-        FeeAuction(d.feeAuction).initialize(
-            infra.accessControl,
-            d.capToken, // payment token is the vault's cap token
-            d.feeReceiver, // payment recipient is the staked cap token
-            24 hours, // 3 hour auctions
-            1e18 // min price of 1 token
-        );
-        CapToken(d.capToken).initialize(
-            name, symbol, infra.accessControl, d.feeAuction, infra.oracle, assets, insuranceFund
-        );
+        FeeAuction(d.feeAuction)
+            .initialize(
+                infra.accessControl,
+                d.capToken, // payment token is the vault's cap token
+                d.feeReceiver, // payment recipient is the staked cap token
+                24 hours, // 3 hour auctions
+                1e18 // min price of 1 token
+            );
+        CapToken(d.capToken)
+            .initialize(name, symbol, infra.accessControl, d.feeAuction, infra.oracle, assets, insuranceFund);
         StakedCap(d.stakedCapToken).initialize(infra.accessControl, d.capToken, 24 hours);
 
         // deploy and init debt tokens
@@ -114,6 +114,8 @@ contract DeployVault is ProxyUtils {
         accessControl.grantAccess(Vault.borrow.selector, vault.capToken, infra.lender);
         accessControl.grantAccess(Vault.repay.selector, vault.capToken, infra.lender);
         accessControl.grantAccess(Minter.setFeeData.selector, vault.capToken, users.lender_admin);
+        accessControl.grantAccess(Minter.setFeeDataBatch.selector, vault.capToken, users.lender_admin);
+        accessControl.grantAccess(Minter.setMaxMintSkewBps.selector, vault.capToken, users.lender_admin);
         accessControl.grantAccess(Minter.setRedeemFee.selector, vault.capToken, users.lender_admin);
         accessControl.grantAccess(Minter.setDepositCap.selector, vault.capToken, users.vault_config_admin);
         accessControl.grantAccess(Vault.pauseProtocol.selector, vault.capToken, users.vault_config_admin);
@@ -157,9 +159,22 @@ contract DeployVault is ProxyUtils {
     }
 
     function _initVaultLender(VaultConfig memory d, InfraConfig memory infra, FeeConfig memory fee) internal {
-        for (uint256 i = 0; i < d.assets.length; i++) {
-            Lender(infra.lender).addAsset(
-                ILender.AddAssetParams({
+        uint256 n = d.assets.length;
+        address[] memory batchAssets = new address[](n);
+        IMinter.FeeData[] memory batchFees = new IMinter.FeeData[](n);
+        IMinter.FeeData memory fd = IMinter.FeeData({
+            minMintFee: fee.minMintFee,
+            slope0: fee.slope0,
+            slope1: fee.slope1,
+            mintKinkRatio: fee.mintKinkRatio,
+            burnKinkRatio: fee.burnKinkRatio,
+            optimalRatio: fee.optimalRatio,
+            minBurnFee: fee.minBurnFee
+        });
+        for (uint256 i = 0; i < n; i++) {
+            Lender(infra.lender)
+                .addAsset(
+                    ILender.AddAssetParams({
                     asset: d.assets[i],
                     vault: d.capToken,
                     debtToken: d.debtTokens[i],
@@ -167,21 +182,13 @@ contract DeployVault is ProxyUtils {
                     bonusCap: 0.1e27,
                     minBorrow: 100e6
                 })
-            );
+                );
 
             Lender(infra.lender).pauseAsset(d.assets[i], false);
 
-            Minter(d.capToken).setFeeData(
-                d.assets[i],
-                IMinter.FeeData({
-                    minMintFee: fee.minMintFee,
-                    slope0: fee.slope0,
-                    slope1: fee.slope1,
-                    mintKinkRatio: fee.mintKinkRatio,
-                    burnKinkRatio: fee.burnKinkRatio,
-                    optimalRatio: fee.optimalRatio
-                })
-            );
+            batchAssets[i] = d.assets[i];
+            batchFees[i] = fd;
         }
+        Minter(d.capToken).setFeeDataBatch(batchAssets, batchFees);
     }
 }

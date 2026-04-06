@@ -6,6 +6,7 @@ import { IOracle } from "../../interfaces/IOracle.sol";
 import { IVault } from "../../interfaces/IVault.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title Amount Out Logic
 /// @author kexley, Cap Labs
@@ -29,12 +30,22 @@ library MinterLogic {
     {
         (uint256 amountOutBeforeFee, uint256 newRatio) = _amountOutBeforeFee($.oracle, params);
 
-        if ($.whitelist[params.user]) {
+        if (params.mint) {
+            uint256 oneToOne = _amountToCapDecimals(params.asset, params.amount);
+            _enforceMintOracleDeviation(oneToOne, amountOutBeforeFee, $.maxMintSkewBps);
+            if ($.whitelist[params.user]) {
+                amount = oneToOne;
+            } else {
+                (amount, fee) = _applyFeeSlopes(
+                    $.fees[params.asset], IMinter.FeeSlopeParams({ mint: true, amount: oneToOne, ratio: newRatio })
+                );
+            }
+        } else if ($.whitelist[params.user]) {
             amount = amountOutBeforeFee;
         } else {
             (amount, fee) = _applyFeeSlopes(
                 $.fees[params.asset],
-                IMinter.FeeSlopeParams({ mint: params.mint, amount: amountOutBeforeFee, ratio: newRatio })
+                IMinter.FeeSlopeParams({ mint: false, amount: amountOutBeforeFee, ratio: newRatio })
             );
         }
     }
@@ -110,6 +121,26 @@ library MinterLogic {
         }
     }
 
+    /// @dev Scale underlying amount to cap token decimals (1:1 human amount)
+    function _amountToCapDecimals(address asset, uint256 amount) private view returns (uint256) {
+        uint256 assetDec = IERC20Metadata(asset).decimals();
+        uint256 capDec = IERC20Metadata(address(this)).decimals();
+        if (capDec >= assetDec) {
+            return amount * 10 ** (capDec - assetDec);
+        }
+        return amount / 10 ** (assetDec - capDec);
+    }
+
+    /// @dev If bps == 0, skip (unset). Otherwise |oneToOne - oracleFair| must be <= oracleFair * bps / 10000.
+    function _enforceMintOracleDeviation(uint256 oneToOne, uint256 oracleFair, uint256 maxBps) private pure {
+        if (maxBps == 0) return;
+        if (oneToOne == 0 && oracleFair == 0) return;
+        if (oracleFair == 0) revert IMinter.MintOracleDeviation(oneToOne, oracleFair);
+        uint256 diff = oneToOne > oracleFair ? oneToOne - oracleFair : oracleFair - oneToOne;
+        uint256 maxDiff = Math.mulDiv(oracleFair, maxBps, 10_000);
+        if (diff > maxDiff) revert IMinter.MintOracleDeviation(oneToOne, oracleFair);
+    }
+
     /// @notice Apply fee slopes to a mint or burn
     /// @dev Fees only apply to mints or burns that over-allocate the basket to one asset
     /// @param fees Fee slopes and ratio kinks
@@ -133,12 +164,13 @@ library MinterLogic {
                 }
             }
         } else {
+            rate = fees.minBurnFee;
             if (params.ratio < fees.optimalRatio) {
                 if (params.ratio < fees.burnKinkRatio) {
                     uint256 excessRatio = fees.burnKinkRatio - params.ratio;
-                    rate = fees.slope0 + (fees.slope1 * excessRatio / fees.burnKinkRatio);
+                    rate += fees.slope0 + (fees.slope1 * excessRatio / fees.burnKinkRatio);
                 } else {
-                    rate = fees.slope0 * (fees.optimalRatio - params.ratio) / (fees.optimalRatio - fees.burnKinkRatio);
+                    rate += fees.slope0 * (fees.optimalRatio - params.ratio) / (fees.optimalRatio - fees.burnKinkRatio);
                 }
             }
         }

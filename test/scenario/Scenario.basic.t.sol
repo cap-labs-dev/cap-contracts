@@ -29,12 +29,19 @@ contract ScenarioBasicTest is TestDeployer {
             slope1: 0.1e27,
             mintKinkRatio: 0.85e27,
             burnKinkRatio: 0.15e27,
-            optimalRatio: 0.33e27
+            optimalRatio: 0.33e27,
+            minBurnFee: 0.005e27
         });
 
-        cUSD.setFeeData(address(usdt), feeData);
-        cUSD.setFeeData(address(usdc), feeData);
-        cUSD.setFeeData(address(usdx), feeData);
+        address[] memory batchAssets = new address[](3);
+        batchAssets[0] = address(usdt);
+        batchAssets[1] = address(usdc);
+        batchAssets[2] = address(usdx);
+        IMinter.FeeData[] memory batchFees = new IMinter.FeeData[](3);
+        batchFees[0] = feeData;
+        batchFees[1] = feeData;
+        batchFees[2] = feeData;
+        cUSD.setFeeDataBatch(batchAssets, batchFees);
 
         cUSD.setRedeemFee(0.001e27); // 0.1%
 

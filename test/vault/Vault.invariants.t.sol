@@ -93,6 +93,23 @@ contract VaultInvariantsTest is Test, ProxyUtils {
         );
         mockOracle.setPrice(address(vault), 1e18);
 
+        IMinter.FeeData memory initFd = IMinter.FeeData({
+            minMintFee: 0.001e27,
+            slope0: 0.01e27,
+            slope1: 0.02e27,
+            mintKinkRatio: 0.85e27,
+            burnKinkRatio: 0.15e27,
+            optimalRatio: 0.33e27,
+            minBurnFee: 0.001e27
+        });
+        address[] memory initAssets = vault.assets();
+        IMinter.FeeData[] memory initBatch = new IMinter.FeeData[](initAssets.length);
+        for (uint256 i; i < initAssets.length; ++i) {
+            initBatch[i] = initFd;
+        }
+        vault.setFeeDataBatch(initAssets, initBatch);
+        vault.setMaxMintSkewBps(10_000);
+
         // Setup initial test accounts
         for (uint256 i = 0; i < 5; i++) {
             address user = makeAddr(string(abi.encodePacked("User", vm.toString(i))));
@@ -516,17 +533,21 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         // Ensure optimalRatio is not equal to mintKinkRatio or burnKinkRatio
         if (optimalRatio == mintKinkRatio || optimalRatio == burnKinkRatio) optimalRatio += 1;
 
-        vault.setFeeData(
-            currentAsset,
-            IMinter.FeeData({
-                minMintFee: minMintFee,
-                slope0: slope0,
-                slope1: slope1,
-                mintKinkRatio: mintKinkRatio,
-                burnKinkRatio: burnKinkRatio,
-                optimalRatio: optimalRatio
-            })
-        );
+        IMinter.FeeData memory fd = IMinter.FeeData({
+            minMintFee: minMintFee,
+            slope0: slope0,
+            slope1: slope1,
+            mintKinkRatio: mintKinkRatio,
+            burnKinkRatio: burnKinkRatio,
+            optimalRatio: optimalRatio,
+            minBurnFee: minMintFee
+        });
+        address[] memory va = vault.assets();
+        IMinter.FeeData[] memory fds = new IMinter.FeeData[](va.length);
+        for (uint256 i; i < va.length; ++i) {
+            fds[i] = fd;
+        }
+        vault.setFeeDataBatch(va, fds);
     }
 
     function setVaultRedeemFee(uint256 redeemFeeSeed) external {
@@ -572,7 +593,10 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
 
     function donateGasToken(uint256 amountSeed) external {
         uint256 amount = bound(amountSeed, 1, 1e50);
-        vm.deal(address(vault), amount /* we need gas to send gas */ );
+        vm.deal(
+            address(vault),
+            amount /* we need gas to send gas */
+        );
     }
 
     function setAssetOraclePrice(uint256 assetSeed, uint256 priceSeed) external {

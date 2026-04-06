@@ -86,4 +86,5 @@ struct FeeConfig {
     uint256 mintKinkRatio;
     uint256 burnKinkRatio;
     uint256 optimalRatio;
+    uint256 minBurnFee;
 }

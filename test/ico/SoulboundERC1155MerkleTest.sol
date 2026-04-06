@@ -96,4 +96,35 @@ contract SoulboundERC1155MerkleTest is IcoSetup {
         vm.expectRevert(); // Transfer to any address, including self, is not allowed
         erc1155.safeTransferFrom(user, user, 0, 1, "");
     }
+
+    /// @notice Regression test: specific user + merkle root + proof that must verify
+    function test_soulbound_erc1155_mint_regression() public {
+        address regressionUser = 0xe3115272dDCfE726A63e2D9B963C7eA8314D0d04;
+        bytes32 regressionRoot = 0x8ef45a0eebbf2e88ddeea3db950233fdd2304857f73c729f36aceb701606f9fb;
+        bytes32[] memory regressionProof = new bytes32[](14);
+        regressionProof[0] = 0x9157425dbb897602f8e7beaa055483a88a606f1d7178b6479e04957515526d36;
+        regressionProof[1] = 0xe6e0350b41e2e111ef87447a7dedc86a29c0bfe1d6e6ff8b5599fcab55038118;
+        regressionProof[2] = 0xce657c0c04559cc2eea031784b7f54d0258b43ceddefac179ea11bc45f35babd;
+        regressionProof[3] = 0x7f8d33802096abf9beacff929c73140d27252a3d9b8efbfae2afcbba60ae6550;
+        regressionProof[4] = 0xdf3a12972e1963524c1b301968e3f83102894df6f09def7cef42b1f7e22d31c3;
+        regressionProof[5] = 0x53189cf38ffb88abdba0e384d73babe0cd95c3779428d8734c649309d159b3a2;
+        regressionProof[6] = 0x5a344bdfb8adb916f1e0fa4f90348f2534ae1f5f02493073afd7a212bab1e729;
+        regressionProof[7] = 0x27380604bec058c5bd17bc95f0612ab3b2ad095e9c6d1f391d430007bb2928ea;
+        regressionProof[8] = 0xaf1477ba3e1a984ce2dbb1cc748d3cd7fa68086b9c6f6a93ed61ca9323f34447;
+        regressionProof[9] = 0xdce7564dac876ce88de611bb8098b9f3f768d771c7db96dc28eb474973134e81;
+        regressionProof[10] = 0x8f3c126f29ad7720539116ccf60982e26136a5c1cc832ac0a38bc8bf5a3bfff8;
+        regressionProof[11] = 0x19ca96d5d1bc53cb9b7fb1b87d5c7d52c0f579b51447677f05f2ff0ee90b22cf;
+        regressionProof[12] = 0x5a0976e419cd1a8e7e01d58fc149831cbac486f7585b3c52f01a5375172fbcf5;
+        regressionProof[13] = 0x30c9d9900b1e4b5c4e30fd0d515a3254c1be1f5f97ffed5403398b1cfa70457d;
+
+        vm.startPrank(admin);
+        erc1155.setRoot(regressionRoot);
+        erc1155.unpause();
+        vm.stopPrank();
+
+        vm.prank(regressionUser);
+        erc1155.mint(regressionUser, regressionProof);
+
+        assertEq(erc1155.balanceOf(regressionUser, 0), 1);
+    }
 }

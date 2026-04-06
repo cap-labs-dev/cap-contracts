@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import { IMinter } from "../../contracts/interfaces/IMinter.sol";
 import { TestDeployer } from "../deploy/TestDeployer.sol";
 import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
@@ -52,9 +53,26 @@ contract VaultMintTest is TestDeployer {
 
         cUSD.mint(address(usdt), amountIn, minAmountOut, user, deadline);
 
-        // We should receive less cUSD since USDT is worth more
-        assertGe(cUSD.balanceOf(user), amountIn * 98 / 100, "Should have received less cUSD due to higher USDT price");
+        // Decimal 1:1 mint: 100e6 -> 100e18 before fees; min mint fee shaves ~0.5%
+        assertApproxEqAbs(cUSD.balanceOf(user), 99.5e18, 1e15);
         assertEq(usdt.balanceOf(address(cUSD)), amountIn, "Vault should have received USDT");
+    }
+
+    function test_mint_reverts_when_oracle_deviation_exceeded() public {
+        _initTestVaultLiquidity(usdVault);
+
+        vm.startPrank(env.users.lender_admin);
+        cUSD.setMaxMintSkewBps(50); // 0.5%
+        vm.stopPrank();
+
+        _setAssetOraclePrice(address(usdt), 200e8); // 2x vs $1 cap components → large oracleFair vs 1:1
+
+        vm.startPrank(user);
+        usdt.mint(user, 100e6);
+        usdt.approve(address(cUSD), 100e6);
+
+        vm.expectRevert(IMinter.MintOracleDeviation.selector);
+        cUSD.mint(address(usdt), 100e6, 0, user, block.timestamp + 1 hours);
     }
 
     function test_mint_on_non_empty_vault() public {

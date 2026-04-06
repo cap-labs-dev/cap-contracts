@@ -7,8 +7,9 @@ import { EigenAgentManager } from "../../contracts/delegation/providers/eigenlay
 import { EigenServiceManager } from "../../contracts/delegation/providers/eigenlayer/EigenServiceManager.sol";
 import { SymbioticAgentManager } from "../../contracts/delegation/providers/symbiotic/SymbioticAgentManager.sol";
 import { SymbioticNetwork } from "../../contracts/delegation/providers/symbiotic/SymbioticNetwork.sol";
-import { SymbioticNetworkMiddleware } from
-    "../../contracts/delegation/providers/symbiotic/SymbioticNetworkMiddleware.sol";
+import {
+    SymbioticNetworkMiddleware
+} from "../../contracts/delegation/providers/symbiotic/SymbioticNetworkMiddleware.sol";
 import { InfraConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import { VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import { EigenConfig } from "../../contracts/deploy/interfaces/EigenDeployConfig.sol";
@@ -83,19 +84,18 @@ contract CheckAccess is
         NamedSelector({ selector: Delegation.setLtvBuffer.selector, name: "Delegation.setLtvBuffer" }),
         NamedSelector({ selector: Delegation.setFeeRecipient.selector, name: "Delegation.setFeeRecipient" }),
         NamedSelector({ selector: EigenAgentManager.addEigenAgent.selector, name: "EigenAgentManager.addEigenAgent" }),
-        NamedSelector({ selector: EigenAgentManager.setRestakerRate.selector, name: "EigenAgentManager.setRestakerRate" }),
+        NamedSelector({
+            selector: EigenAgentManager.setRestakerRate.selector, name: "EigenAgentManager.setRestakerRate"
+        }),
         NamedSelector({ selector: EigenServiceManager.slash.selector, name: "EigenServiceManager.slash" }),
         NamedSelector({
-            selector: EigenServiceManager.distributeRewards.selector,
-            name: "EigenServiceManager.distributeRewards"
+            selector: EigenServiceManager.distributeRewards.selector, name: "EigenServiceManager.distributeRewards"
         }),
         NamedSelector({
-            selector: EigenServiceManager.registerOperator.selector,
-            name: "EigenServiceManager.registerOperator"
+            selector: EigenServiceManager.registerOperator.selector, name: "EigenServiceManager.registerOperator"
         }),
         NamedSelector({
-            selector: EigenServiceManager.registerStrategy.selector,
-            name: "EigenServiceManager.registerStrategy"
+            selector: EigenServiceManager.registerStrategy.selector, name: "EigenServiceManager.registerStrategy"
         }),
         NamedSelector({
             selector: EigenServiceManager.updateAVSMetadataURI.selector,
@@ -113,17 +113,14 @@ contract CheckAccess is
         NamedSelector({ selector: SymbioticAgentManager.setRestakerRate.selector, name: "AgentManager.addAgent" }),
         NamedSelector({ selector: SymbioticNetwork.registerVault.selector, name: "Network.registerVault" }),
         NamedSelector({
-            selector: SymbioticNetworkMiddleware.registerVault.selector,
-            name: "NetworkMiddleware.registerVault"
+            selector: SymbioticNetworkMiddleware.registerVault.selector, name: "NetworkMiddleware.registerVault"
         }),
         NamedSelector({
-            selector: SymbioticNetworkMiddleware.setFeeAllowed.selector,
-            name: "NetworkMiddleware.setFeeAllowed"
+            selector: SymbioticNetworkMiddleware.setFeeAllowed.selector, name: "NetworkMiddleware.setFeeAllowed"
         }),
         NamedSelector({ selector: SymbioticNetworkMiddleware.slash.selector, name: "NetworkMiddleware.slash" }),
         NamedSelector({
-            selector: SymbioticNetworkMiddleware.distributeRewards.selector,
-            name: "NetworkMiddleware.distributeRewards"
+            selector: SymbioticNetworkMiddleware.distributeRewards.selector, name: "NetworkMiddleware.distributeRewards"
         }),
         NamedSelector({ selector: FeeAuction.setStartPrice.selector, name: "FeeAuction.setStartPrice" }),
         NamedSelector({ selector: FeeAuction.setDuration.selector, name: "FeeAuction.setDuration" }),
@@ -132,21 +129,19 @@ contract CheckAccess is
         NamedSelector({ selector: FeeReceiver.setCapToken.selector, name: "FeeReceiver.setCapToken" }),
         NamedSelector({ selector: FeeReceiver.setStakedCapToken.selector, name: "FeeReceiver.setStakedCapToken" }),
         NamedSelector({
-            selector: FeeReceiver.setProtocolFeePercentage.selector,
-            name: "FeeReceiver.setProtocolFeePercentage"
-        }),
-        NamedSelector({ selector: FeeReceiver.setProtocolFeeReceiver.selector, name: "FeeReceiver.setProtocolFeeReceiver" }),
-        NamedSelector({
-            selector: CapInterestHarvester.harvestInterest.selector,
-            name: "CapInterestHarvester.harvestInterest"
+            selector: FeeReceiver.setProtocolFeePercentage.selector, name: "FeeReceiver.setProtocolFeePercentage"
         }),
         NamedSelector({
-            selector: CapInterestHarvester.receiveFlashLoan.selector,
-            name: "CapInterestHarvester.receiveFlashLoan"
+            selector: FeeReceiver.setProtocolFeeReceiver.selector, name: "FeeReceiver.setProtocolFeeReceiver"
         }),
         NamedSelector({
-            selector: CapInterestHarvester.setExcessReceiver.selector,
-            name: "CapInterestHarvester.setExcessReceiver"
+            selector: CapInterestHarvester.harvestInterest.selector, name: "CapInterestHarvester.harvestInterest"
+        }),
+        NamedSelector({
+            selector: CapInterestHarvester.receiveFlashLoan.selector, name: "CapInterestHarvester.receiveFlashLoan"
+        }),
+        NamedSelector({
+            selector: CapInterestHarvester.setExcessReceiver.selector, name: "CapInterestHarvester.setExcessReceiver"
         }),
         NamedSelector({ selector: CapSweeper.sweep.selector, name: "CapSweeper.sweep" }),
         NamedSelector({ selector: CapSweeper.setSweepInterval.selector, name: "CapSweeper.setSweepInterval" }),
@@ -163,12 +158,13 @@ contract CheckAccess is
         NamedSelector({ selector: DebtToken.burn.selector, name: "DebtToken.burn" }),
         NamedSelector({ selector: PriceOracle.setPriceOracleData.selector, name: "PriceOracle.setPriceOracleData" }),
         NamedSelector({
-            selector: PriceOracle.setPriceBackupOracleData.selector,
-            name: "PriceOracle.setPriceBackupOracleData"
+            selector: PriceOracle.setPriceBackupOracleData.selector, name: "PriceOracle.setPriceBackupOracleData"
         }),
         NamedSelector({ selector: PriceOracle.setStaleness.selector, name: "PriceOracle.setStaleness" }),
         NamedSelector({ selector: RateOracle.setMarketOracleData.selector, name: "RateOracle.setMarketOracleData" }),
-        NamedSelector({ selector: RateOracle.setUtilizationOracleData.selector, name: "RateOracle.setUtilizationOracleData" }),
+        NamedSelector({
+            selector: RateOracle.setUtilizationOracleData.selector, name: "RateOracle.setUtilizationOracleData"
+        }),
         NamedSelector({ selector: RateOracle.setBenchmarkRate.selector, name: "RateOracle.setBenchmarkRate" }),
         NamedSelector({ selector: RateOracle.setRestakerRate.selector, name: "RateOracle.setRestakerRate" }),
         NamedSelector({
@@ -186,6 +182,8 @@ contract CheckAccess is
         }),
         NamedSelector({ selector: FractionalReserve.setReserve.selector, name: "FractionalReserve.setReserve" }),
         NamedSelector({ selector: Minter.setFeeData.selector, name: "Minter.setFeeData" }),
+        NamedSelector({ selector: Minter.setFeeDataBatch.selector, name: "Minter.setFeeDataBatch" }),
+        NamedSelector({ selector: Minter.setMaxMintSkewBps.selector, name: "Minter.setMaxMintSkewBps" }),
         NamedSelector({ selector: Minter.setRedeemFee.selector, name: "Minter.setRedeemFee" }),
         NamedSelector({ selector: Minter.setWhitelist.selector, name: "Minter.setWhitelist" }),
         NamedSelector({ selector: Vault.borrow.selector, name: "Vault.borrow" }),
@@ -255,12 +253,13 @@ contract CheckAccess is
         vaultConfig = _readVaultConfig(symbol);
 
         namedContracts.push(
-            NamedContract({ contractAddress: vaultConfig.feeAuction, name: string.concat("Fee Auction (", symbol, ")") })
+            NamedContract({
+                contractAddress: vaultConfig.feeAuction, name: string.concat("Fee Auction (", symbol, ")")
+            })
         );
         namedContracts.push(
             NamedContract({
-                contractAddress: vaultConfig.feeReceiver,
-                name: string.concat("Fee Receiver (", symbol, ")")
+                contractAddress: vaultConfig.feeReceiver, name: string.concat("Fee Receiver (", symbol, ")")
             })
         );
         namedContracts.push(
@@ -268,8 +267,7 @@ contract CheckAccess is
         );
         namedContracts.push(
             NamedContract({
-                contractAddress: vaultConfig.stakedCapToken,
-                name: string.concat("Staked Vault (", symbol, ")")
+                contractAddress: vaultConfig.stakedCapToken, name: string.concat("Staked Vault (", symbol, ")")
             })
         );
 
