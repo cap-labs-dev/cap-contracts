@@ -30,6 +30,11 @@ contract MockVault is MockERC20, MinterStorageUtils {
         $.fees[_asset] = _feeData;
     }
 
+    function mockMaxMintSkewBps(uint256 _bps) external {
+        IMinter.MinterStorage storage $ = getMinterStorage();
+        $.maxMintSkewBps = _bps;
+    }
+
     function mockTotalSupplies(address _asset, uint256 _totalSupply) external {
         _totalSupplies[_asset] = _totalSupply;
     }
@@ -78,10 +83,11 @@ contract MinterLogicTest is Test {
         vault.mockFees(
             address(asset),
             IMinter.FeeData({
-                minMintFee: 0, slope0: 0, slope1: 0, mintKinkRatio: 0, burnKinkRatio: 0, optimalRatio: 0
+                minMintFee: 0, slope0: 0, slope1: 0, mintKinkRatio: 0, burnKinkRatio: 0, optimalRatio: 0, minBurnFee: 0
             })
         );
         vault.mockDecimals(18);
+        vault.mockMaxMintSkewBps(10_000);
     }
 
     function test_getAmountOut_firstDeposit() public {
@@ -153,7 +159,8 @@ contract MinterLogicTest is Test {
 
         uint256 amount = vault.minter_getAmountOut(params);
 
-        assertApproxEqAbs(amount, 200e18, 2, "Amount should account for price difference");
+        // Mint is decimal 1:1; oracle deviation cap is permissive (10_000 bps in setUp)
+        assertApproxEqAbs(amount, 100e18, 2, "Mint output follows 1:1 decimal scaling");
     }
 
     function test_getAmountOut_zeroAmount() public {
@@ -185,7 +192,7 @@ contract MinterLogicTest is Test {
         vault.mockFees(
             address(asset6Dec),
             IMinter.FeeData({
-                minMintFee: 0, slope0: 0, slope1: 0, mintKinkRatio: 0, burnKinkRatio: 0, optimalRatio: 0
+                minMintFee: 0, slope0: 0, slope1: 0, mintKinkRatio: 0, burnKinkRatio: 0, optimalRatio: 0, minBurnFee: 0
             })
         );
 

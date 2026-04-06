@@ -17,6 +17,8 @@ interface IMinter {
         mapping(address => FeeData) fees;
         mapping(address => bool) whitelist;
         mapping(address => uint256) depositCap;
+        /// @dev Max allowed skew (bps) of 1:1 mint vs oracle-fair amount. Zero skips the check until configured.
+        uint256 maxMintSkewBps;
     }
 
     /// @dev Fee data set for an asset in a vault
@@ -26,6 +28,7 @@ interface IMinter {
     /// @param mintKinkRatio Mint kink ratio
     /// @param burnKinkRatio Burn kink ratio
     /// @param optimalRatio Optimal ratio
+    /// @param minBurnFee Minimum burn fee (RAY); applied before below-optimal burn slopes
     struct FeeData {
         uint256 minMintFee;
         uint256 slope0;
@@ -33,6 +36,7 @@ interface IMinter {
         uint256 mintKinkRatio;
         uint256 burnKinkRatio;
         uint256 optimalRatio;
+        uint256 minBurnFee;
     }
 
     /// @dev Parameters for applying fee slopes
@@ -76,8 +80,23 @@ interface IMinter {
     /// @dev Deposit cap set
     event SetDepositCap(address asset, uint256 cap);
 
+    /// @dev Max mint skew (vs oracle) updated
+    event SetMaxMintSkewBps(uint256 bps);
+
     /// @dev Invalid minimum mint fee
     error InvalidMinMintFee();
+
+    /// @dev Invalid minimum burn fee
+    error InvalidMinBurnFee();
+
+    /// @dev Batch length mismatch for setFeeDataBatch
+    error FeeDataBatchLengthMismatch();
+
+    /// @dev After a fee update, some basket asset lacks positive min mint and min burn floors
+    error BasketFeeFloorsIncomplete();
+
+    /// @dev 1:1 mint vs oracle-fair amount exceeds maxMintSkewBps
+    error MintOracleDeviation(uint256 oneToOne, uint256 oracleFair);
 
     /// @dev Invalid mint kink ratio
     error InvalidMintKinkRatio();
@@ -97,6 +116,15 @@ interface IMinter {
     /// @param _asset Asset address
     /// @param _feeData Fee slopes and ratios for the asset in the vault
     function setFeeData(address _asset, FeeData calldata _feeData) external;
+
+    /// @notice Set fee data for many assets atomically (required so basket min-fee invariant can be satisfied)
+    function setFeeDataBatch(address[] calldata _assets, FeeData[] calldata _feeDatas) external;
+
+    /// @notice Set max skew (bps) between 1:1 mint and oracle-fair mint; large values are permissive
+    function setMaxMintSkewBps(uint256 _bps) external;
+
+    /// @notice Max mint skew in basis points (0 = check disabled until set)
+    function maxMintSkewBps() external view returns (uint256 bps);
 
     /// @notice Get the redeem fee
     /// @return redeemFee Redeem fee amount

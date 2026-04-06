@@ -224,7 +224,8 @@ contract TestDeployer is
             slope1: 0, // allow liquidity to be added without fee to start with
             mintKinkRatio: 0.85e27,
             burnKinkRatio: 0.15e27,
-            optimalRatio: 0.33e27
+            optimalRatio: 0.33e27,
+            minBurnFee: 0.005e27
         });
 
         _initVaultLender(env.usdVault, env.infra, fee);

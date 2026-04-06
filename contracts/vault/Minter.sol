@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import { Access } from "../access/Access.sol";
 
 import { IMinter } from "../interfaces/IMinter.sol";
+import { IVault } from "../interfaces/IVault.sol";
 import { MinterStorageUtils } from "../storage/MinterStorageUtils.sol";
 import { MinterLogic } from "./libraries/MinterLogic.sol";
 
@@ -21,15 +22,58 @@ abstract contract Minter is IMinter, Access, MinterStorageUtils {
 
     /// @inheritdoc IMinter
     function setFeeData(address _asset, FeeData calldata _feeData) external checkAccess(this.setFeeData.selector) {
+        _validateFeeData(_feeData);
+        getMinterStorage().fees[_asset] = _feeData;
+        emit SetFeeData(_asset, _feeData);
+        _requireBasketFeeFloors();
+    }
+
+    /// @inheritdoc IMinter
+    function setFeeDataBatch(address[] calldata _assets, FeeData[] calldata _feeDatas)
+        external
+        checkAccess(this.setFeeDataBatch.selector)
+    {
+        uint256 len = _assets.length;
+        if (len != _feeDatas.length) revert FeeDataBatchLengthMismatch();
+        IMinter.MinterStorage storage $ = getMinterStorage();
+        for (uint256 i; i < len; ++i) {
+            _validateFeeData(_feeDatas[i]);
+            $.fees[_assets[i]] = _feeDatas[i];
+            emit SetFeeData(_assets[i], _feeDatas[i]);
+        }
+        _requireBasketFeeFloors();
+    }
+
+    /// @inheritdoc IMinter
+    function setMaxMintSkewBps(uint256 _bps) external checkAccess(this.setMaxMintSkewBps.selector) {
+        getMinterStorage().maxMintSkewBps = _bps;
+        emit SetMaxMintSkewBps(_bps);
+    }
+
+    /// @inheritdoc IMinter
+    function maxMintSkewBps() external view returns (uint256 bps) {
+        bps = getMinterStorage().maxMintSkewBps;
+    }
+
+    function _validateFeeData(FeeData calldata _feeData) private pure {
         if (_feeData.minMintFee >= 0.05e27) revert InvalidMinMintFee();
+        if (_feeData.minBurnFee >= 0.05e27) revert InvalidMinBurnFee();
         if (_feeData.mintKinkRatio >= 1e27 || _feeData.mintKinkRatio == 0) revert InvalidMintKinkRatio();
         if (_feeData.burnKinkRatio >= 1e27 || _feeData.burnKinkRatio == 0) revert InvalidBurnKinkRatio();
         if (_feeData.optimalRatio >= 1e27 || _feeData.optimalRatio == 0) revert InvalidOptimalRatio();
         if (_feeData.optimalRatio == _feeData.mintKinkRatio || _feeData.optimalRatio == _feeData.burnKinkRatio) {
             revert InvalidOptimalRatio();
         }
-        getMinterStorage().fees[_asset] = _feeData;
-        emit SetFeeData(_asset, _feeData);
+    }
+
+    function _requireBasketFeeFloors() private view {
+        address[] memory assets_ = IVault(address(this)).assets();
+        IMinter.MinterStorage storage $ = getMinterStorage();
+        uint256 len = assets_.length;
+        for (uint256 i; i < len; ++i) {
+            FeeData memory f = $.fees[assets_[i]];
+            if (f.minMintFee == 0 || f.minBurnFee == 0) revert BasketFeeFloorsIncomplete();
+        }
     }
 
     /// @inheritdoc IMinter
