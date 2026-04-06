@@ -16,12 +16,14 @@ interface ICapInterestHarvester {
         address excessReceiver;
         uint256 lastharvest;
         bool flashInProgress;
+        address wtgxx;
     }
 
     /// @notice Initialize the CapInterestHarvester contract
     /// @param _accessControl Access control address
     /// @param _asset Asset address
     /// @param _cusd cUSD address
+    /// @param _wtgxx wTGXX address
     /// @param _feeAuction Fee auction address
     /// @param _feeReceiver Fee receiver address
     /// @param _harvester Harvester address
@@ -32,6 +34,7 @@ interface ICapInterestHarvester {
         address _accessControl,
         address _asset,
         address _cusd,
+        address _wtgxx,
         address _feeAuction,
         address _feeReceiver,
         address _harvester,

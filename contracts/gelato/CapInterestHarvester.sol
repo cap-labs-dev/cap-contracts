@@ -36,6 +36,7 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
         address _accessControl,
         address _asset,
         address _cusd,
+        address _wtgxx,
         address _feeAuction,
         address _feeReceiver,
         address _harvester,
@@ -49,6 +50,7 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
         CapInterestHarvesterStorage storage s = getCapInterestHarvesterStorage();
         s.asset = _asset;
         s.cusd = _cusd;
+        s.wtgxx = _wtgxx;
         s.feeAuction = _feeAuction;
         s.feeReceiver = _feeReceiver;
         s.harvester = _harvester;
@@ -63,12 +65,14 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
 
         /// 1. Harvest fractional reserve
         _harvestFractionalReserve($.harvester, $.asset, $.cusd);
+        _harvestFractionalReserve($.harvester, $.wtgxx, $.cusd);
 
         /// 2. Claim interest from lender
         _claimInterestFromLender($.lender, $.asset);
+        _claimInterestFromLender($.lender, $.wtgxx);
 
         /// 3. Flashloan buy all the interest
-        _flashloanBuyInterest($.balancerVault, $.cusd, $.feeAuction, $.asset);
+        _flashloanBuyInterest($.balancerVault, $.feeAuction);
 
         /// 4. Call distribute on fee receiver
         _distributeInterest($.feeReceiver);
@@ -95,26 +99,31 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
     }
 
     /// @dev Flashloan buy all the interest
-    /// @param _asset Asset address
-    function _flashloanBuyInterest(address _balancerVault, address _cusd, address _feeAuction, address _asset)
-        private
-    {
+    /// @param _balancerVault Balancer vault address
+    /// @param _feeAuction Fee auction address
+    function _flashloanBuyInterest(address _balancerVault, address _feeAuction) private {
         CapInterestHarvesterStorage storage $ = getCapInterestHarvesterStorage();
-        uint256 assetBalOfFeeAuction = IERC20(_asset).balanceOf(_feeAuction);
+
+        uint256 assetBalOfFeeAuction = IERC20($.asset).balanceOf(_feeAuction);
+        (uint256 cusdFromUsdc,) = IMinter($.cusd).getMintAmount($.asset, assetBalOfFeeAuction);
+
+        uint256 wtgxxBalOfFeeAuction = IERC20($.wtgxx).balanceOf(_feeAuction);
+        (uint256 cusdFromWtgxx,) = IMinter($.cusd).getMintAmount($.wtgxx, wtgxxBalOfFeeAuction);
+
+        uint256 cusdAmountFromMint = cusdFromUsdc + cusdFromWtgxx;
+
         uint256 price = IFeeAuction(_feeAuction).currentPrice();
-        (uint256 cusdAmountFromMint,) = IMinter(_cusd).getMintAmount(_asset, assetBalOfFeeAuction);
 
         if (cusdAmountFromMint > price) {
-            address[] memory assets = new address[](1);
-            assets[0] = _asset;
+            address[] memory flashloanAssets = new address[](1);
+            flashloanAssets[0] = $.asset;
 
-            uint256[] memory amounts = new uint256[](1);
-            amounts[0] = assetBalOfFeeAuction;
+            uint256[] memory flashloanAmounts = new uint256[](1);
+            flashloanAmounts[0] = price / 0.99e12; // flashloan USDC amount plus buffer (6 decimals vs 18 decimals for price)
 
             IBalancerVault balancerVault = IBalancerVault(_balancerVault);
             $.flashInProgress = true;
-
-            balancerVault.flashLoan(address(this), assets, amounts, "");
+            balancerVault.flashLoan(address(this), flashloanAssets, flashloanAmounts, "");
         }
     }
 
@@ -140,13 +149,24 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
 
         IVault($.cusd).mint($.asset, amounts[0], price, address(this), block.timestamp);
 
-        address[] memory assets = new address[](1);
+        address[] memory assets = new address[](2);
         assets[0] = $.asset;
+        assets[1] = $.wtgxx;
 
-        uint256[] memory minAmounts = new uint256[](1);
+        uint256[] memory minAmounts = new uint256[](2);
         minAmounts[0] = IERC20($.asset).balanceOf($.feeAuction);
+        minAmounts[1] = IERC20($.wtgxx).balanceOf($.feeAuction);
 
         IFeeAuction($.feeAuction).buy(price, assets, minAmounts, address(this), block.timestamp);
+
+        uint256 wtgxxBalance = IERC20($.wtgxx).balanceOf(address(this));
+        if (wtgxxBalance > 0) {
+            _checkApproval($.wtgxx, $.cusd);
+            try IVault($.cusd).mint($.wtgxx, wtgxxBalance, 0, address(this), block.timestamp) { }
+            catch {
+                IERC20($.wtgxx).safeTransfer($.excessReceiver, wtgxxBalance);
+            }
+        }
 
         uint256 cusdLeft = IERC20($.cusd).balanceOf(address(this));
         if (cusdLeft > 0) {
@@ -193,8 +213,14 @@ contract CapInterestHarvester is ICapInterestHarvester, UUPSUpgradeable, Access,
         }
 
         uint256 assetBalOfFeeAuction = IERC20($.asset).balanceOf($.feeAuction);
+        (uint256 cusdFromUsdc,) = IMinter($.cusd).getMintAmount($.asset, assetBalOfFeeAuction);
+
+        uint256 wtgxxBalOfFeeAuction = IERC20($.wtgxx).balanceOf($.feeAuction);
+        (uint256 cusdFromWtgxx,) = IMinter($.cusd).getMintAmount($.wtgxx, wtgxxBalOfFeeAuction);
+
+        uint256 cusdAmountFromMint = cusdFromUsdc + cusdFromWtgxx;
+
         uint256 price = IFeeAuction($.feeAuction).currentPrice();
-        (uint256 cusdAmountFromMint,) = IMinter($.cusd).getMintAmount($.asset, assetBalOfFeeAuction);
 
         canExec = cusdAmountFromMint > price;
 
