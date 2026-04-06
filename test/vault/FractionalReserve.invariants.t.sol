@@ -135,6 +135,19 @@ contract VaultInvariantsTest is Test {
             }
         }
     }
+
+    /// @dev The actual FR vault token balance must always be >= vault.loaned() for each asset.
+    ///      vault.loaned() tracks the deposited principal; the FR vault balance equals
+    ///      principal + accrued interest, so it can never fall below the principal (yield >= 0).
+    /// forge-config: default.invariant.depth = 100
+    function invariant_loanedLeInvestedBalance() public view {
+        for (uint256 i = 0; i < assets.length; i++) {
+            address asset = assets[i];
+            assertGe(
+                handler.getInvestedAmount(asset), vault.loaned(asset), "FR vault balance must be >= loaned principal"
+            );
+        }
+    }
 }
 
 /**

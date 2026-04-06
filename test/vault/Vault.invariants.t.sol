@@ -240,6 +240,64 @@ contract VaultInvariantsTest is Test, ProxyUtils {
         }
     }
 
+    /// @dev Physical token balance in the vault must be >= the reported available balance for each asset.
+    ///      Donations can push physical balance above available balance, but accounting must never
+    ///      report more availability than the vault physically holds.
+    /// forge-config: default.invariant.depth = 100
+    function invariant_physicalBalanceGeAvailable() public view {
+        address[] memory vaultAssets = vault.assets();
+        for (uint256 i = 0; i < vaultAssets.length; i++) {
+            address asset = vaultAssets[i];
+            assertGe(
+                IERC20(asset).balanceOf(address(vault)),
+                vault.availableBalance(asset),
+                "Physical balance must be >= available balance"
+            );
+        }
+    }
+
+    /// @dev The sum of all asset allocations must cover totalSupplies — no value may be destroyed.
+    ///      physical + totalBorrows + loaned >= totalSupplies
+    ///      Donations (direct transfers) increase the left side without touching totalSupplies,
+    ///      so the invariant direction is physical+borrows+loaned >= totalSupplies, not the reverse.
+    /// forge-config: default.invariant.depth = 100
+    function invariant_totalSuppliesCoversAllAllocations() public view {
+        address[] memory vaultAssets = vault.assets();
+        for (uint256 i = 0; i < vaultAssets.length; i++) {
+            address asset = vaultAssets[i];
+            assertGe(
+                IERC20(asset).balanceOf(address(vault)) + vault.totalBorrows(asset) + vault.loaned(asset),
+                vault.totalSupplies(asset),
+                "physical + totalBorrows + loaned must cover totalSupplies"
+            );
+        }
+    }
+
+    /// @dev Burning vault shares must strictly decrease the cap token total supply.
+    ///      This mirrors invariant_mintingIncreaseBalance for the burn direction.
+    /// forge-config: default.invariant.depth = 100
+    function invariant_burningDecreasesCapTokenSupply() public {
+        address[] memory unpausedAssets = handler.getVaultUnpausedAssets();
+        if (unpausedAssets.length == 0) return;
+        address mintAsset = unpausedAssets[0];
+
+        uint256 amount = 1000 * (10 ** IERC20Metadata(mintAsset).decimals());
+
+        MockERC20(mintAsset).mint(address(this), amount);
+        IERC20(mintAsset).approve(address(vault), amount);
+        (uint256 amountOut,) = vault.getMintAmount(address(this), mintAsset, amount);
+        if (amountOut == 0) return;
+        vault.mint(mintAsset, amount, 0, address(this), block.timestamp);
+
+        uint256 supplyBefore = vault.totalSupply();
+        uint256 shares = vault.balanceOf(address(this));
+        if (shares == 0) return;
+
+        vault.burn(mintAsset, shares, 0, address(this), block.timestamp);
+
+        assertLt(vault.totalSupply(), supplyBefore, "Burning shares must decrease cap token total supply");
+    }
+
     /// @dev Test that minting increases asset balance correctly
     function invariant_mintingIncreaseBalance() public {
         address[] memory unpausedAssets = handler.getVaultUnpausedAssets();
@@ -536,8 +594,12 @@ contract TestVaultHandler is StdUtils, RandomActorUtils, RandomAssetUtils {
         uint256 burnKinkRatio = bound(burnKinkRatioSeed, 0.0000000000001e27, 0.9999999999999e27);
         uint256 optimalRatio = bound(optimalRatioSeed, 0.0000000000001e27, 0.9999999999999e27);
 
-        // Ensure optimalRatio is not equal to mintKinkRatio or burnKinkRatio
-        if (optimalRatio == mintKinkRatio || optimalRatio == burnKinkRatio) optimalRatio += 1;
+        // Ensure optimalRatio is not equal to mintKinkRatio or burnKinkRatio.
+        // A single +1 is insufficient when the two kink ratios are consecutive (e.g. K and K+1),
+        // so loop until the condition is satisfied. At most 2 iterations are ever needed.
+        while (optimalRatio == mintKinkRatio || optimalRatio == burnKinkRatio) {
+            optimalRatio = (optimalRatio + 1 < 1e27) ? optimalRatio + 1 : 1;
+        }
 
         vault.setFeeData(
             currentAsset,

@@ -68,6 +68,42 @@ Use the “deep” profile (more runs / higher confidence, slower):
 FOUNDRY_PROFILE=deep forge test --match-path "test/**/*.invariants.t.sol"
 ```
 
+#### Global invariant settings (`foundry.toml`)
+
+- **`fail_on_revert = true`** — any handler call that reverts causes the test to fail immediately with the revert error. Handler functions must therefore be written defensively (guard invalid inputs before calling contract functions, not just catch-and-continue).
+- **`dictionary_weight = 80`** — biases fuzzing toward values already seen in storage, increasing the chance of finding meaningful state interactions.
+
+#### `test/lendingPool/Lender.invariants.t.sol`
+
+| Invariant | What it checks |
+|---|---|
+| `invariant_agentDelegationLimitsDebt` | Each agent's total debt across all assets (in USD) must never exceed their total delegation (coverage) reported by the Delegation contract. |
+| `invariant_debtTokenSupplyEqualsAgentBalances` | The total supply of each asset's debt token must equal the sum of all test-agent debt balances for that asset. |
+| `invariant_healthFactorConsistency` | Any agent for whom `maxLiquidatable > 0` on any asset must have `health < 1e27` (i.e., below 1.0 in ray). |
+| `invariant_healthyAgentsNotLiquidatable` | Any agent with `health >= 1e27` (healthy) must have `maxLiquidatable == 0` for every asset. Inverse of the above. |
+
+> **Note**: `lender.agent()` internally calls `Delegation.coverage()` which calls the network middleware. Agents that have never borrowed are unregistered in the Delegation contract (`network == address(0)`) and would cause a revert. Both health invariants pre-check debt via `lender.debt()` (a safe storage read) and skip zero-debt agents.
+
+#### `test/vault/Vault.invariants.t.sol`
+
+| Invariant | What it checks |
+|---|---|
+| `invariant_totalAssetsExceedBorrowed` | `totalSupplies(asset) >= totalBorrows(asset)` for every asset — the vault can never owe more than it has received. |
+| `invariant_physicalBalanceGeAvailable` | The vault's physical token balance must be `>= availableBalance(asset)` — physical holdings cover the reported available liquidity. |
+| `invariant_totalSuppliesCoversAllAllocations` | `physical + totalBorrows + loaned >= totalSupplies` for every asset — no value is destroyed. Donations increase physical without touching `totalSupplies`, so the direction is "allocations cover deposits", not the reverse. |
+| `invariant_mintingIncreaseBalance` | Minting cap tokens increases the vault's asset balance by exactly the minted amount. |
+| `invariant_burningDecreasesCapTokenSupply` | Burning cap tokens strictly decreases the total cap token supply. |
+
+#### `test/vault/FractionalReserve.invariants.t.sol`
+
+| Invariant | What it checks |
+|---|---|
+| `invariant_reserveLimits` | The current held reserve never exceeds the configured reserve target. |
+| `invariant_totalAssetsBalance` | `invested + reserve == total assets` — all assets are accounted for between the FR vault and the reserve. |
+| `invariant_interestAccuracy` | `claimableInterest` correctly reflects actual FR vault yield above the loaned principal. |
+| `invariant_divestingPossible` | Divesting up to the invested amount is always possible without underflow. |
+| `invariant_loanedLeInvestedBalance` | The FR vault's redeemable balance is always `>= vault.loaned()` — yield is never negative (principal is always recoverable). |
+
 ## Harness configuration (fork vs mock)
 
 ### Where config comes from

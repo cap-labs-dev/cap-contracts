@@ -3,7 +3,7 @@
     "fork": {
       "useMockBackingNetwork": false,
       "mockChainId": 11155111,
-      "rpcUrl": "https://mainnet.gateway.tenderly.co",
+      "rpcUrl": "https://mainnet.gateway.tenderly.co/2hLMdZedp007tr6dL6i2CR",
       "blockNumber": 23285216
     },
     "infra": {
