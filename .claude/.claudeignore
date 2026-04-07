@@ -1,23 +1,18 @@
 # claude-docker.sh reads only this file (no defaults in the shell).
 #
-# Lines ending with /  → find prunes these directories (no descent; no per-file mounts).
+# Lines ending with /  → maskdir: find skips these directories when scanning for maskfile targets.
+#   In Docker, .claude/maskdir is bind-mounted at each matching path (committed; holds maskfile).
 #   - foo/               → any directory named foo (-name foo)
 #   - path/to/dir/       → that path under the repo root (-path)
 #
-# Any other non-comment line → .claude/maskfile mounted read-only over matching files.
-# Keep maskfile empty (0 bytes) so masked paths stay non-secret for claude:test-file.
+# Any other non-comment line → .claude/maskdir/maskfile mounted read-only over matching files.
+# Keep maskfile empty (0 bytes) so masked paths stay non-secret inside the container.
 #   - no / in the line   → basename match anywhere
 #   - contains /         → path under repo root (find -path; globs ok)
 
 .git/
 .pnpm-store/
 .claude/docker-home/
-broadcast/
-cache/
-out/
-lcov.info
-.venv
 
 .env
 .env.*
-*.log

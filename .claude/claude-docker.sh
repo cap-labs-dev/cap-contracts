@@ -2,12 +2,15 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLAUDE_DIR="${ROOT}/.claude"
+# Built by `build`, consumed by `run`. Override: CLAUDE_DOCKER_IMAGE=… $0 …
+CLAUDE_DOCKER_IMAGE="${CLAUDE_DOCKER_IMAGE:-claude-docker}"
 cd "$ROOT"
 
-MASK_FILE="${CLAUDE_DIR}/maskfile"
+MASK_DIR="${CLAUDE_DIR}/maskdir"
+MASK_FILE="${MASK_DIR}/maskfile"
 mask_mounts=()
 
-# From .claudeignore: prune_* = dirs find skips; mask_* = file patterns to overlay
+# From .claudeignore: lines ending with / → maskdir bind mounts; other lines → maskdir/maskfile bind mounts.
 _prune_names=()
 _prune_paths=()
 _mask_names=()
@@ -21,7 +24,7 @@ parse_claudeignore() {
   _mask_paths=()
   _cig_f="${CLAUDE_DIR}/.claudeignore"
   if [ ! -f "$_cig_f" ]; then
-    echo "error: missing $_cig_f (all prune and mask rules live there)" >&2
+    echo "error: missing $_cig_f (maskdir entries, maskfile patterns, comments)" >&2
     exit 1
   fi
   while IFS= read -r _cig_line || [ -n "$_cig_line" ]; do
@@ -56,7 +59,7 @@ parse_claudeignore() {
   done <"$_cig_f"
 
   if [ "${#_prune_names[@]}" -eq 0 ] && [ "${#_prune_paths[@]}" -eq 0 ]; then
-    echo "error: $_cig_f must define at least one prune directory (line ending with /)" >&2
+    echo "error: $_cig_f must define at least one maskdir entry (line ending with /)" >&2
     exit 1
   fi
 }
@@ -90,14 +93,36 @@ append_masked_paths_from_stdin() {
   done
 }
 
+# Directory entries (lines ending with /): find skips them when listing maskfile targets;
+# in the container, maskdir is bind-mounted at each matching path (same tree as host maskdir).
+append_maskdir_mounts() {
+  local _pd _rel
+  while IFS= read -r -d '' _pd; do
+    _rel="${_pd#"$ROOT"/}"
+    _rel="${_rel#/}"
+    [ -z "$_rel" ] && continue
+    mask_mounts+=(-v "${MASK_DIR}:/workspace/${_rel}:ro")
+  done < <(
+    find "$ROOT" \( "${find_prune_ary[@]}" \) -exec sh -c 'test -d "$1" && printf "%s\0" "$1"' _ {} \; -prune
+  )
+}
+
 build_mask_mounts() {
+  echo "claude-docker: resolving .claudeignore …" >&2
+  SECONDS=0
   parse_claudeignore
   build_find_prune_ary
+  echo "claude-docker:   parsed .claudeignore + built find prune expression (${SECONDS}s)" >&2
+
   if [ ! -f "$MASK_FILE" ]; then
-    echo "error: missing $MASK_FILE (read-only source for masked paths)" >&2
+    echo "error: missing $MASK_FILE (keep maskdir/maskfile in the repo; empty file is ok)" >&2
     exit 1
   fi
   mask_mounts=()
+
+  SECONDS=0
+  append_maskdir_mounts
+  echo "claude-docker:   find(1) for maskdir bind-mount targets (${SECONDS}s)" >&2
 
   if [ "${#_mask_names[@]}" -gt 0 ] || [ "${#_mask_paths[@]}" -gt 0 ]; then
     _mask_clause=(-false)
@@ -111,40 +136,49 @@ build_mask_mounts() {
         _mask_clause+=( -o -path "${ROOT}/${__p}" )
       done
     fi
+    SECONDS=0
     append_masked_paths_from_stdin < <(
       find "$ROOT" \( "${find_prune_ary[@]}" \) -prune -o \( -type f \( "${_mask_clause[@]}" \) -print0 \)
     )
+    echo "claude-docker:   find(1) for maskfile bind-mount targets (${SECONDS}s)" >&2
+  else
+    echo "claude-docker:   find(1) for maskfile bind-mount targets (skipped, no patterns)" >&2
   fi
+  echo "claude-docker: resolving .claudeignore done" >&2
 }
 
-# Audit output only: replace repo root prefix with this placeholder (readable trace).
-_audit_root_placeholder() {
+# Printed docker command only: mask paths → $MASKFILE / $MASKDIR; other paths under $ROOT → $PATH + suffix.
+_echo_cmd_host_path() {
   local p="$1"
-  if [ "$p" = "$ROOT" ]; then
-    printf '%s' '${PATH}'
+  if [ "$p" = "$MASK_FILE" ]; then
+    printf '%s' '$MASKFILE'
+  elif [ "$p" = "$MASK_DIR" ]; then
+    printf '%s' '$MASKDIR'
+  elif [[ "$p" == "$MASK_DIR"/* ]]; then
+    printf '%s%s' '$MASKDIR' "${p#"$MASK_DIR"}"
+  elif [ "$p" = "$ROOT" ]; then
+    printf '%s' '$PATH'
   elif [[ "$p" == "$ROOT"/* ]]; then
-    printf '%s%s' '${PATH}' "${p#"$ROOT"}"
+    printf '%s%s' '$PATH' "${p#"$ROOT"}"
   else
     printf '%q' "$p"
   fi
 }
 
-print_audit_run_cmd() {
+print_docker_run_cmd() {
   printf '%s \\\n' 'docker run -it --rm'
-  printf '  -v %s:/workspace \\\n' "$(_audit_root_placeholder "$ROOT")"
-  printf '  -v %s:/home/claude \\\n' "$(_audit_root_placeholder "${CLAUDE_DIR}/docker-home")"
+  printf '  -v %s:/workspace \\\n' "$(_echo_cmd_host_path "$ROOT")"
+  printf '  -v %s:/home/claude \\\n' "$(_echo_cmd_host_path "${CLAUDE_DIR}/docker-home")"
   _par_i=0
   while [ "$_par_i" -lt "${#mask_mounts[@]}" ]; do
-    _audit_flag="${mask_mounts[$_par_i]}"
-    _audit_spec="${mask_mounts[$((_par_i + 1))]}"
-    _audit_src="${_audit_spec%%:*}"
-    _audit_suffix="${_audit_spec#"${_audit_src}:"}"
-    _audit_vol="$(_audit_root_placeholder "$_audit_src"):${_audit_suffix}"
-    printf '  %q %s \\\n' "$_audit_flag" "$_audit_vol"
+    _vol_spec="${mask_mounts[$((_par_i + 1))]}"
+    _vol_host="${_vol_spec%%:*}"
+    _vol_rest="${_vol_spec#"${_vol_host}:"}"
+    printf '  -v %s:%s \\\n' "$(_echo_cmd_host_path "$_vol_host")" "$_vol_rest"
     _par_i=$((_par_i + 2))
   done
-  printf '  --env-file %s \\\n' "$(_audit_root_placeholder "${ROOT}/.env.claude")"
-  printf '  cap-ui-claude'
+  printf '  --env-file %s \\\n' "$(_echo_cmd_host_path "${ROOT}/.env.claude")"
+  printf '  %s' "$CLAUDE_DOCKER_IMAGE"
   for _par_a in "$@"; do
     printf ' %q' "$_par_a"
   done
@@ -156,62 +190,28 @@ case "${1-}" in
     shift
     build_mask_mounts
     mkdir -p "${CLAUDE_DIR}/docker-home"
+    echo "# docker run (executing next); placeholders: \$PATH=repo root, \$MASKDIR=\$PATH/.claude/maskdir, \$MASKFILE=\$MASKDIR/maskfile:" >&2
+    print_docker_run_cmd "$@" >&2
+    echo >&2
     docker run -it --rm \
       -v "${ROOT}:/workspace" \
       -v "${CLAUDE_DIR}/docker-home:/home/claude" \
       "${mask_mounts[@]}" \
       --env-file "${ROOT}/.env.claude" \
-      cap-ui-claude "$@"
-    ;;
-  audit)
-    shift
-    mkdir -p "${CLAUDE_DIR}/docker-home"
-    build_mask_mounts
-    echo "# docker run (same as: $0 run …)" >&2
-    echo "# \${PATH} below = repo root: $(printf '%q' "$ROOT")" >&2
-    echo "# prune dirs (lines ending with / in .claudeignore):" >&2
-    echo "#   -name:$([ "${#_prune_names[@]}" -gt 0 ] && printf ' %s' "${_prune_names[@]}")" >&2
-    echo "#   -path:$([ "${#_prune_paths[@]}" -gt 0 ] && printf ' %s' "${_prune_paths[@]}")" >&2
-    echo "# mask basename:$([ "${#_mask_names[@]}" -gt 0 ] && printf ' %s' "${_mask_names[@]}")" >&2
-    echo "# mask path:$([ "${#_mask_paths[@]}" -gt 0 ] && printf ' %s' "${_mask_paths[@]}")" >&2
-    echo "# maskfile bind mounts: $((${#mask_mounts[@]} / 2)) ($(_audit_root_placeholder "$MASK_FILE"))" >&2
-    echo >&2
-    print_audit_run_cmd "$@"
-    ;;
-  test-file)
-    shift
-    rel="${1:?usage: $0 test-file <path-under-repo>, e.g. apps/ui/.env}"
-    shift
-    case "${rel}" in
-      *..*)
-        echo "error: path must not contain .." >&2
-        exit 2
-        ;;
-    esac
-    build_mask_mounts
-    mkdir -p "${CLAUDE_DIR}/docker-home"
-    docker run --rm \
-      -v "${ROOT}:/workspace" \
-      -v "${CLAUDE_DIR}/docker-home:/home/claude" \
-      "${mask_mounts[@]}" \
-      --env-file "${ROOT}/.env.claude" \
-      --entrypoint sh \
-      cap-ui-claude \
-      -c 'f="/workspace/$1"; if ! cat "$f" >/dev/null 2>&1; then echo "ok: cat failed (missing or not readable)"; exit 0; fi; if [ ! -s "$f" ]; then echo "ok: file is empty (masked or empty on disk)"; exit 0; fi; echo "fail: cat succeeded and file is non-empty" >&2; exit 1' \
-      sh "${rel}"
+      "$CLAUDE_DOCKER_IMAGE" "$@"
     ;;
   build)
     shift
     mkdir -p "${CLAUDE_DIR}/docker-home"
-    exec docker build -f "${CLAUDE_DIR}/Dockerfile" -t cap-ui-claude \
+    exec docker build -f "${CLAUDE_DIR}/Dockerfile" -t "$CLAUDE_DOCKER_IMAGE" \
       --build-arg "UID=$(id -u)" \
       --build-arg "GID=$(id -g)" \
       "${CLAUDE_DIR}" "$@"
     ;;
   *)
-    echo "usage: $0 run|audit|build|test-file [args...]" >&2
-    echo "  audit             — print the docker run command (quoted) for auditing" >&2
-    echo "  test-file <path>  — verify path is not readable as non-empty inside the same mounts as run" >&2
+    echo "usage: $0 run|build [args...]" >&2
+    echo "  run   — print docker command to stderr, then run Claude in Docker (args forwarded to claude)" >&2
+    echo "  build — docker build image $CLAUDE_DOCKER_IMAGE" >&2
     exit 1
     ;;
 esac
