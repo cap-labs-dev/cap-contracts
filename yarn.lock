@@ -14,6 +14,11 @@
   resolved "https://registry.yarnpkg.com/@danieldietrich/copy/-/copy-0.4.2.tgz#c1cabfa499d8b473ba95413c446c1c1efae64d24"
   integrity sha512-ZVNZIrgb2KeomfNahP77rL445ho6aQj0HHqU6hNlQ61o4rhvca+NS+ePj0d82zQDq2UPk1mjVZBTXgP+ErsDgw==
 
+"@devcontainers/cli@^0.75.0":
+  version "0.75.0"
+  resolved "https://registry.yarnpkg.com/@devcontainers/cli/-/cli-0.75.0.tgz#ca57e24074931d9bdc02c8e326e1ca029950735d"
+  integrity sha512-fYcAZMX1RjhG9bIhkiBrQMcKwnoGp808PWToAvWyNqSg8AeY8Bm2ClXVrFQknnPLRzD+GENlLrlx+WpI6weuUA==
+
 "@ethereumjs/rlp@^5.0.2":
   version "5.0.2"
   resolved "https://registry.yarnpkg.com/@ethereumjs/rlp/-/rlp-5.0.2.tgz#c89bd82f2f3bec248ab2d517ae25f5bbc4aac842"
