@@ -88,7 +88,8 @@ contract InfraConfigSerializer {
             aaveAdapter: json.readAddress(string.concat(libsPrefix, "aaveAdapter")),
             chainlinkAdapter: json.readAddress(string.concat(libsPrefix, "chainlinkAdapter")),
             capTokenAdapter: json.readAddress(string.concat(libsPrefix, "capTokenAdapter")),
-            stakedCapAdapter: json.readAddress(string.concat(libsPrefix, "stakedCapAdapter"))
+            stakedCapAdapter: json.readAddress(string.concat(libsPrefix, "stakedCapAdapter")),
+            lbtcAdapter: json.readAddress(string.concat(libsPrefix, "lbtcAdapter"))
         });
 
         string memory infraPrefix = string.concat(chainPrefix, "infra.");
