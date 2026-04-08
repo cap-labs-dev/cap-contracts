@@ -6,6 +6,7 @@ struct LibsConfig {
     address chainlinkAdapter;
     address capTokenAdapter;
     address stakedCapAdapter;
+    address lbtcAdapter;
 }
 
 struct ImplementationsConfig {
