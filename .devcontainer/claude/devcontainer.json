@@ -21,16 +21,13 @@
   "mounts": [
     "source=${localWorkspaceFolder}/.devcontainer/claude/home,target=/home/vscode,type=bind",
     "source=${localWorkspaceFolder}/.devcontainer/maskdir/maskfile,target=/workspace/.env,type=bind,readonly",
-    "source=${localWorkspaceFolder}/.devcontainer/maskdir/maskfile,target=/workspace/.env.claude,type=bind,readonly",
     "source=${localWorkspaceFolder}/.devcontainer/maskdir,target=/workspace/.ssh,type=bind,readonly",
     "source=${localWorkspaceFolder}/.devcontainer/maskdir,target=/workspace/.git,type=bind,readonly"
   ],
-  "initializeCommand": "mkdir -p .devcontainer/claude/home",
+  "initializeCommand": "mkdir -p .devcontainer/claude/home && git submodule update --init --recursive",
   "runArgs": [
     "--name",
-    "devcontainer-cap-contracts-claude",
-    "--env-file",
-    "${localWorkspaceFolder}/.env.claude"
+    "devcontainer-cap-contracts-claude"
   ],
   "postCreateCommand": "bash /workspace/.devcontainer/post-install.sh",
   "customizations": {
