@@ -20,7 +20,7 @@ interface ICapInterestHarvester {
     }
 
     /// @notice Initialize the CapInterestHarvester contract
-    /// @param _accessControl Access control address
+    /// @param _owner Owner address
     /// @param _asset Asset address
     /// @param _cusd cUSD address
     /// @param _wtgxx wTGXX address
@@ -31,7 +31,7 @@ interface ICapInterestHarvester {
     /// @param _balancerVault Balancer vault address
     /// @param _excessReceiver Excess receiver address
     function initialize(
-        address _accessControl,
+        address _owner,
         address _asset,
         address _cusd,
         address _wtgxx,
