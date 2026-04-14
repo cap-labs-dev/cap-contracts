@@ -58,7 +58,6 @@ dictionary_weight = 80
 [fuzz]
 dictionary_weight = 60
 include_storage = true
-show_metrics = true
 
 [fmt]
 bracket_spacing = true
@@ -68,7 +67,6 @@ single_line_statement_blocks = "preserve"
 contract_new_lines = false
 
 [profile.deep]
-inherit = "default"
 [profile.deep.invariant]
 runs = 5000
 depth = 200 # handler based testing doesn't need to be deep
@@ -76,7 +74,6 @@ depth = 200 # handler based testing doesn't need to be deep
 runs = 5000
 
 [profile.release]
-inherits = "default"
 gas_reports = ["*"]
 gas_reports_ignore = [
     "MockAaveDataProvider",
@@ -102,5 +99,4 @@ yul = true                                    # default true
 # constantOptimizer = true # default false 
 
 [profile.slither]
-inherit = "default"
 via_ir = true

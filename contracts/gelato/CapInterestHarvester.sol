@@ -66,7 +66,7 @@ contract CapInterestHarvester is
     }
 
     /// @inheritdoc ICapInterestHarvester
-    function harvestInterest() external onlyOwner {
+    function harvestInterest() external returns (uint256 _excess) {
         CapInterestHarvesterStorage storage $ = getCapInterestHarvesterStorage();
 
         /// 1. Harvest fractional reserve
@@ -86,6 +86,8 @@ contract CapInterestHarvester is
         $.lastharvest = block.timestamp;
 
         emit HarvestedInterest(block.timestamp);
+        _excess = $.excess;
+        $.excess = 0;
     }
 
     /// @dev Harvest fractional reserve
@@ -184,6 +186,7 @@ contract CapInterestHarvester is
 
         IERC20($.asset).safeTransfer($.balancerVault, amounts[0] + feeAmounts[0]);
         uint256 excessAmount = IERC20($.asset).balanceOf(address(this));
+        $.excess = excessAmount;
         if (excessAmount > 0) IERC20($.asset).safeTransfer($.excessReceiver, excessAmount);
         $.flashInProgress = false;
     }
