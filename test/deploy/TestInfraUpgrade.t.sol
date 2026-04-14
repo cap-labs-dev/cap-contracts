@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.28;
 
 import { AccessControl } from "../../contracts/access/AccessControl.sol";
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
@@ -13,27 +13,21 @@ import { DebtToken } from "../../contracts/lendingPool/tokens/DebtToken.sol";
 import { Oracle } from "../../contracts/oracle/Oracle.sol";
 import { CapToken } from "../../contracts/token/CapToken.sol";
 import { StakedCap } from "../../contracts/token/StakedCap.sol";
-import { TestDeployer } from "../deploy/TestDeployer.sol";
-
-import { AccessControlUpgradeable } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { LenderFixture } from "../fixtures/LenderFixture.sol";
 import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
-import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-contract TestInfraUpgrade is TestDeployer {
-    address user_agent;
+/// @dev Ensures the suite's upgrade path is exercisable and does not silently corrupt state.
+contract TestInfraUpgrade is LenderFixture {
+    address agent;
 
     function setUp() public {
-        _deployCapTestEnvironment();
-        _initTestVaultLiquidity(usdVault);
-        _initSymbioticVaultsLiquidity(env, 100);
-
-        user_agent = _getRandomAgent();
+        _setUpLenderFixture();
+        agent = _getRandomAgent();
     }
 
     function test_can_upgrade_infra_as_access_control_admin() public {
         // assert initial state
-        assertEq(Lender(env.infra.lender).maxBorrowable(user_agent, env.usdMocks[0]), 2000e6);
+        assertEq(Lender(env.infra.lender).maxBorrowable(agent, env.usdMocks[0]), 2000e6);
         // TODO assert more state, ideally one per contract
 
         // have new implementations
@@ -64,7 +58,7 @@ contract TestInfraUpgrade is TestDeployer {
         vm.etch(implems1.feeAuction, "");
 
         // assert new state is unchanged
-        assertEq(Lender(env.infra.lender).maxBorrowable(user_agent, env.usdMocks[0]), 2000e6);
+        assertEq(Lender(env.infra.lender).maxBorrowable(agent, env.usdMocks[0]), 2000e6);
         // TODO assert more state, ideally one per contract
     }
 

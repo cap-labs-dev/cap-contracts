@@ -3,17 +3,16 @@ pragma solidity ^0.8.28;
 
 import { L2VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import { L2TokenUpgradeable } from "../../contracts/token/L2TokenUpgradeable.sol";
-import { TestDeployer } from "../deploy/TestDeployer.sol";
+import { CapIntegrationFixture } from "../fixtures/CapIntegrationFixture.sol";
 
-import { console } from "forge-std/console.sol";
-
-contract L2TokenTest is TestDeployer {
+/// @dev Ensures the L2-bridged token proxies are deployed + upgradeable under the vault admin.
+contract L2TokenTest is CapIntegrationFixture {
     address user;
     L2TokenUpgradeable l2cap;
     L2TokenUpgradeable l2StakedCap;
 
     function setUp() public {
-        _deployCapTestEnvironment();
+        _setUpCap();
 
         vm.startPrank(env.users.vault_config_admin);
         L2VaultConfig memory l2VaultConfig = _deployL2InfraForVault(env.users, env.usdVault, lzAb);

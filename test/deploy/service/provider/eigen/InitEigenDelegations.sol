@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
-import { EigenAddressbook, EigenUtils } from "../../../../../contracts/deploy/utils/EigenUtils.sol";
+import { EigenAddressbook } from "../../../../../contracts/deploy/utils/EigenUtils.sol";
 
 import { MockERC20 } from "../../../../mocks/MockERC20.sol";
-import { TestEnvConfig, UsersConfig } from "../../../interfaces/TestDeployConfig.sol";
-
-import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {
     EigenAgentManager,
@@ -25,14 +22,14 @@ import {
     IStrategyManager
 } from "../../../../../contracts/delegation/providers/eigenlayer/interfaces/IStrategyManager.sol";
 import { IEigenOperator } from "../../../../../contracts/interfaces/IEigenOperator.sol";
-import { InfraConfig } from "../../../interfaces/TestDeployConfig.sol";
 import { TimeUtils } from "../../../utils/TimeUtils.sol";
 
 import { Test } from "forge-std/Test.sol";
 import { Vm } from "forge-std/Vm.sol";
-import { console } from "forge-std/console.sol";
 
-contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
+contract InitEigenDelegations is Test, TimeUtils {
+    /// @dev End-to-end setup for Eigen: stake restakers into the Eigen strategy, delegate to the agent's EigenOperator,
+    /// advance time to satisfy Eigen's timing, then call `allocate` for each agent.
     function _initEigenDelegations(
         EigenAddressbook memory eigenAb,
         address eigenServiceManager,
@@ -47,6 +44,7 @@ contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
         }
     }
 
+    /// @dev Stakes + delegates for each (agent, restaker) pair.
     function _initEigenDelegationsForAgent(
         EigenAddressbook memory eigenAb,
         address eigenServiceManager,
@@ -68,6 +66,7 @@ contract InitEigenDelegations is Test, EigenUtils, TimeUtils {
         }
     }
 
+    /// @dev Funds `restaker` with real collateral using Foundry `deal`, then deposits and delegates.
     function _eigenMintAndStakeInStrategy(
         EigenAddressbook memory eigenAb,
         address strategy,

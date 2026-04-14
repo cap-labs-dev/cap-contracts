@@ -3,7 +3,6 @@ pragma solidity ^0.8.28;
 
 import { stdJson } from "forge-std/StdJson.sol";
 import { Vm } from "forge-std/Vm.sol";
-import { console } from "forge-std/console.sol";
 
 struct EigenAddresses {
     address allocationManager;
@@ -19,7 +18,7 @@ struct EigenAddressbook {
     EigenAddresses eigenAddresses;
 }
 
-struct VaultAddressbook {
+struct EigenVaultAddressbook {
     address strategy;
     address curator;
 }
@@ -35,8 +34,6 @@ contract EigenUtils {
         string memory configJson = vm.readFile(EIGEN_CONFIG_PATH_FROM_PROJECT_ROOT);
         string memory selectorPrefix = string.concat("$['", vm.toString(block.chainid), "']");
 
-        console.log("block.chainid", block.chainid);
-
         // mainnet
         ab.eigenAddresses.allocationManager =
             configJson.readAddress(string.concat(selectorPrefix, ".allocationManager"));
@@ -51,7 +48,7 @@ contract EigenUtils {
         ab.eigenAddresses.strategy = configJson.readAddress(string.concat(selectorPrefix, ".strategy"));
     }
 
-    function _getEigenVaultAddressbook(address asset) internal view returns (VaultAddressbook memory ab) {
+    function _getEigenVaultAddressbook(address asset) internal view returns (EigenVaultAddressbook memory ab) {
         Vm vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
         string memory configJson = vm.readFile(EIGEN_CONFIG_PATH_FROM_PROJECT_ROOT);

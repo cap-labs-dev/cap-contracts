@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { TestDeployer } from "../deploy/TestDeployer.sol";
+import { VaultFixture } from "../fixtures/VaultFixture.sol";
 
-contract StakedCapStakeTest is TestDeployer {
+/// @dev Staking cUSD should mint scUSD 1:1 and custody cUSD in the staking contract.
+contract StakedCapStakeTest is VaultFixture {
     address user;
 
     function setUp() public {
-        _deployCapTestEnvironment();
-        _initTestVaultLiquidity(usdVault);
-
+        _setUpVaultWithLiquidity();
         user = makeAddr("test_user");
         _initTestUserMintCapToken(usdVault, user, 4000e18);
     }

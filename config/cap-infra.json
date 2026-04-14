@@ -33,7 +33,8 @@
             "aaveAdapter": "0xf4DE2D82904D528E8F0fE9c374218aE6B0A86d7e",
             "capTokenAdapter": "0xAcc9ce4C15A0F6A2bec49C3F81261d60553D2Faf",
             "chainlinkAdapter": "0xc850409DC3587039e87930008217B6622CC3B2E2",
-            "stakedCapAdapter": "0xdf48Eb321B38bc19E7F5b2CCA8242Cc6B9a6EcD0"
+            "stakedCapAdapter": "0xdf48Eb321B38bc19E7F5b2CCA8242Cc6B9a6EcD0",
+            "lbtcAdapter": "0x7aA9896a606314335A09fE66d069d11ab50D40DF"
         }
     }
 }

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.symbiotic.fi)",
+      "WebFetch(domain:docs.eigenlayer.xyz)",
+      "WebFetch(domain:docs.eigencloud.xyz)",
+      "WebFetch(domain:docs.cap.app)"
+    ]
+  }
+}

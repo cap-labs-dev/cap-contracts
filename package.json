@@ -31,9 +31,14 @@
     "gas:flamegraph": "forge test --flamegraph --match-path 'test/**/*.gas.t.sol'",
     "coverage:forge": "forge coverage --report summary --ir-minimum",
     "coverage:forge:report": "forge coverage --report lcov --ir-minimum && lcov --remove lcov.info \"*test/*\" \"lendingPool/libraries/math\" \"*/contracts/deploy/*\" \"*script/*\" \"*node_modules/*\" --output-file lcov.info --rc lcov_branch_coverage=1 --ignore-errors inconsistent --ignore-errors unused && genhtml lcov.info --branch-coverage --output-dir coverage --ignore-errors inconsistent --ignore-errors unused",
-    "merkle:proof": "cd script/merkle && node MerkleProof.js"
+    "merkle:proof": "cd script/merkle && node MerkleProof.js",
+    "claude": "DC_ARGS='--workspace-folder . --config .devcontainer/claude/devcontainer.json' && devcontainer up $DC_ARGS && devcontainer exec $DC_ARGS claude",
+    "devc:claude:update": "docker rm -f devcontainer-cap-contracts-claude; DC_ARGS='--workspace-folder . --config .devcontainer/claude/devcontainer.json' && devcontainer up $DC_ARGS --build-no-cache",
+    "devc:claude:stop": "docker rm -f devcontainer-cap-contracts-claude",
+    "devc:claude:rm": "docker rm -f devcontainer-cap-contracts-claude"
   },
   "devDependencies": {
+    "@devcontainers/cli": "^0.75.0",
     "@openzeppelin/contracts": "npm:@openzeppelin/contracts",
     "@openzeppelin/contracts-upgradeable": "npm:@openzeppelin/contracts-upgradeable",
     "@symbioticfi/burners": "^1.0.0-devnet.2",
@@ -48,6 +53,8 @@
     "@openzeppelin/contracts": "^5.2.0"
   },
   "dependencies": {
+    "@layerzerolabs/oapp-alt-evm": "^0.0.5",
+    "@layerzerolabs/oft-alt-evm": "^0.0.5",
     "@layerzerolabs/oft-evm-upgradeable": "^4.0.2",
     "@morenabarboni/sumo": "^2.5.4",
     "@openzeppelin/foundry-upgrades": "^0.3.7",

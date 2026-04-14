@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { TestDeployer } from "../deploy/TestDeployer.sol";
-import { MockChainlinkPriceFeed } from "../mocks/MockChainlinkPriceFeed.sol";
+import { VaultFixture } from "../fixtures/VaultFixture.sol";
 
-contract VaultGasTest is TestDeployer {
+/// @dev Snapshot tests for gas costs of the most common mint/burn paths.
+contract VaultGasTest is VaultFixture {
     address user;
 
     function setUp() public {
-        _deployCapTestEnvironment();
+        _setUpVault();
         user = makeAddr("test_user");
 
         usdt.mint(user, 100e6);

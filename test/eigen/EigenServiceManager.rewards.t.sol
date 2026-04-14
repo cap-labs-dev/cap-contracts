@@ -1,23 +1,25 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.28;
 
 import { EigenServiceManager } from "../../contracts/delegation/providers/eigenlayer/EigenServiceManager.sol";
 
-import { IRewardsCoordinator } from "../../contracts/delegation/providers/eigenlayer/interfaces/IRewardsCoordinator.sol";
+import {
+    IRewardsCoordinator
+} from "../../contracts/delegation/providers/eigenlayer/interfaces/IRewardsCoordinator.sol";
 import { IStrategy } from "../../contracts/delegation/providers/eigenlayer/interfaces/IStrategy.sol";
-import { TestDeployer } from "../../test/deploy/TestDeployer.sol";
+import { CapIntegrationFixture } from "../fixtures/CapIntegrationFixture.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { console } from "forge-std/console.sol";
 
-contract EigenServiceManagerRewardsTest is TestDeployer {
+/// @dev Rewards distribution behavior: per-operator accounting and epoch throttling.
+contract EigenServiceManagerRewardsTest is CapIntegrationFixture {
     EigenServiceManager eigenServiceManager;
     MockERC20 rewardToken1;
     MockERC20 rewardToken2;
     MockERC20 rewardToken3;
 
     function setUp() public {
-        _deployCapTestEnvironment();
+        _setUpCap();
         eigenServiceManager = EigenServiceManager(env.eigen.eigenConfig.eigenServiceManager);
 
         // Deploy mock reward tokens for testing
@@ -218,11 +220,6 @@ contract EigenServiceManagerRewardsTest is TestDeployer {
         // Verify that the sum of pending rewards doesn't exceed available tokens
         uint256 totalPending = agent1Pending + agent2Pending;
         uint256 currentBalance = rewardToken1.balanceOf(address(eigenServiceManager));
-
-        console.log("Agent1 pending:", agent1Pending);
-        console.log("Agent2 pending:", agent2Pending);
-        console.log("Total pending:", totalPending);
-        console.log("Current balance:", currentBalance);
 
         // This test will help identify if there are accounting issues
         assertLe(totalPending, currentBalance, "Total pending rewards should not exceed contract balance");

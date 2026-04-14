@@ -3,12 +3,12 @@ pragma solidity ^0.8.28;
 
 import { IOracle } from "../../contracts/interfaces/IOracle.sol";
 
-import { TestDeployer } from "../deploy/TestDeployer.sol";
+import { OracleFixture } from "../fixtures/OracleFixture.sol";
 
-contract PriceOracleGetPriceTest is TestDeployer {
+/// @dev Sanity-check that mock Chainlink prices surface through CAP's oracle.
+contract PriceOracleGetPriceTest is OracleFixture {
     function setUp() public {
-        _deployCapTestEnvironment();
-        _initTestVaultLiquidity(usdVault);
+        _setUpOracleFixture();
     }
 
     function test_price_oracle_get_price() public view {

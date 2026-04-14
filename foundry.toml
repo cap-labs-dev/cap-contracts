@@ -11,6 +11,8 @@ remappings = [
     "@symbioticfi/burners/=node_modules/@symbioticfi/burners/",
     "@symbioticfi/hooks/=node_modules/@symbioticfi/hooks/",
     "@symbioticfi/rewards/=node_modules/@symbioticfi/rewards/",
+    "@layerzerolabs/oapp-alt-evm/=node_modules/@layerzerolabs/oapp-alt-evm/",
+    "@layerzerolabs/oft-alt-evm/=node_modules/@layerzerolabs/oft-alt-evm/",
     "@layerzerolabs/oft-evm/=lib/layerzero-devtools/packages/oft-evm/",
     "@layerzerolabs/oft-evm-upgradeable/=lib/layerzero-devtools/packages/oft-evm-upgradeable/",
     "@layerzerolabs/oapp-evm/=lib/layerzero-devtools/packages/oapp-evm/",
@@ -35,6 +37,7 @@ fs_permissions = [
     { access = "read", path = "./config/symbiotic.json" },
     { access = "read", path = "./config/layerzero-v2-deployments.json" },
     { access = "read", path = "./config/zap.json" },
+    { access = "read", path = "./config/test-harness.json" },
     { access = "read-write", path = "./config/cap-infra.json" },
     { access = "read-write", path = "./config/cap-symbiotic.json" },
     { access = "read-write", path = "./config/cap-eigen.json" },
@@ -55,7 +58,6 @@ dictionary_weight = 80
 [fuzz]
 dictionary_weight = 60
 include_storage = true
-show_metrics = true
 
 [fmt]
 bracket_spacing = true
@@ -65,7 +67,6 @@ single_line_statement_blocks = "preserve"
 contract_new_lines = false
 
 [profile.deep]
-inherit = "default"
 [profile.deep.invariant]
 runs = 5000
 depth = 200 # handler based testing doesn't need to be deep
@@ -73,7 +74,6 @@ depth = 200 # handler based testing doesn't need to be deep
 runs = 5000
 
 [profile.release]
-inherits = "default"
 gas_reports = ["*"]
 gas_reports_ignore = [
     "MockAaveDataProvider",
@@ -99,5 +99,4 @@ yul = true                                    # default true
 # constantOptimizer = true # default false 
 
 [profile.slither]
-inherit = "default"
 via_ir = true

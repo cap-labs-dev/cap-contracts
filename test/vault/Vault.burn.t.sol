@@ -2,19 +2,21 @@
 pragma solidity ^0.8.28;
 
 import { VaultLogic } from "../../contracts/vault/libraries/VaultLogic.sol";
-import { TestDeployer } from "../deploy/TestDeployer.sol";
+import { VaultFixture } from "../fixtures/VaultFixture.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
-import { console } from "forge-std/console.sol";
 
-contract VaultBurnTest is TestDeployer {
+/// @dev Burn-path regression tests for `CapToken` (cUSD).
+contract VaultBurnTest is VaultFixture {
     address user;
 
     function setUp() public {
-        _deployCapTestEnvironment();
-        _initTestVaultLiquidity(usdVault);
-
+        _setUpVaultWithLiquidity();
         user = makeAddr("test_user");
         _initTestUserMintCapToken(usdVault, user, 4000e18);
+    }
+
+    function _deadline() internal view returns (uint256) {
+        return block.timestamp + 1 hours;
     }
 
     function test_vault_burn() public {
@@ -23,9 +25,7 @@ contract VaultBurnTest is TestDeployer {
         // burn the cUSD tokens we own
         uint256 burnAmount = 100e18;
         uint256 minOutputAmount = 95e6; // Expect at least 95% back accounting for potential fees
-        uint256 deadline = block.timestamp + 1 hours;
-
-        uint256 outputAmount = cUSD.burn(address(usdt), burnAmount, minOutputAmount, user, deadline);
+        uint256 outputAmount = cUSD.burn(address(usdt), burnAmount, minOutputAmount, user, _deadline());
 
         // Verify final balances
         assertEq(cUSD.balanceOf(user), 4000e18 - burnAmount, "Should have burned their cUSD tokens");
@@ -41,10 +41,9 @@ contract VaultBurnTest is TestDeployer {
         // Burn cUSD with USDT
         uint256 amountIn = 100e18;
         uint256 minAmountOut = 95e6; // Accounting for potential fees
-        uint256 deadline = block.timestamp + 1 hours;
 
         vm.expectRevert();
-        cUSD.burn(address(invalidAsset), amountIn, minAmountOut, user, deadline);
+        cUSD.burn(address(invalidAsset), amountIn, minAmountOut, user, _deadline());
     }
 
     function test_burn_with_invalid_min_amount() public {
@@ -53,10 +52,9 @@ contract VaultBurnTest is TestDeployer {
         // Burn cUSD with USDT
         uint256 amountIn = 100e18;
         uint256 minAmountOut = 105e6; // Accounting for potential fees
-        uint256 deadline = block.timestamp + 1 hours;
 
         vm.expectRevert();
-        cUSD.burn(address(usdt), amountIn, minAmountOut, user, deadline);
+        cUSD.burn(address(usdt), amountIn, minAmountOut, user, _deadline());
     }
 
     function test_burn_with_invalid_deadline() public {
@@ -77,14 +75,13 @@ contract VaultBurnTest is TestDeployer {
         // Burn cUSD with USDT
         uint256 amountIn = 1;
         uint256 minAmountOut = 1; // Accounting for potential fees
-        uint256 deadline = block.timestamp + 1 hours;
 
         vm.expectRevert(); // Slippage
-        cUSD.burn(address(usdt), amountIn, minAmountOut, user, deadline);
+        cUSD.burn(address(usdt), amountIn, minAmountOut, user, _deadline());
 
         minAmountOut = 0;
 
         vm.expectRevert(VaultLogic.InvalidAmount.selector);
-        cUSD.burn(address(usdt), amountIn, minAmountOut, user, deadline);
+        cUSD.burn(address(usdt), amountIn, minAmountOut, user, _deadline());
     }
 }

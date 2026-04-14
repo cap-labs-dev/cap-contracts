@@ -3,13 +3,13 @@ pragma solidity ^0.8.28;
 
 import { FeeReceiver } from "../../contracts/feeReceiver/FeeReceiver.sol";
 import { IFeeReceiver } from "../../contracts/interfaces/IFeeReceiver.sol";
-import { TestDeployer } from "../deploy/TestDeployer.sol";
+import { CapIntegrationFixture } from "../fixtures/CapIntegrationFixture.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract FeesDistributeTest is TestDeployer {
+/// @dev FeeReceiver should forward fees to `StakedCap` and optionally split out a protocol fee.
+contract FeesDistributeTest is CapIntegrationFixture {
     function setUp() public {
-        _deployCapTestEnvironment();
-        _initTestVaultLiquidity(usdVault);
+        _setUpCapWithUsdVaultLiquidity();
     }
 
     function test_distribute_no_fees() public {

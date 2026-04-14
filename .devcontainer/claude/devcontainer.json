@@ -1,0 +1,41 @@
+{
+  "name": "Cap Contracts (Claude)",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20.18.0",
+      "installYarnUsingCorepack": true
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "toolsToInstall": "slither-analyzer"
+    },
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
+    "ghcr.io/rocker-org/devcontainer-features/apt-packages:1": {
+      "packages": "lcov"
+    }
+  },
+  "updateRemoteUserUID": true,
+  "remoteUser": "vscode",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+  "workspaceFolder": "/workspace",
+  "mounts": [
+    "source=${localWorkspaceFolder}/.devcontainer/claude/home,target=/home/vscode,type=bind",
+    "source=${localWorkspaceFolder}/.devcontainer/maskdir/maskfile,target=/workspace/.env,type=bind,readonly",
+    "source=${localWorkspaceFolder}/.devcontainer/maskdir,target=/workspace/.ssh,type=bind,readonly",
+    "source=${localWorkspaceFolder}/.devcontainer/maskdir,target=/workspace/.git,type=bind,readonly"
+  ],
+  "initializeCommand": "mkdir -p .devcontainer/claude/home && git submodule update --init --recursive",
+  "runArgs": [
+    "--name",
+    "devcontainer-cap-contracts-claude"
+  ],
+  "postCreateCommand": "bash /workspace/.devcontainer/post-install.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "JuanBlanco.solidity",
+        "anthropic.claude-code"
+      ]
+    }
+  }
+}

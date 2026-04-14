@@ -47,9 +47,10 @@ import { DeployVault } from "../../contracts/deploy/service/DeployVault.sol";
 import {
     ConfigureSymbioticOptIns
 } from "../../contracts/deploy/service/providers/symbiotic/ConfigureSymbioticOptIns.sol";
+import { DeployEigenAdapter } from "../../contracts/deploy/service/providers/symbiotic/DeployEigenAdapter.sol";
 import {
-    DeployCapNetworkAdapter
-} from "../../contracts/deploy/service/providers/symbiotic/DeployCapNetworkAdapter.sol";
+    DeploySymbioticNetworkAdapter
+} from "../../contracts/deploy/service/providers/symbiotic/DeploySymbioticNetworkAdapter.sol";
 import { ProxyUtils } from "../../contracts/deploy/utils/ProxyUtils.sol";
 import { SymbioticAddressbook, SymbioticUtils } from "../../contracts/deploy/utils/SymbioticUtils.sol";
 import { FeeAuction } from "../../contracts/feeAuction/FeeAuction.sol";
@@ -70,8 +71,10 @@ import { DeployMocks } from "./service/DeployMocks.sol";
 import { DeployTestUsers } from "./service/DeployTestUsers.sol";
 import { InitTestVaultLiquidity } from "./service/InitTestVaultLiquidity.sol";
 
+import { TestHarnessConfig } from "./interfaces/TestHarnessConfig.sol";
 import { InitEigenDelegations } from "./service/provider/eigen/InitEigenDelegations.sol";
 import { InitSymbioticVaultLiquidity } from "./service/provider/symbiotic/InitSymbioticVaultLiquidity.sol";
+import { TestHarnessConfigReader } from "./utils/TestHarnessConfigReader.sol";
 import { TimeUtils } from "./utils/TimeUtils.sol";
 
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -79,30 +82,63 @@ import { Test } from "forge-std/Test.sol";
 import { Vm } from "forge-std/Vm.sol";
 import { console } from "forge-std/console.sol";
 
+/// @dev Test harness deployer.
+///
+/// This contract builds a full, local CAP stack for tests and returns the deployed addresses in `env`.
+/// The intent is that 3rd parties can audit test behavior by reading this file top-to-bottom and seeing:
+/// - where external protocol addresses come from (addressbooks),
+/// - how CAP infra is deployed and wired,
+/// - what scenario parameters are used (fork block, epoch durations, fees, oracle prices).
+///
+/// Configuration:
+/// - Default values live in `config/test-harness.json` (chain-id keyed).
+/// - Override hook: override `_harnessConfig()` in a derived test to tweak parameters without editing JSON.
+///
+/// High-level flow:
+/// ```mermaid
+/// flowchart TD
+///   boot[LoadHarnessConfig] --> ctx[SelectForkOrMock]
+///   ctx --> users[DeployTestUsers]
+///   users --> addrbooks[LoadExternalAddressbooks]
+///   addrbooks --> core[DeployCoreInfraAndVault]
+///   core --> ac[InitAccessControlAndCaps]
+///   ac --> oracles[InitOraclesAndRateOracles]
+///   oracles --> providers[DeployProviders(Eigen/Symbiotic)]
+///   providers --> finalize[TimeSkipAndLabel]
+/// ```
 contract TestDeployer is
     Test,
+    // Config
+    TestHarnessConfigReader,
+    // External addressbooks
     LzUtils,
+    ZapUtils,
     SymbioticUtils,
     EigenUtils,
+    // Test helpers
     TimeUtils,
-    ZapUtils,
+    VaultConfigHelpers,
+    InitTestVaultLiquidity,
+    InitSymbioticVaultLiquidity,
+    InitEigenDelegations,
+    DeployTestUsers,
     DeployMocks,
-    DeployInfra,
-    DeployVault,
+    // Deployment services
     DeployImplems,
     DeployLibs,
+    DeployInfra,
+    DeployVault,
     ConfigureOracle,
     ConfigureDelegation,
     ConfigureAccessControl,
-    DeployTestUsers,
-    InitTestVaultLiquidity,
-    DeployCapNetworkAdapter,
-    ConfigureSymbioticOptIns,
-    InitSymbioticVaultLiquidity,
-    InitEigenDelegations,
-    VaultConfigHelpers
+    // Provider deployment
+    DeployEigenAdapter,
+    DeploySymbioticNetworkAdapter,
+    ConfigureSymbioticOptIns
 {
     TestEnvConfig env;
+    TestHarnessConfig harness;
+    bool harnessLoaded;
     EigenAddressbook eigenAb;
     LzAddressbook lzAb;
     SymbioticAddressbook symbioticAb;
@@ -113,35 +149,67 @@ contract TestDeployer is
     /// TODO: remove this and create a different deployer method for each environment we need to create
     ///       this is not great as it makes the deployer harder to understand
     function useMockBackingNetwork() internal view virtual returns (bool) {
-        return false;
+        if (harnessLoaded) return harness.fork.useMockBackingNetwork;
+        return false; // backwards compatible default if `_deployCapTestEnvironment()` hasn't run yet
+    }
+
+    function _harnessConfig() internal view virtual returns (TestHarnessConfig memory) {
+        // Load based on the current chainid, but allow config to choose mock mode.
+        // The first load uses the pre-fork chain id, which is fine because the JSON includes both mainnet and mock keys.
+        return _loadHarnessConfigOrDefault(block.chainid);
     }
 
     function _deployCapTestEnvironment() internal {
-        if (useMockBackingNetwork()) {
-            console.log("using MOCK blockchain");
-            vm.chainId(11155111);
-        } else {
-            console.log("using sepolia as the test blockchain");
-            // we need to fork the sepolia network to deploy the symbiotic network adapter
-            // hardcoding the block number to benefit from the anvil cache
-            vm.createSelectFork("https://mainnet.gateway.tenderly.co", 23285216); // holesky needed to use OperatorNetworkSpecificDelegator
+        _bootHarness();
+        _selectForkOrMock();
+        _deployUsersAndEnterDeployerPrank();
+        _loadExternalAddressbooks();
+        _deployCoreInfraAndVault();
+        _initAccessControlAndCaps();
+        _initOraclesAndRateOracles();
+        _initLender();
+        _deployEigenIfEnabled();
+        _deploySymbioticAdapterAndVaults();
+        _finalizeEnvironment();
+    }
+
+    function _bootHarness() internal {
+        if (harnessLoaded) return;
+        harness = _harnessConfig();
+        harnessLoaded = true;
+    }
+
+    function _selectForkOrMock() internal {
+        if (harness.fork.useMockBackingNetwork) {
+            console.log("using MOCK backing network");
+            vm.chainId(harness.fork.mockChainId);
+            return;
         }
 
+        console.log("using forked backing network");
+        if (harness.fork.blockNumber == 0) {
+            vm.createSelectFork(harness.fork.rpcUrl); // latest
+        } else {
+            vm.createSelectFork(harness.fork.rpcUrl, harness.fork.blockNumber);
+        }
+    }
+
+    function _deployUsersAndEnterDeployerPrank() internal {
         (env.users, env.testUsers) = _deployTestUsers();
-
-        /// DEPLOY
         vm.startPrank(env.users.deployer);
+    }
 
+    function _loadExternalAddressbooks() internal {
         lzAb = _getLzAddressbook();
         symbioticAb = _getSymbioticAddressbook();
         zapAb = _getZapAddressbook();
-        if (!useMockBackingNetwork()) {
-            eigenAb = _getEigenAddressbook();
-        }
+        if (!useMockBackingNetwork()) eigenAb = _getEigenAddressbook();
+    }
 
+    function _deployCoreInfraAndVault() internal {
         env.implems = _deployImplementations();
         env.libs = _deployLibs();
-        env.infra = _deployInfra(env.implems, env.users, 1 days);
+        env.infra = _deployInfra(env.implems, env.users, harness.infra.delegationEpochDuration);
 
         env.usdMocks = _deployUSDMocks();
         env.ethMocks = _deployEthMocks();
@@ -157,103 +225,113 @@ contract TestDeployer is
         );
 
         if (useMockBackingNetwork()) {
-            console.log("skipping lzperiphery");
+            console.log("skipping lzperiphery (mock backing network)");
         } else {
             console.log("deploying lzperiphery");
             env.usdVault.lzperiphery = _deployVaultLzPeriphery(lzAb, zapAb, env.usdVault, env.users);
         }
+    }
 
-        /// ACCESS CONTROL
-        console.log("deploying access control");
+    function _initAccessControlAndCaps() internal {
+        console.log("initializing access control");
         vm.startPrank(env.users.access_control_admin);
         _initInfraAccessControl(env.infra, env.users);
         _initVaultAccessControl(env.infra, env.usdVault, env.users);
 
-        /// SET DEPOSIT CAP
         console.log("setting deposit caps");
         vm.startPrank(env.users.vault_config_admin);
         for (uint256 i = 0; i < env.usdVault.assets.length; i++) {
-            address asset = env.usdVault.assets[i];
-            CapToken(env.usdVault.capToken).setDepositCap(asset, type(uint256).max);
+            CapToken(env.usdVault.capToken).setDepositCap(env.usdVault.assets[i], type(uint256).max);
         }
         vm.stopPrank();
+    }
 
-        /// ORACLE
-        console.log("deploying oracle");
+    function _initOraclesAndRateOracles() internal {
+        console.log("initializing oracle");
         vm.startPrank(env.users.oracle_admin);
-        _initOracleMocks(env.usdOracleMocks, 1e8, uint256(0.1e27)); // $1.00 with 8 decimals & 10% Annualized in ray decimals
-        _initOracleMocks(env.ethOracleMocks, 2600e8, uint256(0.1e27)); // $2600.00 with 8 decimals & 10% Annualized in ray decimals
-        _initOracleMocks(env.permissionedOracleMocks, 1e8, uint256(0.1e27)); // $1.00 with 8 decimals & 10% Annualized in ray decimals
+        _initOracleMocks(env.usdOracleMocks, harness.oracle.usdPrice8, harness.oracle.usdRateRay);
+        _initOracleMocks(env.ethOracleMocks, harness.oracle.ethPrice8, harness.oracle.ethRateRay);
+        _initOracleMocks(
+            env.permissionedOracleMocks, harness.oracle.permissionedPrice8, harness.oracle.permissionedRateRay
+        );
         _initVaultOracle(env.libs, env.infra, env.usdVault);
+
         for (uint256 i = 0; i < env.usdVault.assets.length; i++) {
-            address asset = env.usdVault.assets[i];
-            address priceFeed = env.usdOracleMocks.chainlinkPriceFeeds[i];
-            _initChainlinkPriceOracle(env.libs, env.infra, asset, priceFeed);
+            _initChainlinkPriceOracle(
+                env.libs, env.infra, env.usdVault.assets[i], env.usdOracleMocks.chainlinkPriceFeeds[i]
+            );
         }
         for (uint256 i = 0; i < env.ethOracleMocks.assets.length; i++) {
-            address asset = env.ethOracleMocks.assets[i];
-            address priceFeed = env.ethOracleMocks.chainlinkPriceFeeds[i];
-            _initChainlinkPriceOracle(env.libs, env.infra, asset, priceFeed);
+            _initChainlinkPriceOracle(
+                env.libs, env.infra, env.ethOracleMocks.assets[i], env.ethOracleMocks.chainlinkPriceFeeds[i]
+            );
         }
         for (uint256 i = 0; i < env.permissionedOracleMocks.assets.length; i++) {
-            address asset = env.permissionedOracleMocks.assets[i];
-            address priceFeed = env.permissionedOracleMocks.chainlinkPriceFeeds[i];
-            _initChainlinkPriceOracle(env.libs, env.infra, asset, priceFeed);
+            _initChainlinkPriceOracle(
+                env.libs,
+                env.infra,
+                env.permissionedOracleMocks.assets[i],
+                env.permissionedOracleMocks.chainlinkPriceFeeds[i]
+            );
         }
 
-        if (!useMockBackingNetwork()) {
-            /// cbETH for Eigen test
-            address asset = 0xBe9895146f7AF43049ca1c1AE358B0541Ea49704;
-            address priceFeed = env.ethOracleMocks.chainlinkPriceFeeds[0];
-            _initChainlinkPriceOracle(env.libs, env.infra, asset, priceFeed);
+        if (!useMockBackingNetwork() && harness.oracle.extraChainlinkAsset != address(0)) {
+            _initChainlinkPriceOracle(
+                env.libs, env.infra, harness.oracle.extraChainlinkAsset, env.ethOracleMocks.chainlinkPriceFeeds[0]
+            );
         }
 
-        console.log("deploying rate oracle");
+        console.log("initializing rate oracle");
         vm.startPrank(env.users.rate_oracle_admin);
         for (uint256 i = 0; i < env.usdVault.assets.length; i++) {
             _initAaveRateOracle(env.libs, env.infra, env.usdVault.assets[i], env.usdOracleMocks.aaveDataProviders[i]);
         }
+    }
 
-        /// LENDER
-        console.log("deploying lender");
+    function _initLender() internal {
+        console.log("initializing lender");
         vm.startPrank(env.users.lender_admin);
+        _initVaultLender(env.usdVault, env.infra, harness.fee);
+    }
 
-        FeeConfig memory fee = FeeConfig({
-            minMintFee: 0.005e27, // 0.5% minimum mint fee
-            slope0: 0, // allow liquidity to be added without fee
-            slope1: 0, // allow liquidity to be added without fee to start with
-            mintKinkRatio: 0.85e27,
-            burnKinkRatio: 0.15e27,
-            optimalRatio: 0.33e27
-        });
+    function _deployEigenIfEnabled() internal {
+        if (useMockBackingNetwork()) return;
 
-        _initVaultLender(env.usdVault, env.infra, fee);
+        console.log("deploying eigen adapter");
+        address eigenAdmin = makeAddr("strategy_admin");
 
-        /// Deploy Eigen Network
-        if (!useMockBackingNetwork()) {
-            address eigenAdmin = makeAddr("strategy_admin");
-            env.eigen.eigenImplementations = _deployEigenImplementations();
-            env.eigen.eigenConfig =
-                _deployEigenInfra(env.infra, env.eigen.eigenImplementations, eigenAb, env.usdVault.capToken, 7);
-            vm.startPrank(env.users.access_control_admin);
-            _initEigenAccessControl(env.infra, env.eigen.eigenConfig, eigenAdmin, eigenAb);
-            vm.stopPrank();
-            vm.startPrank(env.users.delegation_admin);
-            console.log(env.eigen.eigenConfig.eigenServiceManager);
-            _registerNetworkForCapDelegation(env.infra, env.eigen.eigenConfig.eigenServiceManager);
-            vm.stopPrank();
-            // _agentRegisterAsOperator(eigenAb, env.testUsers.agents[1]);
-            address[] memory _agents = new address[](2);
-            _agents[0] = env.testUsers.agents[1];
-            _agents[1] = env.testUsers.agents[2];
-            address[] memory _restakers = new address[](2);
-            _restakers[0] = env.testUsers.restakers[1];
-            _restakers[1] = env.testUsers.restakers[2];
-            _registerToEigenServiceManager(eigenAb, eigenAdmin, env.eigen.eigenConfig.agentManager, _agents, _restakers);
-            _initEigenDelegations(eigenAb, env.eigen.eigenConfig.eigenServiceManager, _agents, _restakers, 10);
-        }
+        env.eigen.eigenImplementations = _deployEigenImplementations();
+        env.eigen.eigenConfig = _deployEigenInfra(
+            env.infra, env.eigen.eigenImplementations, eigenAb, env.usdVault.capToken, harness.eigen.rewardDuration
+        );
 
-        /// Deploy Symbiotic Network Adapter
+        vm.startPrank(env.users.access_control_admin);
+        _initEigenAccessControl(env.infra, env.eigen.eigenConfig, eigenAdmin, eigenAb);
+        vm.stopPrank();
+
+        vm.startPrank(env.users.delegation_admin);
+        _registerNetworkForCapDelegation(env.infra, env.eigen.eigenConfig.eigenServiceManager);
+        vm.stopPrank();
+
+        address[] memory agents = new address[](2);
+        agents[0] = env.testUsers.agents[1];
+        agents[1] = env.testUsers.agents[2];
+        address[] memory restakers = new address[](2);
+        restakers[0] = env.testUsers.restakers[1];
+        restakers[1] = env.testUsers.restakers[2];
+
+        _registerToEigenServiceManager(eigenAb, eigenAdmin, env.eigen.eigenConfig.agentManager, agents, restakers);
+        _initEigenDelegations(
+            eigenAb,
+            env.eigen.eigenConfig.eigenServiceManager,
+            agents,
+            restakers,
+            harness.eigen.delegationAmountNoDecimals
+        );
+    }
+
+    function _deploySymbioticAdapterAndVaults() internal {
+        // Fee recipient (used by `Delegation.distributeRewards`)
         vm.startPrank(env.users.delegation_admin);
         Delegation(env.infra.delegation).setFeeRecipient(env.usdVault.feeAuction);
         vm.stopPrank();
@@ -266,54 +344,53 @@ contract TestDeployer is
             vm.stopPrank();
 
             _configureMockNetworkMiddleware(env, networkMiddleware);
-
-            _setMockNetworkMiddlewareAgentCoverage(env, env.testUsers.agents[0], 1_000_000e8);
-        } else {
-            /// SYMBIOTIC NETWORK ADAPTER
-            console.log("deploying symbiotic cap network address");
-            env.symbiotic.users.vault_admin = makeAddr("vault_admin");
-
-            console.log("deploying symbiotic network adapter");
-            vm.startPrank(env.users.deployer);
-            env.symbiotic.networkAdapterImplems = _deploySymbioticNetworkAdapterImplems();
-            env.symbiotic.networkAdapter = _deploySymbioticNetworkAdapterInfra(
-                env.usdVault.capToken,
-                env.infra,
-                symbioticAb,
-                env.symbiotic.networkAdapterImplems,
-                SymbioticNetworkAdapterParams({ vaultEpochDuration: 7 days, feeAllowed: 1000 })
+            _setMockNetworkMiddlewareAgentCoverage(
+                env, env.testUsers.agents[0], harness.symbiotic.mockAgentCoverageUsd8
             );
-
-            address agent = env.testUsers.agents[0];
-
-            console.log("registering delegation network");
-            vm.startPrank(env.users.delegation_admin);
-            _registerNetworkForCapDelegation(env.infra, env.symbiotic.networkAdapter.networkMiddleware);
-
-            console.log("access control mgmt");
-            vm.startPrank(env.users.access_control_admin);
-            _initSymbioticNetworkAdapterAccessControl(env.infra, env.symbiotic.networkAdapter, env.users);
-
-            console.log("deploying symbiotic WETH vault");
-            (SymbioticVaultConfig memory _vault, SymbioticNetworkRewardsConfig memory _rewards) =
-                _deployAndConfigureTestnetSymbioticVault(env.ethMocks[0], "WETH", agent);
-
-            _symbioticVaultConfigToEnv(_vault);
-            _symbioticNetworkRewardsConfigToEnv(_rewards);
-
-            vm.startPrank(env.users.delegation_admin);
-            for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
-                Delegation(env.infra.delegation).setCoverageCap(env.testUsers.agents[i], 1_000_000_000_000e8);
-            }
-            vm.stopPrank();
+            return;
         }
 
-        // change  epoch
-        _timeTravel(28 days);
+        console.log("deploying symbiotic adapter");
+        env.symbiotic.users.vault_admin = makeAddr("vault_admin");
 
+        vm.startPrank(env.users.deployer);
+        env.symbiotic.networkAdapterImplems = _deploySymbioticNetworkAdapterImplems();
+        env.symbiotic.networkAdapter = _deploySymbioticNetworkAdapterInfra(
+            env.usdVault.capToken,
+            env.infra,
+            symbioticAb,
+            env.symbiotic.networkAdapterImplems,
+            SymbioticNetworkAdapterParams({
+                vaultEpochDuration: harness.symbiotic.vaultEpochDuration, feeAllowed: harness.symbiotic.feeAllowed
+            })
+        );
+
+        address agent = env.testUsers.agents[0];
+
+        vm.startPrank(env.users.delegation_admin);
+        _registerNetworkForCapDelegation(env.infra, env.symbiotic.networkAdapter.networkMiddleware);
+
+        vm.startPrank(env.users.access_control_admin);
+        _initSymbioticNetworkAdapterAccessControl(env.infra, env.symbiotic.networkAdapter, env.users);
+
+        console.log("deploying symbiotic WETH vault");
+        (SymbioticVaultConfig memory vault, SymbioticNetworkRewardsConfig memory rewards) =
+            _deployAndConfigureTestnetSymbioticVault(env.ethMocks[0], "WETH", agent);
+        _symbioticVaultConfigToEnv(vault);
+        _symbioticNetworkRewardsConfigToEnv(rewards);
+
+        vm.startPrank(env.users.delegation_admin);
+        for (uint256 i = 0; i < env.testUsers.agents.length; i++) {
+            Delegation(env.infra.delegation)
+                .setCoverageCap(env.testUsers.agents[i], harness.symbiotic.defaultCoverageCapUsd8);
+        }
+        vm.stopPrank();
+    }
+
+    function _finalizeEnvironment() internal {
+        _timeTravel(harness.scenario.postDeployTimeSkip);
         _unwrapEnvToMakeTestsReadable();
         _applyTestnetLabels();
-
         vm.stopPrank();
     }
 
@@ -336,7 +413,7 @@ contract TestDeployer is
         _vault.delegator = delegator;
         _vault.burnerRouter = burner;
         _vault.slasher = slasher;
-        _vault.vaultEpochDuration = 7 days;
+        _vault.vaultEpochDuration = harness.symbiotic.vaultEpochDuration;
         _rewards.stakerRewarder = stakerRewarder;
 
         console.log("registering vaults in network middleware");
@@ -346,9 +423,9 @@ contract TestDeployer is
             agent: agent,
             vault: vault,
             rewarder: stakerRewarder,
-            ltv: 0.5e27,
-            liquidationThreshold: 0.7e27,
-            delegationRate: 0.02e27,
+            ltv: harness.symbiotic.defaultAgentLtvRay,
+            liquidationThreshold: harness.symbiotic.defaultAgentLiquidationThresholdRay,
+            delegationRate: harness.symbiotic.defaultDelegationRateRay,
             coverageCap: type(uint256).max
         });
 

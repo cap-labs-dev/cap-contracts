@@ -2,17 +2,19 @@
 pragma solidity ^0.8.28;
 
 import { Wrapper } from "../../contracts/token/Wrapper.sol";
-import { TestDeployer } from "../deploy/TestDeployer.sol";
+import { CapIntegrationFixture } from "../fixtures/CapIntegrationFixture.sol";
 import { MockPermissionedERC20 } from "../mocks/MockPermissionedERC20.sol";
 
-contract WrapperTest is TestDeployer {
+/// @dev The permissioned wrapper should be depositable/withdrawable without leaking the underlying asset.
+/// The wrapper token itself is transferable even if the underlying recipient is blacklisted; only withdraws should fail.
+contract WrapperTest is CapIntegrationFixture {
     MockPermissionedERC20 permissionedAsset;
     Wrapper wrapper;
     address user;
     address user2;
 
     function setUp() public {
-        _deployCapTestEnvironment();
+        _setUpCap();
 
         permissionedAsset = MockPermissionedERC20(env.permissionedMocks[0]);
         wrapper = Wrapper(env.permissionedMocks[1]);

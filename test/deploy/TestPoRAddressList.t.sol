@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.28;
 
 import { AccessControl } from "../../contracts/access/AccessControl.sol";
 import { ProxyUtils } from "../../contracts/deploy/utils/ProxyUtils.sol";
@@ -7,16 +7,14 @@ import {
     CapChainlinkPoRAddressList,
     ICapChainlinkPoRAddressList
 } from "../../contracts/oracle/chainlink/CapChainlinkPoRAddressList.sol";
-import { TestDeployer } from "./TestDeployer.sol";
-import { console } from "forge-std/console.sol";
+import { LenderFixture } from "../fixtures/LenderFixture.sol";
 
-contract TestPoRAddressList is TestDeployer {
+/// @dev Basic integration coverage for the PoR allowlist helper used by the oracle stack.
+contract TestPoRAddressList is LenderFixture {
     CapChainlinkPoRAddressList porAddressList;
 
     function setUp() public {
-        _deployCapTestEnvironment();
-        _initTestVaultLiquidity(usdVault);
-        _initSymbioticVaultsLiquidity(env, 100);
+        _setUpLenderFixture();
 
         address impl = address(new CapChainlinkPoRAddressList());
         porAddressList = CapChainlinkPoRAddressList(_proxy(impl));
@@ -24,9 +22,10 @@ contract TestPoRAddressList is TestDeployer {
         porAddressList.initialize(env.infra.accessControl, env.usdVault.capToken);
 
         vm.startPrank(env.users.access_control_admin);
-        AccessControl(env.infra.accessControl).grantAccess(
-            ICapChainlinkPoRAddressList.addTokenPriceOracle.selector, address(porAddressList), env.users.deployer
-        );
+        AccessControl(env.infra.accessControl)
+            .grantAccess(
+                ICapChainlinkPoRAddressList.addTokenPriceOracle.selector, address(porAddressList), env.users.deployer
+            );
         vm.stopPrank();
     }
 
@@ -36,13 +35,14 @@ contract TestPoRAddressList is TestDeployer {
 
     function test_getPoRAddressList() public view {
         ICapChainlinkPoRAddressList.PoRInfo[] memory addresses = porAddressList.getPoRAddressList(1, 2);
-        console.log(addresses[0].chain);
-        console.log(addresses[0].chainId);
-        console.log(addresses[0].tokenSymbol);
-        console.log(addresses[0].tokenAddress);
-        console.log(addresses[0].tokenDecimals);
-        console.log(addresses[0].tokenPriceOracle);
-        console.log(addresses[0].yourVaultAddress);
+        assertEq(addresses.length, 2);
+        for (uint256 i = 0; i < addresses.length; i++) {
+            assertTrue(bytes(addresses[i].chain).length > 0);
+            assertEq(addresses[i].chainId, block.chainid);
+            assertTrue(addresses[i].tokenAddress != address(0));
+            // `tokenPriceOracle` is expected to be unset (0) until an admin configures it.
+            assertEq(addresses[i].yourVaultAddress, env.usdVault.capToken);
+        }
     }
 
     function test_addTokenPriceOracle() public {
