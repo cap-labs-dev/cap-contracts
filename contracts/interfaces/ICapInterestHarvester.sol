@@ -17,6 +17,7 @@ interface ICapInterestHarvester {
         uint256 lastharvest;
         bool flashInProgress;
         address wtgxx;
+        uint256 excess;
     }
 
     /// @notice Initialize the CapInterestHarvester contract
@@ -44,7 +45,8 @@ interface ICapInterestHarvester {
     ) external;
 
     /// @notice Harvest interest from borrow and the fractional reserve, sends to fee auction, buys interest, calls distribute on fee receiver
-    function harvestInterest() external;
+    /// @return _excess The amount of excess asset remaining after the harvest
+    function harvestInterest() external returns (uint256 _excess);
 
     /// @notice Set excess receiver
     /// @param _excessReceiver Excess receiver address
