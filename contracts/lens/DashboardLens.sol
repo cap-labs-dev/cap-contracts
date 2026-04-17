@@ -20,15 +20,26 @@ interface IAllocationManagerLens {
 // ─── Structs ─────────────────────────────────────────────────────────────────
 
 struct SymbioticVaultSnapshot {
-    uint256 activeBalance;
-    uint256 slashableBalance;
-    uint256 withdrawalAmount;
+    uint256 activeStake;
+    uint256 depositorActiveBalance;
+    uint256 depositorSlashableBalance;
+    uint256 depositorWithdrawalAmount;
     uint256 withdrawalEpoch;
     uint256 currentEpoch;
     uint256 epochDuration;
     uint256 nextEpochStart;
     bool isWhitelistEnabled;
     address collateralToken;
+    uint256 depositorActiveShares;
+    bool depositorIsWhitelisted;
+    uint256 activeShares;
+    bool isDepositLimit;
+    uint256 depositLimit;
+    address burner;
+    address delegator;
+    bool isDelegatorInitialized;
+    address slasher;
+    bool isSlasherInitialized;
 }
 
 struct EigenLayerSnapshot {
@@ -73,17 +84,29 @@ contract DashboardLens {
     {
         IVault v = IVault(vault);
 
-        snapshot.activeBalance = v.activeBalanceOf(depositor);
-        snapshot.slashableBalance =
+        snapshot.depositorActiveBalance = v.activeBalanceOf(depositor);
+        snapshot.activeStake = v.activeStake();
+        snapshot.depositorSlashableBalance =
             ISymbioticNetworkMiddleware(middleware).slashableCollateral(depositor, uint48(block.timestamp));
         snapshot.currentEpoch = v.currentEpoch();
         snapshot.withdrawalEpoch = snapshot.currentEpoch + 1;
-        snapshot.withdrawalAmount = v.withdrawalsOf(snapshot.withdrawalEpoch, depositor);
+        snapshot.depositorWithdrawalAmount = v.withdrawalsOf(snapshot.withdrawalEpoch, depositor);
         uint48 duration = v.epochDuration();
         snapshot.epochDuration = uint256(duration);
-        snapshot.nextEpochStart = uint256(v.currentEpochStart()) + uint256(duration);
+        snapshot.nextEpochStart = uint256(v.nextEpochStart());
         snapshot.isWhitelistEnabled = v.depositWhitelist();
         snapshot.collateralToken = v.collateral();
+
+        snapshot.depositorActiveShares = v.activeSharesOf(depositor);
+        snapshot.depositorIsWhitelisted = v.isDepositorWhitelisted(depositor);
+        snapshot.activeShares = v.activeShares();
+        snapshot.isDepositLimit = v.isDepositLimit();
+        snapshot.depositLimit = v.depositLimit();
+        snapshot.burner = v.burner();
+        snapshot.delegator = v.delegator();
+        snapshot.isDelegatorInitialized = v.isDelegatorInitialized();
+        snapshot.slasher = v.slasher();
+        snapshot.isSlasherInitialized = v.isSlasherInitialized();
     }
 
     /// @notice Returns snapshots for multiple Symbiotic vaults in a single call.
