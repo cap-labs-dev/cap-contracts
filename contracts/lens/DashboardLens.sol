@@ -3,6 +3,10 @@ pragma solidity ^0.8.28;
 
 import { ILender } from "../interfaces/ILender.sol";
 import { ISymbioticNetworkMiddleware } from "../interfaces/ISymbioticNetworkMiddleware.sol";
+import {
+    IOperatorNetworkSpecificDelegator
+} from "@symbioticfi/core/src/interfaces/delegator/IOperatorNetworkSpecificDelegator.sol";
+import { IOptInService } from "@symbioticfi/core/src/interfaces/service/IOptInService.sol";
 import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 import { IDelegationManager } from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import { IStrategy } from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
@@ -39,6 +43,7 @@ struct SymbioticVaultSnapshot {
     bool isDelegatorInitialized;
     address slasher;
     bool isSlasherInitialized;
+    bool isCapNetworkVault;
 }
 
 struct EigenLayerSnapshot {
@@ -70,6 +75,7 @@ struct LoanSnapshot {
 /// @dev No state, no write functions, no access control — purely a view utility.
 contract DashboardLens {
     ILender public constant LENDER = ILender(0x15622c3dbbc5614E6DFa9446603c1779647f01FC);
+    IOptInService public constant VAULT_OPT_IN_SERVICE = IOptInService(0xb361894bC06cbBA7Ea8098BF0e32EB1906A5F891);
 
     // ─── Symbiotic ───────────────────────────────────────────────────────────
 
@@ -106,6 +112,12 @@ contract DashboardLens {
         snapshot.isDelegatorInitialized = v.isDelegatorInitialized();
         snapshot.slasher = v.slasher();
         snapshot.isSlasherInitialized = v.isSlasherInitialized();
+
+        try IOperatorNetworkSpecificDelegator(snapshot.delegator).operator() returns (address operator) {
+            try VAULT_OPT_IN_SERVICE.isOptedIn(operator, vault) returns (bool opted) {
+                snapshot.isCapNetworkVault = opted;
+            } catch { }
+        } catch { }
     }
 
     /// @notice Returns snapshots for multiple Symbiotic vaults in a single call.
