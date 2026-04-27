@@ -1,0 +1,879 @@
+Warning: This is a nightly build of Foundry. It is recommended to use the latest stable version. To mute this warning set `FOUNDRY_DISABLE_NIGHTLY_WARNING` in your environment. 
+
+Compiling 2 files with Solc 0.8.28
+Solc 0.8.28 finished in 282.04ms
+Compiler run successful!
+Script ran successfully.
+Gas used: 491719186
+
+== Logs ==
+  
+  ==================================================================
+    SOURCE: Ethereum  |  chainId: 1  |  eid: 30101
+    Endpoint: 0x1a44076050125825900e736c501f859c50fE728c
+    Forking ETH_RPC_URL ...
+  ==================================================================
+  
+    OFT: cUSD  addr: 0xA62571EbdFfAbC3051a2e5B9e1f57b23D830c8Fd
+  
+      -> Monad  (eid: 30390)
+      -------------------------------------------------------
+      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1 [default]
+      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2 [default]
+      [SEND] Executor    : 0x173272739Bd7Aa6e4e214714048a9fE699453059
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x589dEDbD617e0CBcB916A9223F4d1300c294236b (LayerZero Labs)
+             required[1]: 0xa4fE5A5B9A846458a70Cd0748228aED3bF65c2cd (Canary)
+             required[2]: 0xa59BA433ac34D2927232918Ef5B2eaAfcF130BA5 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x589dEDbD617e0CBcB916A9223F4d1300c294236b (LayerZero Labs)
+             required[1]: 0xa4fE5A5B9A846458a70Cd0748228aED3bF65c2cd (Canary)
+             required[2]: 0xa59BA433ac34D2927232918Ef5B2eaAfcF130BA5 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Tempo  (eid: 30410)
+      -------------------------------------------------------
+      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1 [default]
+      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2 [default]
+      [SEND] Executor    : 0x173272739Bd7Aa6e4e214714048a9fE699453059
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x589dEDbD617e0CBcB916A9223F4d1300c294236b (LayerZero Labs)
+             required[1]: 0xa4fE5A5B9A846458a70Cd0748228aED3bF65c2cd (Canary)
+             required[2]: 0xa59BA433ac34D2927232918Ef5B2eaAfcF130BA5 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x589dEDbD617e0CBcB916A9223F4d1300c294236b (LayerZero Labs)
+             required[1]: 0xa4fE5A5B9A846458a70Cd0748228aED3bF65c2cd (Canary)
+             required[2]: 0xa59BA433ac34D2927232918Ef5B2eaAfcF130BA5 (Nethermind)
+      EnforcedOpts [SEND] raw: 0x0003010011010000000000000000000000000005cc60
+        [EXEC] lzReceiveGas: 380000
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> MegaETH  (eid: 30398)
+      -------------------------------------------------------
+      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1 [default]
+      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2 [default]
+      [SEND] Executor    : 0x173272739Bd7Aa6e4e214714048a9fE699453059
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x589dEDbD617e0CBcB916A9223F4d1300c294236b (LayerZero Labs)
+             required[1]: 0xa4fE5A5B9A846458a70Cd0748228aED3bF65c2cd (Canary)
+             required[2]: 0xa59BA433ac34D2927232918Ef5B2eaAfcF130BA5 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x589dEDbD617e0CBcB916A9223F4d1300c294236b (LayerZero Labs)
+             required[1]: 0xa4fE5A5B9A846458a70Cd0748228aED3bF65c2cd (Canary)
+             required[2]: 0xa59BA433ac34D2927232918Ef5B2eaAfcF130BA5 (Nethermind)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000030d40
+        [EXEC] lzReceiveGas: 200000
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Katana  (eid: 30375)
+      -------------------------------------------------------
+      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1 [default]
+      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2 [default]
+      [SEND] Executor    : 0x173272739Bd7Aa6e4e214714048a9fE699453059
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x589dEDbD617e0CBcB916A9223F4d1300c294236b (LayerZero Labs)
+             required[1]: 0xa4fE5A5B9A846458a70Cd0748228aED3bF65c2cd (Canary)
+             required[2]: 0xa59BA433ac34D2927232918Ef5B2eaAfcF130BA5 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x589dEDbD617e0CBcB916A9223F4d1300c294236b (LayerZero Labs)
+             required[1]: 0xa4fE5A5B9A846458a70Cd0748228aED3bF65c2cd (Canary)
+             required[2]: 0xa59BA433ac34D2927232918Ef5B2eaAfcF130BA5 (Nethermind)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
+        [EXEC] lzReceiveGas: 80000
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+    OFT: stcUSD  addr: 0x983AEAaA0d0426839158435C43725EA7F45d4137
+  
+      -> Monad  (eid: 30390)
+      -------------------------------------------------------
+      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1 [default]
+      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2 [default]
+      [SEND] Executor    : 0x173272739Bd7Aa6e4e214714048a9fE699453059
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x589dEDbD617e0CBcB916A9223F4d1300c294236b (LayerZero Labs)
+             required[1]: 0xa4fE5A5B9A846458a70Cd0748228aED3bF65c2cd (Canary)
+             required[2]: 0xa59BA433ac34D2927232918Ef5B2eaAfcF130BA5 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x589dEDbD617e0CBcB916A9223F4d1300c294236b (LayerZero Labs)
+             required[1]: 0xa4fE5A5B9A846458a70Cd0748228aED3bF65c2cd (Canary)
+             required[2]: 0xa59BA433ac34D2927232918Ef5B2eaAfcF130BA5 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Tempo  (eid: 30410)
+      -------------------------------------------------------
+      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1 [default]
+      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2 [default]
+      [SEND] Executor    : 0x173272739Bd7Aa6e4e214714048a9fE699453059
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x589dEDbD617e0CBcB916A9223F4d1300c294236b (LayerZero Labs)
+             required[1]: 0xa4fE5A5B9A846458a70Cd0748228aED3bF65c2cd (Canary)
+             required[2]: 0xa59BA433ac34D2927232918Ef5B2eaAfcF130BA5 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x589dEDbD617e0CBcB916A9223F4d1300c294236b (LayerZero Labs)
+             required[1]: 0xa4fE5A5B9A846458a70Cd0748228aED3bF65c2cd (Canary)
+             required[2]: 0xa59BA433ac34D2927232918Ef5B2eaAfcF130BA5 (Nethermind)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000099cf0
+        [EXEC] lzReceiveGas: 630000
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> MegaETH  (eid: 30398)
+      -------------------------------------------------------
+      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1 [default]
+      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2 [default]
+      [SEND] Executor    : 0x173272739Bd7Aa6e4e214714048a9fE699453059
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x589dEDbD617e0CBcB916A9223F4d1300c294236b (LayerZero Labs)
+             required[1]: 0xa4fE5A5B9A846458a70Cd0748228aED3bF65c2cd (Canary)
+             required[2]: 0xa59BA433ac34D2927232918Ef5B2eaAfcF130BA5 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x589dEDbD617e0CBcB916A9223F4d1300c294236b (LayerZero Labs)
+             required[1]: 0xa4fE5A5B9A846458a70Cd0748228aED3bF65c2cd (Canary)
+             required[2]: 0xa59BA433ac34D2927232918Ef5B2eaAfcF130BA5 (Nethermind)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000030d40
+        [EXEC] lzReceiveGas: 200000
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Katana  (eid: 30375)
+      -------------------------------------------------------
+      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1 [default]
+      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2 [default]
+      [SEND] Executor    : 0x173272739Bd7Aa6e4e214714048a9fE699453059
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x589dEDbD617e0CBcB916A9223F4d1300c294236b (LayerZero Labs)
+             required[1]: 0xa4fE5A5B9A846458a70Cd0748228aED3bF65c2cd (Canary)
+             required[2]: 0xa59BA433ac34D2927232918Ef5B2eaAfcF130BA5 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x589dEDbD617e0CBcB916A9223F4d1300c294236b (LayerZero Labs)
+             required[1]: 0xa4fE5A5B9A846458a70Cd0748228aED3bF65c2cd (Canary)
+             required[2]: 0xa59BA433ac34D2927232918Ef5B2eaAfcF130BA5 (Nethermind)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
+        [EXEC] lzReceiveGas: 80000
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+  ==================================================================
+    SOURCE: Monad  |  chainId: 143  |  eid: 30390
+    Endpoint: 0x6F475642a6e85809B1c36Fa62763669b1b48DD5B
+    Forking MONAD_RPC_URL ...
+  ==================================================================
+  
+    OFT: cUSD  addr: 0xcCcc62962d17b8914c62D74FfB843d73B2a3cccC
+  
+      -> Ethereum  (eid: 30101)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x493626C5D852B9B187a9eb709D0b0978a3877238 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x493626C5D852B9B187a9eb709D0b0978a3877238 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Tempo  (eid: 30410)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x493626C5D852B9B187a9eb709D0b0978a3877238 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x493626C5D852B9B187a9eb709D0b0978a3877238 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> MegaETH  (eid: 30398)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x493626C5D852B9B187a9eb709D0b0978a3877238 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x493626C5D852B9B187a9eb709D0b0978a3877238 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Katana  (eid: 30375)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x493626C5D852B9B187a9eb709D0b0978a3877238 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x493626C5D852B9B187a9eb709D0b0978a3877238 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+    OFT: stcUSD  addr: 0x88887bE419578051FF9F4eb6C858A951921D8888
+  
+      -> Ethereum  (eid: 30101)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x493626C5D852B9B187a9eb709D0b0978a3877238 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x493626C5D852B9B187a9eb709D0b0978a3877238 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Tempo  (eid: 30410)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x493626C5D852B9B187a9eb709D0b0978a3877238 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x493626C5D852B9B187a9eb709D0b0978a3877238 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> MegaETH  (eid: 30398)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x493626C5D852B9B187a9eb709D0b0978a3877238 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x493626C5D852B9B187a9eb709D0b0978a3877238 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Katana  (eid: 30375)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x493626C5D852B9B187a9eb709D0b0978a3877238 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x493626C5D852B9B187a9eb709D0b0978a3877238 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+  ==================================================================
+    SOURCE: Tempo  |  chainId: 4217  |  eid: 30410
+    Endpoint: 0x20Bb7C2E2f4e5ca2B4c57060d1aE2615245dCc9C
+    Forking TEMPO_RPC_URL ...
+  ==================================================================
+  
+    OFT: cUSD  addr: 0xbD12E50Bfaa25735D074DBfDCF73208b9ccD2e43
+  
+      -> Ethereum  (eid: 30101)
+      -------------------------------------------------------
+      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C [default]
+      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5 [default]
+      [SEND] Executor    : 0xf851abCa1d0fD1Df8eAba6de466a102996b7d7B2
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
+             required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
+             required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
+             required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
+             required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
+        [EXEC] lzReceiveGas: 80000
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Monad  (eid: 30390)
+      -------------------------------------------------------
+      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C [default]
+      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5 [default]
+      [SEND] Executor    : 0xf851abCa1d0fD1Df8eAba6de466a102996b7d7B2
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
+             required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
+             required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
+             required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
+             required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> MegaETH  (eid: 30398)
+      -------------------------------------------------------
+      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C [default]
+      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5 [default]
+      [SEND] Executor    : 0xf851abCa1d0fD1Df8eAba6de466a102996b7d7B2
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
+             required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
+             required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
+             required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
+             required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000030d40
+        [EXEC] lzReceiveGas: 200000
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Katana  (eid: 30375)
+      -------------------------------------------------------
+      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C [default]
+      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5 [default]
+      [SEND] Executor    : 0xf851abCa1d0fD1Df8eAba6de466a102996b7d7B2
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
+             required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
+             required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
+             required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
+             required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+    OFT: stcUSD  addr: 0x4eeC5B8FDfBcdd45Dfb29F666D9c34AD38c7aFa5
+  
+      -> Ethereum  (eid: 30101)
+      -------------------------------------------------------
+      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C [default]
+      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5 [default]
+      [SEND] Executor    : 0xf851abCa1d0fD1Df8eAba6de466a102996b7d7B2
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
+             required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
+             required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
+             required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
+             required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
+        [EXEC] lzReceiveGas: 80000
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Monad  (eid: 30390)
+      -------------------------------------------------------
+      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C [default]
+      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5 [default]
+      [SEND] Executor    : 0xf851abCa1d0fD1Df8eAba6de466a102996b7d7B2
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
+             required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
+             required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
+             required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
+             required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> MegaETH  (eid: 30398)
+      -------------------------------------------------------
+      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C [default]
+      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5 [default]
+      [SEND] Executor    : 0xf851abCa1d0fD1Df8eAba6de466a102996b7d7B2
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
+             required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
+             required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
+             required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
+             required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000030d40
+        [EXEC] lzReceiveGas: 200000
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Katana  (eid: 30375)
+      -------------------------------------------------------
+      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C [default]
+      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5 [default]
+      [SEND] Executor    : 0xf851abCa1d0fD1Df8eAba6de466a102996b7d7B2
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
+             required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
+             required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
+             required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
+             required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+  ==================================================================
+    SOURCE: MegaETH  |  chainId: 4326  |  eid: 30398
+    Endpoint: 0x6F475642a6e85809B1c36Fa62763669b1b48DD5B
+    Forking MEGAETH_RPC_URL ...
+  ==================================================================
+  
+    OFT: cUSD  addr: 0xcCcc62962d17b8914c62D74FfB843d73B2a3cccC
+  
+      -> Ethereum  (eid: 30101)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
+             required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
+             required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
+        [EXEC] lzReceiveGas: 80000
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Monad  (eid: 30390)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
+             required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
+             required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Tempo  (eid: 30410)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
+             required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
+             required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000099cf0
+        [EXEC] lzReceiveGas: 630000
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Katana  (eid: 30375)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
+             required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
+             required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+    OFT: stcUSD  addr: 0x88887bE419578051FF9F4eb6C858A951921D8888
+  
+      -> Ethereum  (eid: 30101)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
+             required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
+             required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
+        [EXEC] lzReceiveGas: 80000
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Monad  (eid: 30390)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
+             required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
+             required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Tempo  (eid: 30410)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
+             required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
+             required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000099cf0
+        [EXEC] lzReceiveGas: 630000
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Katana  (eid: 30375)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
+             required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
+             required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+  ==================================================================
+    SOURCE: Katana  |  chainId: 747474  |  eid: 30375
+    Endpoint: 0x6F475642a6e85809B1c36Fa62763669b1b48DD5B
+    Forking KATANA_RPC_URL ...
+  ==================================================================
+  
+    OFT: cUSD  addr: 0xcCcc62962d17b8914c62D74FfB843d73B2a3cccC
+  
+      -> Ethereum  (eid: 30101)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
+        [EXEC] lzReceiveGas: 80000
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Monad  (eid: 30390)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Tempo  (eid: 30410)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> MegaETH  (eid: 30398)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+    OFT: stcUSD  addr: 0x88887bE419578051FF9F4eb6C858A951921D8888
+  
+      -> Ethereum  (eid: 30101)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
+        [EXEC] lzReceiveGas: 80000
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Monad  (eid: 30390)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> Tempo  (eid: 30410)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+      -> MegaETH  (eid: 30398)
+      -------------------------------------------------------
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
+      [SEND] MaxMsgSize  : 10000
+      [SEND] Confirmations : 15
+      [SEND] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      [RECV] Confirmations : 15
+      [RECV] RequiredDVNs  : 3
+             required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
+             required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
+             required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
+      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND_AND_CALL]: (not set)
+      Peer       : NOT SET (0x0000...0000)
+  
+  ==================================================================
+    Done.
+  ==================================================================
