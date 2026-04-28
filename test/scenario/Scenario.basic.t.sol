@@ -92,16 +92,16 @@ contract ScenarioBasicTest is CapIntegrationFixture {
             cUSD.mint(address(usdt), 2000e6, 3000e18, alice, block.timestamp + 1 hours);
             vm.expectRevert();
             /// Time
-            cUSD.mint(address(usdt), 2000e6, 1990e18, alice, block.timestamp - 1);
-            cUSD.mint(address(usdt), 2000e6, 1990e18, alice, block.timestamp + 1 hours);
-            assertGt(cUSD.balanceOf(alice), 1990e18);
+            cUSD.mint(address(usdt), 2000e6, 1989e18, alice, block.timestamp - 1);
+            cUSD.mint(address(usdt), 2000e6, 1989e18, alice, block.timestamp + 1 hours);
+            assertGt(cUSD.balanceOf(alice), 1989e18);
 
             vm.stopPrank();
 
             vm.startPrank(bob);
 
             usdc.approve(address(cUSD), 10000e6);
-            cUSD.mint(address(usdc), 2000e6, 1990e6, bob, block.timestamp + 1 hours);
+            cUSD.mint(address(usdc), 2000e6, 1989e6, bob, block.timestamp + 1 hours);
 
             assertLt(cUSD.balanceOf(bob), 2000e18);
 
