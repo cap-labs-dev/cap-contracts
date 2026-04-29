@@ -38,7 +38,15 @@ contract ZapOFTComposer is SafeOFTLzComposer {
 
     /// @notice Handles incoming composed messages from LayerZero OFTs and executes the zap order it represents.
     /// @inheritdoc SafeOFTLzComposer
-    function _lzCompose(address, /*_oApp*/ bytes32, /*_guid*/ bytes calldata _message, address, bytes calldata)
+    function _lzCompose(
+        address,
+        /*_oApp*/
+        bytes32,
+        /*_guid*/
+        bytes calldata _message,
+        address,
+        bytes calldata
+    )
         internal
         override
     {

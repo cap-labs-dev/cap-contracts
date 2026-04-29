@@ -6,10 +6,7 @@ import { Statement } from "@predicate/interfaces/IPredicateRegistry.sol";
 
 // Mock PredicateRegistry for testing
 contract MockPredicateRegistry {
-    function validateAttestation(Statement calldata _statement, Attestation calldata _attestation)
-        external
-        returns (bool isVerified)
-    {
+    function validateAttestation(Statement calldata, Attestation calldata) external pure returns (bool isVerified) {
         isVerified = true;
     }
 
