@@ -10,48 +10,48 @@
         "receiveUln301": "0x245B6e8FFE9ea5Fc301e32d16F66bD4C2123eEfC",
         "receiveUln302": "0xc02Ab410f0734EFa3F14628780e6e695156024C2"
     },
-    "421614": {
-        "chainName": "Arbitrum Sepolia",
-        "nativeChainId": 421614,
-        "eid": "40231",
-        "executor": "0x5Df3a1cEbBD9c8BA7F8dF51Fd632A9aef8308897",
-        "endpointV2": "0x6EDCE65403992e310A62460808c4b910D972f10f",
-        "sendUln301": "0x92709d5BAc33547482e4BB7dd736f9a82b029c40",
-        "sendUln302": "0x4f7cd4DA19ABB31b0eC98b9066B9e857B1bf9C0E",
-        "receiveUln301": "0xa673a180fB2BF0E315b4f832b7d5b9ACB7162273",
-        "receiveUln302": "0x75Db67CDab2824970131D5aa9CECfC9F69c69636"
+    "143": {
+        "chainName": "Monad",
+        "nativeChainId": 143,
+        "eid": "30390",
+        "executor": "0x4208D6E27538189bB48E603D6123A94b8Abe0A0b",
+        "endpointV2": "0x6F475642a6e85809B1c36Fa62763669b1b48DD5B",
+        "sendUln301": "0x0000000000000000000000000000000000000000",
+        "sendUln302": "0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7",
+        "receiveUln301": "0x0000000000000000000000000000000000000000",
+        "receiveUln302": "0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043"
     },
-    "11155111": {
-        "chainName": "Ethereum Sepolia",
-        "nativeChainId": 11155111,
-        "eid": "40161",
-        "executor": "0x718B92b5CB0a5552039B593faF724D182A881eDA",
-        "endpointV2": "0x6EDCE65403992e310A62460808c4b910D972f10f",
-        "sendUln301": "0x6862b19f6e42a810946B9C782E6ebE26Ad266C84",
-        "sendUln302": "0xcc1ae8Cf5D3904Cef3360A9532B477529b177cCE",
-        "receiveUln301": "0x5937A5fe272fbA38699A1b75B3439389EEFDb399",
-        "receiveUln302": "0xdAf00F5eE2158dD58E0d3857851c432E34A3A851"
+    "4217": {
+        "chainName": "Tempo",
+        "nativeChainId": 4217,
+        "eid": "30410",
+        "executor": "0xf851abCa1d0fD1Df8eAba6de466a102996b7d7B2",
+        "endpointV2": "0x20Bb7C2E2f4e5ca2B4c57060d1aE2615245dCc9C",
+        "sendUln301": "0x0000000000000000000000000000000000000000",
+        "sendUln302": "0x572863d9247E52026E0892d9Cd2E519B41EdB73C",
+        "receiveUln301": "0x0000000000000000000000000000000000000000",
+        "receiveUln302": "0x0B6F08C2D39421Acb49c99abCe82050e356171e5"
     },
-    "17000": {
-        "chainName": "Ethereum Holesky Testnet",
-        "nativeChainId": 17000,
-        "eid": "40217",
-        "executor": "0xBc0C24E6f24eC2F1fd7E859B8322A1277F80aaD5",
-        "endpointV2": "0x6EDCE65403992e310A62460808c4b910D972f10f",
-        "sendUln301": "0xDD066F8c7592bf7235F314028E5e01a66F9835F0",
-        "sendUln302": "0x21F33EcF7F65D61f77e554B4B4380829908cD076",
-        "receiveUln301": "0x8d00218390E52B30d755882E09B2418eD08dCa7d",
-        "receiveUln302": "0xbAe52D605770aD2f0D17533ce56D146c7C964A0d"
+    "4326": {
+        "chainName": "megaETH",
+        "nativeChainId": 4326,
+        "eid": "30398",
+        "executor": "0x4208D6E27538189bB48E603D6123A94b8Abe0A0b",
+        "endpointV2": "0x6F475642a6e85809B1c36Fa62763669b1b48DD5B",
+        "sendUln301": "0x0000000000000000000000000000000000000000",
+        "sendUln302": "0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7",
+        "receiveUln301": "0x0000000000000000000000000000000000000000",
+        "receiveUln302": "0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043"
     },
-    "6342": {
-        "chainName": "MegaETH Testnet",
-        "nativeChainId": 6342,
-        "eid": "40370",
-        "executor": "0x9dB9Ca3305B48F196D18082e91cB64663b13d014",
-        "endpointV2": "0x6C7Ab2202C98C4227C5c46f1417D81144DA716Ff",
-        "sendUln301": "0xB0487596a0B62D1A71D0C33294bd6eB635Fc6B09",
-        "sendUln302": "0xd682ECF100f6F4284138AA925348633B0611Ae21",
-        "receiveUln301": "0x073f5b4FdF17BBC16b0980d49f6C56123477bb51",
-        "receiveUln302": "0xcF1B0F4106B0324F96fEfcC31bA9498caa80701C"
+    "747474": {
+        "chainName": "Katana",
+        "nativeChainId": 747474,
+        "eid": "30375",
+        "executor": "0x4208D6E27538189bB48E603D6123A94b8Abe0A0b",
+        "endpointV2": "0x6F475642a6e85809B1c36Fa62763669b1b48DD5B",
+        "sendUln301": "0x0000000000000000000000000000000000000000",
+        "sendUln302": "0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7",
+        "receiveUln301": "0x0000000000000000000000000000000000000000",
+        "receiveUln302": "0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043"
     }
 }

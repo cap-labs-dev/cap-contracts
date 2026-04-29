@@ -20,7 +20,6 @@ import { CapToken } from "../../token/CapToken.sol";
 import { OFTLockbox } from "../../token/OFTLockbox.sol";
 import { StakedCap } from "../../token/StakedCap.sol";
 import { Vault } from "../../vault/Vault.sol";
-import { ZapOFTComposer } from "../../zap/ZapOFTComposer.sol";
 import {
     FeeConfig,
     ImplementationsConfig,
@@ -50,16 +49,16 @@ contract DeployVault is ProxyUtils {
         d.feeAuction = _proxy(implementations.feeAuction);
 
         FeeReceiver(d.feeReceiver).initialize(infra.accessControl, d.capToken, d.stakedCapToken);
-        FeeAuction(d.feeAuction).initialize(
-            infra.accessControl,
-            d.capToken, // payment token is the vault's cap token
-            d.feeReceiver, // payment recipient is the staked cap token
-            24 hours, // 3 hour auctions
-            1e18 // min price of 1 token
-        );
-        CapToken(d.capToken).initialize(
-            name, symbol, infra.accessControl, d.feeAuction, infra.oracle, assets, insuranceFund
-        );
+        FeeAuction(d.feeAuction)
+            .initialize(
+                infra.accessControl,
+                d.capToken, // payment token is the vault's cap token
+                d.feeReceiver, // payment recipient is the staked cap token
+                24 hours, // 3 hour auctions
+                1e18 // min price of 1 token
+            );
+        CapToken(d.capToken)
+            .initialize(name, symbol, infra.accessControl, d.feeAuction, infra.oracle, assets, insuranceFund);
         StakedCap(d.stakedCapToken).initialize(infra.accessControl, d.capToken, 24 hours);
 
         // deploy and init debt tokens
@@ -73,7 +72,6 @@ contract DeployVault is ProxyUtils {
 
     function _deployVaultLzPeriphery(
         LzAddressbook memory lzAddressbook,
-        ZapAddressbook memory zapAddressbook,
         VaultConfig memory vault,
         UsersConfig memory users
     ) internal returns (VaultLzPeriphery memory d) {
@@ -83,24 +81,6 @@ contract DeployVault is ProxyUtils {
 
         d.stakedCapOFTLockbox =
             address(new OFTLockbox(vault.stakedCapToken, address(lzAddressbook.endpointV2), users.vault_config_admin));
-
-        // deploy the zap composers
-        d.capZapComposer = address(
-            new ZapOFTComposer(
-                address(lzAddressbook.endpointV2),
-                d.capOFTLockbox,
-                zapAddressbook.zapRouter,
-                zapAddressbook.tokenManager
-            )
-        );
-        d.stakedCapZapComposer = address(
-            new ZapOFTComposer(
-                address(lzAddressbook.endpointV2),
-                d.stakedCapOFTLockbox,
-                zapAddressbook.zapRouter,
-                zapAddressbook.tokenManager
-            )
-        );
     }
 
     function _initVaultAccessControl(InfraConfig memory infra, VaultConfig memory vault, UsersConfig memory users)
@@ -158,8 +138,9 @@ contract DeployVault is ProxyUtils {
 
     function _initVaultLender(VaultConfig memory d, InfraConfig memory infra, FeeConfig memory fee) internal {
         for (uint256 i = 0; i < d.assets.length; i++) {
-            Lender(infra.lender).addAsset(
-                ILender.AddAssetParams({
+            Lender(infra.lender)
+                .addAsset(
+                    ILender.AddAssetParams({
                     asset: d.assets[i],
                     vault: d.capToken,
                     debtToken: d.debtTokens[i],
@@ -167,13 +148,14 @@ contract DeployVault is ProxyUtils {
                     bonusCap: 0.1e27,
                     minBorrow: 100e6
                 })
-            );
+                );
 
             Lender(infra.lender).pauseAsset(d.assets[i], false);
 
-            Minter(d.capToken).setFeeData(
-                d.assets[i],
-                IMinter.FeeData({
+            Minter(d.capToken)
+                .setFeeData(
+                    d.assets[i],
+                    IMinter.FeeData({
                     minMintFee: fee.minMintFee,
                     slope0: fee.slope0,
                     slope1: fee.slope1,
@@ -181,7 +163,7 @@ contract DeployVault is ProxyUtils {
                     burnKinkRatio: fee.burnKinkRatio,
                     optimalRatio: fee.optimalRatio
                 })
-            );
+                );
         }
     }
 }

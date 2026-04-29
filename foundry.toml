@@ -36,6 +36,8 @@ fs_permissions = [
     { access = "read", path = "./config/eigen.json" },
     { access = "read", path = "./config/symbiotic.json" },
     { access = "read", path = "./config/layerzero-v2-deployments.json" },
+    { access = "read", path = "./config/oft-deployments.json" },
+    { access = "read", path = "./config/lz-dvn-metadata.json" },
     { access = "read", path = "./config/zap.json" },
     { access = "read", path = "./config/test-harness.json" },
     { access = "read-write", path = "./config/cap-infra.json" },
@@ -50,6 +52,13 @@ fs_permissions = [
 ]
 optimizer = true
 optimizer_runs = 200
+
+[rpc_endpoints]
+ethereum  = "${ETH_RPC_URL}"
+monad     = "${MONAD_RPC_URL}"
+tempo     = "${TEMPO_RPC_URL}"
+megaeth   = "${MEGAETH_RPC_URL}"
+katana    = "${KATANA_RPC_URL}"
 
 [invariant]
 show_metrics = true

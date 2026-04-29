@@ -94,7 +94,7 @@ contract Swapper is ISwapper, UUPSUpgradeable, Access, SwapperStorageUtils {
         returns (uint256 amountOut)
     {
         IERC20Metadata(_fromToken).safeTransferFrom(msg.sender, address(this), _amountIn);
-        _executeSwap(_fromToken, _toToken, _amountIn, _minAmountOut);
+        _executeSwap(_fromToken, _toToken, _amountIn);
         amountOut = IERC20Metadata(_toToken).balanceOf(address(this));
         if (amountOut < _minAmountOut) revert SlippageExceeded(amountOut, _minAmountOut);
         if (amountOut == 0) revert NoAmountOut();
@@ -111,8 +111,7 @@ contract Swapper is ISwapper, UUPSUpgradeable, Access, SwapperStorageUtils {
     /// @param _fromToken Token to swap from
     /// @param _toToken Token to swap to
     /// @param _amountIn Amount of _fromToken to use in the swap
-    /// @param _minAmountOut Minimum amount of _toToken that is acceptable to be returned to caller
-    function _executeSwap(address _fromToken, address _toToken, uint256 _amountIn, uint256 _minAmountOut) private {
+    function _executeSwap(address _fromToken, address _toToken, uint256 _amountIn) private {
         ISwapper.SwapInfo memory swapData = getSwapperStorage().swapInfo[_fromToken][_toToken];
         address router = swapData.router;
         if (router == address(0)) revert NoSwapData(_fromToken, _toToken);
