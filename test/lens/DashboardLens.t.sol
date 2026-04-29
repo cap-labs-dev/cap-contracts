@@ -15,10 +15,6 @@ import { Test } from "forge-std/Test.sol";
 contract DashboardLensForkTest is Test {
     // ─── Contract Addresses ───────────────────────────────────────────────────
 
-    // CAP infrastructure
-    address constant LENDER = 0x15622c3dbbc5614E6DFa9446603c1779647f01FC;
-    address constant MIDDLEWARE = 0x09A3976d8D63728d20DCDFEe1e531C206Ba91225;
-
     // Symbiotic: bedrock / uniBTC vault
     // delegatorAddress from collateralConfigs (delegationNetwork: 'symbiotic')
     address constant VAULT = 0x5e278BF93478c842148E7c52be5415f6C1d46538;
@@ -51,10 +47,10 @@ contract DashboardLensForkTest is Test {
     // ─── Symbiotic Vault Snapshot ─────────────────────────────────────────────
 
     function test_fork_getSymbioticVaultSnapshot_vaultMetadata() public view {
-        SymbioticVaultSnapshot memory s = lens.getSymbioticVaultSnapshot(VAULT, AGENT, MIDDLEWARE);
+        SymbioticVaultSnapshot memory s = lens.getSymbioticVaultSnapshot(VAULT, AGENT);
 
         // Vault-level fields are always populated regardless of who the depositor is.
-        // activeBalance and slashableBalance are 0 here because AGENT is the CAP operator
+        // Depositor-specific balances may be 0 here because AGENT is the CAP operator
         // address, not the identifier registered in this middleware — the Lender aggregates
         // collateral through its own delegation stack using a different internal agent id.
         assertTrue(s.collateralToken != address(0), "collateralToken");
@@ -63,7 +59,7 @@ contract DashboardLensForkTest is Test {
     }
 
     function test_fork_getSymbioticVaultSnapshot_epochFields() public view {
-        SymbioticVaultSnapshot memory s = lens.getSymbioticVaultSnapshot(VAULT, AGENT, MIDDLEWARE);
+        SymbioticVaultSnapshot memory s = lens.getSymbioticVaultSnapshot(VAULT, AGENT);
 
         assertGt(s.currentEpoch, 0, "currentEpoch");
         assertGt(s.epochDuration, 0, "epochDuration");
@@ -76,7 +72,7 @@ contract DashboardLensForkTest is Test {
         address[] memory vaults = new address[](1);
         vaults[0] = VAULT;
 
-        SymbioticVaultSnapshot[] memory snapshots = lens.getSymbioticVaultBatch(vaults, AGENT, MIDDLEWARE);
+        SymbioticVaultSnapshot[] memory snapshots = lens.getSymbioticVaultBatch(vaults, AGENT);
 
         assertEq(snapshots.length, 1);
         assertGt(snapshots[0].currentEpoch, 0, "batch[0].currentEpoch");
@@ -89,7 +85,7 @@ contract DashboardLensForkTest is Test {
         vaults[1] = address(0xdead); // invalid — will revert inside batch
         vaults[2] = VAULT;
 
-        SymbioticVaultSnapshot[] memory snapshots = lens.getSymbioticVaultBatch(vaults, AGENT, MIDDLEWARE);
+        SymbioticVaultSnapshot[] memory snapshots = lens.getSymbioticVaultBatch(vaults, AGENT);
 
         assertEq(snapshots.length, 3);
         // index 0 and 2: real vault — epoch data is populated for any valid Symbiotic vault
@@ -134,7 +130,7 @@ contract DashboardLensForkTest is Test {
     // ─── Loan Snapshot ────────────────────────────────────────────────────────
 
     function test_fork_getLoanSnapshot_nonZeroLoan() public view {
-        LoanSnapshot memory s = lens.getLoanSnapshot(LENDER, AGENT, USDC);
+        LoanSnapshot memory s = lens.getLoanSnapshot(AGENT, USDC);
 
         // bedrock has a $21M loan — all core fields should be non-zero
         assertGt(s.totalDelegation, 0, "totalDelegation");
@@ -146,14 +142,14 @@ contract DashboardLensForkTest is Test {
     }
 
     function test_fork_getLoanSnapshot_healthAboveOne() public view {
-        LoanSnapshot memory s = lens.getLoanSnapshot(LENDER, AGENT, USDC);
+        LoanSnapshot memory s = lens.getLoanSnapshot(AGENT, USDC);
 
         // A healthy agent with a $21M loan should have health > 1 ray (1e27)
         assertGt(s.health, 1e27, "health should be above 1 ray for a well-collateralised agent");
     }
 
     function test_fork_getLoanSnapshot_accruedInterestAndMaxBorrowable() public view {
-        LoanSnapshot memory s = lens.getLoanSnapshot(LENDER, AGENT, USDC);
+        LoanSnapshot memory s = lens.getLoanSnapshot(AGENT, USDC);
 
         // accruedRestakerInterest and maxBorrowable calls must not revert
         // accruedRestakerInterest ≥ 0 (always, for uint256)

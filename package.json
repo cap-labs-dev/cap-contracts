@@ -62,5 +62,6 @@
     "@openzeppelin/foundry-upgrades": "^0.3.7",
     "@uniswap/v3-core": "^1.0.0",
     "eigenlayer": "^2.1.5"
-  }
+  },
+  "packageManager": "yarn@1.22.22"
 }

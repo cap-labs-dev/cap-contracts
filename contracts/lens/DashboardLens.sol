@@ -3,6 +3,10 @@ pragma solidity ^0.8.28;
 
 import { ILender } from "../interfaces/ILender.sol";
 import { ISymbioticNetworkMiddleware } from "../interfaces/ISymbioticNetworkMiddleware.sol";
+import {
+    IOperatorNetworkSpecificDelegator
+} from "@symbioticfi/core/src/interfaces/delegator/IOperatorNetworkSpecificDelegator.sol";
+import { IOptInService } from "@symbioticfi/core/src/interfaces/service/IOptInService.sol";
 import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 import { IDelegationManager } from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import { IStrategy } from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
@@ -20,15 +24,26 @@ interface IAllocationManagerLens {
 // ─── Structs ─────────────────────────────────────────────────────────────────
 
 struct SymbioticVaultSnapshot {
-    uint256 activeBalance;
-    uint256 slashableBalance;
-    uint256 withdrawalAmount;
+    uint256 activeStake;
+    uint256 depositorActiveBalance;
+    uint256 depositorWithdrawalAmount;
     uint256 withdrawalEpoch;
     uint256 currentEpoch;
     uint256 epochDuration;
     uint256 nextEpochStart;
     bool isWhitelistEnabled;
     address collateralToken;
+    uint256 depositorActiveShares;
+    bool depositorIsWhitelisted;
+    uint256 activeShares;
+    bool isDepositLimit;
+    uint256 depositLimit;
+    address burner;
+    address delegator;
+    bool isDelegatorInitialized;
+    address slasher;
+    bool isSlasherInitialized;
+    bool isCapNetworkVault;
 }
 
 struct EigenLayerSnapshot {
@@ -59,31 +74,50 @@ struct LoanSnapshot {
 ///         RPC round-trips and avoid rate limiting.
 /// @dev No state, no write functions, no access control — purely a view utility.
 contract DashboardLens {
+    ILender public constant LENDER = ILender(0x15622c3dbbc5614E6DFa9446603c1779647f01FC);
+    IOptInService public constant VAULT_OPT_IN_SERVICE = IOptInService(0xb361894bC06cbBA7Ea8098BF0e32EB1906A5F891);
+
     // ─── Symbiotic ───────────────────────────────────────────────────────────
 
     /// @notice Returns a snapshot of a single Symbiotic vault for a given depositor.
     /// @param vault      The Symbiotic vault contract address.
     /// @param depositor  The address whose balance and withdrawal state to read.
     ///                   For a CAP delegator, pass the delegator's agent address.
-    /// @param middleware The SymbioticNetworkMiddleware address for slashableCollateral reads.
-    function getSymbioticVaultSnapshot(address vault, address depositor, address middleware)
+    function getSymbioticVaultSnapshot(address vault, address depositor)
         external
         view
         returns (SymbioticVaultSnapshot memory snapshot)
     {
         IVault v = IVault(vault);
 
-        snapshot.activeBalance = v.activeBalanceOf(depositor);
-        snapshot.slashableBalance =
-            ISymbioticNetworkMiddleware(middleware).slashableCollateral(depositor, uint48(block.timestamp));
+        snapshot.depositorActiveBalance = v.activeBalanceOf(depositor);
+        snapshot.depositorActiveShares = v.activeSharesOf(depositor);
+        snapshot.depositorIsWhitelisted = v.isDepositorWhitelisted(depositor);
+
+        snapshot.activeStake = v.activeStake();
         snapshot.currentEpoch = v.currentEpoch();
         snapshot.withdrawalEpoch = snapshot.currentEpoch + 1;
-        snapshot.withdrawalAmount = v.withdrawalsOf(snapshot.withdrawalEpoch, depositor);
+        snapshot.depositorWithdrawalAmount = v.withdrawalsOf(snapshot.withdrawalEpoch, depositor);
         uint48 duration = v.epochDuration();
         snapshot.epochDuration = uint256(duration);
-        snapshot.nextEpochStart = uint256(v.currentEpochStart()) + uint256(duration);
+        snapshot.nextEpochStart = uint256(v.nextEpochStart());
         snapshot.isWhitelistEnabled = v.depositWhitelist();
         snapshot.collateralToken = v.collateral();
+
+        snapshot.activeShares = v.activeShares();
+        snapshot.isDepositLimit = v.isDepositLimit();
+        snapshot.depositLimit = v.depositLimit();
+        snapshot.burner = v.burner();
+        snapshot.delegator = v.delegator();
+        snapshot.isDelegatorInitialized = v.isDelegatorInitialized();
+        snapshot.slasher = v.slasher();
+        snapshot.isSlasherInitialized = v.isSlasherInitialized();
+
+        try IOperatorNetworkSpecificDelegator(snapshot.delegator).operator() returns (address operator) {
+            try VAULT_OPT_IN_SERVICE.isOptedIn(operator, vault) returns (bool opted) {
+                snapshot.isCapNetworkVault = opted;
+            } catch { }
+        } catch { }
     }
 
     /// @notice Returns snapshots for multiple Symbiotic vaults in a single call.
@@ -91,17 +125,14 @@ contract DashboardLens {
     ///         rather than reverting the entire batch.
     /// @param vaults     Array of Symbiotic vault addresses.
     /// @param depositor  The address to read balances for.
-    /// @param middleware The SymbioticNetworkMiddleware address for slashableCollateral reads.
-    function getSymbioticVaultBatch(address[] calldata vaults, address depositor, address middleware)
+    function getSymbioticVaultBatch(address[] calldata vaults, address depositor)
         external
         view
         returns (SymbioticVaultSnapshot[] memory snapshots)
     {
         snapshots = new SymbioticVaultSnapshot[](vaults.length);
         for (uint256 i = 0; i < vaults.length; i++) {
-            try this.getSymbioticVaultSnapshot(vaults[i], depositor, middleware) returns (
-                SymbioticVaultSnapshot memory s
-            ) {
+            try this.getSymbioticVaultSnapshot(vaults[i], depositor) returns (SymbioticVaultSnapshot memory s) {
                 snapshots[i] = s;
             } catch {
                 // Leave snapshots[i] as zero-value struct
@@ -157,26 +188,42 @@ contract DashboardLens {
 
     /// @notice Returns a comprehensive snapshot of a CAP loan position.
     ///         Combines Lender.agent() (6 values) with accruedRestakerInterest and maxBorrowable.
-    /// @param lender The CAP Lender contract address.
     /// @param agent  The delegator agent address.
     /// @param asset  The borrowed asset address.
-    function getLoanSnapshot(address lender, address agent, address asset)
-        external
-        view
-        returns (LoanSnapshot memory snapshot)
-    {
-        ILender l = ILender(lender);
-
-        (
-            snapshot.totalDelegation,
-            snapshot.totalSlashableCollateral,
-            snapshot.totalDebt,
-            snapshot.ltv,
-            snapshot.liquidationThreshold,
-            snapshot.health
-        ) = l.agent(agent);
-
-        snapshot.accruedRestakerInterest = l.accruedRestakerInterest(agent, asset);
-        snapshot.maxBorrowable = l.maxBorrowable(agent, asset);
+    function getLoanSnapshot(address agent, address asset) external view returns (LoanSnapshot memory snapshot) {
+        try LENDER.agent(agent) returns (
+            uint256 totalDelegation,
+            uint256 totalSlashableCollateral,
+            uint256 totalDebt,
+            uint256 ltv,
+            uint256 liquidationThreshold,
+            uint256 health
+        ) {
+            snapshot.totalDelegation = totalDelegation;
+            snapshot.totalSlashableCollateral = totalSlashableCollateral;
+            snapshot.totalDebt = totalDebt;
+            snapshot.ltv = ltv;
+            snapshot.liquidationThreshold = liquidationThreshold;
+            snapshot.health = health;
+        } catch {
+            snapshot.totalDelegation = 0;
+            snapshot.totalSlashableCollateral = 0;
+            snapshot.totalDebt = 0;
+            snapshot.ltv = 0;
+            snapshot.liquidationThreshold = 0;
+            snapshot.health = 0;
+        }
+        // Try to call accruedRestakerInterest, set to 0 if it fails
+        try LENDER.accruedRestakerInterest(agent, asset) returns (uint256 interest) {
+            snapshot.accruedRestakerInterest = interest;
+        } catch {
+            snapshot.accruedRestakerInterest = 0;
+        }
+        // Try to call maxBorrowable, set to 0 if it fails
+        try LENDER.maxBorrowable(agent, asset) returns (uint256 maxBorrow) {
+            snapshot.maxBorrowable = maxBorrow;
+        } catch {
+            snapshot.maxBorrowable = 0;
+        }
     }
 }
