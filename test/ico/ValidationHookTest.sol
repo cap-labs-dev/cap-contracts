@@ -18,7 +18,7 @@ contract ValidationHookTest is IcoSetup {
         erc1155.ownerMint(recipients);
     }
 
-    function test_validation_hook_supports_interface() public {
+    function test_validation_hook_supports_interface() public view {
         assertEq(validationHook.supportsInterface(type(IValidationHook).interfaceId), true);
         assertEq(validationHook.supportsInterface(type(IPredicateClient).interfaceId), true);
         assertEq(validationHook.supportsInterface(type(IGatedERC1155ValidationHook).interfaceId), true);

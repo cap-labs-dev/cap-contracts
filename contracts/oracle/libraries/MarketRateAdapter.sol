@@ -7,7 +7,7 @@ pragma solidity ^0.8.28;
 library MarketRateAdapter {
     /// @notice Returns the market rate for an asset
     /// @return latestAnswer Latest borrow rate for the asset
-    function rate() external view returns (uint256 latestAnswer) {
+    function rate() external pure returns (uint256 latestAnswer) {
         return 0;
     }
 }
