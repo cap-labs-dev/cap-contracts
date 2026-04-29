@@ -1,10 +1,10 @@
 Warning: This is a nightly build of Foundry. It is recommended to use the latest stable version. To mute this warning set `FOUNDRY_DISABLE_NIGHTLY_WARNING` in your environment. 
 
 Compiling 2 files with Solc 0.8.28
-Solc 0.8.28 finished in 282.04ms
+Solc 0.8.28 finished in 579.20ms
 Compiler run successful!
 Script ran successfully.
-Gas used: 491719186
+Gas used: 491756166
 
 == Logs ==
   
@@ -55,7 +55,7 @@ Gas used: 491719186
       EnforcedOpts [SEND] raw: 0x0003010011010000000000000000000000000005cc60
         [EXEC] lzReceiveGas: 380000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x000000000000000000000000bd12e50bfaa25735d074dbfdcf73208b9ccd2e43
   
       -> MegaETH  (eid: 30398)
       -------------------------------------------------------
@@ -76,7 +76,7 @@ Gas used: 491719186
       EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000030d40
         [EXEC] lzReceiveGas: 200000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x000000000000000000000000cccc62962d17b8914c62d74ffb843d73b2a3cccc
   
       -> Katana  (eid: 30375)
       -------------------------------------------------------
@@ -140,7 +140,7 @@ Gas used: 491719186
       EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000099cf0
         [EXEC] lzReceiveGas: 630000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x0000000000000000000000004eec5b8fdfbcdd45dfb29f666d9c34ad38c7afa5
   
       -> MegaETH  (eid: 30398)
       -------------------------------------------------------
@@ -161,7 +161,7 @@ Gas used: 491719186
       EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000030d40
         [EXEC] lzReceiveGas: 200000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x00000000000000000000000088887be419578051ff9f4eb6c858a951921d8888
   
       -> Katana  (eid: 30375)
       -------------------------------------------------------
@@ -381,7 +381,7 @@ Gas used: 491719186
       EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
         [EXEC] lzReceiveGas: 80000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x000000000000000000000000a62571ebdffabc3051a2e5b9e1f57b23d830c8fd
   
       -> Monad  (eid: 30390)
       -------------------------------------------------------
@@ -422,7 +422,7 @@ Gas used: 491719186
       EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000030d40
         [EXEC] lzReceiveGas: 200000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x000000000000000000000000cccc62962d17b8914c62d74ffb843d73b2a3cccc
   
       -> Katana  (eid: 30375)
       -------------------------------------------------------
@@ -465,7 +465,7 @@ Gas used: 491719186
       EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
         [EXEC] lzReceiveGas: 80000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x000000000000000000000000983aeaaa0d0426839158435c43725ea7f45d4137
   
       -> Monad  (eid: 30390)
       -------------------------------------------------------
@@ -506,7 +506,7 @@ Gas used: 491719186
       EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000030d40
         [EXEC] lzReceiveGas: 200000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x00000000000000000000000088887be419578051ff9f4eb6c858a951921d8888
   
       -> Katana  (eid: 30375)
       -------------------------------------------------------
@@ -555,7 +555,7 @@ Gas used: 491719186
       EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
         [EXEC] lzReceiveGas: 80000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x000000000000000000000000a62571ebdffabc3051a2e5b9e1f57b23d830c8fd
   
       -> Monad  (eid: 30390)
       -------------------------------------------------------
@@ -596,7 +596,7 @@ Gas used: 491719186
       EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000099cf0
         [EXEC] lzReceiveGas: 630000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x000000000000000000000000bd12e50bfaa25735d074dbfdcf73208b9ccd2e43
   
       -> Katana  (eid: 30375)
       -------------------------------------------------------
@@ -639,7 +639,7 @@ Gas used: 491719186
       EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
         [EXEC] lzReceiveGas: 80000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x000000000000000000000000983aeaaa0d0426839158435c43725ea7f45d4137
   
       -> Monad  (eid: 30390)
       -------------------------------------------------------
@@ -680,7 +680,7 @@ Gas used: 491719186
       EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000099cf0
         [EXEC] lzReceiveGas: 630000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x0000000000000000000000004eec5b8fdfbcdd45dfb29f666d9c34ad38c7afa5
   
       -> Katana  (eid: 30375)
       -------------------------------------------------------
