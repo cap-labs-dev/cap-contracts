@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import { IDelegation } from "../interfaces/IDelegation.sol";
 import { ILender } from "../interfaces/ILender.sol";
+import { IPriceOracle } from "../interfaces/IPriceOracle.sol";
+import { IRateOracle } from "../interfaces/IRateOracle.sol";
 import { ISymbioticNetworkMiddleware } from "../interfaces/ISymbioticNetworkMiddleware.sol";
 import {
     IOperatorNetworkSpecificDelegator
@@ -64,6 +67,20 @@ struct LoanSnapshot {
     uint256 health;
     uint256 accruedRestakerInterest;
     uint256 maxBorrowable;
+    /// @dev Rates in ray (27 decimals), yearly — matches IRateOracle / DebtToken interest logic.
+    uint256 benchmarkRate;
+    uint256 marketRate;
+    uint256 utilizationRate;
+    uint256 restakerRate;
+    /// @dev max(marketRate, benchmarkRate) + utilizationRate, same as DebtToken._nextInterestRate.
+    uint256 borrowRate;
+    /// @dev Price and lastUpdated from IPriceOracle.getPrice (8-decimal USD convention).
+    uint256 vaultAssetPrice;
+    uint256 vaultAssetPriceLastUpdated;
+    address collateralToken;
+    bool hasCollateralToken;
+    uint256 collateralTokenPrice;
+    uint256 collateralTokenPriceLastUpdated;
 }
 
 // ─── DashboardLens ───────────────────────────────────────────────────────────
@@ -72,10 +89,14 @@ struct LoanSnapshot {
 /// @notice Read-only aggregation contract for the CAP Underwriter Dashboard.
 ///         Batches multiple external contract reads into a single call to reduce
 ///         RPC round-trips and avoid rate limiting.
-/// @dev No state, no write functions, no access control — purely a view utility.
+/// @dev No state, no write functions, no access control — purely an aggregation utility.
+///      Some reads use non-view oracle rate functions; callers should use eth_call.
 contract DashboardLens {
     ILender public constant LENDER = ILender(0x15622c3dbbc5614E6DFa9446603c1779647f01FC);
     IOptInService public constant VAULT_OPT_IN_SERVICE = IOptInService(0xb361894bC06cbBA7Ea8098BF0e32EB1906A5F891);
+    IDelegation public constant DELEGATION = IDelegation(0xF3E3Eae671000612CE3Fd15e1019154C1a4d693F);
+    IRateOracle public constant RATE_ORACLE = IRateOracle(0xcD7f45566bc0E7303fB92A93969BB4D3f6e662bb);
+    IPriceOracle public constant PRICE_ORACLE = IPriceOracle(0xcD7f45566bc0E7303fB92A93969BB4D3f6e662bb);
 
     // ─── Symbiotic ───────────────────────────────────────────────────────────
 
@@ -187,10 +208,12 @@ contract DashboardLens {
     // ─── CAP Lender ──────────────────────────────────────────────────────────
 
     /// @notice Returns a comprehensive snapshot of a CAP loan position.
-    ///         Combines Lender.agent() (6 values) with accruedRestakerInterest and maxBorrowable.
+    ///         Combines Lender.agent(), accruedRestakerInterest, maxBorrowable, oracle rates/prices,
+    ///         and borrowRate (max(marketRate, benchmarkRate) + utilizationRate, matching DebtToken).
+    /// @dev Not `view`: IRateOracle.marketRate / utilizationRate are non-view (adapter calls).
     /// @param agent  The delegator agent address.
     /// @param asset  The borrowed asset address.
-    function getLoanSnapshot(address agent, address asset) external view returns (LoanSnapshot memory snapshot) {
+    function getLoanSnapshot(address agent, address asset) external returns (LoanSnapshot memory snapshot) {
         try LENDER.agent(agent) returns (
             uint256 totalDelegation,
             uint256 totalSlashableCollateral,
@@ -225,5 +248,40 @@ contract DashboardLens {
         } catch {
             snapshot.maxBorrowable = 0;
         }
+
+        try RATE_ORACLE.benchmarkRate(asset) returns (uint256 r) {
+            snapshot.benchmarkRate = r;
+        } catch { }
+
+        try RATE_ORACLE.marketRate(asset) returns (uint256 r) {
+            snapshot.marketRate = r;
+        } catch { }
+
+        try RATE_ORACLE.utilizationRate(asset) returns (uint256 r) {
+            snapshot.utilizationRate = r;
+        } catch { }
+
+        try RATE_ORACLE.restakerRate(agent) returns (uint256 r) {
+            snapshot.restakerRate = r;
+        } catch { }
+
+        uint256 base = snapshot.marketRate > snapshot.benchmarkRate ? snapshot.marketRate : snapshot.benchmarkRate;
+        snapshot.borrowRate = base + snapshot.utilizationRate;
+
+        try PRICE_ORACLE.getPrice(asset) returns (uint256 price, uint256 lastUpdated) {
+            snapshot.vaultAssetPrice = price;
+            snapshot.vaultAssetPriceLastUpdated = lastUpdated;
+        } catch { }
+
+        try DELEGATION.collateral(agent) returns (address collateral) {
+            if (collateral != address(0)) {
+                snapshot.collateralToken = collateral;
+                snapshot.hasCollateralToken = true;
+                try PRICE_ORACLE.getPrice(collateral) returns (uint256 price, uint256 lastUpdated) {
+                    snapshot.collateralTokenPrice = price;
+                    snapshot.collateralTokenPriceLastUpdated = lastUpdated;
+                } catch { }
+            }
+        } catch { }
     }
 }

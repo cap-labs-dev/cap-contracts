@@ -129,7 +129,7 @@ contract DashboardLensForkTest is Test {
 
     // ─── Loan Snapshot ────────────────────────────────────────────────────────
 
-    function test_fork_getLoanSnapshot_nonZeroLoan() public view {
+    function test_fork_getLoanSnapshot_nonZeroLoan() public {
         LoanSnapshot memory s = lens.getLoanSnapshot(AGENT, USDC);
 
         // bedrock has a $21M loan — all core fields should be non-zero
@@ -141,14 +141,14 @@ contract DashboardLensForkTest is Test {
         assertGt(s.liquidationThreshold, 0, "liquidationThreshold");
     }
 
-    function test_fork_getLoanSnapshot_healthAboveOne() public view {
+    function test_fork_getLoanSnapshot_healthAboveOne() public {
         LoanSnapshot memory s = lens.getLoanSnapshot(AGENT, USDC);
 
         // A healthy agent with a $21M loan should have health > 1 ray (1e27)
         assertGt(s.health, 1e27, "health should be above 1 ray for a well-collateralised agent");
     }
 
-    function test_fork_getLoanSnapshot_accruedInterestAndMaxBorrowable() public view {
+    function test_fork_getLoanSnapshot_accruedInterestAndMaxBorrowable() public {
         LoanSnapshot memory s = lens.getLoanSnapshot(AGENT, USDC);
 
         // accruedRestakerInterest and maxBorrowable calls must not revert
