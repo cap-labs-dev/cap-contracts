@@ -1,0 +1,27 @@
+{
+    "address": "0x99991c6AAbba5a096f24f250b73580F5179b9999",
+    "implementation": "0x9c850771b321c6E7AA909413B5Cc98C86CcBa96f",
+    "name": "Cap",
+    "symbol": "CAP",
+    "decimals": 18,
+    "supply": "10B",
+    "owner": {
+        "address": "0x00000000c3da1F276183e66EBdb2B6dB7763b709",
+        "type": "timelock",
+        "delay": 86400,
+        "proposers": [
+            {
+                "address": "0x80A216738E4e49B262Deae6bEb6578Bdf164c2eA",
+                "type": "multisig",
+                "threshold": 3,
+                "signers": [
+                    "0x62D0b3c0a77bE77EaB2060266a95FfaD9e6A3F51",
+                    "0x7c29F6A93df60Bcd3B20f03B57a2F9e698FD4128",
+                    "0xA62f87A9D4B5EE1F83cb644Ea076832A396101b8",
+                    "0xC1F56b5Af6aFfe36BC9A4cd9bd6cAaCFdc18FD7a",
+                    "0xdf466Fa3ddd0042d990FA9A023e040884CBaD439"
+                ]
+            }
+        ]
+    }
+}
