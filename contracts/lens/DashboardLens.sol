@@ -6,6 +6,7 @@ import { ILender } from "../interfaces/ILender.sol";
 import { IPriceOracle } from "../interfaces/IPriceOracle.sol";
 import { IRateOracle } from "../interfaces/IRateOracle.sol";
 import { ISymbioticNetworkMiddleware } from "../interfaces/ISymbioticNetworkMiddleware.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {
     IOperatorNetworkSpecificDelegator
 } from "@symbioticfi/core/src/interfaces/delegator/IOperatorNetworkSpecificDelegator.sol";
@@ -36,6 +37,11 @@ struct SymbioticVaultSnapshot {
     uint256 nextEpochStart;
     bool isWhitelistEnabled;
     address collateralToken;
+    string collateralTokenSymbol;
+    string collateralTokenName;
+    uint256 collateralTokenDecimals;
+    uint256 collateralTokenPrice;
+    uint256 collateralTokenPriceLastUpdated;
     uint256 depositorActiveShares;
     bool depositorIsWhitelisted;
     uint256 activeShares;
@@ -78,7 +84,9 @@ struct LoanSnapshot {
     uint256 vaultAssetPrice;
     uint256 vaultAssetPriceLastUpdated;
     address collateralToken;
-    bool hasCollateralToken;
+    string collateralTokenSymbol;
+    string collateralTokenName;
+    uint256 collateralTokenDecimals;
     uint256 collateralTokenPrice;
     uint256 collateralTokenPriceLastUpdated;
 }
@@ -124,6 +132,13 @@ contract DashboardLens {
         snapshot.nextEpochStart = uint256(v.nextEpochStart());
         snapshot.isWhitelistEnabled = v.depositWhitelist();
         snapshot.collateralToken = v.collateral();
+        if (snapshot.collateralToken != address(0)) {
+            snapshot.collateralTokenSymbol = IERC20Metadata(snapshot.collateralToken).symbol();
+            snapshot.collateralTokenName = IERC20Metadata(snapshot.collateralToken).name();
+            snapshot.collateralTokenDecimals = IERC20Metadata(snapshot.collateralToken).decimals();
+            (snapshot.collateralTokenPrice, snapshot.collateralTokenPriceLastUpdated) =
+                PRICE_ORACLE.getPrice(snapshot.collateralToken);
+        }
 
         snapshot.activeShares = v.activeShares();
         snapshot.isDepositLimit = v.isDepositLimit();
@@ -276,7 +291,11 @@ contract DashboardLens {
         try DELEGATION.collateral(agent) returns (address collateral) {
             if (collateral != address(0)) {
                 snapshot.collateralToken = collateral;
-                snapshot.hasCollateralToken = true;
+                snapshot.collateralTokenSymbol = IERC20Metadata(collateral).symbol();
+                snapshot.collateralTokenName = IERC20Metadata(collateral).name();
+                snapshot.collateralTokenDecimals = IERC20Metadata(collateral).decimals();
+                (snapshot.collateralTokenPrice, snapshot.collateralTokenPriceLastUpdated) =
+                    PRICE_ORACLE.getPrice(collateral);
                 try PRICE_ORACLE.getPrice(collateral) returns (uint256 price, uint256 lastUpdated) {
                     snapshot.collateralTokenPrice = price;
                     snapshot.collateralTokenPriceLastUpdated = lastUpdated;

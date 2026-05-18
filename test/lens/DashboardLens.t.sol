@@ -54,6 +54,11 @@ contract DashboardLensForkTest is Test {
         // address, not the identifier registered in this middleware — the Lender aggregates
         // collateral through its own delegation stack using a different internal agent id.
         assertTrue(s.collateralToken != address(0), "collateralToken");
+        assertGt(bytes(s.collateralTokenSymbol).length, 0, "collateralTokenSymbol");
+        assertGt(bytes(s.collateralTokenName).length, 0, "collateralTokenName");
+        assertGt(s.collateralTokenDecimals, 0, "collateralTokenDecimals");
+        assertGt(s.collateralTokenPrice, 0, "collateralTokenPrice");
+        assertGt(s.collateralTokenPriceLastUpdated, 0, "collateralTokenPriceLastUpdated");
         assertGt(s.epochDuration, 0, "epochDuration");
         assertGt(s.currentEpoch, 0, "currentEpoch");
     }
@@ -156,5 +161,18 @@ contract DashboardLensForkTest is Test {
         // maxBorrowable can be 0 if agent is at capacity — just confirm no revert
         assertTrue(s.accruedRestakerInterest >= 0); // confirms call succeeded
         assertTrue(s.maxBorrowable >= 0); // confirms call succeeded
+    }
+
+    function test_fork_getLoanSnapshot_collateralMetadata() public {
+        LoanSnapshot memory s = lens.getLoanSnapshot(AGENT, USDC);
+
+        assertTrue(s.collateralToken != address(0), "collateralToken");
+        assertGt(bytes(s.collateralTokenSymbol).length, 0, "collateralTokenSymbol");
+        assertGt(bytes(s.collateralTokenName).length, 0, "collateralTokenName");
+        assertGt(s.collateralTokenDecimals, 0, "collateralTokenDecimals");
+        assertGt(s.collateralTokenPrice, 0, "collateralTokenPrice");
+        assertGt(s.collateralTokenPriceLastUpdated, 0, "collateralTokenPriceLastUpdated");
+        assertGt(s.vaultAssetPrice, 0, "vaultAssetPrice");
+        assertGt(s.vaultAssetPriceLastUpdated, 0, "vaultAssetPriceLastUpdated");
     }
 }
