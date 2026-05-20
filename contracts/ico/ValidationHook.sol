@@ -140,7 +140,7 @@ contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Ac
     }
 
     /// @inheritdoc IERC165
-    function supportsInterface(bytes4 interfaceId) public view returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public pure returns (bool) {
         return interfaceId == type(IValidationHook).interfaceId || interfaceId == type(IPredicateClient).interfaceId
             || interfaceId == type(IGatedERC1155ValidationHook).interfaceId || interfaceId == type(IERC165).interfaceId;
     }

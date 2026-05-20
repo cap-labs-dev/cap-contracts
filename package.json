@@ -18,6 +18,8 @@
     "check-proxy-implem:save": "yarn --silent check-proxy-implem > check-proxy-implem.txt",
     "check-access": "forge script script/manage/CheckAccess.s.sol:CheckAccess --via-ir --rpc-url ethereum",
     "check-access:save": "yarn --silent check-access > check-access.txt",
+    "check-oft-config": "forge script script/layerzero/CheckOFTConfig.s.sol:CheckOFTConfig",
+    "check-oft-config:save": "forge script script/layerzero/CheckOFTConfig.s.sol 2>&1 | tee oft-config-report.txt",
     "test": "forge test --no-match-path 'test/noTest/*'",
     "test:unit": "forge test --no-match-path 'test/noTest/* --no-match-path 'test/**/*.invariants.t.sol'",
     "test:invariants": "forge test --match-path 'test/**/*.invariants.t.sol'",

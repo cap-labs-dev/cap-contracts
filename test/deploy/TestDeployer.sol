@@ -200,7 +200,7 @@ contract TestDeployer is
     }
 
     function _loadExternalAddressbooks() internal {
-        lzAb = _getLzAddressbook();
+        if (!useMockBackingNetwork()) lzAb = _getLzAddressbook();
         symbioticAb = _getSymbioticAddressbook();
         zapAb = _getZapAddressbook();
         if (!useMockBackingNetwork()) eigenAb = _getEigenAddressbook();
@@ -228,7 +228,7 @@ contract TestDeployer is
             console.log("skipping lzperiphery (mock backing network)");
         } else {
             console.log("deploying lzperiphery");
-            env.usdVault.lzperiphery = _deployVaultLzPeriphery(lzAb, zapAb, env.usdVault, env.users);
+            env.usdVault.lzperiphery = _deployVaultLzPeriphery(lzAb, env.usdVault, env.users);
         }
     }
 

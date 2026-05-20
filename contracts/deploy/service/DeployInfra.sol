@@ -14,7 +14,6 @@ import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy
 import { L2TokenUpgradeable } from "../../token/L2TokenUpgradeable.sol";
 import { Vault } from "../../vault/Vault.sol";
 
-import { PreMainnetVault } from "../../testnetCampaign/PreMainnetVault.sol";
 import {
     ImplementationsConfig,
     InfraConfig,
@@ -43,21 +42,6 @@ contract DeployInfra is ProxyUtils {
         Lender(d.lender).initialize(d.accessControl, d.delegation, d.oracle, 1.25e27, 1 hours, 1 days, 0.1e27, 0.9e27);
         Oracle(d.oracle).initialize(d.accessControl);
         Delegation(d.delegation).initialize(d.accessControl, d.oracle, _delegationEpochDuration);
-    }
-
-    function _deployPreMainnetInfra(
-        LzAddressbook memory srcAddressbook,
-        LzAddressbook memory dstAddressbook,
-        address asset,
-        address cap,
-        address stakedCap,
-        uint48 maxCampaignLength
-    ) internal returns (PreMainnetInfraConfig memory d) {
-        d.preMainnetVault = address(
-            new PreMainnetVault(
-                asset, cap, stakedCap, address(srcAddressbook.endpointV2), dstAddressbook.eid, maxCampaignLength
-            )
-        );
     }
 
     function _deployL2InfraForVault(
