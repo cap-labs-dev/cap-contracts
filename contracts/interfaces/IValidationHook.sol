@@ -8,7 +8,7 @@ import { IPredicateClient } from "@predicate/interfaces/IPredicateClient.sol";
 /// @title IValidationHook
 /// @notice Interface for the validation hook
 /// @author kexley, Cap Labs
-interface IValidationHook is IPredicateClient, IGatedERC1155ValidationHook, IERC165 {
+interface IValidationHook is IPredicateClient, IGatedERC1155ValidationHook {
     /// @custom:storage-location erc7201:cap.storage.ValidationHook
     /// @dev Validation hook storage
     /// @param auction Auction address
