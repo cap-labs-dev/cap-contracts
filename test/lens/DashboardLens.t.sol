@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { IDelegation } from "../../contracts/interfaces/IDelegation.sol";
+import { ILender } from "../../contracts/interfaces/ILender.sol";
 import {
     DashboardLens,
     EigenLayerSnapshot,
@@ -171,6 +172,23 @@ contract DashboardLensForkTest is Test {
         assertGt(s.ltv, 0, "ltv");
         assertGt(s.liquidationThreshold, 0, "liquidationThreshold");
         assertEq(s.coverageCap, IDelegation(address(lens.DELEGATION())).coverageCap(AGENT), "coverageCap");
+
+        (
+            uint256 id,
+            address vault,
+            address debtToken,
+            address interestReceiver,
+            uint8 decimals,
+            bool paused,
+            uint256 minBorrow
+        ) = ILender(address(lens.LENDER())).reservesData(USDC);
+        assertEq(s.reserve.id, id, "reserve.id");
+        assertEq(s.reserve.vault, vault, "reserve.vault");
+        assertEq(s.reserve.debtToken, debtToken, "reserve.debtToken");
+        assertEq(s.reserve.interestReceiver, interestReceiver, "reserve.interestReceiver");
+        assertEq(s.reserve.decimals, decimals, "reserve.decimals");
+        assertEq(s.reserve.paused, paused, "reserve.paused");
+        assertEq(s.reserve.minBorrow, minBorrow, "reserve.minBorrow");
     }
 
     function test_fork_getLoanSnapshot_healthAboveOne() public {

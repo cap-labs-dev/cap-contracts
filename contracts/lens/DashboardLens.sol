@@ -86,11 +86,22 @@ struct EigenLayerSnapshot {
     bool allocationDelayPending;
 }
 
+struct ReserveSnapshot {
+    uint256 id;
+    address vault;
+    address debtToken;
+    address interestReceiver;
+    uint8 decimals;
+    bool paused;
+    uint256 minBorrow;
+}
+
 struct LoanSnapshot {
     uint256 totalDelegation;
     uint256 totalSlashableCollateral;
     /// @dev Coverage cap in USD (8 decimals) — matches IDelegation.coverageCap.
     uint256 coverageCap;
+    ReserveSnapshot reserve;
     uint256 totalDebt;
     uint256 ltv;
     uint256 liquidationThreshold;
@@ -300,6 +311,24 @@ contract DashboardLens {
 
         try DELEGATION.coverageCap(agent) returns (uint256 cap) {
             snapshot.coverageCap = cap;
+        } catch { }
+
+        try LENDER.reservesData(asset) returns (
+            uint256 id,
+            address vault,
+            address debtToken,
+            address interestReceiver,
+            uint8 decimals,
+            bool paused,
+            uint256 minBorrow
+        ) {
+            snapshot.reserve.id = id;
+            snapshot.reserve.vault = vault;
+            snapshot.reserve.debtToken = debtToken;
+            snapshot.reserve.interestReceiver = interestReceiver;
+            snapshot.reserve.decimals = decimals;
+            snapshot.reserve.paused = paused;
+            snapshot.reserve.minBorrow = minBorrow;
         } catch { }
     }
 
