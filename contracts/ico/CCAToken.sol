@@ -145,7 +145,6 @@ contract CCAToken is
     function _exchange(address _from, address _to, uint256 _amount) internal {
         address token = UNDERLYING_TOKEN_ADDRESS();
         if (token == address(0)) revert AssetNotSet();
-        if (IERC20(token).balanceOf(address(this)) < totalSupply()) revert InsufficientBalance();
         if (_amount == 0) revert ZeroAmountNotValid();
 
         _burn(_from, _amount);

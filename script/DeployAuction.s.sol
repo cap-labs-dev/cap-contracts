@@ -34,19 +34,19 @@ contract DeployAuction is Script {
             currency: address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48), // USDC
             tokensRecipient: address(0xA388cf78Ba2AbFfBE6dFcc0a4211cDBD430B69fd),
             fundsRecipient: address(0xA388cf78Ba2AbFfBE6dFcc0a4211cDBD430B69fd),
-            startBlock: 24420030, // 2026-02-09 14:00:00 UTC
-            endBlock: 24484830, // 2026-02-18 14:00:00 UTC
-            claimBlock: 24484830, // 2026-02-18 14:00:00 UTC
-            tickSpacing: 11884224377139, // 1% of floor price
+            startBlock: 25273679, // 2026-06-08 15:00:00 UTC
+            endBlock: 25338479, // 2026-06-17 15:00:00 UTC
+            claimBlock: 25338479, // 2026-06-17 15:00:00 UTC
+            tickSpacing: 5942112188570, // 1% of floor price
             validationHook: address(0xccCc021dB9dE6ab185d752Fc135029EA76efcCcc),
-            floorPrice: 1188422437713900, // 0.015 USDC per token ((0.015 * 10^6) / 10^18) * 2^96
+            floorPrice: 594211218857000, // 0.0075 USDC per token ((0.0075 * 10^6) / 10^18) * 2^96
             requiredCurrencyRaised: 0, // 0 minimum, auction will always complete
             auctionStepsData: encodeAuctionStepsData() // auction steps data
         });
 
         address auction = continuousClearingAuctionFactory.initializeDistribution(
-            address(0xcCcC87d42dB3d35018eCAe712A0Bc53e79d9cCcc), // rCAP token
-            1_000_000_000e18, // 1B rCAP tokens
+            address(), // rCAP token
+            450_000_000e18, // 450M rCAP tokens
             abi.encode(auctionParameters), // config data
             bytes32(0) // salt
         );
