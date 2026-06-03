@@ -128,16 +128,6 @@ contract CCAToken is
         zapAddress = getCCATokenStorage().zap;
     }
 
-    /// @inheritdoc ERC20Upgradeable
-    function name() public pure override returns (string memory) {
-        return "Cap Redeemable Token";
-    }
-
-    /// @inheritdoc EIP712Upgradeable
-    function _EIP712Name() internal pure override returns (string memory) {
-        return "Cap Redeemable Token";
-    }
-
     /// @dev Exchange CCA tokens for the asset at a 1:1 value
     /// @param _from Sender address
     /// @param _to Receiver address
