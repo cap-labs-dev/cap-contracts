@@ -46,7 +46,7 @@ contract DeployAuction is Script {
 
         address auction = continuousClearingAuctionFactory.initializeDistribution(
             address(), // rCAP token
-            450_000_000e18, // 450M rCAP tokens
+            400_000_000e18, // 400M rCAP tokens
             abi.encode(auctionParameters), // config data
             bytes32(0) // salt
         );
