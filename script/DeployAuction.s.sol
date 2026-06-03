@@ -38,14 +38,14 @@ contract DeployAuction is Script {
             endBlock: 25338479, // 2026-06-17 15:00:00 UTC
             claimBlock: 25338479, // 2026-06-17 15:00:00 UTC
             tickSpacing: 5942112188570, // 1% of floor price
-            validationHook: address(0xccCc021dB9dE6ab185d752Fc135029EA76efcCcc),
+            validationHook: address(0x999963A8386cb48a2b7d08637d1e119bDAc99999),
             floorPrice: 594211218857000, // 0.0075 USDC per token ((0.0075 * 10^6) / 10^18) * 2^96
             requiredCurrencyRaised: 0, // 0 minimum, auction will always complete
             auctionStepsData: encodeAuctionStepsData() // auction steps data
         });
 
         address auction = continuousClearingAuctionFactory.initializeDistribution(
-            address(), // rCAP token
+            address(0x9999B7E3cc6979223Ff1aF980b7D8B90B75d9999), // rCAP token
             400_000_000e18, // 400M rCAP tokens
             abi.encode(auctionParameters), // config data
             bytes32(0) // salt
