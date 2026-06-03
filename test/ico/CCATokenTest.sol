@@ -84,11 +84,7 @@ contract CCATokenTest is IcoSetup {
         assertEq(ccaToken.balanceOf(user), 0);
         assertEq(asset.balanceOf(user), 2_000);
 
-        ccaToken.mint(user, 10_000); // simulate user exchanging more CCA tokens than the asset balance
-        vm.startPrank(user);
-        vm.expectRevert(); // Insufficient balance
-        ccaToken.exchange(user, 1_000);
-
+        ccaToken.mint(user, 10_000);
         asset.mint(address(ccaToken), 2_000); // match the asset balance with the CCA tokens
         // simulate zap exchanging tokens for user
         vm.startPrank(user);

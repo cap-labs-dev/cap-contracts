@@ -19,9 +19,6 @@ interface ICCAToken {
     /// @dev Asset not set yet
     error AssetNotSet();
 
-    /// @dev Insufficient balance of the asset
-    error InsufficientBalance();
-
     /// @dev Transfer not allowed
     error TransferNotAllowed();
 
