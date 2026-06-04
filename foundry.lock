@@ -1,0 +1,26 @@
+{
+  "lib/continuous-clearing-auction": {
+    "rev": "0e1e6733d5ff6f5a9e4755b5e637e49e4d51cc50"
+  },
+  "lib/forge-std": {
+    "rev": "83c5d212a01f8950727da4095cdfe2654baccb5b"
+  },
+  "lib/layerzero-devtools": {
+    "rev": "0de900fb7efc1c1ccbdecc69820b8d4172e69d38"
+  },
+  "lib/layerzero-v1": {
+    "rev": "a1fb11a3b9c0ac449291816e71eacede4e36613e"
+  },
+  "lib/layerzero-v2": {
+    "rev": "7da76840e41dc593d3c2007ce35b911b1d816b4b"
+  },
+  "lib/openzeppelin-foundry-upgrades": {
+    "rev": "453d9ff3591cb42f65d2281ea792aded95d7bd8c"
+  },
+  "lib/solidity-bytes-utils": {
+    "rev": "e0115c4d231910df47ce3b60625ce562fe4af985"
+  },
+  "lib/tokenized-strategy": {
+    "rev": "82806289f967590c4efbf6bc3d237e4e7f0a0966"
+  }
+}

@@ -19,9 +19,6 @@ interface ICCAToken {
     /// @dev Asset not set yet
     error AssetNotSet();
 
-    /// @dev Insufficient balance of the asset
-    error InsufficientBalance();
-
     /// @dev Transfer not allowed
     error TransferNotAllowed();
 
@@ -107,7 +104,7 @@ interface ICCAToken {
 
     /// @notice Get the asset address
     /// @return assetAddress Asset address
-    function asset() external view returns (address assetAddress);
+    function UNDERLYING_TOKEN_ADDRESS() external view returns (address assetAddress);
 
     /// @notice Check if a user is whitelisted for sending CCA tokens
     /// @param _user User address

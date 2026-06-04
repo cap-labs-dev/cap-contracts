@@ -114,7 +114,7 @@ contract CCAToken is
     }
 
     /// @inheritdoc ICCAToken
-    function asset() public view returns (address assetAddress) {
+    function UNDERLYING_TOKEN_ADDRESS() public view returns (address assetAddress) {
         assetAddress = getCCATokenStorage().asset;
     }
 
@@ -128,24 +128,13 @@ contract CCAToken is
         zapAddress = getCCATokenStorage().zap;
     }
 
-    /// @inheritdoc ERC20Upgradeable
-    function name() public pure override returns (string memory) {
-        return "Cap Redeemable Token";
-    }
-
-    /// @inheritdoc EIP712Upgradeable
-    function _EIP712Name() internal pure override returns (string memory) {
-        return "Cap Redeemable Token";
-    }
-
     /// @dev Exchange CCA tokens for the asset at a 1:1 value
     /// @param _from Sender address
     /// @param _to Receiver address
     /// @param _amount Amount of tokens to exchange
     function _exchange(address _from, address _to, uint256 _amount) internal {
-        address token = asset();
+        address token = UNDERLYING_TOKEN_ADDRESS();
         if (token == address(0)) revert AssetNotSet();
-        if (IERC20(token).balanceOf(address(this)) < totalSupply()) revert InsufficientBalance();
         if (_amount == 0) revert ZeroAmountNotValid();
 
         _burn(_from, _amount);

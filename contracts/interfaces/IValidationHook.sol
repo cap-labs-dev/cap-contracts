@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { IGatedERC1155ValidationHook } from "./IGatedERC1155ValidationHook.sol";
+import {
+    IBaseERC1155ValidationHook,
+    IGatedERC1155ValidationHook
+} from "@continuous-clearing-auction/periphery/validationHooks/GatedERC1155ValidationHook.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { IPredicateClient } from "@predicate/interfaces/IPredicateClient.sol";
 
 /// @title IValidationHook
 /// @notice Interface for the validation hook
 /// @author kexley, Cap Labs
-interface IValidationHook is IPredicateClient, IGatedERC1155ValidationHook, IERC165 {
+interface IValidationHook is IPredicateClient, IGatedERC1155ValidationHook {
     /// @custom:storage-location erc7201:cap.storage.ValidationHook
     /// @dev Validation hook storage
     /// @param auction Auction address
