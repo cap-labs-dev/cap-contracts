@@ -1,121 +1,151 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import { IDelegation } from "../../contracts/interfaces/IDelegation.sol";
+import { ILender } from "../../contracts/interfaces/ILender.sol";
 import {
     DashboardLens,
     EigenLayerSnapshot,
     LoanSnapshot,
+    StakerRewardsTokenSnapshot,
     SymbioticVaultSnapshot
 } from "../../contracts/lens/DashboardLens.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {
+    IOperatorNetworkSpecificDelegator
+} from "@symbioticfi/core/src/interfaces/delegator/IOperatorNetworkSpecificDelegator.sol";
+import { IVault } from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
+import {
+    IDefaultStakerRewards
+} from "@symbioticfi/rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewards.sol";
 import { Test } from "forge-std/Test.sol";
 
 /// @notice Fork tests for DashboardLens against Ethereum mainnet state.
 ///         Run with: forge test --match-path test/lens/DashboardLens.t.sol -v
-///         Requires MAINNET_RPC_URL env var pointing to an Ethereum mainnet RPC endpoint.
 contract DashboardLensForkTest is Test {
-    // ─── Contract Addresses ───────────────────────────────────────────────────
-
-    // CAP infrastructure
-    address constant LENDER = 0x15622c3dbbc5614E6DFa9446603c1779647f01FC;
-    address constant MIDDLEWARE = 0x09A3976d8D63728d20DCDFEe1e531C206Ba91225;
-
-    // Symbiotic: bedrock / uniBTC vault
-    // delegatorAddress from collateralConfigs (delegationNetwork: 'symbiotic')
     address constant VAULT = 0x5e278BF93478c842148E7c52be5415f6C1d46538;
-    // operatorAddress — bedrock CAP operator, holds a $21M loan
     address constant AGENT = 0xbAfa91d22C093E42E28D7Be417e38244E4153f78;
-
-    // Borrowed asset
     address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
 
-    // EigenLayer mainnet proxies
-    // Note: eigen.json has a typo (extra 'A') in delegationManager — correct address used here.
+    // cap-symbiotic.json adapter.network
+    address constant SYMBIOTIC_NETWORK = 0x98e52Ea7578F2088c152E81b17A9a459bF089f2a;
+
     address constant DELEGATION_MANAGER = 0x39053D51B77DC0d36036Fc1fCc8Cb819df8Ef37A;
     address constant STRATEGY_MANAGER = 0x858646372CC42E1A627fcE94aa7A7033e7CF075A;
     address constant ALLOCATION_MANAGER = 0x948a420b8CC1d6BFd0B6087C2E7c344a2CD0bc39;
-    // yield-nest OETH strategy (eigenStrategyAddress in collateralConfigs)
     address constant EL_STRATEGY = 0xa4C637e0F704745D182e4D38cAb7E7485321d059;
-    // yield-nest EigenLayer operator (eigenOperatorAddress in collateralConfigs)
     address constant EL_STAKER = 0x4668d41D944B92f800965266D6382EF3F5C6B763;
 
     string constant MAINNET_RPC_URL = "https://mainnet.gateway.tenderly.co";
     uint256 constant FORK_BLOCK = 24843127;
 
     DashboardLens lens;
+    address stakerRewarder;
 
     function setUp() public {
         vm.createSelectFork(MAINNET_RPC_URL, FORK_BLOCK);
         lens = new DashboardLens();
+        stakerRewarder = _discoverStakerRewarder(VAULT);
     }
 
-    // ─── Symbiotic Vault Snapshot ─────────────────────────────────────────────
+    /// @dev Scan Symbiotic DefaultStakerRewardsFactory entities for this vault.
+    function _discoverStakerRewarder(address vault) internal view returns (address rewarder) {
+        address factory = 0xFEB871581C2ab2e1EEe6f7dDC7e6246cFa087A23;
+        uint256 n = _totalEntities(factory);
+        for (uint256 i = 0; i < n; i++) {
+            address entity = _entityAt(factory, i);
+            try IDefaultStakerRewards(entity).VAULT() returns (address v) {
+                if (v == vault) return entity;
+            } catch { }
+        }
+    }
+
+    function _totalEntities(address registry) internal view returns (uint256) {
+        (bool ok, bytes memory data) = registry.staticcall(abi.encodeWithSignature("totalEntities()"));
+        if (!ok || data.length < 32) return 0;
+        return abi.decode(data, (uint256));
+    }
+
+    function _entityAt(address registry, uint256 index) internal view returns (address entity) {
+        (bool ok, bytes memory data) = registry.staticcall(abi.encodeWithSignature("entity(uint256)", index));
+        if (!ok || data.length < 32) return address(0);
+        return abi.decode(data, (address));
+    }
 
     function test_fork_getSymbioticVaultSnapshot_vaultMetadata() public view {
-        SymbioticVaultSnapshot memory s = lens.getSymbioticVaultSnapshot(VAULT, AGENT, MIDDLEWARE);
+        SymbioticVaultSnapshot memory s = lens.getSymbioticVaultSnapshot(VAULT, AGENT, address(0));
 
-        // Vault-level fields are always populated regardless of who the depositor is.
-        // activeBalance and slashableBalance are 0 here because AGENT is the CAP operator
-        // address, not the identifier registered in this middleware — the Lender aggregates
-        // collateral through its own delegation stack using a different internal agent id.
         assertTrue(s.collateralToken != address(0), "collateralToken");
+        assertGt(bytes(s.collateralTokenSymbol).length, 0, "collateralTokenSymbol");
+        assertGt(bytes(s.collateralTokenName).length, 0, "collateralTokenName");
+        assertGt(s.collateralTokenDecimals, 0, "collateralTokenDecimals");
+        assertGt(s.collateralTokenPrice, 0, "collateralTokenPrice");
+        assertGt(s.collateralTokenPriceLastUpdated, 0, "collateralTokenPriceLastUpdated");
         assertGt(s.epochDuration, 0, "epochDuration");
         assertGt(s.currentEpoch, 0, "currentEpoch");
+        assertEq(s.stakerRewards.stakerRewarder, address(0), "stakerRewards skipped");
     }
 
     function test_fork_getSymbioticVaultSnapshot_epochFields() public view {
-        SymbioticVaultSnapshot memory s = lens.getSymbioticVaultSnapshot(VAULT, AGENT, MIDDLEWARE);
+        SymbioticVaultSnapshot memory s = lens.getSymbioticVaultSnapshot(VAULT, AGENT, address(0));
 
         assertGt(s.currentEpoch, 0, "currentEpoch");
         assertGt(s.epochDuration, 0, "epochDuration");
         assertGt(s.nextEpochStart, 0, "nextEpochStart");
-        // Computed relationship must always hold
         assertEq(s.withdrawalEpoch, s.currentEpoch + 1, "withdrawalEpoch = currentEpoch + 1");
     }
 
-    function test_fork_getSymbioticVaultBatch_single() public view {
-        address[] memory vaults = new address[](1);
-        vaults[0] = VAULT;
+    function test_fork_getSymbioticVaultSnapshot_stakerRewards() public view {
+        assertTrue(stakerRewarder != address(0), "discover stakerRewarder");
 
-        SymbioticVaultSnapshot[] memory snapshots = lens.getSymbioticVaultBatch(vaults, AGENT, MIDDLEWARE);
+        SymbioticVaultSnapshot memory s = lens.getSymbioticVaultSnapshot(VAULT, AGENT, stakerRewarder);
 
-        assertEq(snapshots.length, 1);
-        assertGt(snapshots[0].currentEpoch, 0, "batch[0].currentEpoch");
-        assertEq(snapshots[0].withdrawalEpoch, snapshots[0].currentEpoch + 1);
+        assertEq(s.stakerRewards.stakerRewarder, stakerRewarder);
+        assertEq(s.stakerRewards.vault, VAULT);
+        assertEq(s.stakerRewards.delegator, IVault(VAULT).delegator());
+        assertEq(s.delegator, s.stakerRewards.delegator, "vault and stakerRewards delegator");
+        assertEq(s.stakerRewards.operator, IOperatorNetworkSpecificDelegator(s.stakerRewards.delegator).operator());
+        assertEq(s.stakerRewards.network, SYMBIOTIC_NETWORK);
+
+        assertGt(s.stakerRewards.version, 0, "version");
+        assertGt(s.stakerRewards.adminFeeBase, 0, "adminFeeBase");
+        assertTrue(s.stakerRewards.tokens.length > 0, "active reward tokens");
+
+        bool foundUsdc;
+        for (uint256 i = 0; i < s.stakerRewards.tokens.length; i++) {
+            StakerRewardsTokenSnapshot memory t = s.stakerRewards.tokens[i];
+            if (t.rewardToken == USDC) {
+                foundUsdc = true;
+                assertEq(t.rewardsLength, IDefaultStakerRewards(stakerRewarder).rewardsLength(USDC, SYMBIOTIC_NETWORK));
+                assertEq(t.tokenBalance, IERC20(USDC).balanceOf(stakerRewarder));
+            }
+        }
+        assertTrue(foundUsdc, "USDC reward token entry");
     }
 
-    function test_fork_getSymbioticVaultBatch_partialRevert() public view {
-        address[] memory vaults = new address[](3);
-        vaults[0] = VAULT;
-        vaults[1] = address(0xdead); // invalid — will revert inside batch
-        vaults[2] = VAULT;
+    function test_fork_getSymbioticVaultSnapshot_wrongStakerRewarder() public view {
+        SymbioticVaultSnapshot memory s = lens.getSymbioticVaultSnapshot(VAULT, AGENT, address(0xdead));
 
-        SymbioticVaultSnapshot[] memory snapshots = lens.getSymbioticVaultBatch(vaults, AGENT, MIDDLEWARE);
-
-        assertEq(snapshots.length, 3);
-        // index 0 and 2: real vault — epoch data is populated for any valid Symbiotic vault
-        assertGt(snapshots[0].currentEpoch, 0, "snapshots[0].currentEpoch");
-        assertGt(snapshots[2].currentEpoch, 0, "snapshots[2].currentEpoch");
-        // index 1: reverting address → zero-value struct, not a revert of the whole call
-        assertEq(snapshots[1].currentEpoch, 0, "snapshots[1].currentEpoch should be zero");
-        assertEq(snapshots[1].collateralToken, address(0), "snapshots[1].collateralToken should be zero");
+        assertEq(s.stakerRewards.stakerRewarder, address(0));
+        assertEq(s.stakerRewards.delegator, address(0));
+        assertEq(s.stakerRewards.operator, address(0));
+        assertEq(s.stakerRewards.network, address(0));
+        assertEq(s.stakerRewards.tokens.length, 0);
     }
 
     // ─── EigenLayer Snapshot ──────────────────────────────────────────────────
 
     function test_fork_getEigenLayerSnapshot_callSucceeds() public view {
-        // Verify the full call completes without revert and returns a coherent struct
         EigenLayerSnapshot memory s = lens.getEigenLayerSnapshot(
             EL_STRATEGY, EL_STAKER, STRATEGY_MANAGER, DELEGATION_MANAGER, ALLOCATION_MANAGER
         );
 
-        // Zero shares ↔ zero amount (sharesToUnderlyingView(0) == 0)
         if (s.depositedShares == 0) {
             assertEq(s.depositedAmount, 0, "zero shares -> zero amount");
         } else {
             assertGt(s.depositedAmount, 0, "non-zero shares -> non-zero amount");
         }
 
-        // Allocation delay fields are coherent: if pending, delay should be 0
         if (s.allocationDelayPending) {
             assertEq(s.allocationDelay, 0, "pending delay -> delay value is 0");
         }
@@ -126,39 +156,62 @@ contract DashboardLensForkTest is Test {
             EL_STRATEGY, EL_STAKER, STRATEGY_MANAGER, DELEGATION_MANAGER, ALLOCATION_MANAGER
         );
 
-        // EigenLayer operators self-delegate: isDelegated == true, delegatee == self
         assertTrue(s.isDelegated, "EL operator should be delegated");
         assertEq(s.delegatee, EL_STAKER, "EL operator should delegate to self");
     }
 
     // ─── Loan Snapshot ────────────────────────────────────────────────────────
 
-    function test_fork_getLoanSnapshot_nonZeroLoan() public view {
-        LoanSnapshot memory s = lens.getLoanSnapshot(LENDER, AGENT, USDC);
+    function test_fork_getLoanSnapshot_nonZeroLoan() public {
+        LoanSnapshot memory s = lens.getLoanSnapshot(AGENT, USDC);
 
-        // bedrock has a $21M loan — all core fields should be non-zero
         assertGt(s.totalDelegation, 0, "totalDelegation");
         assertGt(s.totalSlashableCollateral, 0, "totalSlashableCollateral");
         assertGt(s.totalDebt, 0, "totalDebt");
         assertGt(s.health, 0, "health");
         assertGt(s.ltv, 0, "ltv");
         assertGt(s.liquidationThreshold, 0, "liquidationThreshold");
+        assertEq(s.coverageCap, IDelegation(address(lens.DELEGATION())).coverageCap(AGENT), "coverageCap");
+
+        (
+            uint256 id,
+            address vault,
+            address debtToken,
+            address interestReceiver,
+            uint8 decimals,
+            bool paused,
+            uint256 minBorrow
+        ) = ILender(address(lens.LENDER())).reservesData(USDC);
+        assertEq(s.reserve.id, id, "reserve.id");
+        assertEq(s.reserve.vault, vault, "reserve.vault");
+        assertEq(s.reserve.debtToken, debtToken, "reserve.debtToken");
+        assertEq(s.reserve.interestReceiver, interestReceiver, "reserve.interestReceiver");
+        assertEq(s.reserve.decimals, decimals, "reserve.decimals");
+        assertEq(s.reserve.paused, paused, "reserve.paused");
+        assertEq(s.reserve.minBorrow, minBorrow, "reserve.minBorrow");
     }
 
-    function test_fork_getLoanSnapshot_healthAboveOne() public view {
-        LoanSnapshot memory s = lens.getLoanSnapshot(LENDER, AGENT, USDC);
-
-        // A healthy agent with a $21M loan should have health > 1 ray (1e27)
+    function test_fork_getLoanSnapshot_healthAboveOne() public {
+        LoanSnapshot memory s = lens.getLoanSnapshot(AGENT, USDC);
         assertGt(s.health, 1e27, "health should be above 1 ray for a well-collateralised agent");
     }
 
-    function test_fork_getLoanSnapshot_accruedInterestAndMaxBorrowable() public view {
-        LoanSnapshot memory s = lens.getLoanSnapshot(LENDER, AGENT, USDC);
+    function test_fork_getLoanSnapshot_accruedInterestAndMaxBorrowable() public {
+        LoanSnapshot memory s = lens.getLoanSnapshot(AGENT, USDC);
+        assertTrue(s.accruedRestakerInterest >= 0);
+        assertTrue(s.maxBorrowable >= 0);
+    }
 
-        // accruedRestakerInterest and maxBorrowable calls must not revert
-        // accruedRestakerInterest ≥ 0 (always, for uint256)
-        // maxBorrowable can be 0 if agent is at capacity — just confirm no revert
-        assertTrue(s.accruedRestakerInterest >= 0); // confirms call succeeded
-        assertTrue(s.maxBorrowable >= 0); // confirms call succeeded
+    function test_fork_getLoanSnapshot_collateralMetadata() public {
+        LoanSnapshot memory s = lens.getLoanSnapshot(AGENT, USDC);
+
+        assertTrue(s.collateralToken != address(0), "collateralToken");
+        assertGt(bytes(s.collateralTokenSymbol).length, 0, "collateralTokenSymbol");
+        assertGt(bytes(s.collateralTokenName).length, 0, "collateralTokenName");
+        assertGt(s.collateralTokenDecimals, 0, "collateralTokenDecimals");
+        assertGt(s.collateralTokenPrice, 0, "collateralTokenPrice");
+        assertGt(s.collateralTokenPriceLastUpdated, 0, "collateralTokenPriceLastUpdated");
+        assertGt(s.vaultAssetPrice, 0, "vaultAssetPrice");
+        assertGt(s.vaultAssetPriceLastUpdated, 0, "vaultAssetPriceLastUpdated");
     }
 }
