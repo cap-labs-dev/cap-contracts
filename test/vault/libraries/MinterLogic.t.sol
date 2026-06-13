@@ -152,7 +152,21 @@ contract MinterLogicTest is Test {
 
         uint256 amount = vault.minter_getAmountOut(params);
 
-        assertApproxEqAbs(amount, 200e18, 2, "Amount should account for price difference");
+        assertApproxEqAbs(amount, 100e18, 2, "Amount should not account for price difference");
+    }
+
+    function test_getAmountOut_zero_when_oracle_below_min_mint_price() public {
+        vault.mockMinimumTotalSupply(1000e18);
+        vault.mockTotalSupplies(address(asset), 1000e18);
+        vault.mockTotalSupplies(address(vault), 1000e18);
+
+        oracle.setPrice(address(asset), 0.994e8);
+
+        IMinter.AmountOutParams memory params =
+            IMinter.AmountOutParams({ asset: address(asset), amount: 100e18, mint: true, user: msg.sender });
+
+        uint256 amount = vault.minter_getAmountOut(params);
+        assertEq(amount, 0, "Below MIN_ASSET_PRICE mint quote is zero so mint reverts on InvalidAmount");
     }
 
     function test_getAmountOut_zeroAmount() public {

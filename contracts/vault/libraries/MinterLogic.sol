@@ -17,6 +17,9 @@ library MinterLogic {
     /// @dev Share precision
     uint256 constant SHARE_PRECISION = 1e33;
 
+    /// @dev Minimum asset price
+    uint256 constant MIN_ASSET_PRICE = 0.995e8;
+
     /// @notice Calculate the amount out from a swap including fees
     /// @param $ Storage pointer
     /// @param params Parameters for a swap
@@ -74,38 +77,29 @@ library MinterLogic {
         view
         returns (uint256 amount, uint256 newRatio)
     {
-        (uint256 assetPrice,) = IOracle(_oracle).getPrice(params.asset);
-        (uint256 capPrice,) = IOracle(_oracle).getPrice(address(this));
-
         uint256 assetDecimalsPow = 10 ** IERC20Metadata(params.asset).decimals();
         uint256 capDecimalsPow = 10 ** IERC20Metadata(address(this)).decimals();
-
         uint256 capSupply = IERC20(address(this)).totalSupply();
-        uint256 capValue = capSupply * capPrice / capDecimalsPow;
-        uint256 allocationValue = IVault(address(this)).totalSupplies(params.asset) * assetPrice / assetDecimalsPow;
+        uint256 allocationValue = IVault(address(this)).totalSupplies(params.asset) * capDecimalsPow / assetDecimalsPow;
 
-        uint256 assetValue;
         if (params.mint) {
-            assetValue = params.amount * assetPrice / assetDecimalsPow;
+            (uint256 assetPrice,) = IOracle(_oracle).getPrice(params.asset);
+            if (assetPrice < MIN_ASSET_PRICE) {
+                amount = 0;
+            } else {
+                amount = params.amount * capDecimalsPow / assetDecimalsPow;
+            }
             if (capSupply == 0) {
                 newRatio = 0;
-                amount = assetValue * capDecimalsPow / assetPrice;
             } else {
-                newRatio = (allocationValue + assetValue) * RAY_PRECISION / (capValue + assetValue);
-                amount = assetValue * capDecimalsPow / capPrice;
+                newRatio = RAY_PRECISION * (allocationValue + amount) / (capSupply + amount);
             }
         } else {
-            assetValue = params.amount * capPrice / capDecimalsPow;
-            if (params.amount == capSupply) {
-                newRatio = RAY_PRECISION;
-                amount = assetValue * assetDecimalsPow / assetPrice;
+            amount = params.amount * assetDecimalsPow / capDecimalsPow;
+            if (params.amount >= allocationValue || params.amount >= capSupply) {
+                newRatio = 0;
             } else {
-                if (allocationValue < assetValue || capValue <= assetValue) {
-                    newRatio = 0;
-                } else {
-                    newRatio = (allocationValue - assetValue) * RAY_PRECISION / (capValue - assetValue);
-                }
-                amount = assetValue * assetDecimalsPow / assetPrice;
+                newRatio = RAY_PRECISION * (allocationValue - params.amount) / (capSupply - params.amount);
             }
         }
     }
