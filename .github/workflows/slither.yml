@@ -19,4 +19,4 @@ jobs:
         with:
           sarif: results.sarif
           fail-on: none
-          node-version: v20.18.0
+          node-version: v26.2.0

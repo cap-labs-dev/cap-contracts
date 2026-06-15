@@ -1,0 +1,21 @@
+{
+  "id": "foundry",
+  "version": "1.0.0",
+  "name": "Foundry",
+  "description": "Install forge, cast, anvil, and chisel via foundryup",
+  "documentationURL": "https://www.getfoundry.sh/",
+  "options": {
+    "foundryVersion": {
+      "type": "string",
+      "proposals": [
+        "stable",
+        "nightly"
+      ],
+      "default": "stable",
+      "description": "Foundry release channel or version tag passed to foundryup --install"
+    }
+  },
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/common-utils"
+  ]
+}
