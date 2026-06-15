@@ -1,0 +1,14 @@
+{
+  "enabledPlugins": {
+    "zeroize-audit@trailofbits": true,
+    "debug-buttercup@trailofbits": true,
+    "fp-check@trailofbits": true,
+    "building-secure-contracts@trailofbits": true,
+    "constant-time-analysis@trailofbits": true,
+    "differential-review@trailofbits": true,
+    "insecure-defaults@trailofbits": true,
+    "dimensional-analysis@trailofbits": true,
+    "supply-chain-risk-auditor@trailofbits": true,
+    "mutation-testing@trailofbits": true
+  }
+}
