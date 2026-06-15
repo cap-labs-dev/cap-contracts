@@ -1,10 +1,14 @@
 {
-  "permissions": {
-    "allow": [
-      "WebFetch(domain:docs.symbiotic.fi)",
-      "WebFetch(domain:docs.eigenlayer.xyz)",
-      "WebFetch(domain:docs.eigencloud.xyz)",
-      "WebFetch(domain:docs.cap.app)"
-    ]
+  "enabledPlugins": {
+    "zeroize-audit@trailofbits": true,
+    "debug-buttercup@trailofbits": true,
+    "fp-check@trailofbits": true,
+    "building-secure-contracts@trailofbits": true,
+    "constant-time-analysis@trailofbits": true,
+    "differential-review@trailofbits": true,
+    "insecure-defaults@trailofbits": true,
+    "dimensional-analysis@trailofbits": true,
+    "supply-chain-risk-auditor@trailofbits": true,
+    "mutation-testing@trailofbits": true
   }
 }

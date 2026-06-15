@@ -1,0 +1,20 @@
+# Self-contained Compose stack for the dev devcontainer.
+# Brings up the workspace container (`dev`) so contracts
+# tools can reach sibling services (e.g. postgres) by service name.
+name: cap-contracts-devcontainer
+services:
+  dev:
+    image: mcr.microsoft.com/devcontainers/javascript-node:24-bookworm
+    # keep the container alive so the devcontainer CLI can attach and run lifecycle hooks
+    command: sleep infinity
+    container_name: devcontainer-cap-contracts-dev
+    user: node
+    # mirror the previous runArgs hardening
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      # workspace bind (replaces devcontainer.json workspaceMount); path is relative
+      # to this compose file, so ../.. resolves to the repo root
+      - ../..:/workspace:cached

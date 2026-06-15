@@ -2,6 +2,9 @@
 pragma solidity ^0.8.28;
 
 interface ICapSymbioticVaultFactory {
+    /// @notice CAP Symbiotic network middleware used for vaults created by this factory
+    function middleware() external view returns (address);
+
     /// @notice Creates a new vault
     /// @param _owner The owner of the vault, will manage delegations and set deposit limits
     /// @param asset The asset of the vault

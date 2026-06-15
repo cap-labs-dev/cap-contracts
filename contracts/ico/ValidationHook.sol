@@ -9,6 +9,7 @@ import { PredicateClient } from "@predicate/mixins/PredicateClient.sol";
 import { Access } from "../access/Access.sol";
 import { IContinuousClearingAuction } from "../interfaces/IContinuousClearingAuction.sol";
 import {
+    IBaseERC1155ValidationHook,
     IERC165,
     IGatedERC1155ValidationHook,
     IPredicateClient,
@@ -124,12 +125,12 @@ contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Ac
         return getValidationHookStorage().auction;
     }
 
-    /// @inheritdoc IGatedERC1155ValidationHook
+    /// @inheritdoc IBaseERC1155ValidationHook
     function erc1155() external view returns (IERC1155) {
         return IERC1155(getValidationHookStorage().erc1155);
     }
 
-    /// @inheritdoc IGatedERC1155ValidationHook
+    /// @inheritdoc IBaseERC1155ValidationHook
     function tokenId() external view returns (uint256) {
         return getValidationHookStorage().tokenId;
     }
@@ -142,7 +143,8 @@ contract ValidationHook is IValidationHook, UUPSUpgradeable, PredicateClient, Ac
     /// @inheritdoc IERC165
     function supportsInterface(bytes4 interfaceId) public pure returns (bool) {
         return interfaceId == type(IValidationHook).interfaceId || interfaceId == type(IPredicateClient).interfaceId
-            || interfaceId == type(IGatedERC1155ValidationHook).interfaceId || interfaceId == type(IERC165).interfaceId;
+            || interfaceId == type(IGatedERC1155ValidationHook).interfaceId
+            || interfaceId == type(IBaseERC1155ValidationHook).interfaceId || interfaceId == type(IERC165).interfaceId;
     }
 
     /// @inheritdoc UUPSUpgradeable

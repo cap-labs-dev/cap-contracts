@@ -1,19 +1,110 @@
 {
-  "name": "Cap Contracts (Dev)",
-  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  // Threat model:
+  // - Dev container: trusted human dev; full git write, real .env for local stack.
+  //   No AI extensions — use .devcontainer/claude for agentic work.
+  // - Claude container: untrusted AI; .env and .git masked read-only.
+  "name": "cap-contracts (Dev)",
+  // Compose-based: brings up the dev Postgres as a sibling service so the DB is
+  // reachable from inside the container at postgres:5432 (see ./docker-compose.yml).
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "dev",
+  "runServices": [
+    "dev"
+  ],
   "features": {
-    "ghcr.io/devcontainers/features/node:1": { "version": "20.18.0", "installYarnUsingCorepack": true },
-    "ghcr.io/devcontainers/features/python:1": { "toolsToInstall": "slither-analyzer" },
-    "ghcr.io/rocker-org/devcontainer-features/apt-packages:1": { "packages": "lcov" }
+    "ghcr.io/devcontainers/features/node:2.0.0": {
+      "version": "26.2.0",
+      "pnpmVersion": "10.33.2",
+      "yarnVersion": "1.22.22",
+      "installYarnUsingCorepack": true
+    },
+    "ghcr.io/devcontainers/features/python:1.8.0": {
+      "toolsToInstall": "slither-analyzer"
+    },
+    "ghcr.io/rocker-org/devcontainer-features/apt-packages:1.0.2": {
+      "packages": "lcov openssh-client"
+    },
+    "ghcr.io/devcontainers/features/git:1.3.5": {},
+    "ghcr.io/devcontainers/features/common-utils:2.5.8": {
+      "installZsh": true,
+      "installOhMyZsh": true,
+      "installOhMyZshConfig": true,
+      "configureZshAsDefaultShell": true
+    },
+    "./../features/foundry": {
+      "foundryVersion": "stable"
+    },
+    "./../features/git-secrets": {
+      "version": "1.3.0"
+    },
+    "./../features/shell-aliases": {
+      "aliases": [
+        "p=pnpm",
+        "ll='ls -lah'"
+      ]
+    }
   },
-  "updateRemoteUserUID": true,
-  "remoteUser": "vscode",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+  "remoteEnv": {
+    "NODE_ENV": "development",
+    "ZSH_THEME": "agnoster",
+  },
+  // workspaceFolder must match the bind target in docker-compose.yml; the bind
+  // itself lives in compose (workspaceMount is ignored for Compose devcontainers).
   "workspaceFolder": "/workspace",
-  "postCreateCommand": "bash /workspace/.devcontainer/post-install.sh",
+  // Forward the dev-server ports running inside the `dev` service. Spec-portable
+  // (works for the headless CLI too), unlike VS Code's implicit auto-forward.
+  // Postgres (5432) is intentionally omitted: it's already published to the host
+  // by the compose `ports` mapping and lives in the `postgres` sibling service.
+  "forwardPorts": [
+    3000,
+    3001,
+    3002,
+    5555
+  ],
+  "initializeCommand": "bash .devcontainer/dev/prepare-host.sh",
+  // runtime mounts
+  "mounts": [
+    // persist yarn store across rebuilds (outside workspace to avoid a repo-root mount stub)
+    "source=${localWorkspaceFolder}/.devcontainer/dev/yarn-store,target=/yarn-store,type=bind,consistency=delegated",
+    // isolate node_modules from host (bind-mounted so they persist across rebuilds)
+    "source=${localWorkspaceFolder}/.devcontainer/dev/node_modules,target=/workspace/node_modules,type=bind,consistency=delegated",
+    // host Foundry config (read-only; prepared on host by prepare-host.sh if missing)
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.foundry/foundry.toml,target=/home/node/.foundry/foundry.toml,type=bind,readonly"
+  ],
+  "remoteUser": "node",
+  "updateRemoteUserUID": true,
+  "postCreateCommand": "ulimit -n 65536 && yarn config set cache-folder /yarn-store --global && yarn install --frozen-lockfile",
+  "postStartCommand": "yarn config set cache-folder /yarn-store --global",
   "customizations": {
     "vscode": {
-      "extensions": ["JuanBlanco.solidity", "anthropic.claude-code"]
+      // pin all extensions to a specific version to prevent supply chain attacks
+      // we never want to install extension versions that are too recent (7 days minimum)
+      "extensions": [
+        "biomejs.biome@3.6.1",
+        "GraphQL.vscode-graphql-syntax@1.3.8",
+        "GitHub.vscode-pull-request-github@0.120.2",
+        "bradlc.vscode-tailwindcss@0.14.28",
+        "esbenp.prettier-vscode@12.4.0",
+        "NomicFoundation.hardhat-solidity@0.8.29",
+        "tamasfe.even-better-toml@0.21.2",
+        "ms-vscode-remote.remote-containers@0.394.0"
+      ],
+      "settings": {
+        // forward any git alias config from the host to the container
+        // allows us to use git aliases, sign config and ssh key config from the host
+        "remote.containers.copyGitConfig": true,
+        "remote.containers.forwardSSHAgent": true,
+        // prevent extensions from updating automatically to prevent supply chain attacks
+        "extensions.autoCheckUpdates": false,
+        "extensions.autoUpdate": false,
+        // set default terminal profile to zsh
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.profiles.linux": {
+          "zsh": {
+            "path": "/bin/zsh"
+          }
+        }
+      }
     }
   }
 }

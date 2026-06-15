@@ -1,41 +1,45 @@
 {
-  "name": "Cap Contracts (Claude)",
-  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "name": "cap-contracts (Claude)",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:24-bookworm",
   "features": {
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "20.18.0",
+    "ghcr.io/devcontainers/features/node:2.0.0": {
+      "version": "26.2.0",
+      "yarnVersion": "1.22.22",
       "installYarnUsingCorepack": true
     },
-    "ghcr.io/devcontainers/features/python:1": {
+    "ghcr.io/devcontainers/features/python:1.8.0": {
       "toolsToInstall": "slither-analyzer"
     },
-    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
-    "ghcr.io/rocker-org/devcontainer-features/apt-packages:1": {
+    "ghcr.io/rocker-org/devcontainer-features/apt-packages:1.0.2": {
       "packages": "lcov"
+    },
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0.5": {},
+    "./../features/foundry": {
+      "foundryVersion": "stable"
     }
   },
-  "updateRemoteUserUID": true,
-  "remoteUser": "vscode",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
   "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+  "initializeCommand": "bash .devcontainer/claude/prepare-host.sh",
   "mounts": [
-    "source=${localWorkspaceFolder}/.devcontainer/claude/home,target=/home/vscode,type=bind",
+    // prevent accidental exposure of .env files
     "source=${localWorkspaceFolder}/.devcontainer/maskdir/maskfile,target=/workspace/.env,type=bind,readonly",
     "source=${localWorkspaceFolder}/.devcontainer/maskdir,target=/workspace/.ssh,type=bind,readonly",
-    "source=${localWorkspaceFolder}/.devcontainer/maskdir,target=/workspace/.git,type=bind,readonly"
+    // don't allow git access
+    "source=${localWorkspaceFolder}/.devcontainer/maskdir,target=/workspace/.git,type=bind,readonly",
+    // persist yarn store across rebuilds (outside workspace to avoid a repo-root mount stub)
+    "source=${localWorkspaceFolder}/.devcontainer/claude/yarn-store,target=/yarn-store,type=bind,consistency=delegated",
+    // isolate node_modules from host (bind-mounted so they persist across rebuilds)
+    "source=${localWorkspaceFolder}/.devcontainer/claude/node_modules,target=/workspace/node_modules,type=bind,consistency=delegated"
   ],
-  "initializeCommand": "mkdir -p .devcontainer/claude/home && git submodule update --init --recursive",
   "runArgs": [
     "--name",
     "devcontainer-cap-contracts-claude"
   ],
-  "postCreateCommand": "bash /workspace/.devcontainer/post-install.sh",
-  "customizations": {
-    "vscode": {
-      "extensions": [
-        "JuanBlanco.solidity",
-        "anthropic.claude-code"
-      ]
-    }
-  }
+  "remoteUser": "node",
+  "updateRemoteUserUID": true,
+  // Default loginInteractiveShell probe hangs in this minimal image after "Container started".
+  "userEnvProbe": "none",
+  "postCreateCommand": "ulimit -n 65536 && yarn config set cache-folder /yarn-store --global && yarn install --immutable",
+  "postStartCommand": "yarn config set cache-folder /yarn-store --global"
 }

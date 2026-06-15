@@ -1,0 +1,15 @@
+{
+  "id": "git-secrets",
+  "version": "1.0.0",
+  "name": "git-secrets",
+  "description": "Install awslabs/git-secrets for pre-commit secret scanning",
+  "documentationURL": "https://github.com/awslabs/git-secrets",
+  "options": {
+    "version": {
+      "type": "string",
+      "default": "1.3.0",
+      "description": "git-secrets release tag to install from GitHub"
+    }
+  },
+  "installsAfter": ["ghcr.io/devcontainers/features/git"]
+}

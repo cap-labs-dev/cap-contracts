@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { IGatedERC1155ValidationHook } from "../../contracts/interfaces/IGatedERC1155ValidationHook.sol";
 import { IValidationHook } from "../../contracts/interfaces/IValidationHook.sol";
 import { IcoSetup } from "./IcoSetup.sol";
+import {
+    IBaseERC1155ValidationHook,
+    IGatedERC1155ValidationHook
+} from "@continuous-clearing-auction/periphery/validationHooks/GatedERC1155ValidationHook.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { IPredicateClient } from "@predicate/interfaces/IPredicateClient.sol";
 import { Attestation } from "@predicate/interfaces/IPredicateRegistry.sol";
@@ -22,6 +25,7 @@ contract ValidationHookTest is IcoSetup {
         assertEq(validationHook.supportsInterface(type(IValidationHook).interfaceId), true);
         assertEq(validationHook.supportsInterface(type(IPredicateClient).interfaceId), true);
         assertEq(validationHook.supportsInterface(type(IGatedERC1155ValidationHook).interfaceId), true);
+        assertEq(validationHook.supportsInterface(type(IBaseERC1155ValidationHook).interfaceId), true);
         assertEq(validationHook.supportsInterface(type(IERC165).interfaceId), true);
     }
 

@@ -1,0 +1,14 @@
+{
+  "id": "shell-aliases",
+  "version": "1.0.0",
+  "name": "Shell aliases",
+  "description": "Configure shell aliases in .zshrc and .bashrc",
+  "options": {
+    "aliases": {
+      "type": "string",
+      "default": "p=pnpm",
+      "description": "Shell aliases. Pass a JSON array in devcontainer.json (e.g. [\"p=pnpm\", \"ll='ls -lah'\"]) or a comma-separated string."
+    }
+  },
+  "installsAfter": ["ghcr.io/devcontainers/features/common-utils"]
+}

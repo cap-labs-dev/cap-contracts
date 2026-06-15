@@ -22,3 +22,6 @@
 [submodule "lib/predicate-contracts"]
 	path = lib/predicate-contracts
 	url = https://github.com/predicatelabs/predicate-contracts
+[submodule "lib/continuous-clearing-auction"]
+	path = lib/continuous-clearing-auction
+	url = https://github.com/Uniswap/continuous-clearing-auction
