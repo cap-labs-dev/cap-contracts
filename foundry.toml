@@ -29,6 +29,8 @@ remappings = [
     "ds-test/=lib/layerzero-v2/lib/forge-std/lib/ds-test/src/",
     "forge-std/=lib/forge-std/src/",
     "@openzeppelin/=node_modules/@openzeppelin/",
+    "@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
+    "@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/",
     "@tokenized-strategy/=lib/tokenized-strategy/src/",
     "@predicate/=node_modules/@predicate/contracts/src/"
 ]

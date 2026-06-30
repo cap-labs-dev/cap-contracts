@@ -1,201 +1,50 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
-import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import { IERC6909TokenSupply } from "@openzeppelin/contracts/interfaces/IERC6909.sol";
 
-/// @title Vault interface for storing the backing for cTokens
+/// @title IVault
 /// @author kexley, Cap Labs
-/// @notice Interface for the Vault contract which handles supplies, borrows and utilization tracking
-interface IVault {
-    /// @dev Storage for the vault
-    /// @param assets List of assets
-    /// @param totalSupplies Total supplies of an asset
-    /// @param totalBorrows Total borrows of an asset
-    /// @param utilizationIndex Utilization index of an asset
-    /// @param lastUpdate Last update time of an asset
-    /// @param paused Pause state of an asset
-    /// @param insuranceFund Insurance fund address
-    struct VaultStorage {
-        EnumerableSet.AddressSet assets;
-        mapping(address => uint256) totalSupplies;
-        mapping(address => uint256) totalBorrows;
-        mapping(address => uint256) utilizationIndex;
-        mapping(address => uint256) lastUpdate;
-        mapping(address => bool) paused;
-        address insuranceFund;
-    }
+/// @notice Interface for the collateral vault (ERC6909)
+interface IVault is IERC6909TokenSupply {
+    /// @notice Deposit an ERC20 asset and mint the corresponding ERC6909 balance
+    /// @param asset The ERC20 asset to deposit
+    /// @param amount The amount to deposit
+    /// @param recipient The address to receive the minted balance
+    function deposit(address asset, uint256 amount, address recipient) external;
 
-    /// @dev Parameters for minting or burning
-    /// @param asset Asset to mint or burn
-    /// @param amountIn Amount of asset to use in the minting or burning
-    /// @param amountOut Amount of cap token to mint or burn
-    /// @param minAmountOut Minimum amount to mint or burn
-    /// @param receiver Receiver of the minting or burning
-    /// @param deadline Deadline of the tx
-    /// @param fee Fee paid to the insurance fund
-    struct MintBurnParams {
-        address asset;
-        uint256 amountIn;
-        uint256 amountOut;
-        uint256 minAmountOut;
-        address receiver;
-        uint256 deadline;
-        uint256 fee;
-    }
+    /// @notice Burn ERC6909 balance and withdraw the underlying ERC20 asset
+    /// @param asset The ERC20 asset to withdraw
+    /// @param amount The amount to withdraw
+    /// @param recipient The address to receive the withdrawn tokens
+    function withdraw(address asset, uint256 amount, address recipient) external;
 
-    /// @dev Parameters for redeeming
-    /// @param amountIn Amount of cap token to burn
-    /// @param amountsOut Amounts of assets to withdraw
-    /// @param minAmountsOut Minimum amounts of assets to withdraw
-    /// @param receiver Receiver of the withdrawal
-    /// @param deadline Deadline of the tx
-    /// @param fees Fees paid to the insurance fund
-    struct RedeemParams {
-        uint256 amountIn;
-        uint256[] amountsOut;
-        uint256[] minAmountsOut;
-        address receiver;
-        uint256 deadline;
-        uint256[] fees;
-    }
+    /// @notice Transfer an asset from one address to another
+    /// @param from The address to transfer from
+    /// @param to The address to transfer to
+    /// @param asset The asset to transfer
+    /// @param amount The amount of asset to transfer
+    function transferFrom(address from, address to, address asset, uint256 amount) external;
 
-    /// @dev Parameters for borrowing
-    /// @param asset Asset to borrow
-    /// @param amount Amount of asset to borrow
-    /// @param receiver Receiver of the borrow
-    struct BorrowParams {
-        address asset;
-        uint256 amount;
-        address receiver;
-    }
+    /// @notice Transfer an asset to an address
+    /// @param to The address to transfer to
+    /// @param asset The asset to transfer
+    /// @param amount The amount of asset to transfer
+    function transfer(address to, address asset, uint256 amount) external;
 
-    /// @dev Parameters for repaying
-    /// @param asset Asset to repay
-    /// @param amount Amount of asset to repay
-    struct RepayParams {
-        address asset;
-        uint256 amount;
-    }
+    /// @notice Get the balance of an asset for an address
+    /// @param owner The address to get the balance of
+    /// @param asset The asset to get the balance of
+    /// @return balance The balance of the asset for the address
+    function balanceOf(address owner, address asset) external view returns (uint256 balance);
 
-    /// @notice Mint the cap token using an asset
-    /// @dev This contract must have approval to move asset from msg.sender
-    /// @dev The amount in is capped by the deposit cap of the asset
-    /// @param _asset Whitelisted asset to deposit
-    /// @param _amountIn Amount of asset to use in the minting
-    /// @param _minAmountOut Minimum amount to mint
-    /// @param _receiver Receiver of the minting
-    /// @param _deadline Deadline of the tx
-    function mint(address _asset, uint256 _amountIn, uint256 _minAmountOut, address _receiver, uint256 _deadline)
-        external
-        returns (uint256 amountOut);
+    /// @notice Get the ERC6909 token id for an asset address
+    /// @param asset The ERC20 asset address
+    /// @return id The token id (lower 160 bits of the address)
+    function id(address asset) external view returns (uint256 id);
 
-    /// @notice Burn the cap token for an asset
-    /// @dev Asset is withdrawn from the reserve or divested from the underlying vault
-    /// @param _asset Asset to withdraw
-    /// @param _amountIn Amount of cap token to burn
-    /// @param _minAmountOut Minimum amount out to receive
-    /// @param _receiver Receiver of the withdrawal
-    /// @param _deadline Deadline of the tx
-    function burn(address _asset, uint256 _amountIn, uint256 _minAmountOut, address _receiver, uint256 _deadline)
-        external
-        returns (uint256 amountOut);
-
-    /// @notice Redeem the Cap token for a bundle of assets
-    /// @dev Assets are withdrawn from the reserve or divested from the underlying vault
-    /// @param _amountIn Amount of Cap token to burn
-    /// @param _minAmountsOut Minimum amounts of assets to withdraw
-    /// @param _receiver Receiver of the withdrawal
-    /// @param _deadline Deadline of the tx
-    /// @return amountsOut Amount of assets withdrawn
-    function redeem(uint256 _amountIn, uint256[] calldata _minAmountsOut, address _receiver, uint256 _deadline)
-        external
-        returns (uint256[] memory amountsOut);
-
-    /// @notice Borrow an asset
-    /// @dev Whitelisted agents can borrow any amount, LTV is handled by Agent contracts
-    /// @param _asset Asset to borrow
-    /// @param _amount Amount of asset to borrow
-    /// @param _receiver Receiver of the borrow
-    function borrow(address _asset, uint256 _amount, address _receiver) external;
-
-    /// @notice Repay an asset
-    /// @param _asset Asset to repay
-    /// @param _amount Amount of asset to repay
-    function repay(address _asset, uint256 _amount) external;
-
-    /// @notice Add an asset to the vault list
-    /// @param _asset Asset address
-    function addAsset(address _asset) external;
-
-    /// @notice Remove an asset from the vault list
-    /// @param _asset Asset address
-    function removeAsset(address _asset) external;
-
-    /// @notice Pause an asset
-    /// @param _asset Asset address
-    function pauseAsset(address _asset) external;
-
-    /// @notice Unpause an asset
-    /// @param _asset Asset address
-    function unpauseAsset(address _asset) external;
-
-    /// @notice Pause all protocol operations
-    function pauseProtocol() external;
-
-    /// @notice Unpause all protocol operations
-    function unpauseProtocol() external;
-
-    /// @notice Set the insurance fund
-    /// @param _insuranceFund Insurance fund address
-    function setInsuranceFund(address _insuranceFund) external;
-
-    /// @notice Rescue an unsupported asset
-    /// @param _asset Asset to rescue
-    /// @param _receiver Receiver of the rescue
-    function rescueERC20(address _asset, address _receiver) external;
-
-    /// @notice Get the list of assets supported by the vault
-    /// @return assetList List of assets
-    function assets() external view returns (address[] memory assetList);
-
-    /// @notice Get the total supplies of an asset
-    /// @param _asset Asset address
-    /// @return totalSupply Total supply
-    function totalSupplies(address _asset) external view returns (uint256 totalSupply);
-
-    /// @notice Get the total borrows of an asset
-    /// @param _asset Asset address
-    /// @return totalBorrow Total borrow
-    function totalBorrows(address _asset) external view returns (uint256 totalBorrow);
-
-    /// @notice Get the pause state of an asset
-    /// @param _asset Asset address
-    /// @return isPaused Pause state
-    function paused(address _asset) external view returns (bool isPaused);
-
-    /// @notice Available balance to borrow
-    /// @param _asset Asset to borrow
-    /// @return amount Amount available
-    function availableBalance(address _asset) external view returns (uint256 amount);
-
-    /// @notice Utilization rate of an asset
-    /// @dev Utilization scaled by 1e27
-    /// @param _asset Utilized asset
-    /// @return ratio Utilization ratio
-    function utilization(address _asset) external view returns (uint256 ratio);
-
-    /// @notice Up to date cumulative utilization index of an asset
-    /// @dev Utilization scaled by 1e27
-    /// @param _asset Utilized asset
-    /// @return index Utilization ratio index
-    function currentUtilizationIndex(address _asset) external view returns (uint256 index);
-
-    /// @notice Get the insurance fund
-    /// @return insuranceFund Insurance fund
-    function insuranceFund() external view returns (address);
-
-    /// @notice Get the remaining mint capacity of an asset
-    /// @param _asset Asset address
-    /// @return remainingMintCapacity Remaining mint capacity
-    function getRemainingMintCapacity(address _asset) external view returns (uint256 remainingMintCapacity);
+    /// @notice Get the ERC20 asset address for a token id
+    /// @param id The ERC6909 token id
+    /// @return asset The ERC20 asset address
+    function asset(uint256 id) external view returns (address asset);
 }

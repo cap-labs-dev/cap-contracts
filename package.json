@@ -8,7 +8,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": "^20.18.0"
+    "node": "^24.12.0"
   },
   "scripts": {
     "postinstall": "lefthook install && forge remappings > remappings.txt",
@@ -41,26 +41,16 @@
   },
   "devDependencies": {
     "@devcontainers/cli": "^0.75.0",
-    "@openzeppelin/contracts": "npm:@openzeppelin/contracts",
-    "@openzeppelin/contracts-upgradeable": "npm:@openzeppelin/contracts-upgradeable",
-    "@symbioticfi/burners": "^1.0.0-devnet.2",
-    "@symbioticfi/core": "^1.0.0-devnet.10",
-    "@symbioticfi/hooks": "^1.0.0-devnet.1",
-    "@symbioticfi/rewards": "^1.0.0-devnet.6",
-    "eigenlayer-contracts": "^1.0.4",
-    "lefthook": "^1.10.10",
-    "@predicate/contracts": "^2.2.0"
+    "@openzeppelin/contracts": "^5.6.1",
+    "@openzeppelin/contracts-upgradeable": "^5.6.1",
+    "lefthook": "^1.10.10"
   },
   "resolutions": {
-    "@openzeppelin/contracts": "^5.2.0"
+    "@openzeppelin/contracts": "^5.6.1",
+    "@openzeppelin/contracts-upgradeable": "^5.6.1"
   },
   "dependencies": {
-    "@layerzerolabs/oapp-alt-evm": "^0.0.5",
-    "@layerzerolabs/oft-alt-evm": "^0.0.5",
-    "@layerzerolabs/oft-evm-upgradeable": "^4.0.2",
     "@morenabarboni/sumo": "^2.5.4",
-    "@openzeppelin/foundry-upgrades": "^0.3.7",
-    "@uniswap/v3-core": "^1.0.0",
-    "eigenlayer": "^2.1.5"
+    "@openzeppelin/foundry-upgrades": "^0.3.7"
   }
 }

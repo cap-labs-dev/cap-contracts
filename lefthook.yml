@@ -5,8 +5,3 @@ pre-commit:
       glob: "*.sol"
       run: forge fmt {staged_files}
       stage_fixed: true
-
-    generate-full-gas-report:
-      glob: "*.sol"
-      run: yarn test:gas
-      stage_fixed: true
