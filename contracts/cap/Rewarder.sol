@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.28;
 
-import { IInverseInterestRateModel } from "../interfaces/IInverseInterestRateModel.sol";
+import { IInterestRateModel } from "../interfaces/IInterestRateModel.sol";
 import { ILender } from "../interfaces/ILender.sol";
 import { IRewarder } from "../interfaces/IRewarder.sol";
 import { IStablecoin } from "../interfaces/IStablecoin.sol";
@@ -22,11 +22,36 @@ contract Rewarder is IRewarder, AccessManagedUpgradeable, RewarderStorageUtils, 
 
     /// @notice Initialize the Rewarder
     /// @param _authority The authority address
+    /// @param _lender The address of the lender
     /// @param _stablecoin The address of the stablecoin
-    function initialize(address _authority, address _stablecoin) external initializer {
+    /// @param _irm The address of the interest rate model
+    function initialize(address _authority, address _lender, address _stablecoin, address _irm) external initializer {
         __AccessManaged_init(_authority);
         Storage storage $ = getRewarderStorage();
+        $.lender = _lender;
         $.stablecoin = _stablecoin;
+        $.irm = _irm;
+    }
+
+    /// @notice Register a market's underwriter tranches
+    /// @dev Callable only by the Lender when a market is created
+    /// @param marketId The market to register
+    /// @param seniorUnderwriter The senior underwriter tranche
+    /// @param juniorUnderwriter The junior underwriter tranche
+    function registerMarket(bytes32 marketId, address seniorUnderwriter, address juniorUnderwriter) external {
+        Storage storage $ = getRewarderStorage();
+        if (msg.sender != $.lender) revert Unauthorized();
+        Market storage market = $.market[marketId];
+        market.seniorUnderwriter = seniorUnderwriter;
+        market.juniorUnderwriter = juniorUnderwriter;
+        emit RegisterMarket(marketId, seniorUnderwriter, juniorUnderwriter);
+    }
+
+    /// @notice Set the staked cUSD recipient of supply rewards
+    /// @param _stcUSD The new staked cUSD address
+    function setStcUSD(address _stcUSD) external restricted {
+        getRewarderStorage().stcUSD = _stcUSD;
+        emit SetStcUSD(_stcUSD);
     }
 
     /// @notice Set the junior split for a market
@@ -112,7 +137,7 @@ contract Rewarder is IRewarder, AccessManagedUpgradeable, RewarderStorageUtils, 
         }
 
         updateRewards(marketId);
-        IInverseInterestRateModel($.irm).update(marketId);
+        IInterestRateModel($.irm).update(marketId);
         uint256 accumulatedReward = rewardPerShare(marketId, msg.sender).rayMul(IERC20(msg.sender).balanceOf(user));
         market.pendingReward[msg.sender][user] += accumulatedReward - market.rewardDebt[msg.sender][user];
         market.rewardDebt[msg.sender][user] += amount.rayDiv(rewardPerShare(marketId, msg.sender));
@@ -130,7 +155,7 @@ contract Rewarder is IRewarder, AccessManagedUpgradeable, RewarderStorageUtils, 
         }
 
         updateRewards(marketId);
-        IInverseInterestRateModel($.irm).update(marketId);
+        IInterestRateModel($.irm).update(marketId);
         uint256 accumulatedReward = rewardPerShare(marketId, msg.sender).rayMul(IERC20(msg.sender).balanceOf(user));
         market.pendingReward[msg.sender][user] += accumulatedReward - market.rewardDebt[msg.sender][user];
         market.rewardDebt[msg.sender][user] -= amount.rayDiv(rewardPerShare(marketId, msg.sender));

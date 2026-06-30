@@ -32,7 +32,11 @@ interface IRewarder {
     event SetJuniorSplit(bytes32 marketId, uint256 juniorSplit);
     event ClaimSupplyReward(uint256 reward);
     event ClaimUnderwriterReward(bytes32 marketId, address underwriter, address recipient, uint256 reward);
+    event RegisterMarket(bytes32 marketId, address seniorUnderwriter, address juniorUnderwriter);
+    event SetStcUSD(address stcUSD);
 
+    function registerMarket(bytes32 marketId, address seniorUnderwriter, address juniorUnderwriter) external;
+    function setStcUSD(address stcUSD) external;
     function setJuniorSplit(bytes32 marketId, uint256 juniorSplit) external;
     function updateRewards(bytes32 marketId) external;
     function updateSupplyIndex(bytes32 marketId) external;

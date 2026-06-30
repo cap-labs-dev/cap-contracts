@@ -7,7 +7,7 @@ import {
     IERC4626,
     IERC7540AsyncRedeem
 } from "../ERC7540/ERC7540AsyncRedeem.sol";
-import { IInverseInterestRateModel } from "../interfaces/IInverseInterestRateModel.sol";
+import { IInterestRateModel } from "../interfaces/IInterestRateModel.sol";
 import { ILender } from "../interfaces/ILender.sol";
 import { IRewarder } from "../interfaces/IRewarder.sol";
 import { IUnderwriter } from "../interfaces/IUnderwriter.sol";
@@ -53,6 +53,7 @@ contract Underwriter is IUnderwriter, ERC7540AsyncRedeem, OwnableUpgradeable, Un
         $.vault = _vault;
         $.rewarder = _rewarder;
         $.irm = _irm;
+        $.lender = msg.sender;
     }
 
     //////////////////////////////////////////////////////////////////////////////
@@ -73,7 +74,7 @@ contract Underwriter is IUnderwriter, ERC7540AsyncRedeem, OwnableUpgradeable, Un
     /// @notice Update the interest rate model for the underwriter
     function updateIRM() public {
         Storage storage $ = getUnderwriterStorage();
-        IInverseInterestRateModel($.irm).update($.marketId);
+        IInterestRateModel($.irm).update($.marketId);
     }
 
     //////////////////////////////////////////////////////////////////////////////

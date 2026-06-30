@@ -2,7 +2,6 @@
 pragma solidity 0.8.28;
 
 import { IInterestRateModel } from "../interfaces/IInterestRateModel.sol";
-import { IInverseInterestRateModel } from "../interfaces/IInverseInterestRateModel.sol";
 import { ILender } from "../interfaces/ILender.sol";
 import { IOracle } from "../interfaces/IOracle.sol";
 import { IRewarder } from "../interfaces/IRewarder.sol";
@@ -75,7 +74,7 @@ contract Lender is ILender, AccessManagedUpgradeable, LenderStorageUtils, UUPSUp
         if (scaledAmount == 0) revert InvalidAmount();
         market.scaledDebt += scaledAmount;
 
-        IInverseInterestRateModel($.irm).update(marketId);
+        IInterestRateModel($.irm).update(marketId);
 
         IStablecoin($.stablecoin).mintUnbacked(recipient, borrowed);
 
@@ -99,7 +98,7 @@ contract Lender is ILender, AccessManagedUpgradeable, LenderStorageUtils, UUPSUp
         if (scaledRepaid == 0) revert InvalidAmount();
         market.scaledDebt -= scaledRepaid;
 
-        IInverseInterestRateModel($.irm).update(marketId);
+        IInterestRateModel($.irm).update(marketId);
 
         IStablecoin($.stablecoin).burnUnbacked(msg.sender, repaid);
 
@@ -161,7 +160,7 @@ contract Lender is ILender, AccessManagedUpgradeable, LenderStorageUtils, UUPSUp
         address[] calldata borrowers
     ) external returns (bytes32 marketId, address seniorUnderwriter, address juniorUnderwriter) {
         Storage storage $ = getLenderStorage();
-        bytes32 marketId = keccak256(abi.encode(name, symbol, asset, manager));
+        marketId = keccak256(abi.encode(name, symbol, asset, manager));
         if ($.markets.contains(marketId)) revert MarketAlreadyExists();
         $.markets.add(marketId);
 
@@ -181,6 +180,8 @@ contract Lender is ILender, AccessManagedUpgradeable, LenderStorageUtils, UUPSUp
                 )
             )
         );
+
+        IRewarder($.rewarder).registerMarket(marketId, seniorUnderwriter, juniorUnderwriter);
 
         Market storage market = $.market[marketId];
         market.asset = asset;
@@ -331,6 +332,32 @@ contract Lender is ILender, AccessManagedUpgradeable, LenderStorageUtils, UUPSUp
         emit SetMultiplierLimits(min, max);
     }
 
+    /// @notice Set the price oracle
+    /// @param oracle The new oracle address
+    function setOracle(address oracle) external restricted {
+        getLenderStorage().oracle = oracle;
+        emit SetOracle(oracle);
+    }
+
+    /// @notice Set the target health factor used to size liquidations
+    /// @param targetHealth The new target health factor in ray (1e27)
+    function setTargetHealth(uint256 targetHealth) external restricted {
+        getLenderStorage().targetHealth = targetHealth;
+        emit SetTargetHealth(targetHealth);
+    }
+
+    /// @notice Set the liquidation bonus curve parameters
+    /// @param kink The health factor (ray) at which the bonus slope steepens
+    /// @param slope0 The bonus slope above the kink in ray
+    /// @param slope1 The bonus slope below the kink in ray
+    function setBonusConfig(uint256 kink, uint256 slope0, uint256 slope1) external restricted {
+        Storage storage $ = getLenderStorage();
+        $.bonusKink = kink;
+        $.bonusSlope0 = slope0;
+        $.bonusSlope1 = slope1;
+        emit SetBonusConfig(kink, slope0, slope1);
+    }
+
     /// @notice Get the maximum amount of cUSD that can be borrowed
     /// @param marketId The ID of the market
     /// @return borrowable The maximum amount of cUSD that can be borrowed
@@ -470,7 +497,7 @@ contract Lender is ILender, AccessManagedUpgradeable, LenderStorageUtils, UUPSUp
     /// @return currentIndex The current underwriter premium index in ray
     function underwriterIndex(bytes32 marketId) public view returns (uint256 currentIndex) {
         Storage storage $ = getLenderStorage();
-        currentIndex = IInverseInterestRateModel($.irm).index(marketId);
+        currentIndex = IInterestRateModel($.irm).index(marketId);
     }
 
     /// @notice Get the combined debt index for a market

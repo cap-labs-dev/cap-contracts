@@ -75,6 +75,8 @@ interface ILender {
     event SetBorrowCap(bytes32 marketId, uint256 borrowCap);
     event SetMultiplierLimits(uint256 min, uint256 max);
     event SetOracle(address oracle);
+    event SetTargetHealth(uint256 targetHealth);
+    event SetBonusConfig(uint256 kink, uint256 slope0, uint256 slope1);
     event CreateMarket(bytes32 marketId);
 
     function borrow(bytes32 marketId, address recipient, uint256 amount) external returns (uint256 borrowed);
@@ -94,6 +96,9 @@ interface ILender {
     function setLt(bytes32 marketId, uint256 lt) external;
     function setBorrowCap(bytes32 marketId, uint256 borrowCap) external;
     function setMultiplierLimits(uint256 min, uint256 max) external;
+    function setOracle(address oracle) external;
+    function setTargetHealth(uint256 targetHealth) external;
+    function setBonusConfig(uint256 kink, uint256 slope0, uint256 slope1) external;
     function utilization(bytes32 marketId) external view returns (uint256 utilization);
     function maxBorrowable(bytes32 marketId) external view returns (uint256 maxBorrowable);
     function maxLiquidatable(bytes32 marketId) external view returns (uint256 maxLiquidatable);

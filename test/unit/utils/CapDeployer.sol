@@ -1,0 +1,169 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.28;
+
+import { MockERC20 } from "../mocks/MockERC20.sol";
+import { MockOracle } from "../mocks/MockOracle.sol";
+import { BaseTest } from "./BaseTest.sol";
+
+import { InterestRateModel } from "../../../contracts/cap/InterestRateModel.sol";
+import { Lender } from "../../../contracts/cap/Lender.sol";
+import { Rewarder } from "../../../contracts/cap/Rewarder.sol";
+import { Stablecoin } from "../../../contracts/cap/Stablecoin.sol";
+import { Underwriter } from "../../../contracts/cap/Underwriter.sol";
+import { Vault } from "../../../contracts/cap/Vault.sol";
+import { IInterestRateModel } from "../../../contracts/interfaces/IInterestRateModel.sol";
+import { IUnderwriter } from "../../../contracts/interfaces/IUnderwriter.sol";
+
+import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+
+/// @title CapDeployer
+/// @notice Deploys and fully wires a Cap protocol instance for integration-style unit tests.
+/// @dev Resolves the deploy-order circular dependencies by deploying every proxy first and then
+/// initializing. The test contract is the AccessManager admin and the protocol's "minter" role is
+/// granted to the Lender and Rewarder so they can mint/burn unbacked cUSD.
+abstract contract CapDeployer is BaseTest {
+    uint64 internal constant MINTER_ROLE = 1;
+
+    // core
+    MockOracle internal oracle;
+    MockERC20 internal cusdUnderlying; // underlying for the stablecoin (cUSD reserves)
+    MockERC20 internal collateral; // market collateral asset
+
+    Vault internal vault;
+    Stablecoin internal stablecoin;
+    InterestRateModel internal irm;
+    Lender internal lender;
+    Rewarder internal rewarder;
+    UpgradeableBeacon internal underwriterBeacon;
+
+    // sensible defaults (ray)
+    uint256 internal constant DEFAULT_BUFFER = 0.1e27;
+    uint256 internal constant DEFAULT_LT = 0.8e27;
+    uint256 internal constant DEFAULT_LTV = 0.5e27;
+
+    function _deployCap() internal {
+        _setUpAccessManager();
+        address authority = address(accessManager);
+
+        oracle = new MockOracle();
+        cusdUnderlying = new MockERC20("USD Coin", "USDC", 18);
+        collateral = new MockERC20("Wrapped Ether", "WETH", 18);
+
+        // implementations
+        Vault vaultImpl = new Vault();
+        Stablecoin stablecoinImpl = new Stablecoin();
+        InterestRateModel irmImpl = new InterestRateModel();
+        Lender lenderImpl = new Lender();
+        Rewarder rewarderImpl = new Rewarder();
+        Underwriter underwriterImpl = new Underwriter();
+        underwriterBeacon = new UpgradeableBeacon(address(underwriterImpl), address(this));
+
+        // predict proxy addresses by deploying proxies with deferred init is complex; instead deploy
+        // proxies that need each other's addresses by initializing in dependency order where possible
+        // and using setters/zero where a value is only required after another contract exists.
+
+        // Vault has no cross dependencies
+        vault = Vault(_deployProxy(address(vaultImpl), abi.encodeCall(Vault.initialize, (authority))));
+
+        // Lender, Rewarder, IRM and Stablecoin reference each other, so this OZ proxy forbids deploying
+        // uninitialized. Pre-compute the four proxy addresses (CREATE is deterministic from sender+nonce)
+        // and initialize each one immediately with the known peers. None of these initializers call into
+        // their peers, so ordering only needs the addresses to be correct.
+        uint256 n = vm.getNonce(address(this));
+        address lenderAddr = vm.computeCreateAddress(address(this), n);
+        address rewarderAddr = vm.computeCreateAddress(address(this), n + 1);
+        address irmAddr = vm.computeCreateAddress(address(this), n + 2);
+        address stablecoinAddr = vm.computeCreateAddress(address(this), n + 3);
+
+        lender = Lender(
+            _deployProxy(
+                address(lenderImpl),
+                abi.encodeCall(
+                    Lender.initialize,
+                    (
+                        authority,
+                        stablecoinAddr,
+                        address(underwriterBeacon),
+                        address(oracle),
+                        rewarderAddr,
+                        address(vault),
+                        irmAddr
+                    )
+                )
+            )
+        );
+        rewarder = Rewarder(
+            _deployProxy(
+                address(rewarderImpl),
+                abi.encodeCall(Rewarder.initialize, (authority, lenderAddr, stablecoinAddr, irmAddr))
+            )
+        );
+        irm = InterestRateModel(
+            _deployProxy(
+                address(irmImpl), abi.encodeCall(InterestRateModel.initialize, (stablecoinAddr, lenderAddr, authority))
+            )
+        );
+        stablecoin = Stablecoin(
+            _deployProxy(
+                address(stablecoinImpl),
+                abi.encodeCall(
+                    Stablecoin.initialize, (authority, address(cusdUnderlying), "Cap USD", "cUSD", "", irmAddr)
+                )
+            )
+        );
+
+        require(address(lender) == lenderAddr, "lender addr");
+        require(address(rewarder) == rewarderAddr, "rewarder addr");
+        require(address(irm) == irmAddr, "irm addr");
+        require(address(stablecoin) == stablecoinAddr, "stablecoin addr");
+
+        // risk params
+        lender.setDefaultBuffer(DEFAULT_BUFFER);
+        lender.setDefaultLt(DEFAULT_LT);
+        lender.setMultiplierLimits(0, 10e27);
+        lender.setTargetHealth(1.1e27);
+        lender.setBonusConfig(0.9e27, 0.02e27, 0.1e27);
+
+        // allow Lender and Rewarder to mint/burn unbacked cUSD
+        bytes4[] memory sels = new bytes4[](2);
+        sels[0] = Stablecoin.mintUnbacked.selector;
+        sels[1] = Stablecoin.burnUnbacked.selector;
+        accessManager.setTargetFunctionRole(address(stablecoin), sels, MINTER_ROLE);
+        accessManager.grantRole(MINTER_ROLE, address(lender), 0);
+        accessManager.grantRole(MINTER_ROLE, address(rewarder), 0);
+
+        // price the collateral at $1 (ray)
+        oracle.setPrice(address(collateral), 1e27);
+    }
+
+    /// @dev Create a market and return its id plus tranche addresses.
+    function _createMarket(string memory name, address manager, address[] memory borrowers)
+        internal
+        returns (bytes32 marketId, address senior, address junior)
+    {
+        (marketId, senior, junior) =
+            lender.createMarket(name, name, address(collateral), manager, DEFAULT_LTV, borrowers);
+    }
+
+    /// @dev Fund an underwriter tranche with `amount` of collateral supplied by `supplier`.
+    function _fundUnderwriter(address underwriter, address manager, address supplier, uint256 amount) internal {
+        collateral.mint(supplier, amount);
+        vm.startPrank(supplier);
+        collateral.approve(address(vault), amount);
+        vault.deposit(address(collateral), amount, supplier);
+        vault.setOperator(underwriter, true);
+        vm.stopPrank();
+
+        vm.prank(manager);
+        Underwriter(underwriter).setWhitelist(supplier, true);
+
+        vm.prank(supplier);
+        Underwriter(underwriter).deposit(amount, supplier);
+    }
+
+    function _setMarketSlopes(bytes32 marketId) internal {
+        irm.setMarketSlopes(
+            marketId, IInterestRateModel.Slopes({ base: 0.2e27, slope0: 0.1e27, slope1: 0.3e27, kink: 0.5e27 })
+        );
+    }
+}

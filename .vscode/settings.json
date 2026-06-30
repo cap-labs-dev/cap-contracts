@@ -5,7 +5,13 @@
   },
   "solidity.formatter": "forge",
   "solidity.compileUsingRemoteVersion": "v0.8.28",
-  "solidity.packageDefaultDependenciesContractsDirectory": "src",
-  "solidity.packageDefaultDependenciesDirectory": "lib",
-  "solidity.defaultCompiler": "remote"
+  "solidity.packageDefaultDependenciesContractsDirectory": "",
+  "solidity.packageDefaultDependenciesDirectory": ["node_modules", "lib"],
+  "solidity.defaultCompiler": "remote",
+  "solidity.remappings": [
+    "@openzeppelin/=node_modules/@openzeppelin/",
+    "@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
+    "@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/",
+    "forge-std/=lib/forge-std/src/"
+  ]
 }
