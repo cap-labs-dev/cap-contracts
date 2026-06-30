@@ -2,10 +2,10 @@
 pragma solidity 0.8.28;
 
 import { Vault } from "../../../contracts/cap/Vault.sol";
-import { IVault } from "../../../contracts/interfaces/IVault.sol";
 import { AssetId } from "../../../contracts/utils/AssetId.sol";
-import { MockERC20 } from "../mocks/MockERC20.sol";
-import { BaseTest } from "../utils/BaseTest.sol";
+import { BaseTest } from "../../shared/BaseTest.sol";
+import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 contract VaultTest is BaseTest {
     Vault internal vault;
@@ -101,6 +101,19 @@ contract VaultTest is BaseTest {
         vm.prank(bob);
         vault.transferFrom(alice, bob, address(token), 10e18);
         assertEq(vault.balanceOf(bob, address(token)), 10e18);
+    }
+
+    function test_upgrade_authorized() public {
+        Vault newImpl = new Vault();
+        UUPSUpgradeable(address(vault)).upgradeToAndCall(address(newImpl), "");
+        assertEq(vault.id(address(token)), AssetId.toId(address(token))); // still functional
+    }
+
+    function test_upgrade_unauthorized_reverts() public {
+        Vault newImpl = new Vault();
+        vm.prank(bob);
+        vm.expectRevert();
+        UUPSUpgradeable(address(vault)).upgradeToAndCall(address(newImpl), "");
     }
 
     function testFuzz_depositWithdraw(uint256 amount) public {

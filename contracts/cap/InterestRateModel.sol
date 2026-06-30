@@ -150,7 +150,9 @@ contract InterestRateModel is
     /// @return rate The next interest rate
     function _nextInterestRate(uint256 utilization, Slopes memory slopes) internal pure returns (uint256 rate) {
         if (utilization <= slopes.kink) {
-            rate = slopes.base + slopes.slope0.rayMul(utilization.rayDiv(slopes.kink));
+            // unconfigured slopes (kink == 0) accrue no rate rather than dividing by zero
+            uint256 ratio = slopes.kink == 0 ? 0 : utilization.rayDiv(slopes.kink);
+            rate = slopes.base + slopes.slope0.rayMul(ratio);
         } else {
             rate = slopes.base + slopes.slope0
                 + slopes.slope1.rayMul((utilization - slopes.kink).rayDiv(1e27 - slopes.kink));
@@ -167,7 +169,8 @@ contract InterestRateModel is
         returns (uint256 newRate)
     {
         if (utilization <= slopes.kink) {
-            newRate = slopes.base - slopes.slope0.rayMul(utilization.rayDiv(slopes.kink));
+            uint256 ratio = slopes.kink == 0 ? 0 : utilization.rayDiv(slopes.kink);
+            newRate = slopes.base - slopes.slope0.rayMul(ratio);
         } else {
             newRate = slopes.base - slopes.slope0
                 + slopes.slope1.rayMul((utilization - slopes.kink).rayDiv(1e27 - slopes.kink));

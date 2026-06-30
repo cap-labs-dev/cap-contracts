@@ -138,9 +138,12 @@ contract Rewarder is IRewarder, AccessManagedUpgradeable, RewarderStorageUtils, 
 
         updateRewards(marketId);
         IInterestRateModel($.irm).update(marketId);
-        uint256 accumulatedReward = rewardPerShare(marketId, msg.sender).rayMul(IERC20(msg.sender).balanceOf(user));
-        market.pendingReward[msg.sender][user] += accumulatedReward - market.rewardDebt[msg.sender][user];
-        market.rewardDebt[msg.sender][user] += amount.rayDiv(rewardPerShare(marketId, msg.sender));
+        uint256 accRewardPerShare = rewardPerShare(marketId, msg.sender);
+        uint256 balance = IERC20(msg.sender).balanceOf(user);
+        market.pendingReward[msg.sender][user] += accRewardPerShare.rayMul(balance)
+        - market.rewardDebt[msg.sender][user];
+        // checkpoint the user's reward debt against their post-change balance (MasterChef-style)
+        market.rewardDebt[msg.sender][user] = accRewardPerShare.rayMul(balance + amount);
     }
 
     /// @notice Decrease reward debt for a user
@@ -156,9 +159,12 @@ contract Rewarder is IRewarder, AccessManagedUpgradeable, RewarderStorageUtils, 
 
         updateRewards(marketId);
         IInterestRateModel($.irm).update(marketId);
-        uint256 accumulatedReward = rewardPerShare(marketId, msg.sender).rayMul(IERC20(msg.sender).balanceOf(user));
-        market.pendingReward[msg.sender][user] += accumulatedReward - market.rewardDebt[msg.sender][user];
-        market.rewardDebt[msg.sender][user] -= amount.rayDiv(rewardPerShare(marketId, msg.sender));
+        uint256 accRewardPerShare = rewardPerShare(marketId, msg.sender);
+        uint256 balance = IERC20(msg.sender).balanceOf(user);
+        market.pendingReward[msg.sender][user] += accRewardPerShare.rayMul(balance)
+        - market.rewardDebt[msg.sender][user];
+        // checkpoint the user's reward debt against their post-change balance (MasterChef-style)
+        market.rewardDebt[msg.sender][user] = accRewardPerShare.rayMul(balance - amount);
     }
 
     /// @notice Claim accumulated supply interest as stcUSD

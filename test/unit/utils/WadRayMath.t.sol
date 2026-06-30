@@ -81,6 +81,31 @@ contract WadRayMathTest is Test {
         m.wadDiv(WAD, 0);
     }
 
+    function test_wadDiv_identity() public view {
+        assertEq(m.wadDiv(5 * WAD, WAD), 5 * WAD);
+        assertEq(m.wadDiv(WAD, WAD), WAD);
+    }
+
+    function test_wadMul_zero() public view {
+        assertEq(m.wadMul(0, WAD), 0);
+        assertEq(m.wadMul(WAD, 0), 0);
+    }
+
+    function test_wadMul_overflow_reverts() public {
+        vm.expectRevert();
+        m.wadMul(type(uint256).max, 2 * WAD);
+    }
+
+    function test_wadDiv_overflow_reverts() public {
+        vm.expectRevert();
+        m.wadDiv(type(uint256).max, 1);
+    }
+
+    function test_wadToRay_overflow_reverts() public {
+        vm.expectRevert();
+        m.wadToRay(type(uint256).max);
+    }
+
     function test_rayToWad_roundsHalfUp() public view {
         assertEq(m.rayToWad(RAY), WAD);
         // 1.5e9 in ray remainder -> rounds up

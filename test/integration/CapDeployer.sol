@@ -1,18 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import { MockERC20 } from "../mocks/MockERC20.sol";
-import { MockOracle } from "../mocks/MockOracle.sol";
-import { BaseTest } from "./BaseTest.sol";
+import { BaseTest } from "../shared/BaseTest.sol";
+import { MockERC20 } from "../shared/mocks/MockERC20.sol";
+import { MockOracle } from "../shared/mocks/MockOracle.sol";
 
-import { InterestRateModel } from "../../../contracts/cap/InterestRateModel.sol";
-import { Lender } from "../../../contracts/cap/Lender.sol";
-import { Rewarder } from "../../../contracts/cap/Rewarder.sol";
-import { Stablecoin } from "../../../contracts/cap/Stablecoin.sol";
-import { Underwriter } from "../../../contracts/cap/Underwriter.sol";
-import { Vault } from "../../../contracts/cap/Vault.sol";
-import { IInterestRateModel } from "../../../contracts/interfaces/IInterestRateModel.sol";
-import { IUnderwriter } from "../../../contracts/interfaces/IUnderwriter.sol";
+import { InterestRateModel } from "../../contracts/cap/InterestRateModel.sol";
+import { Lender } from "../../contracts/cap/Lender.sol";
+import { Rewarder } from "../../contracts/cap/Rewarder.sol";
+import { Stablecoin } from "../../contracts/cap/Stablecoin.sol";
+import { Underwriter } from "../../contracts/cap/Underwriter.sol";
+import { Vault } from "../../contracts/cap/Vault.sol";
+import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
 
 import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
@@ -165,5 +164,11 @@ abstract contract CapDeployer is BaseTest {
         irm.setMarketSlopes(
             marketId, IInterestRateModel.Slopes({ base: 0.2e27, slope0: 0.1e27, slope1: 0.3e27, kink: 0.5e27 })
         );
+    }
+
+    /// @dev Mint unbacked cUSD to an address (e.g. to fund a liquidator after interest compounds).
+    function _mintStable(address to, uint256 amount) internal {
+        accessManager.grantRole(MINTER_ROLE, address(this), 0);
+        stablecoin.mintUnbacked(to, amount);
     }
 }

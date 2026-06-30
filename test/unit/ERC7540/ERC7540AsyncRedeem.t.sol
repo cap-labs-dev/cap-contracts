@@ -3,8 +3,9 @@ pragma solidity 0.8.28;
 
 import { ERC7540AsyncRedeem } from "../../../contracts/ERC7540/ERC7540AsyncRedeem.sol";
 import { IERC7540AsyncRedeem } from "../../../contracts/interfaces/IERC7540AsyncRedeem.sol";
-import { MockERC20 } from "../mocks/MockERC20.sol";
+import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
+import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { Test } from "forge-std/Test.sol";
 
 /// @dev Minimal concrete async-redeem vault whose available liquidity (unlockedSupply) is settable,
@@ -22,6 +23,13 @@ contract MockAsyncVault is ERC7540AsyncRedeem {
 
     function setUnlocked(uint256 u) external {
         _unlocked = u;
+    }
+}
+
+/// @dev A vault that does NOT override unlockedSupply, exercising the base (zero) implementation.
+contract MockBareVault is ERC7540AsyncRedeem {
+    function initialize(IERC20 asset_) external initializer {
+        __ERC7540AsyncRedeem_init(asset_, "Bare Vault", "bVLT", "");
     }
 }
 
@@ -194,5 +202,88 @@ contract ERC7540AsyncRedeemTest is Test {
         uint256 id = vault.requestRedeem(300e18, bob, alice);
         // receipt controlled by bob
         assertEq(vault.claimableRedeemRequest(id, bob), 300e18);
+    }
+
+    function test_withdraw_exceedingClaimable_reverts() public {
+        vault.setUnlocked(300e18);
+        vm.startPrank(alice);
+        uint256 id = vault.requestRedeem(1_000e18, alice, alice);
+        vm.expectRevert();
+        vault.withdraw(id, 301e18, alice, alice);
+        vm.stopPrank();
+    }
+
+    // --- instant ERC4626 path (no request) hits the 5-arg _withdraw override ---
+
+    function test_instantRedeem_ERC4626() public {
+        vault.setUnlocked(1_000e18);
+        vm.prank(alice);
+        uint256 assets = vault.redeem(400e18, alice, alice);
+
+        assertEq(assets, 400e18);
+        assertEq(asset.balanceOf(alice), 400e18);
+        assertEq(vault.balanceOf(alice), 600e18);
+        assertEq(vault.totalSupply(), 600e18);
+    }
+
+    function test_instantWithdraw_ERC4626() public {
+        vault.setUnlocked(1_000e18);
+        vm.prank(alice);
+        uint256 shares = vault.withdraw(250e18, alice, alice);
+
+        assertEq(shares, 250e18);
+        assertEq(asset.balanceOf(alice), 250e18);
+        assertEq(vault.balanceOf(alice), 750e18);
+    }
+
+    function test_instantRedeem_byOperator() public {
+        vault.setUnlocked(1_000e18);
+        vm.prank(alice);
+        vault.setOperator(bob, true);
+
+        vm.prank(bob);
+        uint256 assets = vault.redeem(100e18, bob, alice);
+        assertEq(assets, 100e18);
+        assertEq(asset.balanceOf(bob), 100e18);
+        assertEq(vault.balanceOf(alice), 900e18);
+    }
+
+    // --- ERC7575 / ERC165 ---
+
+    function test_share_returnsSelf() public view {
+        assertEq(vault.share(), address(vault));
+    }
+
+    function test_supportsInterface() public view {
+        assertTrue(vault.supportsInterface(type(IERC4626).interfaceId));
+        assertFalse(vault.supportsInterface(0xffffffff));
+    }
+
+    // --- fully pending request (no liquidity reaches it) ---
+
+    function test_fullyPending_whenNoLiquidity() public {
+        // _unlocked defaults to 0 -> nothing in the request is claimable yet
+        vm.prank(alice);
+        uint256 id = vault.requestRedeem(400e18, alice, alice);
+
+        assertEq(vault.claimableRedeemRequest(id, alice), 0);
+        assertEq(vault.pendingRedeemRequest(id, alice), 400e18);
+    }
+
+    // --- base unlockedSupply (no override) ---
+
+    function test_bareVault_baseUnlockedSupplyIsZero() public {
+        MockBareVault bare = new MockBareVault();
+        bare.initialize(IERC20(address(asset)));
+
+        asset.mint(bob, 100e18);
+        vm.startPrank(bob);
+        asset.approve(address(bare), type(uint256).max);
+        bare.deposit(100e18, bob);
+        vm.stopPrank();
+
+        assertEq(bare.unlockedSupply(), 0);
+        assertEq(bare.instantUnlockedSupply(), 0);
+        assertEq(bare.maxRedeem(bob), 0);
     }
 }

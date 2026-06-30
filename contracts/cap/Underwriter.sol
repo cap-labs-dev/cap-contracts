@@ -65,7 +65,7 @@ contract Underwriter is IUnderwriter, ERC7540AsyncRedeem, OwnableUpgradeable, Un
     /// @return slashedAssets The amount of assets slashed
     function slash(uint256 assets, address recipient) external returns (uint256 slashedAssets) {
         Storage storage $ = getUnderwriterStorage();
-        if (msg.sender != address($.vault)) revert Unauthorized();
+        if (msg.sender != $.lender) revert Unauthorized();
         slashedAssets = Math.min(assets, totalAssets());
         IVault($.vault).withdraw(asset(), slashedAssets, recipient);
         updateIRM();

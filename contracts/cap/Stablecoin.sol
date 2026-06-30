@@ -70,8 +70,9 @@ contract Stablecoin is
     /// @notice Get the utilization rate of the Stablecoin
     /// @return rate The utilization rate of the cUSD
     function utilizationRate() public view returns (uint256 rate) {
-        Storage storage $ = getStablecoinStorage();
-        rate = $.unbacked.rayDiv(totalSupply());
+        uint256 supply = totalSupply();
+        if (supply == 0) return 0;
+        rate = getStablecoinStorage().unbacked.rayDiv(supply);
     }
 
     /// @notice Increase the current bad debt to instantly socialize losses

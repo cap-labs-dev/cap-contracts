@@ -448,7 +448,9 @@ contract Lender is ILender, AccessManagedUpgradeable, LenderStorageUtils, UUPSUp
     /// @param marketId The ID of the market
     /// @return util The utilization of the market
     function utilization(bytes32 marketId) external view returns (uint256 util) {
-        util = debt(marketId).rayDiv(totalCredit(marketId));
+        uint256 credit = totalCredit(marketId);
+        if (credit == 0) return 0;
+        util = debt(marketId).rayDiv(credit);
     }
 
     /// @notice Get the price of the asset for a market

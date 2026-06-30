@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import { Underwriter } from "../../../contracts/cap/Underwriter.sol";
-import { IUnderwriter } from "../../../contracts/interfaces/IUnderwriter.sol";
-import { CapDeployer } from "../utils/CapDeployer.sol";
+import { Underwriter } from "../../contracts/cap/Underwriter.sol";
+import { IUnderwriter } from "../../contracts/interfaces/IUnderwriter.sol";
+import { CapDeployer } from "./CapDeployer.sol";
 
 contract UnderwriterTest is CapDeployer {
     address internal manager = makeAddr("manager");
@@ -33,6 +33,8 @@ contract UnderwriterTest is CapDeployer {
 
     function test_supportsInterface() public view {
         assertTrue(senior.supportsInterface(type(IUnderwriter).interfaceId));
+        // an unknown id short-circuits into super.supportsInterface (which returns false)
+        assertFalse(senior.supportsInterface(0xffffffff));
     }
 
     function test_setWhitelist_onlyOwner() public {
@@ -59,8 +61,8 @@ contract UnderwriterTest is CapDeployer {
         assertEq(senior.maxDeposit(supplier), 0);
     }
 
-    function test_slash_onlyVault() public {
-        // anyone other than the vault is rejected at the auth check
+    function test_slash_onlyLender() public {
+        // only the Lender may slash; anyone else is rejected at the auth check
         vm.prank(stranger);
         vm.expectRevert(IUnderwriter.Unauthorized.selector);
         senior.slash(1e18, stranger);
@@ -70,8 +72,32 @@ contract UnderwriterTest is CapDeployer {
         assertEq(senior.unlockedSupply(), 0);
     }
 
+    function test_updateIRM_callable() public {
+        // permissionless poke of the market interest rate model; must not revert
+        senior.updateIRM();
+    }
+
     function test_tranchesAreDistinct() public view {
         assertTrue(address(senior) != address(junior));
         assertEq(junior.asset(), address(collateral));
+    }
+
+    function test_deposit_requestRedeem_redeem_roundtrip() public {
+        _fundUnderwriter(address(senior), manager, supplier, 100e18);
+        assertEq(senior.totalSupply(), 100e18);
+        assertEq(senior.balanceOf(supplier), 100e18);
+        // no debt -> every share is unlocked
+        assertEq(senior.unlockedSupply(), 100e18);
+
+        vm.startPrank(supplier);
+        uint256 id = senior.requestRedeem(100e18, supplier, supplier);
+        assertEq(senior.claimableRedeemRequest(id, supplier), 100e18);
+        uint256 assets = senior.redeem(id, 100e18, supplier, supplier);
+        vm.stopPrank();
+
+        assertEq(assets, 100e18);
+        assertEq(senior.totalSupply(), 0);
+        // assets are returned to the supplier's vault (ERC6909) balance
+        assertEq(vault.balanceOf(supplier, address(collateral)), 100e18);
     }
 }

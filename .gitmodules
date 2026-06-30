@@ -1,24 +1,3 @@
 [submodule "lib/forge-std"]
 	path = lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
-[submodule "lib/layerzero-devtools"]
-	path = lib/layerzero-devtools
-	url = https://github.com/LayerZero-Labs/devtools
-[submodule "lib/layerzero-v2"]
-	path = lib/layerzero-v2
-	url = https://github.com/LayerZero-Labs/layerzero-v2
-[submodule "lib/solidity-bytes-utils"]
-	path = lib/solidity-bytes-utils
-	url = https://github.com/GNSPS/solidity-bytes-utils
-[submodule "lib/openzeppelin-foundry-upgrades"]
-	path = lib/openzeppelin-foundry-upgrades
-	url = https://github.com/OpenZeppelin/openzeppelin-foundry-upgrades
-[submodule "lib/layerzero-v1"]
-	path = lib/layerzero-v1
-	url = https://github.com/LayerZero-Labs/LayerZero-v1
-[submodule "lib/tokenized-strategy"]
-	path = lib/tokenized-strategy
-	url = https://github.com/yearn/tokenized-strategy
-[submodule "lib/predicate-contracts"]
-	path = lib/predicate-contracts
-	url = https://github.com/predicatelabs/predicate-contracts
