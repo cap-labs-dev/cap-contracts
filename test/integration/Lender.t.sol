@@ -2,14 +2,13 @@
 pragma solidity 0.8.28;
 
 import { Lender } from "../../contracts/cap/Lender.sol";
-import { Underwriter } from "../../contracts/cap/Underwriter.sol";
+import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { ILender } from "../../contracts/interfaces/ILender.sol";
 import { MockOracle } from "../shared/mocks/MockOracle.sol";
 import { CapDeployer } from "./CapDeployer.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 contract LenderTest is CapDeployer {
-    address internal manager = makeAddr("manager");
     address internal borrower = makeAddr("borrower");
     address internal stranger = makeAddr("stranger");
 
@@ -52,61 +51,55 @@ contract LenderTest is CapDeployer {
     // --- market creation ---
 
     function test_createMarket_returnsNonZeroIdAndTranches() public {
-        (bytes32 marketId, address senior, address junior) = _createMarket("Market A", manager, _borrowers());
+        (bytes32 marketId, address senior, address junior) = _createMarket("Market A", _borrowers());
 
-        // marketId is the keccak of the market params (shadow-bug fix => non-zero, deterministic)
-        assertEq(marketId, keccak256(abi.encode("Market A", "Market A", address(collateral), manager)));
+        assertEq(marketId, keccak256(abi.encode("Market A", "Market A", address(collateral))));
         assertTrue(senior != address(0));
         assertTrue(junior != address(0));
         assertTrue(senior != junior);
 
-        assertEq(Underwriter(senior).asset(), address(collateral));
-        assertEq(Underwriter(senior).owner(), manager);
-        assertEq(Underwriter(junior).owner(), manager);
+        assertEq(Tranche(senior).asset(), address(collateral));
+        assertEq(Tranche(junior).asset(), address(collateral));
     }
 
     function test_createMarket_duplicate_reverts() public {
-        _createMarket("Market A", manager, _borrowers());
+        _createMarket("Market A", _borrowers());
         vm.expectRevert(ILender.MarketAlreadyExists.selector);
-        _createMarket("Market A", manager, _borrowers());
+        _createMarket("Market A", _borrowers());
     }
 
     function test_createMarket_invalidLtv_reverts() public {
-        // ltv + buffer must be <= lt; here ltv close to lt with buffer pushes over
         address[] memory b = _borrowers();
         vm.expectRevert(ILender.InvalidLtv.selector);
-        lender.createMarket("Bad", "Bad", address(collateral), manager, 0.75e27, b); // 0.75 + 0.1 > 0.8
+        lender.createMarket("Bad", "Bad", address(collateral), 0.75e27, b); // 0.75 + 0.1 > 0.8
     }
 
-    function test_setLtv_onlyManager() public {
+    function test_setLtv_onlyAuthority() public {
         bytes32 marketId = _market();
         vm.prank(stranger);
-        vm.expectRevert(ILender.Unauthorized.selector);
+        vm.expectRevert();
         lender.setLtv(marketId, 0.4e27);
 
-        vm.prank(manager);
         lender.setLtv(marketId, 0.4e27);
     }
 
-    function test_addRemoveBorrower_onlyManager() public {
+    function test_addRemoveBorrower_onlyAuthority() public {
         bytes32 marketId = _market();
-        vm.prank(manager);
         lender.addBorrower(marketId, stranger);
-        vm.prank(manager);
         lender.removeBorrower(marketId, stranger);
     }
 
     function test_addBorrower_unauthorized_reverts() public {
         bytes32 marketId = _market();
         vm.prank(stranger);
-        vm.expectRevert(ILender.Unauthorized.selector);
+        vm.expectRevert();
         lender.addBorrower(marketId, stranger);
     }
 
     function test_removeBorrower_unauthorized_reverts() public {
         bytes32 marketId = _market();
         vm.prank(stranger);
-        vm.expectRevert(ILender.Unauthorized.selector);
+        vm.expectRevert();
         lender.removeBorrower(marketId, borrower);
     }
 
@@ -115,44 +108,11 @@ contract LenderTest is CapDeployer {
         dup[0] = borrower;
         dup[1] = borrower;
         vm.expectRevert(ILender.InvalidBorrower.selector);
-        lender.createMarket("Dup", "Dup", address(collateral), manager, DEFAULT_LTV, dup);
-    }
-
-    function test_setManager_transfersControl() public {
-        bytes32 marketId = _market();
-        address newManager = makeAddr("newManager");
-
-        vm.prank(manager);
-        lender.setManager(marketId, newManager);
-
-        // the new manager can now manage the market
-        vm.prank(newManager);
-        lender.setLtv(marketId, 0.4e27);
-
-        // the old manager can no longer manage it
-        vm.prank(manager);
-        vm.expectRevert(ILender.Unauthorized.selector);
-        lender.setLtv(marketId, 0.3e27);
-    }
-
-    function test_setManager_zero_reverts() public {
-        bytes32 marketId = _market();
-        vm.prank(manager);
-        vm.expectRevert(ILender.InvalidManager.selector);
-        lender.setManager(marketId, address(0));
-    }
-
-    function test_setManager_unauthorized_reverts() public {
-        bytes32 marketId = _market();
-        vm.prank(stranger);
-        vm.expectRevert(ILender.Unauthorized.selector);
-        lender.setManager(marketId, stranger);
+        lender.createMarket("Dup", "Dup", address(collateral), DEFAULT_LTV, dup);
     }
 
     function test_setLtv_invalid_reverts() public {
         bytes32 marketId = _market();
-        // ltv + buffer (0.1) must be <= lt (0.8); 0.75 + 0.1 > 0.8
-        vm.prank(manager);
         vm.expectRevert(ILender.InvalidLtv.selector);
         lender.setLtv(marketId, 0.75e27);
     }
@@ -207,7 +167,7 @@ contract LenderTest is CapDeployer {
         Lender newImpl = new Lender();
         UUPSUpgradeable(address(lender)).upgradeToAndCall(address(newImpl), "");
         bytes32 marketId = _market();
-        assertEq(lender.getPrice(marketId), 1e27); // still functional
+        assertEq(lender.getPrice(marketId), 1e27);
     }
 
     function test_upgrade_unauthorized_reverts() public {
@@ -217,10 +177,7 @@ contract LenderTest is CapDeployer {
         UUPSUpgradeable(address(lender)).upgradeToAndCall(address(newImpl), "");
     }
 
-    // NOTE: end-to-end borrow/repay/liquidate flows live in LendingFlow.t.sol and RewardRouting.t.sol.
-
-    // helper: a default market
     function _market() internal returns (bytes32 marketId) {
-        (marketId,,) = _createMarket("Market A", manager, _borrowers());
+        (marketId,,) = _createMarket("Market A", _borrowers());
     }
 }

@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import { Underwriter } from "../../contracts/cap/Underwriter.sol";
+import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
 import { ILender } from "../../contracts/interfaces/ILender.sol";
 import { CapDeployer } from "./CapDeployer.sol";
 
 /// @notice End-to-end lending lifecycle: supply -> borrow -> accrue -> repay -> rewards -> liquidate.
 contract LendingFlowTest is CapDeployer {
-    address internal manager = makeAddr("manager");
     address internal borrower = makeAddr("borrower");
     address internal juniorSupplier = makeAddr("juniorSupplier");
     address internal seniorSupplier = makeAddr("seniorSupplier");
@@ -26,7 +25,7 @@ contract LendingFlowTest is CapDeployer {
 
         address[] memory borrowers = new address[](1);
         borrowers[0] = borrower;
-        (marketId, senior, junior) = _createMarket("Market A", manager, borrowers);
+        (marketId, senior, junior) = _createMarket("Market A", borrowers);
 
         // configure the rate curves before any deposits: the first underwriter deposit pokes the
         // market IRM, which needs valid (non-zero kink) premium slopes to compute a rate.
@@ -39,11 +38,11 @@ contract LendingFlowTest is CapDeployer {
         lender.setMultiplier(marketId, 1e27);
         // split premium 50/50 so both tranches accrue underwriter rewards
         vm.prank(senior);
-        rewarder.setJuniorSplit(marketId, 0.5e27);
+        lender.setJuniorSplit(marketId, 0.5e27);
 
         // suppliers underwrite the market
-        _fundUnderwriter(junior, manager, juniorSupplier, JUNIOR_DEPOSIT);
-        _fundUnderwriter(senior, manager, seniorSupplier, SENIOR_DEPOSIT);
+        _fundTranche(junior, juniorSupplier, JUNIOR_DEPOSIT);
+        _fundTranche(senior, seniorSupplier, SENIOR_DEPOSIT);
 
         lender.setBorrowCap(marketId, 1_000e18);
     }
@@ -137,21 +136,21 @@ contract LendingFlowTest is CapDeployer {
 
     function test_supplyReward_accruesAndClaims() public {
         address stcUSD = makeAddr("stcUSD");
-        rewarder.setStcUSD(stcUSD);
+        lender.setStcUSD(stcUSD);
 
         vm.prank(borrower);
         lender.borrow(marketId, borrower, 400e18);
 
         vm.warp(block.timestamp + 365 days);
-        rewarder.updateRewards(marketId);
+        lender.updateRewards(marketId);
 
-        uint256 claimable = rewarder.claimableSupplyReward();
+        uint256 claimable = lender.claimableSupplyReward();
         assertGt(claimable, 0);
 
-        uint256 minted = rewarder.claimSupplyReward();
+        uint256 minted = lender.claimSupplyReward();
         assertEq(minted, claimable);
         assertEq(stablecoin.balanceOf(stcUSD), claimable);
-        assertEq(rewarder.claimableSupplyReward(), 0);
+        assertEq(lender.claimableSupplyReward(), 0);
     }
 
     // --- underwriter (premium) rewards ---
@@ -161,13 +160,13 @@ contract LendingFlowTest is CapDeployer {
         lender.borrow(marketId, borrower, 400e18);
 
         vm.warp(block.timestamp + 365 days);
-        rewarder.updateRewards(marketId);
+        lender.updateRewards(marketId);
 
-        uint256 claimable = rewarder.claimableUnderwriterReward(marketId, junior, juniorSupplier);
+        uint256 claimable = lender.claimableTrancheReward(junior, juniorSupplier);
         assertGt(claimable, 0);
 
         vm.prank(juniorSupplier);
-        uint256 reward = rewarder.claimUnderwriterReward(marketId, junior, juniorSupplier);
+        uint256 reward = lender.claimTrancheReward(junior, juniorSupplier);
         assertEq(reward, claimable);
         assertEq(stablecoin.balanceOf(juniorSupplier), reward);
     }
@@ -204,7 +203,7 @@ contract LendingFlowTest is CapDeployer {
         assertLe(slashed, JUNIOR_DEPOSIT + SENIOR_DEPOSIT);
     }
 
-    // --- manager / admin paths that touch reward + index bookkeeping ---
+    // --- authority paths that touch reward + index bookkeeping ---
 
     function test_setMultiplier_reindexesDebt() public {
         vm.prank(borrower);

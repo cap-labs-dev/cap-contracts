@@ -8,27 +8,102 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 /// @author kexley, Cap Labs
 /// @notice Interface for Underwriter contract
 interface IUnderwriter is IERC7540AsyncRedeem {
-    error UnauthorizedRedemption();
     error Unauthorized();
+    error InvalidTranche();
 
     struct Storage {
-        address lender;
         address vault;
-        address rewarder;
-        address irm;
-        bytes32 marketId;
+        address lender;
         EnumerableSet.AddressSet whitelist;
+        mapping(address => uint256) debt;
+        uint256 totalDebt;
+        uint256 vestedReward;
+        uint256 rewardPerSecond;
+        uint256 vestingPeriod;
+        uint256 lastReported;
+        address rewardToken;
+        mapping(address => uint256) pendingReward;
+        mapping(address => uint256) rewardDebt;
+        uint256 lastRewardUpdate;
+        uint256 rewardPerShare;
+        address defaultTranche;
     }
 
+    event DebtIncreased(address indexed tranche, uint256 amount);
+    event DebtDecreased(address indexed tranche, uint256 amount);
+    event RequestedRedeem(address indexed tranche, uint256 shares, uint256 requestId);
+    event Reported(address indexed tranche, uint256 reward);
+    event SetDefaultTranche(address tranche);
+
+    /// @notice Initialize the underwriter
+    /// @param name The name of the underwriter
+    /// @param symbol The symbol of the underwriter
+    /// @param asset The asset of the underwriter
+    /// @param vault The vault of the underwriter
+    /// @param lender The lender of the underwriter
     function initialize(
-        bytes32 marketId,
+        address authority,
         string memory name,
         string memory symbol,
         address asset,
-        address manager,
         address vault,
-        address rewarder,
-        address irm
+        address lender
     ) external;
-    function slash(uint256 assets, address recipient) external returns (uint256 slashedAssets);
+
+    function allocate(address tranche, uint256 assets) external;
+
+    function setDefaultTranche(address tranche) external;
+
+    function whitelist(address account, bool allowed) external;
+
+    /// @notice Get the vault
+    /// @return vault The vault
+    function vault() external view returns (address);
+
+    /// @notice Get the lender
+    /// @return lender The lender
+    function lender() external view returns (address);
+
+    /// @notice Request to deallocate shares from a tranche
+    /// @param tranche The tranche to deallocate from
+    /// @param shares The shares to deallocate
+    /// @return requestId The request id
+    function requestDeallocate(address tranche, uint256 shares) external returns (uint256 requestId);
+
+    /// @notice Deallocate shares from a tranche
+    /// @param tranche The tranche to deallocate from
+    /// @param shares The shares to deallocate
+    /// @return deallocated The amount of shares deallocated
+    function deallocate(address tranche, uint256 shares) external returns (uint256 deallocated);
+
+    /// @notice Deallocate shares from a tranche using a request id
+    /// @param tranche The tranche to deallocate from
+    /// @param requestId The request id
+    /// @param shares The shares to deallocate
+    function deallocate(address tranche, uint256 requestId, uint256 shares) external;
+
+    /// @notice Report the debt and rewards for a tranche
+    /// @param tranche The tranche to report
+    function report(address tranche) external;
+
+    /// @notice Claim the reward for the caller
+    function claim() external;
+
+    /// @notice Get the claimable reward for a user
+    /// @param user The user to get the claimable reward for
+    /// @return reward The claimable reward
+    function claimableReward(address user) external view returns (uint256 reward);
+
+    /// @notice Get the vested reward
+    /// @return vested The vested reward
+    function vestedReward() external view returns (uint256 vested);
+
+    /// @notice Get the vesting end
+    /// @return end The vesting end
+    function vestingEnd() external view returns (uint256 end);
+
+    /// @notice Check if an account is whitelisted
+    /// @param account The account to check
+    /// @return allowed Whether the account is whitelisted
+    function whitelisted(address account) external view returns (bool allowed);
 }

@@ -5,6 +5,7 @@
   },
   "solidity.formatter": "forge",
   "solidity.compileUsingRemoteVersion": "v0.8.28",
+  "solidity.projectRoot": ".",
   "solidity.packageDefaultDependenciesContractsDirectory": "",
   "solidity.packageDefaultDependenciesDirectory": ["node_modules", "lib"],
   "solidity.defaultCompiler": "remote",
