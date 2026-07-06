@@ -19,6 +19,7 @@ import {
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title Underwriter
@@ -42,13 +43,16 @@ contract Underwriter is
         string memory _symbol,
         address _asset,
         address _vault,
-        address _lender
+        address _lender,
+        address _rewardToken
     ) external initializer {
         Storage storage $ = getUnderwriterStorage();
         __AccessManaged_init(_authority);
         __ERC7540AsyncRedeem_init(IERC20(_asset), _name, _symbol, hex"");
         $.vault = _vault;
         $.lender = _lender;
+        $.rewardToken = _rewardToken;
+        $.vestingPeriod = 6 hours;
     }
 
     //////////////////////////////////////////////////////////////////////////////
@@ -117,6 +121,14 @@ contract Underwriter is
         if (!ILender($.lender).isTranche(tranche)) revert InvalidTranche();
         $.defaultTranche = tranche;
         emit SetDefaultTranche(tranche);
+    }
+
+    /// @inheritdoc IUnderwriter
+    function setVestingPeriod(uint256 vestingPeriod) external restricted {
+        Storage storage $ = getUnderwriterStorage();
+        if (vestingPeriod == 0) revert InvalidVestingPeriod();
+        $.vestingPeriod = vestingPeriod;
+        emit SetVestingPeriod(vestingPeriod);
     }
 
     /// @inheritdoc IUnderwriter
@@ -235,6 +247,11 @@ contract Underwriter is
         return getUnderwriterStorage().lender;
     }
 
+    /// @inheritdoc IUnderwriter
+    function rewardToken() external view returns (address) {
+        return getUnderwriterStorage().rewardToken;
+    }
+
     /// @inheritdoc IERC4626
     function totalAssets() public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
         Storage storage $ = getUnderwriterStorage();
@@ -303,6 +320,11 @@ contract Underwriter is
     function _transferOut(address to, uint256 assets) internal override {
         Storage storage $ = getUnderwriterStorage();
         IVault($.vault).transfer(to, asset(), assets);
+    }
+
+    /// @inheritdoc IERC165
+    function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
+        return interfaceId == type(IUnderwriter).interfaceId || super.supportsInterface(interfaceId);
     }
 
     //////////////////////////////////////////////////////////////////////////////

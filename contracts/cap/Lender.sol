@@ -44,6 +44,10 @@ contract Lender is ILender, AccessManagedUpgradeable, LenderStorageUtils, UUPSUp
         $.oracle = _oracle;
         $.vault = _vault;
         $.irm = _irm;
+
+        $.lt = 0.8e27;
+        $.buffer = 0.05e27;
+        $.targetHealth = 1.25e27;
     }
 
     //////////////////////////////////////////////////////////////////////////////

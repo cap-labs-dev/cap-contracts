@@ -22,18 +22,6 @@ library LendLib {
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    event Borrow(bytes32 marketId, address caller, address recipient, uint256 amount);
-    event Repay(bytes32 marketId, address caller, uint256 amount);
-    event Liquidate(
-        bytes32 marketId,
-        address caller,
-        address recipient,
-        uint256 amount,
-        address assetLiquidated,
-        uint256 assetsSlashed
-    );
-    event CreateMarket(bytes32 marketId);
-
     /// @notice Mint unbacked stablecoin and increase the borrower's debt
     function borrow(ILender.Storage storage $, bytes32 marketId, address recipient, uint256 amount)
         public
@@ -57,7 +45,7 @@ library LendLib {
 
         IStablecoin($.stablecoin).mintUnbacked(recipient, borrowed);
 
-        emit Borrow(marketId, msg.sender, recipient, borrowed);
+        emit ILender.Borrow(marketId, msg.sender, recipient, borrowed);
     }
 
     /// @notice Repay by burning cUSD and reduce the borrower's debt
@@ -77,7 +65,7 @@ library LendLib {
 
         IStablecoin($.stablecoin).burnUnbacked(msg.sender, repaid);
 
-        emit Repay(marketId, msg.sender, repaid);
+        emit ILender.Repay(marketId, msg.sender, repaid);
     }
 
     /// @notice Liquidate unhealthy debt by burning cUSD and slashing tranche collateral
@@ -102,7 +90,7 @@ library LendLib {
 
         assetsSlashed = _slash(market, assetsToSlash, recipient);
 
-        emit Liquidate(marketId, msg.sender, recipient, repaid, assetLiquidated, assetsSlashed);
+        emit ILender.Liquidate(marketId, msg.sender, recipient, repaid, assetLiquidated, assetsSlashed);
     }
 
     /// @notice Slash the junior tranche first, then the senior tranche for any shortfall
@@ -150,7 +138,7 @@ library LendLib {
         }
         $.marketForTranche[seniorTranche] = marketId;
         $.marketForTranche[juniorTranche] = marketId;
-        emit CreateMarket(marketId);
+        emit ILender.CreateMarket(marketId, seniorTranche, juniorTranche);
     }
 
     /// @notice Deploy a tranche beacon proxy for a market

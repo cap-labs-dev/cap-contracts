@@ -8,8 +8,8 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 /// @author kexley, Cap Labs
 /// @notice Interface for Underwriter contract
 interface IUnderwriter is IERC7540AsyncRedeem {
-    error Unauthorized();
     error InvalidTranche();
+    error InvalidVestingPeriod();
 
     struct Storage {
         address vault;
@@ -34,6 +34,7 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     event RequestedRedeem(address indexed tranche, uint256 shares, uint256 requestId);
     event Reported(address indexed tranche, uint256 reward);
     event SetDefaultTranche(address tranche);
+    event SetVestingPeriod(uint256 vestingPeriod);
 
     /// @notice Initialize the underwriter
     /// @param name The name of the underwriter
@@ -41,19 +42,29 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @param asset The asset of the underwriter
     /// @param vault The vault of the underwriter
     /// @param lender The lender of the underwriter
+    /// @param rewardToken The reward token of the underwriter
     function initialize(
         address authority,
         string memory name,
         string memory symbol,
         address asset,
         address vault,
-        address lender
+        address lender,
+        address rewardToken
     ) external;
 
+    /// @notice Allocate assets to a tranche
+    /// @param tranche The tranche to allocate to
+    /// @param assets The assets to allocate
     function allocate(address tranche, uint256 assets) external;
 
+    /// @notice Set the default tranche
+    /// @param tranche The default tranche
     function setDefaultTranche(address tranche) external;
 
+    /// @notice Whitelist an account
+    /// @param account The account to whitelist
+    /// @param allowed Whether the account is whitelisted
     function whitelist(address account, bool allowed) external;
 
     /// @notice Get the vault
@@ -63,6 +74,10 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice Get the lender
     /// @return lender The lender
     function lender() external view returns (address);
+
+    /// @notice Get the reward token
+    /// @return rewardToken The reward token
+    function rewardToken() external view returns (address);
 
     /// @notice Request to deallocate shares from a tranche
     /// @param tranche The tranche to deallocate from
@@ -85,6 +100,10 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice Report the debt and rewards for a tranche
     /// @param tranche The tranche to report
     function report(address tranche) external;
+
+    /// @notice Set the vesting period
+    /// @param vestingPeriod The vesting period
+    function setVestingPeriod(uint256 vestingPeriod) external;
 
     /// @notice Claim the reward for the caller
     function claim() external;
