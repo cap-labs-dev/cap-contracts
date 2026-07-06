@@ -69,7 +69,7 @@ contract Underwriter is
         Storage storage $ = getUnderwriterStorage();
         if (!ILender($.lender).isTranche(tranche)) revert InvalidTranche();
 
-        IERC20(asset()).forceApprove(tranche, assets);
+        IVault($.vault).setOperator(tranche, true);
         uint256 shares = ITranche(tranche).deposit(assets, address(this));
         uint256 debt = ITranche(tranche).previewRedeem(shares);
 
@@ -151,6 +151,9 @@ contract Underwriter is
             }
             $.debt[tranche] = assets;
         }
+
+        // settle any rewards accrued under the previous schedule before re-vesting
+        _updateRewards();
 
         uint256 reward = ILender($.lender).claimTrancheReward(tranche, address(this));
         $.vestedReward = vestedReward() + reward;

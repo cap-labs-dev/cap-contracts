@@ -9,6 +9,7 @@ import { InterestRateModel } from "../../contracts/cap/InterestRateModel.sol";
 import { Lender } from "../../contracts/cap/Lender.sol";
 import { Stablecoin } from "../../contracts/cap/Stablecoin.sol";
 import { Tranche } from "../../contracts/cap/Tranche.sol";
+import { Underwriter } from "../../contracts/cap/Underwriter.sol";
 import { Vault } from "../../contracts/cap/Vault.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
 
@@ -143,5 +144,46 @@ abstract contract CapDeployer is BaseTest {
     function _mintStable(address to, uint256 amount) internal {
         accessManager.grantRole(MINTER_ROLE, address(this), 0);
         stablecoin.mintUnbacked(to, amount);
+    }
+
+    /// @dev Give `who` an ERC6909 vault balance of collateral (the form tranches/underwriters consume).
+    function _fundVault(address who, uint256 amount) internal {
+        collateral.mint(who, amount);
+        vm.startPrank(who);
+        collateral.approve(address(vault), amount);
+        vault.deposit(address(collateral), amount, who);
+        vm.stopPrank();
+    }
+
+    /// @dev Deploy a curator-level Underwriter over the collateral asset, paying rewards in cUSD.
+    function _deployUnderwriter() internal returns (Underwriter underwriter) {
+        Underwriter impl = new Underwriter();
+        underwriter = Underwriter(
+            _deployProxy(
+                address(impl),
+                abi.encodeCall(
+                    Underwriter.initialize,
+                    (
+                        address(accessManager),
+                        "Cap Underwriter",
+                        "cUW",
+                        address(collateral),
+                        address(vault),
+                        address(lender),
+                        address(stablecoin)
+                    )
+                )
+            )
+        );
+    }
+
+    /// @dev Supply `amount` of collateral from `supplier` into the underwriter.
+    function _fundUnderwriter(address underwriter, address supplier, uint256 amount) internal {
+        _fundVault(supplier, amount);
+        Underwriter(underwriter).whitelist(supplier, true);
+        vm.startPrank(supplier);
+        vault.setOperator(underwriter, true);
+        Underwriter(underwriter).deposit(amount, supplier);
+        vm.stopPrank();
     }
 }
