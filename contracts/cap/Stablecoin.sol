@@ -55,6 +55,7 @@ contract Stablecoin is
         Storage storage $ = getStablecoinStorage();
         $.unbacked += _amount;
         IInterestRateModel($.irm).update();
+        emit MintUnbacked(_to, _amount);
     }
 
     /// @notice Burn unbacked shares as part of a repayment or liquidation
@@ -65,6 +66,7 @@ contract Stablecoin is
         Storage storage $ = getStablecoinStorage();
         $.unbacked -= _amount;
         IInterestRateModel($.irm).update();
+        emit BurnUnbacked(_from, _amount);
     }
 
     /// @notice Get the utilization rate of the Stablecoin
@@ -80,6 +82,7 @@ contract Stablecoin is
     function increaseBadDebt(uint256 _badDebt) external restricted {
         Storage storage $ = getStablecoinStorage();
         $.badDebt += _badDebt;
+        emit BadDebtIncreased(_badDebt);
     }
 
     /// @notice Get the remaining bad debt
@@ -195,12 +198,11 @@ contract Stablecoin is
     {
         Storage storage $ = getStablecoinStorage();
         if ($.badDebt > 0) {
-            if (_shares > $.badDebt) {
-                $.badDebt = 0;
-            } else {
-                $.badDebt -= _shares;
-            }
+            uint256 reduced = _shares > $.badDebt ? $.badDebt : _shares;
+            $.badDebt -= reduced;
+            emit BadDebtReduced(_owner, reduced);
         }
+
         super._withdraw(_caller, _receiver, _owner, _assets, _shares);
         IInterestRateModel(getStablecoinStorage().irm).update();
     }

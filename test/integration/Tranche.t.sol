@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import { Market } from "../../contracts/cap/Market.sol";
 import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { ITranche } from "../../contracts/interfaces/ITranche.sol";
 import { CapDeployer } from "./CapDeployer.sol";
@@ -8,17 +9,19 @@ import { CapDeployer } from "./CapDeployer.sol";
 contract TrancheTest is CapDeployer {
     address internal supplier = makeAddr("supplier");
     address internal stranger = makeAddr("stranger");
-
+    uint64 internal managerId = MANAGER_ROLE;
     Tranche internal senior;
     Tranche internal junior;
-    bytes32 internal marketId;
+    Market internal market;
 
     function setUp() public {
         _deployCap();
         address[] memory borrowers = new address[](0);
+        address marketAddr;
         address s;
         address j;
-        (marketId, s, j) = _createMarket("Market A", borrowers);
+        (marketAddr, s, j) = _createMarket("Market A", borrowers, managerId);
+        market = Market(marketAddr);
         senior = Tranche(s);
         junior = Tranche(j);
     }
@@ -28,6 +31,7 @@ contract TrancheTest is CapDeployer {
         assertEq(senior.authority(), address(accessManager));
         assertEq(senior.totalAssets(), 0);
         assertEq(senior.totalSupply(), 0);
+        assertEq(senior.market(), address(market));
     }
 
     function test_supportsInterface() public view {
@@ -57,7 +61,7 @@ contract TrancheTest is CapDeployer {
         assertEq(senior.maxDeposit(supplier), 0);
     }
 
-    function test_slash_onlyLender() public {
+    function test_slash_onlyMarket() public {
         vm.prank(stranger);
         vm.expectRevert(ITranche.Unauthorized.selector);
         senior.slash(1e18, stranger);
@@ -67,8 +71,8 @@ contract TrancheTest is CapDeployer {
         assertEq(senior.unlockedSupply(), 0);
     }
 
-    function test_updateIRM_callable() public {
-        senior.updateIRM();
+    function test_updateIrm_callable() public {
+        senior.updateIrm();
     }
 
     function test_tranchesAreDistinct() public view {

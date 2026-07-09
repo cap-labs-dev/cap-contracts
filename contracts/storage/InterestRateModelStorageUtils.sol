@@ -13,11 +13,7 @@ abstract contract InterestRateModelStorageUtils {
 
     /// @dev Get InterestRateModel storage
     /// @return $ Storage pointer
-    function getInterestRateModelStorage()
-        internal
-        pure
-        returns (IInterestRateModel.InterestRateModelStorage storage $)
-    {
+    function getInterestRateModelStorage() internal pure returns (IInterestRateModel.Storage storage $) {
         assembly {
             $.slot := INTEREST_RATE_MODEL_STORAGE_LOCATION
         }

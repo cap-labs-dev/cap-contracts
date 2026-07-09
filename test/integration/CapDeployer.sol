@@ -5,36 +5,38 @@ import { BaseTest } from "../shared/BaseTest.sol";
 import { MockERC20 } from "../shared/mocks/MockERC20.sol";
 import { MockOracle } from "../shared/mocks/MockOracle.sol";
 
+import { BeaconFactory } from "../../contracts/cap/BeaconFactory.sol";
 import { InterestRateModel } from "../../contracts/cap/InterestRateModel.sol";
-import { Lender } from "../../contracts/cap/Lender.sol";
+import { Market } from "../../contracts/cap/Market.sol";
+import { Registry } from "../../contracts/cap/Registry.sol";
 import { Stablecoin } from "../../contracts/cap/Stablecoin.sol";
 import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { Underwriter } from "../../contracts/cap/Underwriter.sol";
 import { Vault } from "../../contracts/cap/Vault.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
-
-import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import { IMarket } from "../../contracts/interfaces/IMarket.sol";
 
 /// @title CapDeployer
 /// @notice Deploys and fully wires a Cap protocol instance for integration-style unit tests.
-/// @dev Resolves the deploy-order circular dependencies by deploying every proxy first and then
-/// initializing. The test contract is the AccessManager admin and the protocol's "minter" role is
-/// granted to the Lender so it can mint/burn unbacked cUSD.
 abstract contract CapDeployer is BaseTest {
     uint64 internal constant MINTER_ROLE = 1;
+    uint64 internal constant MANAGER_ROLE = 2;
+    uint64 internal constant KEEPER_ROLE = 3;
+    uint64 internal constant BORROWER_ROLE = 4;
 
-    // core
     MockOracle internal oracle;
-    MockERC20 internal cusdUnderlying; // underlying for the stablecoin (cUSD reserves)
-    MockERC20 internal collateral; // market collateral asset
+    MockERC20 internal cusdUnderlying;
+    MockERC20 internal collateral;
 
     Vault internal vault;
     Stablecoin internal stablecoin;
     InterestRateModel internal irm;
-    Lender internal lender;
-    UpgradeableBeacon internal trancheBeacon;
+    Registry internal registry;
 
-    // sensible defaults (ray)
+    BeaconFactory internal marketFactory;
+    BeaconFactory internal trancheFactory;
+    BeaconFactory internal underwriterFactory;
+
     uint256 internal constant DEFAULT_BUFFER = 0.1e27;
     uint256 internal constant DEFAULT_LT = 0.8e27;
     uint256 internal constant DEFAULT_LTV = 0.5e27;
@@ -47,38 +49,23 @@ abstract contract CapDeployer is BaseTest {
         cusdUnderlying = new MockERC20("USD Coin", "USDC", 18);
         collateral = new MockERC20("Wrapped Ether", "WETH", 18);
 
-        // implementations
         Vault vaultImpl = new Vault();
         Stablecoin stablecoinImpl = new Stablecoin();
         InterestRateModel irmImpl = new InterestRateModel();
-        Lender lenderImpl = new Lender();
+        Market marketImpl = new Market();
         Tranche trancheImpl = new Tranche();
-        trancheBeacon = new UpgradeableBeacon(address(trancheImpl), address(this));
+        Underwriter underwriterImpl = new Underwriter();
+        Registry registryImpl = new Registry();
 
         // Vault has no cross dependencies
         vault = Vault(_deployProxy(address(vaultImpl), abi.encodeCall(Vault.initialize, (authority))));
 
-        // The Hub (Lender), IRM and Stablecoin reference each other, so this OZ proxy forbids deploying
-        // uninitialized. Pre-compute the three proxy addresses (CREATE is deterministic from sender+nonce)
-        // and initialize each one immediately with the known peers.
         uint256 n = vm.getNonce(address(this));
-        address lenderAddr = vm.computeCreateAddress(address(this), n);
-        address irmAddr = vm.computeCreateAddress(address(this), n + 1);
-        address stablecoinAddr = vm.computeCreateAddress(address(this), n + 2);
+        address irmAddr = vm.computeCreateAddress(address(this), n);
+        address stablecoinAddr = vm.computeCreateAddress(address(this), n + 1);
 
-        lender = Lender(
-            _deployProxy(
-                address(lenderImpl),
-                abi.encodeCall(
-                    Lender.initialize,
-                    (authority, stablecoinAddr, address(trancheBeacon), address(oracle), address(vault), irmAddr)
-                )
-            )
-        );
         irm = InterestRateModel(
-            _deployProxy(
-                address(irmImpl), abi.encodeCall(InterestRateModel.initialize, (stablecoinAddr, lenderAddr, authority))
-            )
+            _deployProxy(address(irmImpl), abi.encodeCall(InterestRateModel.initialize, (stablecoinAddr, authority)))
         );
         stablecoin = Stablecoin(
             _deployProxy(
@@ -89,37 +76,76 @@ abstract contract CapDeployer is BaseTest {
             )
         );
 
-        require(address(lender) == lenderAddr, "lender addr");
         require(address(irm) == irmAddr, "irm addr");
         require(address(stablecoin) == stablecoinAddr, "stablecoin addr");
 
-        // risk params
-        lender.setDefaultBuffer(DEFAULT_BUFFER);
-        lender.setDefaultLt(DEFAULT_LT);
-        lender.setMultiplierLimits(0, 10e27);
-        lender.setTargetHealth(1.1e27);
-        lender.setBonusConfig(0.9e27, 0.02e27, 0.1e27);
+        marketFactory = new BeaconFactory(address(this), address(marketImpl));
+        trancheFactory = new BeaconFactory(address(this), address(trancheImpl));
+        underwriterFactory = new BeaconFactory(address(this), address(underwriterImpl));
 
-        // allow the Hub to mint/burn unbacked cUSD
-        bytes4[] memory sels = new bytes4[](2);
-        sels[0] = Stablecoin.mintUnbacked.selector;
-        sels[1] = Stablecoin.burnUnbacked.selector;
-        accessManager.setTargetFunctionRole(address(stablecoin), sels, MINTER_ROLE);
-        accessManager.grantRole(MINTER_ROLE, address(lender), 0);
+        registry = Registry(
+            _deployProxy(
+                address(registryImpl),
+                abi.encodeCall(
+                    Registry.initialize,
+                    (
+                        authority,
+                        address(stablecoin),
+                        address(0),
+                        address(vault),
+                        address(oracle),
+                        address(irm),
+                        address(marketFactory),
+                        address(trancheFactory),
+                        address(underwriterFactory)
+                    )
+                )
+            )
+        );
 
-        // price the collateral at $1 (ray)
+        _configureAccess();
+
         oracle.setPrice(address(collateral), 1e27);
     }
 
-    /// @dev Create a market and return its id plus tranche addresses.
-    function _createMarket(string memory name, address[] memory borrowers)
-        internal
-        returns (bytes32 marketId, address senior, address junior)
-    {
-        (marketId, senior, junior) = lender.createMarket(name, name, address(collateral), DEFAULT_LTV, borrowers);
+    function _configureAccess() internal {
+        bytes4[] memory registrySelectors = new bytes4[](2);
+        registrySelectors[0] = Registry.createMarket.selector;
+        registrySelectors[1] = Registry.createUnderwriter.selector;
+        accessManager.setTargetFunctionRole(address(registry), registrySelectors, MANAGER_ROLE);
+        accessManager.grantRole(MANAGER_ROLE, address(registry), 0);
+        accessManager.grantRole(MANAGER_ROLE, address(this), 0);
+
+        bytes4[] memory minterSelectors = new bytes4[](2);
+        minterSelectors[0] = Stablecoin.mintUnbacked.selector;
+        minterSelectors[1] = Stablecoin.burnUnbacked.selector;
+        accessManager.setTargetFunctionRole(address(stablecoin), minterSelectors, MINTER_ROLE);
+        accessManager.grantRole(MINTER_ROLE, address(this), 0);
+
+        bytes4[] memory irmSelectors = new bytes4[](3);
+        irmSelectors[0] = InterestRateModel.setVariableSlopes.selector;
+        irmSelectors[1] = InterestRateModel.setFixedSlopes.selector;
+        irmSelectors[2] = InterestRateModel.setMarketSlopes.selector;
+        accessManager.setTargetFunctionRole(address(irm), irmSelectors, MANAGER_ROLE);
+
+        accessManager.grantRole(ADMIN_ROLE, address(registry), 0);
     }
 
-    /// @dev Fund a tranche with `amount` of collateral supplied by `supplier`.
+    uint64 internal constant ADMIN_ROLE = 0;
+
+    function _createMarket(string memory name, uint64 managerId, uint64 borrowerId)
+        internal
+        returns (address market, address senior, address junior)
+    {
+        (market, senior, junior) = registry.createMarket(address(collateral), name, managerId, borrowerId);
+        Market(market).setLtv(DEFAULT_LTV);
+        Market(market).setBuffer(DEFAULT_BUFFER);
+        Market(market).setLt(DEFAULT_LT);
+        Market(market).setMultiplier(1e27);
+        Market(market).setTargetHealth(1.1e27);
+        Market(market).setBonusConfig(0.9e27, 0.02e27, 0.1e27);
+    }
+
     function _fundTranche(address tranche, address supplier, uint256 amount) internal {
         collateral.mint(supplier, amount);
         vm.startPrank(supplier);
@@ -134,19 +160,16 @@ abstract contract CapDeployer is BaseTest {
         Tranche(tranche).deposit(amount, supplier);
     }
 
-    function _setMarketSlopes(bytes32 marketId) internal {
+    function _setMarketSlopes(address market) internal {
         irm.setMarketSlopes(
-            marketId, IInterestRateModel.Slopes({ base: 0.2e27, slope0: 0.1e27, slope1: 0.3e27, kink: 0.5e27 })
+            market, IInterestRateModel.Slopes({ base: 0.2e27, slope0: 0.1e27, slope1: 0.3e27, kink: 0.5e27 })
         );
     }
 
-    /// @dev Mint unbacked cUSD to an address (e.g. to fund a liquidator after interest compounds).
     function _mintStable(address to, uint256 amount) internal {
-        accessManager.grantRole(MINTER_ROLE, address(this), 0);
         stablecoin.mintUnbacked(to, amount);
     }
 
-    /// @dev Give `who` an ERC6909 vault balance of collateral (the form tranches/underwriters consume).
     function _fundVault(address who, uint256 amount) internal {
         collateral.mint(who, amount);
         vm.startPrank(who);
@@ -155,29 +178,11 @@ abstract contract CapDeployer is BaseTest {
         vm.stopPrank();
     }
 
-    /// @dev Deploy a curator-level Underwriter over the collateral asset, paying rewards in cUSD.
     function _deployUnderwriter() internal returns (Underwriter underwriter) {
-        Underwriter impl = new Underwriter();
-        underwriter = Underwriter(
-            _deployProxy(
-                address(impl),
-                abi.encodeCall(
-                    Underwriter.initialize,
-                    (
-                        address(accessManager),
-                        "Cap Underwriter",
-                        "cUW",
-                        address(collateral),
-                        address(vault),
-                        address(lender),
-                        address(stablecoin)
-                    )
-                )
-            )
-        );
+        address uw = registry.createUnderwriter(address(collateral), "Cap Underwriter", "cUW", MANAGER_ROLE);
+        underwriter = Underwriter(uw);
     }
 
-    /// @dev Supply `amount` of collateral from `supplier` into the underwriter.
     function _fundUnderwriter(address underwriter, address supplier, uint256 amount) internal {
         _fundVault(supplier, amount);
         Underwriter(underwriter).whitelist(supplier, true);

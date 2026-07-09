@@ -7,7 +7,7 @@ import {
     IERC4626,
     IERC7540AsyncRedeem
 } from "../ERC7540/ERC7540AsyncRedeem.sol";
-import { ILender } from "../interfaces/ILender.sol";
+import { IRegistry } from "../interfaces/IRegistry.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
 import { IUnderwriter } from "../interfaces/IUnderwriter.sol";
 import { IVault } from "../interfaces/IVault.sol";
@@ -16,7 +16,6 @@ import { WadRayMath } from "../utils/WadRayMath.sol";
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
-import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
@@ -24,14 +23,8 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 
 /// @title Underwriter
 /// @author kexley
-/// @notice The Vault is a contract that allows users to deposit and withdraw ERC20 assets.
-contract Underwriter is
-    IUnderwriter,
-    AccessManagedUpgradeable,
-    ERC7540AsyncRedeem,
-    UnderwriterStorageUtils,
-    UUPSUpgradeable
-{
+/// @notice The Underwriter is a contract that allows users to allocate and deallocate assets to a tranche.
+contract Underwriter is IUnderwriter, AccessManagedUpgradeable, ERC7540AsyncRedeem, UnderwriterStorageUtils {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
     using WadRayMath for uint256;
@@ -43,15 +36,15 @@ contract Underwriter is
         string memory _symbol,
         address _asset,
         address _vault,
-        address _lender,
-        address _rewardToken
+        address _registry,
+        address _stablecoin
     ) external initializer {
-        Storage storage $ = getUnderwriterStorage();
         __AccessManaged_init(_authority);
         __ERC7540AsyncRedeem_init(IERC20(_asset), _name, _symbol, hex"");
+        Storage storage $ = getUnderwriterStorage();
         $.vault = _vault;
-        $.lender = _lender;
-        $.rewardToken = _rewardToken;
+        $.registry = _registry;
+        $.stablecoin = _stablecoin;
         $.vestingPeriod = 6 hours;
     }
 
@@ -67,7 +60,7 @@ contract Underwriter is
     /// @dev Allocate assets to a tranche
     function _allocate(address tranche, uint256 assets) internal {
         Storage storage $ = getUnderwriterStorage();
-        if (!ILender($.lender).isTranche(tranche)) revert InvalidTranche();
+        if (!IRegistry($.registry).isTranche(tranche)) revert InvalidTranche();
 
         IVault($.vault).setOperator(tranche, true);
         uint256 shares = ITranche(tranche).deposit(assets, address(this));
@@ -79,20 +72,9 @@ contract Underwriter is
     }
 
     /// @inheritdoc IUnderwriter
-    function requestDeallocate(address tranche, uint256 shares) external restricted returns (uint256 requestId) {
-        Storage storage $ = getUnderwriterStorage();
-        if (!ILender($.lender).isTranche(tranche)) revert InvalidTranche();
-        uint256 balance = ITranche(tranche).balanceOf(address(this));
-        if (shares > balance) shares = balance;
-
-        requestId = ITranche(tranche).requestRedeem(shares, address(this), address(this));
-        emit RequestedRedeem(tranche, shares, requestId);
-    }
-
-    /// @inheritdoc IUnderwriter
     function deallocate(address tranche, uint256 shares) external restricted returns (uint256 deallocated) {
         Storage storage $ = getUnderwriterStorage();
-        if (!ILender($.lender).isTranche(tranche)) revert InvalidTranche();
+        if (!IRegistry($.registry).isTranche(tranche)) revert InvalidTranche();
 
         uint256 unlockedShares = ITranche(tranche).instantUnlockedSupply();
         deallocated = unlockedShares < shares ? unlockedShares : shares;
@@ -105,9 +87,20 @@ contract Underwriter is
     }
 
     /// @inheritdoc IUnderwriter
-    function deallocate(address tranche, uint256 requestId, uint256 shares) external restricted {
+    function deallocateAsync(address tranche, uint256 shares) external restricted returns (uint256 requestId) {
         Storage storage $ = getUnderwriterStorage();
-        if (!ILender($.lender).isTranche(tranche)) revert InvalidTranche();
+        if (!IRegistry($.registry).isTranche(tranche)) revert InvalidTranche();
+        uint256 balance = ITranche(tranche).balanceOf(address(this));
+        if (shares > balance) shares = balance;
+
+        requestId = ITranche(tranche).requestRedeem(shares, address(this), address(this));
+        emit RequestedRedeem(tranche, shares, requestId);
+    }
+
+    /// @inheritdoc IUnderwriter
+    function finalizeDeallocateAsync(address tranche, uint256 requestId, uint256 shares) external restricted {
+        Storage storage $ = getUnderwriterStorage();
+        if (!IRegistry($.registry).isTranche(tranche)) revert InvalidTranche();
 
         uint256 withdrawn = ITranche(tranche).redeem(requestId, shares, address(this), address(this));
         $.debt[tranche] -= withdrawn;
@@ -118,7 +111,7 @@ contract Underwriter is
     /// @inheritdoc IUnderwriter
     function setDefaultTranche(address tranche) external restricted {
         Storage storage $ = getUnderwriterStorage();
-        if (!ILender($.lender).isTranche(tranche)) revert InvalidTranche();
+        if (!IRegistry($.registry).isTranche(tranche)) revert InvalidTranche();
         $.defaultTranche = tranche;
         emit SetDefaultTranche(tranche);
     }
@@ -134,18 +127,20 @@ contract Underwriter is
     /// @inheritdoc IUnderwriter
     function report(address tranche) external restricted {
         Storage storage $ = getUnderwriterStorage();
-        if (!ILender($.lender).isTranche(tranche)) revert InvalidTranche();
+        if (!IRegistry($.registry).isTranche(tranche)) revert InvalidTranche();
 
         uint256 debt = $.debt[tranche];
         uint256 assets = ITranche(tranche).previewRedeem(ITranche(tranche).balanceOf(address(this)));
+        uint256 gain;
+        uint256 loss;
 
         if (assets != debt) {
             if (assets < debt) {
-                uint256 loss = debt - assets;
+                loss = debt - assets;
                 $.totalDebt -= loss;
                 emit DebtDecreased(tranche, loss);
             } else {
-                uint256 gain = assets - debt;
+                gain = assets - debt;
                 $.totalDebt += gain;
                 emit DebtIncreased(tranche, gain);
             }
@@ -155,12 +150,12 @@ contract Underwriter is
         // settle any rewards accrued under the previous schedule before re-vesting
         _updateRewards();
 
-        uint256 reward = ILender($.lender).claimTrancheReward(tranche, address(this));
+        uint256 reward = ITranche(tranche).claim(address(this));
         $.vestedReward = vestedReward() + reward;
         $.rewardPerSecond = $.vestedReward.rayDiv($.vestingPeriod);
         $.lastReported = block.timestamp;
 
-        emit Reported(tranche, reward);
+        emit Reported(tranche, reward, gain, loss);
     }
 
     //////////////////////////////////////////////////////////////////////////////
@@ -171,18 +166,18 @@ contract Underwriter is
     function claim() external {
         _updateRewards();
         Storage storage $ = getUnderwriterStorage();
-        uint256 reward = _claimableReward(msg.sender);
+        uint256 reward = _claimable(msg.sender);
         $.pendingReward[msg.sender] = 0;
-        IERC20($.rewardToken).safeTransfer(msg.sender, reward);
+        IERC20($.stablecoin).safeTransfer(msg.sender, reward);
     }
 
     /// @inheritdoc IUnderwriter
-    function claimableReward(address user) external view returns (uint256 reward) {
-        reward = _claimableReward(user);
+    function claimable(address user) external view returns (uint256 reward) {
+        reward = _claimable(user);
     }
 
     /// @dev Get the claimable reward for a user
-    function _claimableReward(address user) internal view returns (uint256 reward) {
+    function _claimable(address user) internal view returns (uint256 reward) {
         Storage storage $ = getUnderwriterStorage();
         uint256 accumulatedReward;
         uint256 supply = activeSupply();
@@ -246,13 +241,13 @@ contract Underwriter is
     }
 
     /// @inheritdoc IUnderwriter
-    function lender() external view returns (address) {
-        return getUnderwriterStorage().lender;
+    function registry() external view returns (address) {
+        return getUnderwriterStorage().registry;
     }
 
     /// @inheritdoc IUnderwriter
-    function rewardToken() external view returns (address) {
-        return getUnderwriterStorage().rewardToken;
+    function stablecoin() external view returns (address) {
+        return getUnderwriterStorage().stablecoin;
     }
 
     /// @inheritdoc IERC4626
@@ -329,11 +324,4 @@ contract Underwriter is
     function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
         return interfaceId == type(IUnderwriter).interfaceId || super.supportsInterface(interfaceId);
     }
-
-    //////////////////////////////////////////////////////////////////////////////
-    /**************************** UUPS functions ********************************/
-    //////////////////////////////////////////////////////////////////////////////
-
-    /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address) internal override restricted { }
 }

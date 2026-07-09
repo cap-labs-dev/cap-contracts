@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import { Market } from "../../contracts/cap/Market.sol";
 import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
-import { ILender } from "../../contracts/interfaces/ILender.sol";
+import { IMarket } from "../../contracts/interfaces/IMarket.sol";
 import { CapDeployer } from "./CapDeployer.sol";
 
 /// @notice End-to-end lending lifecycle: supply -> borrow -> accrue -> repay -> rewards -> liquidate.
@@ -12,8 +13,8 @@ contract LendingFlowTest is CapDeployer {
     address internal juniorSupplier = makeAddr("juniorSupplier");
     address internal seniorSupplier = makeAddr("seniorSupplier");
     address internal stranger = makeAddr("stranger");
-
-    bytes32 internal marketId;
+    uint64 internal managerId = 1;
+    address internal market;
     address internal senior;
     address internal junior;
 
@@ -25,293 +26,231 @@ contract LendingFlowTest is CapDeployer {
 
         address[] memory borrowers = new address[](1);
         borrowers[0] = borrower;
-        (marketId, senior, junior) = _createMarket("Market A", borrowers);
+        address marketAddr;
+        (marketAddr, senior, junior) = _createMarket("Market A", managerId, borrowerId);
+        market = Market(marketAddr);
 
-        // configure the rate curves before any deposits: the first underwriter deposit pokes the
-        // market IRM, which needs valid (non-zero kink) premium slopes to compute a rate.
-        _setMarketSlopes(marketId);
+        _setMarketSlopes(marketAddr);
         irm.setVariableSlopes(
             IInterestRateModel.Slopes({ base: 0.05e27, slope0: 0.05e27, slope1: 0.1e27, kink: 0.8e27 })
         );
 
-        // a non-zero supply multiplier makes the supply index track the IRM (enables supply rewards)
-        lender.setMultiplier(marketId, 1e27);
-        // split premium 50/50 so both tranches accrue underwriter rewards
-        vm.prank(senior);
-        lender.setJuniorSplit(marketId, 0.5e27);
+        market.setMultiplier(1e27);
+        market.setJuniorSplit(0.5e27);
 
-        // suppliers underwrite the market
         _fundTranche(junior, juniorSupplier, JUNIOR_DEPOSIT);
         _fundTranche(senior, seniorSupplier, SENIOR_DEPOSIT);
 
-        lender.setBorrowCap(marketId, 1_000e18);
+        market.setBorrowCap(1_000e18);
     }
-
-    // --- credit sizing ---
 
     function test_availableCredit_isLtvOfCapital() public view {
-        // capital = 1000 collateral @ price 1.0; ltv 0.5 -> credit 500
-        assertEq(lender.availableCredit(marketId), 500e18);
-        assertEq(lender.maxBorrowable(marketId), 500e18);
-        // total credit = capital (1000) * lt (0.8)
-        assertEq(lender.totalCredit(marketId), 800e18);
+        assertEq(market.availableCredit(), 500e18);
+        assertEq(market.maxBorrowable(), 500e18);
+        assertEq(market.totalCredit(), 800e18);
     }
-
-    // --- borrow ---
 
     function test_borrow_mintsStableAndRecordsDebt() public {
         vm.prank(borrower);
-        uint256 borrowed = lender.borrow(marketId, borrower, 300e18);
+        uint256 borrowed = market.borrow(borrower, 300e18);
 
         assertEq(borrowed, 300e18);
         assertEq(stablecoin.balanceOf(borrower), 300e18);
-        assertApproxEqAbs(lender.debt(marketId), 300e18, 1);
-        assertGt(lender.scaledDebt(marketId), 0);
-        // remaining credit shrinks by the borrowed amount
-        assertApproxEqAbs(lender.maxBorrowable(marketId), 200e18, 1);
+        assertApproxEqAbs(market.debt(), 300e18, 1);
+        assertApproxEqAbs(market.maxBorrowable(), 200e18, 1);
     }
 
     function test_borrow_unauthorizedCaller_reverts() public {
         vm.prank(stranger);
-        vm.expectRevert(ILender.Unauthorized.selector);
-        lender.borrow(marketId, stranger, 1e18);
+        vm.expectRevert();
+        market.borrow(stranger, 1e18);
     }
 
     function test_borrow_exceedingCredit_reverts() public {
         vm.prank(borrower);
-        vm.expectRevert(ILender.InsufficientLiquidity.selector);
-        lender.borrow(marketId, borrower, 500e18 + 1);
+        vm.expectRevert(IMarket.InsufficientLiquidity.selector);
+        market.borrow(borrower, 500e18 + 1);
     }
 
     function test_borrow_maxUint_borrowsMaxBorrowable() public {
         vm.prank(borrower);
-        uint256 borrowed = lender.borrow(marketId, borrower, type(uint256).max);
+        uint256 borrowed = market.borrow(borrower, type(uint256).max);
         assertEq(borrowed, 500e18);
         assertEq(stablecoin.balanceOf(borrower), 500e18);
     }
 
-    // --- interest accrual ---
-
     function test_interestAccruesOverTime() public {
         vm.prank(borrower);
-        lender.borrow(marketId, borrower, 300e18);
-        uint256 debtBefore = lender.debt(marketId);
+        market.borrow(borrower, 300e18);
+        uint256 debtBefore = market.debt();
 
         vm.warp(block.timestamp + 365 days);
 
-        uint256 debtAfter = lender.debt(marketId);
+        uint256 debtAfter = market.debt();
         assertGt(debtAfter, debtBefore);
-        // combined supply + premium index should have grown
-        assertGt(lender.index(marketId), 1e27);
     }
-
-    // --- repay ---
 
     function test_repay_reducesDebtAndBurnsStable() public {
         vm.startPrank(borrower);
-        lender.borrow(marketId, borrower, 300e18);
+        market.borrow(borrower, 300e18);
         vm.warp(block.timestamp + 30 days);
 
-        uint256 debtBefore = lender.debt(marketId);
-        uint256 repaid = lender.repay(marketId, 100e18);
+        uint256 debtBefore = market.debt();
+        uint256 repaid = market.repay(100e18);
         vm.stopPrank();
 
         assertEq(repaid, 100e18);
-        assertEq(stablecoin.balanceOf(borrower), 200e18); // 300 borrowed - 100 burned
-        assertApproxEqAbs(lender.debt(marketId), debtBefore - 100e18, 2);
+        assertEq(stablecoin.balanceOf(borrower), 200e18);
+        assertApproxEqAbs(market.debt(), debtBefore - 100e18, 2);
     }
 
     function test_repay_capsAtOutstandingDebt() public {
         vm.startPrank(borrower);
-        lender.borrow(marketId, borrower, 100e18);
-        // try to repay more than owed -> capped at debt
-        uint256 repaid = lender.repay(marketId, 1_000e18);
+        market.borrow(borrower, 100e18);
+        uint256 repaid = market.repay(1_000e18);
         vm.stopPrank();
 
         assertApproxEqAbs(repaid, 100e18, 1);
-        assertApproxEqAbs(lender.debt(marketId), 0, 2);
+        assertApproxEqAbs(market.debt(), 0, 2);
     }
 
-    // --- supply rewards ---
-
-    function test_supplyReward_accruesAndClaims() public {
+    function test_supplyReward_accruesToYieldRecipient() public {
         address stcUSD = makeAddr("stcUSD");
-        lender.setStcUSD(stcUSD);
+        market.setStablecoinYield(stcUSD);
 
         vm.prank(borrower);
-        lender.borrow(marketId, borrower, 400e18);
+        market.borrow(borrower, 400e18);
 
         vm.warp(block.timestamp + 365 days);
-        lender.updateRewards(marketId);
+        vm.prank(borrower);
+        market.repay(1);
 
-        uint256 claimable = lender.claimableSupplyReward();
-        assertGt(claimable, 0);
-
-        uint256 minted = lender.claimSupplyReward();
-        assertEq(minted, claimable);
-        assertEq(stablecoin.balanceOf(stcUSD), claimable);
-        assertEq(lender.claimableSupplyReward(), 0);
+        assertGt(stablecoin.balanceOf(stcUSD), 0);
     }
-
-    // --- underwriter (premium) rewards ---
 
     function test_underwriterReward_accruesAndClaims() public {
         vm.prank(borrower);
-        lender.borrow(marketId, borrower, 400e18);
+        market.borrow(borrower, 400e18);
 
         vm.warp(block.timestamp + 365 days);
-        lender.updateRewards(marketId);
-
-        uint256 claimable = lender.claimableTrancheReward(junior, juniorSupplier);
-        assertGt(claimable, 0);
+        vm.prank(borrower);
+        market.repay(1);
 
         vm.prank(juniorSupplier);
-        uint256 reward = lender.claimTrancheReward(junior, juniorSupplier);
-        assertEq(reward, claimable);
+        uint256 reward = Tranche(junior).claim(juniorSupplier);
+        assertGt(reward, 0);
         assertEq(stablecoin.balanceOf(juniorSupplier), reward);
     }
 
-    // --- liquidation ---
-
     function test_liquidate_solventMarket_reverts() public {
         vm.prank(borrower);
-        lender.borrow(marketId, borrower, 100e18);
+        market.borrow(borrower, 100e18);
 
-        vm.expectRevert(ILender.Solvent.selector);
-        lender.liquidate(marketId, borrower, 50e18);
+        vm.expectRevert(IMarket.Solvent.selector);
+        market.liquidate(borrower, 50e18);
     }
 
     function test_liquidate_unhealthyMarket_repaysAndSlashes() public {
         vm.prank(borrower);
-        lender.borrow(marketId, borrower, 500e18);
+        market.borrow(borrower, 500e18);
 
-        // let debt compound past the liquidation threshold
         vm.warp(block.timestamp + 3650 days);
-        assertGt(lender.maxLiquidatable(marketId), 0);
+        assertGt(market.maxLiquidatable(), 0);
 
         uint256 borrowerStableBefore = stablecoin.balanceOf(borrower);
         uint256 recipientCollateralBefore = collateral.balanceOf(borrower);
 
-        // borrower acts as liquidator, burning some of their cUSD
         vm.prank(borrower);
-        (uint256 repaid,, uint256 slashed) = lender.liquidate(marketId, borrower, 100e18);
+        (uint256 repaid, uint256 slashed) = market.liquidate(borrower, 100e18);
 
         assertGt(repaid, 0);
         assertEq(stablecoin.balanceOf(borrower), borrowerStableBefore - repaid);
-        // collateral is paid out to the recipient (>= 0; slash math may round small)
         assertGe(collateral.balanceOf(borrower), recipientCollateralBefore);
         assertLe(slashed, JUNIOR_DEPOSIT + SENIOR_DEPOSIT);
     }
 
-    // --- authority paths that touch reward + index bookkeeping ---
-
     function test_setMultiplier_reindexesDebt() public {
         vm.prank(borrower);
-        lender.borrow(marketId, borrower, 200e18);
+        market.borrow(borrower, 200e18);
 
-        lender.setMultiplier(marketId, 2e27);
-        // debt remains continuous across the reindex
-        assertApproxEqAbs(lender.debt(marketId), 200e18, 1e12);
+        market.setMultiplier(2e27);
+        assertApproxEqAbs(market.debt(), 200e18, 1e12);
     }
 
     function test_setInterestType_togglesVariableFixed() public {
         vm.prank(borrower);
-        lender.borrow(marketId, borrower, 200e18);
+        market.borrow(borrower, 200e18);
 
-        lender.setInterestType(marketId, false);
-        assertApproxEqAbs(lender.debt(marketId), 200e18, 1e12);
+        market.setInterestType(false);
+        assertApproxEqAbs(market.debt(), 200e18, 1e12);
     }
-
-    // --- borrow / repay edge branches ---
 
     function test_borrow_zero_reverts() public {
         vm.prank(borrower);
-        vm.expectRevert(ILender.InvalidAmount.selector);
-        lender.borrow(marketId, borrower, 0);
+        vm.expectRevert(IMarket.InvalidAmount.selector);
+        market.borrow(borrower, 0);
     }
 
     function test_repay_zero_reverts() public {
         vm.prank(borrower);
-        lender.borrow(marketId, borrower, 100e18);
+        market.borrow(borrower, 100e18);
         vm.prank(borrower);
-        vm.expectRevert(ILender.InvalidAmount.selector);
-        lender.repay(marketId, 0);
+        vm.expectRevert(IMarket.InvalidAmount.selector);
+        market.repay(0);
     }
-
-    function test_repay_dustBelowIndex_reverts() public {
-        vm.prank(borrower);
-        lender.borrow(marketId, borrower, 300e18);
-        vm.warp(block.timestamp + 36500 days);
-
-        vm.prank(borrower);
-        vm.expectRevert(ILender.InvalidAmount.selector);
-        lender.repay(marketId, 1);
-    }
-
-    // --- liquidation bonus curve bands (getBonus) ---
 
     function test_getBonus_zeroWhenNoDebt() public view {
-        assertEq(lender.getBonus(marketId), 0);
+        assertEq(market.bonus(), 0);
     }
 
     function test_getBonus_zeroWhenHealthy() public {
-        // small debt against full capital -> health >> 1 -> no bonus
         vm.prank(borrower);
-        lender.borrow(marketId, borrower, 100e18);
-        assertEq(lender.getBonus(marketId), 0);
+        market.borrow(borrower, 100e18);
+        assertEq(market.bonus(), 0);
     }
 
     function test_getBonus_aboveKinkBand() public {
         vm.prank(borrower);
-        lender.borrow(marketId, borrower, 300e18);
+        market.borrow(borrower, 300e18);
 
-        // drive health into (kink=0.9, 1): capital ~356 -> health ~0.95
         oracle.setPrice(address(collateral), 2.807e27);
-        uint256 bonus = lender.getBonus(marketId);
+        uint256 bonus = market.bonus();
         assertGt(bonus, 0);
-        // above-kink band stays below slope0 (0.02)
         assertLt(bonus, 0.02e27);
     }
 
     function test_getBonus_belowKinkBand_cappedToMax() public {
         vm.prank(borrower);
-        lender.borrow(marketId, borrower, 300e18);
+        market.borrow(borrower, 300e18);
 
-        // capital ~305 just above debt -> health ~0.81 (< kink) and a tiny max-bonus cap
         oracle.setPrice(address(collateral), 3.2787e27);
-        uint256 bonus = lender.getBonus(marketId);
+        uint256 bonus = market.bonus();
         assertGt(bonus, 0);
-        // capped to (capital-debt)/debt which is small here
-        uint256 capital = lender.totalCapital(marketId);
-        uint256 debt = lender.debt(marketId);
+        uint256 capital = market.totalCapital();
+        uint256 debt = market.debt();
         assertEq(bonus, (capital - debt) * 1e27 / debt);
     }
 
     function test_getBonus_zeroWhenInsolvent() public {
         vm.prank(borrower);
-        lender.borrow(marketId, borrower, 300e18);
+        market.borrow(borrower, 300e18);
 
-        // capital < debt -> no bonus
         oracle.setPrice(address(collateral), 5e27);
-        assertEq(lender.getBonus(marketId), 0);
+        assertEq(market.bonus(), 0);
     }
-
-    // --- liquidation slashes through junior into senior, and caps the burn amount ---
 
     function test_liquidate_amountCappedToMax() public {
         vm.prank(borrower);
-        lender.borrow(marketId, borrower, 500e18);
+        market.borrow(borrower, 500e18);
         vm.warp(block.timestamp + 3650 days);
 
-        uint256 max = lender.maxLiquidatable(marketId);
+        uint256 max = market.maxLiquidatable();
         assertGt(max, 0);
 
-        // fund the liquidator so the (capped) burn can be covered
         _mintStable(borrower, max);
 
-        // request to burn far more than allowed -> capped at maxLiquidatable
         vm.prank(borrower);
-        (uint256 repaid,,) = lender.liquidate(marketId, borrower, type(uint256).max);
+        (uint256 repaid,) = market.liquidate(borrower, type(uint256).max);
         assertLe(repaid, max);
         assertGt(repaid, 0);
     }

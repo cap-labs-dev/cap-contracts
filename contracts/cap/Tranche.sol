@@ -8,14 +8,14 @@ import {
     IERC7540AsyncRedeem
 } from "../ERC7540/ERC7540AsyncRedeem.sol";
 import { IInterestRateModel } from "../interfaces/IInterestRateModel.sol";
-import { ILender } from "../interfaces/ILender.sol";
+import { IMarket } from "../interfaces/IMarket.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import { TrancheStorageUtils } from "../storage/TrancheStorageUtils.sol";
+import { WadRayMath } from "../utils/WadRayMath.sol";
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
-import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -27,34 +27,37 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 /// underwriting the market.
 /// @dev Tranche is a specialized ERC4626 vault that is used to underwrite a market. It is used to
 /// track the assets of the tranche and the rewards earned from underwriting the market.
-contract Tranche is ITranche, AccessManagedUpgradeable, ERC7540AsyncRedeem, TrancheStorageUtils, UUPSUpgradeable {
+contract Tranche is ITranche, AccessManagedUpgradeable, ERC7540AsyncRedeem, TrancheStorageUtils {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
+    using WadRayMath for uint256;
 
     /// @notice Initialize the tranche
     /// @param _authority The authority address
-    /// @param _marketId The id of the market
     /// @param _asset The asset to underwrite
     /// @param _name The name of the tranche
     /// @param _symbol The symbol of the tranche
-    /// @param _vault The vault for the tranche
-    /// @param _irm The interest rate model for the tranche
+    /// @param _market The market to underwrite
+    /// @param _vault The vault to use for the tranche
+    /// @param _irm The interest rate model to use for the tranche
+
     function initialize(
         address _authority,
-        bytes32 _marketId,
+        address _asset,
         string memory _name,
         string memory _symbol,
-        address _asset,
+        address _market,
         address _vault,
-        address _irm
+        address _irm,
+        address _stablecoin
     ) external initializer {
         __AccessManaged_init(_authority);
         Storage storage $ = getTrancheStorage();
         __ERC7540AsyncRedeem_init(IERC20(_asset), _name, _symbol, hex"");
-        $.marketId = _marketId;
+        $.market = _market;
         $.vault = _vault;
         $.irm = _irm;
-        $.lender = msg.sender;
+        $.stablecoin = _stablecoin;
     }
 
     //////////////////////////////////////////////////////////////////////////////
@@ -66,16 +69,11 @@ contract Tranche is ITranche, AccessManagedUpgradeable, ERC7540AsyncRedeem, Tran
     /// @return slashedAssets The amount of assets slashed
     function slash(uint256 assets, address recipient) external returns (uint256 slashedAssets) {
         Storage storage $ = getTrancheStorage();
-        if (msg.sender != $.lender) revert Unauthorized();
+        if (msg.sender != $.market) revert Unauthorized();
         slashedAssets = Math.min(assets, totalAssets());
         IVault($.vault).withdraw(asset(), slashedAssets, recipient);
-        updateIRM();
-    }
-
-    /// @notice Update the interest rate model for the tranche
-    function updateIRM() public {
-        Storage storage $ = getTrancheStorage();
-        IInterestRateModel($.irm).update($.marketId);
+        updateIrm();
+        emit Slashed(recipient, slashedAssets);
     }
 
     //////////////////////////////////////////////////////////////////////////////
@@ -134,7 +132,7 @@ contract Tranche is ITranche, AccessManagedUpgradeable, ERC7540AsyncRedeem, Tran
     function _transferIn(address from, uint256 assets) internal override {
         Storage storage $ = getTrancheStorage();
         IVault($.vault).transferFrom(from, address(this), asset(), assets);
-        updateIRM();
+        updateIrm();
     }
 
     /// @notice Override the _transferOut function to transfer assets internally in the Vault
@@ -143,20 +141,92 @@ contract Tranche is ITranche, AccessManagedUpgradeable, ERC7540AsyncRedeem, Tran
     function _transferOut(address to, uint256 assets) internal override {
         Storage storage $ = getTrancheStorage();
         IVault($.vault).transfer(to, asset(), assets);
-        updateIRM();
+        updateIrm();
+    }
+
+    //////////////////////////////////////////////////////////////////////////////
+    /**************************** Reward functions ******************************/
+    //////////////////////////////////////////////////////////////////////////////
+
+    /// @notice Update the interest rate model for the tranche
+    function updateIrm() public {
+        Storage storage $ = getTrancheStorage();
+        IInterestRateModel($.irm).update($.market);
+    }
+
+    /// @notice Modifier to update the reward
+    modifier updateReward() {
+        _updateReward();
+        _;
+    }
+
+    /// @notice Claim the reward for the caller
+    /// @param recipient The address to send the reward to
+    /// @return reward The amount of reward claimed
+    function claim(address recipient) external updateReward returns (uint256 reward) {
+        Storage storage $ = getTrancheStorage();
+        reward = claimable(msg.sender);
+        if (reward > 0) {
+            $.pendingReward[msg.sender] = 0;
+            $.rewardDebt[msg.sender] = $.rewardPerShare.rayMul(balanceOf(msg.sender));
+            IERC20($.stablecoin).safeTransfer(recipient, reward);
+            emit Claimed(msg.sender, recipient, reward);
+        }
+    }
+
+    /// @notice Get the claimable reward for an address
+    /// @param user The address to get the claimable reward for
+    /// @return reward The amount of claimable reward
+    function claimable(address user) public view returns (uint256 reward) {
+        Storage storage $ = getTrancheStorage();
+        reward = $.pendingReward[user] + _rewardPerShare().rayMul(balanceOf(user)) - $.rewardDebt[user];
+    }
+
+    /// @notice Update the reward
+    function _updateReward() internal {
+        Storage storage $ = getTrancheStorage();
+        if ($.lastRewardUpdate != block.timestamp) {
+            uint256 supply = activeSupply();
+            if (supply > 0) {
+                $.rewardPerShare += IMarket($.market).claim(address(this)).rayDiv(supply);
+                $.lastRewardUpdate = block.timestamp;
+            }
+        }
+    }
+
+    /// @notice Get the reward per share for the tranche
+    /// @return rewardPerShare_ The reward per share
+    function _rewardPerShare() internal view returns (uint256 rewardPerShare_) {
+        Storage storage $ = getTrancheStorage();
+        rewardPerShare_ = $.rewardPerShare;
+        if ($.lastRewardUpdate != block.timestamp) {
+            uint256 supply = activeSupply();
+            if (supply > 0) rewardPerShare_ += IMarket($.market).claimable(address(this)).rayDiv(supply);
+        }
+    }
+
+    /// @inheritdoc ITranche
+    function market() external view returns (address) {
+        return getTrancheStorage().market;
     }
 
     /// @notice Override the _update function to update the sender and receiver's rewards
     /// @param from The address of the sender
     /// @param to The address of the receiver
     /// @param amount The amount of assets transferred
-    function _update(address from, address to, uint256 amount) internal override {
+    function _update(address from, address to, uint256 amount) internal override updateReward {
         Storage storage $ = getTrancheStorage();
         if (from != address(0) && from != address(this)) {
-            ILender($.lender).decreaseRewardDebt($.marketId, from, amount);
+            uint256 accRewardPerShare = $.rewardPerShare;
+            uint256 balance = balanceOf(from);
+            $.pendingReward[from] += accRewardPerShare.rayMul(balance) - $.rewardDebt[from];
+            $.rewardDebt[from] = accRewardPerShare.rayMul(balance - amount);
         }
         if (to != address(0) && to != address(this)) {
-            ILender($.lender).increaseRewardDebt($.marketId, to, amount);
+            uint256 accRewardPerShare = $.rewardPerShare;
+            uint256 balance = balanceOf(to);
+            $.pendingReward[to] += accRewardPerShare.rayMul(balance) - $.rewardDebt[to];
+            $.rewardDebt[to] = accRewardPerShare.rayMul(balance + amount);
         }
         super._update(from, to, amount);
     }
@@ -169,7 +239,7 @@ contract Tranche is ITranche, AccessManagedUpgradeable, ERC7540AsyncRedeem, Tran
     /// @return unlocked The number of unlocked shares
     function unlockedSupply() public view override(ERC7540AsyncRedeem, IERC7540AsyncRedeem) returns (uint256 unlocked) {
         Storage storage $ = getTrancheStorage();
-        uint256 lockedShares = previewWithdraw(ILender($.lender).lockedAssets($.marketId, address(this)));
+        uint256 lockedShares = previewWithdraw(IMarket($.market).lockedAssets(address(this)));
         uint256 totalSupply = totalSupply();
         if (totalSupply > lockedShares) unlocked = totalSupply - lockedShares;
     }
@@ -184,11 +254,4 @@ contract Tranche is ITranche, AccessManagedUpgradeable, ERC7540AsyncRedeem, Tran
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC7540AsyncRedeem) returns (bool) {
         return interfaceId == type(ITranche).interfaceId || super.supportsInterface(interfaceId);
     }
-
-    //////////////////////////////////////////////////////////////////////////////
-    /**************************** UUPS functions ********************************/
-    //////////////////////////////////////////////////////////////////////////////
-
-    /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address) internal override restricted { }
 }

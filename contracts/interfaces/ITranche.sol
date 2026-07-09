@@ -8,23 +8,28 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 /// @author kexley, Cap Labs
 /// @notice Interface for Tranche contract
 interface ITranche is IERC7540AsyncRedeem {
-    error Unauthorized();
-
     struct Storage {
-        bytes32 marketId;
+        address market;
         address vault;
         address irm;
-        address lender;
         EnumerableSet.AddressSet whitelist;
+        mapping(address => uint256) pendingReward;
+        mapping(address => uint256) rewardDebt;
+        uint256 rewardPerShare;
+        uint256 lastRewardUpdate;
     }
 
-    /// @notice Initialize the tranche
+    error Unauthorized();
+
+    event Slashed(address indexed recipient, uint256 amount);
+    event Claimed(address indexed user, address indexed recipient, uint256 amount);
+
     function initialize(
         address authority,
-        bytes32 marketId,
+        address asset,
         string memory name,
         string memory symbol,
-        address asset,
+        address market,
         address vault,
         address irm
     ) external;
@@ -34,13 +39,10 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @param recipient The recipient of the slashed assets
     /// @return slashedAssets The amount of assets slashed
     function slash(uint256 assets, address recipient) external returns (uint256 slashedAssets);
-
-    /// @notice Update the interest rate model for the tranche
-    function updateIRM() external;
-
-    /// @notice Set the whitelist for a depositor into the tranche
+    function updateIrm() external;
     function setWhitelist(address account, bool allowed) external;
-
-    /// @notice Check if an account is whitelisted
     function whitelisted(address account) external view returns (bool allowed);
+    function market() external view returns (address);
+    function claim(address recipient) external returns (uint256 reward);
+    function claimable(address user) external view returns (uint256 reward);
 }

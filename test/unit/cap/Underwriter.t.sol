@@ -5,45 +5,33 @@ import { Underwriter } from "../../../contracts/cap/Underwriter.sol";
 import { IUnderwriter } from "../../../contracts/interfaces/IUnderwriter.sol";
 import { BaseTest } from "../../shared/BaseTest.sol";
 import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
-import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-/// @dev Minimal Lender stand-in: toggles tranche registration and returns a fixed tranche reward.
-contract MockLender {
+contract MockRegistry {
     mapping(address => bool) internal _tranches;
-    uint256 internal _reward;
 
     function setTranche(address tranche, bool ok) external {
         _tranches[tranche] = ok;
     }
 
-    function setReward(uint256 reward) external {
-        _reward = reward;
-    }
-
     function isTranche(address tranche) external view returns (bool) {
         return _tranches[tranche];
     }
-
-    function claimTrancheReward(address, address) external view returns (uint256) {
-        return _reward;
-    }
 }
 
-/// @notice Unit tests for the Underwriter contract in isolation with mocked dependencies.
 contract UnderwriterUnitTest is BaseTest {
     Underwriter internal underwriter;
-    MockLender internal lender;
+    MockRegistry internal registry;
     MockERC20 internal collateral;
 
     address internal vault = makeAddr("vault");
     address internal tranche = makeAddr("tranche");
     address internal supplier = makeAddr("supplier");
     address internal stranger = makeAddr("stranger");
-    address internal rewardToken = makeAddr("rewardToken");
+    address internal stablecoin = makeAddr("stablecoin");
 
     function setUp() public {
         _setUpAccessManager();
-        lender = new MockLender();
+        registry = new MockRegistry();
         collateral = new MockERC20("Wrapped Ether", "WETH", 18);
 
         Underwriter impl = new Underwriter();
@@ -58,52 +46,29 @@ contract UnderwriterUnitTest is BaseTest {
                         "UW",
                         address(collateral),
                         vault,
-                        address(lender),
-                        address(rewardToken)
+                        address(registry),
+                        stablecoin
                     )
                 )
             )
         );
     }
 
-    // --- init / upgrade ---
-
     function test_initializedState() public view {
         assertEq(underwriter.asset(), address(collateral));
         assertEq(underwriter.vault(), vault);
-        assertEq(underwriter.lender(), address(lender));
+        assertEq(underwriter.registry(), address(registry));
         assertEq(underwriter.authority(), address(accessManager));
         assertEq(underwriter.totalSupply(), 0);
-        assertEq(underwriter.rewardToken(), address(rewardToken));
+        assertEq(underwriter.stablecoin(), stablecoin);
     }
 
     function test_initialize_cannotReinit() public {
         vm.expectRevert();
         underwriter.initialize(
-            address(accessManager),
-            "Underwriter",
-            "UW",
-            address(collateral),
-            vault,
-            address(lender),
-            address(rewardToken)
+            address(accessManager), "Underwriter", "UW", address(collateral), vault, address(registry), stablecoin
         );
     }
-
-    function test_upgrade_authorized() public {
-        Underwriter newImpl = new Underwriter();
-        UUPSUpgradeable(address(underwriter)).upgradeToAndCall(address(newImpl), "");
-        assertEq(underwriter.lender(), address(lender));
-    }
-
-    function test_upgrade_unauthorized_reverts() public {
-        Underwriter newImpl = new Underwriter();
-        vm.prank(stranger);
-        vm.expectRevert();
-        UUPSUpgradeable(address(underwriter)).upgradeToAndCall(address(newImpl), "");
-    }
-
-    // --- whitelist ---
 
     function test_whitelist_onlyAuthority() public {
         vm.prank(stranger);
@@ -127,8 +92,6 @@ contract UnderwriterUnitTest is BaseTest {
         assertEq(underwriter.maxDeposit(supplier), 0);
     }
 
-    // --- allocation auth + invalid tranche guards ---
-
     function test_allocate_onlyAuthority() public {
         vm.prank(stranger);
         vm.expectRevert();
@@ -140,9 +103,9 @@ contract UnderwriterUnitTest is BaseTest {
         underwriter.allocate(tranche, 1e18);
     }
 
-    function test_requestDeallocate_invalidTranche_reverts() public {
+    function test_deallocateAsync_invalidTranche_reverts() public {
         vm.expectRevert(IUnderwriter.InvalidTranche.selector);
-        underwriter.requestDeallocate(tranche, 1e18);
+        underwriter.deallocateAsync(tranche, 1e18);
     }
 
     function test_deallocate_invalidTranche_reverts() public {
@@ -150,9 +113,9 @@ contract UnderwriterUnitTest is BaseTest {
         underwriter.deallocate(tranche, 1e18);
     }
 
-    function test_deallocateWithRequest_invalidTranche_reverts() public {
+    function test_finalizeDeallocateAsync_invalidTranche_reverts() public {
         vm.expectRevert(IUnderwriter.InvalidTranche.selector);
-        underwriter.deallocate(tranche, 0, 1e18);
+        underwriter.finalizeDeallocateAsync(tranche, 0, 1e18);
     }
 
     function test_report_invalidTranche_reverts() public {
@@ -160,10 +123,8 @@ contract UnderwriterUnitTest is BaseTest {
         underwriter.report(tranche);
     }
 
-    // --- default tranche ---
-
     function test_setDefaultTranche_onlyAuthority() public {
-        lender.setTranche(tranche, true);
+        registry.setTranche(tranche, true);
         vm.prank(stranger);
         vm.expectRevert();
         underwriter.setDefaultTranche(tranche);
@@ -175,13 +136,11 @@ contract UnderwriterUnitTest is BaseTest {
     }
 
     function test_setDefaultTranche_valid_emits() public {
-        lender.setTranche(tranche, true);
+        registry.setTranche(tranche, true);
         vm.expectEmit(false, false, false, true);
         emit IUnderwriter.SetDefaultTranche(tranche);
         underwriter.setDefaultTranche(tranche);
     }
-
-    // --- ERC4626 views ---
 
     function test_totalAssets_isVaultBalancePlusDebt() public {
         vm.mockCall(
@@ -189,7 +148,6 @@ contract UnderwriterUnitTest is BaseTest {
             abi.encodeWithSignature("balanceOf(address,address)", address(underwriter), address(collateral)),
             abi.encode(500e18)
         );
-        // no debt allocated yet, so totalAssets == vault custody balance
         assertEq(underwriter.totalAssets(), 500e18);
     }
 
@@ -202,14 +160,11 @@ contract UnderwriterUnitTest is BaseTest {
         assertEq(underwriter.unlockedSupply(), 0);
     }
 
-    // --- reward views (empty state) ---
-
     function test_vestedReward_zeroInitially() public view {
         assertEq(underwriter.vestedReward(), 0);
     }
 
     function test_vestingEnd_isDefaultVestingPeriod() public view {
-        // initialize() sets a default vestingPeriod of 6 hours and lastReported stays 0
         assertEq(underwriter.vestingEnd(), 6 hours);
     }
 
@@ -229,7 +184,7 @@ contract UnderwriterUnitTest is BaseTest {
         assertEq(underwriter.vestingEnd(), 1 days);
     }
 
-    function test_claimableReward_zeroInitially() public view {
-        assertEq(underwriter.claimableReward(supplier), 0);
+    function test_claimable_zeroInitially() public view {
+        assertEq(underwriter.claimable(supplier), 0);
     }
 }

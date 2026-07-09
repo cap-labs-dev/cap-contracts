@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import { IInterestRateModel } from "../interfaces/IInterestRateModel.sol";
-import { ILender } from "../interfaces/ILender.sol";
+import { IMarket } from "../interfaces/IMarket.sol";
 import { IStablecoin } from "../interfaces/IStablecoin.sol";
 import { InterestRateModelStorageUtils } from "../storage/InterestRateModelStorageUtils.sol";
 import { MathUtils } from "../utils/MathUtils.sol";
@@ -24,57 +24,19 @@ contract InterestRateModel is
     using WadRayMath for uint256;
 
     /// @notice Initialize the InterestRateModel
-    /// @param _stablecoin The address of the Stablecoin token
-    /// @param _lender The address of the Lender
     /// @param _authority The address of the authority
-    function initialize(address _stablecoin, address _lender, address _authority) external initializer {
+    /// @param _stablecoin The address of the Stablecoin token
+    function initialize(address _authority, address _stablecoin) external initializer {
         __AccessManaged_init(_authority);
-        IInterestRateModel.InterestRateModelStorage storage $ = getInterestRateModelStorage();
+        Storage storage $ = getInterestRateModelStorage();
         $.stablecoin = _stablecoin;
         $.variableIndex = 1e27;
         $.fixedIndex = 1e27;
         $.lastUpdate = block.timestamp;
-        $.lender = _lender;
     }
 
     //////////////////////////////////////////////////////////////////////////////
-    /**************************** Setter functions ******************************/
-    //////////////////////////////////////////////////////////////////////////////
-
-    /// @notice Set the variable slopes for the supply interest rate
-    /// @param _slopes The new variable slopes
-    function setVariableSlopes(Slopes memory _slopes) external restricted {
-        InterestRateModelStorage storage $ = getInterestRateModelStorage();
-        $.variableSlopes = _slopes;
-        _update();
-        emit SetVariableSlopes(_slopes);
-    }
-
-    /// @notice Set the fixed slopes for the supply interest rate
-    /// @param _slopes The new fixed slopes
-    function setFixedSlopes(Slopes memory _slopes) external restricted {
-        InterestRateModelStorage storage $ = getInterestRateModelStorage();
-        $.fixedSlopes = _slopes;
-        _update();
-        emit SetFixedSlopes(_slopes);
-    }
-
-    /// @notice Set the slopes for a market's inverse premium rate
-    /// @param marketId The ID of the market
-    /// @param _slopes The new inverse slopes
-    function setMarketSlopes(bytes32 marketId, Slopes memory _slopes) external restricted {
-        if (_slopes.base < _slopes.slope0) revert InvalidSlopes();
-        if (_slopes.kink == 0 || _slopes.kink >= 1e27) revert InvalidSlopes();
-
-        InterestRateModelStorage storage $ = getInterestRateModelStorage();
-        $.marketSlopes[marketId] = _slopes;
-        if ($.marketIndex[marketId] == 0) $.marketIndex[marketId] = 1e27;
-        _updateMarket(marketId);
-        emit SetMarketSlopes(marketId, _slopes);
-    }
-
-    //////////////////////////////////////////////////////////////////////////////
-    /**************************** Index functions *******************************/
+    /**************************** Stablecoin functions **************************/
     //////////////////////////////////////////////////////////////////////////////
 
     /// @notice Update the supply interest rates based on the utilization of the stablecoin
@@ -82,16 +44,26 @@ contract InterestRateModel is
         _update();
     }
 
-    /// @notice Update a market's inverse premium rate based on the utilization of the market
-    /// @param marketId The market to update
-    function update(bytes32 marketId) external {
-        _updateMarket(marketId);
+    /// @notice Set the variable slopes for the supply interest rate
+    function setVariableSlopes(Slopes memory _slopes) external restricted {
+        Storage storage $ = getInterestRateModelStorage();
+        $.variableSlopes = _slopes;
+        _update();
+        emit SetVariableSlopes(_slopes);
+    }
+
+    /// @notice Set the fixed slopes for the supply interest rate
+    function setFixedSlopes(Slopes memory _slopes) external restricted {
+        Storage storage $ = getInterestRateModelStorage();
+        $.fixedSlopes = _slopes;
+        _update();
+        emit SetFixedSlopes(_slopes);
     }
 
     /// @notice Get the current variable supply index
     /// @return currentIndex The current variable index
     function variableIndex() public view returns (uint256 currentIndex) {
-        InterestRateModelStorage storage $ = getInterestRateModelStorage();
+        Storage storage $ = getInterestRateModelStorage();
 
         currentIndex = $.variableIndex;
         if ($.lastUpdate != block.timestamp) {
@@ -102,7 +74,7 @@ contract InterestRateModel is
     /// @notice Get the current fixed supply index
     /// @return currentIndex The current fixed index
     function fixedIndex() public view returns (uint256 currentIndex) {
-        InterestRateModelStorage storage $ = getInterestRateModelStorage();
+        Storage storage $ = getInterestRateModelStorage();
 
         currentIndex = $.fixedIndex;
         if ($.lastUpdate != block.timestamp) {
@@ -110,38 +82,29 @@ contract InterestRateModel is
         }
     }
 
-    /// @notice Get the current inverse premium index for a market
-    /// @param marketId The ID of the market
-    /// @return currentIndex The current index
-    function index(bytes32 marketId) public view returns (uint256 currentIndex) {
-        InterestRateModelStorage storage $ = getInterestRateModelStorage();
+    /// @notice Get the current variable supply rate
+    /// @return rate The current variable rate
+    function variableRate() public view returns (uint256 rate) {
+        Storage storage $ = getInterestRateModelStorage();
+        rate = $.variableRate;
+    }
 
-        currentIndex = $.marketIndex[marketId];
-        if ($.lastMarketUpdate[marketId] != block.timestamp) {
-            currentIndex = currentIndex.rayMul(
-                MathUtils.calculateCompoundedInterest($.marketRate[marketId], $.lastMarketUpdate[marketId])
-            );
-        }
+    /// @notice Get the current fixed supply rate
+    /// @return rate The current fixed rate
+    function fixedRate() public view returns (uint256 rate) {
+        Storage storage $ = getInterestRateModelStorage();
+        rate = $.fixedRate;
     }
 
     /// @dev Update the supply indexes and then the supply interest rates
     function _update() internal {
-        InterestRateModelStorage storage $ = getInterestRateModelStorage();
+        Storage storage $ = getInterestRateModelStorage();
         $.variableIndex = variableIndex();
         $.fixedIndex = fixedIndex();
         $.lastUpdate = block.timestamp;
         uint256 utilization = IStablecoin($.stablecoin).utilizationRate();
         $.variableRate = _nextInterestRate(utilization, $.variableSlopes);
         $.fixedRate = _nextInterestRate(utilization, $.fixedSlopes);
-    }
-
-    /// @dev Update a market's inverse index and then the inverse interest rate
-    /// @param marketId The market to update
-    function _updateMarket(bytes32 marketId) internal {
-        InterestRateModelStorage storage $ = getInterestRateModelStorage();
-        $.marketIndex[marketId] = index(marketId);
-        $.lastMarketUpdate[marketId] = block.timestamp;
-        $.marketRate[marketId] = nextInterestRate(marketId);
     }
 
     /// @dev Calculate the next supply interest rate based on the utilization and slopes
@@ -157,6 +120,68 @@ contract InterestRateModel is
             rate = slopes.base + slopes.slope0
                 + slopes.slope1.rayMul((utilization - slopes.kink).rayDiv(1e27 - slopes.kink));
         }
+    }
+
+    //////////////////////////////////////////////////////////////////////////////
+    /**************************** Market functions *******************************/
+    //////////////////////////////////////////////////////////////////////////////
+
+    /// @notice Update a market's inverse premium rate based on the utilization of the market
+    /// @param market The market to update
+    function update(address market) external {
+        _updateMarket(market);
+    }
+
+    /// @notice Set the slopes for a market's inverse premium rate
+    function setUnderwriterSlopes(address market, Slopes memory _slopes) external restricted {
+        if (_slopes.base < _slopes.slope0) revert InvalidSlopes();
+        if (_slopes.kink == 0 || _slopes.kink >= 1e27) revert InvalidSlopes();
+
+        Storage storage $ = getInterestRateModelStorage();
+        $.underwriterSlopes[market] = _slopes;
+        if ($.underwriterIndex[market] == 0) $.underwriterIndex[market] = 1e27;
+        _updateMarket(market);
+        emit SetUnderwriterSlopes(market, _slopes);
+    }
+
+    /// @notice Get the current inverse premium index for a market
+    /// @param market The market to get the current index for
+    /// @return currentIndex The current index
+    function underwriterIndex(address market) public view returns (uint256 currentIndex) {
+        Storage storage $ = getInterestRateModelStorage();
+
+        currentIndex = $.underwriterIndex[market];
+        if ($.lastUnderwriterUpdate[market] != block.timestamp) {
+            currentIndex = currentIndex.rayMul(
+                MathUtils.calculateCompoundedInterest($.underwriterRate[market], $.lastUnderwriterUpdate[market])
+            );
+        }
+    }
+
+    /// @notice Get the current inverse premium rate for a market
+    /// @param market The market to get the current interest rate for
+    /// @return currentRate The current interest rate
+    function underwriterRate(address market) external view returns (uint256 currentRate) {
+        Storage storage $ = getInterestRateModelStorage();
+        currentRate = $.underwriterRate[market];
+    }
+
+    /// @notice Get the next inverse premium rate based on the utilization of the market
+    /// @param market The market to get the next interest rate for
+    /// @return nextRate The next interest rate
+    function nextInterestRate(address market) public view returns (uint256 nextRate) {
+        Storage storage $ = getInterestRateModelStorage();
+        uint256 utilization = IMarket($.market).utilization(market);
+        nextRate = _calculateInverseRate($.underwriterSlopes[market], utilization);
+    }
+
+    /// @dev Update a market's inverse index and then the inverse interest rate
+    /// @param market The market to update
+    function _updateMarket(address market) internal {
+        Storage storage $ = getInterestRateModelStorage();
+        $.underwriterIndex[market] = underwriterIndex(market);
+        $.lastUnderwriterUpdate[market] = block.timestamp;
+        $.underwriterRate[market] = nextInterestRate(market);
     }
 
     /// @dev Calculate the next inverse interest rate based on the utilization and slopes
@@ -175,41 +200,6 @@ contract InterestRateModel is
             newRate = slopes.base - slopes.slope0
                 + slopes.slope1.rayMul((utilization - slopes.kink).rayDiv(1e27 - slopes.kink));
         }
-    }
-
-    //////////////////////////////////////////////////////////////////////////////
-    /**************************** Rate functions ********************************/
-    //////////////////////////////////////////////////////////////////////////////
-
-    /// @notice Get the current variable supply rate
-    /// @return rate The current variable rate
-    function variableRate() public view returns (uint256 rate) {
-        InterestRateModelStorage storage $ = getInterestRateModelStorage();
-        rate = $.variableRate;
-    }
-
-    /// @notice Get the current fixed supply rate
-    /// @return rate The current fixed rate
-    function fixedRate() public view returns (uint256 rate) {
-        InterestRateModelStorage storage $ = getInterestRateModelStorage();
-        rate = $.fixedRate;
-    }
-
-    /// @notice Get the current inverse premium rate for a market
-    /// @param marketId The ID of the market
-    /// @return currentRate The current interest rate
-    function rate(bytes32 marketId) external view returns (uint256 currentRate) {
-        InterestRateModelStorage storage $ = getInterestRateModelStorage();
-        currentRate = $.marketRate[marketId];
-    }
-
-    /// @notice Get the next inverse premium rate based on the utilization of the market
-    /// @param marketId The ID of the market
-    /// @return nextRate The next interest rate
-    function nextInterestRate(bytes32 marketId) public view returns (uint256 nextRate) {
-        InterestRateModelStorage storage $ = getInterestRateModelStorage();
-        uint256 utilization = ILender($.lender).utilization(marketId);
-        nextRate = _calculateInverseRate($.marketSlopes[marketId], utilization);
     }
 
     //////////////////////////////////////////////////////////////////////////////

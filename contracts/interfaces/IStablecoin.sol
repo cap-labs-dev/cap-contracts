@@ -12,11 +12,10 @@ interface IStablecoin {
         uint256 badDebt;
     }
 
-    error Unauthorized();
-
-    event MintUnbacked(address to, uint256 amount);
-    event BurnUnbacked(address from, uint256 amount);
-    event IncreaseBadDebt(uint256 badDebt);
+    event MintUnbacked(address indexed to, uint256 amount);
+    event BurnUnbacked(address indexed from, uint256 amount);
+    event BadDebtIncreased(uint256 amount);
+    event BadDebtReduced(address indexed owner, uint256 amount);
 
     function badDebt() external view returns (uint256 debt);
     function utilizationRate() external view returns (uint256 rate);

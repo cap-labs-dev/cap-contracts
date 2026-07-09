@@ -12,9 +12,8 @@ interface IInterestRateModel {
         uint256 kink;
     }
 
-    struct InterestRateModelStorage {
+    struct Storage {
         address stablecoin;
-        address lender;
         Slopes variableSlopes;
         Slopes fixedSlopes;
         uint256 lastUpdate;
@@ -22,27 +21,29 @@ interface IInterestRateModel {
         uint256 fixedRate;
         uint256 variableIndex;
         uint256 fixedIndex;
-        mapping(bytes32 => Slopes) marketSlopes;
-        mapping(bytes32 => uint256) marketIndex;
-        mapping(bytes32 => uint256) lastMarketUpdate;
-        mapping(bytes32 => uint256) marketRate;
+        mapping(address => Slopes) marketSlopes;
+        mapping(address => uint256) marketIndex;
+        mapping(address => uint256) lastMarketUpdate;
+        mapping(address => uint256) marketRate;
+        mapping(address => bool) marketVariable;
     }
 
     error InvalidSlopes();
 
     event SetVariableSlopes(Slopes slopes);
     event SetFixedSlopes(Slopes slopes);
-    event SetMarketSlopes(bytes32 marketId, Slopes slopes);
+    event SetUnderwriterSlopes(address market, Slopes slopes);
 
     function setVariableSlopes(Slopes memory _slopes) external;
     function setFixedSlopes(Slopes memory _slopes) external;
-    function setMarketSlopes(bytes32 marketId, Slopes memory _slopes) external;
+    function setUnderwriterSlopes(address market, Slopes memory _slopes) external;
     function variableIndex() external view returns (uint256 index);
     function fixedIndex() external view returns (uint256 index);
-    function index(bytes32 marketId) external view returns (uint256 index);
     function variableRate() external view returns (uint256 rate);
     function fixedRate() external view returns (uint256 rate);
-    function rate(bytes32 marketId) external view returns (uint256 rate);
+    function underwriterRate(address market) external view returns (uint256 rate);
     function update() external;
-    function update(bytes32 marketId) external;
+    function update(address market) external;
+    function underwriterIndex(address market) external view returns (uint256 index);
+    function nextInterestRate(address market) external view returns (uint256 rate);
 }

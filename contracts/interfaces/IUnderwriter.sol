@@ -13,7 +13,8 @@ interface IUnderwriter is IERC7540AsyncRedeem {
 
     struct Storage {
         address vault;
-        address lender;
+        address registry;
+        address stablecoin;
         EnumerableSet.AddressSet whitelist;
         mapping(address => uint256) debt;
         uint256 totalDebt;
@@ -21,7 +22,6 @@ interface IUnderwriter is IERC7540AsyncRedeem {
         uint256 rewardPerSecond;
         uint256 vestingPeriod;
         uint256 lastReported;
-        address rewardToken;
         mapping(address => uint256) pendingReward;
         mapping(address => uint256) rewardDebt;
         uint256 lastRewardUpdate;
@@ -32,7 +32,7 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     event DebtIncreased(address indexed tranche, uint256 amount);
     event DebtDecreased(address indexed tranche, uint256 amount);
     event RequestedRedeem(address indexed tranche, uint256 shares, uint256 requestId);
-    event Reported(address indexed tranche, uint256 reward);
+    event Reported(address indexed tranche, uint256 reward, uint256 gain, uint256 loss);
     event SetDefaultTranche(address tranche);
     event SetVestingPeriod(uint256 vestingPeriod);
 
@@ -41,16 +41,16 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @param symbol The symbol of the underwriter
     /// @param asset The asset of the underwriter
     /// @param vault The vault of the underwriter
-    /// @param lender The lender of the underwriter
-    /// @param rewardToken The reward token of the underwriter
+    /// @param registry The registry of the underwriter
+    /// @param stablecoin The stablecoin of the underwriter
     function initialize(
         address authority,
         string memory name,
         string memory symbol,
         address asset,
         address vault,
-        address lender,
-        address rewardToken
+        address registry,
+        address stablecoin
     ) external;
 
     /// @notice Allocate assets to a tranche
@@ -71,31 +71,39 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @return vault The vault
     function vault() external view returns (address);
 
-    /// @notice Get the lender
-    /// @return lender The lender
-    function lender() external view returns (address);
+    /// @notice Get the registry
+    /// @return registry The registry
+    function registry() external view returns (address);
 
-    /// @notice Get the reward token
-    /// @return rewardToken The reward token
-    function rewardToken() external view returns (address);
+    /// @notice Get the stablecoin
+    /// @return stablecoin The stablecoin
+    function stablecoin() external view returns (address);
 
-    /// @notice Request to deallocate shares from a tranche
+    /// @notice Deallocate assets from a tranche asynchronously
     /// @param tranche The tranche to deallocate from
     /// @param shares The shares to deallocate
-    /// @return requestId The request id
-    function requestDeallocate(address tranche, uint256 shares) external returns (uint256 requestId);
+    /// @return requestId The request ID
+    function deallocateAsync(address tranche, uint256 shares) external returns (uint256 requestId);
 
-    /// @notice Deallocate shares from a tranche
+    /// @notice Deallocate assets from a tranche
+    /// @param tranche The tranche to deallocate from
+
+    /// @notice Instantly deallocate unlocked shares from a tranche
     /// @param tranche The tranche to deallocate from
     /// @param shares The shares to deallocate
     /// @return deallocated The amount of shares deallocated
     function deallocate(address tranche, uint256 shares) external returns (uint256 deallocated);
 
-    /// @notice Deallocate shares from a tranche using a request id
+    /// @notice Finalize a deallocate request asynchronously
+    /// @param tranche The tranche to finalize the deallocate request for
+    /// @param requestId The request ID
+    /// @param shares The shares to finalize the deallocate request for
+
+    /// @notice Finalize an async deallocation using a request id
     /// @param tranche The tranche to deallocate from
     /// @param requestId The request id
     /// @param shares The shares to deallocate
-    function deallocate(address tranche, uint256 requestId, uint256 shares) external;
+    function finalizeDeallocateAsync(address tranche, uint256 requestId, uint256 shares) external;
 
     /// @notice Report the debt and rewards for a tranche
     /// @param tranche The tranche to report
@@ -111,7 +119,7 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice Get the claimable reward for a user
     /// @param user The user to get the claimable reward for
     /// @return reward The claimable reward
-    function claimableReward(address user) external view returns (uint256 reward);
+    function claimable(address user) external view returns (uint256 reward);
 
     /// @notice Get the vested reward
     /// @return vested The vested reward
