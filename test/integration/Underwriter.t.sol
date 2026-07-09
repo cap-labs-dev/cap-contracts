@@ -12,6 +12,7 @@ contract UnderwriterIntegrationTest is CapDeployer {
     address internal borrower = makeAddr("borrower");
     address internal depositor = makeAddr("depositor");
     uint64 internal managerId = MANAGER_ROLE;
+    uint64 internal borrowerId = BORROWER_ROLE;
     Market internal market;
     Tranche internal senior;
     Tranche internal junior;
@@ -22,12 +23,11 @@ contract UnderwriterIntegrationTest is CapDeployer {
     function setUp() public {
         _deployCap();
 
-        address[] memory borrowers = new address[](1);
-        borrowers[0] = borrower;
         address marketAddr;
         address s;
         address j;
-        (marketAddr, s, j) = _createMarket("Market A", borrowers, managerId);
+        (marketAddr, s, j) = _createMarket("Market A", managerId, borrowerId);
+        accessManager.grantRole(BORROWER_ROLE, borrower, 0);
         market = Market(marketAddr);
         senior = Tranche(s);
         junior = Tranche(j);

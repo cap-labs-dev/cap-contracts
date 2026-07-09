@@ -12,6 +12,7 @@ interface ITranche is IERC7540AsyncRedeem {
         address market;
         address vault;
         address irm;
+        address stablecoin;
         EnumerableSet.AddressSet whitelist;
         mapping(address => uint256) pendingReward;
         mapping(address => uint256) rewardDebt;
@@ -31,7 +32,8 @@ interface ITranche is IERC7540AsyncRedeem {
         string memory symbol,
         address market,
         address vault,
-        address irm
+        address irm,
+        address stablecoin
     ) external;
 
     /// @notice Slash the tranche's assets

@@ -24,7 +24,7 @@ interface IMarket {
         uint256 borrowCap;
         uint256 scaledDebt;
         uint256 lastSupplyIndex;
-        uint256 lastTrancheIndex;
+        uint256 lastUnderwriterIndex;
         uint256 lastRewardUpdate;
         uint256 juniorSplit;
         uint256 targetHealth;
@@ -79,7 +79,7 @@ interface IMarket {
     function borrow(address recipient, uint256 amount) external returns (uint256 borrowed);
     function repay(uint256 amount) external returns (uint256 repaid);
     function liquidate(address recipient, uint256 amount) external returns (uint256 repaid, uint256 assetsSlashed);
-    function claim(address tranche) external returns (uint256 reward);
+    function claim() external returns (uint256 reward);
 
     function setInterestType(bool supplyVariable) external;
     function setJuniorSplit(uint256 juniorSplit) external;

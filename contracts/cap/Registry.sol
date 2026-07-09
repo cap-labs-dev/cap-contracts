@@ -23,8 +23,8 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 contract Registry is IRegistry, AccessManagedUpgradeable, RegistryStorageUtils, UUPSUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    uint64 internal constant KEEPER_ROLE = uint64(keccak256("KEEPER_ROLE"));
-    uint64 internal constant GUARDIAN_ROLE = uint64(keccak256("GUARDIAN_ROLE"));
+    uint64 internal constant KEEPER_ROLE = 1;
+    uint64 internal constant GUARDIAN_ROLE = 2;
 
     /// @inheritdoc IRegistry
     function initialize(
@@ -82,14 +82,16 @@ contract Registry is IRegistry, AccessManagedUpgradeable, RegistryStorageUtils, 
         seniorTranche = IBeaconFactory($.trancheFactory)
             .create(
                 abi.encodeCall(
-                    ITranche.initialize, ($.authority, _asset, seniorName, "srTRANCHE", market, $.vault, $.irm)
+                    ITranche.initialize,
+                    ($.authority, _asset, seniorName, "srTRANCHE", market, $.vault, $.irm, $.stablecoin)
                 )
             );
         $.tranches.add(seniorTranche);
         juniorTranche = IBeaconFactory($.trancheFactory)
             .create(
                 abi.encodeCall(
-                    ITranche.initialize, ($.authority, _asset, juniorName, "jrTRANCHE", market, $.vault, $.irm)
+                    ITranche.initialize,
+                    ($.authority, _asset, juniorName, "jrTRANCHE", market, $.vault, $.irm, $.stablecoin)
                 )
             );
         $.tranches.add(juniorTranche);

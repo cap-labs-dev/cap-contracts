@@ -12,17 +12,17 @@ contract AsyncRedemptionTest is CapDeployer {
     address internal cusdHolder = makeAddr("cusdHolder");
     address internal cusdDepositor = makeAddr("cusdDepositor");
     uint64 internal managerId = MANAGER_ROLE;
+    uint64 internal borrowerId = BORROWER_ROLE;
 
     function setUp() public {
         _deployCap();
     }
 
     function test_tranche_asyncRedemption_pendingUntilRepaid() public {
-        address[] memory borrowers = new address[](1);
-        borrowers[0] = borrower;
         address marketAddr;
         address s;
-        (marketAddr, s,) = _createMarket("Market A", borrowers, managerId);
+        (marketAddr, s,) = _createMarket("Market A", managerId, borrowerId);
+        accessManager.grantRole(BORROWER_ROLE, borrower, 0);
         Market market = Market(marketAddr);
         Tranche senior = Tranche(s);
 

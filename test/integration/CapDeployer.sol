@@ -15,6 +15,7 @@ import { Underwriter } from "../../contracts/cap/Underwriter.sol";
 import { Vault } from "../../contracts/cap/Vault.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
 import { IMarket } from "../../contracts/interfaces/IMarket.sol";
+import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 /// @title CapDeployer
 /// @notice Deploys and fully wires a Cap protocol instance for integration-style unit tests.
@@ -79,9 +80,13 @@ abstract contract CapDeployer is BaseTest {
         require(address(irm) == irmAddr, "irm addr");
         require(address(stablecoin) == stablecoinAddr, "stablecoin addr");
 
-        marketFactory = new BeaconFactory(address(this), address(marketImpl));
-        trancheFactory = new BeaconFactory(address(this), address(trancheImpl));
-        underwriterFactory = new BeaconFactory(address(this), address(underwriterImpl));
+        UpgradeableBeacon marketBeacon = new UpgradeableBeacon(address(marketImpl), address(this));
+        UpgradeableBeacon trancheBeacon = new UpgradeableBeacon(address(trancheImpl), address(this));
+        UpgradeableBeacon underwriterBeacon = new UpgradeableBeacon(address(underwriterImpl), address(this));
+
+        marketFactory = new BeaconFactory(address(marketBeacon));
+        trancheFactory = new BeaconFactory(address(trancheBeacon));
+        underwriterFactory = new BeaconFactory(address(underwriterBeacon));
 
         registry = Registry(
             _deployProxy(
@@ -125,7 +130,7 @@ abstract contract CapDeployer is BaseTest {
         bytes4[] memory irmSelectors = new bytes4[](3);
         irmSelectors[0] = InterestRateModel.setVariableSlopes.selector;
         irmSelectors[1] = InterestRateModel.setFixedSlopes.selector;
-        irmSelectors[2] = InterestRateModel.setMarketSlopes.selector;
+        irmSelectors[2] = InterestRateModel.setUnderwriterSlopes.selector;
         accessManager.setTargetFunctionRole(address(irm), irmSelectors, MANAGER_ROLE);
 
         accessManager.grantRole(ADMIN_ROLE, address(registry), 0);
@@ -161,7 +166,7 @@ abstract contract CapDeployer is BaseTest {
     }
 
     function _setMarketSlopes(address market) internal {
-        irm.setMarketSlopes(
+        irm.setUnderwriterSlopes(
             market, IInterestRateModel.Slopes({ base: 0.2e27, slope0: 0.1e27, slope1: 0.3e27, kink: 0.5e27 })
         );
     }

@@ -10,17 +10,17 @@ contract TrancheTest is CapDeployer {
     address internal supplier = makeAddr("supplier");
     address internal stranger = makeAddr("stranger");
     uint64 internal managerId = MANAGER_ROLE;
+    uint64 internal borrowerId = BORROWER_ROLE;
     Tranche internal senior;
     Tranche internal junior;
     Market internal market;
 
     function setUp() public {
         _deployCap();
-        address[] memory borrowers = new address[](0);
         address marketAddr;
         address s;
         address j;
-        (marketAddr, s, j) = _createMarket("Market A", borrowers, managerId);
+        (marketAddr, s, j) = _createMarket("Market A", managerId, borrowerId);
         market = Market(marketAddr);
         senior = Tranche(s);
         junior = Tranche(j);

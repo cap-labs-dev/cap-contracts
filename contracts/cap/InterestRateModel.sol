@@ -171,7 +171,7 @@ contract InterestRateModel is
     /// @return nextRate The next interest rate
     function nextInterestRate(address market) public view returns (uint256 nextRate) {
         Storage storage $ = getInterestRateModelStorage();
-        uint256 utilization = IMarket($.market).utilization(market);
+        uint256 utilization = IMarket(market).utilization();
         nextRate = _calculateInverseRate($.underwriterSlopes[market], utilization);
     }
 

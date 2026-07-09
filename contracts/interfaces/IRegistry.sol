@@ -40,7 +40,7 @@ interface IRegistry {
         address underwriterFactory
     ) external;
 
-    function createMarket(address asset, string memory name, address[] calldata borrowers, uint64 managerId)
+    function createMarket(address asset, string memory name, uint64 managerId, uint64 borrowerId)
         external
         returns (address market, address seniorTranche, address juniorTranche);
 

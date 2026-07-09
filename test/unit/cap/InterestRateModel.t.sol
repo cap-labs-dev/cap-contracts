@@ -73,42 +73,42 @@ contract InterestRateModelTest is BaseTest {
     }
 
     function test_inverse_indexZeroUntilSlopesSet() public view {
-        assertEq(irm.trancheIndex(address(market)), 0);
+        assertEq(irm.underwriterIndex(address(market)), 0);
     }
 
     function test_inverse_setSlopes_invalid_baseLtSlope0() public {
         IInterestRateModel.Slopes memory s =
             IInterestRateModel.Slopes({ base: 0.1e27, slope0: 0.2e27, slope1: 0, kink: 0.5e27 });
         vm.expectRevert(IInterestRateModel.InvalidSlopes.selector);
-        irm.setMarketSlopes(address(market), s);
+        irm.setUnderwriterSlopes(address(market), s);
     }
 
     function test_inverse_setSlopes_initializesIndexToRay() public {
         IInterestRateModel.Slopes memory s =
             IInterestRateModel.Slopes({ base: 0.2e27, slope0: 0.1e27, slope1: 0.3e27, kink: 0.5e27 });
-        irm.setMarketSlopes(address(market), s);
-        assertEq(irm.trancheIndex(address(market)), RAY);
+        irm.setUnderwriterSlopes(address(market), s);
+        assertEq(irm.underwriterIndex(address(market)), RAY);
     }
 
     function test_inverse_rate_decreasesWithUtilizationBelowKink() public {
         IInterestRateModel.Slopes memory s =
             IInterestRateModel.Slopes({ base: 0.2e27, slope0: 0.1e27, slope1: 0.3e27, kink: 0.5e27 });
         market.setMarketUtilization(address(market), 0);
-        irm.setMarketSlopes(address(market), s);
-        assertEq(irm.rate(address(market)), 0.2e27);
+        irm.setUnderwriterSlopes(address(market), s);
+        assertEq(irm.underwriterRate(address(market)), 0.2e27);
 
         market.setMarketUtilization(address(market), 0.5e27);
         irm.update(address(market));
-        assertEq(irm.rate(address(market)), 0.1e27);
+        assertEq(irm.underwriterRate(address(market)), 0.1e27);
     }
 
     function test_inverse_index_growsOverTime() public {
         IInterestRateModel.Slopes memory s =
             IInterestRateModel.Slopes({ base: 0.2e27, slope0: 0.1e27, slope1: 0.3e27, kink: 0.5e27 });
-        irm.setMarketSlopes(address(market), s);
-        uint256 before = irm.trancheIndex(address(market));
+        irm.setUnderwriterSlopes(address(market), s);
+        uint256 before = irm.underwriterIndex(address(market));
         vm.warp(block.timestamp + 365 days);
-        assertGt(irm.trancheIndex(address(market)), before);
+        assertGt(irm.underwriterIndex(address(market)), before);
     }
 
     function test_upgrade_authorized() public {

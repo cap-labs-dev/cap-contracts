@@ -8,22 +8,18 @@ import { MockOracle } from "../shared/mocks/MockOracle.sol";
 import { CapDeployer } from "./CapDeployer.sol";
 
 contract MarketTest is CapDeployer {
-    address internal borrower = makeAddr("borrower");
     address internal stranger = makeAddr("stranger");
-    uint64 internal managerId = 1;
+    uint64 internal managerId = MANAGER_ROLE;
+    uint64 internal borrowerId = BORROWER_ROLE;
+    Market internal market;
 
     function setUp() public {
         _deployCap();
     }
 
-    function _borrowers() internal view returns (address[] memory b) {
-        b = new address[](1);
-        b[0] = borrower;
-    }
-
     function _market() internal returns (Market m) {
         address marketAddr;
-        (marketAddr,,) = _createMarket("Market A", _borrowers(), managerId, borrowerId);
+        (marketAddr,,) = _createMarket("Market A", managerId, borrowerId);
         m = Market(marketAddr);
     }
 
@@ -58,7 +54,7 @@ contract MarketTest is CapDeployer {
         address marketAddr;
         address senior;
         address junior;
-        (marketAddr, senior, junior) = _createMarket("Market A", _borrowers(), managerId, borrowerId);
+        (marketAddr, senior, junior) = _createMarket("Market A", managerId, borrowerId);
 
         assertTrue(marketAddr != address(0));
         assertTrue(senior != address(0));

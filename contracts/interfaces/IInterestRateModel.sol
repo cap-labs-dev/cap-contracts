@@ -21,11 +21,10 @@ interface IInterestRateModel {
         uint256 fixedRate;
         uint256 variableIndex;
         uint256 fixedIndex;
-        mapping(address => Slopes) marketSlopes;
-        mapping(address => uint256) marketIndex;
-        mapping(address => uint256) lastMarketUpdate;
-        mapping(address => uint256) marketRate;
-        mapping(address => bool) marketVariable;
+        mapping(address => Slopes) underwriterSlopes;
+        mapping(address => uint256) underwriterIndex;
+        mapping(address => uint256) lastUnderwriterUpdate;
+        mapping(address => uint256) underwriterRate;
     }
 
     error InvalidSlopes();

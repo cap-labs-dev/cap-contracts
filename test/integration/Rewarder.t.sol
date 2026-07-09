@@ -8,6 +8,7 @@ import { CapDeployer } from "./CapDeployer.sol";
 contract RewarderTest is CapDeployer {
     address internal stranger = makeAddr("stranger");
     uint64 internal managerId = MANAGER_ROLE;
+    uint64 internal borrowerId = BORROWER_ROLE;
     Market internal market;
     address internal senior;
     address internal junior;
@@ -15,8 +16,7 @@ contract RewarderTest is CapDeployer {
     function setUp() public {
         _deployCap();
         address marketAddr;
-        address[] memory borrowers = new address[](0);
-        (marketAddr, senior, junior) = _createMarket("Market A", borrowers, managerId);
+        (marketAddr, senior, junior) = _createMarket("Market A", managerId, borrowerId);
         market = Market(marketAddr);
     }
 

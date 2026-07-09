@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.28;
 
-import { IInterestRateModel } from "../interfaces/IInterestRateModel.sol";
 import { IMarket } from "../interfaces/IMarket.sol";
 import { IStablecoin } from "../interfaces/IStablecoin.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
@@ -19,12 +18,13 @@ library RewardLib {
     function updateRewards(IMarket.Storage storage $) public {
         if ($.lastRewardUpdate == block.timestamp) return;
 
-        (uint256 supplyIndex, uint256 trancheIndex) = IInterestRateModel($.irm).index(address(this));
+        uint256 supplyIndex = ViewLib.supplyIndex($);
+        uint256 underwriterIndex = ViewLib.underwriterIndex($);
         uint256 scaledDebt = $.scaledDebt;
 
         if (scaledDebt > 0) {
-            uint256 supplyInterest = scaledDebt.rayMul($.lastTrancheIndex.rayMul(supplyIndex - $.lastSupplyIndex));
-            uint256 premiumInterest = scaledDebt.rayMul(supplyIndex.rayMul(trancheIndex - $.lastTrancheIndex));
+            uint256 supplyInterest = scaledDebt.rayMul($.lastSupplyIndex.rayMul(supplyIndex - $.lastSupplyIndex));
+            uint256 premiumInterest = scaledDebt.rayMul(supplyIndex.rayMul(underwriterIndex - $.lastUnderwriterIndex));
             uint256 juniorInterest = premiumInterest.rayMul($.juniorSplit);
             uint256 seniorInterest = premiumInterest - juniorInterest;
             uint256 seniorSupply = ITranche($.seniorTranche).activeSupply();
@@ -36,7 +36,7 @@ library RewardLib {
         }
 
         $.lastSupplyIndex = supplyIndex;
-        $.lastTrancheIndex = trancheIndex;
+        $.lastUnderwriterIndex = underwriterIndex;
         $.lastRewardUpdate = block.timestamp;
     }
 

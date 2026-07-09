@@ -12,6 +12,7 @@ contract RewardRoutingTest is CapDeployer {
     address internal jSup = makeAddr("jSup");
     address internal sSup = makeAddr("sSup");
     uint64 internal managerId = MANAGER_ROLE;
+    uint64 internal borrowerId = BORROWER_ROLE;
 
     function setUp() public {
         _deployCap();
@@ -21,10 +22,9 @@ contract RewardRoutingTest is CapDeployer {
         internal
         returns (Market m, address senior, address junior)
     {
-        address[] memory bs = new address[](1);
-        bs[0] = borrower;
         address marketAddr;
-        (marketAddr, senior, junior) = _createMarket(name, bs, managerId);
+        (marketAddr, senior, junior) = _createMarket(name, managerId, borrowerId);
+        accessManager.grantRole(BORROWER_ROLE, borrower, 0);
         m = Market(marketAddr);
 
         _setMarketSlopes(marketAddr);

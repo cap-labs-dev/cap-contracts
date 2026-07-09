@@ -51,7 +51,7 @@ contract Market is IMarket, AccessManagedUpgradeable, MarketStorageUtils {
         $.targetHealth = 1.25e27;
         $.variable = true;
         $.lastSupplyIndex = 1e27;
-        $.lastTrancheIndex = 1e27;
+        $.lastUnderwriterIndex = 1e27;
     }
 
     /// @inheritdoc IMarket
@@ -70,8 +70,8 @@ contract Market is IMarket, AccessManagedUpgradeable, MarketStorageUtils {
     }
 
     /// @inheritdoc IMarket
-    function claim(address tranche) external returns (uint256 reward) {
-        reward = RewardLib.claim(getMarketStorage(), tranche);
+    function claim() external returns (uint256 reward) {
+        reward = RewardLib.claim(getMarketStorage());
     }
 
     /// @inheritdoc IMarket

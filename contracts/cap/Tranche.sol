@@ -188,7 +188,7 @@ contract Tranche is ITranche, AccessManagedUpgradeable, ERC7540AsyncRedeem, Tran
         if ($.lastRewardUpdate != block.timestamp) {
             uint256 supply = activeSupply();
             if (supply > 0) {
-                $.rewardPerShare += IMarket($.market).claim(address(this)).rayDiv(supply);
+                $.rewardPerShare += IMarket($.market).claim().rayDiv(supply);
                 $.lastRewardUpdate = block.timestamp;
             }
         }

@@ -13,8 +13,9 @@ contract LendingFlowTest is CapDeployer {
     address internal juniorSupplier = makeAddr("juniorSupplier");
     address internal seniorSupplier = makeAddr("seniorSupplier");
     address internal stranger = makeAddr("stranger");
-    uint64 internal managerId = 1;
-    address internal market;
+    uint64 internal managerId = MANAGER_ROLE;
+    uint64 internal borrowerId = BORROWER_ROLE;
+    Market internal market;
     address internal senior;
     address internal junior;
 
@@ -24,11 +25,10 @@ contract LendingFlowTest is CapDeployer {
     function setUp() public {
         _deployCap();
 
-        address[] memory borrowers = new address[](1);
-        borrowers[0] = borrower;
         address marketAddr;
         (marketAddr, senior, junior) = _createMarket("Market A", managerId, borrowerId);
         market = Market(marketAddr);
+        accessManager.grantRole(BORROWER_ROLE, borrower, 0);
 
         _setMarketSlopes(marketAddr);
         irm.setVariableSlopes(
