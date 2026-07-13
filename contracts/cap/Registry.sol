@@ -7,7 +7,6 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 import { IBeaconFactory } from "../interfaces/IBeaconFactory.sol";
 import { IMarket } from "../interfaces/IMarket.sol";
 import { IRegistry } from "../interfaces/IRegistry.sol";
-import { IStablecoin } from "../interfaces/IStablecoin.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
 import { IUnderwriter } from "../interfaces/IUnderwriter.sol";
 import { RegistryStorageUtils } from "../storage/RegistryStorageUtils.sol";
@@ -25,6 +24,7 @@ contract Registry is IRegistry, AccessManagedUpgradeable, RegistryStorageUtils, 
 
     uint64 internal constant KEEPER_ROLE = 1;
     uint64 internal constant GUARDIAN_ROLE = 2;
+    uint64 internal constant MINTER_ROLE = 3;
 
     /// @inheritdoc IRegistry
     function initialize(
@@ -83,7 +83,7 @@ contract Registry is IRegistry, AccessManagedUpgradeable, RegistryStorageUtils, 
             .create(
                 abi.encodeCall(
                     ITranche.initialize,
-                    ($.authority, _asset, seniorName, "srTRANCHE", market, $.vault, $.irm, $.stablecoin)
+                    (authority(), _asset, seniorName, "srTRANCHE", market, $.vault, $.irm, $.stablecoin)
                 )
             );
         $.tranches.add(seniorTranche);
@@ -91,7 +91,7 @@ contract Registry is IRegistry, AccessManagedUpgradeable, RegistryStorageUtils, 
             .create(
                 abi.encodeCall(
                     ITranche.initialize,
-                    ($.authority, _asset, juniorName, "jrTRANCHE", market, $.vault, $.irm, $.stablecoin)
+                    (authority(), _asset, juniorName, "jrTRANCHE", market, $.vault, $.irm, $.stablecoin)
                 )
             );
         $.tranches.add(juniorTranche);
@@ -184,7 +184,7 @@ contract Registry is IRegistry, AccessManagedUpgradeable, RegistryStorageUtils, 
         selectors[0] = IMarket.borrow.selector;
         IAccessManager(authority()).setTargetFunctionRole(market, selectors, borrowerId);
 
-        selectors = new bytes4[](1);
+        selectors = new bytes4[](12);
         selectors[0] = IMarket.setSeniorTranche.selector;
         selectors[1] = IMarket.setJuniorTranche.selector;
         selectors[3] = IMarket.setMultiplier.selector;
@@ -197,6 +197,8 @@ contract Registry is IRegistry, AccessManagedUpgradeable, RegistryStorageUtils, 
         selectors[10] = IMarket.setLt.selector;
         selectors[11] = IMarket.setInterestType.selector;
         IAccessManager(authority()).setTargetFunctionRole(market, selectors, GUARDIAN_ROLE);
+
+        IAccessManager(authority()).grantRole(MINTER_ROLE, market, 0);
     }
 
     function _configureTrancheRoles(address tranche, uint64 managerId) internal {

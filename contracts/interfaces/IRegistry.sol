@@ -8,7 +8,6 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 /// @notice Interface for deploying and tracking protocol instances
 interface IRegistry {
     struct Storage {
-        address authority;
         address vault;
         address stablecoin;
         address stablecoinYield;

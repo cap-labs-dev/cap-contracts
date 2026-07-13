@@ -173,10 +173,10 @@ library ViewLib {
             uint256 supply = ITranche(tranche).activeSupply();
             if (supply == 0) return reward;
 
-            uint256 supplyIndex = supplyIndex($);
-            uint256 underwriterIndex = underwriterIndex($);
+            uint256 sIndex = supplyIndex($);
+            uint256 uwIndex = underwriterIndex($);
             uint256 scaledDebt = $.scaledDebt;
-            uint256 premiumInterest = scaledDebt.rayMul(supplyIndex.rayMul(underwriterIndex - $.lastUnderwriterIndex));
+            uint256 premiumInterest = scaledDebt.rayMul(sIndex.rayMul(uwIndex - $.lastUnderwriterIndex));
 
             uint256 juniorInterest = premiumInterest.rayMul($.juniorSplit);
             if (tranche == $.seniorTranche) {
