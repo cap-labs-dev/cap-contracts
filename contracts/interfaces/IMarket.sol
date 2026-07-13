@@ -10,7 +10,7 @@ interface IMarket {
         uint8 decimals;
         string name;
         address stablecoin;
-        address stablecoinYield;
+        address stakedStablecoin;
         address oracle;
         address vault;
         address irm;
@@ -59,22 +59,12 @@ interface IMarket {
     event SetTargetHealth(uint256 targetHealth);
     event SetBonusConfig(uint256 kink, uint256 slope0, uint256 slope1);
     event SetJuniorSplit(uint256 juniorSplit);
-    event SetStablecoinYield(address stablecoinYield);
+    event SetStakedStablecoin(address stakedStablecoin);
     event SetSeniorTranche(address seniorTranche);
     event SetJuniorTranche(address juniorTranche);
     event Claimed(address tranche, uint256 reward);
 
-    function initialize(
-        address authority,
-        address asset,
-        string memory name,
-        uint256 multiplier,
-        address irm,
-        address stablecoin,
-        address stablecoinYield,
-        address vault,
-        address oracle
-    ) external;
+    function initialize(address authority, address asset, string memory name) external;
 
     function borrow(address recipient, uint256 amount) external returns (uint256 borrowed);
     function repay(uint256 amount) external returns (uint256 repaid);
@@ -91,7 +81,7 @@ interface IMarket {
     function setOracle(address oracle) external;
     function setTargetHealth(uint256 targetHealth) external;
     function setBonusConfig(uint256 kink, uint256 slope0, uint256 slope1) external;
-    function setStablecoinYield(address stablecoinYield) external;
+    function setStakedStablecoin(address stakedStablecoin) external;
     function setSeniorTranche(address seniorTranche) external;
     function setJuniorTranche(address juniorTranche) external;
 

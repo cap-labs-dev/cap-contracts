@@ -25,16 +25,8 @@ interface ITranche is IERC7540AsyncRedeem {
     event Slashed(address indexed recipient, uint256 amount);
     event Claimed(address indexed user, address indexed recipient, uint256 amount);
 
-    function initialize(
-        address authority,
-        address asset,
-        string memory name,
-        string memory symbol,
-        address market,
-        address vault,
-        address irm,
-        address stablecoin
-    ) external;
+    function initialize(address authority, address asset, string memory name, string memory symbol, address market)
+        external;
 
     /// @notice Slash the tranche's assets
     /// @param assets The amount of assets to slash

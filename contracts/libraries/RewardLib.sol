@@ -30,7 +30,7 @@ library RewardLib {
             uint256 seniorSupply = ITranche($.seniorTranche).activeSupply();
             uint256 juniorSupply = ITranche($.juniorTranche).activeSupply();
 
-            if (supplyInterest > 0) IStablecoin($.stablecoin).mintUnbacked($.stablecoinYield, supplyInterest);
+            if (supplyInterest > 0) IStablecoin($.stablecoin).mintUnbacked($.stakedStablecoin, supplyInterest);
             if (seniorInterest > 0 && seniorSupply > 0) $.reward[$.seniorTranche] += seniorInterest;
             if (juniorInterest > 0 && juniorSupply > 0) $.reward[$.juniorTranche] += juniorInterest;
         }

@@ -20,16 +20,16 @@ contract RewarderTest is CapDeployer {
         market = Market(marketAddr);
     }
 
-    function test_setStablecoinYield_onlyAuthority() public {
+    function test_setStakedStablecoin_onlyAuthority() public {
         vm.prank(stranger);
         vm.expectRevert();
-        market.setStablecoinYield(address(0xCAFE));
+        market.setStakedStablecoin(address(0xCAFE));
     }
 
-    function test_setStablecoinYield_emits() public {
+    function test_setStakedStablecoin_emits() public {
         vm.expectEmit(false, false, false, true);
-        emit IMarket.SetStablecoinYield(address(0xCAFE));
-        market.setStablecoinYield(address(0xCAFE));
+        emit IMarket.SetStakedStablecoin(address(0xCAFE));
+        market.setStakedStablecoin(address(0xCAFE));
     }
 
     function test_setJuniorSplit_onlyAuthority() public {

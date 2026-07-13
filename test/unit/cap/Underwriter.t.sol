@@ -39,16 +39,7 @@ contract UnderwriterUnitTest is BaseTest {
             _deployProxy(
                 address(impl),
                 abi.encodeCall(
-                    Underwriter.initialize,
-                    (
-                        address(accessManager),
-                        "Underwriter",
-                        "UW",
-                        address(collateral),
-                        vault,
-                        address(registry),
-                        stablecoin
-                    )
+                    Underwriter.initialize, (address(accessManager), "Underwriter", "UW", address(collateral))
                 )
             )
         );
@@ -65,9 +56,7 @@ contract UnderwriterUnitTest is BaseTest {
 
     function test_initialize_cannotReinit() public {
         vm.expectRevert();
-        underwriter.initialize(
-            address(accessManager), "Underwriter", "UW", address(collateral), vault, address(registry), stablecoin
-        );
+        underwriter.initialize(address(accessManager), "Underwriter", "UW", address(collateral));
     }
 
     function test_whitelist_onlyAuthority() public {

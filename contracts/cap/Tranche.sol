@@ -9,6 +9,7 @@ import {
 } from "../ERC7540/ERC7540AsyncRedeem.sol";
 import { IInterestRateModel } from "../interfaces/IInterestRateModel.sol";
 import { IMarket } from "../interfaces/IMarket.sol";
+import { IRegistry } from "../interfaces/IRegistry.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import { TrancheStorageUtils } from "../storage/TrancheStorageUtils.sol";
@@ -38,26 +39,18 @@ contract Tranche is ITranche, AccessManagedUpgradeable, ERC7540AsyncRedeem, Tran
     /// @param _name The name of the tranche
     /// @param _symbol The symbol of the tranche
     /// @param _market The market to underwrite
-    /// @param _vault The vault to use for the tranche
-    /// @param _irm The interest rate model to use for the tranche
-
-    function initialize(
-        address _authority,
-        address _asset,
-        string memory _name,
-        string memory _symbol,
-        address _market,
-        address _vault,
-        address _irm,
-        address _stablecoin
-    ) external initializer {
+    function initialize(address _authority, address _asset, string memory _name, string memory _symbol, address _market)
+        external
+        initializer
+    {
         __AccessManaged_init(_authority);
         Storage storage $ = getTrancheStorage();
         __ERC7540AsyncRedeem_init(IERC20(_asset), _name, _symbol, hex"");
         $.market = _market;
-        $.vault = _vault;
-        $.irm = _irm;
-        $.stablecoin = _stablecoin;
+        IRegistry registry = IRegistry(msg.sender);
+        $.vault = registry.vault();
+        $.irm = registry.irm();
+        $.stablecoin = registry.stablecoin();
     }
 
     //////////////////////////////////////////////////////////////////////////////

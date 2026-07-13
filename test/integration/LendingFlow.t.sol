@@ -116,7 +116,7 @@ contract LendingFlowTest is CapDeployer {
 
     function test_supplyReward_accruesToYieldRecipient() public {
         address stcUSD = makeAddr("stcUSD");
-        market.setStablecoinYield(stcUSD);
+        market.setStakedStablecoin(stcUSD);
 
         vm.prank(borrower);
         market.borrow(borrower, 400e18);

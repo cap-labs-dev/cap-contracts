@@ -40,18 +40,7 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @param name The name of the underwriter
     /// @param symbol The symbol of the underwriter
     /// @param asset The asset of the underwriter
-    /// @param vault The vault of the underwriter
-    /// @param registry The registry of the underwriter
-    /// @param stablecoin The stablecoin of the underwriter
-    function initialize(
-        address authority,
-        string memory name,
-        string memory symbol,
-        address asset,
-        address vault,
-        address registry,
-        address stablecoin
-    ) external;
+    function initialize(address authority, string memory name, string memory symbol, address asset) external;
 
     /// @notice Allocate assets to a tranche
     /// @param tranche The tranche to allocate to

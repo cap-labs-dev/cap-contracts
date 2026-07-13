@@ -83,9 +83,9 @@ library SetterLib {
     }
 
     /// @notice Set the stablecoin yield for a market
-    function setStablecoinYield(IMarket.Storage storage $, address stablecoinYield) external {
-        $.stablecoinYield = stablecoinYield;
-        emit IMarket.SetStablecoinYield(stablecoinYield);
+    function setStakedStablecoin(IMarket.Storage storage $, address stakedStablecoin) external {
+        $.stakedStablecoin = stakedStablecoin;
+        emit IMarket.SetStakedStablecoin(stakedStablecoin);
     }
 
     /// @notice Set the junior split for a market

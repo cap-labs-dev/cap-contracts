@@ -30,21 +30,17 @@ contract Underwriter is IUnderwriter, AccessManagedUpgradeable, ERC7540AsyncRede
     using WadRayMath for uint256;
 
     /// @inheritdoc IUnderwriter
-    function initialize(
-        address _authority,
-        string memory _name,
-        string memory _symbol,
-        address _asset,
-        address _vault,
-        address _registry,
-        address _stablecoin
-    ) external initializer {
+    function initialize(address _authority, string memory _name, string memory _symbol, address _asset)
+        external
+        initializer
+    {
         __AccessManaged_init(_authority);
         __ERC7540AsyncRedeem_init(IERC20(_asset), _name, _symbol, hex"");
         Storage storage $ = getUnderwriterStorage();
-        $.vault = _vault;
-        $.registry = _registry;
-        $.stablecoin = _stablecoin;
+        IRegistry registry = IRegistry(msg.sender);
+        $.vault = registry.vault();
+        $.registry = address(registry);
+        $.stablecoin = registry.stablecoin();
         $.vestingPeriod = 6 hours;
     }
 

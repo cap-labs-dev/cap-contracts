@@ -64,20 +64,7 @@ contract MarketUnitTest is BaseTest {
         market = Market(
             _deployProxy(
                 address(impl),
-                abi.encodeCall(
-                    Market.initialize,
-                    (
-                        address(accessManager),
-                        address(collateral),
-                        "Market",
-                        1e27,
-                        address(irm),
-                        address(0xCAFE),
-                        address(0),
-                        address(0xFEED),
-                        address(oracle)
-                    )
-                )
+                abi.encodeCall(Market.initialize, (address(accessManager), address(collateral), "Market"))
             )
         );
 
@@ -93,17 +80,7 @@ contract MarketUnitTest is BaseTest {
 
     function test_initialize_cannotReinit() public {
         vm.expectRevert();
-        market.initialize(
-            address(accessManager),
-            address(collateral),
-            "Market",
-            1e27,
-            address(irm),
-            address(0xCAFE),
-            address(0),
-            address(0xFEED),
-            address(oracle)
-        );
+        market.initialize(address(accessManager), address(collateral), "Market");
     }
 
     function test_setOracle_onlyAuthority() public {

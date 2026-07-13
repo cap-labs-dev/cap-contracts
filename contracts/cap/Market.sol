@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import { IMarket } from "../interfaces/IMarket.sol";
+import { IRegistry } from "../interfaces/IRegistry.sol";
 import { LendLib } from "../libraries/LendLib.sol";
 import { RewardLib } from "../libraries/RewardLib.sol";
 import { SetterLib } from "../libraries/SetterLib.sol";
@@ -10,7 +11,7 @@ import { MarketStorageUtils } from "../storage/MarketStorageUtils.sol";
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 
 /// @title Market
 /// @author kexley, Cap Labs
@@ -22,29 +23,20 @@ contract Market is IMarket, AccessManagedUpgradeable, MarketStorageUtils {
     }
 
     /// @inheritdoc IMarket
-    function initialize(
-        address _authority,
-        address _asset,
-        string memory _name,
-        uint256 _multiplier,
-        address _irm,
-        address _stablecoin,
-        address _stablecoinYield,
-        address _vault,
-        address _oracle
-    ) external initializer {
+    function initialize(address _authority, address _asset, string memory _name) external initializer {
         __AccessManaged_init(_authority);
         Storage storage $ = getMarketStorage();
 
         $.asset = _asset;
         $.decimals = IERC20Metadata(_asset).decimals();
         $.name = _name;
-        $.multiplier = _multiplier;
-        $.irm = _irm;
-        $.stablecoin = _stablecoin;
-        $.stablecoinYield = _stablecoinYield;
-        $.vault = _vault;
-        $.oracle = _oracle;
+        IRegistry registry = IRegistry(msg.sender);
+        $.multiplier = registry.multiplier(_asset);
+        $.irm = registry.irm();
+        $.stablecoin = registry.stablecoin();
+        $.stakedStablecoin = registry.stakedStablecoin();
+        $.vault = registry.vault();
+        $.oracle = registry.oracle();
 
         $.lt = 0.8e27;
         $.buffer = 0.05e27;
@@ -125,8 +117,8 @@ contract Market is IMarket, AccessManagedUpgradeable, MarketStorageUtils {
     }
 
     /// @inheritdoc IMarket
-    function setStablecoinYield(address _stablecoinYield) external restricted {
-        SetterLib.setStablecoinYield(getMarketStorage(), _stablecoinYield);
+    function setStakedStablecoin(address _stakedStablecoin) external restricted {
+        SetterLib.setStakedStablecoin(getMarketStorage(), _stakedStablecoin);
     }
 
     /// @inheritdoc IMarket

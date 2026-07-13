@@ -30,7 +30,7 @@ contract Registry is IRegistry, AccessManagedUpgradeable, RegistryStorageUtils, 
     function initialize(
         address _authority,
         address _stablecoin,
-        address _stablecoinYield,
+        address _stakedStablecoin,
         address _vault,
         address _oracle,
         address _irm,
@@ -42,7 +42,7 @@ contract Registry is IRegistry, AccessManagedUpgradeable, RegistryStorageUtils, 
         Storage storage $ = getRegistryStorage();
         $.vault = _vault;
         $.stablecoin = _stablecoin;
-        $.stablecoinYield = _stablecoinYield;
+        $.stakedStablecoin = _stakedStablecoin;
         $.oracle = _oracle;
         $.irm = _irm;
         $.marketFactory = _marketFactory;
@@ -58,42 +58,16 @@ contract Registry is IRegistry, AccessManagedUpgradeable, RegistryStorageUtils, 
     {
         Storage storage $ = getRegistryStorage();
 
-        market = IBeaconFactory($.marketFactory)
-            .create(
-                abi.encodeCall(
-                    Market.initialize,
-                    (
-                        authority(),
-                        _asset,
-                        _name,
-                        $.multiplier[_asset],
-                        $.irm,
-                        $.stablecoin,
-                        $.stablecoinYield,
-                        $.vault,
-                        $.oracle
-                    )
-                )
-            );
+        market = IBeaconFactory($.marketFactory).create(abi.encodeCall(Market.initialize, (authority(), _asset, _name)));
         $.markets.add(market);
 
         string memory seniorName = string.concat(_name, " Senior Tranche");
         string memory juniorName = string.concat(_name, " Junior Tranche");
         seniorTranche = IBeaconFactory($.trancheFactory)
-            .create(
-                abi.encodeCall(
-                    ITranche.initialize,
-                    (authority(), _asset, seniorName, "srTRANCHE", market, $.vault, $.irm, $.stablecoin)
-                )
-            );
+            .create(abi.encodeCall(ITranche.initialize, (authority(), _asset, seniorName, "srTRANCHE", market)));
         $.tranches.add(seniorTranche);
         juniorTranche = IBeaconFactory($.trancheFactory)
-            .create(
-                abi.encodeCall(
-                    ITranche.initialize,
-                    (authority(), _asset, juniorName, "jrTRANCHE", market, $.vault, $.irm, $.stablecoin)
-                )
-            );
+            .create(abi.encodeCall(ITranche.initialize, (authority(), _asset, juniorName, "jrTRANCHE", market)));
         $.tranches.add(juniorTranche);
 
         _configureMarketRoles(market, _managerId, _borrowerId);
@@ -115,16 +89,48 @@ contract Registry is IRegistry, AccessManagedUpgradeable, RegistryStorageUtils, 
         Storage storage $ = getRegistryStorage();
 
         underwriter = IBeaconFactory($.underwriterFactory)
-            .create(
-                abi.encodeCall(
-                    IUnderwriter.initialize, (authority(), _name, _symbol, _asset, $.vault, address(this), $.stablecoin)
-                )
-            );
+            .create(abi.encodeCall(IUnderwriter.initialize, (authority(), _name, _symbol, _asset)));
         $.underwriters.add(underwriter);
 
         _configureUnderwriterRoles(underwriter, _managerId);
 
         emit CreateUnderwriter(underwriter, _asset, _name, _symbol, _managerId);
+    }
+
+    function multiplier(address _asset) external view returns (uint256) {
+        return getRegistryStorage().multiplier[_asset];
+    }
+
+    function irm() external view returns (address) {
+        return getRegistryStorage().irm;
+    }
+
+    function stablecoin() external view returns (address) {
+        return getRegistryStorage().stablecoin;
+    }
+
+    function stakedStablecoin() external view returns (address) {
+        return getRegistryStorage().stakedStablecoin;
+    }
+
+    function vault() external view returns (address) {
+        return getRegistryStorage().vault;
+    }
+
+    function oracle() external view returns (address) {
+        return getRegistryStorage().oracle;
+    }
+
+    function marketFactory() external view returns (address) {
+        return getRegistryStorage().marketFactory;
+    }
+
+    function trancheFactory() external view returns (address) {
+        return getRegistryStorage().trancheFactory;
+    }
+
+    function underwriterFactory() external view returns (address) {
+        return getRegistryStorage().underwriterFactory;
     }
 
     /// @inheritdoc IRegistry
@@ -173,30 +179,28 @@ contract Registry is IRegistry, AccessManagedUpgradeable, RegistryStorageUtils, 
     }
 
     function _configureMarketRoles(address market, uint64 managerId, uint64 borrowerId) internal {
-        Storage storage $ = getRegistryStorage();
+        bytes4[] memory managerSelectors = new bytes4[](2);
+        managerSelectors[0] = IMarket.setJuniorSplit.selector;
+        managerSelectors[1] = IMarket.setLtv.selector;
+        IAccessManager(authority()).setTargetFunctionRole(market, managerSelectors, managerId);
 
-        bytes4[] memory selectors = new bytes4[](2);
-        selectors[1] = IMarket.setJuniorSplit.selector;
-        selectors[3] = IMarket.setLtv.selector;
-        IAccessManager(authority()).setTargetFunctionRole(market, selectors, managerId);
+        bytes4[] memory borrowerSelectors = new bytes4[](1);
+        borrowerSelectors[0] = IMarket.borrow.selector;
+        IAccessManager(authority()).setTargetFunctionRole(market, borrowerSelectors, borrowerId);
 
-        selectors = new bytes4[](1);
-        selectors[0] = IMarket.borrow.selector;
-        IAccessManager(authority()).setTargetFunctionRole(market, selectors, borrowerId);
-
-        selectors = new bytes4[](12);
-        selectors[0] = IMarket.setSeniorTranche.selector;
-        selectors[1] = IMarket.setJuniorTranche.selector;
-        selectors[3] = IMarket.setMultiplier.selector;
-        selectors[4] = IMarket.setBorrowCap.selector;
-        selectors[5] = IMarket.setOracle.selector;
-        selectors[6] = IMarket.setTargetHealth.selector;
-        selectors[7] = IMarket.setBonusConfig.selector;
-        selectors[8] = IMarket.setStablecoinYield.selector;
-        selectors[9] = IMarket.setBuffer.selector;
-        selectors[10] = IMarket.setLt.selector;
-        selectors[11] = IMarket.setInterestType.selector;
-        IAccessManager(authority()).setTargetFunctionRole(market, selectors, GUARDIAN_ROLE);
+        bytes4[] memory guardianSelectors = new bytes4[](11);
+        guardianSelectors[0] = IMarket.setSeniorTranche.selector;
+        guardianSelectors[1] = IMarket.setJuniorTranche.selector;
+        guardianSelectors[2] = IMarket.setMultiplier.selector;
+        guardianSelectors[3] = IMarket.setBorrowCap.selector;
+        guardianSelectors[4] = IMarket.setOracle.selector;
+        guardianSelectors[5] = IMarket.setTargetHealth.selector;
+        guardianSelectors[6] = IMarket.setBonusConfig.selector;
+        guardianSelectors[7] = IMarket.setStakedStablecoin.selector;
+        guardianSelectors[8] = IMarket.setBuffer.selector;
+        guardianSelectors[9] = IMarket.setLt.selector;
+        guardianSelectors[10] = IMarket.setInterestType.selector;
+        IAccessManager(authority()).setTargetFunctionRole(market, guardianSelectors, GUARDIAN_ROLE);
 
         IAccessManager(authority()).grantRole(MINTER_ROLE, market, 0);
     }

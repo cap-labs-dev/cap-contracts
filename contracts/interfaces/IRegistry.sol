@@ -10,7 +10,7 @@ interface IRegistry {
     struct Storage {
         address vault;
         address stablecoin;
-        address stablecoinYield;
+        address stakedStablecoin;
         address oracle;
         address irm;
         address marketFactory;
@@ -30,7 +30,7 @@ interface IRegistry {
     function initialize(
         address authority,
         address stablecoin,
-        address stablecoinYield,
+        address stakedStablecoin,
         address vault,
         address oracle,
         address irm,
@@ -46,6 +46,16 @@ interface IRegistry {
     function createUnderwriter(address asset, string memory name, string memory symbol, uint64 managerId)
         external
         returns (address underwriter);
+
+    function multiplier(address asset) external view returns (uint256);
+    function irm() external view returns (address);
+    function stablecoin() external view returns (address);
+    function stakedStablecoin() external view returns (address);
+    function vault() external view returns (address);
+    function oracle() external view returns (address);
+    function marketFactory() external view returns (address);
+    function trancheFactory() external view returns (address);
+    function underwriterFactory() external view returns (address);
 
     function isMarket(address market) external view returns (bool);
     function markets(uint256 start, uint256 end) external view returns (address[] memory);
