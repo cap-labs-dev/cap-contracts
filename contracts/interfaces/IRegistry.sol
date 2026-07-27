@@ -47,6 +47,8 @@ interface IRegistry {
         external
         returns (address underwriter);
 
+    function setMultiplier(address asset, uint256 multiplier) external;
+
     function multiplier(address asset) external view returns (uint256);
     function irm() external view returns (address);
     function stablecoin() external view returns (address);

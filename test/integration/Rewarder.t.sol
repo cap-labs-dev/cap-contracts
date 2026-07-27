@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import { Market } from "../../contracts/cap/Market.sol";
 import { IMarket } from "../../contracts/interfaces/IMarket.sol";
-import { CapDeployer } from "./CapDeployer.sol";
+import { CapDeployer } from "../shared/CapDeployer.sol";
 
 contract RewarderTest is CapDeployer {
     address internal stranger = makeAddr("stranger");

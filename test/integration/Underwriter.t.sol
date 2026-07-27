@@ -6,7 +6,7 @@ import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { Underwriter } from "../../contracts/cap/Underwriter.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
 import { IUnderwriter } from "../../contracts/interfaces/IUnderwriter.sol";
-import { CapDeployer } from "./CapDeployer.sol";
+import { CapDeployer } from "../shared/CapDeployer.sol";
 
 contract UnderwriterIntegrationTest is CapDeployer {
     address internal borrower = makeAddr("borrower");

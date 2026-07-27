@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import { Market } from "../../contracts/cap/Market.sol";
 import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { ITranche } from "../../contracts/interfaces/ITranche.sol";
-import { CapDeployer } from "./CapDeployer.sol";
+import { CapDeployer } from "../shared/CapDeployer.sol";
 
 contract TrancheTest is CapDeployer {
     address internal supplier = makeAddr("supplier");

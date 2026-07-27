@@ -32,6 +32,7 @@ contract Market is IMarket, AccessManagedUpgradeable, MarketStorageUtils {
         $.name = _name;
         IRegistry registry = IRegistry(msg.sender);
         $.multiplier = registry.multiplier(_asset);
+        if ($.multiplier == 0) revert IMarket.InvalidMultiplier();
         $.irm = registry.irm();
         $.stablecoin = registry.stablecoin();
         $.stakedStablecoin = registry.stakedStablecoin();

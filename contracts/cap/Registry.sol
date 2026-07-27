@@ -18,12 +18,13 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 
 /// @title Registry
 /// @author kexley
-/// @notice Deploy and initialize beacon proxies
+/// @notice The Registry manages the creation and initial configuration of markets, tranches, and underwriters.
+/// The Registry has the ability to grant roles and set function roles for the contracts it deploys.
 contract Registry is IRegistry, AccessManagedUpgradeable, RegistryStorageUtils, UUPSUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    uint64 internal constant KEEPER_ROLE = 1;
-    uint64 internal constant GUARDIAN_ROLE = 2;
+    uint64 internal constant GUARDIAN_ROLE = 1;
+    uint64 internal constant KEEPER_ROLE = 2;
     uint64 internal constant MINTER_ROLE = 3;
 
     /// @inheritdoc IRegistry
@@ -97,38 +98,52 @@ contract Registry is IRegistry, AccessManagedUpgradeable, RegistryStorageUtils, 
         emit CreateUnderwriter(underwriter, _asset, _name, _symbol, _managerId);
     }
 
+    /// @inheritdoc IRegistry
+    function setMultiplier(address _asset, uint256 _multiplier) external restricted {
+        getRegistryStorage().multiplier[_asset] = _multiplier;
+    }
+
+    /// @inheritdoc IRegistry
     function multiplier(address _asset) external view returns (uint256) {
         return getRegistryStorage().multiplier[_asset];
     }
 
+    /// @inheritdoc IRegistry
     function irm() external view returns (address) {
         return getRegistryStorage().irm;
     }
 
+    /// @inheritdoc IRegistry
     function stablecoin() external view returns (address) {
         return getRegistryStorage().stablecoin;
     }
 
+    /// @inheritdoc IRegistry
     function stakedStablecoin() external view returns (address) {
         return getRegistryStorage().stakedStablecoin;
     }
 
+    /// @inheritdoc IRegistry
     function vault() external view returns (address) {
         return getRegistryStorage().vault;
     }
 
+    /// @inheritdoc IRegistry
     function oracle() external view returns (address) {
         return getRegistryStorage().oracle;
     }
 
+    /// @inheritdoc IRegistry
     function marketFactory() external view returns (address) {
         return getRegistryStorage().marketFactory;
     }
 
+    /// @inheritdoc IRegistry
     function trancheFactory() external view returns (address) {
         return getRegistryStorage().trancheFactory;
     }
 
+    /// @inheritdoc IRegistry
     function underwriterFactory() external view returns (address) {
         return getRegistryStorage().underwriterFactory;
     }

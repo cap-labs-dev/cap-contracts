@@ -5,7 +5,7 @@ import { Market } from "../../contracts/cap/Market.sol";
 import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
 import { IMarket } from "../../contracts/interfaces/IMarket.sol";
-import { CapDeployer } from "./CapDeployer.sol";
+import { CapDeployer } from "../shared/CapDeployer.sol";
 
 /// @notice End-to-end lending lifecycle: supply -> borrow -> accrue -> repay -> rewards -> liquidate.
 contract LendingFlowTest is CapDeployer {

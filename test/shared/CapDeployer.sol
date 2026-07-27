@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import { BaseTest } from "../shared/BaseTest.sol";
-import { CapRoles } from "../shared/CapRoles.sol";
-import { MockERC20 } from "../shared/mocks/MockERC20.sol";
-import { MockOracle } from "../shared/mocks/MockOracle.sol";
+import { BaseTest } from "./BaseTest.sol";
+import { CapRoles } from "./CapRoles.sol";
+import { MockERC20 } from "./mocks/MockERC20.sol";
+import { MockOracle } from "./mocks/MockOracle.sol";
 
 import { BeaconFactory } from "../../contracts/cap/BeaconFactory.sol";
 import { InterestRateModel } from "../../contracts/cap/InterestRateModel.sol";
@@ -18,7 +18,7 @@ import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateMode
 import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 /// @title CapDeployer
-/// @notice Deploys and wires a full Cap protocol stack for integration tests.
+/// @notice Deploys and wires a full Cap protocol stack for unit and integration tests.
 /// @dev Override `capConfig` fields before `_deployCap()` to tune defaults per test suite.
 abstract contract CapDeployer is BaseTest {
     uint64 internal constant MANAGER_ROLE = CapRoles.MANAGER;
