@@ -1,10 +1,8 @@
 Warning: This is a nightly build of Foundry. It is recommended to use the latest stable version. To mute this warning set `FOUNDRY_DISABLE_NIGHTLY_WARNING` in your environment. 
 
-Compiling 2 files with Solc 0.8.28
-Solc 0.8.28 finished in 579.20ms
-Compiler run successful!
+No files changed, compilation skipped
 Script ran successfully.
-Gas used: 491756166
+Gas used: 491777989
 
 == Logs ==
   
@@ -38,8 +36,8 @@ Gas used: 491756166
   
       -> Tempo  (eid: 30410)
       -------------------------------------------------------
-      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1 [default]
-      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2 [default]
+      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1
+      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2
       [SEND] Executor    : 0x173272739Bd7Aa6e4e214714048a9fE699453059
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -59,8 +57,8 @@ Gas used: 491756166
   
       -> MegaETH  (eid: 30398)
       -------------------------------------------------------
-      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1 [default]
-      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2 [default]
+      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1
+      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2
       [SEND] Executor    : 0x173272739Bd7Aa6e4e214714048a9fE699453059
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -80,8 +78,8 @@ Gas used: 491756166
   
       -> Katana  (eid: 30375)
       -------------------------------------------------------
-      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1 [default]
-      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2 [default]
+      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1
+      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2
       [SEND] Executor    : 0x173272739Bd7Aa6e4e214714048a9fE699453059
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -97,7 +95,7 @@ Gas used: 491756166
       EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
         [EXEC] lzReceiveGas: 80000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x000000000000000000000000cccc62962d17b8914c62d74ffb843d73b2a3cccc
   
     OFT: stcUSD  addr: 0x983AEAaA0d0426839158435C43725EA7F45d4137
   
@@ -123,8 +121,8 @@ Gas used: 491756166
   
       -> Tempo  (eid: 30410)
       -------------------------------------------------------
-      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1 [default]
-      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2 [default]
+      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1
+      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2
       [SEND] Executor    : 0x173272739Bd7Aa6e4e214714048a9fE699453059
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -144,8 +142,8 @@ Gas used: 491756166
   
       -> MegaETH  (eid: 30398)
       -------------------------------------------------------
-      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1 [default]
-      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2 [default]
+      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1
+      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2
       [SEND] Executor    : 0x173272739Bd7Aa6e4e214714048a9fE699453059
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -165,8 +163,8 @@ Gas used: 491756166
   
       -> Katana  (eid: 30375)
       -------------------------------------------------------
-      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1 [default]
-      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2 [default]
+      Send Lib   : 0xbB2Ea70C9E858123480642Cf96acbcCE1372dCe1
+      Receive Lib: 0xc02Ab410f0734EFa3F14628780e6e695156024C2
       [SEND] Executor    : 0x173272739Bd7Aa6e4e214714048a9fE699453059
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -182,7 +180,7 @@ Gas used: 491756166
       EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
         [EXEC] lzReceiveGas: 80000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x00000000000000000000000088887be419578051ff9f4eb6c858a951921d8888
   
   ==================================================================
     SOURCE: Monad  |  chainId: 143  |  eid: 30390
@@ -364,8 +362,8 @@ Gas used: 491756166
   
       -> Ethereum  (eid: 30101)
       -------------------------------------------------------
-      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C [default]
-      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5 [default]
+      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C
+      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5
       [SEND] Executor    : 0xf851abCa1d0fD1Df8eAba6de466a102996b7d7B2
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -405,8 +403,8 @@ Gas used: 491756166
   
       -> MegaETH  (eid: 30398)
       -------------------------------------------------------
-      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C [default]
-      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5 [default]
+      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C
+      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5
       [SEND] Executor    : 0xf851abCa1d0fD1Df8eAba6de466a102996b7d7B2
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -426,8 +424,8 @@ Gas used: 491756166
   
       -> Katana  (eid: 30375)
       -------------------------------------------------------
-      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C [default]
-      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5 [default]
+      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C
+      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5
       [SEND] Executor    : 0xf851abCa1d0fD1Df8eAba6de466a102996b7d7B2
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -440,16 +438,17 @@ Gas used: 491756166
              required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
              required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
              required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
-      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
+        [EXEC] lzReceiveGas: 80000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x000000000000000000000000cccc62962d17b8914c62d74ffb843d73b2a3cccc
   
     OFT: stcUSD  addr: 0x4eeC5B8FDfBcdd45Dfb29F666D9c34AD38c7aFa5
   
       -> Ethereum  (eid: 30101)
       -------------------------------------------------------
-      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C [default]
-      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5 [default]
+      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C
+      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5
       [SEND] Executor    : 0xf851abCa1d0fD1Df8eAba6de466a102996b7d7B2
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -489,8 +488,8 @@ Gas used: 491756166
   
       -> MegaETH  (eid: 30398)
       -------------------------------------------------------
-      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C [default]
-      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5 [default]
+      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C
+      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5
       [SEND] Executor    : 0xf851abCa1d0fD1Df8eAba6de466a102996b7d7B2
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -510,8 +509,8 @@ Gas used: 491756166
   
       -> Katana  (eid: 30375)
       -------------------------------------------------------
-      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C [default]
-      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5 [default]
+      Send Lib   : 0x572863d9247E52026E0892d9Cd2E519B41EdB73C
+      Receive Lib: 0x0B6F08C2D39421Acb49c99abCe82050e356171e5
       [SEND] Executor    : 0xf851abCa1d0fD1Df8eAba6de466a102996b7d7B2
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -524,9 +523,10 @@ Gas used: 491756166
              required[0]: 0x0D875bD6c833cEDef7Fca4FE154d023cDB8eb1cb (Nethermind)
              required[1]: 0x76FaFF60799021B301B45dC1BbEDE53F261F9961 (LayerZero Labs)
              required[2]: 0xB30B5B27Cb23356DE1D3100E0e120D481Da97b1f (Canary)
-      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
+        [EXEC] lzReceiveGas: 80000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x00000000000000000000000088887be419578051ff9f4eb6c858a951921d8888
   
   ==================================================================
     SOURCE: MegaETH  |  chainId: 4326  |  eid: 30398
@@ -538,8 +538,8 @@ Gas used: 491756166
   
       -> Ethereum  (eid: 30101)
       -------------------------------------------------------
-      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
-      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043
       [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -579,8 +579,8 @@ Gas used: 491756166
   
       -> Tempo  (eid: 30410)
       -------------------------------------------------------
-      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
-      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043
       [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -600,8 +600,8 @@ Gas used: 491756166
   
       -> Katana  (eid: 30375)
       -------------------------------------------------------
-      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
-      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043
       [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -614,16 +614,17 @@ Gas used: 491756166
              required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
              required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
              required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
-      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
+        [EXEC] lzReceiveGas: 80000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x000000000000000000000000cccc62962d17b8914c62d74ffb843d73b2a3cccc
   
     OFT: stcUSD  addr: 0x88887bE419578051FF9F4eb6C858A951921D8888
   
       -> Ethereum  (eid: 30101)
       -------------------------------------------------------
-      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
-      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043
       [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -663,8 +664,8 @@ Gas used: 491756166
   
       -> Tempo  (eid: 30410)
       -------------------------------------------------------
-      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
-      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043
       [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -684,8 +685,8 @@ Gas used: 491756166
   
       -> Katana  (eid: 30375)
       -------------------------------------------------------
-      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
-      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043
       [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -698,9 +699,10 @@ Gas used: 491756166
              required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
              required[1]: 0x7DEcC6Df3aF9CFc275E25d2f9703eCF7ad800D5D (Canary)
              required[2]: 0xeEdE111103535e473451311e26C3E6660b0F77e1 (Nethermind)
-      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
+        [EXEC] lzReceiveGas: 80000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x00000000000000000000000088887be419578051ff9f4eb6c858a951921d8888
   
   ==================================================================
     SOURCE: Katana  |  chainId: 747474  |  eid: 30375
@@ -712,8 +714,8 @@ Gas used: 491756166
   
       -> Ethereum  (eid: 30101)
       -------------------------------------------------------
-      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
-      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043
       [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -729,7 +731,7 @@ Gas used: 491756166
       EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
         [EXEC] lzReceiveGas: 80000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x000000000000000000000000a62571ebdffabc3051a2e5b9e1f57b23d830c8fd
   
       -> Monad  (eid: 30390)
       -------------------------------------------------------
@@ -753,8 +755,8 @@ Gas used: 491756166
   
       -> Tempo  (eid: 30410)
       -------------------------------------------------------
-      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
-      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043
       [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -767,14 +769,15 @@ Gas used: 491756166
              required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
              required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
              required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
-      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000099cf0
+        [EXEC] lzReceiveGas: 630000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x000000000000000000000000bd12e50bfaa25735d074dbfdcf73208b9ccd2e43
   
       -> MegaETH  (eid: 30398)
       -------------------------------------------------------
-      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
-      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043
       [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -787,16 +790,17 @@ Gas used: 491756166
              required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
              required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
              required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
-      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000030d40
+        [EXEC] lzReceiveGas: 200000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x000000000000000000000000cccc62962d17b8914c62d74ffb843d73b2a3cccc
   
     OFT: stcUSD  addr: 0x88887bE419578051FF9F4eb6C858A951921D8888
   
       -> Ethereum  (eid: 30101)
       -------------------------------------------------------
-      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
-      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043
       [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -812,7 +816,7 @@ Gas used: 491756166
       EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000013880
         [EXEC] lzReceiveGas: 80000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x000000000000000000000000983aeaaa0d0426839158435c43725ea7f45d4137
   
       -> Monad  (eid: 30390)
       -------------------------------------------------------
@@ -836,8 +840,8 @@ Gas used: 491756166
   
       -> Tempo  (eid: 30410)
       -------------------------------------------------------
-      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
-      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043
       [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -850,14 +854,15 @@ Gas used: 491756166
              required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
              required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
              required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
-      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000099cf0
+        [EXEC] lzReceiveGas: 630000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x0000000000000000000000004eec5b8fdfbcdd45dfb29f666d9c34ad38c7afa5
   
       -> MegaETH  (eid: 30398)
       -------------------------------------------------------
-      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7 [default]
-      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043 [default]
+      Send Lib   : 0xC39161c743D0307EB9BCc9FEF03eeb9Dc4802de7
+      Receive Lib: 0xe1844c5D63a9543023008D332Bd3d2e6f1FE1043
       [SEND] Executor    : 0x4208D6E27538189bB48E603D6123A94b8Abe0A0b
       [SEND] MaxMsgSize  : 10000
       [SEND] Confirmations : 15
@@ -870,9 +875,10 @@ Gas used: 491756166
              required[0]: 0x282b3386571f7f794450d5789911a9804FA346b4 (LayerZero Labs)
              required[1]: 0x53fF818a1c492e667E2cD0b5AFe0FC82c66d33c7 (Canary)
              required[2]: 0xaCDe1f22EEAb249d3ca6Ba8805C8fEe9f52a16e7 (Nethermind)
-      EnforcedOpts [SEND]: (not set)
+      EnforcedOpts [SEND] raw: 0x00030100110100000000000000000000000000030d40
+        [EXEC] lzReceiveGas: 200000
       EnforcedOpts [SEND_AND_CALL]: (not set)
-      Peer       : NOT SET (0x0000...0000)
+      Peer       : 0x00000000000000000000000088887be419578051ff9f4eb6c858a951921d8888
   
   ==================================================================
     Done.

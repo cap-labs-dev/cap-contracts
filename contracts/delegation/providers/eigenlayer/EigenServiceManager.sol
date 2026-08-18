@@ -428,9 +428,24 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
 
         // Start at the next epoch to next double reward the current epoch which should have been included in the previous distribution
         _lastDistroEpoch += 1;
-        uint48 maxDuration = IRewardsCoordinator($.eigen.rewardsCoordinator).MAX_REWARDS_DURATION();
         uint256 startTimestamp = _lastDistroEpoch * calcIntervalSeconds;
-        uint256 duration = (_currentEpoch - _lastDistroEpoch) * calcIntervalSeconds;
+
+        // Clamp the start timestamp inside the rewards coordinator's retroactive window, rounded up to the next
+        // calculation interval. Without this, an operator with no distribution for longer than
+        // MAX_RETROACTIVE_LENGTH makes every submission revert with StartTimestampTooFarInPast, which bricks
+        // the repay and liquidation paths that realize restaker interest inline. Rewards accrued before the
+        // window are not lost; the full amount is distributed over the clamped window instead.
+        {
+            uint256 maxRetroactiveLength = IRewardsCoordinator($.eigen.rewardsCoordinator).MAX_RETROACTIVE_LENGTH();
+            if (startTimestamp + maxRetroactiveLength < block.timestamp) {
+                uint256 minStartTimestamp =
+                    (((block.timestamp - maxRetroactiveLength) / calcIntervalSeconds) + 1) * calcIntervalSeconds;
+                if (startTimestamp < minStartTimestamp) startTimestamp = minStartTimestamp;
+            }
+        }
+
+        uint256 duration = (_currentEpoch * calcIntervalSeconds) - startTimestamp;
+        uint48 maxDuration = IRewardsCoordinator($.eigen.rewardsCoordinator).MAX_REWARDS_DURATION();
         if (duration > maxDuration) duration = maxDuration;
 
         rewardsSubmissions[0] = IRewardsCoordinator.OperatorDirectedRewardsSubmission({
