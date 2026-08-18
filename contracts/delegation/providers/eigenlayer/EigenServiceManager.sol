@@ -437,18 +437,16 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         // window are not lost; the full amount is distributed over the clamped window instead.
         {
             uint256 maxRetroactiveLength = IRewardsCoordinator($.eigen.rewardsCoordinator).MAX_RETROACTIVE_LENGTH();
-            if (block.timestamp > maxRetroactiveLength) {
+            if (startTimestamp + maxRetroactiveLength < block.timestamp) {
                 uint256 minStartTimestamp =
-                    ((block.timestamp - maxRetroactiveLength) / calcIntervalSeconds + 1) * calcIntervalSeconds;
+                    (((block.timestamp - maxRetroactiveLength) / calcIntervalSeconds) + 1) * calcIntervalSeconds;
                 if (startTimestamp < minStartTimestamp) startTimestamp = minStartTimestamp;
             }
         }
 
-        uint256 duration = _currentEpoch * calcIntervalSeconds - startTimestamp;
-        {
-            uint48 maxDuration = IRewardsCoordinator($.eigen.rewardsCoordinator).MAX_REWARDS_DURATION();
-            if (duration > maxDuration) duration = maxDuration;
-        }
+        uint256 duration = (_currentEpoch * calcIntervalSeconds) - startTimestamp;
+        uint48 maxDuration = IRewardsCoordinator($.eigen.rewardsCoordinator).MAX_REWARDS_DURATION();
+        if (duration > maxDuration) duration = maxDuration;
 
         rewardsSubmissions[0] = IRewardsCoordinator.OperatorDirectedRewardsSubmission({
             strategiesAndMultipliers: _strategiesAndMultipliers,
