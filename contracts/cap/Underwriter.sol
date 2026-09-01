@@ -51,6 +51,15 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     /// @inheritdoc IUnderwriter
     uint256 public premiumPerShare;
 
+    /// @inheritdoc IUnderwriter
+    address public defaultTranche;
+
+    /// @inheritdoc IUnderwriter
+    mapping(address => uint256) public debt;
+
+    /// @inheritdoc IUnderwriter
+    uint256 public totalDebt;
+
     /// @dev The list of registered tranches
     EnumerableSet.AddressSet private _registeredTranches;
 
@@ -62,15 +71,6 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
 
     /// @dev The whitelist of accounts
     EnumerableSet.AddressSet private _whitelist;
-
-    /// @inheritdoc IUnderwriter
-    address public defaultTranche;
-
-    /// @inheritdoc IUnderwriter
-    mapping(address => uint256) public debt;
-
-    /// @inheritdoc IUnderwriter
-    uint256 public totalDebt;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -293,7 +293,6 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
             lastPremiumUpdate = block.timestamp;
         }
         uint256 supply = activeSupply();
-        lastPremiumUpdate = block.timestamp;
         if (supply == 0) return;
         premiumPerShare += (premiumPerSecond * elapsed).rayDiv(supply);
     }

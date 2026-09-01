@@ -82,7 +82,7 @@ abstract contract CapDeployer is BaseTest {
     }
 
     function _defaultCapConfig() internal pure returns (CapConfig memory cfg) {
-        cfg.collateralPrice = 1e27;
+        cfg.collateralPrice = 1e18;
         cfg.stablecoinYield = address(0);
         cfg.defaultLtv = 0.5e27;
         cfg.defaultBuffer = 0.1e27;

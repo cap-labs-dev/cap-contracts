@@ -10,7 +10,7 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @notice Emitted when assets are slashed
     /// @param recipient The recipient of the slashed assets
     /// @param assets The amount of assets slashed
-    /// @param value The value of the slashed assets in USD (RAY decimals)
+    /// @param value The value of the slashed assets in USD (18 decimals)
     event Slashed(address indexed recipient, uint256 assets, uint256 value);
 
     /// @notice Emitted when premium is claimed
@@ -127,11 +127,11 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @return unlocked Shares not locked by the market
     function unlockedSupply() external view returns (uint256 unlocked);
 
-    /// @notice Get the total capital value of the tranche in USD (RAY decimals)
+    /// @notice Get the total capital value of the tranche in USD (18 decimals)
     /// @return capital The total capital value in USD
     function totalCapital() external view returns (uint256 capital);
 
-    /// @notice Get the active capital value of the tranche in USD (RAY decimals)
+    /// @notice Get the active capital value of the tranche in USD (18 decimals)
     /// @return capital The active capital value in USD
     function activeCapital() external view returns (uint256 capital);
 }

@@ -300,8 +300,9 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
 
         for (uint256 i = $.tranches.length; i > 0;) {
             i--;
-            slashed += ITranche($.tranches[i].tranche).slash(toSlash, recipient);
-            toSlash -= slashed;
+            uint256 slashedAmount = ITranche($.tranches[i].tranche).slash(toSlash, recipient);
+            slashed += slashedAmount;
+            toSlash -= slashedAmount;
             if (toSlash == 0) break;
         }
 

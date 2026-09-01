@@ -90,7 +90,7 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     /// @inheritdoc ITranche
     function slash(uint256 assets, address recipient) external restricted returns (uint256 slashedValue) {
         uint256 slashedAssets = Math.min(assets, totalAssets());
-        slashedValue = slashedAssets.rayMul(getPrice());
+        slashedValue = slashedAssets * getPrice() / 10 ** decimals();
         IVault(vault).withdraw(asset(), slashedAssets, recipient);
         emit Slashed(recipient, slashedAssets, slashedValue);
     }
@@ -176,12 +176,12 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
 
     /// @inheritdoc ITranche
     function totalCapital() public view returns (uint256 capital) {
-        capital = totalAssets().rayDiv(getPrice());
+        capital = totalAssets() * getPrice() / 10 ** decimals();
     }
 
     /// @inheritdoc ITranche
     function activeCapital() public view returns (uint256 capital) {
-        capital = activeAssets().rayDiv(getPrice());
+        capital = activeAssets() * getPrice() / 10 ** decimals();
     }
 
     /// @dev Transfer assets into the vault on deposit

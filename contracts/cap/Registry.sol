@@ -226,7 +226,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
                 ITranche.initialize, (authority(), _asset, trancheName, trancheSymbol, market, vault, oracle)
             )
         );
-        _configureTrancheRoles(tranche, market, ownerRole);
+        _configureTrancheRoles(tranche, ownerRole);
     }
 
     /// @dev Deploy a beacon proxy through the shared factory
@@ -291,7 +291,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     /// @dev Wire tranche function selectors to the market owner and market roles
-    function _configureTrancheRoles(address tranche, address market, uint64 ownerRole) internal {
+    function _configureTrancheRoles(address tranche, uint64 ownerRole) internal {
         IAccessManager manager = IAccessManager(authority());
 
         bytes4[] memory ownerSelectors = new bytes4[](1);
@@ -301,7 +301,6 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         bytes4[] memory marketSelectors = new bytes4[](1);
         marketSelectors[0] = ITranche.slash.selector;
         manager.setTargetFunctionRole(tranche, marketSelectors, CapRoles.MARKET);
-        manager.grantRole(CapRoles.MARKET, market, 0);
 
         bytes4[] memory publicSelectors = new bytes4[](1);
         publicSelectors[0] = ITranche.notifyPremium.selector;

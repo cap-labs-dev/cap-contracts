@@ -128,7 +128,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @inheritdoc IBaseMarket
-    function totalDebt() public view override returns (uint256 marketDebt) {
+    function totalDebt() public view override(BaseMarket, IBaseMarket) returns (uint256 marketDebt) {
         marketDebt = _totalDebt;
     }
 
@@ -149,7 +149,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         if (term > maximumTermLimit) term = maximumTermLimit;
         (uint256 liquidityRate, uint256 underwriterRate) =
             IInterestRateModel(irm()).fixedRates(address(this), term.rayDiv(maximumTermLimit));
-        credit = credit.rayDiv(1e27 + (term * liquidityRate) + (term * underwriterRate));
+        credit = credit.rayDiv(1e27 + (term.rayMul(liquidityRate)) + (term.rayMul(underwriterRate)));
     }
 
     /// @dev Borrow the principal
