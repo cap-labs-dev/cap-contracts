@@ -216,6 +216,8 @@ contract DashboardLensForkTest is Test {
         assertGt(s.collateralTokenPriceLastUpdated, 0, "collateralTokenPriceLastUpdated");
         assertGt(s.vaultAssetPrice, 0, "vaultAssetPrice");
         assertGt(s.vaultAssetPriceLastUpdated, 0, "vaultAssetPriceLastUpdated");
+        assertTrue(s.reserve.vault != address(0), "reserve.vault");
+        assertGt(s.vaultTotalSupplies, 0, "vaultTotalSupplies");
     }
 
     // ─── Agent coverage / snapshot ────────────────────────────────────────────
@@ -234,6 +236,10 @@ contract DashboardLensForkTest is Test {
         AgentSnapshot memory s = lens.getAgentSnapshot(AGENT);
 
         assertGt(s.coverage.totalDelegation, 0, "coverage.totalDelegation");
+        assertGt(s.lenderDelegation, 0, "lenderDelegation");
+        assertGt(s.health, 0, "health");
+        assertTrue(s.collateralToken != address(0), "collateralToken");
+        assertGt(s.collateralTokenPrice, 0, "collateralTokenPrice");
         assertGt(s.loans.length, 0, "loans.length");
 
         bool foundUsdc;
@@ -246,7 +252,7 @@ contract DashboardLensForkTest is Test {
         assertTrue(foundUsdc, "USDC reserve present");
     }
 
-    function test_fork_getReserveSnapshots() public view {
+    function test_fork_getReserveSnapshots() public {
         ReserveSnapshot[] memory snapshots = lens.getReserveSnapshots();
         assertGt(snapshots.length, 0, "reserves length");
 
@@ -256,6 +262,7 @@ contract DashboardLensForkTest is Test {
                 foundUsdc = true;
                 assertTrue(snapshots[i].vault != address(0), "usdc vault");
                 assertGt(snapshots[i].assetPriceUSD, 0, "usdc assetPriceUSD");
+                assertGt(snapshots[i].totalSupplies, 0, "usdc totalSupplies");
             }
         }
         assertTrue(foundUsdc, "USDC reserve present");

@@ -131,6 +131,9 @@ struct LoanSnapshot {
     uint256 collateralTokenDecimals;
     uint256 collateralTokenPrice;
     uint256 collateralTokenPriceLastUpdated;
+    /// @dev Vault liquidity for the reserve asset (available = supplies − borrows).
+    uint256 vaultTotalSupplies;
+    uint256 vaultTotalBorrows;
 }
 
 /// @dev Coverage / epoch-boundary reads used to derive when a pending deposit becomes live.
@@ -162,11 +165,22 @@ struct AgentLoan {
 /// @dev Lean per-agent snapshot for summary/list pages (no strings / lastUpdated).
 struct AgentSnapshot {
     AgentCoverageSnapshot coverage;
+    /// @dev LENDER.agent fields — names distinguish from coverage.totalDelegation (middleware)
+    ///      and coverage.liveCoverage (DELEGATION.coverage).
+    uint256 lenderDelegation; // LENDER.agent.totalDelegation
+    uint256 totalSlashableCollateral; // LENDER.agent.totalSlashableCollateral
+    uint256 totalDebt; // LENDER.agent.totalDebt (USD, 8 decimals)
+    uint256 ltv; // ray
+    uint256 liquidationThreshold; // ray
+    uint256 health; // ray
     uint256 restakerRate; // RATE_ORACLE.restakerRate(agent)
+    /// @dev Lean collateral (no symbol/name — those stay on LoanSnapshot).
+    address collateralToken; // DELEGATION.collateral(agent)
+    uint256 collateralTokenPrice; // PRICE_ORACLE.getPrice (USD 8 decimals)
     AgentLoan[] loans; // one entry per hardcoded reserve asset
 }
 
-/// @dev Lean per-reserve snapshot for the lender-assets summary page.
+/// @dev Lean per-reserve snapshot for the lender-assets summary/detail pages.
 struct ReserveSnapshot {
     address asset;
     address vault;
@@ -175,6 +189,10 @@ struct ReserveSnapshot {
     uint256 depositCap; // VAULT.depositCap(asset)
     uint256 assetPriceUSD; // PRICE_ORACLE.getPrice(asset)
     uint256 minBorrow; // LENDER.reservesData(asset).minBorrow
+    /// @dev Rates in ray (27 decimals). Non-view oracle adapters — see getReserveSnapshots.
+    uint256 marketRate;
+    uint256 benchmarkRate;
+    uint256 utilizationRate;
 }
 
 // ─── DashboardLens ───────────────────────────────────────────────────────────
@@ -296,14 +314,39 @@ contract DashboardLens {
         return _agentCoverageSnapshot(agent);
     }
 
-    /// @notice Lean per-agent snapshot for summary/list pages: coverage + restaker rate + per-reserve loans.
+    /// @notice Lean per-agent snapshot for summary/list pages: coverage + lender health + collateral + loans.
     /// @dev Walks the hardcoded reserve asset list. Zero-fills failed reads.
     ///      Not `view`: IRateOracle.marketRate / utilizationRate are non-view (adapter calls).
     function getAgentSnapshot(address agent) external returns (AgentSnapshot memory s) {
         s.coverage = _agentCoverageSnapshot(agent);
 
+        try LENDER.agent(agent) returns (
+            uint256 lenderDelegation,
+            uint256 totalSlashableCollateral,
+            uint256 totalDebt,
+            uint256 ltv,
+            uint256 liquidationThreshold,
+            uint256 health
+        ) {
+            s.lenderDelegation = lenderDelegation;
+            s.totalSlashableCollateral = totalSlashableCollateral;
+            s.totalDebt = totalDebt;
+            s.ltv = ltv;
+            s.liquidationThreshold = liquidationThreshold;
+            s.health = health;
+        } catch { }
+
         try RATE_ORACLE.restakerRate(agent) returns (uint256 rate) {
             s.restakerRate = rate;
+        } catch { }
+
+        try DELEGATION.collateral(agent) returns (address collateral) {
+            if (collateral != address(0)) {
+                s.collateralToken = collateral;
+                try PRICE_ORACLE.getPrice(collateral) returns (uint256 price, uint256) {
+                    s.collateralTokenPrice = price;
+                } catch { }
+            }
         } catch { }
 
         address[] memory assets = _reserveAssets();
@@ -313,9 +356,10 @@ contract DashboardLens {
         }
     }
 
-    /// @notice Lean per-reserve snapshots for the lender-assets summary page.
+    /// @notice Lean per-reserve snapshots for the lender-assets summary/detail pages.
     /// @dev Walks the hardcoded reserve asset list. Zero-fills failed reads.
-    function getReserveSnapshots() external view returns (ReserveSnapshot[] memory snapshots) {
+    ///      Not `view`: IRateOracle.marketRate / utilizationRate are non-view (adapter calls).
+    function getReserveSnapshots() external returns (ReserveSnapshot[] memory snapshots) {
         address[] memory assets = _reserveAssets();
         snapshots = new ReserveSnapshot[](assets.length);
         for (uint256 i; i < assets.length; ++i) {
@@ -420,6 +464,16 @@ contract DashboardLens {
             snapshot.reserve.decimals = decimals;
             snapshot.reserve.paused = paused;
             snapshot.reserve.minBorrow = minBorrow;
+
+            if (vault != address(0)) {
+                ICapVaultLens v = ICapVaultLens(vault);
+                try v.totalSupplies(asset) returns (uint256 supplies) {
+                    snapshot.vaultTotalSupplies = supplies;
+                } catch { }
+                try v.totalBorrows(asset) returns (uint256 borrows) {
+                    snapshot.vaultTotalBorrows = borrows;
+                } catch { }
+            }
         } catch { }
     }
 
@@ -499,7 +553,7 @@ contract DashboardLens {
         } catch { }
     }
 
-    function _reserveSnapshot(address asset) internal view returns (ReserveSnapshot memory s) {
+    function _reserveSnapshot(address asset) internal returns (ReserveSnapshot memory s) {
         s.asset = asset;
 
         address vault;
@@ -526,6 +580,18 @@ contract DashboardLens {
 
         try PRICE_ORACLE.getPrice(asset) returns (uint256 price, uint256) {
             s.assetPriceUSD = price;
+        } catch { }
+
+        try RATE_ORACLE.marketRate(asset) returns (uint256 rate) {
+            s.marketRate = rate;
+        } catch { }
+
+        try RATE_ORACLE.benchmarkRate(asset) returns (uint256 rate) {
+            s.benchmarkRate = rate;
+        } catch { }
+
+        try RATE_ORACLE.utilizationRate(asset) returns (uint256 rate) {
+            s.utilizationRate = rate;
         } catch { }
     }
 
