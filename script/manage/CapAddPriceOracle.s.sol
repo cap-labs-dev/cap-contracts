@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.36;
 
 import { InfraConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import { LibsConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";

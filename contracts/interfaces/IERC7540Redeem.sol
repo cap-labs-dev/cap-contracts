@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.28;
+pragma solidity 0.8.36;
 
 /// @title IERC7540Redeem
 /// @notice IERC7540Redeem is required for ERC165 support of the ERC7540 async redemption standard.

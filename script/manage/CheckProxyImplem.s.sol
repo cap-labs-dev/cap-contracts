@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.36;
 
 import { AccessControl } from "../../contracts/access/AccessControl.sol";
 import { Delegation } from "../../contracts/delegation/Delegation.sol";
@@ -96,7 +96,9 @@ contract CheckProxyImplem is
                 implementation: eigenImplems.eigenServiceManager,
                 name: "Service Manager"
             }),
-            NamedProxy({ proxy: eigenAdapter.agentManager, implementation: eigenImplems.agentManager, name: "Agent Manager" })
+            NamedProxy({
+                proxy: eigenAdapter.agentManager, implementation: eigenImplems.agentManager, name: "Agent Manager"
+            })
         ];
 
         string[1] memory capTokenSymbols = ["cUSD"];
@@ -122,7 +124,9 @@ contract CheckProxyImplem is
             NamedProxy({ proxy: vaultConfig.capToken, implementation: implems.capToken, name: "Cap Token" })
         );
         namedProxies.push(
-            NamedProxy({ proxy: vaultConfig.stakedCapToken, implementation: implems.stakedCap, name: "Staked Cap Token" })
+            NamedProxy({
+                proxy: vaultConfig.stakedCapToken, implementation: implems.stakedCap, name: "Staked Cap Token"
+            })
         );
         namedProxies.push(
             NamedProxy({ proxy: vaultConfig.feeAuction, implementation: implems.feeAuction, name: "Fee Auction" })

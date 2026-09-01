@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.36;
 
 import { VaultConfig, VaultLzPeriphery } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import { TokenSerializer } from "./TokenSerializer.sol";

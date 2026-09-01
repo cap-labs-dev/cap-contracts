@@ -1,18 +1,9 @@
 {
-  "editor.formatOnSave": true,
   "[solidity]": {
-    "editor.defaultFormatter": "JuanBlanco.solidity"
+    "editor.defaultFormatter": "NomicFoundation.hardhat-solidity",
+    "editor.formatOnSave": true
   },
   "solidity.formatter": "forge",
-  "solidity.compileUsingLocalVersion": "0.8.28",
-  "solidity.projectRoot": ".",
-  "solidity.packageDefaultDependenciesContractsDirectory": "",
-  "solidity.packageDefaultDependenciesDirectory": ["node_modules", "lib"],
-  "solidity.defaultCompiler": "local",
-  "solidity.remappings": [
-    "@openzeppelin/=node_modules/@openzeppelin/",
-    "@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
-    "@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/",
-    "forge-std/=lib/forge-std/src/"
-  ]
+  "solidity.packageDefaultDependenciesContractsDirectory": "contracts",
+  "solidity.packageDefaultDependenciesDirectory": ["node_modules", "lib"]
 }

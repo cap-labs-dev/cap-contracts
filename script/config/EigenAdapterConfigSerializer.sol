@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.36;
 
 import { EigenConfig, EigenImplementationsConfig } from "../../contracts/deploy/interfaces/EigenDeployConfig.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";

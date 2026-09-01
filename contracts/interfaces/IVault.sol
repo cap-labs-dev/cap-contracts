@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.28;
+pragma solidity 0.8.36;
 
 import { IERC6909TokenSupply } from "@openzeppelin/contracts/interfaces/IERC6909.sol";
 
@@ -7,6 +7,10 @@ import { IERC6909TokenSupply } from "@openzeppelin/contracts/interfaces/IERC6909
 /// @author kexley, Cap Labs
 /// @notice Interface for the collateral vault (ERC6909)
 interface IVault is IERC6909TokenSupply {
+    /// @notice Initialize the vault
+    /// @param authority The access manager address
+    function initialize(address authority) external;
+
     /// @notice Deposit an ERC20 asset and mint the corresponding ERC6909 balance
     /// @param asset The ERC20 asset to deposit
     /// @param amount The amount to deposit

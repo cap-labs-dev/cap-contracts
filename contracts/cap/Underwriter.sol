@@ -1,17 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.28;
+pragma solidity 0.8.36;
 
-import {
-    ERC4626Upgradeable,
-    ERC7540AsyncRedeem,
-    IERC4626,
-    IERC7540AsyncRedeem
-} from "../ERC7540/ERC7540AsyncRedeem.sol";
-import { IRegistry } from "../interfaces/IRegistry.sol";
+import { ERC4626Upgradeable, ERC7540AsyncRedeem, IERC4626 } from "../ERC7540/ERC7540AsyncRedeem.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
 import { IUnderwriter } from "../interfaces/IUnderwriter.sol";
 import { IVault } from "../interfaces/IVault.sol";
-import { UnderwriterStorageUtils } from "../storage/UnderwriterStorageUtils.sol";
 import { WadRayMath } from "../utils/WadRayMath.sol";
 import {
     AccessManagedUpgradeable
@@ -22,31 +15,95 @@ import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title Underwriter
-/// @author kexley
-/// @notice The Underwriter is a contract that allows users to allocate and deallocate assets to a tranche.
-contract Underwriter is IUnderwriter, AccessManagedUpgradeable, ERC7540AsyncRedeem, UnderwriterStorageUtils {
+/// @author kexley, Cap Labs
+/// @notice Curator vault that allocates assets into tranches and distributes premium to depositors.
+contract Underwriter layout at erc7201("cap.storage.Underwriter")
+    is
+    IUnderwriter,
+    AccessManagedUpgradeable,
+    ERC7540AsyncRedeem
+{
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
     using WadRayMath for uint256;
 
     /// @inheritdoc IUnderwriter
-    function initialize(address _authority, string memory _name, string memory _symbol, address _asset)
-        external
-        initializer
-    {
-        __AccessManaged_init(_authority);
-        __ERC7540AsyncRedeem_init(IERC20(_asset), _name, _symbol, hex"");
-        Storage storage $ = getUnderwriterStorage();
-        IRegistry registry = IRegistry(msg.sender);
-        $.vault = registry.vault();
-        $.registry = address(registry);
-        $.stablecoin = registry.stablecoin();
-        $.vestingPeriod = 6 hours;
+    address public vault;
+
+    /// @inheritdoc IUnderwriter
+    address public stablecoin;
+
+    /// @inheritdoc IUnderwriter
+    uint256 public vestingPeriod;
+
+    /// @inheritdoc IUnderwriter
+    uint256 public lastReported;
+
+    /// @inheritdoc IUnderwriter
+    uint256 public vestedPremium;
+
+    /// @inheritdoc IUnderwriter
+    uint256 public premiumPerSecond;
+
+    /// @inheritdoc IUnderwriter
+    uint256 public lastPremiumUpdate;
+
+    /// @inheritdoc IUnderwriter
+    uint256 public premiumPerShare;
+
+    /// @dev The list of registered tranches
+    EnumerableSet.AddressSet private _registeredTranches;
+
+    /// @inheritdoc IUnderwriter
+    mapping(address => uint256) public pendingPremium;
+
+    /// @dev Premium already credited to an account at its last balance checkpoint
+    mapping(address => uint256) private _premiumDebt;
+
+    /// @dev The whitelist of accounts
+    EnumerableSet.AddressSet private _whitelist;
+
+    /// @inheritdoc IUnderwriter
+    address public defaultTranche;
+
+    /// @inheritdoc IUnderwriter
+    mapping(address => uint256) public debt;
+
+    /// @inheritdoc IUnderwriter
+    uint256 public totalDebt;
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
-    //////////////////////////////////////////////////////////////////////////////
-    /**************************** Allocation functions ***************************/
-    //////////////////////////////////////////////////////////////////////////////
+    /// @inheritdoc IUnderwriter
+    function initialize(
+        address _authority,
+        string memory _name,
+        string memory _symbol,
+        address _asset,
+        address _vaultAddress,
+        address _stablecoinAddress
+    ) external override initializer {
+        __AccessManaged_init(_authority);
+        __ERC7540AsyncRedeem_init(IERC20(_asset), _name, _symbol, hex"");
+        vault = _vaultAddress;
+        stablecoin = _stablecoinAddress;
+        vestingPeriod = 6 hours;
+    }
+
+    /// @inheritdoc IUnderwriter
+    function addTranche(address _tranche) external restricted {
+        _registeredTranches.add(_tranche);
+        emit AddTranche(_tranche);
+    }
+
+    /// @inheritdoc IUnderwriter
+    function removeTranche(address _tranche) external restricted {
+        _registeredTranches.remove(_tranche);
+        emit RemoveTranche(_tranche);
+    }
 
     /// @inheritdoc IUnderwriter
     function allocate(address tranche, uint256 assets) external restricted {
@@ -55,37 +112,30 @@ contract Underwriter is IUnderwriter, AccessManagedUpgradeable, ERC7540AsyncRede
 
     /// @dev Allocate assets to a tranche
     function _allocate(address tranche, uint256 assets) internal {
-        Storage storage $ = getUnderwriterStorage();
-        if (!IRegistry($.registry).isTranche(tranche)) revert InvalidTranche();
-
-        IVault($.vault).setOperator(tranche, true);
+        if (!_registeredTranches.contains(tranche)) revert NotRegisteredTranche();
+        IVault(vault).setOperator(tranche, true);
         uint256 shares = ITranche(tranche).deposit(assets, address(this));
-        uint256 debt = ITranche(tranche).previewRedeem(shares);
+        uint256 newDebt = ITranche(tranche).previewRedeem(shares);
 
-        $.debt[tranche] += debt;
-        $.totalDebt += debt;
-        emit DebtIncreased(tranche, debt);
+        debt[tranche] += newDebt;
+        totalDebt += newDebt;
+        emit DebtIncreased(tranche, newDebt);
     }
 
     /// @inheritdoc IUnderwriter
     function deallocate(address tranche, uint256 shares) external restricted returns (uint256 deallocated) {
-        Storage storage $ = getUnderwriterStorage();
-        if (!IRegistry($.registry).isTranche(tranche)) revert InvalidTranche();
-
         uint256 unlockedShares = ITranche(tranche).instantUnlockedSupply();
         deallocated = unlockedShares < shares ? unlockedShares : shares;
         if (deallocated > 0) {
             uint256 withdrawn = IERC4626(tranche).redeem(deallocated, address(this), address(this));
-            $.debt[tranche] -= withdrawn;
-            $.totalDebt -= withdrawn;
+            debt[tranche] -= withdrawn;
+            totalDebt -= withdrawn;
             emit DebtDecreased(tranche, withdrawn);
         }
     }
 
     /// @inheritdoc IUnderwriter
     function deallocateAsync(address tranche, uint256 shares) external restricted returns (uint256 requestId) {
-        Storage storage $ = getUnderwriterStorage();
-        if (!IRegistry($.registry).isTranche(tranche)) revert InvalidTranche();
         uint256 balance = ITranche(tranche).balanceOf(address(this));
         if (shares > balance) shares = balance;
 
@@ -95,203 +145,169 @@ contract Underwriter is IUnderwriter, AccessManagedUpgradeable, ERC7540AsyncRede
 
     /// @inheritdoc IUnderwriter
     function finalizeDeallocateAsync(address tranche, uint256 requestId, uint256 shares) external restricted {
-        Storage storage $ = getUnderwriterStorage();
-        if (!IRegistry($.registry).isTranche(tranche)) revert InvalidTranche();
-
         uint256 withdrawn = ITranche(tranche).redeem(requestId, shares, address(this), address(this));
-        $.debt[tranche] -= withdrawn;
-        $.totalDebt -= withdrawn;
+        debt[tranche] -= withdrawn;
+        totalDebt -= withdrawn;
         emit DebtDecreased(tranche, withdrawn);
     }
 
     /// @inheritdoc IUnderwriter
     function setDefaultTranche(address tranche) external restricted {
-        Storage storage $ = getUnderwriterStorage();
-        if (!IRegistry($.registry).isTranche(tranche)) revert InvalidTranche();
-        $.defaultTranche = tranche;
+        if (!_registeredTranches.contains(tranche)) revert NotRegisteredTranche();
+        defaultTranche = tranche;
         emit SetDefaultTranche(tranche);
     }
 
     /// @inheritdoc IUnderwriter
-    function setVestingPeriod(uint256 vestingPeriod) external restricted {
-        Storage storage $ = getUnderwriterStorage();
-        if (vestingPeriod == 0) revert InvalidVestingPeriod();
-        $.vestingPeriod = vestingPeriod;
-        emit SetVestingPeriod(vestingPeriod);
+    function setVestingPeriod(uint256 _vestingPeriod) external restricted {
+        if (_vestingPeriod == 0) revert InvalidVestingPeriod();
+        vestingPeriod = _vestingPeriod;
+        emit SetVestingPeriod(_vestingPeriod);
     }
 
     /// @inheritdoc IUnderwriter
-    function report(address tranche) external restricted {
-        Storage storage $ = getUnderwriterStorage();
-        if (!IRegistry($.registry).isTranche(tranche)) revert InvalidTranche();
+    function whitelist(address account, bool allowed) external restricted {
+        if (allowed) _whitelist.add(account);
+        else _whitelist.remove(account);
+    }
 
-        uint256 debt = $.debt[tranche];
-        uint256 assets = ITranche(tranche).previewRedeem(ITranche(tranche).balanceOf(address(this)));
+    /// @inheritdoc IUnderwriter
+    function report(address _tranche) external restricted {
+        if (!_registeredTranches.contains(_tranche)) revert NotRegisteredTranche();
+        uint256 trancheDebt = debt[_tranche];
+        uint256 assets = ITranche(_tranche).previewRedeem(ITranche(_tranche).balanceOf(address(this)));
         uint256 gain;
         uint256 loss;
 
-        if (assets != debt) {
-            if (assets < debt) {
-                loss = debt - assets;
-                $.totalDebt -= loss;
-                emit DebtDecreased(tranche, loss);
+        if (assets != trancheDebt) {
+            if (assets < trancheDebt) {
+                loss = trancheDebt - assets;
+                totalDebt -= loss;
+                emit DebtDecreased(_tranche, loss);
             } else {
-                gain = assets - debt;
-                $.totalDebt += gain;
-                emit DebtIncreased(tranche, gain);
+                gain = assets - trancheDebt;
+                totalDebt += gain;
+                emit DebtIncreased(_tranche, gain);
             }
-            $.debt[tranche] = assets;
+            debt[_tranche] = assets;
         }
 
-        // settle any rewards accrued under the previous schedule before re-vesting
-        _updateRewards();
+        // settle any premiums accrued under the previous schedule before re-vesting
+        _updatePremiums();
 
-        uint256 reward = ITranche(tranche).claim(address(this));
-        $.vestedReward = vestedReward() + reward;
-        $.rewardPerSecond = $.vestedReward.rayDiv($.vestingPeriod);
-        $.lastReported = block.timestamp;
+        uint256 premium = ITranche(_tranche).claim(address(this));
+        vestedPremium = vestedReward() + premium;
+        premiumPerSecond = vestedPremium / vestingPeriod;
+        lastReported = block.timestamp;
+        lastPremiumUpdate = block.timestamp;
 
-        emit Reported(tranche, reward, gain, loss);
+        emit Reported(_tranche, premium, gain, loss);
     }
-
-    //////////////////////////////////////////////////////////////////////////////
-    /**************************** Reward functions ******************************/
-    //////////////////////////////////////////////////////////////////////////////
 
     /// @inheritdoc IUnderwriter
     function claim() external {
-        _updateRewards();
-        Storage storage $ = getUnderwriterStorage();
-        uint256 reward = _claimable(msg.sender);
-        $.pendingReward[msg.sender] = 0;
-        IERC20($.stablecoin).safeTransfer(msg.sender, reward);
+        _updatePremiums();
+        uint256 premium = _claimable(msg.sender);
+        if (premium == 0) return;
+        pendingPremium[msg.sender] = 0;
+        _premiumDebt[msg.sender] = premiumPerShare.rayMul(balanceOf(msg.sender));
+        IERC20(stablecoin).safeTransfer(msg.sender, premium);
     }
 
     /// @inheritdoc IUnderwriter
-    function claimable(address user) external view returns (uint256 reward) {
-        reward = _claimable(user);
+    function claimable(address user) external view returns (uint256 premium) {
+        premium = _claimable(user);
     }
 
-    /// @dev Get the claimable reward for a user
-    function _claimable(address user) internal view returns (uint256 reward) {
-        Storage storage $ = getUnderwriterStorage();
-        uint256 accumulatedReward;
+    /// @dev Get the claimable premium for a user
+    function _claimable(address user) internal view returns (uint256 premium) {
+        uint256 accumulatedPremium;
         uint256 supply = activeSupply();
-        if ($.lastRewardUpdate == block.timestamp || supply == 0) {
-            accumulatedReward = $.rewardPerShare.rayMul(balanceOf(user));
+        if (lastPremiumUpdate == block.timestamp || supply == 0) {
+            accumulatedPremium = premiumPerShare.rayMul(balanceOf(user));
         } else {
             uint256 end = vestingEnd();
-            uint256 elapsed = (block.timestamp > end) ? end - $.lastRewardUpdate : block.timestamp - $.lastRewardUpdate;
-            accumulatedReward =
-                ($.rewardPerShare + $.rewardPerSecond.rayMul(elapsed).rayDiv(supply)).rayMul(balanceOf(user));
+            uint256 elapsed = (block.timestamp > end) ? end - lastPremiumUpdate : block.timestamp - lastPremiumUpdate;
+            accumulatedPremium = (premiumPerShare + (premiumPerSecond * elapsed).rayDiv(supply)).rayMul(balanceOf(user));
         }
-        reward = $.pendingReward[user] + accumulatedReward - $.rewardDebt[user];
+        premium = pendingPremium[user] + accumulatedPremium - _premiumDebt[user];
     }
 
     /// @inheritdoc IUnderwriter
     function vestedReward() public view returns (uint256 vested) {
-        Storage storage $ = getUnderwriterStorage();
-        uint256 elapsed = block.timestamp - $.lastReported;
-        if (elapsed >= $.vestingPeriod) return 0;
-        vested = $.vestedReward.rayMul(1e27 - elapsed.rayDiv($.vestingPeriod));
+        uint256 elapsed = block.timestamp - lastReported;
+        if (elapsed >= vestingPeriod) return 0;
+        vested = vestedPremium * (vestingPeriod - elapsed) / vestingPeriod;
     }
 
     /// @inheritdoc IUnderwriter
     function vestingEnd() public view returns (uint256 end) {
-        Storage storage $ = getUnderwriterStorage();
-        end = $.lastReported + $.vestingPeriod;
-    }
-
-    /// @dev Update the distributed rewards
-    function _updateRewards() internal {
-        Storage storage $ = getUnderwriterStorage();
-        uint256 elapsed;
-        uint256 end = vestingEnd();
-        if (block.timestamp > end) {
-            elapsed = end - $.lastRewardUpdate;
-            if (elapsed == 0) return;
-            $.lastRewardUpdate = end;
-        } else {
-            elapsed = block.timestamp - $.lastRewardUpdate;
-            $.lastRewardUpdate = block.timestamp;
-        }
-        uint256 supply = activeSupply();
-        if (supply == 0) return;
-        $.rewardPerShare += $.rewardPerSecond.rayMul(elapsed).rayDiv(supply);
-    }
-
-    //////////////////////////////////////////////////////////////////////////////
-    /**************************** ERC4626 functions *****************************/
-    //////////////////////////////////////////////////////////////////////////////
-
-    /// @inheritdoc IUnderwriter
-    function whitelist(address account, bool allowed) external restricted {
-        Storage storage $ = getUnderwriterStorage();
-        if (allowed) $.whitelist.add(account);
-        else $.whitelist.remove(account);
+        end = lastReported + vestingPeriod;
     }
 
     /// @inheritdoc IUnderwriter
-    function vault() external view returns (address) {
-        return getUnderwriterStorage().vault;
+    function whitelisted(address account) public view returns (bool allowed) {
+        allowed = _whitelist.contains(account);
     }
 
     /// @inheritdoc IUnderwriter
-    function registry() external view returns (address) {
-        return getUnderwriterStorage().registry;
+    function totalAssets() public view override(ERC4626Upgradeable, IERC4626, IUnderwriter) returns (uint256) {
+        return IVault(vault).balanceOf(address(this), asset()) + totalDebt;
     }
 
     /// @inheritdoc IUnderwriter
-    function stablecoin() external view returns (address) {
-        return getUnderwriterStorage().stablecoin;
-    }
-
-    /// @inheritdoc IERC4626
-    function totalAssets() public view override(ERC4626Upgradeable, IERC4626) returns (uint256) {
-        Storage storage $ = getUnderwriterStorage();
-        return IVault($.vault).balanceOf(address(this), asset()) + $.totalDebt;
-    }
-
-    /// @inheritdoc IERC4626
     function maxDeposit(address receiver)
         public
         view
-        override(ERC4626Upgradeable, IERC4626)
+        override(ERC4626Upgradeable, IERC4626, IUnderwriter)
         returns (uint256 maxAssets)
     {
         if (whitelisted(receiver)) maxAssets = type(uint256).max;
     }
 
-    /// @inheritdoc IERC4626
-    function maxMint(address receiver) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 maxShares) {
+    /// @inheritdoc IUnderwriter
+    function maxMint(address receiver)
+        public
+        view
+        override(ERC4626Upgradeable, IERC4626, IUnderwriter)
+        returns (uint256 maxShares)
+    {
         if (whitelisted(receiver)) maxShares = type(uint256).max;
     }
 
     /// @inheritdoc IUnderwriter
-    function whitelisted(address account) public view returns (bool allowed) {
-        allowed = getUnderwriterStorage().whitelist.contains(account);
+    function unlockedSupply() public view override(ERC7540AsyncRedeem, IUnderwriter) returns (uint256) {
+        return previewWithdraw(IVault(vault).balanceOf(address(this), asset()));
     }
 
-    /// @inheritdoc IERC7540AsyncRedeem
-    function unlockedSupply() public view override(ERC7540AsyncRedeem, IERC7540AsyncRedeem) returns (uint256) {
-        Storage storage $ = getUnderwriterStorage();
-        return previewWithdraw(IVault($.vault).balanceOf(address(this), asset()));
+    /// @dev Update the distributed premiums
+    function _updatePremiums() internal {
+        uint256 elapsed;
+        uint256 end = vestingEnd();
+        if (block.timestamp > end) {
+            elapsed = end - lastPremiumUpdate;
+            if (elapsed == 0) return;
+            lastPremiumUpdate = end;
+        } else {
+            elapsed = block.timestamp - lastPremiumUpdate;
+            lastPremiumUpdate = block.timestamp;
+        }
+        uint256 supply = activeSupply();
+        lastPremiumUpdate = block.timestamp;
+        if (supply == 0) return;
+        premiumPerShare += (premiumPerSecond * elapsed).rayDiv(supply);
     }
 
-    /// @notice Override the _update function to update the sender and receiver's rewards
-    /// @param from The address of the sender
-    /// @param to The address of the receiver
-    /// @param amount The amount of assets transferred
+    /// @dev Settle premium accounting when shares move
     function _update(address from, address to, uint256 amount) internal override {
-        _updateRewards();
-        Storage storage $ = getUnderwriterStorage();
+        _updatePremiums();
         if (from != address(0) && from != address(this)) {
-            $.pendingReward[from] += $.rewardPerShare.rayMul(balanceOf(from)) - $.rewardDebt[from];
-            $.rewardDebt[from] = $.rewardPerShare.rayMul(balanceOf(from) - amount);
+            pendingPremium[from] += premiumPerShare.rayMul(balanceOf(from)) - _premiumDebt[from];
+            _premiumDebt[from] = premiumPerShare.rayMul(balanceOf(from) - amount);
         }
         if (to != address(0) && to != address(this)) {
-            $.pendingReward[to] += $.rewardPerShare.rayMul(balanceOf(to)) - $.rewardDebt[to];
-            $.rewardDebt[to] = $.rewardPerShare.rayMul(balanceOf(to) + amount);
+            pendingPremium[to] += premiumPerShare.rayMul(balanceOf(to)) - _premiumDebt[to];
+            _premiumDebt[to] = premiumPerShare.rayMul(balanceOf(to) + amount);
         }
         super._update(from, to, amount);
     }
@@ -300,11 +316,10 @@ contract Underwriter is IUnderwriter, AccessManagedUpgradeable, ERC7540AsyncRede
     /// @param from The address of the sender
     /// @param assets The amount of assets to transfer in
     function _transferIn(address from, uint256 assets) internal override {
-        Storage storage $ = getUnderwriterStorage();
-        IVault($.vault).transferFrom(from, address(this), asset(), assets);
+        IVault(vault).transferFrom(from, address(this), asset(), assets);
 
-        if ($.defaultTranche != address(0)) {
-            _allocate($.defaultTranche, assets);
+        if (defaultTranche != address(0)) {
+            _allocate(defaultTranche, assets);
         }
     }
 
@@ -312,8 +327,7 @@ contract Underwriter is IUnderwriter, AccessManagedUpgradeable, ERC7540AsyncRede
     /// @param to The address of the receiver
     /// @param assets The amount of assets to transfer out
     function _transferOut(address to, uint256 assets) internal override {
-        Storage storage $ = getUnderwriterStorage();
-        IVault($.vault).transfer(to, asset(), assets);
+        IVault(vault).transfer(to, asset(), assets);
     }
 
     /// @inheritdoc IERC165

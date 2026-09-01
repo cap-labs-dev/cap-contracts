@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.36;
 
 import { UsersConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import { SymbioticVaultParams } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
@@ -9,7 +9,9 @@ import {
     SymbioticNetworkRewardsConfig,
     SymbioticVaultConfig
 } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
-import { DeployCapNetworkAdapter } from "../../contracts/deploy/service/providers/symbiotic/DeployCapNetworkAdapter.sol";
+import {
+    DeployCapNetworkAdapter
+} from "../../contracts/deploy/service/providers/symbiotic/DeployCapNetworkAdapter.sol";
 import { DeploySymbioticVault } from "../../contracts/deploy/service/providers/symbiotic/DeploySymbioticVault.sol";
 import { LzUtils } from "../../contracts/deploy/utils/LzUtils.sol";
 import { SymbioticAddressbook, SymbioticUtils } from "../../contracts/deploy/utils/SymbioticUtils.sol";
@@ -52,10 +54,7 @@ contract SymbioticCreateVault is
         vault = _deploySymbioticVault(
             symbioticAb,
             SymbioticVaultParams({
-                vault_admin: vault_admin,
-                collateral: collateral,
-                vaultEpochDuration: 1 days,
-                burnerRouterDelay: 0
+                vault_admin: vault_admin, collateral: collateral, vaultEpochDuration: 1 days, burnerRouterDelay: 0
             })
         );
 

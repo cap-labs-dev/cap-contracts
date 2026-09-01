@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.36;
 
 import { IERC7540AsyncRedeem } from "../interfaces/IERC7540AsyncRedeem.sol";
 import { IERC7540Redeem } from "../interfaces/IERC7540Redeem.sol";
-import { ERC7540AsyncRedeemStorageUtils } from "../storage/ERC7540AsyncRedeemStorageUtils.sol";
 import { ERC1155Queue, IERC1155Queue } from "./ERC1155Queue.sol";
 import { ERC7540Operator, IERC7540Operator } from "./ERC7540Operator.sol";
 import { ERC7575, IERC7575 } from "./ERC7575.sol";
@@ -14,6 +13,7 @@ import {
 import { ERC165Upgradeable } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 /// @title ERC7540AsyncRedeem
 /// @author kexley
@@ -25,16 +25,40 @@ abstract contract ERC7540AsyncRedeem is
     ERC7540Operator,
     ERC4626Upgradeable,
     ERC7575,
-    ERC7540AsyncRedeemStorageUtils,
     ERC165Upgradeable
 {
     using SafeERC20 for IERC20;
+
+    /// @custom:storage-location cap.storage.ERC7540AsyncRedeem
+    // forge-lint: disable-next-item(pascal-case-struct)
+    struct ERC7540AsyncRedeemStorage {
+        uint256 requestId;
+        uint256 redeemQueue;
+        uint256 settledQueue;
+        mapping(uint256 => uint256) queueIndex;
+        address queueNft;
+    }
+
+    // keccak256(abi.encode(uint256(keccak256("cap.storage.ERC7540AsyncRedeem")) - 1)) & ~bytes32(uint256(0xff))
+    /// @dev ERC-7201 storage slot for ERC7540AsyncRedeem
+    uint256 private constant STORAGE_LOCATION = 0x8bbfa7ffdb3d5e8e16606d7fe820f66c6f836f8f0a57a0e300a31d3eca5c0300;
+
+    /// @dev Get the storage of the contract
+    /// @return $ The storage of the contract
+    // forge-lint: disable-next-item(mixed-case-function)
+    function _getERC7540AsyncRedeemStorage() private pure returns (ERC7540AsyncRedeemStorage storage $) {
+        uint256 slot = STORAGE_LOCATION;
+        assembly {
+            $.slot := slot
+        }
+    }
 
     /// @dev Initializer for ERC7540AsyncRedeem
     /// @param _asset The asset to be redeemed
     /// @param _name The name of the token
     /// @param _symbol The symbol of the token
     /// @param _uri The URI for ERC1155 metadata
+    // forge-lint: disable-next-item(mixed-case-function)
     function __ERC7540AsyncRedeem_init(IERC20 _asset, string memory _name, string memory _symbol, string memory _uri)
         internal
         onlyInitializing
@@ -42,25 +66,21 @@ abstract contract ERC7540AsyncRedeem is
         __ERC20_init(_name, _symbol);
         __ERC4626_init(_asset);
         __ERC165_init();
-        getERC7540AsyncRedeemStorage().queueNft = address(new ERC1155Queue(_uri));
+        _getERC7540AsyncRedeemStorage().queueNft = address(new ERC1155Queue(_uri));
     }
 
     //////////////////////////////////////////////////////////////////////////////
     /**************************** ERC7540 functions *****************************/
     //////////////////////////////////////////////////////////////////////////////
 
-    /// @notice Request a redeem, shares are escrowed in this contract.
-    /// @param _shares The number of shares to request for redeem
-    /// @param _controller The controller of the request
-    /// @param _owner The owner of the shares being redeemed
-    /// @return requestId The id of the request
+    /// @inheritdoc IERC7540AsyncRedeem
     function requestRedeem(uint256 _shares, address _controller, address _owner) external returns (uint256 requestId) {
         _checkAllowance(_owner, msg.sender, _shares);
 
         if (balanceOf(_owner) < _shares) revert ERC20InsufficientBalance(_owner, balanceOf(_owner), _shares);
         if (_shares == 0) revert ZeroShares();
 
-        ERC7540AsyncRedeemStorage storage $ = getERC7540AsyncRedeemStorage();
+        ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
         requestId = $.requestId;
         $.requestId++;
 
@@ -73,12 +93,7 @@ abstract contract ERC7540AsyncRedeem is
         emit RedeemRequest(_controller, _owner, requestId, msg.sender, _shares);
     }
 
-    /// @notice Withdraw assets from the vault after requesting a redeem.
-    /// @param _requestId The id of the request
-    /// @param _assets The number of assets to withdraw
-    /// @param _receiver The receiver of the assets
-    /// @param _controller The controller of the request
-    /// @return shares The number of shares withdrawn
+    /// @inheritdoc IERC7540AsyncRedeem
     function withdraw(uint256 _requestId, uint256 _assets, address _receiver, address _controller)
         public
         virtual
@@ -91,13 +106,7 @@ abstract contract ERC7540AsyncRedeem is
         _withdraw(msg.sender, _receiver, _controller, _assets, shares, _requestId);
     }
 
-    /// @notice Redeem shares from the vault after requesting a redeem and it has been initiated
-    /// @dev Shares are converted to assets at the exchange rate at the moment of redemption, not request.
-    /// @param _requestId The id of the request
-    /// @param _shares The number of shares to redeem
-    /// @param _receiver The receiver of the assets
-    /// @param _controller The controller of the request
-    /// @return assets The number of assets redeemed
+    /// @inheritdoc IERC7540AsyncRedeem
     function redeem(uint256 _requestId, uint256 _shares, address _receiver, address _controller)
         public
         virtual
@@ -110,16 +119,13 @@ abstract contract ERC7540AsyncRedeem is
         _withdraw(msg.sender, _receiver, _controller, assets, _shares, _requestId);
     }
 
-    /// @notice Get the number of claimable shares for a controller's request
-    /// @param _requestId The id of the request
-    /// @param _controller The controller of the request
-    /// @return claimableShares The number of claimable shares
+    /// @inheritdoc IERC7540AsyncRedeem
     function claimableRedeemRequest(uint256 _requestId, address _controller)
         public
         view
         returns (uint256 claimableShares)
     {
-        ERC7540AsyncRedeemStorage storage $ = getERC7540AsyncRedeemStorage();
+        ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
         uint256 currentIndex = $.settledQueue + unlockedSupply();
         uint256 queueIndex = $.queueIndex[_requestId];
         uint256 balance = IERC1155Queue($.queueNft).balanceOf(_controller, _requestId);
@@ -133,16 +139,13 @@ abstract contract ERC7540AsyncRedeem is
         }
     }
 
-    /// @notice Get the number of pending shares for a controller's request
-    /// @param _requestId The id of the request
-    /// @param _controller The controller of the request
-    /// @return pendingShares The number of pending shares
+    /// @inheritdoc IERC7540AsyncRedeem
     function pendingRedeemRequest(uint256 _requestId, address _controller)
         external
         view
         returns (uint256 pendingShares)
     {
-        ERC7540AsyncRedeemStorage storage $ = getERC7540AsyncRedeemStorage();
+        ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
         uint256 currentIndex = $.settledQueue + unlockedSupply();
         uint256 queueIndex = $.queueIndex[_requestId];
         uint256 balance = IERC1155Queue($.queueNft).balanceOf(_controller, _requestId);
@@ -156,41 +159,33 @@ abstract contract ERC7540AsyncRedeem is
         }
     }
 
-    /// @notice Get the maximum number of instantly redeemable shares
-    /// @param _owner The owner of the shares
-    /// @return maxShares The maximum number of instantly redeemable shares
+    /// @inheritdoc IERC4626
     function maxRedeem(address _owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 maxShares) {
         uint256 instantUnlocked = instantUnlockedSupply();
         uint256 balance = balanceOf(_owner);
         maxShares = balance > instantUnlocked ? instantUnlocked : balance;
     }
 
-    /// @notice Get the number of shares not in the redemption queue
-    /// @return supply The number of shares not in the redemption queue
+    /// @inheritdoc IERC7540AsyncRedeem
     function activeSupply() public view returns (uint256 supply) {
         supply = totalSupply() - redemptionQueue();
     }
 
-    /// @notice Get the number of assets not in the redemption queue
-    /// @return assets The number of assets not in the redemption queue
+    /// @inheritdoc IERC7540AsyncRedeem
     function activeAssets() public view returns (uint256 assets) {
         assets = previewRedeem(activeSupply());
     }
 
-    /// @notice Get the number of shares in the redemption queue
-    /// @return queue The number of shares in the redemption queue
+    /// @inheritdoc IERC7540AsyncRedeem
     function redemptionQueue() public view returns (uint256 queue) {
-        ERC7540AsyncRedeemStorage storage $ = getERC7540AsyncRedeemStorage();
+        ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
         queue = $.redeemQueue - $.settledQueue;
     }
 
-    /// @notice Get the number of shares not locked
-    /// @dev This function should be overridden
-    /// @return unlocked The number of unlocked shares
+    /// @inheritdoc IERC7540AsyncRedeem
     function unlockedSupply() public view virtual returns (uint256 unlocked) { }
 
-    /// @notice Get the number of shares available to be instantly redeemed, taking into account the redemption queue
-    /// @return unlocked The number of instantly unlocked shares
+    /// @inheritdoc IERC7540AsyncRedeem
     function instantUnlockedSupply() public view returns (uint256 unlocked) {
         uint256 totalUnlocked = unlockedSupply();
         uint256 queue = redemptionQueue();
@@ -223,7 +218,7 @@ abstract contract ERC7540AsyncRedeem is
     ) internal virtual {
         _checkAllowance(_controller, _caller, _shares);
 
-        ERC7540AsyncRedeemStorage storage $ = getERC7540AsyncRedeemStorage();
+        ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
         $.queueIndex[_requestId] += _shares;
         $.settledQueue += _shares;
         IERC1155Queue($.queueNft).burn(_controller, _requestId, _shares);
@@ -257,9 +252,7 @@ abstract contract ERC7540AsyncRedeem is
     /**************************** ERC165 functions ******************************/
     //////////////////////////////////////////////////////////////////////////////
 
-    /// @notice Check if the contract supports an interface
-    /// @param interfaceId The interface ID to check
-    /// @return supported Whether the interface is supported
+    /// @inheritdoc IERC165
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165Upgradeable) returns (bool) {
         return interfaceId == type(IERC4626).interfaceId || interfaceId == type(IERC7540Operator).interfaceId
             || interfaceId == type(IERC7575).interfaceId || interfaceId == type(IERC7540Redeem).interfaceId

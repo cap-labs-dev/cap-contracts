@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity 0.8.36;
 
 import { LzAddressbook, LzUtils } from "../../contracts/deploy/utils/LzUtils.sol";
 import { WalletUtils } from "../../contracts/deploy/utils/WalletUtils.sol";

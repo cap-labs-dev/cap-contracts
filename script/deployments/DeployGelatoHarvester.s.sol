@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.28;
+pragma solidity 0.8.36;
 
 import { AccessControl } from "../../contracts/access/AccessControl.sol";
 import { CapInterestHarvester } from "../../contracts/gelato/CapInterestHarvester.sol";
@@ -42,12 +42,10 @@ contract DeployGelatoHarvester is Script {
         console.log("CapInterestHarvesterProxy deployed to:", address(proxy));
 
         AccessControl(accessControl).grantAccess(ICapInterestHarvester.harvestInterest.selector, address(proxy), gelato);
-        AccessControl(accessControl).grantAccess(
-            ICapInterestHarvester.receiveFlashLoan.selector, address(proxy), balancerVault
-        );
-        AccessControl(accessControl).grantAccess(
-            ICapInterestHarvester.setExcessReceiver.selector, address(proxy), admin
-        );
+        AccessControl(accessControl)
+            .grantAccess(ICapInterestHarvester.receiveFlashLoan.selector, address(proxy), balancerVault);
+        AccessControl(accessControl)
+            .grantAccess(ICapInterestHarvester.setExcessReceiver.selector, address(proxy), admin);
         AccessControl(accessControl).grantAccess(bytes4(0), address(proxy), admin);
 
         vm.stopBroadcast();

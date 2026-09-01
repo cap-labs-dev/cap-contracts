@@ -1,38 +1,27 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.36;
 
-/// @notice No-op interest rate model satisfying the calls Stablecoin/Market/Rewarder make.
+/// @notice No-op interest rate model satisfying the calls Stablecoin/Market make.
 contract MockIRM {
     uint256 public updateCalls;
-    mapping(address => uint256) public marketUpdateCalls;
 
-    function update() external {
+    function updateLiquidityRate() external {
         updateCalls++;
     }
 
-    function update(address market) external {
-        marketUpdateCalls[market]++;
-    }
-
-    function setInterestType(address, bool) external pure { }
-
-    function variableIndex() external pure returns (uint256) {
+    function liquidityIndex(address) external pure returns (uint256) {
         return 1e27;
     }
 
-    function fixedIndex() external pure returns (uint256) {
-        return 1e27;
-    }
-
-    function supplyIndex(address) external pure returns (uint256) {
-        return 1e27;
-    }
-
-    function trancheIndex(address) external pure returns (uint256) {
-        return 1e27;
-    }
-
-    function index(address) external pure returns (uint256, uint256) {
+    function indices(address) external pure returns (uint256 liquidity, uint256 underwriter) {
         return (1e27, 1e27);
+    }
+
+    function underwriterIndex(address) external pure returns (uint256) {
+        return 1e27;
+    }
+
+    function liquidationBonus() external pure returns (uint256) {
+        return 0.02e27;
     }
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.36;
 
 import { IERC7575 } from "./IERC7575.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
@@ -7,14 +7,6 @@ import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 /// @title IERC7540AsyncRedeem
 /// @notice IERC7540AsyncRedeem is the interface for the ERC7540 async redemption compatible ERC4626 vaults.
 interface IERC7540AsyncRedeem is IERC4626, IERC7575 {
-    struct ERC7540AsyncRedeemStorage {
-        uint256 requestId;
-        uint256 redeemQueue;
-        uint256 settledQueue;
-        mapping(uint256 => uint256) queueIndex;
-        address queueNft;
-    }
-
     /// @dev Emitted when `sender` has locked `shares`, owned by `owner`, in the Vault to request a redemption.
     /// `controller` controls this request.
     event RedeemRequest(

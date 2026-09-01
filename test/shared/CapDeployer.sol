@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.36;
 
 import { BaseTest } from "./BaseTest.sol";
 import { CapRoles } from "./CapRoles.sol";
@@ -8,24 +8,22 @@ import { MockOracle } from "./mocks/MockOracle.sol";
 
 import { BeaconFactory } from "../../contracts/cap/BeaconFactory.sol";
 import { InterestRateModel } from "../../contracts/cap/InterestRateModel.sol";
-import { Market } from "../../contracts/cap/Market.sol";
 import { Registry } from "../../contracts/cap/Registry.sol";
 import { Stablecoin } from "../../contracts/cap/Stablecoin.sol";
 import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { Underwriter } from "../../contracts/cap/Underwriter.sol";
 import { Vault } from "../../contracts/cap/Vault.sol";
+import { FixedMarket } from "../../contracts/cap/market/FixedMarket.sol";
+import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
+import { IBeaconFactory } from "../../contracts/interfaces/IBeaconFactory.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
+import { IRegistry } from "../../contracts/interfaces/IRegistry.sol";
 import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 /// @title CapDeployer
 /// @notice Deploys and wires a full Cap protocol stack for unit and integration tests.
 /// @dev Override `capConfig` fields before `_deployCap()` to tune defaults per test suite.
 abstract contract CapDeployer is BaseTest {
-    uint64 internal constant MANAGER_ROLE = CapRoles.MANAGER;
-    uint64 internal constant BORROWER_ROLE = CapRoles.BORROWER;
-    uint64 internal constant KEEPER_ROLE = CapRoles.KEEPER;
-    uint64 internal constant MINTER_ROLE = CapRoles.MINTER;
-
     // ── protocol instances ────────────────────────────────────────────────────
     MockOracle internal oracle;
     MockERC20 internal cusdUnderlying;
@@ -36,9 +34,16 @@ abstract contract CapDeployer is BaseTest {
     InterestRateModel internal irm;
     Registry internal registry;
 
-    BeaconFactory internal marketFactory;
-    BeaconFactory internal trancheFactory;
-    BeaconFactory internal underwriterFactory;
+    BeaconFactory internal beaconFactory;
+    address internal floatingMarketBeacon;
+    address internal fixedMarketBeacon;
+    address internal trancheBeacon;
+    address internal underwriterBeacon;
+
+    /// @dev Default market owner, borrower, and liquidator; roles assigned during deploy.
+    address internal defaultMarketOwner;
+    address internal defaultBorrower;
+    address internal defaultLiquidator;
 
     // ── tunable deployment config (mutate before _deployCap) ─────────────────
     CapConfig internal capConfig;
@@ -51,25 +56,29 @@ abstract contract CapDeployer is BaseTest {
         uint256 defaultLt;
         uint256 defaultMultiplier;
         uint256 defaultTargetHealth;
-        uint256 defaultKinkMinBonus;
-        uint256 defaultKinkMaxBonus;
-        uint256 defaultKinkBonus;
-        uint256 defaultJuniorSplit;
-        uint256 defaultBorrowCap;
-        IInterestRateModel.Slopes variableSlopes;
-        IInterestRateModel.Slopes underwriterSlopes;
-        bool applyVariableSlopes;
-        bool applyUnderwriterSlopes;
+        uint256 defaultLiquidationBonus;
+        uint256 defaultMinimumMarketMultiplier;
+        uint256 defaultMaximumMarketMultiplier;
+        uint256 defaultMinimumUnderwriterRate;
+        uint256 defaultMaximumUnderwriterRate;
+        uint256 defaultUnderwriterRate;
+        uint256[] defaultTrancheWeights;
+        uint256 defaultFixedCreditLimit;
+        uint256 defaultMaximumTermLimit;
+        uint256 defaultMinimumTermLimit;
+        uint256 defaultGrace;
+        IInterestRateModel.Slopes liquiditySlopes;
+        bool applyLiquiditySlopes;
     }
 
     /// @dev Result bundle returned by market creation helpers.
     struct MarketBundle {
-        Market market;
-        Tranche senior;
-        Tranche junior;
+        FloatingMarket market;
+        Tranche tranche0;
+        Tranche tranche1;
         address marketAddr;
-        address seniorAddr;
-        address juniorAddr;
+        address tranche0Addr;
+        address tranche1Addr;
     }
 
     function _defaultCapConfig() internal pure returns (CapConfig memory cfg) {
@@ -80,16 +89,22 @@ abstract contract CapDeployer is BaseTest {
         cfg.defaultLt = 0.8e27;
         cfg.defaultMultiplier = 1e27;
         cfg.defaultTargetHealth = 1.1e27;
-        cfg.defaultKinkMinBonus = 0.9e27;
-        cfg.defaultKinkMaxBonus = 0.02e27;
-        cfg.defaultKinkBonus = 0.1e27;
-        cfg.defaultJuniorSplit = 0.5e27;
-        cfg.defaultBorrowCap = 1_000e18;
-        cfg.variableSlopes = IInterestRateModel.Slopes({ base: 0.05e27, slope0: 0.05e27, slope1: 0.1e27, kink: 0.8e27 });
-        cfg.underwriterSlopes =
-            IInterestRateModel.Slopes({ base: 0.2e27, slope0: 0.1e27, slope1: 0.3e27, kink: 0.5e27 });
-        cfg.applyVariableSlopes = false;
-        cfg.applyUnderwriterSlopes = false;
+        cfg.defaultLiquidationBonus = 0.02e27;
+        cfg.defaultMinimumMarketMultiplier = 1e27;
+        cfg.defaultMaximumMarketMultiplier = 2e27;
+        cfg.defaultMinimumUnderwriterRate = 0;
+        cfg.defaultMaximumUnderwriterRate = 1e27;
+        cfg.defaultUnderwriterRate = 6341958396753; // ~20% APR in ray per second
+        cfg.defaultTrancheWeights = new uint256[](2);
+        cfg.defaultTrancheWeights[0] = 1e27 - 0.05e27;
+        cfg.defaultTrancheWeights[1] = 0.05e27;
+        cfg.defaultFixedCreditLimit = 1_000e18;
+        cfg.defaultMaximumTermLimit = 30 days;
+        cfg.defaultMinimumTermLimit = 1 days;
+        cfg.defaultGrace = 1 days;
+        cfg.liquiditySlopes =
+            IInterestRateModel.Slopes({ base: 0.05e27, slope0: 0.05e27, slope1: 0.1e27, kink: 0.8e27 });
+        cfg.applyLiquiditySlopes = false;
     }
 
     // ── deployment ────────────────────────────────────────────────────────────
@@ -100,11 +115,21 @@ abstract contract CapDeployer is BaseTest {
     }
 
     function _deployCapWithConfig(CapConfig memory cfg) internal {
+        if (cfg.stablecoinYield == address(0)) {
+            cfg.stablecoinYield = makeAddr("stcUSD");
+        }
         capConfig = cfg;
+        defaultMarketOwner = address(this);
+        defaultBorrower = makeAddr("borrower");
+        defaultLiquidator = makeAddr("liquidator");
+
         _setUpAccessManager();
         _deployCoreContracts();
         _deployRegistry();
         _configureAccess();
+        _assignOperator(defaultMarketOwner);
+        _assignOperator(defaultBorrower);
+
         oracle.setPrice(address(collateral), capConfig.collateralPrice);
     }
 
@@ -125,7 +150,21 @@ abstract contract CapDeployer is BaseTest {
         address stablecoinAddr = vm.computeCreateAddress(address(this), n + 1);
 
         irm = InterestRateModel(
-            _deployProxy(address(irmImpl), abi.encodeCall(InterestRateModel.initialize, (authority, stablecoinAddr)))
+            _deployProxy(
+                address(irmImpl),
+                abi.encodeCall(
+                    InterestRateModel.initialize,
+                    (
+                        authority,
+                        stablecoinAddr,
+                        capConfig.defaultMinimumMarketMultiplier,
+                        capConfig.defaultMaximumMarketMultiplier,
+                        capConfig.defaultMinimumUnderwriterRate,
+                        capConfig.defaultMaximumUnderwriterRate,
+                        capConfig.defaultLiquidationBonus
+                    )
+                )
+            )
         );
         stablecoin = Stablecoin(
             _deployProxy(
@@ -139,13 +178,20 @@ abstract contract CapDeployer is BaseTest {
         require(address(irm) == irmAddr, "irm addr");
         require(address(stablecoin) == stablecoinAddr, "stablecoin addr");
 
-        Market marketImpl = new Market();
+        FloatingMarket marketImpl = new FloatingMarket();
+        FixedMarket fixedMarketImpl = new FixedMarket();
         Tranche trancheImpl = new Tranche();
         Underwriter underwriterImpl = new Underwriter();
 
-        marketFactory = new BeaconFactory(address(new UpgradeableBeacon(address(marketImpl), address(this))));
-        trancheFactory = new BeaconFactory(address(new UpgradeableBeacon(address(trancheImpl), address(this))));
-        underwriterFactory = new BeaconFactory(address(new UpgradeableBeacon(address(underwriterImpl), address(this))));
+        beaconFactory = BeaconFactory(
+            _deployProxy(
+                address(new BeaconFactory()), abi.encodeCall(BeaconFactory.initialize, (address(accessManager)))
+            )
+        );
+        floatingMarketBeacon = address(new UpgradeableBeacon(address(marketImpl), address(this)));
+        fixedMarketBeacon = address(new UpgradeableBeacon(address(fixedMarketImpl), address(this)));
+        trancheBeacon = address(new UpgradeableBeacon(address(trancheImpl), address(this)));
+        underwriterBeacon = address(new UpgradeableBeacon(address(underwriterImpl), address(this)));
     }
 
     function _deployRegistry() internal {
@@ -156,14 +202,21 @@ abstract contract CapDeployer is BaseTest {
                     Registry.initialize,
                     (
                         address(accessManager),
-                        address(stablecoin),
-                        capConfig.stablecoinYield,
-                        address(vault),
-                        address(oracle),
-                        address(irm),
-                        address(marketFactory),
-                        address(trancheFactory),
-                        address(underwriterFactory)
+                        IRegistry.InitParams({
+                            stablecoin: address(stablecoin),
+                            stakedStablecoin: capConfig.stablecoinYield,
+                            vault: address(vault),
+                            oracle: address(oracle),
+                            irm: address(irm),
+                            factory: address(beaconFactory),
+                            floatingMarketBeacon: floatingMarketBeacon,
+                            fixedMarketBeacon: fixedMarketBeacon,
+                            trancheBeacon: trancheBeacon,
+                            underwriterBeacon: underwriterBeacon,
+                            lt: capConfig.defaultLt,
+                            buffer: capConfig.defaultBuffer,
+                            targetHealth: capConfig.defaultTargetHealth
+                        })
                     )
                 )
             )
@@ -171,101 +224,162 @@ abstract contract CapDeployer is BaseTest {
     }
 
     function _configureAccess() internal {
-        bytes4[] memory registrySelectors = new bytes4[](2);
-        registrySelectors[0] = Registry.createMarket.selector;
-        registrySelectors[1] = Registry.createUnderwriter.selector;
-        accessManager.setTargetFunctionRole(address(registry), registrySelectors, CapRoles.MANAGER);
-        accessManager.grantRole(CapRoles.MANAGER, address(registry), 0);
-        accessManager.grantRole(CapRoles.MANAGER, address(this), 0);
+        accessManager.grantRole(CapRoles.ADMIN, address(registry), 0);
+        accessManager.grantRole(CapRoles.REGISTRY, address(registry), 0);
+        accessManager.grantRole(CapRoles.GOVERNOR, address(this), 0);
+        accessManager.grantRole(CapRoles.KEEPER, address(this), 0);
+        accessManager.grantRole(CapRoles.GUARDIAN, address(this), 0);
+        accessManager.grantRole(CapRoles.ADMIN, address(this), 0);
+        accessManager.grantRole(CapRoles.LIQUIDATOR, defaultLiquidator, 0);
+
+        bytes4[] memory factorySelectors = new bytes4[](1);
+        factorySelectors[0] = IBeaconFactory.create.selector;
+        accessManager.setTargetFunctionRole(address(beaconFactory), factorySelectors, CapRoles.REGISTRY);
+
+        bytes4[] memory governorSelectors = new bytes4[](1);
+        governorSelectors[0] = Registry.assignOperator.selector;
+        accessManager.setTargetFunctionRole(address(registry), governorSelectors, CapRoles.GOVERNOR);
+
+        bytes4[] memory keeperSelectors = new bytes4[](3);
+        keeperSelectors[0] = Registry.createMarket.selector;
+        keeperSelectors[1] = Registry.createFixedMarket.selector;
+        keeperSelectors[2] = Registry.createUnderwriter.selector;
+        accessManager.setTargetFunctionRole(address(registry), keeperSelectors, CapRoles.KEEPER);
 
         bytes4[] memory minterSelectors = new bytes4[](2);
-        minterSelectors[0] = Stablecoin.mintUnbacked.selector;
-        minterSelectors[1] = Stablecoin.burnUnbacked.selector;
+        minterSelectors[0] = Stablecoin.mintCreditBacked.selector;
+        minterSelectors[1] = Stablecoin.burnCreditBacked.selector;
         accessManager.setTargetFunctionRole(address(stablecoin), minterSelectors, CapRoles.MINTER);
         accessManager.grantRole(CapRoles.MINTER, address(this), 0);
 
-        bytes4[] memory irmSelectors = new bytes4[](3);
-        irmSelectors[0] = InterestRateModel.setVariableSlopes.selector;
-        irmSelectors[1] = InterestRateModel.setFixedSlopes.selector;
-        irmSelectors[2] = InterestRateModel.setUnderwriterSlopes.selector;
-        accessManager.setTargetFunctionRole(address(irm), irmSelectors, CapRoles.MANAGER);
+        bytes4[] memory irmGovernorSelectors = new bytes4[](3);
+        irmGovernorSelectors[0] = InterestRateModel.setLiquiditySlopes.selector;
+        irmGovernorSelectors[1] = InterestRateModel.setTermMultiplierSlopes.selector;
+        irmGovernorSelectors[2] = InterestRateModel.setLiquidationBonus.selector;
+        accessManager.setTargetFunctionRole(address(irm), irmGovernorSelectors, CapRoles.GOVERNOR);
+    }
 
-        accessManager.grantRole(CapRoles.ADMIN, address(registry), 0);
-        accessManager.grantRole(CapRoles.GUARDIAN, address(registry), 0);
-        accessManager.grantRole(CapRoles.GUARDIAN, address(this), 0);
+    // ── operator helpers ──────────────────────────────────────────────────────
+
+    function _assignOperator(address account) internal returns (uint64 roleId) {
+        roleId = registry.assignOperator(account);
     }
 
     // ── market helpers ────────────────────────────────────────────────────────
 
-    /// @dev Create a market with default capConfig risk parameters.
-    function _createMarket(string memory name) internal returns (address market, address senior, address junior) {
-        return _createMarket(name, CapRoles.MANAGER, CapRoles.BORROWER);
+    function _createMarket(string memory name, address marketOwner, address borrower, uint256[] memory weights)
+        internal
+        returns (address market, address[] memory tranches)
+    {
+        if (registry.operatorRole(marketOwner) == 0) _assignOperator(marketOwner);
+        if (registry.operatorRole(borrower) == 0) _assignOperator(borrower);
+
+        (market, tranches) = registry.createMarket(address(collateral), name, marketOwner, borrower, weights);
+        _applyMarketDefaults(FloatingMarket(market));
     }
 
-    function _createMarket(string memory name, uint64 managerId, uint64 borrowerId)
+    function _createMarket(string memory name) internal returns (address market, address tranche0, address tranche1) {
+        address[] memory tranches;
+        (market, tranches) = _createMarket(name, defaultMarketOwner, defaultBorrower, capConfig.defaultTrancheWeights);
+        tranche0 = tranches[0];
+        tranche1 = tranches[1];
+    }
+
+    function _createMarket(string memory name, address marketOwner, address borrower)
         internal
-        returns (address market, address senior, address junior)
+        returns (address market, address tranche0, address tranche1)
     {
-        (market, senior, junior) = registry.createMarket(address(collateral), name, managerId, borrowerId);
-        _applyMarketDefaults(Market(market));
+        address[] memory tranches;
+        (market, tranches) = _createMarket(name, marketOwner, borrower, capConfig.defaultTrancheWeights);
+        tranche0 = tranches[0];
+        tranche1 = tranches[1];
+    }
+
+    function _createFixedMarket(string memory name, address marketOwner, address borrower, uint256[] memory weights)
+        internal
+        returns (address market, address[] memory tranches)
+    {
+        if (registry.operatorRole(marketOwner) == 0) _assignOperator(marketOwner);
+        if (registry.operatorRole(borrower) == 0) _assignOperator(borrower);
+
+        (market, tranches) = registry.createFixedMarket(
+            address(collateral),
+            name,
+            marketOwner,
+            borrower,
+            capConfig.defaultMaximumTermLimit,
+            capConfig.defaultMinimumTermLimit,
+            capConfig.defaultGrace,
+            weights
+        );
+        _applyMarketDefaults(FloatingMarket(market));
+    }
+
+    function _createFixedMarket(string memory name)
+        internal
+        returns (address market, address tranche0, address tranche1)
+    {
+        return _createFixedMarket(name, defaultMarketOwner, defaultBorrower);
+    }
+
+    function _createFixedMarket(string memory name, address marketOwner, address borrower)
+        internal
+        returns (address market, address tranche0, address tranche1)
+    {
+        address[] memory tranches;
+        (market, tranches) = _createFixedMarket(name, marketOwner, borrower, capConfig.defaultTrancheWeights);
+        tranche0 = tranches[0];
+        tranche1 = tranches[1];
     }
 
     function _createMarketBundle(string memory name) internal returns (MarketBundle memory bundle) {
-        bundle = _createMarketBundle(name, CapRoles.MANAGER, CapRoles.BORROWER);
+        bundle = _createMarketBundle(name, defaultMarketOwner, defaultBorrower);
     }
 
-    function _createMarketBundle(string memory name, uint64 managerId, uint64 borrowerId)
+    function _createMarketBundle(string memory name, address marketOwner, address borrower)
         internal
         returns (MarketBundle memory bundle)
     {
-        (bundle.marketAddr, bundle.seniorAddr, bundle.juniorAddr) =
-            registry.createMarket(address(collateral), name, managerId, borrowerId);
+        (bundle.marketAddr, bundle.tranche0Addr, bundle.tranche1Addr) = _createMarket(name, marketOwner, borrower);
 
-        bundle.market = Market(bundle.marketAddr);
-        bundle.senior = Tranche(bundle.seniorAddr);
-        bundle.junior = Tranche(bundle.juniorAddr);
-
-        _applyMarketDefaults(bundle.market);
+        bundle.market = FloatingMarket(bundle.marketAddr);
+        bundle.tranche0 = Tranche(bundle.tranche0Addr);
+        bundle.tranche1 = Tranche(bundle.tranche1Addr);
     }
 
-    /// @dev Create market, apply slopes, junior split, and borrow cap from capConfig.
+    /// @dev Create market, apply slopes, and fixed credit limit from capConfig.
     function _createReadyMarket(string memory name) internal returns (MarketBundle memory bundle) {
         bundle = _createMarketBundle(name);
-        _configureMarketRates(bundle.marketAddr);
-        bundle.market.setJuniorSplit(capConfig.defaultJuniorSplit);
-        bundle.market.setBorrowCap(capConfig.defaultBorrowCap);
+        _configureMarketRates(bundle.market);
+        bundle.market.setFixedCreditLimit(capConfig.defaultFixedCreditLimit);
     }
 
-    function _applyMarketDefaults(Market market) internal {
+    function _applyMarketDefaults(FloatingMarket market) internal {
         market.setLtv(capConfig.defaultLtv);
         market.setBuffer(capConfig.defaultBuffer);
         market.setLt(capConfig.defaultLt);
-        market.setMultiplier(capConfig.defaultMultiplier);
+        market.setMarketMultiplier(capConfig.defaultMultiplier);
         market.setTargetHealth(capConfig.defaultTargetHealth);
-        market.setBonusConfig(capConfig.defaultKinkMinBonus, capConfig.defaultKinkMaxBonus, capConfig.defaultKinkBonus);
+        market.setFixedCreditLimit(capConfig.defaultFixedCreditLimit);
     }
 
-    function _configureMarketRates(address marketAddr) internal {
-        if (capConfig.applyVariableSlopes) {
-            irm.setVariableSlopes(capConfig.variableSlopes);
+    function _configureMarketRates(FloatingMarket market) internal {
+        if (capConfig.applyLiquiditySlopes) {
+            irm.setLiquiditySlopes(capConfig.liquiditySlopes);
         }
-        if (capConfig.applyUnderwriterSlopes) {
-            irm.setUnderwriterSlopes(marketAddr, capConfig.underwriterSlopes);
-        }
+        market.setUnderwriterRate(capConfig.defaultUnderwriterRate);
     }
 
     function _setMarketSlopes(address marketAddr) internal {
-        irm.setUnderwriterSlopes(
-            marketAddr, IInterestRateModel.Slopes({ base: 0.2e27, slope0: 0.1e27, slope1: 0.3e27, kink: 0.5e27 })
-        );
-    }
-
-    function _grantBorrower(address borrower) internal {
-        accessManager.grantRole(CapRoles.BORROWER, borrower, 0);
+        FloatingMarket(marketAddr).setUnderwriterRate(capConfig.defaultUnderwriterRate);
     }
 
     function _grantKeeper(address keeper) internal {
         accessManager.grantRole(CapRoles.KEEPER, keeper, 0);
+    }
+
+    function _grantLiquidator(address liquidator) internal {
+        accessManager.grantRole(CapRoles.LIQUIDATOR, liquidator, 0);
     }
 
     // ── funding helpers ───────────────────────────────────────────────────────
@@ -293,13 +407,14 @@ abstract contract CapDeployer is BaseTest {
     }
 
     function _mintStable(address to, uint256 amount) internal {
-        stablecoin.mintUnbacked(to, amount);
+        stablecoin.mintCreditBacked(to, amount);
     }
 
     // ── underwriter helpers ───────────────────────────────────────────────────
 
     function _deployUnderwriter() internal returns (Underwriter underwriter) {
-        address uw = registry.createUnderwriter(address(collateral), "Cap Underwriter", "cUW", CapRoles.MANAGER);
+        if (registry.operatorRole(address(this)) == 0) _assignOperator(address(this));
+        address uw = registry.createUnderwriter(address(collateral), "Cap Underwriter", "cUW", address(this));
         underwriter = Underwriter(uw);
     }
 

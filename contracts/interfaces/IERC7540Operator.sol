@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.36;
 
 interface IERC7540Operator {
-    struct ERC7540OperatorStorage {
-        mapping(address controller => mapping(address operator => bool)) isOperator;
-    }
-
     /// @dev Emitted when `controller` sets the `approved` status for an `operator`.
     event OperatorSet(address indexed controller, address indexed operator, bool approved);
 

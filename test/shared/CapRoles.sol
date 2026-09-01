@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.36;
+
+import { CapRoles as CapRolesLib } from "../../contracts/utils/CapRoles.sol";
 
 /// @title CapRoles
-/// @notice Shared role IDs for Cap protocol tests. Registry-internal roles (guardian/keeper/minter)
-/// match `Registry.sol`; manager and borrower are test-specific IDs passed into `createMarket`.
+/// @notice Test helpers wrapping protocol role ids from {CapRolesLib}.
 library CapRoles {
-    uint64 internal constant ADMIN = 0;
-    uint64 internal constant GUARDIAN = 1;
-    uint64 internal constant KEEPER = 2;
-    uint64 internal constant MINTER = 3;
-    uint64 internal constant MANAGER = 4;
-    uint64 internal constant BORROWER = 5;
+    uint64 internal constant ADMIN = CapRolesLib.ADMIN;
+    uint64 internal constant GUARDIAN = CapRolesLib.GUARDIAN;
+    uint64 internal constant KEEPER = CapRolesLib.KEEPER;
+    uint64 internal constant MINTER = CapRolesLib.MINTER;
+    uint64 internal constant GOVERNOR = CapRolesLib.GOVERNOR;
+    uint64 internal constant REGISTRY = CapRolesLib.REGISTRY;
+    uint64 internal constant LIQUIDATOR = CapRolesLib.LIQUIDATOR;
+    uint64 internal constant FIRST_OPERATOR_ROLE = CapRolesLib.FIRST_OPERATOR_ROLE;
 }

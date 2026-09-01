@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.36;
 
 import {
     SymbioticNetworkAdapterConfig,
     SymbioticVaultConfig
 } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
-import { ConfigureSymbioticOptIns } from
-    "../../contracts/deploy/service/providers/symbiotic/ConfigureSymbioticOptIns.sol";
+import {
+    ConfigureSymbioticOptIns
+} from "../../contracts/deploy/service/providers/symbiotic/ConfigureSymbioticOptIns.sol";
 import { SymbioticAdapterConfigSerializer } from "../config/SymbioticAdapterConfigSerializer.sol";
 import { SymbioticVaultConfigSerializer } from "../config/SymbioticVaultConfigSerializer.sol";
 import { Script } from "forge-std/Script.sol";

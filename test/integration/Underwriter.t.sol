@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.36;
 
-import { Market } from "../../contracts/cap/Market.sol";
 import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { Underwriter } from "../../contracts/cap/Underwriter.sol";
+import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
 import { IUnderwriter } from "../../contracts/interfaces/IUnderwriter.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
@@ -11,11 +11,9 @@ import { CapDeployer } from "../shared/CapDeployer.sol";
 contract UnderwriterIntegrationTest is CapDeployer {
     address internal borrower = makeAddr("borrower");
     address internal depositor = makeAddr("depositor");
-    uint64 internal managerId = MANAGER_ROLE;
-    uint64 internal borrowerId = BORROWER_ROLE;
-    Market internal market;
-    Tranche internal senior;
-    Tranche internal junior;
+    FloatingMarket internal market;
+    Tranche internal tranche0;
+    Tranche internal tranche1;
     Underwriter internal underwriter;
 
     uint256 internal constant DEPOSIT = 1_000e18;
@@ -24,37 +22,36 @@ contract UnderwriterIntegrationTest is CapDeployer {
         _deployCap();
 
         address marketAddr;
-        address s;
-        address j;
-        (marketAddr, s, j) = _createMarket("Market A", managerId, borrowerId);
-        accessManager.grantRole(BORROWER_ROLE, borrower, 0);
-        market = Market(marketAddr);
-        senior = Tranche(s);
-        junior = Tranche(j);
+        address t0;
+        address t1;
+        (marketAddr, t0, t1) = _createMarket("Market A");
+        market = FloatingMarket(marketAddr);
+        tranche0 = Tranche(t0);
+        tranche1 = Tranche(t1);
 
         _setMarketSlopes(marketAddr);
-        irm.setVariableSlopes(
+        irm.setLiquiditySlopes(
             IInterestRateModel.Slopes({ base: 0.05e27, slope0: 0.05e27, slope1: 0.1e27, kink: 0.8e27 })
         );
-        market.setMultiplier(1e27);
-        market.setJuniorSplit(0.5e27);
-        market.setBorrowCap(1_000e18);
+        market.setMarketMultiplier(1e27);
+        market.setFixedCreditLimit(1_000e18);
 
         underwriter = _deployUnderwriter();
-        senior.setWhitelist(address(underwriter), true);
+        tranche0.setWhitelist(address(underwriter), true);
     }
 
-    function _useSeniorAsDefault() internal {
-        underwriter.setDefaultTranche(address(senior));
+    function _useTranche0AsDefault() internal {
+        underwriter.addTranche(address(tranche0));
+        underwriter.setDefaultTranche(address(tranche0));
     }
 
     function test_deposit_allocatesToDefaultTranche() public {
-        _useSeniorAsDefault();
+        _useTranche0AsDefault();
         _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
 
         assertEq(underwriter.balanceOf(depositor), DEPOSIT);
-        assertEq(senior.balanceOf(address(underwriter)), DEPOSIT);
-        assertEq(vault.balanceOf(address(senior), address(collateral)), DEPOSIT);
+        assertEq(tranche0.balanceOf(address(underwriter)), DEPOSIT);
+        assertEq(vault.balanceOf(address(tranche0), address(collateral)), DEPOSIT);
         assertEq(vault.balanceOf(address(underwriter), address(collateral)), 0);
         assertEq(underwriter.totalAssets(), DEPOSIT);
     }
@@ -63,31 +60,53 @@ contract UnderwriterIntegrationTest is CapDeployer {
         _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
         assertEq(vault.balanceOf(address(underwriter), address(collateral)), DEPOSIT);
 
-        underwriter.allocate(address(senior), DEPOSIT);
-        assertEq(senior.balanceOf(address(underwriter)), DEPOSIT);
+        underwriter.addTranche(address(tranche0));
+        underwriter.allocate(address(tranche0), DEPOSIT);
+        assertEq(tranche0.balanceOf(address(underwriter)), DEPOSIT);
         assertEq(vault.balanceOf(address(underwriter), address(collateral)), 0);
 
-        uint256 freed = underwriter.deallocate(address(senior), DEPOSIT);
+        uint256 freed = underwriter.deallocate(address(tranche0), DEPOSIT);
+        assertEq(freed, DEPOSIT);
+        assertEq(vault.balanceOf(address(underwriter), address(collateral)), DEPOSIT);
+    }
+
+    function test_deallocate_afterRemoveTranche() public {
+        _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
+
+        underwriter.addTranche(address(tranche0));
+        underwriter.allocate(address(tranche0), DEPOSIT);
+        assertEq(tranche0.balanceOf(address(underwriter)), DEPOSIT);
+
+        underwriter.removeTranche(address(tranche0));
+
+        vm.expectRevert(IUnderwriter.NotRegisteredTranche.selector);
+        underwriter.allocate(address(tranche0), 1e18);
+
+        uint256 freed = underwriter.deallocate(address(tranche0), DEPOSIT);
         assertEq(freed, DEPOSIT);
         assertEq(vault.balanceOf(address(underwriter), address(collateral)), DEPOSIT);
     }
 
     function test_allocate_nonTranche_reverts() public {
         _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
-        vm.expectRevert(IUnderwriter.InvalidTranche.selector);
+        vm.expectRevert(IUnderwriter.NotRegisteredTranche.selector);
         underwriter.allocate(makeAddr("notTranche"), 1e18);
     }
 
     function test_curatorEarnsPremiumAndDistributesToDepositor() public {
-        _useSeniorAsDefault();
+        _useTranche0AsDefault();
         _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
 
         vm.prank(borrower);
         market.borrow(borrower, 400e18);
 
         vm.warp(block.timestamp + 365 days);
+        vm.prank(borrower);
+        market.repay(1);
 
-        underwriter.report(address(senior));
+        vm.warp(block.timestamp + 6 hours);
+
+        underwriter.report(address(tranche0));
         uint256 pulled = stablecoin.balanceOf(address(underwriter));
         assertGt(pulled, 0);
 
@@ -105,7 +124,7 @@ contract UnderwriterIntegrationTest is CapDeployer {
     }
 
     function test_asyncRedemption_pendingUntilDeallocated() public {
-        _useSeniorAsDefault();
+        _useTranche0AsDefault();
         _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
 
         assertEq(underwriter.unlockedSupply(), 0);
@@ -116,8 +135,8 @@ contract UnderwriterIntegrationTest is CapDeployer {
         assertEq(underwriter.pendingRedeemRequest(reqId, depositor), DEPOSIT);
         assertEq(underwriter.claimableRedeemRequest(reqId, depositor), 0);
 
-        uint256 shares = senior.balanceOf(address(underwriter));
-        uint256 freed = underwriter.deallocate(address(senior), shares);
+        uint256 shares = tranche0.balanceOf(address(underwriter));
+        uint256 freed = underwriter.deallocate(address(tranche0), shares);
         assertEq(freed, DEPOSIT);
 
         assertEq(underwriter.claimableRedeemRequest(reqId, depositor), DEPOSIT);
@@ -130,7 +149,7 @@ contract UnderwriterIntegrationTest is CapDeployer {
     }
 
     function test_asyncRedemption_partialWhileBorrowed_fullAfterRepay() public {
-        _useSeniorAsDefault();
+        _useTranche0AsDefault();
         _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
 
         vm.prank(borrower);
@@ -140,8 +159,8 @@ contract UnderwriterIntegrationTest is CapDeployer {
         uint256 reqId = underwriter.requestRedeem(DEPOSIT, depositor, depositor);
         assertEq(underwriter.claimableRedeemRequest(reqId, depositor), 0);
 
-        uint256 shares = senior.balanceOf(address(underwriter));
-        uint256 partialFreed = underwriter.deallocate(address(senior), shares);
+        uint256 shares = tranche0.balanceOf(address(underwriter));
+        uint256 partialFreed = underwriter.deallocate(address(tranche0), shares);
         assertGt(partialFreed, 0);
         assertLt(partialFreed, DEPOSIT);
 
@@ -153,8 +172,8 @@ contract UnderwriterIntegrationTest is CapDeployer {
         vm.prank(borrower);
         market.repay(type(uint256).max);
 
-        uint256 remaining = senior.balanceOf(address(underwriter));
-        underwriter.deallocate(address(senior), remaining);
+        uint256 remaining = tranche0.balanceOf(address(underwriter));
+        underwriter.deallocate(address(tranche0), remaining);
 
         assertEq(underwriter.claimableRedeemRequest(reqId, depositor), DEPOSIT);
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.36;
 
 /// @notice Mock that satisfies the calls InterestRateModel makes on Stablecoin and Market.
 contract MockUtilizationSource {

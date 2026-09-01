@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity 0.8.36;
 
 import { LzAddressbook, LzUtils } from "../../contracts/deploy/utils/LzUtils.sol";
 import { WalletUtils } from "../../contracts/deploy/utils/WalletUtils.sol";
@@ -72,7 +72,10 @@ contract SendOFTWithZapCompose is Script, WalletUtils, LzUtils {
             });
 
             IZapRouter.StepToken[] memory tokens = new IZapRouter.StepToken[](1);
-            tokens[0] = IZapRouter.StepToken({ token: address(dstStakedCapToken), index: 4 /* selector size */ });
+            tokens[0] = IZapRouter.StepToken({
+                token: address(dstStakedCapToken),
+                index: 4 /* selector size */
+            });
             IZapRouter.Step[] memory route = new IZapRouter.Step[](1);
             route[0] = IZapRouter.Step({
                 target: dstStakedCapToken,

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.0;
+pragma solidity 0.8.36;
 
 /// @title WadRayMath library
 /// @author Aave
@@ -45,7 +45,7 @@ library WadRayMath {
         }
     }
 
-    /// @notice Multiplies two ray, rounding half up to the nearest ray
+    /// @dev Multiplies two ray, rounding half up to the nearest ray
     /// @dev assembly optimized for improved gas savings, see https://twitter.com/transmissions11/status/1451131036377571328
     /// @param a Ray
     /// @param b Ray
@@ -59,7 +59,7 @@ library WadRayMath {
         }
     }
 
-    /// @notice Divides two ray, rounding half up to the nearest ray
+    /// @dev Divides two ray, rounding half up to the nearest ray
     /// @dev assembly optimized for improved gas savings, see https://twitter.com/transmissions11/status/1451131036377571328
     /// @param a Ray
     /// @param b Ray

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.36;
 
 import { ImplementationsConfig, InfraConfig, LibsConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
@@ -19,30 +19,31 @@ contract InfraConfigSerializer {
         internal
     {
         string memory implemsJson = "implems";
-        implemsJson.serialize("accessControl", implems.accessControl);
-        implemsJson.serialize("lender", implems.lender);
-        implemsJson.serialize("delegation", implems.delegation);
-        implemsJson.serialize("capToken", implems.capToken);
-        implemsJson.serialize("stakedCap", implems.stakedCap);
-        implemsJson.serialize("oracle", implems.oracle);
-        implemsJson.serialize("debtToken", implems.debtToken);
-        implemsJson.serialize("feeAuction", implems.feeAuction);
-        implemsJson.serialize("wrapper", implems.wrapper);
-        implemsJson = implemsJson.serialize("feeReceiver", implems.feeReceiver);
+        implemsJson.serialize("vault", implems.vault);
+        implemsJson.serialize("stablecoin", implems.stablecoin);
+        implemsJson.serialize("irm", implems.irm);
+        implemsJson.serialize("registry", implems.registry);
+        implemsJson.serialize("floatingMarket", implems.floatingMarket);
+        implemsJson.serialize("fixedMarket", implems.fixedMarket);
+        implemsJson.serialize("tranche", implems.tranche);
+        implemsJson = implemsJson.serialize("underwriter", implems.underwriter);
         console.log(implemsJson);
 
         string memory libsJson = "libs";
-        libsJson.serialize("aaveAdapter", libs.aaveAdapter);
-        libsJson.serialize("chainlinkAdapter", libs.chainlinkAdapter);
-        libsJson.serialize("capTokenAdapter", libs.capTokenAdapter);
-        libsJson = libsJson.serialize("stakedCapAdapter", libs.stakedCapAdapter);
+        libsJson = libsJson.serialize("unused", libs.unused);
         console.log(libsJson);
 
         string memory infraJson = "infra";
-        infraJson.serialize("oracle", infra.oracle);
-        infraJson.serialize("accessControl", infra.accessControl);
-        infraJson.serialize("lender", infra.lender);
-        infraJson = infraJson.serialize("delegation", infra.delegation);
+        infraJson.serialize("accessManager", infra.accessManager);
+        infraJson.serialize("vault", infra.vault);
+        infraJson.serialize("stablecoin", infra.stablecoin);
+        infraJson.serialize("irm", infra.irm);
+        infraJson.serialize("registry", infra.registry);
+        infraJson.serialize("factory", infra.factory);
+        infraJson.serialize("floatingMarketBeacon", infra.floatingMarketBeacon);
+        infraJson.serialize("fixedMarketBeacon", infra.fixedMarketBeacon);
+        infraJson.serialize("trancheBeacon", infra.trancheBeacon);
+        infraJson = infraJson.serialize("underwriterBeacon", infra.underwriterBeacon);
         console.log(infraJson);
 
         string memory chainJson = "chain";
@@ -70,37 +71,31 @@ contract InfraConfigSerializer {
 
         string memory implemsPrefix = string.concat(chainPrefix, "implems.");
         implems = ImplementationsConfig({
-            accessControl: json.readAddress(string.concat(implemsPrefix, "accessControl")),
-            lender: json.readAddress(string.concat(implemsPrefix, "lender")),
-            delegation: json.readAddress(string.concat(implemsPrefix, "delegation")),
-            capToken: json.readAddress(string.concat(implemsPrefix, "capToken")),
-            stakedCap: json.readAddress(string.concat(implemsPrefix, "stakedCap")),
-            oracle: json.readAddress(string.concat(implemsPrefix, "oracle")),
-            debtToken: json.readAddress(string.concat(implemsPrefix, "debtToken")),
-            feeAuction: json.readAddress(string.concat(implemsPrefix, "feeAuction")),
-            feeReceiver: json.readAddress(string.concat(implemsPrefix, "feeReceiver")),
-            chainlinkPoRAddressList: json.readAddress(string.concat(implemsPrefix, "chainlinkPoRAddressList")),
-            wrapper: json.readAddress(string.concat(implemsPrefix, "wrapper"))
+            vault: json.readAddress(string.concat(implemsPrefix, "vault")),
+            stablecoin: json.readAddress(string.concat(implemsPrefix, "stablecoin")),
+            irm: json.readAddress(string.concat(implemsPrefix, "irm")),
+            registry: json.readAddress(string.concat(implemsPrefix, "registry")),
+            floatingMarket: json.readAddress(string.concat(implemsPrefix, "floatingMarket")),
+            fixedMarket: json.readAddress(string.concat(implemsPrefix, "fixedMarket")),
+            tranche: json.readAddress(string.concat(implemsPrefix, "tranche")),
+            underwriter: json.readAddress(string.concat(implemsPrefix, "underwriter"))
         });
 
         string memory libsPrefix = string.concat(chainPrefix, "libs.");
-        libs = LibsConfig({
-            aaveAdapter: json.readAddress(string.concat(libsPrefix, "aaveAdapter")),
-            chainlinkAdapter: json.readAddress(string.concat(libsPrefix, "chainlinkAdapter")),
-            capTokenAdapter: json.readAddress(string.concat(libsPrefix, "capTokenAdapter")),
-            stakedCapAdapter: json.readAddress(string.concat(libsPrefix, "stakedCapAdapter")),
-            lbtcAdapter: json.readAddress(string.concat(libsPrefix, "lbtcAdapter"))
-        });
+        libs = LibsConfig({ unused: json.readAddress(string.concat(libsPrefix, "unused")) });
 
         string memory infraPrefix = string.concat(chainPrefix, "infra.");
         infra = InfraConfig({
-            oracle: json.readAddress(string.concat(infraPrefix, "oracle")),
-            accessControl: json.readAddress(string.concat(infraPrefix, "accessControl")),
-            lender: json.readAddress(string.concat(infraPrefix, "lender")),
-            delegation: json.readAddress(string.concat(infraPrefix, "delegation")),
-            chainlinkPoRAddressList: json.readAddress(string.concat(infraPrefix, "chainlinkPoRAddressList")),
-            gelatoHarvester: json.readAddress(string.concat(infraPrefix, "gelatoHarvester")),
-            gelatoSweeper: json.readAddress(string.concat(infraPrefix, "gelatoSweeper"))
+            accessManager: json.readAddress(string.concat(infraPrefix, "accessManager")),
+            vault: json.readAddress(string.concat(infraPrefix, "vault")),
+            stablecoin: json.readAddress(string.concat(infraPrefix, "stablecoin")),
+            irm: json.readAddress(string.concat(infraPrefix, "irm")),
+            registry: json.readAddress(string.concat(infraPrefix, "registry")),
+            factory: json.readAddress(string.concat(infraPrefix, "factory")),
+            floatingMarketBeacon: json.readAddress(string.concat(infraPrefix, "floatingMarketBeacon")),
+            fixedMarketBeacon: json.readAddress(string.concat(infraPrefix, "fixedMarketBeacon")),
+            trancheBeacon: json.readAddress(string.concat(infraPrefix, "trancheBeacon")),
+            underwriterBeacon: json.readAddress(string.concat(infraPrefix, "underwriterBeacon"))
         });
     }
 }

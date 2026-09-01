@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.36;
 
-import { Market } from "../../contracts/cap/Market.sol";
 import { Tranche } from "../../contracts/cap/Tranche.sol";
+import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
 
@@ -11,8 +11,6 @@ contract AsyncRedemptionTest is CapDeployer {
     address internal supplier = makeAddr("supplier");
     address internal cusdHolder = makeAddr("cusdHolder");
     address internal cusdDepositor = makeAddr("cusdDepositor");
-    uint64 internal managerId = MANAGER_ROLE;
-    uint64 internal borrowerId = BORROWER_ROLE;
 
     function setUp() public {
         _deployCap();
@@ -20,41 +18,40 @@ contract AsyncRedemptionTest is CapDeployer {
 
     function test_tranche_asyncRedemption_pendingUntilRepaid() public {
         address marketAddr;
-        address s;
-        (marketAddr, s,) = _createMarket("Market A", managerId, borrowerId);
-        accessManager.grantRole(BORROWER_ROLE, borrower, 0);
-        Market market = Market(marketAddr);
-        Tranche senior = Tranche(s);
+        address t0;
+        (marketAddr, t0,) = _createMarket("Market A");
+        FloatingMarket market = FloatingMarket(marketAddr);
+        Tranche tranche0 = Tranche(t0);
 
         _setMarketSlopes(marketAddr);
-        irm.setVariableSlopes(
+        irm.setLiquiditySlopes(
             IInterestRateModel.Slopes({ base: 0.05e27, slope0: 0.05e27, slope1: 0.1e27, kink: 0.8e27 })
         );
-        market.setBorrowCap(1_000e18);
+        market.setFixedCreditLimit(1_000e18);
 
-        _fundTranche(s, supplier, 1_000e18);
+        _fundTranche(t0, supplier, 1_000e18);
         vm.prank(borrower);
         market.borrow(borrower, 500e18);
 
         vm.prank(supplier);
-        uint256 reqId = senior.requestRedeem(1_000e18, supplier, supplier);
+        uint256 reqId = tranche0.requestRedeem(1_000e18, supplier, supplier);
 
-        uint256 claimablePartial = senior.claimableRedeemRequest(reqId, supplier);
+        uint256 claimablePartial = tranche0.claimableRedeemRequest(reqId, supplier);
         assertGt(claimablePartial, 0);
         assertLt(claimablePartial, 1_000e18);
-        assertGt(senior.pendingRedeemRequest(reqId, supplier), 0);
+        assertGt(tranche0.pendingRedeemRequest(reqId, supplier), 0);
 
         _mintStable(borrower, 1_000e18);
         vm.prank(borrower);
         market.repay(type(uint256).max);
 
-        assertEq(senior.claimableRedeemRequest(reqId, supplier), 1_000e18);
+        assertEq(tranche0.claimableRedeemRequest(reqId, supplier), 1_000e18);
 
         vm.prank(supplier);
-        uint256 assets = senior.redeem(reqId, 1_000e18, supplier, supplier);
+        uint256 assets = tranche0.redeem(reqId, 1_000e18, supplier, supplier);
         assertEq(assets, 1_000e18);
         assertEq(vault.balanceOf(supplier, address(collateral)), 1_000e18);
-        assertEq(senior.totalSupply(), 0);
+        assertEq(tranche0.totalSupply(), 0);
     }
 
     function test_stablecoin_asyncRedemption_pendingUntilBacked() public {

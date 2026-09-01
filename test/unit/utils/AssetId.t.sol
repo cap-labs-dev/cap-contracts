@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.36;
 
 import { AssetId } from "../../../contracts/utils/AssetId.sol";
 import { Test } from "forge-std/Test.sol";
@@ -36,6 +36,8 @@ contract AssetIdTest is Test {
     }
 
     function testFuzz_toAsset_truncatesToLower160(uint256 id) public view {
+        // casting to 'uint160' is safe because toAsset intentionally truncates to address width
+        // forge-lint: disable-next-line(unsafe-typecast)
         assertEq(h.toAsset(id), address(uint160(id)));
     }
 }

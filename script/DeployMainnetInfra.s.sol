@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.36;
 
 import { ConfigureAccessControl } from "../contracts/deploy/service/ConfigureAccessControl.sol";
 import { DeployImplems } from "../contracts/deploy/service/DeployImplems.sol";

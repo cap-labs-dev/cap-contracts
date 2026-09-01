@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.36;
 
 import {
     SymbioticNetworkAdapterConfig,
@@ -7,7 +7,9 @@ import {
     SymbioticNetworkRewardsConfig,
     SymbioticVaultConfig
 } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
-import { DeployCapNetworkAdapter } from "../../contracts/deploy/service/providers/symbiotic/DeployCapNetworkAdapter.sol";
+import {
+    DeployCapNetworkAdapter
+} from "../../contracts/deploy/service/providers/symbiotic/DeployCapNetworkAdapter.sol";
 import { SymbioticAddressbook, SymbioticUtils } from "../../contracts/deploy/utils/SymbioticUtils.sol";
 import { SymbioticAdapterConfigSerializer } from "../config/SymbioticAdapterConfigSerializer.sol";
 import { SymbioticVaultConfigSerializer } from "../config/SymbioticVaultConfigSerializer.sol";

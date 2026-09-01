@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.36;
 
 import { InfraConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import {
@@ -8,9 +8,12 @@ import {
     SymbioticVaultConfig
 } from "../../contracts/deploy/interfaces/SymbioticsDeployConfigs.sol";
 import { ConfigureDelegation } from "../../contracts/deploy/service/ConfigureDelegation.sol";
-import { ConfigureSymbioticOptIns } from
-    "../../contracts/deploy/service/providers/symbiotic/ConfigureSymbioticOptIns.sol";
-import { DeployCapNetworkAdapter } from "../../contracts/deploy/service/providers/symbiotic/DeployCapNetworkAdapter.sol";
+import {
+    ConfigureSymbioticOptIns
+} from "../../contracts/deploy/service/providers/symbiotic/ConfigureSymbioticOptIns.sol";
+import {
+    DeployCapNetworkAdapter
+} from "../../contracts/deploy/service/providers/symbiotic/DeployCapNetworkAdapter.sol";
 import { InfraConfigSerializer } from "../config/InfraConfigSerializer.sol";
 import { SymbioticAdapterConfigSerializer } from "../config/SymbioticAdapterConfigSerializer.sol";
 import { SymbioticVaultConfigSerializer } from "../config/SymbioticVaultConfigSerializer.sol";

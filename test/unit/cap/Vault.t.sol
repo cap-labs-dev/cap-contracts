@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.36;
 
 import { Vault } from "../../../contracts/cap/Vault.sol";
 import { AssetId } from "../../../contracts/utils/AssetId.sol";

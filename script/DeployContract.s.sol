@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.28;
+pragma solidity 0.8.36;
 
 import { CapToken } from "../contracts/token/CapToken.sol";
 import { Script } from "forge-std/Script.sol";

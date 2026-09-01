@@ -4,7 +4,7 @@ out = "out"
 test = "test"
 libs = ["node_modules", "lib"]
 script = "scripts"
-solc_version = "0.8.28"
+solc_version = "0.8.36"
 ignored_warnings_from = ["node_modules", "lib"]
 remappings = [
     "@symbioticfi/core/=node_modules/@symbioticfi/core/",
@@ -85,7 +85,7 @@ optimizer_runs = 200
 via_ir = true
 use_literal_content = true
 [profile.release.optimizer_details]
-# # https://docs.soliditylang.org/en/v0.8.28/using-the-compiler.html#input-description
+# # https://docs.soliditylang.org/en/v0.8.36/using-the-compiler.html#input-description
 peephole = true                               # default true
 jumpdestRemover = true                        # default true
 simpleCounterForLoopUncheckedIncrement = true # default true

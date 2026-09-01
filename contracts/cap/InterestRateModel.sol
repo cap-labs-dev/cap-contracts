@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.36;
 
 import { IInterestRateModel } from "../interfaces/IInterestRateModel.sol";
-import { IMarket } from "../interfaces/IMarket.sol";
 import { IStablecoin } from "../interfaces/IStablecoin.sol";
-import { InterestRateModelStorageUtils } from "../storage/InterestRateModelStorageUtils.sol";
 import { MathUtils } from "../utils/MathUtils.sol";
 import { WadRayMath } from "../utils/WadRayMath.sol";
 import {
@@ -13,107 +11,188 @@ import {
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 /// @title InterestRateModel
-/// @author kexley
+/// @author kexley, Cap Labs
 /// @notice The InterestRateModel calculates the canonical variable and fixed interest rates for Stablecoin.
-contract InterestRateModel is
+contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
+    is
     IInterestRateModel,
     UUPSUpgradeable,
-    AccessManagedUpgradeable,
-    InterestRateModelStorageUtils
+    AccessManagedUpgradeable
 {
     using WadRayMath for uint256;
 
-    /// @notice Initialize the InterestRateModel
-    /// @param _authority The address of the authority
-    /// @param _stablecoin The address of the Stablecoin token
-    function initialize(address _authority, address _stablecoin) external initializer {
+    /// @inheritdoc IInterestRateModel
+    address public stablecoin;
+
+    /// @inheritdoc IInterestRateModel
+    Slopes public liquiditySlopes;
+
+    /// @inheritdoc IInterestRateModel
+    Slopes public termMultiplierSlopes;
+
+    /// @dev Per-market liquidity rate multiplier in ray decimals
+    mapping(address => uint256) private _marketMultiplier;
+
+    /// @inheritdoc IInterestRateModel
+    uint256 public minimumMarketMultiplier;
+
+    /// @inheritdoc IInterestRateModel
+    uint256 public maximumMarketMultiplier;
+
+    /// @inheritdoc IInterestRateModel
+    uint256 public minimumUnderwriterRate;
+
+    /// @inheritdoc IInterestRateModel
+    uint256 public maximumUnderwriterRate;
+
+    /// @inheritdoc IInterestRateModel
+    RateData public liquidityData;
+
+    /// @inheritdoc IInterestRateModel
+    mapping(address market => RateData data) public underwriterData;
+
+    /// @inheritdoc IInterestRateModel
+    uint256 public liquidationBonus;
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @inheritdoc IInterestRateModel
+    function initialize(
+        address _authority,
+        address _stablecoin,
+        uint256 _minimumMarketMultiplier,
+        uint256 _maximumMarketMultiplier,
+        uint256 _minimumUnderwriterRate,
+        uint256 _maximumUnderwriterRate,
+        uint256 _liquidationBonus
+    ) external initializer {
         __AccessManaged_init(_authority);
-        Storage storage $ = getInterestRateModelStorage();
-        $.stablecoin = _stablecoin;
-        $.variableIndex = 1e27;
-        $.fixedIndex = 1e27;
-        $.lastUpdate = block.timestamp;
+        stablecoin = _stablecoin;
+        minimumMarketMultiplier = _minimumMarketMultiplier;
+        maximumMarketMultiplier = _maximumMarketMultiplier;
+        minimumUnderwriterRate = _minimumUnderwriterRate;
+        maximumUnderwriterRate = _maximumUnderwriterRate;
+        liquidityData.index = 1e27;
+        liquidityData.lastUpdate = block.timestamp;
+        liquidationBonus = _liquidationBonus;
     }
 
-    //////////////////////////////////////////////////////////////////////////////
-    /**************************** Stablecoin functions **************************/
-    //////////////////////////////////////////////////////////////////////////////
-
-    /// @notice Update the supply interest rates based on the utilization of the stablecoin
-    function update() external {
-        _update();
+    /// @inheritdoc IInterestRateModel
+    function updateLiquidityRate() external {
+        _updateLiquidityRate();
     }
 
-    /// @notice Set the variable slopes for the supply interest rate
-    function setVariableSlopes(Slopes memory _slopes) external restricted {
-        Storage storage $ = getInterestRateModelStorage();
-        $.variableSlopes = _slopes;
-        _update();
-        emit SetVariableSlopes(_slopes);
+    /// @inheritdoc IInterestRateModel
+    function setLiquiditySlopes(Slopes memory _slopes) external restricted {
+        liquiditySlopes = _slopes;
+        _updateLiquidityRate();
+        emit SetLiquiditySlopes(_slopes);
     }
 
-    /// @notice Set the fixed slopes for the supply interest rate
-    function setFixedSlopes(Slopes memory _slopes) external restricted {
-        Storage storage $ = getInterestRateModelStorage();
-        $.fixedSlopes = _slopes;
-        _update();
-        emit SetFixedSlopes(_slopes);
+    /// @inheritdoc IInterestRateModel
+    function liquidityRate() public view returns (uint256 rate) {
+        rate = liquidityData.ratePerSecond;
     }
 
-    /// @notice Get the current variable supply index
-    /// @return currentIndex The current variable index
-    function variableIndex() public view returns (uint256 currentIndex) {
-        Storage storage $ = getInterestRateModelStorage();
+    /// @inheritdoc IInterestRateModel
+    function setUnderwriterRate(uint256 rate) external restricted {
+        if (rate > maximumUnderwriterRate) revert InvalidRate();
+        address market = msg.sender;
+        underwriterData[market].index = underwriterIndex(market);
+        underwriterData[market].lastUpdate = block.timestamp;
+        underwriterData[market].ratePerSecond = rate;
+        emit SetUnderwriterRate(market, rate);
+    }
 
-        currentIndex = $.variableIndex;
-        if ($.lastUpdate != block.timestamp) {
-            currentIndex = currentIndex.rayMul(MathUtils.calculateCompoundedInterest($.variableRate, $.lastUpdate));
+    /// @inheritdoc IInterestRateModel
+    function underwriterIndex(address market) public view returns (uint256 index) {
+        index = _index(underwriterData[market]);
+    }
+
+    /// @inheritdoc IInterestRateModel
+    function underwriterRate(address market) public view returns (uint256 rate) {
+        rate = underwriterData[market].ratePerSecond;
+    }
+
+    /// @inheritdoc IInterestRateModel
+    function setMarketMultiplier(uint256 _multiplier) external restricted {
+        address market = msg.sender;
+        if (_multiplier < minimumMarketMultiplier || _multiplier > maximumMarketMultiplier) revert InvalidMultiplier();
+        _marketMultiplier[market] = _multiplier;
+        emit SetMarketMultiplier(market, _multiplier);
+    }
+
+    /// @inheritdoc IInterestRateModel
+    function marketMultiplier(address market) public view returns (uint256 multiplier) {
+        multiplier = _marketMultiplier[market];
+        if (multiplier == 0) multiplier = 1e27;
+    }
+
+    /// @inheritdoc IInterestRateModel
+    function indices(address market) public view returns (uint256 liquidity, uint256 underwriter) {
+        liquidity = liquidityIndex(market);
+        underwriter = underwriterIndex(market);
+    }
+
+    /// @inheritdoc IInterestRateModel
+    function liquidityIndex(address market) public view returns (uint256 index) {
+        index = _index(liquidityData).rayMul(marketMultiplier(market));
+    }
+
+    /// @inheritdoc IInterestRateModel
+    function setTermMultiplierSlopes(Slopes memory _slopes) external restricted {
+        termMultiplierSlopes = _slopes;
+        emit SetTermMultiplierSlopes(_slopes);
+    }
+
+    /// @inheritdoc IInterestRateModel
+    function liquidityRate(uint256 termUtilization) public view returns (uint256 rate) {
+        rate = liquidityRate().rayMul(termMultiplier(termUtilization));
+    }
+
+    /// @inheritdoc IInterestRateModel
+    function fixedRates(address market, uint256 termUtilization)
+        public
+        view
+        returns (uint256 liquidity, uint256 underwriter)
+    {
+        liquidity = liquidityRate(termUtilization).rayMul(marketMultiplier(market));
+        underwriter = underwriterRate(market);
+    }
+
+    /// @inheritdoc IInterestRateModel
+    function termMultiplier(uint256 termUtilization) public view returns (uint256 multiplier) {
+        Slopes memory slopes = termMultiplierSlopes;
+        if (termUtilization >= 1e27) return slopes.slope0;
+        if (termUtilization >= slopes.kink) {
+            multiplier = slopes.slope0.rayMul(1e27 - termUtilization);
+        } else {
+            multiplier = slopes.slope0 + slopes.slope1.rayMul((slopes.kink - termUtilization).rayDiv(slopes.kink));
         }
     }
 
-    /// @notice Get the current fixed supply index
-    /// @return currentIndex The current fixed index
-    function fixedIndex() public view returns (uint256 currentIndex) {
-        Storage storage $ = getInterestRateModelStorage();
-
-        currentIndex = $.fixedIndex;
-        if ($.lastUpdate != block.timestamp) {
-            currentIndex = currentIndex.rayMul(MathUtils.calculateCompoundedInterest($.fixedRate, $.lastUpdate));
-        }
+    /// @inheritdoc IInterestRateModel
+    function setLiquidationBonus(uint256 _liquidationBonus) external restricted {
+        if (_liquidationBonus > 0.1e27) revert InvalidLiquidationBonus();
+        liquidationBonus = _liquidationBonus;
+        emit SetLiquidationBonus(_liquidationBonus);
     }
 
-    /// @notice Get the current variable supply rate
-    /// @return rate The current variable rate
-    function variableRate() public view returns (uint256 rate) {
-        Storage storage $ = getInterestRateModelStorage();
-        rate = $.variableRate;
+    /// @dev Update the liquidity rate based on the utilization of the stablecoin
+    function _updateLiquidityRate() internal {
+        liquidityData.index = _index(liquidityData);
+        liquidityData.lastUpdate = block.timestamp;
+        uint256 utilization = IStablecoin(stablecoin).utilizationRate();
+        liquidityData.ratePerSecond = _nextLiquidityRate(utilization);
     }
 
-    /// @notice Get the current fixed supply rate
-    /// @return rate The current fixed rate
-    function fixedRate() public view returns (uint256 rate) {
-        Storage storage $ = getInterestRateModelStorage();
-        rate = $.fixedRate;
-    }
-
-    /// @dev Update the supply indexes and then the supply interest rates
-    function _update() internal {
-        Storage storage $ = getInterestRateModelStorage();
-        $.variableIndex = variableIndex();
-        $.fixedIndex = fixedIndex();
-        $.lastUpdate = block.timestamp;
-        uint256 utilization = IStablecoin($.stablecoin).utilizationRate();
-        $.variableRate = _nextInterestRate(utilization, $.variableSlopes);
-        $.fixedRate = _nextInterestRate(utilization, $.fixedSlopes);
-    }
-
-    /// @dev Calculate the next supply interest rate based on the utilization and slopes
-    /// @param utilization The utilization of the stablecoin
-    /// @param slopes The slopes to use for the interest rate
-    /// @return rate The next interest rate
-    function _nextInterestRate(uint256 utilization, Slopes memory slopes) internal pure returns (uint256 rate) {
+    /// @dev Calculate the liquidity rate based on the utilization
+    function _nextLiquidityRate(uint256 utilization) internal view returns (uint256 rate) {
+        Slopes memory slopes = liquiditySlopes;
         if (utilization <= slopes.kink) {
-            // unconfigured slopes (kink == 0) accrue no rate rather than dividing by zero
             uint256 ratio = slopes.kink == 0 ? 0 : utilization.rayDiv(slopes.kink);
             rate = slopes.base + slopes.slope0.rayMul(ratio);
         } else {
@@ -122,90 +201,17 @@ contract InterestRateModel is
         }
     }
 
-    //////////////////////////////////////////////////////////////////////////////
-    /**************************** Market functions *******************************/
-    //////////////////////////////////////////////////////////////////////////////
-
-    /// @notice Update a market's inverse premium rate based on the utilization of the market
-    /// @param market The market to update
-    function update(address market) external {
-        _updateMarket(market);
-    }
-
-    /// @notice Set the slopes for a market's inverse premium rate
-    function setUnderwriterSlopes(address market, Slopes memory _slopes) external restricted {
-        if (_slopes.base < _slopes.slope0) revert InvalidSlopes();
-        if (_slopes.kink == 0 || _slopes.kink >= 1e27) revert InvalidSlopes();
-
-        Storage storage $ = getInterestRateModelStorage();
-        $.underwriterSlopes[market] = _slopes;
-        if ($.underwriterIndex[market] == 0) $.underwriterIndex[market] = 1e27;
-        _updateMarket(market);
-        emit SetUnderwriterSlopes(market, _slopes);
-    }
-
-    /// @notice Get the current inverse premium index for a market
-    /// @param market The market to get the current index for
-    /// @return currentIndex The current index
-    function underwriterIndex(address market) public view returns (uint256 currentIndex) {
-        Storage storage $ = getInterestRateModelStorage();
-
-        currentIndex = $.underwriterIndex[market];
-        if ($.lastUnderwriterUpdate[market] != block.timestamp) {
-            currentIndex = currentIndex.rayMul(
-                MathUtils.calculateCompoundedInterest($.underwriterRate[market], $.lastUnderwriterUpdate[market])
-            );
+    /// @dev Calculate the cumulative index for a given index data
+    /// @param data The index data to calculate the cumulative index for
+    /// @return index The cumulative index
+    function _index(RateData storage data) internal view returns (uint256 index) {
+        index = data.index;
+        if (index == 0) index = 1e27;
+        if (data.lastUpdate != block.timestamp) {
+            index = index.rayMul(MathUtils.calculateCompoundedInterest(data.ratePerSecond, data.lastUpdate));
         }
     }
 
-    /// @notice Get the current inverse premium rate for a market
-    /// @param market The market to get the current interest rate for
-    /// @return currentRate The current interest rate
-    function underwriterRate(address market) external view returns (uint256 currentRate) {
-        Storage storage $ = getInterestRateModelStorage();
-        currentRate = $.underwriterRate[market];
-    }
-
-    /// @notice Get the next inverse premium rate based on the utilization of the market
-    /// @param market The market to get the next interest rate for
-    /// @return nextRate The next interest rate
-    function nextInterestRate(address market) public view returns (uint256 nextRate) {
-        Storage storage $ = getInterestRateModelStorage();
-        uint256 utilization = IMarket(market).utilization();
-        nextRate = _calculateInverseRate($.underwriterSlopes[market], utilization);
-    }
-
-    /// @dev Update a market's inverse index and then the inverse interest rate
-    /// @param market The market to update
-    function _updateMarket(address market) internal {
-        Storage storage $ = getInterestRateModelStorage();
-        $.underwriterIndex[market] = underwriterIndex(market);
-        $.lastUnderwriterUpdate[market] = block.timestamp;
-        $.underwriterRate[market] = nextInterestRate(market);
-    }
-
-    /// @dev Calculate the next inverse interest rate based on the utilization and slopes
-    /// @param slopes The slopes to use
-    /// @param utilization The utilization of the market
-    /// @return newRate The next interest rate
-    function _calculateInverseRate(IInterestRateModel.Slopes memory slopes, uint256 utilization)
-        internal
-        pure
-        returns (uint256 newRate)
-    {
-        if (utilization <= slopes.kink) {
-            uint256 ratio = slopes.kink == 0 ? 0 : utilization.rayDiv(slopes.kink);
-            newRate = slopes.base - slopes.slope0.rayMul(ratio);
-        } else {
-            newRate = slopes.base - slopes.slope0
-                + slopes.slope1.rayMul((utilization - slopes.kink).rayDiv(1e27 - slopes.kink));
-        }
-    }
-
-    //////////////////////////////////////////////////////////////////////////////
-    /**************************** UUPS functions ********************************/
-    //////////////////////////////////////////////////////////////////////////////
-
-    /// @notice Authorize the upgrade
+    /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address) internal override restricted { }
 }

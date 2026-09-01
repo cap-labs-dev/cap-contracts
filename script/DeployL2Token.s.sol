@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.36;
 
 import { VaultConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
 import { LzAddressbook, LzUtils } from "../contracts/deploy/utils/LzUtils.sol";

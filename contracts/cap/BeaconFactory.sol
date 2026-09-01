@@ -1,34 +1,38 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.28;
+pragma solidity 0.8.36;
 
+import { IBeaconFactory } from "../interfaces/IBeaconFactory.sol";
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { BeaconProxy } from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 
 /// @title BeaconFactory
-/// @author kexley
-/// @notice Deploy and initialize beacon proxies
-contract BeaconFactory {
-    /// @notice Emitted when a beacon proxy is deployed
-    /// @param proxy The address of the deployed beacon proxy
-    event Deployed(address proxy);
-
-    /// @notice Mapping of deployed beacon proxies
-    mapping(address proxy => bool) public isDeployed;
-
-    /// @notice The beacon contract address
-    address public beacon;
-
-    /// @notice Constructor for the beacon factory
-    /// @param _beacon The beacon contract address
-    constructor(address _beacon) {
-        beacon = _beacon;
+/// @author kexley, Cap Labs
+/// @notice Deploy and initialize beacon proxies for any registered beacon
+contract BeaconFactory layout at erc7201("cap.storage.BeaconFactory")
+    is
+    IBeaconFactory,
+    AccessManagedUpgradeable,
+    UUPSUpgradeable
+{
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
-    /// @notice Deploy a beacon proxy and initialize it with the given data
-    /// @param data The initialization data for the beacon proxy
-    /// @return proxy The address of the deployed beacon proxy
-    function create(bytes memory data) external returns (address proxy) {
+    /// @inheritdoc IBeaconFactory
+    function initialize(address _authority) external initializer {
+        __AccessManaged_init(_authority);
+    }
+
+    /// @inheritdoc IBeaconFactory
+    function create(address beacon, bytes memory data) external restricted returns (address proxy) {
         proxy = address(new BeaconProxy(beacon, data));
-        isDeployed[proxy] = true;
         emit Deployed(proxy);
     }
+
+    /// @inheritdoc UUPSUpgradeable
+    function _authorizeUpgrade(address) internal override restricted { }
 }

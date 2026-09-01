@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.36;
 
 import { ERC7540Operator } from "../../../contracts/ERC7540/ERC7540Operator.sol";
-import { IERC7540Operator } from "../../../contracts/interfaces/IERC7540Operator.sol";
 import { Test } from "forge-std/Test.sol";
 
 contract ERC7540OperatorTest is Test {
