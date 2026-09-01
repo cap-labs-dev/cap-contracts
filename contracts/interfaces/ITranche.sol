@@ -41,11 +41,13 @@ interface ITranche is IERC7540AsyncRedeem {
         address oracle
     ) external;
 
-    /// @notice Slash the tranche's assets
-    /// @param assets The amount of assets to slash
+    /// @notice Slash the tranche's assets worth a given value
+    /// @dev The value is converted to an asset amount at the oracle price, then capped by the
+    /// tranche's holdings, so the returned value never exceeds the requested value
+    /// @param value The value to slash in USD (18 decimals)
     /// @param recipient The recipient of the slashed assets
-    /// @return slashedAssets The amount of assets slashed
-    function slash(uint256 assets, address recipient) external returns (uint256 slashedAssets);
+    /// @return slashedValue The value slashed in USD (18 decimals)
+    function slash(uint256 value, address recipient) external returns (uint256 slashedValue);
 
     /// @notice Set the whitelist for a depositor
     /// @param account The account to update

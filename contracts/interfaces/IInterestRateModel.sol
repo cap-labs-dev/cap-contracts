@@ -15,11 +15,11 @@ interface IInterestRateModel {
     error InvalidLiquidationBonus();
 
     /// @notice The data for an index
-    /// @param ratePerSecond The interest rate per second in ray decimals
+    /// @param ratePerYear The interest rate per year in ray decimals
     /// @param index The cumulative index
     /// @param lastUpdate The last update time
     struct RateData {
-        uint256 ratePerSecond;
+        uint256 ratePerYear;
         uint256 index;
         uint256 lastUpdate;
     }
@@ -38,7 +38,7 @@ interface IInterestRateModel {
 
     /// @notice Emitted when an underwriter rate is set
     /// @param market The market that set the rate
-    /// @param rate The new underwriter rate per second in ray decimals
+    /// @param rate The new underwriter rate per year in ray decimals
     event SetUnderwriterRate(address indexed market, uint256 rate);
 
     /// @notice Emitted when liquidity slopes are set
@@ -63,8 +63,8 @@ interface IInterestRateModel {
     /// @param stablecoin The address of the Stablecoin token
     /// @param minimumMarketMultiplier The minimum market multiplier in ray decimals
     /// @param maximumMarketMultiplier The maximum market multiplier in ray decimals
-    /// @param minimumUnderwriterRate The minimum underwriter rate per second in ray decimals
-    /// @param maximumUnderwriterRate The maximum underwriter rate per second in ray decimals
+    /// @param minimumUnderwriterRate The minimum underwriter rate per year in ray decimals
+    /// @param maximumUnderwriterRate The maximum underwriter rate per year in ray decimals
     /// @param liquidationBonus The liquidation bonus in ray decimals
     function initialize(
         address authority,
@@ -110,34 +110,34 @@ interface IInterestRateModel {
     /// @notice The maximum multiplier for a market's liquidity interest rate in ray decimals
     function maximumMarketMultiplier() external view returns (uint256);
 
-    /// @notice The minimum underwriter rate per second in ray decimals
+    /// @notice The minimum underwriter rate per year in ray decimals
     function minimumUnderwriterRate() external view returns (uint256);
 
-    /// @notice The maximum underwriter rate per second in ray decimals
+    /// @notice The maximum underwriter rate per year in ray decimals
     function maximumUnderwriterRate() external view returns (uint256);
 
     /// @notice The fixed liquidation bonus in ray decimals
     function liquidationBonus() external view returns (uint256);
 
     /// @notice The data for the liquidity index
-    function liquidityData() external view returns (uint256 ratePerSecond, uint256 index, uint256 lastUpdate);
+    function liquidityData() external view returns (uint256 ratePerYear, uint256 index, uint256 lastUpdate);
 
     /// @notice The data for the underwriter index of a market
     function underwriterData(address market)
         external
         view
-        returns (uint256 ratePerSecond, uint256 index, uint256 lastUpdate);
+        returns (uint256 ratePerYear, uint256 index, uint256 lastUpdate);
 
-    /// @notice The current liquidity rate per second
+    /// @notice The current liquidity rate per year
     function liquidityRate() external view returns (uint256 rate);
 
-    /// @notice The liquidity rate per second for a given term utilization
+    /// @notice The liquidity rate per year for a given term utilization
     function liquidityRate(uint256 termUtilization) external view returns (uint256 rate);
 
     /// @notice The current underwriter index for a market
     function underwriterIndex(address market) external view returns (uint256 index);
 
-    /// @notice The current underwriter rate per second for a market
+    /// @notice The current underwriter rate per year for a market
     function underwriterRate(address market) external view returns (uint256 rate);
 
     /// @notice The current multiplier for a market's liquidity interest rate in ray decimals

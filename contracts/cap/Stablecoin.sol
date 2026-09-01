@@ -96,18 +96,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     }
 
     /// @inheritdoc IStablecoin
-    function previewDeposit(uint256 _shares)
-        public
-        view
-        override(ERC4626Upgradeable, IERC4626, IStablecoin)
-        returns (uint256 assets)
-    {
-        assets =
-            _shares * 10 ** underlyingDecimals / 10 ** decimals();
-    }
-
-    /// @inheritdoc IStablecoin
-    function previewMint(uint256 _assets)
+    function previewDeposit(uint256 _assets)
         public
         view
         override(ERC4626Upgradeable, IERC4626, IStablecoin)
@@ -115,6 +104,17 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     {
         shares =
             _assets * 10 ** decimals() / 10 ** underlyingDecimals;
+    }
+
+    /// @inheritdoc IStablecoin
+    function previewMint(uint256 _shares)
+        public
+        view
+        override(ERC4626Upgradeable, IERC4626, IStablecoin)
+        returns (uint256 assets)
+    {
+        assets =
+            _shares * 10 ** underlyingDecimals / 10 ** decimals();
     }
 
     /// @inheritdoc IStablecoin

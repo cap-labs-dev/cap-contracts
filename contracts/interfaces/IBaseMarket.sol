@@ -124,7 +124,7 @@ interface IBaseMarket {
     event SetTranche(address indexed tranche, uint256 weight, uint256 index);
 
     /// @notice Emitted when the underwriter rate is updated
-    /// @param rate The new underwriter rate per second in ray decimals
+    /// @param rate The new underwriter rate per year in ray decimals
     event SetUnderwriterRate(uint256 rate);
 
     /// @notice Emitted when the market multiplier is updated
@@ -169,7 +169,7 @@ interface IBaseMarket {
     function setTrancheWeights(uint256[] calldata weights) external;
 
     /// @notice Set the underwriter rate
-    /// @param rate The new underwriter rate per second in ray decimals
+    /// @param rate The new underwriter rate per year in ray decimals
     function setUnderwriterRate(uint256 rate) external;
 
     /// @notice Set the market multiplier

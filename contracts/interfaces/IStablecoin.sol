@@ -71,17 +71,17 @@ interface IStablecoin {
     /// @return assets Total redeemable assets in share units
     function totalAssets() external view returns (uint256 assets);
 
-    /// @notice Preview deposit assets at the fixed 1:1 exchange rate
-    /// @dev Overrides IERC4626 preview to scale between 18-decimal shares and underlying decimals
-    /// @param shares The share amount to deposit
-    /// @return assets The asset amount required
-    function previewDeposit(uint256 shares) external view returns (uint256 assets);
-
-    /// @notice Preview mint shares at the fixed 1:1 exchange rate
-    /// @dev Overrides IERC4626 preview to scale between underlying decimals and 18-decimal shares
+    /// @notice Preview the shares minted for a deposit at the fixed 1:1 exchange rate
+    /// @dev Overrides IERC4626 preview to scale from underlying decimals up to 18-decimal shares
     /// @param assets The asset amount to deposit
     /// @return shares The share amount minted
-    function previewMint(uint256 assets) external view returns (uint256 shares);
+    function previewDeposit(uint256 assets) external view returns (uint256 shares);
+
+    /// @notice Preview the assets required to mint shares at the fixed 1:1 exchange rate
+    /// @dev Overrides IERC4626 preview to scale from 18-decimal shares down to underlying decimals
+    /// @param shares The share amount to mint
+    /// @return assets The asset amount required
+    function previewMint(uint256 shares) external view returns (uint256 assets);
 
     /// @notice Share token decimals
     /// @dev Overrides IERC4626/IERC20Metadata: stablecoin shares always use 18 decimals

@@ -88,11 +88,19 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     }
 
     /// @inheritdoc ITranche
-    function slash(uint256 assets, address recipient) external restricted returns (uint256 slashedValue) {
-        uint256 slashedAssets = Math.min(assets, totalAssets());
-        slashedValue = slashedAssets * getPrice() / 10 ** decimals();
-        IVault(vault).withdraw(asset(), slashedAssets, recipient);
-        emit Slashed(recipient, slashedAssets, slashedValue);
+    function slash(uint256 value, address recipient) external restricted returns (uint256 slashedValue) {
+        uint256 price = getPrice();
+        uint256 unit = 10 ** decimals();
+        uint256 assets = value * unit / price;
+        uint256 total = totalAssets();
+        if (assets > total) {
+            assets = total;
+            slashedValue = total * price / unit;
+        } else {
+            slashedValue = value;
+        }
+        IVault(vault).withdraw(asset(), assets, recipient);
+        emit Slashed(recipient, assets, slashedValue);
     }
 
     /// @inheritdoc ITranche

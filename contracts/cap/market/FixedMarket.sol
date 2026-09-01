@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 import { IBaseMarket } from "../../interfaces/IBaseMarket.sol";
 import { IFixedMarket } from "../../interfaces/IFixedMarket.sol";
 import { IInterestRateModel } from "../../interfaces/IInterestRateModel.sol";
+import { MathUtils } from "../../utils/MathUtils.sol";
 import { WadRayMath } from "../../utils/WadRayMath.sol";
 import { BaseMarket } from "./BaseMarket.sol";
 
@@ -149,7 +150,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         if (term > maximumTermLimit) term = maximumTermLimit;
         (uint256 liquidityRate, uint256 underwriterRate) =
             IInterestRateModel(irm()).fixedRates(address(this), term.rayDiv(maximumTermLimit));
-        credit = credit.rayDiv(1e27 + (term.rayMul(liquidityRate)) + (term.rayMul(underwriterRate)));
+        credit = credit.rayDiv(1e27 + (term * (liquidityRate + underwriterRate)) / MathUtils.SECONDS_PER_YEAR);
     }
 
     /// @dev Borrow the principal
@@ -164,6 +165,8 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         actualPrincipal = _creditCheck(availableCredit(term), principal);
         debt[id] += actualPrincipal;
         _totalDebt += actualPrincipal;
+        // the mint raises utilization, so the premium below is charged at a higher liquidity rate
+        // than availableCredit discounted for; see IFixedMarket.availableCredit
         _borrow(recipient, actualPrincipal);
         uint256 chargedPremium = _chargePremiumForTerm(id, actualPrincipal, term);
         emit BorrowFixed(id, recipient, term, actualPrincipal, chargedPremium);
@@ -198,19 +201,21 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @dev Fetch the premium for a loan
+    /// @dev Rates are annualized, so the term is prorated against a year to match the floating
+    /// market's accrual through {MathUtils}
     /// @param chargeableDebt The amount of debt that a premium is being charged on
-    /// @param term The term of the loan
+    /// @param term The term of the loan in seconds
+    /// @param liquidityRate The liquidity rate per year in ray decimals
+    /// @param underwriterRate The underwriter rate per year in ray decimals
     /// @return liquidityPremium The liquidity premium
     /// @return underwriterPremium The underwriter premium
-    /// @param liquidityRate The liquidity rate
-    /// @param underwriterRate The underwriter rate
     function _premium(uint256 chargeableDebt, uint256 term, uint256 liquidityRate, uint256 underwriterRate)
         internal
         pure
         returns (uint256 liquidityPremium, uint256 underwriterPremium)
     {
         uint256 cumulativeDebt = chargeableDebt * term;
-        liquidityPremium = cumulativeDebt.rayMul(liquidityRate);
-        underwriterPremium = cumulativeDebt.rayMul(underwriterRate);
+        liquidityPremium = cumulativeDebt.rayMul(liquidityRate) / MathUtils.SECONDS_PER_YEAR;
+        underwriterPremium = cumulativeDebt.rayMul(underwriterRate) / MathUtils.SECONDS_PER_YEAR;
     }
 }

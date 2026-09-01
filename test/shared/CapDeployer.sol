@@ -94,7 +94,7 @@ abstract contract CapDeployer is BaseTest {
         cfg.defaultMaximumMarketMultiplier = 2e27;
         cfg.defaultMinimumUnderwriterRate = 0;
         cfg.defaultMaximumUnderwriterRate = 1e27;
-        cfg.defaultUnderwriterRate = 6341958396753; // ~20% APR in ray per second
+        cfg.defaultUnderwriterRate = 0.2e27; // 20% APR in ray per year
         cfg.defaultTrancheWeights = new uint256[](2);
         cfg.defaultTrancheWeights[0] = 1e27 - 0.05e27;
         cfg.defaultTrancheWeights[1] = 0.05e27;

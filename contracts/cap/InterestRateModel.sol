@@ -94,7 +94,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
 
     /// @inheritdoc IInterestRateModel
     function liquidityRate() public view returns (uint256 rate) {
-        rate = liquidityData.ratePerSecond;
+        rate = liquidityData.ratePerYear;
     }
 
     /// @inheritdoc IInterestRateModel
@@ -103,7 +103,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         address market = msg.sender;
         underwriterData[market].index = underwriterIndex(market);
         underwriterData[market].lastUpdate = block.timestamp;
-        underwriterData[market].ratePerSecond = rate;
+        underwriterData[market].ratePerYear = rate;
         emit SetUnderwriterRate(market, rate);
     }
 
@@ -114,7 +114,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
 
     /// @inheritdoc IInterestRateModel
     function underwriterRate(address market) public view returns (uint256 rate) {
-        rate = underwriterData[market].ratePerSecond;
+        rate = underwriterData[market].ratePerYear;
     }
 
     /// @inheritdoc IInterestRateModel
@@ -186,7 +186,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         liquidityData.index = _index(liquidityData);
         liquidityData.lastUpdate = block.timestamp;
         uint256 utilization = IStablecoin(stablecoin).utilizationRate();
-        liquidityData.ratePerSecond = _nextLiquidityRate(utilization);
+        liquidityData.ratePerYear = _nextLiquidityRate(utilization);
     }
 
     /// @dev Calculate the liquidity rate based on the utilization
@@ -208,7 +208,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         index = data.index;
         if (index == 0) index = 1e27;
         if (data.lastUpdate != block.timestamp) {
-            index = index.rayMul(MathUtils.calculateCompoundedInterest(data.ratePerSecond, data.lastUpdate));
+            index = index.rayMul(MathUtils.calculateCompoundedInterest(data.ratePerYear, data.lastUpdate));
         }
     }
 

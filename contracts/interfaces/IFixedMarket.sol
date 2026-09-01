@@ -116,7 +116,13 @@ interface IFixedMarket is IBaseMarket {
         view
         returns (uint256 liquidityPremium, uint256 underwriterPremium);
 
-    /// @notice Get the available credit for a term
+    /// @notice Get the available credit for a term, discounted so that the principal plus its
+    /// upfront premium fits inside the credit limit
+    /// @dev The discount uses the liquidity rate as it stands now. Borrowing mints credit-backed
+    /// stablecoin, which raises utilization and so the liquidity rate, and the premium is charged
+    /// at that higher post-mint rate. Final debt can therefore exceed the credit limit by the width
+    /// of that rate move, which is largest on a market with little unlocked supply. The gap is
+    /// bounded by the ltv-to-lt corridor and cannot by itself make the market unhealthy.
     /// @param term The term of the loan
     /// @return credit The available credit
     function availableCredit(uint256 term) external view returns (uint256 credit);
