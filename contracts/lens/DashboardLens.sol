@@ -27,6 +27,13 @@ interface IAllocationManagerLens {
     function getAllocationDelay(address operator) external view returns (bool isSet, uint32 delay);
 }
 
+/// @dev Cap vault + minter surface used by reserve snapshots (avoids clashing with Symbiotic IVault).
+interface ICapVaultLens {
+    function totalSupplies(address asset) external view returns (uint256 totalSupply);
+    function totalBorrows(address asset) external view returns (uint256 totalBorrow);
+    function depositCap(address asset) external view returns (uint256 cap);
+}
+
 // ─── Structs ─────────────────────────────────────────────────────────────────
 
 struct StakerRewardsTokenSnapshot {
@@ -86,7 +93,7 @@ struct EigenLayerSnapshot {
     bool allocationDelayPending;
 }
 
-struct ReserveSnapshot {
+struct LoanReserveSnapshot {
     uint256 id;
     address vault;
     address debtToken;
@@ -101,7 +108,7 @@ struct LoanSnapshot {
     uint256 totalSlashableCollateral;
     /// @dev Coverage cap in USD (8 decimals) — matches IDelegation.coverageCap.
     uint256 coverageCap;
-    ReserveSnapshot reserve;
+    LoanReserveSnapshot reserve;
     uint256 totalDebt;
     uint256 ltv;
     uint256 liquidationThreshold;
@@ -126,6 +133,50 @@ struct LoanSnapshot {
     uint256 collateralTokenPriceLastUpdated;
 }
 
+/// @dev Coverage / epoch-boundary reads used to derive when a pending deposit becomes live.
+///      Amounts are USD (8 decimals), matching IDelegation / ISymbioticNetworkMiddleware.
+struct AgentCoverageSnapshot {
+    uint256 totalDelegation; // MIDDLEWARE.coverage(agent)
+    uint256 liveCoverage; // DELEGATION.coverage(agent)
+    uint256 coverageCap; // DELEGATION.coverageCap(agent)
+    uint256 slashableAtCurrentEpochStart; // MIDDLEWARE.slashableCollateral(agent, epoch*dur)
+    uint256 slashableAtPrevEpochStart; // MIDDLEWARE.slashableCollateral(agent, (epoch-1)*dur)
+    uint256 currentEpoch;
+    uint256 epochDuration;
+}
+
+/// @dev Per-reserve loan slice for the lean agent list/summary view.
+struct AgentLoan {
+    address asset;
+    uint256 debt; // LENDER.debt(agent, asset)
+    uint256 accruedRestakerInterest; // LENDER.accruedRestakerInterest(agent, asset)
+    uint256 maxBorrowable; // LENDER.maxBorrowable(agent, asset)
+    uint256 assetPriceUSD; // PRICE_ORACLE.getPrice(asset)
+    /// @dev Rates in ray (27 decimals). Spec put these on AgentSnapshot, but the oracles take an
+    ///      asset — they live here so multi-reserve agents stay correct.
+    uint256 marketRate;
+    uint256 benchmarkRate;
+    uint256 utilizationRate;
+}
+
+/// @dev Lean per-agent snapshot for summary/list pages (no strings / lastUpdated).
+struct AgentSnapshot {
+    AgentCoverageSnapshot coverage;
+    uint256 restakerRate; // RATE_ORACLE.restakerRate(agent)
+    AgentLoan[] loans; // one entry per hardcoded reserve asset
+}
+
+/// @dev Lean per-reserve snapshot for the lender-assets summary page.
+struct ReserveSnapshot {
+    address asset;
+    address vault;
+    uint256 totalSupplies; // VAULT.totalSupplies(asset)
+    uint256 totalBorrows; // VAULT.totalBorrows(asset)
+    uint256 depositCap; // VAULT.depositCap(asset)
+    uint256 assetPriceUSD; // PRICE_ORACLE.getPrice(asset)
+    uint256 minBorrow; // LENDER.reservesData(asset).minBorrow
+}
+
 // ─── DashboardLens ───────────────────────────────────────────────────────────
 
 /// @title DashboardLens
@@ -143,6 +194,8 @@ contract DashboardLens {
     address internal constant MAINNET_USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     ISymbioticNetworkMiddleware public constant SYMBIOTIC_NETWORK_MIDDLEWARE =
         ISymbioticNetworkMiddleware(0x09A3976d8D63728d20DCDFEe1e531C206Ba91225);
+    /// @dev Hardcoded borrowable reserves (Lender has no reservesList getter we can upgrade).
+    address internal constant MAINNET_WWTGXX = 0x434558CB1EBe9950e8A66f1ef8A15A473Dce7D8c;
 
     // ─── Symbiotic ───────────────────────────────────────────────────────────
 
@@ -229,6 +282,44 @@ contract DashboardLens {
                 IAllocationManagerLens(allocationManager).getAllocationDelay(snapshot.delegatee);
             snapshot.allocationDelayPending = !isSet;
             snapshot.allocationDelay = delay;
+        }
+    }
+
+    // ─── Agent coverage ──────────────────────────────────────────────────────
+
+    /// @notice Returns coverage + epoch-boundary slashable collateral for an agent.
+    /// @dev Resolves the agent's middleware via `DELEGATION.networks(agent)`, falling back to
+    ///      `SYMBIOTIC_NETWORK_MIDDLEWARE`. Per-read reverts are swallowed (zeroed) so this is
+    ///      safe inside an `allowFailure:false` multicall. Epoch-start timestamps mirror
+    ///      `Delegation.coverage()` (subtract 1 when equal to `block.timestamp`).
+    function getAgentCoverageSnapshot(address agent) external view returns (AgentCoverageSnapshot memory s) {
+        return _agentCoverageSnapshot(agent);
+    }
+
+    /// @notice Lean per-agent snapshot for summary/list pages: coverage + restaker rate + per-reserve loans.
+    /// @dev Walks the hardcoded reserve asset list. Zero-fills failed reads.
+    ///      Not `view`: IRateOracle.marketRate / utilizationRate are non-view (adapter calls).
+    function getAgentSnapshot(address agent) external returns (AgentSnapshot memory s) {
+        s.coverage = _agentCoverageSnapshot(agent);
+
+        try RATE_ORACLE.restakerRate(agent) returns (uint256 rate) {
+            s.restakerRate = rate;
+        } catch { }
+
+        address[] memory assets = _reserveAssets();
+        s.loans = new AgentLoan[](assets.length);
+        for (uint256 i; i < assets.length; ++i) {
+            s.loans[i] = _agentLoan(agent, assets[i]);
+        }
+    }
+
+    /// @notice Lean per-reserve snapshots for the lender-assets summary page.
+    /// @dev Walks the hardcoded reserve asset list. Zero-fills failed reads.
+    function getReserveSnapshots() external view returns (ReserveSnapshot[] memory snapshots) {
+        address[] memory assets = _reserveAssets();
+        snapshots = new ReserveSnapshot[](assets.length);
+        for (uint256 i; i < assets.length; ++i) {
+            snapshots[i] = _reserveSnapshot(assets[i]);
         }
     }
 
@@ -329,6 +420,112 @@ contract DashboardLens {
             snapshot.reserve.decimals = decimals;
             snapshot.reserve.paused = paused;
             snapshot.reserve.minBorrow = minBorrow;
+        } catch { }
+    }
+
+    // ─── Agent / reserve helpers (internal) ──────────────────────────────────
+
+    function _agentCoverageSnapshot(address agent) internal view returns (AgentCoverageSnapshot memory s) {
+        uint256 dur = DELEGATION.epochDuration();
+        uint256 epoch = DELEGATION.epoch();
+        s.currentEpoch = epoch;
+        s.epochDuration = dur;
+
+        uint48 curStart = uint48(epoch * dur);
+        if (curStart == block.timestamp) curStart -= 1;
+        uint48 prevStart = uint48(epoch > 0 ? (epoch - 1) * dur : 0);
+
+        ISymbioticNetworkMiddleware middleware = SYMBIOTIC_NETWORK_MIDDLEWARE;
+        try DELEGATION.networks(agent) returns (address network) {
+            if (network != address(0)) middleware = ISymbioticNetworkMiddleware(network);
+        } catch { }
+
+        try DELEGATION.coverageCap(agent) returns (uint256 cap) {
+            s.coverageCap = cap;
+        } catch { }
+
+        try middleware.coverage(agent) returns (uint256 coverage) {
+            s.totalDelegation = coverage;
+        } catch { }
+
+        try DELEGATION.coverage(agent) returns (uint256 coverage) {
+            s.liveCoverage = coverage;
+        } catch { }
+
+        try middleware.slashableCollateral(agent, curStart) returns (uint256 slashable) {
+            s.slashableAtCurrentEpochStart = slashable;
+        } catch { }
+
+        try middleware.slashableCollateral(agent, prevStart) returns (uint256 slashable) {
+            s.slashableAtPrevEpochStart = slashable;
+        } catch { }
+    }
+
+    function _reserveAssets() internal pure returns (address[] memory assets) {
+        assets = new address[](2);
+        assets[0] = MAINNET_USDC;
+        assets[1] = MAINNET_WWTGXX;
+    }
+
+    function _agentLoan(address agent, address asset) internal returns (AgentLoan memory loan) {
+        loan.asset = asset;
+
+        try LENDER.debt(agent, asset) returns (uint256 debt) {
+            loan.debt = debt;
+        } catch { }
+
+        try LENDER.accruedRestakerInterest(agent, asset) returns (uint256 interest) {
+            loan.accruedRestakerInterest = interest;
+        } catch { }
+
+        try LENDER.maxBorrowable(agent, asset) returns (uint256 maxBorrow) {
+            loan.maxBorrowable = maxBorrow;
+        } catch { }
+
+        try PRICE_ORACLE.getPrice(asset) returns (uint256 price, uint256) {
+            loan.assetPriceUSD = price;
+        } catch { }
+
+        try RATE_ORACLE.marketRate(asset) returns (uint256 rate) {
+            loan.marketRate = rate;
+        } catch { }
+
+        try RATE_ORACLE.benchmarkRate(asset) returns (uint256 rate) {
+            loan.benchmarkRate = rate;
+        } catch { }
+
+        try RATE_ORACLE.utilizationRate(asset) returns (uint256 rate) {
+            loan.utilizationRate = rate;
+        } catch { }
+    }
+
+    function _reserveSnapshot(address asset) internal view returns (ReserveSnapshot memory s) {
+        s.asset = asset;
+
+        address vault;
+        try LENDER.reservesData(asset) returns (
+            uint256, address vaultAddr, address, address, uint8, bool, uint256 minBorrow
+        ) {
+            vault = vaultAddr;
+            s.vault = vaultAddr;
+            s.minBorrow = minBorrow;
+        } catch { }
+
+        if (vault != address(0)) {
+            ICapVaultLens v = ICapVaultLens(vault);
+            try v.totalSupplies(asset) returns (uint256 supplies) {
+                s.totalSupplies = supplies;
+            } catch { }
+            try v.totalBorrows(asset) returns (uint256 borrows) {
+                s.totalBorrows = borrows;
+            } catch { }
+            try v.depositCap(asset) returns (uint256 cap) {
+                s.depositCap = cap;
+            } catch { }
+        }
+
+        try PRICE_ORACLE.getPrice(asset) returns (uint256 price, uint256) {
+            s.assetPriceUSD = price;
         } catch { }
     }
 
