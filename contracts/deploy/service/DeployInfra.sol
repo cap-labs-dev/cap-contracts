@@ -86,7 +86,7 @@ contract DeployInfra is ProxyUtils {
                         underwriterBeacon: infra.underwriterBeacon,
                         lt: 0.8e27,
                         buffer: 0.1e27,
-                        targetHealth: 1.1e27
+                        targetHealth: 1.25e27
                     })
                 )
             )

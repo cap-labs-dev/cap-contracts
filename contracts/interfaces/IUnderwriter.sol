@@ -104,6 +104,7 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     function setDefaultTranche(address tranche) external;
 
     /// @notice Set the premium vesting period
+    /// @dev Remaining locked premium is recaptured and re-vested over the new period
     /// @param vestingPeriod The new vesting period in seconds
     function setVestingPeriod(uint256 vestingPeriod) external;
 

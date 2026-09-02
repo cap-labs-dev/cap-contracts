@@ -173,6 +173,7 @@ interface IBaseMarket {
     function setUnderwriterRate(uint256 rate) external;
 
     /// @notice Set the market multiplier
+    /// @dev On a floating market this reindexes scaled debt so outstanding principal is unchanged
     /// @param multiplier The new market multiplier in ray decimals
     function setMarketMultiplier(uint256 multiplier) external;
 
@@ -227,10 +228,13 @@ interface IBaseMarket {
     /// @return liquidatable The maximum liquidatable debt
     function maxLiquidatable() external view returns (uint256 liquidatable);
 
-    /// @notice Get the locked assets for a tranche
+    /// @notice Get the capital value a tranche must keep locked to back the market's debt
+    /// @dev Denominated in USD (18 decimals), not in collateral tokens. More junior tranches are
+    /// locked first, so a tranche only locks what the tranches below it cannot cover. Callers
+    /// holding collateral must convert at the oracle price before comparing against balances.
     /// @param tranche The tranche address
-    /// @return assets The locked assets
-    function lockedAssets(address tranche) external view returns (uint256 assets);
+    /// @return value The locked capital value in USD (18 decimals)
+    function lockedValue(address tranche) external view returns (uint256 value);
 
     /// @notice Get the total capital of the market
     /// @return capital The total capital

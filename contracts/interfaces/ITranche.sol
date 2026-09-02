@@ -7,6 +7,9 @@ import { IERC7540AsyncRedeem } from "./IERC7540AsyncRedeem.sol";
 /// @author kexley, Cap Labs
 /// @notice Interface for Tranche contract
 interface ITranche is IERC7540AsyncRedeem {
+    /// @notice Vesting period must be non-zero, as it is a divisor in premium accrual
+    error InvalidVestingPeriod();
+
     /// @notice Emitted when assets are slashed
     /// @param recipient The recipient of the slashed assets
     /// @param assets The amount of assets slashed

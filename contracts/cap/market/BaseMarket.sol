@@ -66,7 +66,8 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     /// @inheritdoc IBaseMarket
     function setBuffer(uint256 _buffer) external restricted {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        if (_buffer > 1e27) revert InvalidBuffer();
+        // lockedValue divides by lt - buffer, so the buffer must stay strictly below lt
+        if (_buffer >= $.lt) revert InvalidBuffer();
         $.buffer = _buffer;
         emit SetBuffer(_buffer);
     }
@@ -75,6 +76,10 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     function setLt(uint256 _lt) external restricted {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         if (_lt > 1e27) revert InvalidLt();
+        // lockedValue divides by lt - buffer, so lt must stay strictly above the buffer. Dropping
+        // lt below ltv is still allowed: that just makes the market unhealthy, which is a valid
+        // state for a guardian to force.
+        if (_lt <= $.buffer) revert InvalidLt();
         $.lt = _lt;
         emit SetLt(_lt);
     }
@@ -88,8 +93,8 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
 
     /// @inheritdoc IBaseMarket
     function setTargetHealth(uint256 _targetHealth) external restricted {
-        if (_targetHealth < 1e27) revert InvalidTargetHealth();
         BaseMarketStorage storage $ = _getBaseMarketStorage();
+        if (_targetHealth < 1.25e27) revert InvalidTargetHealth();
         $.targetHealth = _targetHealth;
         emit SetTargetHealth(_targetHealth);
     }
@@ -226,19 +231,19 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     }
 
     /// @inheritdoc IBaseMarket
-    function lockedAssets(address tranche) public view returns (uint256 assets) {
+    function lockedValue(address tranche) public view returns (uint256 value) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        assets = totalDebt().rayDiv($.lt - $.buffer);
+        value = totalDebt().rayDiv($.lt - $.buffer);
 
         for (uint256 i = $.tranches.length; i > 0;) {
             i--;
             if ($.tranches[i].tranche == tranche) break;
             uint256 capital = ITranche($.tranches[i].tranche).totalCapital();
-            if (capital > assets) {
-                assets = 0;
+            if (capital > value) {
+                value = 0;
                 break;
             }
-            assets -= capital;
+            value -= capital;
         }
     }
 
@@ -344,6 +349,10 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     }
 
     /// @dev Charge the premium
+    /// @dev Each active tranche is paid its weight of the underwriter premium. Rounding dust and
+    /// the weight of any empty tranche are leftover: they go to the most senior tranche (index 0)
+    /// when that tranche is underwriting, otherwise to the staked stablecoin like the liquidity
+    /// premium. The full premium is always minted so that debt can always be repaid.
     /// @param liquidityPremium The amount of liquidity premium to charge
     /// @param underwriterPremium The amount of underwriter premium to charge
     function _chargePremium(uint256 liquidityPremium, uint256 underwriterPremium) internal {
@@ -354,13 +363,36 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
             emit ChargePremium($.stakedStablecoin, liquidityPremium);
         }
 
-        for (uint256 i; i < $.tranches.length; ++i) {
+        if (underwriterPremium == 0) return;
+
+        uint256 remaining = underwriterPremium;
+        bool seniorActive;
+        uint256 length = $.tranches.length;
+        for (uint256 i; i < length; ++i) {
             address tranche = $.tranches[i].tranche;
             if (ITranche(tranche).activeSupply() == 0) continue;
+            if (i == 0) {
+                seniorActive = true;
+                continue;
+            }
             uint256 premium = underwriterPremium.rayMul($.tranches[i].weight);
+            if (premium == 0) continue;
+            remaining -= premium;
             IStablecoin($.stablecoin).mintCreditBacked(tranche, premium);
             ITranche(tranche).notifyPremium();
             emit ChargePremium(tranche, premium);
+        }
+
+        if (remaining == 0) return;
+
+        if (seniorActive) {
+            address senior = $.tranches[0].tranche;
+            IStablecoin($.stablecoin).mintCreditBacked(senior, remaining);
+            ITranche(senior).notifyPremium();
+            emit ChargePremium(senior, remaining);
+        } else {
+            IStablecoin($.stablecoin).mintCreditBacked($.stakedStablecoin, remaining);
+            emit ChargePremium($.stakedStablecoin, remaining);
         }
     }
 }

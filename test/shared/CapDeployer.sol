@@ -88,7 +88,7 @@ abstract contract CapDeployer is BaseTest {
         cfg.defaultBuffer = 0.1e27;
         cfg.defaultLt = 0.8e27;
         cfg.defaultMultiplier = 1e27;
-        cfg.defaultTargetHealth = 1.1e27;
+        cfg.defaultTargetHealth = 1.25e27;
         cfg.defaultLiquidationBonus = 0.02e27;
         cfg.defaultMinimumMarketMultiplier = 1e27;
         cfg.defaultMaximumMarketMultiplier = 2e27;

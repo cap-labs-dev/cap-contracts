@@ -167,12 +167,24 @@ contract LendingFlowTest is CapDeployer {
         assertLe(slashed, TRANCHE1_DEPOSIT + TRANCHE0_DEPOSIT);
     }
 
-    function test_setMultiplier_reindexesDebt() public {
+    function test_setMultiplier_preservesPrincipal() public {
         vm.prank(borrower);
         market.borrow(borrower, 200e18);
 
+        uint256 debtBefore = market.totalDebt();
+        uint256 supplyBefore = stablecoin.creditBackedSupply();
+        uint256 healthBefore = market.healthiness();
+
         market.setMarketMultiplier(2e27);
-        assertApproxEqAbs(market.totalDebt(), 400e18, 1e12);
+
+        assertApproxEqAbs(market.totalDebt(), debtBefore, 1, "principal must not jump with the index");
+        assertEq(stablecoin.creditBackedSupply(), supplyBefore, "no extra cUSD minted");
+        assertApproxEqAbs(market.healthiness(), healthBefore, 1e9, "healthiness unchanged");
+
+        vm.prank(borrower);
+        uint256 repaid = market.repay(type(uint256).max);
+        assertApproxEqAbs(repaid, 200e18, 1, "borrower can still clear the original principal");
+        assertEq(market.totalDebt(), 0, "no residual debt");
     }
 
     function test_borrow_zero_reverts() public {

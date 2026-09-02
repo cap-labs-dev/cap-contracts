@@ -110,10 +110,13 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     }
 
     /// @inheritdoc ITranche
-    function setVestingPeriod(uint256 _vestingPeriod) external restricted {
+    function setVestingPeriod(uint256 _vestingPeriod) external restricted updatePremium {
+        if (_vestingPeriod == 0) revert InvalidVestingPeriod();
+        // _lockedProfit reads the outgoing period, so it must be captured before the swap
         vested = _lockedProfit();
         periodEnd = block.timestamp + _vestingPeriod;
         vestingPeriod = _vestingPeriod;
+        lastPremiumUpdate = block.timestamp;
         emit SetVestingPeriod(_vestingPeriod);
     }
 
@@ -177,7 +180,10 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
 
     /// @inheritdoc ITranche
     function unlockedSupply() public view override(ERC7540AsyncRedeem, ITranche) returns (uint256 unlocked) {
-        uint256 lockedShares = previewWithdraw(IBaseMarket(market).lockedAssets(address(this)));
+        // the market accounts in USD, so the locked value has to be priced back into collateral
+        // before it can be compared against this tranche's holdings
+        uint256 lockedAssets = IBaseMarket(market).lockedValue(address(this)) * 10 ** decimals() / getPrice();
+        uint256 lockedShares = previewWithdraw(lockedAssets);
         uint256 totalSupply = totalSupply();
         if (totalSupply > lockedShares) unlocked = totalSupply - lockedShares;
     }

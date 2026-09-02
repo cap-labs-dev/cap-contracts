@@ -141,7 +141,7 @@ contract UnderwriterUnitTest is BaseTest {
 
     function test_setVestingPeriod_updatesVestingEnd() public {
         underwriter.setVestingPeriod(1 days);
-        assertEq(underwriter.vestingEnd(), 1 days);
+        assertEq(underwriter.vestingEnd(), block.timestamp + 1 days);
     }
 
     function test_claimable_zeroInitially() public view {

@@ -88,9 +88,10 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
             else if (extension > maximumTermLimit || extension < minimumTermLimit) revert InvalidTerm();
             actualExtension = extension + block.timestamp - previousExpiry;
         } else {
-            uint256 elapsed = maximumTermLimit - (previousExpiry - block.timestamp);
-            if (extension == type(uint256).max) actualExtension = elapsed;
-            else if (extension > elapsed) revert InvalidTerm();
+            uint256 remaining = maximumTermLimit - (previousExpiry - block.timestamp);
+            if (extension == type(uint256).max) actualExtension = remaining;
+            else if (extension > remaining) revert InvalidTerm();
+            else actualExtension = extension;
         }
 
         _extend(id, actualExtension);

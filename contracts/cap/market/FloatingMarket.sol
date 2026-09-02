@@ -39,11 +39,20 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
     }
 
     /// @inheritdoc IBaseMarket
+    /// @dev The multiplier sits inside the liquidity index, so changing it would otherwise reprice
+    /// every outstanding loan. Accrue first, then rewrite scaledDebt so
+    /// `scaledDebt × index` is unchanged.
     function setMarketMultiplier(uint256 multiplier) external override(BaseMarket, IBaseMarket) restricted {
         _chargePremium();
+        uint256 debt = totalDebt();
         IInterestRateModel(irm()).setMarketMultiplier(multiplier);
-        emit SetMarketMultiplier(multiplier);
         lastLiquidityIndex = IInterestRateModel(irm()).liquidityIndex(address(this));
+        if (debt > 0) {
+            uint256 scaled = debt.rayDiv(index());
+            if (scaled == 0) revert InvalidScaledAmount();
+            scaledDebt = scaled;
+        }
+        emit SetMarketMultiplier(multiplier);
     }
 
     /// @inheritdoc IFloatingMarket
@@ -146,7 +155,7 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
         uint256 currentUnderwriterIndex
     ) internal pure returns (uint256 liquidityPremium, uint256 underwriterPremium) {
         liquidityPremium = scaledDebtAmount.rayMul(
-            previousLiquidityIndex.rayMul(currentLiquidityIndex - previousLiquidityIndex)
+            previousUnderwriterIndex.rayMul(currentLiquidityIndex - previousLiquidityIndex)
         );
         underwriterPremium =
             scaledDebtAmount.rayMul(currentLiquidityIndex.rayMul(currentUnderwriterIndex - previousUnderwriterIndex));

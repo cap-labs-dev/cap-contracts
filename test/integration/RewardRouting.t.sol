@@ -42,18 +42,26 @@ contract RewardRoutingTest is CapDeployer {
         m.setFixedCreditLimit(1_000e18);
     }
 
-    function test_emptyTranche0_routesPremiumToTranche1() public {
+    function test_emptyTranche0_leftoverGoesToStakedStablecoin() public {
         (FloatingMarket m, address tranche0, address tranche1) = _setupMarket("Tranche0 Empty", 0, 1_000e18);
 
         vm.prank(borrower);
         m.borrow(borrower, 400e18);
         vm.warp(block.timestamp + 365 days);
+
+        (uint256 liquidityPremium, uint256 underwriterPremium) = m.premium();
+        uint256 juniorShare = underwriterPremium * 0.5e27 / 1e27;
+        uint256 leftover = underwriterPremium - juniorShare;
+
+        address staked = m.stakedStablecoin();
+        uint256 stakedBefore = stablecoin.balanceOf(staked);
+        uint256 t1Before = stablecoin.balanceOf(tranche1);
+
         vm.prank(borrower);
         m.repay(1);
 
-        vm.warp(block.timestamp + 6 hours);
-
-        assertGt(Tranche(tranche1).claimable(supplier1), 0);
+        assertEq(stablecoin.balanceOf(tranche1) - t1Before, juniorShare, "junior takes only its weight");
+        assertEq(stablecoin.balanceOf(staked) - stakedBefore, liquidityPremium + leftover, "leftover to staked");
         assertEq(Tranche(tranche0).claimable(supplier0), 0);
     }
 

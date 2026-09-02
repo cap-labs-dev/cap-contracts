@@ -12,6 +12,7 @@ import {
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title Underwriter
@@ -159,9 +160,17 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     }
 
     /// @inheritdoc IUnderwriter
+    /// @dev Accrue under the outgoing schedule first, then re-vest whatever is still locked over
+    /// the new period, matching {Tranche.setVestingPeriod}.
     function setVestingPeriod(uint256 _vestingPeriod) external restricted {
         if (_vestingPeriod == 0) revert InvalidVestingPeriod();
+        _updatePremiums();
+        uint256 leftover = vestedReward();
         vestingPeriod = _vestingPeriod;
+        vestedPremium = leftover;
+        premiumPerSecond = leftover / _vestingPeriod;
+        lastReported = block.timestamp;
+        lastPremiumUpdate = block.timestamp;
         emit SetVestingPeriod(_vestingPeriod);
     }
 
@@ -221,16 +230,13 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
 
     /// @dev Get the claimable premium for a user
     function _claimable(address user) internal view returns (uint256 premium) {
-        uint256 accumulatedPremium;
+        uint256 perShare = premiumPerShare;
         uint256 supply = activeSupply();
-        if (lastPremiumUpdate == block.timestamp || supply == 0) {
-            accumulatedPremium = premiumPerShare.rayMul(balanceOf(user));
-        } else {
-            uint256 end = vestingEnd();
-            uint256 elapsed = (block.timestamp > end) ? end - lastPremiumUpdate : block.timestamp - lastPremiumUpdate;
-            accumulatedPremium = (premiumPerShare + (premiumPerSecond * elapsed).rayDiv(supply)).rayMul(balanceOf(user));
+        uint256 accrueUntil = Math.min(block.timestamp, vestingEnd());
+        if (supply > 0 && accrueUntil > lastPremiumUpdate) {
+            perShare += (premiumPerSecond * (accrueUntil - lastPremiumUpdate)).rayDiv(supply);
         }
-        premium = pendingPremium[user] + accumulatedPremium - _premiumDebt[user];
+        premium = pendingPremium[user] + perShare.rayMul(balanceOf(user)) - _premiumDebt[user];
     }
 
     /// @inheritdoc IUnderwriter
@@ -281,20 +287,17 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     }
 
     /// @dev Update the distributed premiums
+    /// @dev Accrual stops at vestingEnd. That boundary can move backwards when the vesting period
+    /// is shortened, so it is clamped rather than subtracted from directly.
     function _updatePremiums() internal {
-        uint256 elapsed;
-        uint256 end = vestingEnd();
-        if (block.timestamp > end) {
-            elapsed = end - lastPremiumUpdate;
-            if (elapsed == 0) return;
-            lastPremiumUpdate = end;
-        } else {
-            elapsed = block.timestamp - lastPremiumUpdate;
-            lastPremiumUpdate = block.timestamp;
-        }
+        uint256 accrueUntil = Math.min(block.timestamp, vestingEnd());
+        if (accrueUntil <= lastPremiumUpdate) return;
         uint256 supply = activeSupply();
+        // leave lastPremiumUpdate alone while nothing is staked, so the premium for that window is
+        // carried into the next accrual instead of being burned
         if (supply == 0) return;
-        premiumPerShare += (premiumPerSecond * elapsed).rayDiv(supply);
+        premiumPerShare += (premiumPerSecond * (accrueUntil - lastPremiumUpdate)).rayDiv(supply);
+        lastPremiumUpdate = accrueUntil;
     }
 
     /// @dev Settle premium accounting when shares move
