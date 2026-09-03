@@ -10,11 +10,19 @@ interface IFixedMarket is IBaseMarket {
     /// @notice Invalid term entered for the loan
     error InvalidTerm();
 
-    /// @notice Still in grace period for the loan
+    /// @notice Invalid term limits, the minimum must not exceed a non-zero maximum
+    error InvalidTermLimits();
+
+    /// @notice Loan has not yet passed its expiry plus grace period
     error StillInGracePeriod();
 
     /// @notice Loan has expired, cannot be extended
     error LoanExpired();
+
+    /// @notice Term limits were updated
+    /// @param maximumTermLimit The new maximum term of a loan
+    /// @param minimumTermLimit The new minimum term of a loan
+    event SetTermLimits(uint256 maximumTermLimit, uint256 minimumTermLimit);
 
     /// @notice Borrowed assets from the market
     /// @param id The id of the loan
@@ -95,16 +103,41 @@ interface IFixedMarket is IBaseMarket {
         returns (uint256 repaid, uint256 assetsSlashed);
 
     /// @notice Extend the term of a loan
+    /// @dev A live loan can be extended up to the room left under the maximum term. An expired loan
+    /// is rolled a full `extension` forward from now, so the arrears are added on top of the
+    /// requested term and charged a premium; only the requested term is bound by the term limits.
+    /// Passing `type(uint256).max` takes the largest extension available in either case.
     /// @param id The id of the loan
     /// @param extension The extension of the term
     /// @return actualExtension The actual extension of the term
     function extend(uint256 id, uint256 extension) external returns (uint256 actualExtension);
 
-    /// @notice Extend the term of a loan by the admin
+    /// @notice Roll an overdue loan forward and charge it a premium for the overdue period
+    /// @dev This is how an overdue loan is handled rather than by liquidation, which would take
+    /// collateral from the underwriters instead of charging the borrower. Only callable once the
+    /// loan is past its expiry plus grace period, at which point the keeper rolls it a full
+    /// `extension` forward from now and the borrower's debt grows by the premium on the arrears
+    /// plus the new term. Health is not checked: an overdue loan must be rollable even when the
+    /// market is already unhealthy.
     /// @param id The id of the loan
-    /// @param extension The extension of the term
-    /// @return actualExtension The actual extension of the term
+    /// @param extension The new term to roll the loan forward by
+    /// @return actualExtension The arrears plus the new term
     function extendAdmin(uint256 id, uint256 extension) external returns (uint256 actualExtension);
+
+    /// @notice Write off a loan's share of the market's unrecoverable debt as bad debt
+    /// @dev Callable at any time, not just once the tranches are empty, because a liquidation that
+    /// is unprofitable never happens and would otherwise let the shortfall compound. The amount is
+    /// derived from the tranches rather than supplied: it is the loan's debt capped at the market
+    /// wide {unrecoverableDebt}, so the guardian chooses which loans absorb the shortfall but can
+    /// never write off more than the collateral shortfall in total.
+    /// @param id The id of the loan
+    /// @return amount The amount of debt written off
+    function writeOff(uint256 id) external returns (uint256 amount);
+
+    /// @notice Set the term limits for new loans
+    /// @param maximumTermLimit The maximum term of a loan, must be non-zero
+    /// @param minimumTermLimit The minimum term of a loan, must not exceed the maximum
+    function setTermLimits(uint256 maximumTermLimit, uint256 minimumTermLimit) external;
 
     /// @notice Get the liquidity and underwriter premiums
     /// @param chargeableDebt The amount of debt that a premium is being charged on

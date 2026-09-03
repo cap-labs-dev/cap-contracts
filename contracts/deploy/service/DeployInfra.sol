@@ -34,6 +34,7 @@ contract DeployInfra is ProxyUtils {
     {
         require(users.stablecoinUnderlying != address(0), "stablecoinUnderlying required");
         require(users.stakedStablecoin != address(0), "stakedStablecoin required");
+        require(users.oracle != address(0), "oracle required");
 
         infra.accessManager = address(new AccessManager(users.admin));
 
@@ -46,7 +47,7 @@ contract DeployInfra is ProxyUtils {
         infra.irm = _proxy(
             implementations.irm,
             abi.encodeCall(
-                InterestRateModel.initialize, (infra.accessManager, stablecoinAddr, 1e27, 2e27, 0, 1e27, 0.02e27)
+                InterestRateModel.initialize, (infra.accessManager, stablecoinAddr, 1e27, 2e27, 1e27, 0.02e27)
             )
         );
 
@@ -77,7 +78,7 @@ contract DeployInfra is ProxyUtils {
                         stablecoin: infra.stablecoin,
                         stakedStablecoin: users.stakedStablecoin,
                         vault: infra.vault,
-                        oracle: address(0),
+                        oracle: users.oracle,
                         irm: infra.irm,
                         factory: infra.factory,
                         floatingMarketBeacon: infra.floatingMarketBeacon,

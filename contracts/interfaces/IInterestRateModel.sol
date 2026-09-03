@@ -14,6 +14,9 @@ interface IInterestRateModel {
     /// @notice Invalid liquidation bonus error
     error InvalidLiquidationBonus();
 
+    /// @notice Invalid liquidity slopes error, the kink must not exceed full utilization
+    error InvalidSlopes();
+
     /// @notice The data for an index
     /// @param ratePerYear The interest rate per year in ray decimals
     /// @param index The cumulative index
@@ -39,31 +42,34 @@ interface IInterestRateModel {
     /// @notice Emitted when an underwriter rate is set
     /// @param market The market that set the rate
     /// @param rate The new underwriter rate per year in ray decimals
-    event SetUnderwriterRate(address indexed market, uint256 rate);
+    event UpdateUnderwriterRate(address indexed market, uint256 rate);
 
     /// @notice Emitted when liquidity slopes are set
     /// @param slopes The new liquidity slopes
     event SetLiquiditySlopes(Slopes slopes);
 
-    /// @notice Emitted when term multiplier slopes are set
-    /// @param slopes The new term multiplier slopes
-    event SetTermMultiplierSlopes(Slopes slopes);
+    /// @notice Emitted when the term multiplier slope is set
+    /// @param slope The new term multiplier slope in ray decimals
+    event SetTermMultiplierSlope(uint256 slope);
 
     /// @notice Emitted when a market multiplier is set
     /// @param market The market that set the multiplier
     /// @param multiplier The new market multiplier in ray decimals
-    event SetMarketMultiplier(address indexed market, uint256 multiplier);
+    event UpdateMarketMultiplier(address indexed market, uint256 multiplier);
 
     /// @notice Emitted when the liquidation bonus is set
     /// @param liquidationBonus The new liquidation bonus in ray decimals
     event SetLiquidationBonus(uint256 liquidationBonus);
 
     /// @notice Initialize the interest rate model
+    /// @dev Validated against the same bounds the setters enforce, so a deployment cannot start
+    /// outside the range governance is later allowed to move within. The multiplier band has no
+    /// setter at all, so an inverted one would leave {updateMarketMultiplier} unsatisfiable for good.
     /// @param authority The address of the authority
     /// @param stablecoin The address of the Stablecoin token
-    /// @param minimumMarketMultiplier The minimum market multiplier in ray decimals
+    /// @param minimumMarketMultiplier The minimum market multiplier in ray decimals, at or below
+    /// the maximum
     /// @param maximumMarketMultiplier The maximum market multiplier in ray decimals
-    /// @param minimumUnderwriterRate The minimum underwriter rate per year in ray decimals
     /// @param maximumUnderwriterRate The maximum underwriter rate per year in ray decimals
     /// @param liquidationBonus The liquidation bonus in ray decimals
     function initialize(
@@ -71,7 +77,6 @@ interface IInterestRateModel {
         address stablecoin,
         uint256 minimumMarketMultiplier,
         uint256 maximumMarketMultiplier,
-        uint256 minimumUnderwriterRate,
         uint256 maximumUnderwriterRate,
         uint256 liquidationBonus
     ) external;
@@ -80,20 +85,24 @@ interface IInterestRateModel {
     function updateLiquidityRate() external;
 
     /// @notice Set the liquidity slopes
+    /// @param slopes The rate curve. The kink must not exceed one ray, since utilization cannot,
+    /// and a kink beyond it would leave the second slope unreachable
     function setLiquiditySlopes(Slopes memory slopes) external;
 
-    /// @notice Set the term multiplier slopes
-    function setTermMultiplierSlopes(Slopes memory slopes) external;
+    /// @notice Set the term multiplier slope
+    /// @param slope The excess multiplier over one ray at a zero length term, in ray decimals.
+    /// Zero makes the multiplier flat at one ray for every term.
+    function setTermMultiplierSlope(uint256 slope) external;
 
     /// @notice Set the liquidation bonus
     /// @param liquidationBonus The liquidation bonus in ray decimals
     function setLiquidationBonus(uint256 liquidationBonus) external;
 
-    /// @notice Set the underwriter rate for the calling market
-    function setUnderwriterRate(uint256 rate) external;
+    /// @notice Update the underwriter rate for the calling market, which must hold {CapRoles-MARKET}
+    function updateUnderwriterRate(uint256 rate) external;
 
-    /// @notice Set the multiplier for the calling market
-    function setMarketMultiplier(uint256 multiplier) external;
+    /// @notice Update the multiplier for the calling market, which must hold {CapRoles-MARKET}
+    function updateMarketMultiplier(uint256 multiplier) external;
 
     /// @notice The address of the Stablecoin token
     function stablecoin() external view returns (address);
@@ -101,17 +110,14 @@ interface IInterestRateModel {
     /// @notice The slopes for the liquidity interest rate
     function liquiditySlopes() external view returns (uint256 base, uint256 slope0, uint256 slope1, uint256 kink);
 
-    /// @notice The slopes for the term utilization multiplier
-    function termMultiplierSlopes() external view returns (uint256 base, uint256 slope0, uint256 slope1, uint256 kink);
+    /// @notice The excess term multiplier over one ray at a zero length term, in ray decimals
+    function termMultiplierSlope() external view returns (uint256);
 
     /// @notice The minimum multiplier for a market's liquidity interest rate in ray decimals
     function minimumMarketMultiplier() external view returns (uint256);
 
     /// @notice The maximum multiplier for a market's liquidity interest rate in ray decimals
     function maximumMarketMultiplier() external view returns (uint256);
-
-    /// @notice The minimum underwriter rate per year in ray decimals
-    function minimumUnderwriterRate() external view returns (uint256);
 
     /// @notice The maximum underwriter rate per year in ray decimals
     function maximumUnderwriterRate() external view returns (uint256);
@@ -156,5 +162,11 @@ interface IInterestRateModel {
         returns (uint256 liquidityRate, uint256 underwriterRate);
 
     /// @notice The multiplier for a given term utilization
+    /// @dev Single linear curve decaying from `1e27 + slope` at a zero length term down to `1e27`
+    /// at the maximum term, and flat at `1e27` beyond it. Short terms therefore pay a premium over
+    /// the liquidity rate and long terms pay the rate itself; the multiplier never reaches zero, so
+    /// no term is ever free.
+    /// @param termUtilization The term as a fraction of the market's maximum term in ray decimals
+    /// @return multiplier The multiplier in ray decimals, always at least one ray
     function termMultiplier(uint256 termUtilization) external view returns (uint256 multiplier);
 }

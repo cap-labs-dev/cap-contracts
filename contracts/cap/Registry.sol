@@ -20,12 +20,22 @@ import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 /// @title Registry
 /// @author kexley, Cap Labs
 /// @notice Deploys markets and underwriters and wires AccessManager roles on new instances.
 /// @dev GOVERNOR assigns operator role ids via {assignOperator}. KEEPER deploys with operator addresses.
 /// Registry holds REGISTRY_ROLE on AccessManager and is admin of each assigned operator role.
+///
+/// Trust assumption: Registry must also hold ADMIN on the AccessManager, and this is accepted
+/// rather than fixed. OpenZeppelin's AccessManager hardcodes `setTargetFunctionRole` and
+/// `setRoleAdmin` to ADMIN_ROLE in `_getAdminRestrictions`, with no way to delegate them to a
+/// narrower role. Since wiring a freshly deployed instance means calling both, no lesser role can
+/// do this contract's job. Only `grantRole` is delegable, through `getRoleAdmin(roleId)`, which is
+/// why {assignOperator} makes REGISTRY_ROLE the admin of each operator role. The practical
+/// consequence is that a Registry upgrade is equivalent to full control of the AccessManager, so
+/// the upgrade path must be governed as tightly as ADMIN itself.
 contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, AccessManagedUpgradeable, UUPSUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -82,6 +92,12 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     /// @inheritdoc IRegistry
     function initialize(address _authority, IRegistry.InitParams calldata init) external initializer {
         __AccessManaged_init(_authority);
+        if (
+            init.vault == address(0) || init.stablecoin == address(0) || init.stakedStablecoin == address(0)
+                || init.oracle == address(0) || init.irm == address(0) || init.factory == address(0)
+                || init.floatingMarketBeacon == address(0) || init.fixedMarketBeacon == address(0)
+                || init.trancheBeacon == address(0) || init.underwriterBeacon == address(0)
+        ) revert ZeroAddress();
         vault = init.vault;
         stablecoin = init.stablecoin;
         stakedStablecoin = init.stakedStablecoin;
@@ -167,14 +183,19 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
 
         _grantOperatorRole(roleId, _operator);
 
+        // the depositor set is a role of its own rather than a list on the vault, so the curator
+        // can admit and remove depositors through the AccessManager without the Registry standing
+        // in the middle
+        uint64 depositorRoleId = _nextOperatorRoleId++;
+
         underwriter = _deploy(
             underwriterBeacon,
             abi.encodeCall(IUnderwriter.initialize, (authority(), _name, _symbol, _asset, vault, stablecoin))
         );
 
-        _configureUnderwriterRoles(underwriter, roleId);
+        _configureUnderwriterRoles(underwriter, roleId, depositorRoleId);
 
-        emit CreateUnderwriter(underwriter, _asset, _name, _symbol, _operator, roleId);
+        emit CreateUnderwriter(underwriter, _asset, _name, _symbol, _operator, roleId, depositorRoleId);
     }
 
     /// @dev Deploy a market with tranches and wire AccessManager roles
@@ -257,14 +278,18 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         borrowerSelectors[2] = IFixedMarket.borrowMore.selector;
         manager.setTargetFunctionRole(market, borrowerSelectors, borrowerRole);
 
-        bytes4[] memory governorSelectors = new bytes4[](2);
+        bytes4[] memory governorSelectors = new bytes4[](3);
         governorSelectors[0] = IBaseMarket.setTargetHealth.selector;
         governorSelectors[1] = IBaseMarket.setFixedCreditLimit.selector;
+        governorSelectors[2] = IFixedMarket.setTermLimits.selector;
         manager.setTargetFunctionRole(market, governorSelectors, CapRoles.GOVERNOR);
 
-        bytes4[] memory guardianSelectors = new bytes4[](2);
+        bytes4[] memory guardianSelectors = new bytes4[](4);
         guardianSelectors[0] = IBaseMarket.setBuffer.selector;
         guardianSelectors[1] = IBaseMarket.setLt.selector;
+        // writing off debt recognises a loss, so it sits with the guardian rather than the keeper
+        guardianSelectors[2] = IFloatingMarket.writeOff.selector;
+        guardianSelectors[3] = IFixedMarket.writeOff.selector;
         manager.setTargetFunctionRole(market, guardianSelectors, CapRoles.GUARDIAN);
 
         bytes4[] memory adminSelectors = new bytes4[](2);
@@ -284,8 +309,8 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         manager.grantRole(CapRoles.MINTER, market, 0);
 
         bytes4[] memory irmSelectors = new bytes4[](2);
-        irmSelectors[0] = IInterestRateModel.setUnderwriterRate.selector;
-        irmSelectors[1] = IInterestRateModel.setMarketMultiplier.selector;
+        irmSelectors[0] = IInterestRateModel.updateUnderwriterRate.selector;
+        irmSelectors[1] = IInterestRateModel.updateMarketMultiplier.selector;
         manager.setTargetFunctionRole(irm, irmSelectors, CapRoles.MARKET);
         manager.grantRole(CapRoles.MARKET, market, 0);
     }
@@ -294,8 +319,11 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     function _configureTrancheRoles(address tranche, uint64 ownerRole) internal {
         IAccessManager manager = IAccessManager(authority());
 
-        bytes4[] memory ownerSelectors = new bytes4[](1);
+        bytes4[] memory ownerSelectors = new bytes4[](2);
         ownerSelectors[0] = ITranche.setWhitelist.selector;
+        // matches IUnderwriter.setVestingPeriod sitting with the underwriter's operator: the
+        // smoothing window on premium is a curator knob, and the worst it can do is re-vest
+        ownerSelectors[1] = ITranche.setVestingPeriod.selector;
         manager.setTargetFunctionRole(tranche, ownerSelectors, ownerRole);
 
         bytes4[] memory marketSelectors = new bytes4[](1);
@@ -307,23 +335,45 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         manager.setTargetFunctionRole(tranche, publicSelectors, type(uint64).max);
     }
 
-    /// @dev Wire underwriter function selectors to the operator and keeper roles
-    function _configureUnderwriterRoles(address underwriter, uint64 roleId) internal {
+    /// @dev Wire underwriter function selectors to the operator, keeper and depositor roles
+    function _configureUnderwriterRoles(address underwriter, uint64 roleId, uint64 depositorRoleId) internal {
         IAccessManager manager = IAccessManager(authority());
 
-        bytes4[] memory operatorSelectors = new bytes4[](7);
+        bytes4[] memory operatorSelectors = new bytes4[](6);
         operatorSelectors[0] = IUnderwriter.allocate.selector;
         operatorSelectors[1] = IUnderwriter.deallocate.selector;
         operatorSelectors[2] = IUnderwriter.deallocateAsync.selector;
         operatorSelectors[3] = IUnderwriter.finalizeDeallocateAsync.selector;
         operatorSelectors[4] = IUnderwriter.setDefaultTranche.selector;
-        operatorSelectors[5] = IUnderwriter.whitelist.selector;
-        operatorSelectors[6] = IUnderwriter.setVestingPeriod.selector;
+        operatorSelectors[5] = IUnderwriter.setVestingPeriod.selector;
         manager.setTargetFunctionRole(underwriter, operatorSelectors, roleId);
 
         bytes4[] memory keeperSelectors = new bytes4[](1);
         keeperSelectors[0] = IUnderwriter.report.selector;
         manager.setTargetFunctionRole(underwriter, keeperSelectors, CapRoles.KEEPER);
+
+        // Registration is held above the curator on purpose. addTranche hands its argument vault
+        // operator rights over the underwriter's entire balance and does not check that the address
+        // is a tranche this registry deployed, so a curator holding it could register a contract of
+        // their own and move the balance out. Wired explicitly even though ADMIN is AccessManager's
+        // default for an unconfigured selector, so the role table shows a decision rather than an
+        // omission.
+        bytes4[] memory adminSelectors = new bytes4[](2);
+        adminSelectors[0] = IUnderwriter.addTranche.selector;
+        adminSelectors[1] = IUnderwriter.removeTranche.selector;
+        manager.setTargetFunctionRole(underwriter, adminSelectors, CapRoles.ADMIN);
+
+        // admission is the gate on the entry points themselves, so the allowlist is the membership
+        // of this role and there is nothing to keep in step on the vault. Repointing it later means
+        // another setTargetFunctionRole, which AccessManager reserves to ADMIN
+        bytes4[] memory depositorSelectors = new bytes4[](2);
+        depositorSelectors[0] = IERC4626.deposit.selector;
+        depositorSelectors[1] = IERC4626.mint.selector;
+        manager.setTargetFunctionRole(underwriter, depositorSelectors, depositorRoleId);
+
+        // grant and revoke over the depositor role, and nothing else: they are the only
+        // AccessManager calls delegable to a role other than ADMIN
+        manager.setRoleAdmin(depositorRoleId, roleId);
     }
 
     /// @inheritdoc UUPSUpgradeable

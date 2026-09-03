@@ -10,6 +10,9 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @notice Vesting period must be non-zero, as it is a divisor in premium accrual
     error InvalidVestingPeriod();
 
+    /// @notice The oracle reported a zero price, which is a divisor in every value conversion
+    error InvalidPrice();
+
     /// @notice Emitted when assets are slashed
     /// @param recipient The recipient of the slashed assets
     /// @param assets The amount of assets slashed
@@ -90,6 +93,8 @@ interface ITranche is IERC7540AsyncRedeem {
     function vestingPeriod() external view returns (uint256);
 
     /// @notice Get the end of the current vesting epoch
+    /// @dev Reset to one period out whenever premium arrives, then slid forward by any window in
+    /// which nothing was underwriting, so it is not necessarily one period from the last premium
     function periodEnd() external view returns (uint256);
 
     /// @notice Get the accumulated premium per share

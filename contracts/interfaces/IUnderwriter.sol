@@ -52,6 +52,11 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @param vestingPeriod The new vesting period in seconds
     event SetVestingPeriod(uint256 vestingPeriod);
 
+    /// @notice Emitted when a depositor claims vested premium
+    /// @param user The account that claimed
+    /// @param amount The amount of premium claimed
+    event Claimed(address indexed user, uint256 amount);
+
     /// @notice Initialize the underwriter
     /// @param authority The access manager address
     /// @param name The share token name
@@ -69,10 +74,14 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     ) external;
 
     /// @notice Register a tranche for allocation and reporting
+    /// @dev Grants the tranche vault operator rights so it can pull assets on allocation. The
+    /// grant lasts until {removeTranche} revokes it.
     /// @param tranche The tranche address
     function addTranche(address tranche) external;
 
     /// @notice Remove a tranche from the underwriter to block new allocations
+    /// @dev Revokes the tranche's vault operator rights. Existing shares can still be redeemed,
+    /// since the deallocation functions deliberately do not require registration.
     /// @param tranche The tranche address
     function removeTranche(address tranche) external;
 
@@ -82,18 +91,26 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     function allocate(address tranche, uint256 assets) external;
 
     /// @notice Instantly redeem unlocked tranche shares back to the vault
+    /// @dev Registration is deliberately not checked. Removing a tranche must block new
+    /// allocations without trapping the capital already sitting in it, so every exit path stays
+    /// open to unregistered tranches.
+    ///
+    /// Clamped by both this contract's holding and the tranche's unlocked supply, so an oversized
+    /// request is a short fill rather than a revert, matching {deallocateAsync}.
     /// @param tranche The tranche address
     /// @param shares The shares to redeem
     /// @return deallocated The amount of shares redeemed
     function deallocate(address tranche, uint256 shares) external returns (uint256 deallocated);
 
     /// @notice Request async redemption of tranche shares back to the vault
+    /// @dev Registration is deliberately not checked; see {deallocate}
     /// @param tranche The tranche address
     /// @param shares The shares to redeem
     /// @return requestId The ERC-7540 request id
     function deallocateAsync(address tranche, uint256 shares) external returns (uint256 requestId);
 
     /// @notice Finalize an async tranche redemption
+    /// @dev Registration is deliberately not checked; see {deallocate}
     /// @param tranche The tranche address
     /// @param requestId The ERC-7540 request id
     /// @param shares The shares to redeem
@@ -108,17 +125,16 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @param vestingPeriod The new vesting period in seconds
     function setVestingPeriod(uint256 vestingPeriod) external;
 
-    /// @notice Set whether an account may deposit
-    /// @param account The account to update
-    /// @param allowed Whether the account is whitelisted
-    function whitelist(address account, bool allowed) external;
-
     /// @notice Update recorded tranche debt and claim premium into the underwriter
     /// @param tranche The tranche address
     function report(address tranche) external;
 
     /// @notice Claim vested premium for the caller
-    function claim() external;
+    /// @dev Pays the caller, where {ITranche-claim} takes a recipient. That asymmetry is deliberate
+    /// rather than an omission: the tranche needs one because the underwriter claims a tranche's
+    /// premium to itself in {report}, whereas nothing claims on a depositor's behalf here.
+    /// @return premium The amount of premium claimed
+    function claim() external returns (uint256 premium);
 
     /// @notice Get the vault holding curator assets
     function vault() external view returns (address);
@@ -129,13 +145,18 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice Get the premium vesting period in seconds
     function vestingPeriod() external view returns (uint256);
 
-    /// @notice Get the timestamp of the last tranche report
+    /// @notice Get the anchor the premium vesting schedule runs from
+    /// @dev Set to the report time by {report}, then slid forward by any window in which nothing was
+    /// staked, so it is not necessarily the timestamp of the last report
     function lastReported() external view returns (uint256);
 
     /// @notice Get the total premium from the last report that is vesting to depositors
     function vestedPremium() external view returns (uint256);
 
-    /// @notice Get the premium accrual rate per second from the last report
+    /// @notice Get the nominal premium accrual rate per second
+    /// @dev Reported for convenience and not what accrual uses. {PremiumVesting} scales the vesting
+    /// lump by elapsed time instead, so it does not truncate this figure and then multiply the
+    /// error back up. Expect accrual to run marginally ahead of `premiumPerSecond × elapsed`.
     function premiumPerSecond() external view returns (uint256);
 
     /// @notice Get the timestamp of the last premium accrual update
@@ -171,9 +192,16 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @return end The vesting end timestamp
     function vestingEnd() external view returns (uint256 end);
 
-    /// @notice Check whether an account is whitelisted
+    /// @notice Check whether an account may deposit
+    /// @dev Reads the AccessManager rather than any list held here: {deposit} and {mint} are
+    /// gated by {deposit}'s target function role, so admission is membership of whichever role
+    /// that selector is wired to. Nothing about the allowlist is stored on this contract.
+    ///
+    /// Reported for the account as a caller, which is what the gate on {deposit} tests. Note this
+    /// also drives {maxDeposit}, where the subject is the receiver, so a deposit routed by one
+    /// account to another needs both of them admitted.
     /// @param account The account to check
-    /// @return allowed Whether the account is whitelisted
+    /// @return allowed Whether the account may deposit
     function whitelisted(address account) external view returns (bool allowed);
 
     /// @notice Total assets including vault balance and recorded tranche debt

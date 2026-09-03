@@ -76,6 +76,9 @@ interface IBaseMarket {
     /// @notice The tranche is already set
     error TrancheAlreadySet();
 
+    /// @notice The write off exceeds the debt that liquidation could never recover
+    error ExceedsUnrecoverableDebt();
+
     /// @notice Emitted when assets are borrowed from the market
     /// @param recipient The address receiving the borrowed assets
     /// @param principal The amount borrowed
@@ -92,6 +95,11 @@ interface IBaseMarket {
     /// @param repaid The amount of debt repaid
     /// @param assetsSlashed The amount of tranche assets slashed
     event Liquidate(address caller, address recipient, uint256 repaid, uint256 assetsSlashed);
+
+    /// @notice Emitted when unrecoverable debt is written off the market
+    /// @param caller The address initiating the write off
+    /// @param amount The amount of debt written off
+    event WriteOff(address caller, uint256 amount);
 
     /// @notice Emitted when the loan-to-value ratio is updated
     /// @param ltv The new loan-to-value ratio in ray decimals
@@ -227,6 +235,20 @@ interface IBaseMarket {
     /// @notice Get the maximum liquidatable debt
     /// @return liquidatable The maximum liquidatable debt
     function maxLiquidatable() external view returns (uint256 liquidatable);
+
+    /// @notice Get the debt that fully liquidating every tranche could still repay
+    /// @dev A liquidator takes `1 + liquidationBonus` of collateral value for each unit of debt
+    /// they repay, so the tranche capital can only ever clear its value discounted by the bonus.
+    /// @return recoverable The recoverable debt
+    function recoverableDebt() external view returns (uint256 recoverable);
+
+    /// @notice Get the debt that no amount of liquidation could ever repay
+    /// @dev This is the market's true bad debt: the excess of total debt over {recoverableDebt}.
+    /// It does not require the tranches to be empty, because a liquidation that is unprofitable
+    /// or simply never called still leaves the collateral untouched while the debt is already
+    /// beyond what that collateral can cover.
+    /// @return unrecoverable The unrecoverable debt
+    function unrecoverableDebt() external view returns (uint256 unrecoverable);
 
     /// @notice Get the capital value a tranche must keep locked to back the market's debt
     /// @dev Denominated in USD (18 decimals), not in collateral tokens. More junior tranches are

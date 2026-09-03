@@ -92,12 +92,15 @@ contract LendingFlowTest is CapDeployer {
         vm.warp(block.timestamp + 30 days);
 
         uint256 debtBefore = market.totalDebt();
+        uint256 balanceBefore = stablecoin.balanceOf(borrower);
         uint256 repaid = market.repay(100e18);
         vm.stopPrank();
 
-        assertEq(repaid, 100e18);
-        assertEq(stablecoin.balanceOf(borrower), 200e18);
-        assertApproxEqAbs(market.totalDebt(), debtBefore - 100e18, 2);
+        // the request is floored to a whole scaled unit, so a wei of it may not land
+        assertApproxEqAbs(repaid, 100e18, 2, "settles at the amount asked for");
+        // whatever does land is burned and cleared in lockstep, which is the invariant that matters
+        assertEq(balanceBefore - stablecoin.balanceOf(borrower), repaid, "burn matches the return");
+        assertEq(debtBefore - market.totalDebt(), repaid, "debt cleared matches the burn");
     }
 
     function test_repay_capsAtOutstandingDebt() public {
@@ -118,8 +121,7 @@ contract LendingFlowTest is CapDeployer {
         market.borrow(borrower, 400e18);
 
         vm.warp(block.timestamp + 365 days);
-        vm.prank(borrower);
-        market.repay(1);
+        market.chargePremium();
 
         assertGt(stablecoin.balanceOf(stcUsd), 0);
     }
@@ -129,8 +131,7 @@ contract LendingFlowTest is CapDeployer {
         market.borrow(borrower, 400e18);
 
         vm.warp(block.timestamp + 365 days);
-        vm.prank(borrower);
-        market.repay(1);
+        market.chargePremium();
 
         vm.warp(block.timestamp + 6 hours);
 

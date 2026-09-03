@@ -50,9 +50,13 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         uint256 _grace
     ) external initializer {
         __BaseMarket_init(_authority, _registry, _name);
-        maximumTermLimit = _maximumTermLimit;
-        minimumTermLimit = _minimumTermLimit;
+        _setTermLimits(_maximumTermLimit, _minimumTermLimit);
         grace = _grace;
+    }
+
+    /// @inheritdoc IFixedMarket
+    function setTermLimits(uint256 _maximumTermLimit, uint256 _minimumTermLimit) external restricted {
+        _setTermLimits(_maximumTermLimit, _minimumTermLimit);
     }
 
     /// @inheritdoc IFixedMarket
@@ -84,9 +88,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     function extend(uint256 id, uint256 extension) external restricted returns (uint256 actualExtension) {
         uint256 previousExpiry = expiry[id];
         if (block.timestamp >= previousExpiry) {
-            if (extension == type(uint256).max) actualExtension = maximumTermLimit;
-            else if (extension > maximumTermLimit || extension < minimumTermLimit) revert InvalidTerm();
-            actualExtension = extension + block.timestamp - previousExpiry;
+            actualExtension = _rollFromNow(previousExpiry, extension);
         } else {
             uint256 remaining = maximumTermLimit - (previousExpiry - block.timestamp);
             if (extension == type(uint256).max) actualExtension = remaining;
@@ -101,10 +103,8 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     /// @inheritdoc IFixedMarket
     function extendAdmin(uint256 id, uint256 extension) external restricted returns (uint256 actualExtension) {
         uint256 previousExpiry = expiry[id];
-        if (block.timestamp >= previousExpiry + grace) revert StillInGracePeriod();
-        if (extension == type(uint256).max) actualExtension = maximumTermLimit;
-        else if (extension > maximumTermLimit || extension < minimumTermLimit) revert InvalidTerm();
-        actualExtension = extension + block.timestamp - previousExpiry;
+        if (block.timestamp < previousExpiry + grace) revert StillInGracePeriod();
+        actualExtension = _rollFromNow(previousExpiry, extension);
         _extend(id, actualExtension);
     }
 
@@ -127,6 +127,17 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         debt[id] -= repaid;
         _totalDebt -= repaid;
         emit LiquidateFixed(id, msg.sender, recipient, repaid, assetsSlashed);
+    }
+
+    /// @inheritdoc IFixedMarket
+    function writeOff(uint256 id) external restricted returns (uint256 amount) {
+        uint256 loanDebt = debt[id];
+        uint256 unrecoverable = unrecoverableDebt();
+        amount = loanDebt < unrecoverable ? loanDebt : unrecoverable;
+        // record against the pre-write-off debt, since that is what bounds the write off
+        _writeOff(amount);
+        debt[id] = loanDebt - amount;
+        _totalDebt -= amount;
     }
 
     /// @inheritdoc IBaseMarket
@@ -171,6 +182,31 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         _borrow(recipient, actualPrincipal);
         uint256 chargedPremium = _chargePremiumForTerm(id, actualPrincipal, term);
         emit BorrowFixed(id, recipient, term, actualPrincipal, chargedPremium);
+    }
+
+    /// @dev Validate the term limits and store them
+    /// @param _maximumTermLimit The maximum term of a loan
+    /// @param _minimumTermLimit The minimum term of a loan
+    function _setTermLimits(uint256 _maximumTermLimit, uint256 _minimumTermLimit) internal {
+        // _borrow divides the term by the maximum, and a minimum above the maximum makes every
+        // term invalid
+        if (_maximumTermLimit == 0 || _minimumTermLimit > _maximumTermLimit) revert InvalidTermLimits();
+        maximumTermLimit = _maximumTermLimit;
+        minimumTermLimit = _minimumTermLimit;
+        emit SetTermLimits(_maximumTermLimit, _minimumTermLimit);
+    }
+
+    /// @dev Size an extension that lands the new expiry a full term from now on an expired loan.
+    /// The term limits bound the requested term only; the arrears are then added on top so that
+    /// the borrower is charged a premium for the period the loan sat expired.
+    /// @param previousExpiry The expiry the loan is being rolled from
+    /// @param extension The requested new term, or `type(uint256).max` for the maximum
+    /// @return actualExtension The arrears plus the requested term
+    function _rollFromNow(uint256 previousExpiry, uint256 extension) internal view returns (uint256 actualExtension) {
+        if (extension == type(uint256).max) actualExtension = maximumTermLimit;
+        else if (extension > maximumTermLimit || extension < minimumTermLimit) revert InvalidTerm();
+        else actualExtension = extension;
+        actualExtension += block.timestamp - previousExpiry;
     }
 
     /// @dev Extend the loan

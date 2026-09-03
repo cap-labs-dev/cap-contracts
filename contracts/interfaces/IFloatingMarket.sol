@@ -23,11 +23,20 @@ interface IFloatingMarket is IBaseMarket {
     function borrow(address recipient, uint256 principal) external returns (uint256 actualPrincipal);
 
     /// @notice Repay assets to the market
+    /// @dev Debt is held scaled by {index}, so a repayment settles at the largest whole number of
+    /// scaled units that does not exceed the amount asked for, and that settled figure is what is
+    /// burned. Expect it to come back a wei or two under `amount` at a grown index. An amount too
+    /// small to move a single scaled unit clears nothing and reverts with {InvalidScaledAmount}
+    /// rather than being taken for a no-op; use {chargePremium} to accrue without repaying.
+    /// Passing `type(uint256).max`, or anything at or above the outstanding debt, clears it in full.
     /// @param amount The amount of assets to repay
     /// @return repaid The actual amount of assets repaid
     function repay(uint256 amount) external returns (uint256 repaid);
 
     /// @notice Liquidate assets from the market
+    /// @dev Settles to a whole number of scaled units the same way {repay} does, so `repaid` can
+    /// come back just under the entitlement. Collateral is slashed against `repaid`, not against
+    /// the request, so the bonus is paid on exactly the debt that cleared.
     /// @param recipient The recipient of the liquidated assets
     /// @param amount The amount of assets to liquidate
     /// @return repaid The actual amount of assets repaid
@@ -36,6 +45,16 @@ interface IFloatingMarket is IBaseMarket {
 
     /// @notice Charge the accrued premium
     function chargePremium() external;
+
+    /// @notice Write off the market's unrecoverable debt as bad debt
+    /// @dev Callable at any time, not just once the tranches are empty, because a liquidation that
+    /// is unprofitable never happens and would otherwise let the shortfall compound. The amount is
+    /// derived from the tranches rather than supplied: it is {unrecoverableDebt}, the excess of the
+    /// debt over what the tranche capital could clear at the liquidation bonus. The stablecoin
+    /// records the shortfall and drops it out of the credit-backed supply, and the scaled debt is
+    /// re-indexed to the remainder, which stays liquidatable.
+    /// @return amount The amount of debt written off
+    function writeOff() external returns (uint256 amount);
 
     /// @notice Get the liquidity and underwriter premiums
     /// @return liquidityPremium The liquidity premium

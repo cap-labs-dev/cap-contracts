@@ -18,6 +18,7 @@ import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
 import { IBeaconFactory } from "../../contracts/interfaces/IBeaconFactory.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
 import { IRegistry } from "../../contracts/interfaces/IRegistry.sol";
+import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 /// @title CapDeployer
@@ -59,7 +60,6 @@ abstract contract CapDeployer is BaseTest {
         uint256 defaultLiquidationBonus;
         uint256 defaultMinimumMarketMultiplier;
         uint256 defaultMaximumMarketMultiplier;
-        uint256 defaultMinimumUnderwriterRate;
         uint256 defaultMaximumUnderwriterRate;
         uint256 defaultUnderwriterRate;
         uint256[] defaultTrancheWeights;
@@ -92,7 +92,6 @@ abstract contract CapDeployer is BaseTest {
         cfg.defaultLiquidationBonus = 0.02e27;
         cfg.defaultMinimumMarketMultiplier = 1e27;
         cfg.defaultMaximumMarketMultiplier = 2e27;
-        cfg.defaultMinimumUnderwriterRate = 0;
         cfg.defaultMaximumUnderwriterRate = 1e27;
         cfg.defaultUnderwriterRate = 0.2e27; // 20% APR in ray per year
         cfg.defaultTrancheWeights = new uint256[](2);
@@ -159,7 +158,6 @@ abstract contract CapDeployer is BaseTest {
                         stablecoinAddr,
                         capConfig.defaultMinimumMarketMultiplier,
                         capConfig.defaultMaximumMarketMultiplier,
-                        capConfig.defaultMinimumUnderwriterRate,
                         capConfig.defaultMaximumUnderwriterRate,
                         capConfig.defaultLiquidationBonus
                     )
@@ -246,15 +244,20 @@ abstract contract CapDeployer is BaseTest {
         keeperSelectors[2] = Registry.createUnderwriter.selector;
         accessManager.setTargetFunctionRole(address(registry), keeperSelectors, CapRoles.KEEPER);
 
-        bytes4[] memory minterSelectors = new bytes4[](2);
+        bytes4[] memory minterSelectors = new bytes4[](3);
         minterSelectors[0] = Stablecoin.mintCreditBacked.selector;
         minterSelectors[1] = Stablecoin.burnCreditBacked.selector;
+        minterSelectors[2] = Stablecoin.recognizeBadDebt.selector;
         accessManager.setTargetFunctionRole(address(stablecoin), minterSelectors, CapRoles.MINTER);
         accessManager.grantRole(CapRoles.MINTER, address(this), 0);
 
+        bytes4[] memory stablecoinGovernorSelectors = new bytes4[](1);
+        stablecoinGovernorSelectors[0] = Stablecoin.coverBadDebt.selector;
+        accessManager.setTargetFunctionRole(address(stablecoin), stablecoinGovernorSelectors, CapRoles.GOVERNOR);
+
         bytes4[] memory irmGovernorSelectors = new bytes4[](3);
         irmGovernorSelectors[0] = InterestRateModel.setLiquiditySlopes.selector;
-        irmGovernorSelectors[1] = InterestRateModel.setTermMultiplierSlopes.selector;
+        irmGovernorSelectors[1] = InterestRateModel.setTermMultiplierSlope.selector;
         irmGovernorSelectors[2] = InterestRateModel.setLiquidationBonus.selector;
         accessManager.setTargetFunctionRole(address(irm), irmGovernorSelectors, CapRoles.GOVERNOR);
     }
@@ -418,9 +421,20 @@ abstract contract CapDeployer is BaseTest {
         underwriter = Underwriter(uw);
     }
 
+    /// @dev Admit a depositor to an underwriter. The role wired to {IERC4626-deposit} *is* the
+    /// whitelist, and the curator's operator role administers it, so the grant has to come from the
+    /// curator -- which in these tests is the deployer itself.
+    function _depositorRole(address underwriter) internal view returns (uint64 roleId) {
+        roleId = accessManager.getTargetFunctionRole(underwriter, IERC4626.deposit.selector);
+    }
+
+    function _admitDepositor(address underwriter, address account) internal {
+        accessManager.grantRole(_depositorRole(underwriter), account, 0);
+    }
+
     function _fundUnderwriter(address underwriter, address supplier, uint256 amount) internal {
         _fundVault(supplier, amount);
-        Underwriter(underwriter).whitelist(supplier, true);
+        _admitDepositor(underwriter, supplier);
         vm.startPrank(supplier);
         vault.setOperator(underwriter, true);
         Underwriter(underwriter).deposit(amount, supplier);

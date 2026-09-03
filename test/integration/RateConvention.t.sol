@@ -82,7 +82,7 @@ contract RateConventionTest is CapDeployer {
         irm.setLiquiditySlopes(
             IInterestRateModel.Slopes({ base: 0.05e27, slope0: 0.05e27, slope1: 0.1e27, kink: 0.8e27 })
         );
-        irm.setTermMultiplierSlopes(IInterestRateModel.Slopes({ base: 0, slope0: 1e27, slope1: 0, kink: 0.8e27 }));
+        irm.setTermMultiplierSlope(0.5e27);
 
         (address marketAddr, address t0,) = _createFixedMarket("Fixed");
         FixedMarket market = FixedMarket(marketAddr);
@@ -93,16 +93,46 @@ contract RateConventionTest is CapDeployer {
         // nothing is borrowed yet, so utilization is zero and the liquidity rate is just base
         assertEq(irm.liquidityRate(), 0.05e27, "liquidity rate at zero utilization");
 
+        // half the 30 day maximum, so the term multiplier is 1 + half the slope = 1.25
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 30 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 15 days);
 
         // the borrow mints credit-backed cUSD, and since no real deposits exist utilization jumps
         // above the kink, taking the liquidity rate to base + slope0 + slope1 = 20% per year
         assertEq(irm.liquidityRate(), 0.2e27, "liquidity rate at full utilization");
 
-        // the premium is charged after the mint, so it uses 20% liquidity + 20% underwriter = 40%
-        // per year, prorated over 30 days ~= 3.288%
-        uint256 expectedPremium = PRINCIPAL * 40 * 30 days / (100 * 365 days);
+        // the premium is charged after the mint, so it uses (20% x 1.25) liquidity + 20%
+        // underwriter = 45% per year, prorated over 15 days ~= 1.849%
+        uint256 expectedPremium = PRINCIPAL * 45 * 15 days / (100 * 365 days);
         assertApproxEqRel(market.debt(id) - PRINCIPAL, expectedPremium, 0.01e18, "combined term premium");
+    }
+
+    /// The term multiplier decays from a premium over the liquidity rate down to the rate itself at
+    /// the maximum term. It never reaches zero, so no term is ever free for the borrower.
+    function test_termMultiplier_decaysToOneRayAtMaximumTerm() public {
+        irm.setTermMultiplierSlope(1e27);
+
+        assertEq(irm.termMultiplier(0), 2e27, "one ray plus the slope at a zero length term");
+        assertEq(irm.termMultiplier(0.25e27), 1.75e27, "linear through the range");
+        assertEq(irm.termMultiplier(0.5e27), 1.5e27, "linear through the range");
+        assertEq(irm.termMultiplier(0.75e27), 1.25e27, "linear through the range");
+        assertEq(irm.termMultiplier(1e27), 1e27, "the plain liquidity rate at the maximum term");
+
+        irm.setLiquiditySlopes(
+            IInterestRateModel.Slopes({ base: 0.05e27, slope0: 0.05e27, slope1: 0.1e27, kink: 0.8e27 })
+        );
+
+        (address marketAddr, address t0,) = _createFixedMarket("Fixed");
+        FixedMarket market = FixedMarket(marketAddr);
+        market.setUnderwriterRate(RATE_20PCT_PER_YEAR);
+        market.setFixedCreditLimit(10_000e18);
+        _fundTranche(t0, makeAddr("senior"), 10_000e18);
+
+        vm.prank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 30 days);
+
+        // a maximum term loan still pays the full liquidity rate: 20% + 20% underwriter = 40%
+        uint256 expectedPremium = PRINCIPAL * 40 * 30 days / (100 * 365 days);
+        assertApproxEqRel(market.debt(id) - PRINCIPAL, expectedPremium, 0.01e18, "full rate at the maximum term");
     }
 }

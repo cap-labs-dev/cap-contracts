@@ -25,13 +25,13 @@ contract InterestRateModelTest is BaseTest {
                 address(impl),
                 abi.encodeCall(
                     InterestRateModel.initialize,
-                    (address(accessManager), address(stablecoin), 0.5e27, 2e27, 0, 1e27, 0.02e27)
+                    (address(accessManager), address(stablecoin), 0.5e27, 2e27, 1e27, 0.02e27)
                 )
             )
         );
 
         bytes4[] memory selectors = new bytes4[](1);
-        selectors[0] = IInterestRateModel.setUnderwriterRate.selector;
+        selectors[0] = IInterestRateModel.updateUnderwriterRate.selector;
         accessManager.setTargetFunctionRole(address(irm), selectors, CapRoles.MARKET);
         accessManager.grantRole(CapRoles.MARKET, market, 0);
     }
@@ -76,26 +76,47 @@ contract InterestRateModelTest is BaseTest {
         assertGt(irm.liquidityIndex(market), before);
     }
 
-    function test_setUnderwriterRate_fromMarket() public {
+    function test_updateUnderwriterRate_fromMarket() public {
         vm.prank(market);
-        irm.setUnderwriterRate(0.2e27);
+        irm.updateUnderwriterRate(0.2e27);
         assertEq(irm.underwriterRate(market), 0.2e27);
         assertEq(irm.underwriterIndex(market), RAY);
     }
 
     function test_underwriterIndex_growsOverTime() public {
         vm.prank(market);
-        irm.setUnderwriterRate(0.2e27);
+        irm.updateUnderwriterRate(0.2e27);
         uint256 before = irm.underwriterIndex(market);
         vm.warp(block.timestamp + 365 days);
         assertGt(irm.underwriterIndex(market), before);
     }
 
-    function test_termMultiplierSlopes_effect() public {
-        IInterestRateModel.Slopes memory slopes =
-            IInterestRateModel.Slopes({ base: 0, slope0: 1e27, slope1: 0.5e27, kink: 0.5e27 });
-        irm.setTermMultiplierSlopes(slopes);
-        assertEq(irm.termMultiplier(0), 1.5e27);
+    function test_termMultiplierSlope_effect() public {
+        irm.setTermMultiplierSlope(0.5e27);
+        assertEq(irm.termMultiplierSlope(), 0.5e27);
+        assertEq(irm.termMultiplier(0), 1.5e27, "slope on top of one ray at a zero length term");
+        assertEq(irm.termMultiplier(0.5e27), 1.25e27, "linear through the range");
+        assertEq(irm.termMultiplier(1e27), 1e27, "one ray at the maximum term");
+        assertEq(irm.termMultiplier(2e27), 1e27, "flat beyond the maximum term");
+    }
+
+    function test_termMultiplier_defaultsToOneRay() public view {
+        assertEq(irm.termMultiplierSlope(), 0, "no slope configured");
+        assertEq(irm.termMultiplier(0), 1e27, "a zero slope is neutral");
+        assertEq(irm.termMultiplier(1e27), 1e27, "a zero slope is neutral");
+    }
+
+    function test_updateUnderwriterRate_allowsZero() public {
+        vm.prank(market);
+        irm.updateUnderwriterRate(0);
+        assertEq(irm.underwriterRate(market), 0);
+    }
+
+    function test_updateUnderwriterRate_aboveMaximum_reverts() public {
+        uint256 tooHigh = irm.maximumUnderwriterRate() + 1;
+        vm.prank(market);
+        vm.expectRevert(IInterestRateModel.InvalidRate.selector);
+        irm.updateUnderwriterRate(tooHigh);
     }
 
     function test_upgrade_authorized() public {

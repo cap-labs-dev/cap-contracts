@@ -36,14 +36,23 @@ contract ConfigureAccessControl {
         keeperSelectors[2] = Registry.createUnderwriter.selector;
         manager.setTargetFunctionRole(infra.registry, keeperSelectors, CapRoles.KEEPER);
 
-        bytes4[] memory minterSelectors = new bytes4[](2);
+        // markets are the only MINTER holders, so writing off their own credit-backed supply sits
+        // behind the same role that mints it
+        bytes4[] memory minterSelectors = new bytes4[](3);
         minterSelectors[0] = Stablecoin.mintCreditBacked.selector;
         minterSelectors[1] = Stablecoin.burnCreditBacked.selector;
+        minterSelectors[2] = Stablecoin.recognizeBadDebt.selector;
         manager.setTargetFunctionRole(infra.stablecoin, minterSelectors, CapRoles.MINTER);
+
+        // covering burns the caller's own cUSD, so the risk is funding rather than authority. It
+        // sits with GOVERNOR so the treasury can retire a shortfall without holding MINTER
+        bytes4[] memory stablecoinGovernorSelectors = new bytes4[](1);
+        stablecoinGovernorSelectors[0] = Stablecoin.coverBadDebt.selector;
+        manager.setTargetFunctionRole(infra.stablecoin, stablecoinGovernorSelectors, CapRoles.GOVERNOR);
 
         bytes4[] memory irmGovernorSelectors = new bytes4[](3);
         irmGovernorSelectors[0] = InterestRateModel.setLiquiditySlopes.selector;
-        irmGovernorSelectors[1] = InterestRateModel.setTermMultiplierSlopes.selector;
+        irmGovernorSelectors[1] = InterestRateModel.setTermMultiplierSlope.selector;
         irmGovernorSelectors[2] = InterestRateModel.setLiquidationBonus.selector;
         manager.setTargetFunctionRole(infra.irm, irmGovernorSelectors, CapRoles.GOVERNOR);
     }

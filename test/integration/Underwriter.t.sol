@@ -101,8 +101,7 @@ contract UnderwriterIntegrationTest is CapDeployer {
         market.borrow(borrower, 400e18);
 
         vm.warp(block.timestamp + 365 days);
-        vm.prank(borrower);
-        market.repay(1);
+        market.chargePremium();
 
         vm.warp(block.timestamp + 6 hours);
 

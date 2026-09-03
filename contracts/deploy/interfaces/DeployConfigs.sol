@@ -10,6 +10,7 @@ struct UsersConfig {
     address liquidator;
     address stablecoinUnderlying;
     address stakedStablecoin;
+    address oracle;
 }
 
 struct ImplementationsConfig {

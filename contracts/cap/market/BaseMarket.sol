@@ -66,7 +66,13 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     /// @inheritdoc IBaseMarket
     function setBuffer(uint256 _buffer) external restricted {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        // lockedValue divides by lt - buffer, so the buffer must stay strictly below lt
+        // lockedValue divides by lt - buffer, so the buffer must stay strictly below lt.
+        // Deliberately not re-checking ltv + buffer <= lt the way setLtv does, for the same reason
+        // setLt permits dropping lt below ltv: raising the buffer only shrinks lt - buffer, which
+        // locks more capital per unit of debt, so every direction this opens up is a tightening.
+        // Past lt - ltv it locks the tranches entirely, which is severe but is exactly what a
+        // guardian reaching for this in a hurry is asking for, and blocking them on a stale ltv
+        // would be worse. setLtv keeps the strict check because relaxing ltv is the loosening side.
         if (_buffer >= $.lt) revert InvalidBuffer();
         $.buffer = _buffer;
         emit SetBuffer(_buffer);
@@ -102,6 +108,8 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     /// @inheritdoc IBaseMarket
     function setStakedStablecoin(address _stakedStablecoin) external restricted {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
+        // the liquidity premium is minted straight to this address, so it must never be zero
+        if (_stakedStablecoin == address(0)) revert ZeroAddress();
         $.stakedStablecoin = _stakedStablecoin;
         emit SetStakedStablecoin(_stakedStablecoin);
     }
@@ -125,14 +133,14 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     /// @inheritdoc IBaseMarket
     function setUnderwriterRate(uint256 rate) external restricted {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        IInterestRateModel($.irm).setUnderwriterRate(rate);
+        IInterestRateModel($.irm).updateUnderwriterRate(rate);
         emit SetUnderwriterRate(rate);
     }
 
     /// @inheritdoc IBaseMarket
     function setMarketMultiplier(uint256 multiplier) external virtual restricted {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        IInterestRateModel($.irm).setMarketMultiplier(multiplier);
+        IInterestRateModel($.irm).updateMarketMultiplier(multiplier);
         emit SetMarketMultiplier(multiplier);
     }
 
@@ -231,6 +239,18 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     }
 
     /// @inheritdoc IBaseMarket
+    function recoverableDebt() public view returns (uint256 recoverable) {
+        recoverable = totalCapital().rayDiv(_slashPerDebt());
+    }
+
+    /// @inheritdoc IBaseMarket
+    function unrecoverableDebt() public view returns (uint256 unrecoverable) {
+        uint256 debt = totalDebt();
+        uint256 recoverable = recoverableDebt();
+        if (debt > recoverable) unrecoverable = debt - recoverable;
+    }
+
+    /// @inheritdoc IBaseMarket
     function lockedValue(address tranche) public view returns (uint256 value) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         value = totalDebt().rayDiv($.lt - $.buffer);
@@ -291,6 +311,25 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
         emit Repay(msg.sender, amount);
     }
 
+    /// @dev Collateral value released per unit of debt repaid in a liquidation.
+    ///
+    /// The cUSD a liquidator burns is taken at par even while bad debt is outstanding. It is
+    /// tempting to discount it by the stablecoin's backing ratio, on the grounds that a liquidator
+    /// sourcing depressed cUSD repays with something worth less than a dollar. That would be
+    /// wrong: {IStablecoin-previewDeposit} always mints at par, so the marginal cost of acquiring
+    /// cUSD is a dollar no matter what it trades at, and the tranches never give up more than
+    /// `1 + bonus` per unit of debt cleared. A liquidator who buys below par is capturing value
+    /// from whoever sold to them, not from the underwriters. Discounting would only underpay
+    /// liquidators and stall liquidation exactly when the market most needs it.
+    ///
+    /// Shared with {recoverableDebt} so the debt the capital is assumed to clear always matches
+    /// what a liquidation actually charges for it.
+    /// @return perDebt The collateral value released per unit of debt, in ray decimals
+    function _slashPerDebt() internal view returns (uint256 perDebt) {
+        BaseMarketStorage storage $ = _getBaseMarketStorage();
+        perDebt = 1e27 + IInterestRateModel($.irm).liquidationBonus();
+    }
+
     /// @dev Repay debt and slash tranche collateral when the market is unhealthy
     function _liquidate(address recipient, uint256 amount) internal returns (uint256 repaid, uint256 slashed) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
@@ -301,7 +340,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
 
         _repay(repaid);
 
-        uint256 toSlash = repaid.rayMul(1e27 + IInterestRateModel($.irm).liquidationBonus());
+        uint256 toSlash = repaid.rayMul(_slashPerDebt());
 
         for (uint256 i = $.tranches.length; i > 0;) {
             i--;
@@ -312,6 +351,22 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
         }
 
         emit Liquidate(msg.sender, recipient, repaid, slashed);
+    }
+
+    /// @dev Write off debt that liquidation could never recover. The stablecoin records the
+    /// shortfall as bad debt and drops it out of the credit-backed supply, so the market stops
+    /// accruing and minting premium against debt nobody will repay. Bounded by
+    /// {unrecoverableDebt} rather than by the tranches being empty: an unprofitable liquidation
+    /// leaves the collateral untouched, and waiting for someone to take it would only let the
+    /// shortfall keep compounding. Writing off exactly the unrecoverable slice leaves the debt at
+    /// the level the remaining collateral can still clear, so liquidation stays viable afterwards.
+    /// @param amount The amount of debt to write off
+    function _writeOff(uint256 amount) internal {
+        BaseMarketStorage storage $ = _getBaseMarketStorage();
+        if (amount == 0) revert InvalidAmount();
+        if (amount > unrecoverableDebt()) revert ExceedsUnrecoverableDebt();
+        IStablecoin($.stablecoin).recognizeBadDebt(amount);
+        emit WriteOff(msg.sender, amount);
     }
 
     /// @dev Set the tranches and weights
@@ -353,6 +408,15 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     /// the weight of any empty tranche are leftover: they go to the most senior tranche (index 0)
     /// when that tranche is underwriting, otherwise to the staked stablecoin like the liquidity
     /// premium. The full premium is always minted so that debt can always be repaid.
+    ///
+    /// Each share is clamped to what is left rather than trusting the weights to behave. `rayMul`
+    /// rounds half up, so weighted shares can total more than the premium even when the weights
+    /// themselves are exactly one ray: two junior tranches at half a ray each claim `(P + 1) / 2`
+    /// apiece on an odd premium. Normally the senior weight absorbs that, but a zero senior weight
+    /// leaves no slack and the overrun would underflow, which fails closed on every borrow, repay
+    /// and liquidation for good. The clamp keeps the loop total-safe for any weights that sum to
+    /// one ray, so the configuration stays a distribution choice rather than a way to brick a
+    /// market. It costs one comparison and never binds on a sane split.
     /// @param liquidityPremium The amount of liquidity premium to charge
     /// @param underwriterPremium The amount of underwriter premium to charge
     function _chargePremium(uint256 liquidityPremium, uint256 underwriterPremium) internal {
@@ -376,6 +440,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
                 continue;
             }
             uint256 premium = underwriterPremium.rayMul($.tranches[i].weight);
+            if (premium > remaining) premium = remaining;
             if (premium == 0) continue;
             remaining -= premium;
             IStablecoin($.stablecoin).mintCreditBacked(tranche, premium);

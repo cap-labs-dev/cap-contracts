@@ -6,14 +6,13 @@ import { IBaseMarket } from "../interfaces/IBaseMarket.sol";
 import { IOracle } from "../interfaces/IOracle.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
 import { IVault } from "../interfaces/IVault.sol";
-import { WadRayMath } from "../utils/WadRayMath.sol";
+import { PremiumVesting } from "../utils/PremiumVesting.sol";
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title Tranche
@@ -21,8 +20,8 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 /// @notice Tranche is an ERC4626 vault that allows users to deposit via Vault ERC6909 tokens and earn cUSD premiums from underwriting.
 contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessManagedUpgradeable, ERC7540AsyncRedeem {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using PremiumVesting for PremiumVesting.Schedule;
     using SafeERC20 for IERC20;
-    using WadRayMath for uint256;
 
     /// @inheritdoc ITranche
     address public market;
@@ -36,29 +35,11 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     /// @inheritdoc ITranche
     address public oracle;
 
-    /// @inheritdoc ITranche
-    uint256 public vestingPeriod;
-
-    /// @inheritdoc ITranche
-    uint256 public periodEnd;
-
-    /// @inheritdoc ITranche
-    uint256 public premiumPerShare;
-
-    /// @inheritdoc ITranche
-    uint256 public lastPremiumUpdate;
-
-    /// @inheritdoc ITranche
-    mapping(address => uint256) public pendingPremium;
-
-    /// @dev Premium already credited to an account at its last balance checkpoint
-    mapping(address => uint256) private _premiumDebt;
+    /// @dev The premium vesting schedule and its per-share distribution accounting
+    PremiumVesting.Schedule private _premium;
 
     /// @dev The whitelist of accounts
     EnumerableSet.AddressSet private _whitelist;
-
-    /// @inheritdoc ITranche
-    uint256 public vested;
 
     /// @notice Stored premium balance used for accrual accounting
     uint256 private _storedPremiumBalance;
@@ -84,7 +65,7 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
         vault = _vault;
         stablecoin = IBaseMarket(_market).stablecoin();
         oracle = _oracle;
-        vestingPeriod = 6 hours;
+        _premium.open(6 hours);
     }
 
     /// @inheritdoc ITranche
@@ -112,11 +93,7 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     /// @inheritdoc ITranche
     function setVestingPeriod(uint256 _vestingPeriod) external restricted updatePremium {
         if (_vestingPeriod == 0) revert InvalidVestingPeriod();
-        // _lockedProfit reads the outgoing period, so it must be captured before the swap
-        vested = _lockedProfit();
-        periodEnd = block.timestamp + _vestingPeriod;
-        vestingPeriod = _vestingPeriod;
-        lastPremiumUpdate = block.timestamp;
+        _premium.setPeriod(_vestingPeriod);
         emit SetVestingPeriod(_vestingPeriod);
     }
 
@@ -124,19 +101,15 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     function notifyPremium() external updatePremium restricted {
         uint256 premiumBalance = IERC20(stablecoin).balanceOf(address(this));
         if (premiumBalance > _storedPremiumBalance) {
-            vested = _lockedProfit() + (premiumBalance - _storedPremiumBalance);
+            _premium.fund(premiumBalance - _storedPremiumBalance);
             _storedPremiumBalance = premiumBalance;
-            periodEnd = block.timestamp + vestingPeriod;
-            lastPremiumUpdate = block.timestamp;
         }
     }
 
     /// @inheritdoc ITranche
     function claim(address recipient) external updatePremium returns (uint256 premium) {
-        premium = claimable(msg.sender);
+        premium = _premium.settle(msg.sender, balanceOf(msg.sender));
         if (premium > 0) {
-            pendingPremium[msg.sender] = 0;
-            _premiumDebt[msg.sender] = premiumPerShare.rayMul(balanceOf(msg.sender));
             _storedPremiumBalance -= premium;
             IERC20(stablecoin).safeTransfer(recipient, premium);
             emit Claimed(msg.sender, recipient, premium);
@@ -150,7 +123,37 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
 
     /// @inheritdoc ITranche
     function claimable(address user) public view returns (uint256 premium) {
-        premium = pendingPremium[user] + _premiumPerShare().rayMul(balanceOf(user)) - _premiumDebt[user];
+        premium = _premium.claimable(user, balanceOf(user), activeSupply());
+    }
+
+    /// @inheritdoc ITranche
+    function vestingPeriod() external view returns (uint256 period) {
+        period = _premium.period;
+    }
+
+    /// @inheritdoc ITranche
+    function periodEnd() external view returns (uint256 timestamp) {
+        timestamp = _premium.end();
+    }
+
+    /// @inheritdoc ITranche
+    function vested() external view returns (uint256 premium) {
+        premium = _premium.vested;
+    }
+
+    /// @inheritdoc ITranche
+    function premiumPerShare() external view returns (uint256 perShare) {
+        perShare = _premium.perShare;
+    }
+
+    /// @inheritdoc ITranche
+    function lastPremiumUpdate() external view returns (uint256 timestamp) {
+        timestamp = _premium.lastUpdate;
+    }
+
+    /// @inheritdoc ITranche
+    function pendingPremium(address user) external view returns (uint256 premium) {
+        premium = _premium.pending[user];
     }
 
     /// @inheritdoc ITranche
@@ -214,55 +217,29 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
         _;
     }
 
-    /// @dev Get the price of the asset for a market
+    /// @dev Get the price of the asset for a market. Every conversion between assets and value
+    /// divides by this, so a zero price fails closed here rather than panicking downstream.
     function getPrice() internal view returns (uint256 price) {
         (price,) = IOracle(oracle).getPrice(asset());
+        if (price == 0) revert InvalidPrice();
     }
 
-    /// @dev Accrue vested premium into premium per share
+    /// @dev Accrue vested premium into premium per share. Underwriting exposure is `activeSupply`,
+    /// so shares queued for redemption stop earning; see {PremiumVesting-accrue} for what happens
+    /// to premium vesting through a window where that reaches zero.
     function _updatePremium() internal {
-        if (lastPremiumUpdate == block.timestamp || lastPremiumUpdate == periodEnd) return;
-        uint256 supply = activeSupply();
-        if (supply == 0) return;
-        uint256 unlocked = _unlockedProfit();
-        if (unlocked > 0) premiumPerShare += unlocked.rayDiv(supply);
-        lastPremiumUpdate = Math.min(block.timestamp, periodEnd);
-    }
-
-    /// @dev Get the premium per share including unaccrued vesting
-    function _premiumPerShare() internal view returns (uint256 premiumPerShare_) {
-        premiumPerShare_ = premiumPerShare;
-        if (lastPremiumUpdate != block.timestamp) {
-            uint256 supply = activeSupply();
-            if (supply > 0) premiumPerShare_ += _unlockedProfit().rayDiv(supply);
-        }
-    }
-
-    /// @dev Get the premium unlocked since the last update
-    function _unlockedProfit() internal view returns (uint256 unlockedProfit) {
-        uint256 elapsed = Math.min(periodEnd, block.timestamp) - lastPremiumUpdate;
-        unlockedProfit = vested * elapsed / vestingPeriod;
-    }
-
-    /// @dev Get the premium still locked in the current vesting epoch
-    function _lockedProfit() internal view returns (uint256 lockedProfit) {
-        if (block.timestamp > periodEnd) return 0;
-        lockedProfit = vested * (periodEnd - block.timestamp) / vestingPeriod;
+        _premium.accrue(activeSupply());
     }
 
     /// @dev Settle premium accounting when shares move
     function _update(address from, address to, uint256 amount) internal override updatePremium {
         if (from != address(0) && from != address(this)) {
-            uint256 accPremiumPerShare = premiumPerShare;
             uint256 balance = balanceOf(from);
-            pendingPremium[from] += accPremiumPerShare.rayMul(balance) - _premiumDebt[from];
-            _premiumDebt[from] = accPremiumPerShare.rayMul(balance - amount);
+            _premium.checkpoint(from, balance, balance - amount);
         }
         if (to != address(0) && to != address(this)) {
-            uint256 accPremiumPerShare = premiumPerShare;
             uint256 balance = balanceOf(to);
-            pendingPremium[to] += accPremiumPerShare.rayMul(balance) - _premiumDebt[to];
-            _premiumDebt[to] = accPremiumPerShare.rayMul(balance + amount);
+            _premium.checkpoint(to, balance, balance + amount);
         }
         super._update(from, to, amount);
     }

@@ -79,8 +79,15 @@ interface IRegistry {
     /// @param symbol The underwriter symbol
     /// @param operator The operator address
     /// @param operatorRole The operator role id
+    /// @param depositorRole The role whose members may deposit, administered by the operator role
     event CreateUnderwriter(
-        address underwriter, address asset, string name, string symbol, address operator, uint64 operatorRole
+        address underwriter,
+        address asset,
+        string name,
+        string symbol,
+        address operator,
+        uint64 operatorRole,
+        uint64 depositorRole
     );
 
     /// @notice Initialize the registry

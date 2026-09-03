@@ -28,7 +28,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     Slopes public liquiditySlopes;
 
     /// @inheritdoc IInterestRateModel
-    Slopes public termMultiplierSlopes;
+    uint256 public termMultiplierSlope;
 
     /// @dev Per-market liquidity rate multiplier in ray decimals
     mapping(address => uint256) private _marketMultiplier;
@@ -38,9 +38,6 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
 
     /// @inheritdoc IInterestRateModel
     uint256 public maximumMarketMultiplier;
-
-    /// @inheritdoc IInterestRateModel
-    uint256 public minimumUnderwriterRate;
 
     /// @inheritdoc IInterestRateModel
     uint256 public maximumUnderwriterRate;
@@ -65,19 +62,20 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         address _stablecoin,
         uint256 _minimumMarketMultiplier,
         uint256 _maximumMarketMultiplier,
-        uint256 _minimumUnderwriterRate,
         uint256 _maximumUnderwriterRate,
         uint256 _liquidationBonus
     ) external initializer {
         __AccessManaged_init(_authority);
+        // the multiplier band has no setter, so an inverted one would leave
+        // {updateMarketMultiplier} permanently unsatisfiable with no way to repair it
+        if (_minimumMarketMultiplier > _maximumMarketMultiplier) revert InvalidMultiplier();
         stablecoin = _stablecoin;
         minimumMarketMultiplier = _minimumMarketMultiplier;
         maximumMarketMultiplier = _maximumMarketMultiplier;
-        minimumUnderwriterRate = _minimumUnderwriterRate;
         maximumUnderwriterRate = _maximumUnderwriterRate;
         liquidityData.index = 1e27;
         liquidityData.lastUpdate = block.timestamp;
-        liquidationBonus = _liquidationBonus;
+        _setLiquidationBonus(_liquidationBonus);
     }
 
     /// @inheritdoc IInterestRateModel
@@ -87,6 +85,12 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
 
     /// @inheritdoc IInterestRateModel
     function setLiquiditySlopes(Slopes memory _slopes) external restricted {
+        // Utilization is a ratio of supplies and so never exceeds one ray, which makes a kink above
+        // one ray unreachable: the second slope becomes dead and the curve silently tops out below
+        // `base + slope0` instead of at `base + slope0 + slope1`. A kink entered as 8e27 rather
+        // than 0.8e27 would therefore under-charge every borrower for as long as nobody noticed,
+        // which is the kind of misconfiguration worth failing on rather than absorbing.
+        if (_slopes.kink > 1e27) revert InvalidSlopes();
         liquiditySlopes = _slopes;
         _updateLiquidityRate();
         emit SetLiquiditySlopes(_slopes);
@@ -98,13 +102,14 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     }
 
     /// @inheritdoc IInterestRateModel
-    function setUnderwriterRate(uint256 rate) external restricted {
+    /// @dev There is no lower bound: a market may set its underwriter rate to zero
+    function updateUnderwriterRate(uint256 rate) external restricted {
         if (rate > maximumUnderwriterRate) revert InvalidRate();
         address market = msg.sender;
         underwriterData[market].index = underwriterIndex(market);
         underwriterData[market].lastUpdate = block.timestamp;
         underwriterData[market].ratePerYear = rate;
-        emit SetUnderwriterRate(market, rate);
+        emit UpdateUnderwriterRate(market, rate);
     }
 
     /// @inheritdoc IInterestRateModel
@@ -118,11 +123,11 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     }
 
     /// @inheritdoc IInterestRateModel
-    function setMarketMultiplier(uint256 _multiplier) external restricted {
+    function updateMarketMultiplier(uint256 _multiplier) external restricted {
         address market = msg.sender;
         if (_multiplier < minimumMarketMultiplier || _multiplier > maximumMarketMultiplier) revert InvalidMultiplier();
         _marketMultiplier[market] = _multiplier;
-        emit SetMarketMultiplier(market, _multiplier);
+        emit UpdateMarketMultiplier(market, _multiplier);
     }
 
     /// @inheritdoc IInterestRateModel
@@ -143,9 +148,9 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     }
 
     /// @inheritdoc IInterestRateModel
-    function setTermMultiplierSlopes(Slopes memory _slopes) external restricted {
-        termMultiplierSlopes = _slopes;
-        emit SetTermMultiplierSlopes(_slopes);
+    function setTermMultiplierSlope(uint256 _slope) external restricted {
+        termMultiplierSlope = _slope;
+        emit SetTermMultiplierSlope(_slope);
     }
 
     /// @inheritdoc IInterestRateModel
@@ -165,17 +170,23 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
 
     /// @inheritdoc IInterestRateModel
     function termMultiplier(uint256 termUtilization) public view returns (uint256 multiplier) {
-        Slopes memory slopes = termMultiplierSlopes;
-        if (termUtilization >= 1e27) return slopes.slope0;
-        if (termUtilization >= slopes.kink) {
-            multiplier = slopes.slope0.rayMul(1e27 - termUtilization);
-        } else {
-            multiplier = slopes.slope0 + slopes.slope1.rayMul((slopes.kink - termUtilization).rayDiv(slopes.kink));
-        }
+        // a term at or beyond the maximum pays the plain liquidity rate. Both branches meet at one
+        // ray, so the curve is continuous there and never dips below it
+        if (termUtilization >= 1e27) return 1e27;
+        multiplier = 1e27 + termMultiplierSlope.rayMul(1e27 - termUtilization);
     }
 
     /// @inheritdoc IInterestRateModel
     function setLiquidationBonus(uint256 _liquidationBonus) external restricted {
+        _setLiquidationBonus(_liquidationBonus);
+    }
+
+    /// @dev Shared with {initialize} so a deployment cannot start outside the band governance is
+    /// allowed to move within. The bonus feeds {BaseMarket-_slashPerDebt}, which sets what every
+    /// liquidation takes out of the tranches, and the only route back from an out-of-range value
+    /// would have been a setter that rejects the value already stored.
+    /// @param _liquidationBonus The liquidation bonus in ray decimals
+    function _setLiquidationBonus(uint256 _liquidationBonus) internal {
         if (_liquidationBonus > 0.1e27) revert InvalidLiquidationBonus();
         liquidationBonus = _liquidationBonus;
         emit SetLiquidationBonus(_liquidationBonus);

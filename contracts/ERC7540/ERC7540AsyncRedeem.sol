@@ -224,6 +224,7 @@ abstract contract ERC7540AsyncRedeem is
         IERC1155Queue($.queueNft).burn(_controller, _requestId, _shares);
 
         _burn(address(this), _shares);
+        _onWithdraw(_controller, _assets, _shares);
         _transferOut(_receiver, _assets);
 
         emit Withdraw(_caller, _receiver, _controller, _assets, _shares);
@@ -243,10 +244,23 @@ abstract contract ERC7540AsyncRedeem is
         _checkAllowance(_owner, _caller, _shares);
 
         _burn(_owner, _shares);
+        _onWithdraw(_owner, _assets, _shares);
         _transferOut(_receiver, _assets);
 
         emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
     }
+
+    /// @dev Settle accounting that every redemption shares, whichever path it took. Both instant
+    /// and queued redemptions route through here, which is the only place they meet: the queued
+    /// path cannot reuse the instant one because it burns from this contract rather than from the
+    /// owner, so anything overriding only that would silently skip the whole queue.
+    ///
+    /// Runs after the burn, so the new supply is visible, and before {_transferOut}, so an asset
+    /// token that calls back finds the accounting already settled.
+    /// @param _owner The account whose shares were burned, or the controller of a queued request
+    /// @param _assets The number of assets being paid out
+    /// @param _shares The number of shares burned
+    function _onWithdraw(address _owner, uint256 _assets, uint256 _shares) internal virtual { }
 
     //////////////////////////////////////////////////////////////////////////////
     /**************************** ERC165 functions ******************************/

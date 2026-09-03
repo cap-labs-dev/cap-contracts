@@ -57,8 +57,7 @@ contract RewardRoutingTest is CapDeployer {
         uint256 stakedBefore = stablecoin.balanceOf(staked);
         uint256 t1Before = stablecoin.balanceOf(tranche1);
 
-        vm.prank(borrower);
-        m.repay(1);
+        m.chargePremium();
 
         assertEq(stablecoin.balanceOf(tranche1) - t1Before, juniorShare, "junior takes only its weight");
         assertEq(stablecoin.balanceOf(staked) - stakedBefore, liquidityPremium + leftover, "leftover to staked");
@@ -71,8 +70,7 @@ contract RewardRoutingTest is CapDeployer {
         vm.prank(borrower);
         m.borrow(borrower, 400e18);
         vm.warp(block.timestamp + 365 days);
-        vm.prank(borrower);
-        m.repay(1);
+        m.chargePremium();
 
         vm.warp(block.timestamp + 6 hours);
 
