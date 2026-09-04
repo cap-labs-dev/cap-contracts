@@ -19,6 +19,9 @@ interface IRateOracle is IOracleTypes {
         mapping(address => uint256) restakerRate;
     }
 
+    /// @dev Rate too high
+    error RateTooHigh(address agent, uint256 rate);
+
     /// @dev Set market oracle data
     event SetMarketOracleData(address asset, IOracleTypes.OracleData data);
 
