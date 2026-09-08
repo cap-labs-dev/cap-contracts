@@ -6,6 +6,7 @@ import { IBaseMarket } from "../interfaces/IBaseMarket.sol";
 import { IOracle } from "../interfaces/IOracle.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
 import { IVault } from "../interfaces/IVault.sol";
+import { DeadShares } from "../utils/DeadShares.sol";
 import { PremiumVesting } from "../utils/PremiumVesting.sol";
 import {
     AccessManagedUpgradeable
@@ -13,13 +14,11 @@ import {
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title Tranche
 /// @author kexley, Cap Labs
 /// @notice Tranche is an ERC4626 vault that allows users to deposit via Vault ERC6909 tokens and earn cUSD premiums from underwriting.
 contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessManagedUpgradeable, ERC7540AsyncRedeem {
-    using EnumerableSet for EnumerableSet.AddressSet;
     using PremiumVesting for PremiumVesting.Schedule;
     using SafeERC20 for IERC20;
 
@@ -35,11 +34,15 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     /// @inheritdoc ITranche
     address public oracle;
 
+    /// @inheritdoc ITranche
+    bool public killed;
+
+    /// @dev Shares per asset at which the tranche is retired. Par is one share per asset, so a
+    /// hundred shares failing to claim a single asset is one percent of par.
+    uint256 private constant KILL_RATIO = 100;
+
     /// @dev The premium vesting schedule and its per-share distribution accounting
     PremiumVesting.Schedule private _premium;
-
-    /// @dev The whitelist of accounts
-    EnumerableSet.AddressSet private _whitelist;
 
     /// @notice Stored premium balance used for accrual accounting
     uint256 private _storedPremiumBalance;
@@ -82,12 +85,19 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
         }
         IVault(vault).withdraw(asset(), assets, recipient);
         emit Slashed(recipient, assets, slashedValue);
-    }
 
-    /// @inheritdoc ITranche
-    function setWhitelist(address account, bool allowed) external restricted {
-        if (allowed) _whitelist.add(account);
-        else _whitelist.remove(account);
+        // A slash this deep leaves the share price so far below par that the conversion is
+        // degenerate: the survivors hold almost nothing, and a fresh deposit would mint shares
+        // against a near-zero asset base, where rounding decides who owns what. Latch the tranche
+        // shut instead so it can be retired and replaced rather than repaired in place.
+        //
+        // An empty tranche sits at par by this test rather than below it, so an idle slash cannot
+        // brick a tranche before anyone has deposited. The latch is one-way on purpose: a tranche
+        // that has been through this must not silently reopen on a later recovery.
+        if (!killed && totalSupply() > totalAssets() * KILL_RATIO) {
+            killed = true;
+            emit Killed();
+        }
     }
 
     /// @inheritdoc ITranche
@@ -117,13 +127,13 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     }
 
     /// @inheritdoc ITranche
-    function whitelisted(address account) public view returns (bool allowed) {
-        allowed = _whitelist.contains(account);
-    }
-
-    /// @inheritdoc ITranche
     function claimable(address user) public view returns (uint256 premium) {
-        premium = _premium.claimable(user, balanceOf(user), activeSupply());
+        // shares parked at the burn address are out of `stakedSupply`, so premium is divided as if
+        // they were not there. Reporting an entitlement against them anyway would make the
+        // entitlements sum past the premium actually held, by a few wei that no caller could ever
+        // collect, so the two views are kept consistent instead.
+        if (user == DeadShares.HOLDER) return 0;
+        premium = _premium.claimable(user, balanceOf(user), stakedSupply());
     }
 
     /// @inheritdoc ITranche
@@ -161,24 +171,87 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
         assets = IVault(vault).balanceOf(address(this), asset());
     }
 
+    /// @inheritdoc IERC4626
+    /// @dev The caller must hold whichever role the AccessManager has assigned to this selector on
+    /// this tranche. Membership of that role is the allowlist, and no second copy of it is stored
+    /// here, so admitting a depositor means granting them the role. The market owner can do that,
+    /// because the Registry made their operator role its admin. Letting an underwriter allocate
+    /// here is the same grant, since {IUnderwriter-allocate} deposits as itself.
+    ///
+    /// Pointing the selector at a different role, including the public role to open the tranche to
+    /// everyone, is a {IAccessManager-setTargetFunctionRole} call, which AccessManager reserves to
+    /// ADMIN.
+    ///
+    /// This modifier and the kill are the whole gate; the receiver is unrestricted. Gating the
+    /// receiver as well would contradict this one, because a member granted the role under an
+    /// execution delay clears it by consuming a scheduled operation while still reading as
+    /// unauthorized through {IAccessManager-canCall}'s immediate flag. It would also be a gate on
+    /// the wrong subject, and one worth little, since shares are transferable as soon as they are
+    /// minted.
+    function deposit(uint256 _assets, address _receiver)
+        public
+        override(ERC4626Upgradeable, IERC4626)
+        restricted
+        returns (uint256 shares)
+    {
+        shares = super.deposit(_assets, _receiver);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev Gated the same way as {deposit}; see there for how the allowlist works
+    function mint(uint256 _shares, address _receiver)
+        public
+        override(ERC4626Upgradeable, IERC4626)
+        restricted
+        returns (uint256 assets)
+    {
+        assets = super.mint(_shares, _receiver);
+    }
+
     /// @inheritdoc ITranche
-    function maxDeposit(address receiver)
+    function maxDeposit(address)
         public
         view
         override(ERC4626Upgradeable, IERC4626, ITranche)
         returns (uint256 maxAssets)
     {
-        if (whitelisted(receiver)) maxAssets = type(uint256).max;
+        // admission is a gate on whoever calls {deposit}, not on the receiver, so the kill is the
+        // only thing left for this to report. ERC4626 checks it before minting, which is what
+        // makes a killed tranche refuse deposits rather than merely discourage them
+        if (!killed) maxAssets = type(uint256).max;
     }
 
     /// @inheritdoc ITranche
-    function maxMint(address receiver)
+    function maxMint(address) public view override(ERC4626Upgradeable, IERC4626, ITranche) returns (uint256 maxShares) {
+        // gated the same way as maxDeposit; see there
+        if (!killed) maxShares = type(uint256).max;
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev While the tranche is empty this quotes at par out of {DeadShares-seedDeposit} rather
+    /// than off the ratio, so assets already sitting here cannot price the first deposit, and the
+    /// seed is deducted from what the depositor receives. See {DeadShares} for why.
+    function previewDeposit(uint256 assets)
         public
         view
-        override(ERC4626Upgradeable, IERC4626, ITranche)
-        returns (uint256 maxShares)
+        override(ERC4626Upgradeable, IERC4626)
+        returns (uint256 shares)
     {
-        if (whitelisted(receiver)) maxShares = type(uint256).max;
+        shares = totalSupply() == 0 ? DeadShares.seedDeposit(assets) : super.previewDeposit(assets);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev The inverse of {previewDeposit} while empty: the first depositor pays for the seed on
+    /// top of the shares they asked for
+    function previewMint(uint256 shares) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 assets) {
+        assets = totalSupply() == 0 ? DeadShares.seedMint(shares) : super.previewMint(shares);
+    }
+
+    /// @inheritdoc ITranche
+    function stakedSupply() public view returns (uint256 supply) {
+        uint256 active = activeSupply();
+        uint256 dead = balanceOf(DeadShares.HOLDER);
+        supply = active > dead ? active - dead : 0;
     }
 
     /// @inheritdoc ITranche
@@ -199,6 +272,17 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     /// @inheritdoc ITranche
     function activeCapital() public view returns (uint256 capital) {
         capital = activeAssets() * getPrice() / 10 ** decimals();
+    }
+
+    /// @dev Mint the seed alongside the first deposit. {previewDeposit} and {previewMint} have
+    /// already taken it out of that depositor's quote, so the assets arriving cover both.
+    /// @param caller The account funding the deposit
+    /// @param receiver The account receiving the shares
+    /// @param assets The number of assets deposited
+    /// @param shares The number of shares to mint to the receiver
+    function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
+        if (totalSupply() == 0) _mint(DeadShares.HOLDER, DeadShares.SHARES);
+        super._deposit(caller, receiver, assets, shares);
     }
 
     /// @dev Transfer assets into the vault on deposit
@@ -224,11 +308,12 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
         if (price == 0) revert InvalidPrice();
     }
 
-    /// @dev Accrue vested premium into premium per share. Underwriting exposure is `activeSupply`,
-    /// so shares queued for redemption stop earning; see {PremiumVesting-accrue} for what happens
-    /// to premium vesting through a window where that reaches zero.
+    /// @dev Accrue vested premium into premium per share. Underwriting exposure is
+    /// `stakedSupply`, so shares queued for redemption stop earning and the dead shares never do;
+    /// see {PremiumVesting-accrue} for what happens to premium vesting through a window where that
+    /// reaches zero.
     function _updatePremium() internal {
-        _premium.accrue(activeSupply());
+        _premium.accrue(stakedSupply());
     }
 
     /// @dev Settle premium accounting when shares move

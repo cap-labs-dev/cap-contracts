@@ -19,6 +19,9 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @param value The value of the slashed assets in USD (18 decimals)
     event Slashed(address indexed recipient, uint256 assets, uint256 value);
 
+    /// @notice Emitted once when a slash retires the tranche
+    event Killed();
+
     /// @notice Emitted when premium is claimed
     /// @param user The user who claimed the premium
     /// @param recipient The recipient of the premium
@@ -55,11 +58,6 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @return slashedValue The value slashed in USD (18 decimals)
     function slash(uint256 value, address recipient) external returns (uint256 slashedValue);
 
-    /// @notice Set the whitelist for a depositor
-    /// @param account The account to update
-    /// @param allowed Whether the account may deposit
-    function setWhitelist(address account, bool allowed) external;
-
     /// @notice Set the premium vesting period
     /// @param vestingPeriod The new vesting period
     function setVestingPeriod(uint256 vestingPeriod) external;
@@ -72,11 +70,6 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @return premium The amount of premium claimed
     function claim(address recipient) external returns (uint256 premium);
 
-    /// @notice Check if an account is whitelisted
-    /// @param account The account to check
-    /// @return allowed Whether the account is whitelisted
-    function whitelisted(address account) external view returns (bool allowed);
-
     /// @notice Get the market this tranche underwrites
     function market() external view returns (address);
 
@@ -88,6 +81,11 @@ interface ITranche is IERC7540AsyncRedeem {
 
     /// @notice Get the oracle used for price feeds
     function oracle() external view returns (address);
+
+    /// @notice Get whether a slash has retired the tranche
+    /// @dev Latched by {slash} once the share price falls below one percent of par. Closes deposits
+    /// and mints permanently; redemptions stay open so existing holders can still recover the dust.
+    function killed() external view returns (bool);
 
     /// @notice Get the premium vesting period
     function vestingPeriod() external view returns (uint256);
@@ -121,16 +119,28 @@ interface ITranche is IERC7540AsyncRedeem {
     function totalAssets() external view returns (uint256 assets);
 
     /// @notice Maximum deposit for a receiver
-    /// @dev Overrides IERC4626: returns unlimited assets only for whitelisted accounts
+    /// @dev Overrides IERC4626: unlimited until a slash retires the tranche, then zero. Admission
+    /// is a gate on whoever calls {IERC4626-deposit} rather than on the receiver, so it is not
+    /// reflected here and this cannot be read as "may I deposit".
     /// @param receiver The account that would receive shares
     /// @return maxAssets The maximum deposit amount
     function maxDeposit(address receiver) external view returns (uint256 maxAssets);
 
     /// @notice Maximum mint for a receiver
-    /// @dev Overrides IERC4626: returns unlimited shares only for whitelisted accounts
+    /// @dev Overrides IERC4626: gated the same way as {maxDeposit}
     /// @param receiver The account that would receive shares
     /// @return maxShares The maximum mint amount
     function maxMint(address receiver) external view returns (uint256 maxShares);
+
+    /// @notice Get the number of shares that can earn, which is the active supply net of the dead
+    /// shares seeded out of the first deposit
+    /// @dev Distinct from {IERC7540AsyncRedeem-activeSupply} because the dead shares sit at an
+    /// address nothing can spend from, so premium divided across them could never be collected.
+    /// This figure also returns to zero once every real holder has left, which is what lets callers
+    /// read zero as "no capital at work here". `activeSupply` and `activeAssets` stay gross of
+    /// them, since the assets behind the dead shares are really held and really do back debt.
+    /// @return supply The number of shares that can earn
+    function stakedSupply() external view returns (uint256 supply);
 
     /// @notice Shares available for redemption excluding market-locked assets
     /// @dev Overrides IERC7540AsyncRedeem unlockedSupply

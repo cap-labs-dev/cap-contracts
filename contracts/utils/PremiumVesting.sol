@@ -19,7 +19,8 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 /// the boundary and the division that consumes it on the other.
 ///
 /// Callers own the supply figure and pass it in, since what counts as staked is theirs to define —
-/// both of ours use `activeSupply`, which excludes shares queued for redemption.
+/// both of ours use `stakedSupply`, which excludes shares queued for redemption as well as the
+/// dead shares parked at {DeadShares-HOLDER}.
 ///
 /// The one precondition is that `period` is never zero, because every release divides by it. Both
 /// callers hardcode it at initialization and reject zero in their setters.

@@ -80,9 +80,9 @@ contract VestingScheduleTest is CapDeployer {
     /// Shrinking the period used to move vestingEnd behind lastPremiumUpdate and revert. Accrual
     /// still clamps; the leftover locked premium is recaptured into the new window.
     function test_underwriter_shrinkingPeriodKeepsUnderwriterLive() public {
-        Tranche(senior).setWhitelist(address(this), true);
+        _admitDepositor(address(senior), address(this));
         Underwriter uw = _deployUnderwriter();
-        Tranche(senior).setWhitelist(address(uw), true);
+        _admitDepositor(address(senior), address(uw));
         _fundUnderwriter(address(uw), supplier, 1_000e18);
         uw.addTranche(senior);
         uw.allocate(senior, 500e18);
@@ -111,9 +111,9 @@ contract VestingScheduleTest is CapDeployer {
 
     /// Shortening the period must not strand the unvested remainder on the contract.
     function test_underwriter_shorteningPeriodDoesNotStrandPremium() public {
-        Tranche(senior).setWhitelist(address(this), true);
+        _admitDepositor(address(senior), address(this));
         Underwriter uw = _deployUnderwriter();
-        Tranche(senior).setWhitelist(address(uw), true);
+        _admitDepositor(address(senior), address(uw));
         _fundUnderwriter(address(uw), supplier, 1_000e18);
         uw.addTranche(senior);
         uw.allocate(senior, 500e18);

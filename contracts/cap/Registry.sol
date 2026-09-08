@@ -10,6 +10,7 @@ import { IBeaconFactory } from "../interfaces/IBeaconFactory.sol";
 import { IFixedMarket } from "../interfaces/IFixedMarket.sol";
 import { IFloatingMarket } from "../interfaces/IFloatingMarket.sol";
 import { IInterestRateModel } from "../interfaces/IInterestRateModel.sol";
+import { IOracle } from "../interfaces/IOracle.sol";
 import { IRegistry } from "../interfaces/IRegistry.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
 import { IUnderwriter } from "../interfaces/IUnderwriter.sol";
@@ -84,6 +85,14 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     /// @inheritdoc IRegistry
     mapping(address account => uint64 roleId) public operatorRole;
 
+    /// @inheritdoc IRegistry
+    mapping(address market => bool deployed) public isMarket;
+
+    /// @dev Tranches ever deployed for a market, which is what names their suffix. Counts
+    /// deployments rather than seats so it only ever increases, and a tranche added to take over
+    /// from a retired one is named apart from it rather than inheriting its number.
+    mapping(address market => uint256 count) private _trancheCount;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -130,33 +139,33 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
 
     /// @inheritdoc IRegistry
     function createMarket(
-        address _asset,
+        address[] calldata _assets,
+        uint256[] calldata _weights,
         string memory _name,
         address _marketOwner,
-        address _borrower,
-        uint256[] calldata _weights
+        address _borrower
     ) external restricted returns (address market, address[] memory deployedTranches) {
         (market, deployedTranches) = _createMarket(
             floatingMarketBeacon,
             abi.encodeCall(FloatingMarket.initialize, (authority(), address(this), _name)),
-            _asset,
+            _assets,
+            _weights,
             _name,
             _marketOwner,
-            _borrower,
-            _weights
+            _borrower
         );
     }
 
     /// @inheritdoc IRegistry
     function createFixedMarket(
-        address _asset,
+        address[] calldata _assets,
+        uint256[] calldata _weights,
         string memory _name,
         address _marketOwner,
         address _borrower,
         uint256 _maximumTermLimit,
         uint256 _minimumTermLimit,
-        uint256 _grace,
-        uint256[] calldata _weights
+        uint256 _grace
     ) external restricted returns (address market, address[] memory deployedTranches) {
         (market, deployedTranches) = _createMarket(
             fixedMarketBeacon,
@@ -164,11 +173,11 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
                 FixedMarket.initialize,
                 (authority(), address(this), _name, _maximumTermLimit, _minimumTermLimit, _grace)
             ),
-            _asset,
+            _assets,
+            _weights,
             _name,
             _marketOwner,
-            _borrower,
-            _weights
+            _borrower
         );
     }
 
@@ -198,17 +207,52 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         emit CreateUnderwriter(underwriter, _asset, _name, _symbol, _operator, roleId, depositorRoleId);
     }
 
+    /// @inheritdoc IRegistry
+    function createTranche(address _market, address _asset, uint256[] calldata _weights)
+        external
+        restricted
+        returns (address tranche)
+    {
+        if (!isMarket[_market]) revert UnknownMarket();
+        uint64 ownerRole = marketOwnerRole(_market);
+
+        IBaseMarket.Tranche[] memory existing = IBaseMarket(_market).tranches();
+        if (_weights.length != existing.length + 1) revert InvalidTrancheCount();
+
+        tranche = _deployTranche(_asset, IBaseMarket(_market).name(), _market, ownerRole, _trancheCount[_market]++);
+
+        IBaseMarket.Tranche[] memory updated = new IBaseMarket.Tranche[](_weights.length);
+        for (uint256 i; i < existing.length; ++i) {
+            updated[i] = IBaseMarket.Tranche({ tranche: existing[i].tranche, weight: _weights[i] });
+        }
+        updated[existing.length] = IBaseMarket.Tranche({ tranche: tranche, weight: _weights[existing.length] });
+
+        // reverts unless the weights still total one ray and the market stays healthy
+        IBaseMarket(_market).setTranches(updated);
+    }
+
+    /// @inheritdoc IRegistry
+    function marketOwnerRole(address _market) public view returns (uint64 roleId) {
+        // Derived rather than recorded at deployment, so that repointing a market's owner
+        // selectors moves the owner for later tranches too instead of leaving a copy here saying
+        // otherwise. {IBaseMarket-setTrancheWeights} is the anchor because it is the one owner
+        // selector whose authority is the waterfall, which is what a new tranche joins.
+        if (!isMarket[_market]) return 0;
+        roleId = IAccessManager(authority()).getTargetFunctionRole(_market, IBaseMarket.setTrancheWeights.selector);
+    }
+
     /// @dev Deploy a market with tranches and wire AccessManager roles
     function _createMarket(
         address beacon,
         bytes memory marketInitData,
-        address _asset,
+        address[] calldata _assets,
+        uint256[] calldata _weights,
         string memory _name,
         address _marketOwner,
-        address _borrower,
-        uint256[] calldata _weights
+        address _borrower
     ) internal returns (address market, address[] memory deployedTranches) {
-        if (_weights.length == 0) revert InvalidTrancheCount();
+        if (_assets.length == 0) revert InvalidTrancheCount();
+        if (_assets.length != _weights.length) revert TrancheAssetsMismatch();
 
         uint64 ownerRole = operatorRole[_marketOwner];
         uint64 borrowerRole = operatorRole[_borrower];
@@ -218,12 +262,14 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         _grantOperatorRole(borrowerRole, _borrower);
 
         market = _deploy(beacon, marketInitData);
+        isMarket[market] = true;
+        _trancheCount[market] = _assets.length;
 
-        deployedTranches = new address[](_weights.length);
-        IBaseMarket.Tranche[] memory marketTranches = new IBaseMarket.Tranche[](_weights.length);
+        deployedTranches = new address[](_assets.length);
+        IBaseMarket.Tranche[] memory marketTranches = new IBaseMarket.Tranche[](_assets.length);
 
-        for (uint256 i; i < _weights.length; ++i) {
-            address tranche = _deployTranche(_asset, _name, market, ownerRole, i);
+        for (uint256 i; i < _assets.length; ++i) {
+            address tranche = _deployTranche(_assets[i], _name, market, ownerRole, i);
             deployedTranches[i] = tranche;
             marketTranches[i] = IBaseMarket.Tranche({ tranche: tranche, weight: _weights[i] });
         }
@@ -231,7 +277,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         _configureMarketRoles(market, ownerRole, borrowerRole);
         IBaseMarket(market).setTranches(marketTranches);
 
-        emit CreateMarket(market, _asset, _name, _marketOwner, _borrower, ownerRole, borrowerRole, deployedTranches);
+        emit CreateMarket(market, _assets, _name, _marketOwner, _borrower, ownerRole, borrowerRole, deployedTranches);
     }
 
     /// @dev Deploy and register a tranche for a market
@@ -239,6 +285,14 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         internal
         returns (address tranche)
     {
+        // Checked here because nothing downstream does. {IBaseMarket-setTranches} looks like it
+        // would, since it ends in a health check, but that short-circuits while a market has no
+        // debt, so an asset the oracle cannot price is admitted and only fails on first use. By
+        // then it fails inside {IBaseMarket-lockedValue}, which every senior tranche's
+        // {ITranche-unlockedSupply} runs through, so it would take their redemptions with it.
+        (uint256 price,) = IOracle(oracle).getPrice(_asset);
+        if (price == 0) revert AssetNotPriced(_asset);
+
         string memory trancheName = string.concat(_name, " Tranche ", Strings.toString(index));
         string memory trancheSymbol = string.concat("TR", Strings.toString(index));
         tranche = _deploy(
@@ -247,7 +301,15 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
                 ITranche.initialize, (authority(), _asset, trancheName, trancheSymbol, market, vault, oracle)
             )
         );
-        _configureTrancheRoles(tranche, ownerRole);
+
+        // the depositor set is a role of its own rather than a list on the tranche, so the market
+        // owner can admit and remove depositors through the AccessManager without the Registry
+        // standing in the middle. One role per tranche rather than per market, so a waterfall can
+        // be open at one level and closed at another
+        uint64 depositorRoleId = _nextOperatorRoleId++;
+        _configureTrancheRoles(tranche, ownerRole, depositorRoleId);
+
+        emit CreateTranche(market, tranche, _asset, ownerRole, depositorRoleId);
     }
 
     /// @dev Deploy a beacon proxy through the shared factory
@@ -315,15 +377,14 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         manager.grantRole(CapRoles.MARKET, market, 0);
     }
 
-    /// @dev Wire tranche function selectors to the market owner and market roles
-    function _configureTrancheRoles(address tranche, uint64 ownerRole) internal {
+    /// @dev Wire tranche function selectors to the market owner, market and depositor roles
+    function _configureTrancheRoles(address tranche, uint64 ownerRole, uint64 depositorRoleId) internal {
         IAccessManager manager = IAccessManager(authority());
 
-        bytes4[] memory ownerSelectors = new bytes4[](2);
-        ownerSelectors[0] = ITranche.setWhitelist.selector;
+        bytes4[] memory ownerSelectors = new bytes4[](1);
         // matches IUnderwriter.setVestingPeriod sitting with the underwriter's operator: the
         // smoothing window on premium is a curator knob, and the worst it can do is re-vest
-        ownerSelectors[1] = ITranche.setVestingPeriod.selector;
+        ownerSelectors[0] = ITranche.setVestingPeriod.selector;
         manager.setTargetFunctionRole(tranche, ownerSelectors, ownerRole);
 
         bytes4[] memory marketSelectors = new bytes4[](1);
@@ -333,6 +394,19 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         bytes4[] memory publicSelectors = new bytes4[](1);
         publicSelectors[0] = ITranche.notifyPremium.selector;
         manager.setTargetFunctionRole(tranche, publicSelectors, type(uint64).max);
+
+        // admission is the gate on the entry points themselves, so the allowlist is the membership
+        // of this role and there is nothing to keep in step on the tranche. Registering an
+        // underwriter to allocate here is the same grant. Repointing it later means another
+        // setTargetFunctionRole, which AccessManager reserves to ADMIN
+        bytes4[] memory depositorSelectors = new bytes4[](2);
+        depositorSelectors[0] = IERC4626.deposit.selector;
+        depositorSelectors[1] = IERC4626.mint.selector;
+        manager.setTargetFunctionRole(tranche, depositorSelectors, depositorRoleId);
+
+        // grant and revoke over the depositor role, and nothing else: they are the only
+        // AccessManager calls delegable to a role other than ADMIN
+        manager.setRoleAdmin(depositorRoleId, ownerRole);
     }
 
     /// @dev Wire underwriter function selectors to the operator, keeper and depositor roles

@@ -192,34 +192,20 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @return end The vesting end timestamp
     function vestingEnd() external view returns (uint256 end);
 
-    /// @notice Check whether an account may deposit
-    /// @dev Reads the AccessManager rather than any list held here: {deposit} and {mint} are
-    /// gated by {deposit}'s target function role, so admission is membership of whichever role
-    /// that selector is wired to. Nothing about the allowlist is stored on this contract.
-    ///
-    /// Reported for the account as a caller, which is what the gate on {deposit} tests. Note this
-    /// also drives {maxDeposit}, where the subject is the receiver, so a deposit routed by one
-    /// account to another needs both of them admitted.
-    /// @param account The account to check
-    /// @return allowed Whether the account may deposit
-    function whitelisted(address account) external view returns (bool allowed);
-
     /// @notice Total assets including vault balance and recorded tranche debt
     /// @dev Overrides IERC4626: returns vault ERC6909 balance plus totalDebt
     /// @return assets The total assets
     function totalAssets() external view returns (uint256 assets);
 
-    /// @notice Maximum deposit for a receiver
-    /// @dev Overrides IERC4626: returns unlimited assets only for whitelisted accounts
-    /// @param receiver The account that would receive shares
-    /// @return maxAssets The maximum deposit amount
-    function maxDeposit(address receiver) external view returns (uint256 maxAssets);
-
-    /// @notice Maximum mint for a receiver
-    /// @dev Overrides IERC4626: returns unlimited shares only for whitelisted accounts
-    /// @param receiver The account that would receive shares
-    /// @return maxShares The maximum mint amount
-    function maxMint(address receiver) external view returns (uint256 maxShares);
+    /// @notice Get the number of shares that can earn, which is the active supply net of the dead
+    /// shares seeded out of the first deposit
+    /// @dev Distinct from {IERC7540AsyncRedeem-activeSupply} because the dead shares sit at an
+    /// address nothing can spend from, so premium divided across them could never be collected.
+    /// This figure also returns to zero once every real holder has left, which is what lets callers
+    /// read zero as "no capital at work here". `activeSupply` and `activeAssets` stay gross of
+    /// them, since the assets behind the dead shares are really held and really do back debt.
+    /// @return supply The number of shares that can earn
+    function stakedSupply() external view returns (uint256 supply);
 
     /// @notice Shares available for instant redemption based on vault liquidity
     /// @dev Overrides IERC7540AsyncRedeem unlockedSupply

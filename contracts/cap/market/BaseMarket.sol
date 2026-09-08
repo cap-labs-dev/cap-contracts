@@ -434,7 +434,9 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
         uint256 length = $.tranches.length;
         for (uint256 i; i < length; ++i) {
             address tranche = $.tranches[i].tranche;
-            if (ITranche(tranche).activeSupply() == 0) continue;
+            // stakedSupply rather than activeSupply: a tranche holding nothing but its dead
+            // shares is not underwriting, and premium sent there would sit unclaimable
+            if (ITranche(tranche).stakedSupply() == 0) continue;
             if (i == 0) {
                 seniorActive = true;
                 continue;

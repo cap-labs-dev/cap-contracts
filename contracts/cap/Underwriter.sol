@@ -5,11 +5,11 @@ import { ERC4626Upgradeable, ERC7540AsyncRedeem, IERC4626 } from "../ERC7540/ERC
 import { ITranche } from "../interfaces/ITranche.sol";
 import { IUnderwriter } from "../interfaces/IUnderwriter.sol";
 import { IVault } from "../interfaces/IVault.sol";
+import { DeadShares } from "../utils/DeadShares.sol";
 import { PremiumVesting } from "../utils/PremiumVesting.sol";
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
-import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
@@ -207,7 +207,9 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
 
     /// @inheritdoc IUnderwriter
     function claimable(address user) external view returns (uint256 premium) {
-        premium = _premium.claimable(user, balanceOf(user), activeSupply());
+        // gated the same way as {Tranche-claimable}; see there for why the burn address reads zero
+        if (user == DeadShares.HOLDER) return 0;
+        premium = _premium.claimable(user, balanceOf(user), stakedSupply());
     }
 
     /// @inheritdoc IUnderwriter
@@ -264,8 +266,12 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     /// Pointing the selector at a different role, including the public role to open the vault to
     /// everyone, is a {IAccessManager-setTargetFunctionRole} call, which is reserved to ADMIN.
     ///
-    /// The modifier checks the caller and {maxDeposit} checks the receiver, so depositing on
-    /// another account's behalf needs both of them admitted.
+    /// This modifier is the whole gate: the receiver is unrestricted and {maxDeposit} is left at
+    /// the ERC4626 default. Gating the receiver as well would contradict it, because a member
+    /// granted the role under an execution delay clears this modifier by consuming a scheduled
+    /// operation while still reading as unauthorized through {IAccessManager-canCall}'s immediate
+    /// flag. It would also be a gate on the wrong subject, and one worth little, since shares are
+    /// transferable as soon as they are minted.
     function deposit(uint256 _assets, address _receiver)
         public
         override(ERC4626Upgradeable, IERC4626)
@@ -287,33 +293,35 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     }
 
     /// @inheritdoc IUnderwriter
-    function whitelisted(address account) public view returns (bool allowed) {
-        (allowed,) = IAccessManager(authority()).canCall(account, address(this), this.deposit.selector);
-    }
-
-    /// @inheritdoc IUnderwriter
     function totalAssets() public view override(ERC4626Upgradeable, IERC4626, IUnderwriter) returns (uint256) {
         return IVault(vault).balanceOf(address(this), asset()) + totalDebt;
     }
 
-    /// @inheritdoc IUnderwriter
-    function maxDeposit(address receiver)
+    /// @inheritdoc IERC4626
+    /// @dev While the vault is empty this quotes at par out of {DeadShares-seedDeposit} rather than
+    /// off the ratio, so assets already sitting here cannot price the first deposit, and the seed
+    /// is deducted from what the depositor receives. See {DeadShares} for why.
+    function previewDeposit(uint256 assets)
         public
         view
-        override(ERC4626Upgradeable, IERC4626, IUnderwriter)
-        returns (uint256 maxAssets)
+        override(ERC4626Upgradeable, IERC4626)
+        returns (uint256 shares)
     {
-        if (whitelisted(receiver)) maxAssets = type(uint256).max;
+        shares = totalSupply() == 0 ? DeadShares.seedDeposit(assets) : super.previewDeposit(assets);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev The inverse of {previewDeposit} while empty: the first depositor pays for the seed on
+    /// top of the shares they asked for
+    function previewMint(uint256 shares) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 assets) {
+        assets = totalSupply() == 0 ? DeadShares.seedMint(shares) : super.previewMint(shares);
     }
 
     /// @inheritdoc IUnderwriter
-    function maxMint(address receiver)
-        public
-        view
-        override(ERC4626Upgradeable, IERC4626, IUnderwriter)
-        returns (uint256 maxShares)
-    {
-        if (whitelisted(receiver)) maxShares = type(uint256).max;
+    function stakedSupply() public view returns (uint256 supply) {
+        uint256 active = activeSupply();
+        uint256 dead = balanceOf(DeadShares.HOLDER);
+        supply = active > dead ? active - dead : 0;
     }
 
     /// @inheritdoc IUnderwriter
@@ -321,11 +329,11 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         return previewWithdraw(IVault(vault).balanceOf(address(this), asset()));
     }
 
-    /// @dev Update the distributed premiums. Staked capital is `activeSupply`, so shares queued for
-    /// redemption stop earning; see {PremiumVesting-accrue} for what happens to premium vesting
-    /// through a window where that reaches zero.
+    /// @dev Update the distributed premiums. Staked capital is `stakedSupply`, so shares queued
+    /// for redemption stop earning and the dead shares never do; see {PremiumVesting-accrue} for
+    /// what happens to premium vesting through a window where that reaches zero.
     function _updatePremiums() internal {
-        _premium.accrue(activeSupply());
+        _premium.accrue(stakedSupply());
     }
 
     /// @dev Settle premium accounting when shares move
@@ -340,6 +348,17 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
             _premium.checkpoint(to, balance, balance + amount);
         }
         super._update(from, to, amount);
+    }
+
+    /// @dev Mint the seed alongside the first deposit. {previewDeposit} and {previewMint} have
+    /// already taken it out of that depositor's quote, so the assets arriving cover both.
+    /// @param caller The account funding the deposit
+    /// @param receiver The account receiving the shares
+    /// @param assets The number of assets deposited
+    /// @param shares The number of shares to mint to the receiver
+    function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
+        if (totalSupply() == 0) _mint(DeadShares.HOLDER, DeadShares.SHARES);
+        super._deposit(caller, receiver, assets, shares);
     }
 
     /// @dev Transfer in assets to the vault from the sender

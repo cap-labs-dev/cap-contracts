@@ -36,6 +36,12 @@ contract ConfigureAccessControl {
         keeperSelectors[2] = Registry.createUnderwriter.selector;
         manager.setTargetFunctionRole(infra.registry, keeperSelectors, CapRoles.KEEPER);
 
+        // adding a tranche ends in a setTranches call, so it changes who backs a live market's
+        // debt. That is the same authority setTranches itself carries, not deployment work
+        bytes4[] memory registryAdminSelectors = new bytes4[](1);
+        registryAdminSelectors[0] = Registry.createTranche.selector;
+        manager.setTargetFunctionRole(infra.registry, registryAdminSelectors, CapRoles.ADMIN);
+
         // markets are the only MINTER holders, so writing off their own credit-backed supply sits
         // behind the same role that mints it
         bytes4[] memory minterSelectors = new bytes4[](3);

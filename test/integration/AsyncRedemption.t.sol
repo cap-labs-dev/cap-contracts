@@ -33,25 +33,28 @@ contract AsyncRedemptionTest is CapDeployer {
         vm.prank(borrower);
         market.borrow(borrower, 500e18);
 
+        // the first deposit paid for the seed, so this is everything the supplier holds
+        uint256 held = 1_000e18 - DEAD_SHARES;
         vm.prank(supplier);
-        uint256 reqId = tranche0.requestRedeem(1_000e18, supplier, supplier);
+        uint256 reqId = tranche0.requestRedeem(held, supplier, supplier);
 
         uint256 claimablePartial = tranche0.claimableRedeemRequest(reqId, supplier);
         assertGt(claimablePartial, 0);
-        assertLt(claimablePartial, 1_000e18);
+        assertLt(claimablePartial, held);
         assertGt(tranche0.pendingRedeemRequest(reqId, supplier), 0);
 
         _mintStable(borrower, 1_000e18);
         vm.prank(borrower);
         market.repay(type(uint256).max);
 
-        assertEq(tranche0.claimableRedeemRequest(reqId, supplier), 1_000e18);
+        assertEq(tranche0.claimableRedeemRequest(reqId, supplier), held);
 
         vm.prank(supplier);
-        uint256 assets = tranche0.redeem(reqId, 1_000e18, supplier, supplier);
-        assertEq(assets, 1_000e18);
-        assertEq(vault.balanceOf(supplier, address(collateral)), 1_000e18);
-        assertEq(tranche0.totalSupply(), 0);
+        uint256 assets = tranche0.redeem(reqId, held, supplier, supplier);
+        // short by the dead shares the first deposit seeded, which are never redeemed
+        assertEq(assets, 1_000e18 - DEAD_SHARES);
+        assertEq(vault.balanceOf(supplier, address(collateral)), 1_000e18 - DEAD_SHARES);
+        assertEq(tranche0.totalSupply(), DEAD_SHARES);
     }
 
     function test_stablecoin_asyncRedemption_pendingUntilBacked() public {

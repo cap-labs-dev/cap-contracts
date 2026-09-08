@@ -17,6 +17,16 @@ interface IRegistry {
     /// @notice The tranche count is invalid
     error InvalidTrancheCount();
 
+    /// @notice The assets and weights describe a different number of tranches
+    error TrancheAssetsMismatch();
+
+    /// @notice The oracle has no price for a tranche asset
+    /// @param asset The asset the oracle could not price
+    error AssetNotPriced(address asset);
+
+    /// @notice The market was not deployed by this registry
+    error UnknownMarket();
+
     /// @notice Shared initialization parameters for the registry
     /// @param stablecoin The stablecoin address
     /// @param stakedStablecoin The staked stablecoin address
@@ -54,7 +64,7 @@ interface IRegistry {
 
     /// @notice A market has been created
     /// @param market The deployed market
-    /// @param asset The market asset
+    /// @param assets The asset of each tranche, in the same order as `tranches`
     /// @param name The market name
     /// @param marketOwner The market owner operator address
     /// @param borrower The borrower operator address
@@ -63,13 +73,26 @@ interface IRegistry {
     /// @param tranches The deployed tranche addresses in seniority order
     event CreateMarket(
         address market,
-        address asset,
+        address[] assets,
         string name,
         address marketOwner,
         address borrower,
         uint64 marketOwnerRole,
         uint64 borrowerRole,
         address[] tranches
+    );
+
+    /// @notice A tranche has been deployed for a market
+    /// @dev Emitted for every tranche, both the ones a market is created with and the ones added
+    /// to it later, so the depositor role of each one is observable from a single event
+    /// @param market The market the tranche was deployed for
+    /// @param tranche The deployed tranche
+    /// @param asset The tranche asset
+    /// @param marketOwnerRole The market owner role id the tranche was wired to
+    /// @param depositorRole The role whose members may deposit, administered by the market owner
+    /// role
+    event CreateTranche(
+        address indexed market, address tranche, address asset, uint64 marketOwnerRole, uint64 depositorRole
     );
 
     /// @notice An underwriter has been created
@@ -105,43 +128,84 @@ interface IRegistry {
     /// @return roleId The operator role id, or zero if unassigned
     function operatorRole(address account) external view returns (uint64 roleId);
 
-    /// @notice Deploy a floating market with tranches at the given weights
-    /// @param asset The market asset
+    /// @notice Deploy a floating market with tranches at the given assets and weights
+    /// @dev One tranche is deployed per entry, so `assets` and `weights` must be the same length.
+    /// The assets may differ from each other: the market never touches a collateral token, it
+    /// values every tranche in USD through {ITranche-totalCapital}, so a waterfall can be built
+    /// out of whatever mix of collateral the oracle can price.
+    /// @param assets The asset of each tranche, index 0 is most senior
+    /// @param weights Tranche weights in ray decimals, index 0 is most senior
     /// @param name The market name
     /// @param marketOwner The market owner operator address
     /// @param borrower The borrower operator address
-    /// @param weights Tranche weights in ray decimals, index 0 is most senior
     /// @return market The deployed market
     /// @return deployedTranches The deployed tranche addresses in seniority order
     function createMarket(
-        address asset,
+        address[] calldata assets,
+        uint256[] calldata weights,
         string memory name,
         address marketOwner,
-        address borrower,
-        uint256[] calldata weights
+        address borrower
     ) external returns (address market, address[] memory deployedTranches);
 
-    /// @notice Deploy a fixed market with tranches at the given weights
-    /// @param asset The market asset
+    /// @notice Deploy a fixed market with tranches at the given assets and weights
+    /// @dev See {createMarket} for how `assets` and `weights` pair up
+    /// @param assets The asset of each tranche, index 0 is most senior
+    /// @param weights Tranche weights in ray decimals, index 0 is most senior
     /// @param name The market name
     /// @param marketOwner The market owner operator address
     /// @param borrower The borrower operator address
     /// @param maximumTermLimit The maximum loan term
     /// @param minimumTermLimit The minimum loan term
     /// @param grace The grace period after expiry for admin extensions
-    /// @param weights Tranche weights in ray decimals, index 0 is most senior
     /// @return market The deployed market
     /// @return deployedTranches The deployed tranche addresses in seniority order
     function createFixedMarket(
-        address asset,
+        address[] calldata assets,
+        uint256[] calldata weights,
         string memory name,
         address marketOwner,
         address borrower,
         uint256 maximumTermLimit,
         uint256 minimumTermLimit,
-        uint256 grace,
-        uint256[] calldata weights
+        uint256 grace
     ) external returns (address market, address[] memory deployedTranches);
+
+    /// @notice Add a tranche to a market this registry already created and reweight the waterfall
+    /// @dev The tranche joins as the most junior position, so `weights` must be one entry longer
+    /// than the market's current list and is applied to the whole waterfall in one go. Ordering
+    /// and removals are left to {IBaseMarket-setTranches}: to retire a tranche, add its
+    /// replacement here and then call that with the list you want. The owner role is taken from
+    /// the market rather than from an argument, so a new tranche cannot be wired to somebody
+    /// else's operator role. It opens with an empty depositor role, reported by {CreateTranche},
+    /// which the market owner fills through the AccessManager.
+    ///
+    /// This is ADMIN rather than KEEPER because it ends in a {IBaseMarket-setTranches} call. That
+    /// still enforces the weight total and market health, but choosing who backs a market's debt
+    /// is not routine deployment work.
+    /// @param market The market to deploy a tranche for
+    /// @param asset The asset for the new tranche, which need not match the existing tranches
+    /// @param weights Tranche weights in ray decimals for the resulting waterfall, index 0 is most
+    /// senior and the last entry is the new tranche
+    /// @return tranche The deployed tranche
+    function createTranche(address market, address asset, uint256[] calldata weights) external returns (address tranche);
+
+    /// @notice Get whether a market was deployed by this registry
+    /// @dev The record {createTranche} checks. Kept as a flag rather than as a copy of the market
+    /// owner role, so that nothing here can disagree with the AccessManager about who the owner
+    /// is; see {marketOwnerRole}.
+    /// @param market The market to query
+    /// @return deployed Whether this registry deployed the market
+    function isMarket(address market) external view returns (bool deployed);
+
+    /// @notice Get the market owner role id for a market deployed by this registry
+    /// @dev Read live from the AccessManager off the role wired to
+    /// {IBaseMarket-setTrancheWeights}, so repointing a market's owner selectors moves the owner
+    /// this reports. Zero for a market this registry did not deploy, which is also the id of
+    /// ADMIN, so callers wanting to tell those apart should ask {isMarket}.
+    /// @param market The market to query
+    /// @return roleId The market owner role id, or zero if the market is unknown
+    function marketOwnerRole(address market) external view returns (uint64 roleId);
 
     /// @notice Deploy an underwriter for an asset
     /// @param asset The underwriter asset

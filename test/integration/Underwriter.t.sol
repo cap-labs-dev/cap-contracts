@@ -37,7 +37,7 @@ contract UnderwriterIntegrationTest is CapDeployer {
         market.setFixedCreditLimit(1_000e18);
 
         underwriter = _deployUnderwriter();
-        tranche0.setWhitelist(address(underwriter), true);
+        _admitDepositor(address(tranche0), address(underwriter));
     }
 
     function _useTranche0AsDefault() internal {
@@ -49,11 +49,12 @@ contract UnderwriterIntegrationTest is CapDeployer {
         _useTranche0AsDefault();
         _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
 
-        assertEq(underwriter.balanceOf(depositor), DEPOSIT);
-        assertEq(tranche0.balanceOf(address(underwriter)), DEPOSIT);
+        assertEq(underwriter.balanceOf(depositor), DEPOSIT - DEAD_SHARES);
+        assertEq(tranche0.balanceOf(address(underwriter)), DEPOSIT - DEAD_SHARES);
         assertEq(vault.balanceOf(address(tranche0), address(collateral)), DEPOSIT);
         assertEq(vault.balanceOf(address(underwriter), address(collateral)), 0);
-        assertEq(underwriter.totalAssets(), DEPOSIT);
+        // the dead shares the allocation seeded in the tranche are gone for good
+        assertEq(underwriter.totalAssets(), DEPOSIT - DEAD_SHARES);
     }
 
     function test_manualAllocateDeallocate_roundtrips() public {
@@ -62,12 +63,14 @@ contract UnderwriterIntegrationTest is CapDeployer {
 
         underwriter.addTranche(address(tranche0));
         underwriter.allocate(address(tranche0), DEPOSIT);
-        assertEq(tranche0.balanceOf(address(underwriter)), DEPOSIT);
+        assertEq(tranche0.balanceOf(address(underwriter)), DEPOSIT - DEAD_SHARES);
         assertEq(vault.balanceOf(address(underwriter), address(collateral)), 0);
 
+        // the underwriter only ever held the allocation less the tranche's seed, so that is all
+        // there is to redeem back out of it
         uint256 freed = underwriter.deallocate(address(tranche0), DEPOSIT);
-        assertEq(freed, DEPOSIT);
-        assertEq(vault.balanceOf(address(underwriter), address(collateral)), DEPOSIT);
+        assertEq(freed, DEPOSIT - DEAD_SHARES);
+        assertEq(vault.balanceOf(address(underwriter), address(collateral)), DEPOSIT - DEAD_SHARES);
     }
 
     function test_deallocate_afterRemoveTranche() public {
@@ -75,7 +78,7 @@ contract UnderwriterIntegrationTest is CapDeployer {
 
         underwriter.addTranche(address(tranche0));
         underwriter.allocate(address(tranche0), DEPOSIT);
-        assertEq(tranche0.balanceOf(address(underwriter)), DEPOSIT);
+        assertEq(tranche0.balanceOf(address(underwriter)), DEPOSIT - DEAD_SHARES);
 
         underwriter.removeTranche(address(tranche0));
 
@@ -83,8 +86,8 @@ contract UnderwriterIntegrationTest is CapDeployer {
         underwriter.allocate(address(tranche0), 1e18);
 
         uint256 freed = underwriter.deallocate(address(tranche0), DEPOSIT);
-        assertEq(freed, DEPOSIT);
-        assertEq(vault.balanceOf(address(underwriter), address(collateral)), DEPOSIT);
+        assertEq(freed, DEPOSIT - DEAD_SHARES);
+        assertEq(vault.balanceOf(address(underwriter), address(collateral)), DEPOSIT - DEAD_SHARES);
     }
 
     function test_allocate_nonTranche_reverts() public {
@@ -129,22 +132,23 @@ contract UnderwriterIntegrationTest is CapDeployer {
         assertEq(underwriter.unlockedSupply(), 0);
 
         vm.prank(depositor);
-        uint256 reqId = underwriter.requestRedeem(DEPOSIT, depositor, depositor);
+        uint256 reqId = underwriter.requestRedeem(DEPOSIT - DEAD_SHARES, depositor, depositor);
 
-        assertEq(underwriter.pendingRedeemRequest(reqId, depositor), DEPOSIT);
+        assertEq(underwriter.pendingRedeemRequest(reqId, depositor), DEPOSIT - DEAD_SHARES);
         assertEq(underwriter.claimableRedeemRequest(reqId, depositor), 0);
 
         uint256 shares = tranche0.balanceOf(address(underwriter));
         uint256 freed = underwriter.deallocate(address(tranche0), shares);
-        assertEq(freed, DEPOSIT);
+        assertEq(freed, DEPOSIT - DEAD_SHARES);
 
-        assertEq(underwriter.claimableRedeemRequest(reqId, depositor), DEPOSIT);
+        assertEq(underwriter.claimableRedeemRequest(reqId, depositor), DEPOSIT - DEAD_SHARES);
 
         vm.prank(depositor);
-        uint256 assets = underwriter.redeem(reqId, DEPOSIT, depositor, depositor);
-        assertEq(assets, DEPOSIT);
-        assertEq(vault.balanceOf(depositor, address(collateral)), DEPOSIT);
-        assertEq(underwriter.totalSupply(), 0);
+        // two hops, so two seeds: one in the underwriter and one in the tranche it allocated to
+        uint256 assets = underwriter.redeem(reqId, DEPOSIT - DEAD_SHARES, depositor, depositor);
+        assertEq(assets, DEPOSIT - 2 * DEAD_SHARES);
+        assertEq(vault.balanceOf(depositor, address(collateral)), DEPOSIT - 2 * DEAD_SHARES);
+        assertEq(underwriter.totalSupply(), DEAD_SHARES, "the seed outlives every holder");
     }
 
     function test_asyncRedemption_partialWhileBorrowed_fullAfterRepay() public {
@@ -155,7 +159,7 @@ contract UnderwriterIntegrationTest is CapDeployer {
         market.borrow(borrower, 400e18);
 
         vm.prank(depositor);
-        uint256 reqId = underwriter.requestRedeem(DEPOSIT, depositor, depositor);
+        uint256 reqId = underwriter.requestRedeem(DEPOSIT - DEAD_SHARES, depositor, depositor);
         assertEq(underwriter.claimableRedeemRequest(reqId, depositor), 0);
 
         uint256 shares = tranche0.balanceOf(address(underwriter));
@@ -174,10 +178,10 @@ contract UnderwriterIntegrationTest is CapDeployer {
         uint256 remaining = tranche0.balanceOf(address(underwriter));
         underwriter.deallocate(address(tranche0), remaining);
 
-        assertEq(underwriter.claimableRedeemRequest(reqId, depositor), DEPOSIT);
+        assertEq(underwriter.claimableRedeemRequest(reqId, depositor), DEPOSIT - DEAD_SHARES);
 
         vm.prank(depositor);
-        underwriter.redeem(reqId, DEPOSIT, depositor, depositor);
-        assertEq(vault.balanceOf(depositor, address(collateral)), DEPOSIT);
+        underwriter.redeem(reqId, DEPOSIT - DEAD_SHARES, depositor, depositor);
+        assertEq(vault.balanceOf(depositor, address(collateral)), DEPOSIT - 2 * DEAD_SHARES);
     }
 }

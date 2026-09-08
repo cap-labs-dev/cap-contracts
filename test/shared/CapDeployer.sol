@@ -25,6 +25,11 @@ import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/Upgradea
 /// @notice Deploys and wires a full Cap protocol stack for unit and integration tests.
 /// @dev Override `capConfig` fields before `_deployCap()` to tune defaults per test suite.
 abstract contract CapDeployer is BaseTest {
+    /// @dev Mirrors {DeadShares-SHARES}, which {Tranche} and {Underwriter} carve out of their first
+    /// deposit. They are never redeemed, so a first depositor's round trip is permanently short by
+    /// this much per vault it passes through, and tests asserting an exact round trip net it out.
+    uint256 internal constant DEAD_SHARES = 1e3;
+
     // ── protocol instances ────────────────────────────────────────────────────
     MockOracle internal oracle;
     MockERC20 internal cusdUnderlying;
@@ -244,6 +249,10 @@ abstract contract CapDeployer is BaseTest {
         keeperSelectors[2] = Registry.createUnderwriter.selector;
         accessManager.setTargetFunctionRole(address(registry), keeperSelectors, CapRoles.KEEPER);
 
+        bytes4[] memory registryAdminSelectors = new bytes4[](1);
+        registryAdminSelectors[0] = Registry.createTranche.selector;
+        accessManager.setTargetFunctionRole(address(registry), registryAdminSelectors, CapRoles.ADMIN);
+
         bytes4[] memory minterSelectors = new bytes4[](3);
         minterSelectors[0] = Stablecoin.mintCreditBacked.selector;
         minterSelectors[1] = Stablecoin.burnCreditBacked.selector;
@@ -270,14 +279,33 @@ abstract contract CapDeployer is BaseTest {
 
     // ── market helpers ────────────────────────────────────────────────────────
 
+    /// @dev The shared collateral repeated once per tranche, for the tests that do not care which
+    /// asset a tranche holds
+    function _uniformAssets(uint256 count) internal view returns (address[] memory assets) {
+        assets = new address[](count);
+        for (uint256 i; i < count; ++i) {
+            assets[i] = address(collateral);
+        }
+    }
+
     function _createMarket(string memory name, address marketOwner, address borrower, uint256[] memory weights)
         internal
         returns (address market, address[] memory tranches)
     {
+        (market, tranches) = _createMarket(name, marketOwner, borrower, _uniformAssets(weights.length), weights);
+    }
+
+    function _createMarket(
+        string memory name,
+        address marketOwner,
+        address borrower,
+        address[] memory assets,
+        uint256[] memory weights
+    ) internal returns (address market, address[] memory tranches) {
         if (registry.operatorRole(marketOwner) == 0) _assignOperator(marketOwner);
         if (registry.operatorRole(borrower) == 0) _assignOperator(borrower);
 
-        (market, tranches) = registry.createMarket(address(collateral), name, marketOwner, borrower, weights);
+        (market, tranches) = registry.createMarket(assets, weights, name, marketOwner, borrower);
         _applyMarketDefaults(FloatingMarket(market));
     }
 
@@ -306,14 +334,14 @@ abstract contract CapDeployer is BaseTest {
         if (registry.operatorRole(borrower) == 0) _assignOperator(borrower);
 
         (market, tranches) = registry.createFixedMarket(
-            address(collateral),
+            _uniformAssets(weights.length),
+            weights,
             name,
             marketOwner,
             borrower,
             capConfig.defaultMaximumTermLimit,
             capConfig.defaultMinimumTermLimit,
-            capConfig.defaultGrace,
-            weights
+            capConfig.defaultGrace
         );
         _applyMarketDefaults(FloatingMarket(market));
     }
@@ -385,17 +413,55 @@ abstract contract CapDeployer is BaseTest {
         accessManager.grantRole(CapRoles.LIQUIDATOR, liquidator, 0);
     }
 
+    // ── admission helpers ─────────────────────────────────────────────────────
+
+    /// @dev Tranches and underwriters are admitted the same way: the role the AccessManager has
+    /// wired to {IERC4626-deposit} on that vault *is* the allowlist, and neither contract keeps a
+    /// copy. Its admin is the market owner's or curator's operator role, so the grant has to come
+    /// from them -- which in these tests is the deployer itself.
+    function _depositorRole(address capVault) internal view returns (uint64 roleId) {
+        roleId = accessManager.getTargetFunctionRole(capVault, IERC4626.deposit.selector);
+    }
+
+    function _admitDepositor(address capVault, address account) internal {
+        accessManager.grantRole(_depositorRole(capVault), account, 0);
+    }
+
+    function _expelDepositor(address capVault, address account) internal {
+        accessManager.revokeRole(_depositorRole(capVault), account);
+    }
+
+    /// @dev Whether an account could deposit, asking the AccessManager the same question the
+    /// {IERC4626-deposit} modifier does
+    function _mayDeposit(address capVault, address account) internal view returns (bool allowed) {
+        (allowed,) = accessManager.canCall(account, capVault, IERC4626.deposit.selector);
+    }
+
     // ── funding helpers ───────────────────────────────────────────────────────
 
+    /// @dev A second collateral the oracle can price, for markets whose tranches do not all hold
+    /// the same asset
+    function _newCollateral(string memory name, string memory symbol, uint8 decimals, uint256 price)
+        internal
+        returns (MockERC20 token)
+    {
+        token = new MockERC20(name, symbol, decimals);
+        oracle.setPrice(address(token), price);
+    }
+
     function _fundTranche(address tranche, address supplier, uint256 amount) internal {
-        collateral.mint(supplier, amount);
+        _fundTranche(tranche, address(collateral), supplier, amount);
+    }
+
+    function _fundTranche(address tranche, address asset, address supplier, uint256 amount) internal {
+        MockERC20(asset).mint(supplier, amount);
         vm.startPrank(supplier);
-        collateral.approve(address(vault), amount);
-        vault.deposit(address(collateral), amount, supplier);
+        MockERC20(asset).approve(address(vault), amount);
+        vault.deposit(asset, amount, supplier);
         vault.setOperator(tranche, true);
         vm.stopPrank();
 
-        Tranche(tranche).setWhitelist(supplier, true);
+        _admitDepositor(tranche, supplier);
 
         vm.prank(supplier);
         Tranche(tranche).deposit(amount, supplier);
@@ -419,17 +485,6 @@ abstract contract CapDeployer is BaseTest {
         if (registry.operatorRole(address(this)) == 0) _assignOperator(address(this));
         address uw = registry.createUnderwriter(address(collateral), "Cap Underwriter", "cUW", address(this));
         underwriter = Underwriter(uw);
-    }
-
-    /// @dev Admit a depositor to an underwriter. The role wired to {IERC4626-deposit} *is* the
-    /// whitelist, and the curator's operator role administers it, so the grant has to come from the
-    /// curator -- which in these tests is the deployer itself.
-    function _depositorRole(address underwriter) internal view returns (uint64 roleId) {
-        roleId = accessManager.getTargetFunctionRole(underwriter, IERC4626.deposit.selector);
-    }
-
-    function _admitDepositor(address underwriter, address account) internal {
-        accessManager.grantRole(_depositorRole(underwriter), account, 0);
     }
 
     function _fundUnderwriter(address underwriter, address supplier, uint256 amount) internal {

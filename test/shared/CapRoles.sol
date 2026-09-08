@@ -12,6 +12,7 @@ library CapRoles {
     uint64 internal constant MINTER = CapRolesLib.MINTER;
     uint64 internal constant GOVERNOR = CapRolesLib.GOVERNOR;
     uint64 internal constant REGISTRY = CapRolesLib.REGISTRY;
+    uint64 internal constant MARKET = CapRolesLib.MARKET;
     uint64 internal constant LIQUIDATOR = CapRolesLib.LIQUIDATOR;
     uint64 internal constant FIRST_OPERATOR_ROLE = CapRolesLib.FIRST_OPERATOR_ROLE;
 }

@@ -302,7 +302,7 @@ contract DebtLifecycleTest is CapDeployer {
         uint256[] memory weights = capConfig.defaultTrancheWeights;
         vm.expectRevert(IFixedMarket.InvalidTermLimits.selector);
         registry.createFixedMarket(
-            address(collateral), "Bad", defaultMarketOwner, defaultBorrower, 0, 0, 1 days, weights
+            _uniformAssets(weights.length), weights, "Bad", defaultMarketOwner, defaultBorrower, 0, 0, 1 days
         );
     }
 

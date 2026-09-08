@@ -143,7 +143,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         MarketBundle memory b = _createReadyMarket("m");
         uw.addTranche(b.tranche0Addr);
         uw.setDefaultTranche(b.tranche0Addr);
-        b.tranche0.setWhitelist(address(uw), true);
+        _admitDepositor(address(b.tranche0), address(uw));
 
         // honest LP funds the underwriter and it underwrites a borrow
         _fundUnderwriter(address(uw), alice, 1_000e18);
@@ -166,7 +166,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         uint256 aliceShares = uw.balanceOf(alice);
         vm.prank(alice);
         uw.requestRedeem(aliceShares, alice, alice);
-        assertEq(uw.activeSupply(), 0, "vault is idle");
+        assertEq(uw.stakedSupply(), 0, "vault is idle");
 
         // three of the six hours pass against nobody
         vm.warp(block.timestamp + 3 hours);
@@ -424,14 +424,14 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         uint256 aliceShares = b.tranche0.balanceOf(alice);
         vm.prank(alice);
         b.tranche0.requestRedeem(aliceShares, alice, alice);
-        assertEq(b.tranche0.activeSupply(), 0, "tranche is idle");
+        assertEq(b.tranche0.stakedSupply(), 0, "tranche is idle");
 
         // the whole epoch runs out against nobody
         uint256 idleEnd = b.tranche0.periodEnd();
         vm.warp(idleEnd);
 
         _fundVault(address(this), 1);
-        b.tranche0.setWhitelist(address(this), true);
+        _admitDepositor(address(b.tranche0), address(this));
         vault.setOperator(b.tranche0Addr, true);
         b.tranche0.deposit(1, address(this));
 
@@ -469,7 +469,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         uint256 aliceShares = b.tranche0.balanceOf(alice);
         vm.prank(alice);
         b.tranche0.requestRedeem(aliceShares, alice, alice);
-        assertEq(b.tranche0.activeSupply(), 0, "tranche is idle");
+        assertEq(b.tranche0.stakedSupply(), 0, "tranche is idle");
 
         // half the epoch elapses against nobody, then the schedule is re-vested over it
         vm.warp(block.timestamp + 3 hours);
@@ -488,7 +488,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         MarketBundle memory b = _createReadyMarket("m");
         uw.addTranche(b.tranche0Addr);
         uw.setDefaultTranche(b.tranche0Addr);
-        b.tranche0.setWhitelist(address(uw), true);
+        _admitDepositor(address(b.tranche0), address(uw));
 
         _fundUnderwriter(address(uw), alice, 1_000e18);
         _fundTranche(b.tranche1Addr, bob, 100e18);
@@ -507,7 +507,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         uint256 aliceShares = uw.balanceOf(alice);
         vm.prank(alice);
         uw.requestRedeem(aliceShares, alice, alice);
-        assertEq(uw.activeSupply(), 0, "vault is idle");
+        assertEq(uw.stakedSupply(), 0, "vault is idle");
 
         // half the schedule elapses against nobody, then a report re-vests over it
         vm.warp(block.timestamp + 3 hours);
@@ -578,7 +578,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         MarketBundle memory b = _createReadyMarket("m");
         uw.addTranche(b.tranche0Addr);
         uw.setDefaultTranche(b.tranche0Addr);
-        b.tranche0.setWhitelist(address(uw), true);
+        _admitDepositor(address(b.tranche0), address(uw));
 
         _fundUnderwriter(address(uw), alice, 400e18);
         // a second depositor, so unlocked supply is no longer the binding constraint
@@ -661,7 +661,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         MarketBundle memory b = _createReadyMarket("m");
         uw.addTranche(b.tranche0Addr);
         uw.setDefaultTranche(b.tranche0Addr);
-        b.tranche0.setWhitelist(address(uw), true);
+        _admitDepositor(address(b.tranche0), address(uw));
 
         _fundUnderwriter(address(uw), alice, 1_000e18);
 

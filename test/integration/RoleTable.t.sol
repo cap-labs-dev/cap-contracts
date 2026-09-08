@@ -106,11 +106,67 @@ contract RoleTableTest is CapDeployer {
     }
 
     function _assertTrancheRoleTable(address tranche, uint64 ownerRole) internal view {
-        _expectRole(tranche, ITranche.setWhitelist.selector, ownerRole, "setWhitelist");
         _expectRole(tranche, ITranche.setVestingPeriod.selector, ownerRole, "tranche setVestingPeriod");
         _expectRole(tranche, ITranche.slash.selector, CapRoles.MARKET, "slash");
         // premium is pushed in by whichever market charged it, so this one is open by design
         _expectRole(tranche, ITranche.notifyPremium.selector, PUBLIC_ROLE, "notifyPremium");
+
+        // admission is a row like any other, same as on the underwriter: the entry points are
+        // gated to a role of their own, and the market owner administers that role's membership
+        // rather than a list on the tranche
+        uint64 depositorRole = _depositorRole(tranche);
+        assertTrue(depositorRole != 0 && depositorRole != ownerRole, "depositors are their own role");
+        _expectRole(tranche, IERC4626.deposit.selector, depositorRole, "tranche deposit");
+        _expectRole(tranche, IERC4626.mint.selector, depositorRole, "tranche mint");
+        assertEq(accessManager.getRoleAdmin(depositorRole), ownerRole, "administered by the market owner");
+    }
+
+    /// @dev The Registry keeps no copy of the market owner role, so handing a market to a new
+    /// owner through the AccessManager is enough: the tranches minted afterwards follow.
+    function test_marketOwnerRoleFollowsTheAccessManager() public {
+        (address marketAddr, address[] memory existing) =
+            _createMarket("rehomed", defaultMarketOwner, defaultBorrower, capConfig.defaultTrancheWeights);
+        uint64 originalRole = registry.operatorRole(defaultMarketOwner);
+        assertEq(registry.marketOwnerRole(marketAddr), originalRole, "the deploying owner to begin with");
+
+        uint64 newRole = _assignOperator(makeAddr("newMarketOwner"));
+
+        bytes4[] memory ownerSelectors = new bytes4[](1);
+        ownerSelectors[0] = IBaseMarket.setTrancheWeights.selector;
+        accessManager.setTargetFunctionRole(marketAddr, ownerSelectors, newRole);
+
+        assertEq(registry.marketOwnerRole(marketAddr), newRole, "and the new one once it is rehomed");
+
+        // and the next tranche is wired to the new owner rather than the old one
+        uint256[] memory weights = new uint256[](3);
+        weights[0] = 0.5e27;
+        weights[1] = 0.3e27;
+        weights[2] = 0.2e27;
+        address added = registry.createTranche(marketAddr, address(collateral), weights);
+
+        _expectRole(added, ITranche.setVestingPeriod.selector, newRole, "new tranche follows the new owner");
+        assertEq(accessManager.getRoleAdmin(_depositorRole(added)), newRole, "and so does its depositor role");
+        _expectRole(existing[0], ITranche.setVestingPeriod.selector, originalRole, "the older tranches do not move");
+    }
+
+    function test_marketOwnerRole_isZeroForAMarketItDidNotDeploy() public {
+        assertFalse(registry.isMarket(makeAddr("notAMarket")));
+        assertEq(registry.marketOwnerRole(makeAddr("notAMarket")), 0);
+    }
+
+    /// @dev Each tranche gets its own depositor role, so one level of a waterfall can be open
+    /// while another stays closed.
+    function test_trancheDepositorRolesAreNotShared() public {
+        (, address[] memory tranches) =
+            _createMarket("split-admission", defaultMarketOwner, defaultBorrower, capConfig.defaultTrancheWeights);
+
+        assertTrue(_depositorRole(tranches[0]) != _depositorRole(tranches[1]), "a role each");
+
+        address depositor = makeAddr("trancheDepositor");
+        _admitDepositor(tranches[0], depositor);
+
+        assertTrue(_mayDeposit(tranches[0], depositor), "admitted to the senior tranche");
+        assertFalse(_mayDeposit(tranches[1], depositor), "and not to the junior one");
     }
 
     function test_underwriterRoleTable() public {
@@ -167,6 +223,8 @@ contract RoleTableTest is CapDeployer {
         _expectRole(address(registry), Registry.createMarket.selector, CapRoles.KEEPER, "createMarket");
         _expectRole(address(registry), Registry.createFixedMarket.selector, CapRoles.KEEPER, "createFixedMarket");
         _expectRole(address(registry), Registry.createUnderwriter.selector, CapRoles.KEEPER, "createUnderwriter");
+        // adding a tranche ends in a setTranches call, so it carries that call's authority
+        _expectRole(address(registry), Registry.createTranche.selector, CapRoles.ADMIN, "createTranche");
 
         // only the Registry deploys through the factory
         _expectRole(address(beaconFactory), IBeaconFactory.create.selector, CapRoles.REGISTRY, "factory create");
@@ -179,14 +237,14 @@ contract RoleTableTest is CapDeployer {
         uint64 depositorRole = _depositorRole(underwriter);
         address depositor = makeAddr("depositor");
 
-        assertFalse(IUnderwriter(underwriter).whitelisted(depositor), "closed by default");
+        assertFalse(_mayDeposit(underwriter, depositor), "closed by default");
 
         // this contract is the curator, so it holds the depositor role's admin
         accessManager.grantRole(depositorRole, depositor, 0);
-        assertTrue(IUnderwriter(underwriter).whitelisted(depositor), "curator admitted them");
+        assertTrue(_mayDeposit(underwriter, depositor), "curator admitted them");
 
         accessManager.revokeRole(depositorRole, depositor);
-        assertFalse(IUnderwriter(underwriter).whitelisted(depositor), "and can remove them again");
+        assertFalse(_mayDeposit(underwriter, depositor), "and can remove them again");
     }
 
     /// @dev The delegation is narrow: administering the depositor role does not extend to any other
