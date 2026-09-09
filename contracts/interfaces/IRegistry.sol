@@ -20,10 +20,6 @@ interface IRegistry {
     /// @notice The assets and weights describe a different number of tranches
     error TrancheAssetsMismatch();
 
-    /// @notice The oracle has no price for a tranche asset
-    /// @param asset The asset the oracle could not price
-    error AssetNotPriced(address asset);
-
     /// @notice The market was not deployed by this registry
     error UnknownMarket();
 

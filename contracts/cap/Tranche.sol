@@ -73,6 +73,13 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
 
     /// @inheritdoc ITranche
     function slash(uint256 value, address recipient) external restricted returns (uint256 slashedValue) {
+        // `restricted` establishes only that the caller holds the market role, which every market
+        // the Registry deploys does, so on its own the predicate reads as "is a market" rather
+        // than "is my market" while the recipient stays caller-supplied. What actually keeps one
+        // market off another's collateral today is {BaseMarket-_setTranches} refusing a tranche it
+        // does not own, an invariant enforced two contracts away and shared by every tranche
+        // through one beacon. Assert it where it is relied on
+        if (msg.sender != market) revert InvalidMarket();
         uint256 price = getPrice();
         uint256 unit = 10 ** decimals();
         uint256 assets = value * unit / price;
@@ -119,8 +126,14 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     /// @inheritdoc ITranche
     function claim(address recipient) external updatePremium returns (uint256 premium) {
         premium = _premium.settle(msg.sender, balanceOf(msg.sender));
+        // the per-share arithmetic rounds half up in both directions, so the entitlements can sum
+        // a few wei past what was funded. Without a clamp the last holder out hits the underflow
+        // and cannot collect at all, which trades a rounding error for a stuck claim. Pay what is
+        // there: the gap is dust by construction, and whoever meets it is the one who waited
+        uint256 held = _storedPremiumBalance;
+        if (premium > held) premium = held;
         if (premium > 0) {
-            _storedPremiumBalance -= premium;
+            _storedPremiumBalance = held - premium;
             IERC20(stablecoin).safeTransfer(recipient, premium);
             emit Claimed(msg.sender, recipient, premium);
         }
@@ -303,8 +316,17 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
 
     /// @dev Get the price of the asset for a market. Every conversion between assets and value
     /// divides by this, so a zero price fails closed here rather than panicking downstream.
+    ///
+    /// Age is not checked here. {Oracle-price} measures each reading against that asset's own
+    /// window and falls to the backup before giving up, so a stale feed arrives as a revert rather
+    /// than as a number with an old timestamp on it. That matters enough to say why it is not
+    /// re-checked: a frozen feed is worth more to a borrower than a missing one, since this figure
+    /// drives {totalCapital}, {IBaseMarket-lockedValue}, {IBaseMarket-healthiness} and the slash
+    /// conversion, and a stuck price keeps a market borrowing and out of reach of liquidation on
+    /// collateral that has already fallen. Duplicating the check here would mean reading the
+    /// source data back out for its window, and would still be the oracle's answer either way.
     function getPrice() internal view returns (uint256 price) {
-        (price,) = IOracle(oracle).getPrice(asset());
+        (price,) = IOracle(oracle).price(asset());
         if (price == 0) revert InvalidPrice();
     }
 

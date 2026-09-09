@@ -85,9 +85,9 @@ abstract contract ERC7540AsyncRedeem is
         $.requestId++;
 
         $.queueIndex[requestId] = $.redeemQueue;
+        _transfer(_owner, address(this), _shares);
         $.redeemQueue += _shares;
 
-        _transfer(_owner, address(this), _shares);
         IERC1155Queue($.queueNft).mint(_controller, requestId, _shares);
 
         emit RedeemRequest(_controller, _owner, requestId, msg.sender, _shares);
@@ -201,6 +201,21 @@ abstract contract ERC7540AsyncRedeem is
         }
     }
 
+    /// @dev The authorization a queued claim takes, which is narrower than {_checkAllowance} by
+    /// design. ERC-7540 allows a share allowance to stand in for the owner when a request is
+    /// *made*, because the shares genuinely leave the owner there, but requires controller or
+    /// operator to *claim* one. The distinction matters here rather than being pedantry: a queued
+    /// claim burns from this contract, not from the controller, so an allowance spent here is
+    /// spent against a balance the controller no longer has. It would let an approval outlive the
+    /// exposure anyone would reason about — queueing a position drops `balanceOf` to zero, which
+    /// is exactly when an outstanding approval looks spent — and an infinite one is never
+    /// deducted, so the ceiling would be the whole queued position, paid to any named receiver.
+    /// @param _controller The controller of the request
+    /// @param _caller The caller of the claim
+    function _checkController(address _controller, address _caller) internal view {
+        if (_caller != _controller && !isOperator(_controller, _caller)) revert NotAuthorized(_caller);
+    }
+
     /// @dev Internal function to withdraw assets from the vault after requesting a redeem
     /// @param _caller The caller of the withdraw
     /// @param _receiver The receiver of the assets
@@ -216,14 +231,15 @@ abstract contract ERC7540AsyncRedeem is
         uint256 _shares,
         uint256 _requestId
     ) internal virtual {
-        _checkAllowance(_controller, _caller, _shares);
+        _checkController(_controller, _caller);
 
         ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
         $.queueIndex[_requestId] += _shares;
-        $.settledQueue += _shares;
         IERC1155Queue($.queueNft).burn(_controller, _requestId, _shares);
 
         _burn(address(this), _shares);
+        $.settledQueue += _shares;
+
         _onWithdraw(_controller, _assets, _shares);
         _transferOut(_receiver, _assets);
 

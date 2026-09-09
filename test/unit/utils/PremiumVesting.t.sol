@@ -278,6 +278,59 @@ contract PremiumVestingTest is Test {
         assertLe(toAlice + toBob, PREMIUM, "and never more than was funded");
     }
 
+    /// @dev Both conversions round down, so the ordinary case under-attributes and the remainder
+    /// stays with the caller. A wei split two ways is owed to neither, rather than to both.
+    function test_roundingDownLeavesDustBehindRatherThanOverAttributingIt() public {
+        v.checkpoint(alice, 0, 1);
+        v.checkpoint(bob, 0, 1);
+
+        v.fund(1);
+        vm.warp(block.timestamp + PERIOD);
+        v.accrue(2);
+
+        assertEq(v.perShare(), 0.5e27, "half a ray each, which is half a wei apiece");
+        assertEq(v.claimable(alice, 1, 2) + v.claimable(bob, 1, 2), 0, "so neither is owed a whole one");
+    }
+
+    /// @dev Rounding down does not make the callers' clamp redundant, which is worth pinning
+    /// because it looks as though it should. `debt` rounds down alongside the credit it is
+    /// subtracted from, and a debt rounded down understates what has already been accounted for,
+    /// so an account arriving mid-epoch or dropping its balance banks the fraction.
+    ///
+    /// Four wei funded, five paid out. Both leaks are here: alice arriving against a per-share
+    /// figure of three at half the supply is charged a debt of one where one and a half is owed,
+    /// and bob cutting to a quarter is charged nothing where three quarters is. Contrived, and it
+    /// needs a pot of a few wei against a supply near a ray, but it is reachable with balances a
+    /// real vault could hold, so the clamp is load-bearing rather than defensive.
+    function test_roundingDownStillLetsEntitlementsPassThePot() public {
+        uint256 funded;
+
+        // bob is in from the start, so his debt is zero at a per-share figure of zero
+        for (uint256 i; i < 2; ++i) {
+            uint256 amount = i == 0 ? 2 : 1;
+            v.fund(amount);
+            funded += amount;
+            vm.warp(block.timestamp + PERIOD);
+            v.accrue(1e27);
+        }
+        assertEq(v.perShare(), 3, "three per share against a supply of one ray");
+
+        v.checkpoint(alice, 0, 0.5e27);
+        v.checkpoint(bob, 1e27, 0.25e27);
+
+        v.fund(1);
+        funded += 1;
+        vm.warp(block.timestamp + PERIOD);
+        v.accrue(0.75e27);
+        assertEq(v.perShare(), 4, "and four after the last wei");
+
+        uint256 paid = v.settle(alice, 0.5e27) + v.settle(bob, 0.25e27);
+
+        assertEq(funded, 4, "four wei ever funded");
+        assertEq(paid, 5, "five wei owed between them");
+        assertGt(paid, funded, "which is exactly what the clamp in the callers is there for");
+    }
+
     function test_settleZeroesTheEntitlementAndPaysItOnce() public {
         v.checkpoint(alice, 0, 100e18);
         v.fund(PREMIUM);

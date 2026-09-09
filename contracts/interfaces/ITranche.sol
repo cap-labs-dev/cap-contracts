@@ -13,6 +13,9 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @notice The oracle reported a zero price, which is a divisor in every value conversion
     error InvalidPrice();
 
+    /// @notice The caller holds the market role but is not the market this tranche underwrites
+    error InvalidMarket();
+
     /// @notice Emitted when assets are slashed
     /// @param recipient The recipient of the slashed assets
     /// @param assets The amount of assets slashed

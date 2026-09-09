@@ -5,6 +5,7 @@ import { Underwriter } from "../../contracts/cap/Underwriter.sol";
 import { FixedMarket } from "../../contracts/cap/market/FixedMarket.sol";
 import { IBaseMarket } from "../../contracts/interfaces/IBaseMarket.sol";
 import { IFixedMarket } from "../../contracts/interfaces/IFixedMarket.sol";
+import { IOracle } from "../../contracts/interfaces/IOracle.sol";
 import { ITranche } from "../../contracts/interfaces/ITranche.sol";
 import { WadRayMath } from "../../contracts/utils/WadRayMath.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
@@ -260,16 +261,21 @@ contract DebtLifecycleTest is CapDeployer {
 
     // ── a zero oracle price fails closed ─────────────────────────────────────
 
+    /// @dev The refusal comes from the oracle now rather than from the tranche. {Oracle-price}
+    /// treats a zero from its source as no answer at all, tries the backup and gives up, so the
+    /// tranche never sees the zero it used to guard against. {Tranche-getPrice} keeps that guard
+    /// anyway, since it is one comparison standing between a misbehaving oracle and a division by
+    /// zero in every conversion the tranche performs, but a conformant oracle never reaches it.
     function test_zeroPrice_revertsInsteadOfDividingByZero() public {
         MarketBundle memory bundle = _createReadyMarket("Floating");
         _fundTranche(bundle.tranche0Addr, makeAddr("senior"), 10_000e18);
 
         oracle.setPrice(address(collateral), 0);
 
-        vm.expectRevert(ITranche.InvalidPrice.selector);
+        vm.expectRevert(abi.encodeWithSelector(IOracle.PriceError.selector, address(collateral)));
         bundle.tranche0.totalCapital();
 
-        vm.expectRevert(ITranche.InvalidPrice.selector);
+        vm.expectRevert(abi.encodeWithSelector(IOracle.PriceError.selector, address(collateral)));
         bundle.tranche0.unlockedSupply();
     }
 

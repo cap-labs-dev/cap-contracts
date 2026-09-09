@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
 import { IBaseMarket } from "../../contracts/interfaces/IBaseMarket.sol";
+import { IOracle } from "../../contracts/interfaces/IOracle.sol";
 import { IRegistry } from "../../contracts/interfaces/IRegistry.sol";
 import { ITranche } from "../../contracts/interfaces/ITranche.sol";
 import { DeadShares } from "../../contracts/utils/DeadShares.sol";
@@ -75,12 +76,13 @@ contract TrancheTest is CapDeployer {
     /// because {IBaseMarket-setTranches} only prices tranches through its health check and that
     /// short-circuits while there is no debt. It then fails inside {IBaseMarket-lockedValue},
     /// which every senior tranche's {ITranche-unlockedSupply} runs through, so admitting one
-    /// would strand the redemptions of depositors already in the market. Hence the check up front.
+    /// would strand the redemptions of depositors already in the market. Hence the probe up front,
+    /// which is now just a call to {IOracle-price} and lets the oracle's own refusal through.
     function test_createTranche_rejectsAnAssetTheOracleCannotPrice() public {
         _fundTranche(address(tranche0), supplier, 100e18);
         MockERC20 unpriced = new MockERC20("Ghost", "GHOST", 18);
 
-        vm.expectRevert(abi.encodeWithSelector(IRegistry.AssetNotPriced.selector, address(unpriced)));
+        vm.expectRevert(abi.encodeWithSelector(IOracle.PriceError.selector, address(unpriced)));
         registry.createTranche(address(market), address(unpriced), _weights3(0.5e27, 0.3e27, 0.2e27));
 
         assertGt(tranche0.unlockedSupply(), 0, "existing depositors can still get out");
@@ -93,7 +95,7 @@ contract TrancheTest is CapDeployer {
         assets[0] = address(collateral);
         assets[1] = address(unpriced);
 
-        vm.expectRevert(abi.encodeWithSelector(IRegistry.AssetNotPriced.selector, address(unpriced)));
+        vm.expectRevert(abi.encodeWithSelector(IOracle.PriceError.selector, address(unpriced)));
         registry.createMarket(assets, capConfig.defaultTrancheWeights, "Ghostly", defaultMarketOwner, defaultBorrower);
     }
 
@@ -164,6 +166,64 @@ contract TrancheTest is CapDeployer {
         tranche0.slash(1e18, stranger);
     }
 
+    /// @dev Every market the Registry deploys holds {CapRoles-MARKET}, so the role on its own only
+    /// establishes "is a market" and the recipient is the caller's to choose. Without the tranche
+    /// checking its own market, the only thing keeping one market off another's collateral is
+    /// {IBaseMarket-setTranches} refusing a foreign tranche, two contracts away and shared by
+    /// every tranche through a single beacon.
+    function test_slash_rejectsAForeignMarketHoldingTheRole() public {
+        _fundTranche(address(tranche0), supplier, 100e18);
+        (address interloper,,) = _createMarket("interloper");
+        (bool isMarket,) = accessManager.hasRole(CapRoles.MARKET, interloper);
+        assertTrue(isMarket, "the caller really is a market");
+
+        vm.prank(interloper);
+        vm.expectRevert(ITranche.InvalidMarket.selector);
+        tranche0.slash(1e18, stranger);
+
+        assertEq(tranche0.totalAssets(), 100e18, "collateral untouched");
+    }
+
+    // ── the price has to be fresh, not merely non-zero ────────────────────────
+
+    /// @dev {Oracle-price} measures the reading against the asset's window and reverts rather than
+    /// handing back a number with an old timestamp on it, and {Tranche-getPrice} lets that through
+    /// rather than re-checking. A frozen feed is worth more to a borrower than a missing one: this
+    /// price drives capital, locked value, health and the slash conversion, so a stuck price keeps
+    /// a market borrowing and out of reach of liquidation against collateral that has already
+    /// fallen. Read through the tranche, which is where it would actually bite.
+    function test_getPrice_rejectsAPriceOlderThanItsWindow() public {
+        _fundTranche(address(tranche0), supplier, 100e18);
+        oracle.setStaleness(address(collateral), 1 hours);
+        assertEq(tranche0.totalCapital(), 100e18, "fresh to begin with");
+
+        vm.warp(block.timestamp + 1 hours);
+        assertEq(tranche0.totalCapital(), 100e18, "the window itself is still inside it");
+
+        vm.warp(block.timestamp + 1);
+        vm.expectRevert(abi.encodeWithSelector(IOracle.PriceError.selector, address(collateral)));
+        tranche0.totalCapital();
+
+        // a fresh posting at the very same price is enough to bring it back
+        oracle.setPrice(address(collateral), 1e18);
+        assertEq(tranche0.totalCapital(), 100e18, "and a re-post revives it");
+    }
+
+    /// @dev A window of zero is not treated as unlimited. Under {Oracle-_isStale} it admits only a
+    /// reading posted in the same block, so it is indistinguishable from never having been
+    /// configured, which is why {Registry} refuses to launch against one. Reaching it here means
+    /// an oracle admin cleared the window afterwards.
+    function test_getPrice_rejectsAnAssetOnAZeroWindowASecondLater() public {
+        _fundTranche(address(tranche0), supplier, 100e18);
+        oracle.setStaleness(address(collateral), 0);
+
+        assertEq(tranche0.totalCapital(), 100e18, "the posting block itself still reads");
+
+        vm.warp(block.timestamp + 1);
+        vm.expectRevert(abi.encodeWithSelector(IOracle.PriceError.selector, address(collateral)));
+        tranche0.totalCapital();
+    }
+
     function test_unlockedSupply_zeroWithoutDeposits() public view {
         assertEq(tranche0.unlockedSupply(), 0);
     }
@@ -175,16 +235,17 @@ contract TrancheTest is CapDeployer {
 
     // ── kill on catastrophic slash ────────────────────────────────────────────
 
-    /// @dev Slashing is wired to {CapRoles-MARKET}. Take the role directly so a slash of an exact
-    /// size can be aimed at the tranche without having to steer a market into liquidation first.
-    function _becomeMarket() internal {
-        accessManager.grantRole(CapRoles.MARKET, address(this), 0);
+    /// @dev Slashing needs {CapRoles-MARKET} and the caller to be this tranche's own market, so
+    /// speak as that market. Lets a slash of an exact size be aimed at the tranche without having
+    /// to steer a market into liquidation first.
+    function _marketSlash(ITranche tranche, uint256 value) internal returns (uint256 slashedValue) {
+        vm.prank(tranche.market());
+        slashedValue = tranche.slash(value, stranger);
     }
 
     /// @dev Collateral is priced at one, so a slash of `value` removes `value` assets.
     function _slashTo(uint256 deposited, uint256 remaining) internal {
-        _becomeMarket();
-        tranche0.slash(deposited - remaining, stranger);
+        _marketSlash(tranche0, deposited - remaining);
     }
 
     function test_slash_killsTrancheBelowOnePercentOfPar() public {
@@ -225,8 +286,7 @@ contract TrancheTest is CapDeployer {
 
         assertFalse(tranche0.killed(), "exactly one percent of par is not below it");
 
-        _becomeMarket();
-        tranche0.slash(1, stranger);
+        _marketSlash(tranche0, 1);
 
         assertTrue(tranche0.killed(), "one wei under the threshold kills it");
     }
@@ -361,8 +421,7 @@ contract TrancheTest is CapDeployer {
     /// @dev An empty tranche sits at par by the virtual-share convention, so an idle slash against
     /// one must not latch the flag and brick it before anybody has deposited.
     function test_slash_onEmptyTrancheDoesNotKill() public {
-        _becomeMarket();
-        tranche0.slash(1e18, stranger);
+        _marketSlash(tranche0, 1e18);
 
         assertFalse(tranche0.killed(), "an empty tranche is at par, not below the threshold");
     }
@@ -402,15 +461,14 @@ contract TrancheTest is CapDeployer {
 
     function test_slash_emitsKilledOnlyOnce() public {
         _fundTranche(address(tranche0), supplier, 100e18);
-        _becomeMarket();
 
         vm.expectEmit(true, true, true, true, address(tranche0));
         emit ITranche.Killed();
-        tranche0.slash(99.5e18, stranger);
+        _marketSlash(tranche0, 99.5e18);
 
         // already dead, so a second slash has nothing left to announce
         vm.recordLogs();
-        tranche0.slash(0.1e18, stranger);
+        _marketSlash(tranche0, 0.1e18);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i; i < logs.length; ++i) {
             assertTrue(logs[i].topics[0] != ITranche.Killed.selector, "Killed must not be re-emitted");
@@ -543,7 +601,6 @@ contract TrancheTest is CapDeployer {
         for (uint256 i; i < 24; ++i) {
             vm.warp(block.timestamp + 30 days);
             b.market.chargePremium();
-            b.tranche1.notifyPremium();
         }
         // and let the final epoch run out so everything funded has been released
         vm.warp(block.timestamp + 30 days);
@@ -556,9 +613,13 @@ contract TrancheTest is CapDeployer {
         vm.prank(supplier);
         uint256 collected = b.tranche1.claim(supplier);
 
-        // the sole real holder takes the whole distribution, seed notwithstanding
-        assertEq(collected, held, "the seed cost the holder nothing");
-        assertEq(stablecoin.balanceOf(b.tranche1Addr), 0, "and left nothing stranded behind");
+        // the sole real holder takes the whole distribution bar rounding, seed notwithstanding.
+        // What stays is a wei of dust from the per-share division rounding down, not the seed's
+        // nominal slice, which two years of epochs have grown to far more than that
+        uint256 seedSlice = b.tranche1.balanceOf(DeadShares.HOLDER) * held / b.tranche1.stakedSupply();
+        assertGt(seedSlice, 1, "the seed's nominal share is much larger than a rounding wei");
+        assertApproxEqAbs(collected, held, 1, "the seed cost the holder nothing");
+        assertLe(stablecoin.balanceOf(b.tranche1Addr), 1, "and left only dust behind");
     }
 
     /// @dev The whole point of the dead shares. Anyone can push collateral to a tranche through

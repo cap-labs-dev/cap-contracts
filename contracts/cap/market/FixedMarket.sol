@@ -7,6 +7,7 @@ import { IInterestRateModel } from "../../interfaces/IInterestRateModel.sol";
 import { MathUtils } from "../../utils/MathUtils.sol";
 import { WadRayMath } from "../../utils/WadRayMath.sol";
 import { BaseMarket } from "./BaseMarket.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title FixedMarket
 /// @author kexley, Cap Labs
@@ -146,23 +147,34 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @inheritdoc IFixedMarket
-    function premium(uint256 chargeableDebt, uint256 term)
+    function premiumForExtension(uint256 chargeableDebt, uint256 term)
         external
         view
         returns (uint256 liquidityPremium, uint256 underwriterPremium)
     {
-        (uint256 liquidityRate, uint256 underwriterRate) =
-            IInterestRateModel(irm()).fixedRates(address(this), term.rayDiv(maximumTermLimit));
-        (liquidityPremium, underwriterPremium) = _premium(chargeableDebt, term, liquidityRate, underwriterRate);
+        (liquidityPremium, underwriterPremium) = _premiumStillToMint(chargeableDebt, term, 0);
+    }
+
+    /// @inheritdoc IFixedMarket
+    function premiumForBorrow(uint256 principal, uint256 term)
+        external
+        view
+        returns (uint256 liquidityPremium, uint256 underwriterPremium)
+    {
+        (liquidityPremium, underwriterPremium) = _premiumStillToMint(principal, term, principal);
     }
 
     /// @inheritdoc IFixedMarket
     function availableCredit(uint256 term) public view returns (uint256 credit) {
-        credit = availableCredit();
+        uint256 limit = availableCredit();
         if (term > maximumTermLimit) term = maximumTermLimit;
-        (uint256 liquidityRate, uint256 underwriterRate) =
-            IInterestRateModel(irm()).fixedRates(address(this), term.rayDiv(maximumTermLimit));
-        credit = credit.rayDiv(1e27 + (term * (liquidityRate + underwriterRate)) / MathUtils.SECONDS_PER_YEAR);
+
+        // the premium is charged only once this draw's own mint has moved the liquidity rate, so the
+        // rate it will pay cannot be read off the market as it stands today. Price it against the
+        // worst case instead: the rate that drawing the whole limit would produce. Nothing here can
+        // return more than the limit, and a smaller mint can only mean a lower rate, so the premium
+        // finally charged is at most the one priced in here and the debt lands inside the limit
+        credit = _principalWithin(limit, term, _termRate(term, limit));
     }
 
     /// @dev Borrow the principal
@@ -178,10 +190,78 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         debt[id] += actualPrincipal;
         _totalDebt += actualPrincipal;
         // the mint raises utilization, so the premium below is charged at a higher liquidity rate
-        // than availableCredit discounted for; see IFixedMarket.availableCredit
+        // than the one standing before this call. That is the intent, and availableCredit sizes
+        // against it; see {IFixedMarket-availableCredit}
         _borrow(recipient, actualPrincipal);
-        uint256 chargedPremium = _chargePremiumForTerm(id, actualPrincipal, term);
+        uint256 chargedPremium = _chargePremiumForTerm(id, actualPrincipal, term, actualPrincipal);
+        // unreachable on the sizing above: it holds the debt inside the credit limit, the limit is
+        // the ltv against active capital, and the threshold is the strictly larger lt against total
+        // capital. That chain leans on invariants owned elsewhere though — {setLtv} and {setBuffer}
+        // keeping ltv within lt, and active capital never exceeding total — so it is asserted here
+        // rather than assumed. {extend} asserts the same bound after charging its own premium
+        if (healthiness() < 1e27) revert Unhealthy();
         emit BorrowFixed(id, recipient, term, actualPrincipal, chargedPremium);
+    }
+
+    /// @dev The rates a premium is owed at when `mintAmount` of credit-backed supply is still to be
+    /// minted before it is charged. Every rate read in this contract goes through here, and the
+    /// mint amount is the only thing that varies: zero when the charge is imminent and nothing more
+    /// will be minted first, the principal when quoting a borrow that has yet to draw it, the whole
+    /// limit when sizing the largest draw the market could offer.
+    ///
+    /// Two unrelated senses of utilization meet here. The term as a fraction of the maximum drives
+    /// the term multiplier, so shorter loans pay more; the mint amount drives the stablecoin's
+    /// utilization, and through it the liquidity rate.
+    /// @param term The term of the loan in seconds, already capped at the maximum
+    /// @param mintAmount The credit-backed supply still to be minted before the charge
+    /// @return liquidityRate The liquidity rate per year in ray decimals
+    /// @return underwriterRate The underwriter rate per year in ray decimals
+    function _ratesStillToMint(uint256 term, uint256 mintAmount)
+        internal
+        view
+        returns (uint256 liquidityRate, uint256 underwriterRate)
+    {
+        (liquidityRate, underwriterRate) =
+            IInterestRateModel(irm()).fixedRatesAfterMint(address(this), term.rayDiv(maximumTermLimit), mintAmount);
+    }
+
+    /// @dev The premium on `chargeableDebt` over `term`, priced per {_ratesStillToMint}
+    /// @param chargeableDebt The amount of debt that a premium is being charged on
+    /// @param term The term of the loan in seconds
+    /// @param mintAmount The credit-backed supply still to be minted before the charge
+    /// @return liquidityPremium The liquidity premium
+    /// @return underwriterPremium The underwriter premium
+    function _premiumStillToMint(uint256 chargeableDebt, uint256 term, uint256 mintAmount)
+        internal
+        view
+        returns (uint256 liquidityPremium, uint256 underwriterPremium)
+    {
+        (uint256 liquidityRate, uint256 underwriterRate) = _ratesStillToMint(term, mintAmount);
+        (liquidityPremium, underwriterPremium) = _premium(chargeableDebt, term, liquidityRate, underwriterRate);
+    }
+
+    /// @dev The combined rate, for sizing rather than charging; see {_ratesStillToMint}
+    /// @param term The term of the loan in seconds, already capped at the maximum
+    /// @param mintAmount The credit-backed supply still to be minted before the charge
+    /// @return rate The combined rate per year in ray decimals
+    function _termRate(uint256 term, uint256 mintAmount) internal view returns (uint256 rate) {
+        (uint256 liquidityRate, uint256 underwriterRate) = _ratesStillToMint(term, mintAmount);
+        rate = liquidityRate + underwriterRate;
+    }
+
+    /// @dev The largest principal that fits inside `limit` once its own upfront premium is counted
+    /// alongside it. A fixed loan owes its whole term's premium from the moment it is taken, so what
+    /// has to fit is not the principal but the debt it immediately becomes.
+    ///
+    /// The premium is `principal * term * rate / year`, so the debt is `principal * (1 + term * rate
+    /// / year)` and the principal that lands it exactly on `limit` is `limit` over that same factor.
+    /// Floored, so the premium charged on the result cannot round the debt back over the limit.
+    /// @param limit The credit that the principal and its premium together have to fit inside
+    /// @param term The term of the loan in seconds
+    /// @param rate The combined liquidity and underwriter rate per year in ray decimals
+    /// @return principal The largest principal that fits
+    function _principalWithin(uint256 limit, uint256 term, uint256 rate) internal pure returns (uint256 principal) {
+        principal = Math.mulDiv(limit, 1e27, 1e27 + (term * rate) / MathUtils.SECONDS_PER_YEAR);
     }
 
     /// @dev Validate the term limits and store them
@@ -214,7 +294,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     /// @param extension The extension of the loan
     function _extend(uint256 id, uint256 extension) internal {
         expiry[id] += extension;
-        uint256 chargedPremium = _chargePremiumForTerm(id, debt[id], extension);
+        uint256 chargedPremium = _chargePremiumForTerm(id, debt[id], extension, 0);
         emit ExtendFixed(id, extension, chargedPremium);
     }
 
@@ -222,15 +302,19 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     /// @param id The id of the loan
     /// @param chargeableDebt The amount of debt that a premium is being charged on
     /// @param term The term of the loan
+    /// @param mintAmount The credit-backed supply minted by the call this charge belongs to
     /// @return chargedPremium The amount of premium that was charged
-    function _chargePremiumForTerm(uint256 id, uint256 chargeableDebt, uint256 term)
+    function _chargePremiumForTerm(uint256 id, uint256 chargeableDebt, uint256 term, uint256 mintAmount)
         internal
         returns (uint256 chargedPremium)
     {
-        (uint256 liquidityRate, uint256 underwriterRate) =
-            IInterestRateModel(irm()).fixedRates(address(this), term.rayDiv(maximumTermLimit));
-        (uint256 liquidityPremium, uint256 underwriterPremium) =
-            _premium(chargeableDebt, term, liquidityRate, underwriterRate);
+        // a borrow passes its own principal here even though it has already minted it, which reads
+        // backwards until you look at what the rate is drawn from. Utilization is time-weighted, so
+        // a mint one instruction old has stood for no time and carries no weight yet; the average
+        // will not show it in this block however the charge is ordered. Handing the amount over
+        // explicitly is what keeps a borrower paying for the utilization they create, rather than
+        // the smoothing quietly refunding it. An extension mints nothing and passes zero.
+        (uint256 liquidityPremium, uint256 underwriterPremium) = _premiumStillToMint(chargeableDebt, term, mintAmount);
         chargedPremium = liquidityPremium + underwriterPremium;
         debt[id] += chargedPremium;
         _totalDebt += chargedPremium;

@@ -108,8 +108,9 @@ contract RoleTableTest is CapDeployer {
     function _assertTrancheRoleTable(address tranche, uint64 ownerRole) internal view {
         _expectRole(tranche, ITranche.setVestingPeriod.selector, ownerRole, "tranche setVestingPeriod");
         _expectRole(tranche, ITranche.slash.selector, CapRoles.MARKET, "slash");
-        // premium is pushed in by whichever market charged it, so this one is open by design
-        _expectRole(tranche, ITranche.notifyPremium.selector, PUBLIC_ROLE, "notifyPremium");
+        // premium is pushed in by whichever market charged it, and notifying re-anchors the
+        // vesting epoch, so this may not be open: see {test_dustCannotStallPremiumRelease}
+        _expectRole(tranche, ITranche.notifyPremium.selector, CapRoles.MARKET, "notifyPremium");
 
         // admission is a row like any other, same as on the underwriter: the entry points are
         // gated to a role of their own, and the market owner administers that role's membership

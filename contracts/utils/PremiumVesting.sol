@@ -25,7 +25,26 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 /// The one precondition is that `period` is never zero, because every release divides by it. Both
 /// callers hardcode it at initialization and reject zero in their setters.
 library PremiumVesting {
-    using WadRayMath for uint256;
+    /// @dev Both conversions between a premium amount and the per-share figure round down, so the
+    /// arithmetic can only ever under-attribute and the remainder stays in the vault.
+    ///
+    /// Not {WadRayMath}, whose rayMul and rayDiv round half up. Rounding up on the release makes
+    /// `perShare` overstate what was funded and over-credits every holder at once, and rounding up
+    /// on an entitlement over-credits that holder. Both bias the wrong way for a pot that is paid
+    /// out of a finite balance, and the direction matters more here than matching the convention
+    /// the rate maths uses, where the same helpers are compounding an index rather than dividing
+    /// something up.
+    ///
+    /// It does not make the pot-level clamp in the callers redundant, which is worth being precise
+    /// about since it looks as though it should. `debt` rounds down alongside the credit it is
+    /// subtracted from, and a debt rounded down understates what has already been accounted for,
+    /// so a balance falling or an account arriving mid-epoch banks the fraction. Rounding `debt`
+    /// up instead is what would close it, and cannot be done here: two checkpoints with no accrual
+    /// between them would then subtract more than they credit, so it needs a saturating
+    /// subtraction that erodes an active account's entitlement on every transfer. Searched over
+    /// random schedules at a small ray, this leaves the entitlements able to exceed the pot in
+    /// 0.01% of runs and by a single wei, against 2.2% and four wei rounding half up.
+    uint256 private constant RAY = WadRayMath.RAY;
 
     /// @param period The epoch length in seconds
     /// @param start The epoch anchor. Set to now when the epoch restarts, then slid forward by any
@@ -85,7 +104,7 @@ library PremiumVesting {
         }
 
         uint256 amount = unlocked(s);
-        if (amount > 0) s.perShare += amount.rayDiv(supply);
+        if (amount > 0) s.perShare += Math.mulDiv(amount, RAY, supply, Math.Rounding.Floor);
         s.lastUpdate = until;
     }
 
@@ -112,8 +131,8 @@ library PremiumVesting {
     /// @param newBalance The balance the account will hold
     function checkpoint(Schedule storage s, address account, uint256 balance, uint256 newBalance) internal {
         uint256 perShare = s.perShare;
-        s.pending[account] += perShare.rayMul(balance) - s.debt[account];
-        s.debt[account] = perShare.rayMul(newBalance);
+        s.pending[account] += _owed(perShare, balance) - s.debt[account];
+        s.debt[account] = _owed(perShare, newBalance);
     }
 
     /// @dev Zero an account's entitlement and hand it back for payment.
@@ -127,10 +146,10 @@ library PremiumVesting {
     /// @return premium The premium owed to the account
     function settle(Schedule storage s, address account, uint256 balance) internal returns (uint256 premium) {
         uint256 perShare = s.perShare;
-        premium = s.pending[account] + perShare.rayMul(balance) - s.debt[account];
+        premium = s.pending[account] + _owed(perShare, balance) - s.debt[account];
         if (premium > 0) {
             s.pending[account] = 0;
-            s.debt[account] = perShare.rayMul(balance);
+            s.debt[account] = _owed(perShare, balance);
         }
     }
 
@@ -145,7 +164,7 @@ library PremiumVesting {
         view
         returns (uint256 premium)
     {
-        premium = s.pending[account] + projectedPerShare(s, supply).rayMul(balance) - s.debt[account];
+        premium = s.pending[account] + _owed(projectedPerShare(s, supply), balance) - s.debt[account];
     }
 
     /// @dev The per-share figure including accrual not yet written to storage
@@ -156,7 +175,7 @@ library PremiumVesting {
         perShare = s.perShare;
         if (supply > 0) {
             uint256 amount = unlocked(s);
-            if (amount > 0) perShare += amount.rayDiv(supply);
+            if (amount > 0) perShare += Math.mulDiv(amount, RAY, supply, Math.Rounding.Floor);
         }
     }
 
@@ -202,6 +221,18 @@ library PremiumVesting {
     /// @return perSecond The premium released per second
     function rate(Schedule storage s) internal view returns (uint256 perSecond) {
         perSecond = s.vested / s.period;
+    }
+
+    /// @dev What a balance has been credited at a given per-share figure, rounded down.
+    ///
+    /// Used for the entitlement and for the `debt` subtracted from it, so the two agree. Any two
+    /// checkpoints at the same per-share figure therefore net to exactly zero rather than to a
+    /// negative that would have to be saturated away.
+    /// @param perShare The cumulative premium per share in ray decimals
+    /// @param balance The balance to value
+    /// @return amount The premium accounted to that balance
+    function _owed(uint256 perShare, uint256 balance) private pure returns (uint256 amount) {
+        amount = Math.mulDiv(perShare, balance, RAY, Math.Rounding.Floor);
     }
 
     /// @dev Restart the epoch now, releasing `total` across `period`

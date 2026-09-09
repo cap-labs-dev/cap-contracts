@@ -32,6 +32,10 @@ interface IStablecoin {
     /// @notice There is no bad debt left to cover
     error NoBadDebt();
 
+    /// @notice The underlying carries more decimals than the share, which the par previews cannot
+    /// represent without truncating the deposit side
+    error UnsupportedDecimals();
+
     /// @notice Initialize the stablecoin
     /// @param authority The access manager address
     /// @param asset The underlying asset address
@@ -124,4 +128,21 @@ interface IStablecoin {
     /// @notice Get the utilization rate of credit-backed supply
     /// @return rate The utilization rate in ray decimals
     function utilizationRate() external view returns (uint256 rate);
+
+    /// @notice Get the utilization rate a credit-backed mint would leave behind
+    /// @dev A credit-backed mint raises `creditBackedSupply` and `totalSupply` by the same amount,
+    /// so the utilization it produces is a closed form rather than something a caller has to
+    /// simulate. Since `creditBackedSupply` never exceeds `totalSupply`, this is non-decreasing in
+    /// `amount`, which is what lets a borrow price itself against a rate it is about to create.
+    /// @param amount The credit-backed supply about to be minted
+    /// @return rate The projected utilization rate in ray decimals
+    function utilizationRateAfterMint(uint256 amount) external view returns (uint256 rate);
+
+    /// @notice Get both supplies that utilization is built from, in one call
+    /// @dev For {IInterestRateModel}, which keeps a time-weighted copy of the pair and needs the
+    /// raw readings rather than the ratio to do it. Two supplies read at one instant, so the ratio
+    /// taken from them is the one {utilizationRate} would report.
+    /// @return credit The credit-backed supply
+    /// @return supply The total supply
+    function supplies() external view returns (uint256 credit, uint256 supply);
 }

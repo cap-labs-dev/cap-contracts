@@ -228,13 +228,29 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     }
 
     /// @inheritdoc IBaseMarket
+    /// @dev Solving `(capital - repaid * perDebt) * lt = targetHealth * (debt - repaid)` for the
+    /// repayment that lands health exactly on target gives a denominator of
+    /// `targetHealth - perDebt * lt`, where `perDebt` is {_slashPerDebt}. The bonus belongs there
+    /// because each unit of debt cleared takes `perDebt` of collateral with it rather than one:
+    /// pricing the collateral leg at par makes the divisor too large and undershoots the target,
+    /// so a liquidation sized at exactly this figure would leave the market short of it.
+    ///
+    /// The denominator cannot reach zero at any setting governance can select. {setTargetHealth}
+    /// floors the numerator side at 1.25 ray, while `perDebt * lt` is capped at 1.1 ray between
+    /// {setLt} and {IInterestRateModel-setLiquidationBonus}, so 0.15 ray of slack always remains.
+    ///
+    /// Capped at {recoverableDebt} as well as at the debt itself. Past the recoverable point the
+    /// tranches cannot cover the slash, so further repayment buys collateral that is not there and
+    /// health falls with every unit cleared instead of rising.
     function maxLiquidatable() public view returns (uint256 liquidatable) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         uint256 liquidationThreshold = debtLiquidationThreshold();
         uint256 debt = totalDebt();
         if (debt > liquidationThreshold) {
-            liquidatable = (($.targetHealth.rayMul(debt) - liquidationThreshold).rayDiv($.targetHealth - $.lt));
-            if (liquidatable > debt) liquidatable = debt;
+            uint256 perCleared = $.targetHealth - _slashPerDebt().rayMul($.lt);
+            liquidatable = ($.targetHealth.rayMul(debt) - liquidationThreshold).rayDiv(perCleared);
+            uint256 cap = Math.min(debt, recoverableDebt());
+            if (liquidatable > cap) liquidatable = cap;
         }
     }
 

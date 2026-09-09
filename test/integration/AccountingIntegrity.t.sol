@@ -5,6 +5,7 @@ import { InterestRateModel } from "../../contracts/cap/InterestRateModel.sol";
 import { Stablecoin } from "../../contracts/cap/Stablecoin.sol";
 import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { Underwriter } from "../../contracts/cap/Underwriter.sol";
+import { FixedMarket } from "../../contracts/cap/market/FixedMarket.sol";
 import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
 import { IBaseMarket } from "../../contracts/interfaces/IBaseMarket.sol";
 import { IFloatingMarket } from "../../contracts/interfaces/IFloatingMarket.sol";
@@ -449,6 +450,108 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         assertApproxEqAbs(stablecoin.balanceOf(address(this)), buffered, 1e6, "payable in full");
     }
 
+    /// @dev {ITranche-notifyPremium} re-anchors the vesting epoch, and it used to sit on
+    /// PUBLIC_ROLE, where `restricted` is a no-op. Its only other gate on reaching
+    /// {PremiumVesting-fund} is a balance above the last one it saw, which one wei satisfies, so
+    /// anyone could donate dust and poke it every block: the still-locked balance was re-spread
+    /// over a fresh full period each time and linear release decayed towards never finishing.
+    /// A depositor could claim only 26.20e15 of 41.44e15 at the point the epoch should have
+    /// closed, and it transfers as well as delays, since anyone redeeming during the grief
+    /// forfeits their share of what is still locked.
+    ///
+    /// The market notifies in the same breath as minting the premium, so it is the only caller
+    /// with a reason to be here and the selector now sits with {CapRoles-MARKET}.
+    function test_dustCannotStallPremiumRelease() public {
+        MarketBundle memory b = _createReadyMarket("m");
+        _fundTranche(b.tranche0Addr, alice, 1_000e18);
+
+        vm.prank(defaultBorrower);
+        b.market.borrow(defaultBorrower, 200e18);
+
+        vm.warp(block.timestamp + 30 days);
+        b.market.chargePremium();
+
+        uint256 buffered = stablecoin.balanceOf(b.tranche0Addr);
+        assertGt(buffered, 0, "there is premium at stake");
+        uint256 epochEnd = b.tranche0.periodEnd();
+
+        // the griefer holds a wei of cUSD to donate and no role at all
+        address griefer = makeAddr("griefer");
+        _depositStable(griefer, 1e18);
+
+        vm.startPrank(griefer);
+        stablecoin.transfer(b.tranche0Addr, 1);
+        vm.expectRevert();
+        b.tranche0.notifyPremium();
+        vm.stopPrank();
+
+        // poking it every block is what re-anchored the epoch, so try the whole grief
+        while (block.timestamp < epochEnd) {
+            vm.warp(block.timestamp + 12);
+            vm.startPrank(griefer);
+            stablecoin.transfer(b.tranche0Addr, 1);
+            vm.expectRevert();
+            b.tranche0.notifyPremium();
+            vm.stopPrank();
+        }
+
+        assertEq(b.tranche0.periodEnd(), epochEnd, "the epoch never moved");
+        assertApproxEqAbs(b.tranche0.claimable(alice), buffered, 1e6, "and released in full on time");
+
+        // the donated dust is not stranded either: the next legitimate charge sweeps it in
+        uint256 donated = stablecoin.balanceOf(b.tranche0Addr) - buffered;
+        assertGt(donated, 0, "the dust is sitting there");
+
+        vm.prank(alice);
+        b.tranche0.claim(alice);
+
+        uint256 fundedBefore = b.tranche0.vested();
+        vm.warp(block.timestamp + 30 days);
+        b.market.chargePremium();
+        assertGe(b.tranche0.vested() - fundedBefore, donated, "and is swept into the next epoch");
+    }
+
+    /// @dev The end-to-end read on the rounding direction. Both conversions in the per-share
+    /// arithmetic round down, so a wei that will not divide is retained rather than promised
+    /// twice: two holders of a single share each, splitting a single wei, are owed nothing and the
+    /// wei stays in the tranche. Rounding half up owed each of them the whole wei, and the second
+    /// one out underflowed `_storedPremiumBalance` and could never collect at all.
+    ///
+    /// The clamp behind that underflow is still there and still needed. It is not reachable from
+    /// here — see test_roundingDownStillLetsEntitlementsPassThePot for the case that does reach
+    /// it, which needs a debt rounded down against a mid-epoch balance change.
+    function test_roundingLeavesUndividableDustInTheTranche() public {
+        MarketBundle memory b = _createReadyMarket("dust");
+
+        // a thousand of the first deposit is the dead-share seed, so 1002 leaves two live shares
+        _fundTranche(b.tranche0Addr, alice, 1_002);
+        assertEq(b.tranche0.stakedSupply(), 2, "two shares between the pair of them");
+
+        vm.prank(alice);
+        b.tranche0.transfer(bob, 1);
+        assertEq(b.tranche0.balanceOf(alice), 1, "one each");
+        assertEq(b.tranche0.balanceOf(bob), 1, "one each");
+
+        // one wei of premium, halved and then rounded back up on both sides
+        address donor = makeAddr("donor");
+        _depositStable(donor, 1e18);
+        vm.prank(donor);
+        stablecoin.transfer(b.tranche0Addr, 1);
+        vm.prank(b.tranche0.market());
+        b.tranche0.notifyPremium();
+
+        vm.warp(block.timestamp + b.tranche0.vestingPeriod() + 1);
+        assertEq(b.tranche0.claimable(alice) + b.tranche0.claimable(bob), 0, "half a wei each rounds to none");
+
+        vm.prank(alice);
+        uint256 toAlice = b.tranche0.claim(alice);
+        vm.prank(bob);
+        uint256 toBob = b.tranche0.claim(bob);
+
+        assertEq(toAlice + toBob, 0, "so neither takes anything, and neither reverts");
+        assertEq(stablecoin.balanceOf(b.tranche0Addr), 1, "the wei is retained rather than promised twice");
+    }
+
     /// @dev The other half of it: re-vesting on top of an idle window used to strand the idle part
     /// for good. `setVestingPeriod` rebuilds the lump from {PremiumVesting-locked}, which counts
     /// only what is not yet due and so skips time that elapsed without releasing. Under the frozen
@@ -518,6 +621,83 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // THE QUEUE COUNTERS AND THE STAKED SUPPLY STAY IN STEP
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// @dev Premium is divided by `stakedSupply`, which is read off the queue counters rather than
+    /// off balances, and the share transfer inside `requestRedeem` is what triggers that division.
+    /// Bumping `redeemQueue` before the transfer dropped the requester out of the divisor while
+    /// they still held the shares and were a line away from being checkpointed at the rate it
+    /// produced, so two equal holders splitting one vested epoch were each owed the whole pot the
+    /// moment either of them queued. The counter has to move after the shares do.
+    function test_queueingDoesNotInflateTheRequestersPremiumShare() public {
+        MarketBundle memory b = _createReadyMarket("m");
+        _fundTranche(b.tranche0Addr, alice, 500e18);
+        _fundTranche(b.tranche0Addr, bob, 500e18);
+
+        vm.prank(defaultBorrower);
+        b.market.borrow(defaultBorrower, 100e18);
+
+        vm.warp(block.timestamp + 30 days);
+        b.market.chargePremium();
+
+        // the epoch runs out with nobody touching the tranche, so all of it is still pending and
+        // the accrual inside `requestRedeem` is the one that hands it out
+        vm.warp(b.tranche0.periodEnd());
+        uint256 held = stablecoin.balanceOf(b.tranche0Addr);
+        assertGt(held, 0, "there is premium at stake");
+
+        uint256 aliceShares = b.tranche0.balanceOf(alice);
+        vm.prank(alice);
+        b.tranche0.requestRedeem(aliceShares, alice, alice);
+
+        emit log_named_uint("alice claimable", b.tranche0.claimable(alice));
+        emit log_named_uint("bob claimable  ", b.tranche0.claimable(bob));
+        emit log_named_uint("premium held   ", held);
+
+        assertLe(b.tranche0.claimable(alice) + b.tranche0.claimable(bob), held, "entitlements stay covered");
+        assertApproxEqRel(b.tranche0.claimable(alice), held / 2, 0.001e18, "queueing buys the requester nothing");
+        assertApproxEqRel(b.tranche0.claimable(bob), held / 2, 0.001e18, "and costs the holder who stayed nothing");
+    }
+
+    /// @dev The settlement mirror. `settledQueue` rising before the burn left the shares about to
+    /// vanish still counted in the divisor with nobody holding them, so the slice apportioned to
+    /// them was credited to no one and stranded in the tranche for good. Only the remaining holder
+    /// was exposed across this epoch, so all of it has to be payable to him.
+    function test_settlingAQueuedRedemptionStrandsNoPremium() public {
+        MarketBundle memory b = _createReadyMarket("m");
+        _fundTranche(b.tranche0Addr, alice, 500e18);
+        _fundTranche(b.tranche0Addr, bob, 500e18);
+
+        vm.prank(defaultBorrower);
+        b.market.borrow(defaultBorrower, 100e18);
+
+        vm.warp(block.timestamp + 30 days);
+        b.market.chargePremium();
+
+        // queued in the same block the premium was funded, so she is checkpointed against none of
+        // it and the epoch that follows is bob's alone
+        uint256 aliceShares = b.tranche0.balanceOf(alice);
+        vm.prank(alice);
+        uint256 id = b.tranche0.requestRedeem(aliceShares, alice, alice);
+        assertEq(b.tranche0.claimable(alice), 0, "she earned nothing before queueing");
+
+        vm.warp(b.tranche0.periodEnd());
+        uint256 held = stablecoin.balanceOf(b.tranche0Addr);
+
+        // the burn inside her settlement is the accrual that releases the epoch
+        assertEq(b.tranche0.claimableRedeemRequest(id, alice), aliceShares, "her whole request is settleable");
+        vm.prank(alice);
+        b.tranche0.redeem(id, aliceShares, alice, alice);
+
+        emit log_named_uint("bob claimable", b.tranche0.claimable(bob));
+        emit log_named_uint("premium held ", held);
+
+        assertEq(b.tranche0.claimable(alice), 0, "a settled request earns nothing either");
+        assertApproxEqRel(b.tranche0.claimable(bob), held, 0.001e18, "and none of it was released to nobody");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // THE LOCKED-COLLATERAL GATE COVERS withdraw() AS WELL AS redeem()
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -565,6 +745,371 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // THE UNDERWRITER'S CACHED VALUATION SURVIVES A SLASH
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// @dev `totalAssets` is the idle balance plus a cached valuation of the tranche positions, and
+    /// a slash the cache has not seen prices shares above what backs them. Writing a deallocation
+    /// down by whatever came back was not enough to keep it honest: a slashed tranche returns less
+    /// than was allocated, so the shortfall stayed recorded as debt against a position that had
+    /// already been fully exited, and that same call released the idle assets which made the phantom
+    /// extractable. A depositor could redeem at the pre-slash price in that very block — there was
+    /// no window for a report to land in. Deriving the mark from the shares that remain is what
+    /// closes it: a full exit can only leave nothing recorded.
+    function test_deallocatingASlashedPositionLeavesNoPhantomDebt() public {
+        (Underwriter uw, Tranche t) = _underwriterOnATranche();
+        _fundUnderwriter(address(uw), alice, 1_000e18);
+        _fundUnderwriter(address(uw), bob, 1_000e18);
+
+        // the deposits were allocated straight on, so no one can exit before the curator acts
+        assertEq(uw.unlockedSupply(), 0, "everything is deployed");
+
+        _slashTranche(t, 1_000e18);
+
+        // the curator exits the whole position, which is what frees the liquidity to redeem against
+        uw.deallocate(address(t), t.balanceOf(address(uw)));
+
+        assertEq(t.balanceOf(address(uw)), 0, "the position is gone");
+        assertEq(uw.totalDebt(), 0, "so nothing may still be recorded against it");
+        assertEq(uw.totalAssets(), vault.balanceOf(address(uw), address(collateral)), "the books match the assets held");
+
+        uint256 pool = uw.totalAssets();
+        uint256 aliceRedeemable = uw.maxRedeem(alice);
+        vm.prank(alice);
+        uint256 paid = uw.redeem(aliceRedeemable, alice, alice);
+
+        emit log_named_uint("pool after the slash", pool);
+        emit log_named_uint("alice took          ", paid);
+        emit log_named_uint("bob left with       ", uw.previewRedeem(uw.balanceOf(bob)));
+
+        assertApproxEqRel(paid, pool / 2, 0.001e18, "a half holder takes half the slashed pool, not all of it");
+        assertApproxEqRel(uw.previewRedeem(uw.balanceOf(bob)), pool / 2, 0.001e18, "the rest stays bob's");
+    }
+
+    /// @dev The invariant underneath it. Once the underwriter has touched a tranche its books must
+    /// value that position at exactly what it could realise, whatever the slash did. Fuzzed over
+    /// how deep the slash goes and how much of the position is exited, because the old write-down
+    /// happened to be exact when nothing had been slashed and drifted by the shortfall when it had.
+    /// forge-config: default.fuzz.runs = 256
+    function testFuzz_underwriterBooksMatchWhatItCanRealise(uint96 rawSlash, uint16 rawFraction) public {
+        (Underwriter uw, Tranche t) = _underwriterOnATranche();
+        _fundUnderwriter(address(uw), alice, 1_000e18);
+
+        uint256 slash = bound(rawSlash, 0, 900e18);
+        if (slash > 0) {
+            _slashTranche(t, slash);
+        }
+
+        uint256 held = t.balanceOf(address(uw));
+        uw.deallocate(address(t), held * bound(rawFraction, 0, 10_000) / 10_000);
+
+        uint256 realisable =
+            vault.balanceOf(address(uw), address(collateral)) + t.previewRedeem(t.balanceOf(address(uw)));
+        assertEq(uw.totalAssets(), realisable, "the books must equal what the underwriter could realise");
+    }
+
+    /// @dev A queued deallocation has left this vault's balance for the tranche's own, so a mark
+    /// derived from the balance alone read the position as wiped out while its assets were still in
+    /// flight. Every deposit re-marks the default tranche, so a depositor arriving in that window
+    /// would have minted against a valuation of nearly nothing and captured the rebound the moment
+    /// the request settled — a worse hole than the phantom debt above, and unprivileged.
+    function test_aQueuedDeallocationIsNotAWriteOff() public {
+        (Underwriter uw, Tranche t) = _underwriterOnATranche();
+        _fundUnderwriter(address(uw), alice, 1_000e18);
+
+        uint256 valued = uw.totalAssets();
+        uint256 requestId = uw.deallocateAsync(address(t), t.balanceOf(address(uw)));
+
+        assertEq(t.balanceOf(address(uw)), 0, "the shares have moved to the tranche");
+        assertGt(uw.queuedShares(address(t)), 0, "so the position has to carry them itself");
+        assertEq(uw.totalAssets(), valued, "requesting gives up nothing, so the mark must not move");
+
+        // a report is the sharpest way to force a mark while the request is still outstanding
+        uw.report(address(t));
+        assertEq(uw.totalAssets(), valued, "and re-marking mid-queue must not write the position off");
+
+        uw.finalizeDeallocateAsync(address(t), requestId, uw.queuedShares(address(t)));
+
+        assertEq(uw.queuedShares(address(t)), 0, "nothing is left queued");
+        assertEq(uw.totalDebt(), 0, "nor recorded against a tranche this vault has exited");
+        assertApproxEqAbs(uw.totalAssets(), valued, 2, "and the assets came home at the value carried");
+    }
+
+    /// @dev Queueing an exit changes the position's value not at all — the shares move from one
+    /// column to the other — but it marks for the reason {deallocate} does even when it pulls
+    /// nothing out: touching a tranche is the chance to catch a slash the cache has not seen. Left
+    /// out, it was the one curator path that could queue an exit against a stale valuation.
+    function test_queueingADeallocationCatchesAnUnseenSlash() public {
+        (Underwriter uw, Tranche t) = _underwriterOnATranche();
+        _fundUnderwriter(address(uw), alice, 1_000e18);
+
+        _slashTranche(t, 500e18);
+        assertApproxEqRel(uw.totalAssets(), 1_000e18, 0.001e18, "nothing has re-marked it yet");
+
+        uw.deallocateAsync(address(t), t.balanceOf(address(uw)));
+
+        assertApproxEqRel(uw.totalAssets(), 500e18, 0.001e18, "queueing the exit re-values the position");
+        assertApproxEqRel(uw.debt(address(t)), 500e18, 0.001e18, "against the tranche it belongs to");
+        assertEq(uw.totalDebt(), uw.debt(address(t)), "and the aggregate still agrees with the entry");
+    }
+
+    /// @dev The other half of carrying them: they are valued at the tranche's live price, not at
+    /// what was allocated, so a slash landing mid-queue is felt exactly as it would be on shares
+    /// still held rather than deferred to settlement.
+    function test_aSlashDuringAQueuedDeallocationStillLands() public {
+        (Underwriter uw, Tranche t) = _underwriterOnATranche();
+        _fundUnderwriter(address(uw), alice, 1_000e18);
+
+        uint256 requestId = uw.deallocateAsync(address(t), t.balanceOf(address(uw)));
+
+        _slashTranche(t, 500e18);
+
+        uw.report(address(t));
+        assertApproxEqRel(uw.totalAssets(), 500e18, 0.001e18, "half the book is gone and the books say so");
+
+        uw.finalizeDeallocateAsync(address(t), requestId, uw.queuedShares(address(t)));
+        assertApproxEqRel(uw.totalAssets(), 500e18, 0.001e18, "settling changes nothing about that");
+    }
+
+    /// @dev Anyone may name this vault as the controller of a redemption they request against their
+    /// own shares, which mints a receipt here that no allocation of this vault's backs. Settling one
+    /// of those down against the aggregate would retire shares still genuinely queued and take the
+    /// mark below the position, so an unrecognised id is refused and the gift left alone.
+    function test_aDonatedQueueReceiptCannotBeSettled() public {
+        (Underwriter uw, Tranche t) = _underwriterOnATranche();
+        _fundUnderwriter(address(uw), alice, 1_000e18);
+        uw.deallocateAsync(address(t), t.balanceOf(address(uw)));
+
+        _fundTranche(address(t), bob, 100e18);
+        uint256 bobShares = t.balanceOf(bob);
+        vm.prank(bob);
+        uint256 donated = t.requestRedeem(bobShares, address(uw), bob);
+
+        assertEq(uw.queuedRequest(address(t), donated), 0, "this vault never opened that id");
+        assertGt(uw.queuedShares(address(t)), 0, "and it has real shares queued to protect");
+
+        vm.expectRevert(IUnderwriter.UnknownQueuedRequest.selector);
+        uw.finalizeDeallocateAsync(address(t), donated, 1);
+    }
+
+    /// @dev An underwriter holding a single tranche as its default, so deposits allocate straight
+    /// through and the vault runs with nothing idle — the state the cache is designed around.
+    function _underwriterOnATranche() internal returns (Underwriter uw, Tranche tranche) {
+        uw = _deployUnderwriter();
+        MarketBundle memory b = _createReadyMarket("uw");
+        tranche = b.tranche0;
+        uw.addTranche(b.tranche0Addr);
+        uw.setDefaultTranche(b.tranche0Addr);
+        _admitDepositor(b.tranche0Addr, address(uw));
+    }
+
+    /// @dev A tranche takes a slash from its own market and no other, so speak as that market
+    /// rather than granting this contract the shared role. Lets a slash of an exact depth be aimed
+    /// at the tranche without steering the market into liquidation to get there.
+    function _slashTranche(Tranche tranche, uint256 value) internal {
+        vm.prank(tranche.market());
+        tranche.slash(value, makeAddr("attacker"));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // A FIXED BORROW STAYS INSIDE THE LIMIT IT PRICED AGAINST
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// @dev A fixed loan mints its principal and only then prices the term premium, so the premium
+    /// is charged at the rate its own mint created. Charging that higher rate is deliberate — the
+    /// borrower causes the utilization and should pay for it — but `availableCredit` used to
+    /// discount the draw at the rate standing before the mint, so the debt landed above the very
+    /// limit it was sized to fit inside. Sizing against the projected rate is what closes it.
+    function test_fixedBorrowStaysInsideTheCreditLimit() public {
+        FixedMarket market = _fixedMarketOnSlope(0.1e27);
+
+        uint256 limit = market.creditLimit();
+        vm.prank(defaultBorrower);
+        (uint256 id, uint256 principal) = market.borrow(defaultBorrower, type(uint256).max, 30 days);
+
+        emit log_named_uint("credit limit", limit);
+        emit log_named_uint("principal   ", principal);
+        emit log_named_uint("debt        ", market.debt(id));
+
+        assertGt(principal, 0, "the loan is real");
+        assertLe(market.debt(id), limit, "principal plus premium must fit inside the limit");
+    }
+
+    /// @dev The same overshoot on a steeper curve does not merely breach the credit limit, it
+    /// carries the debt past the liquidation threshold, so the borrow hands a liquidator a
+    /// profitable position the moment it settles. The borrower keeps the cUSD and the tranches take
+    /// the slashing. Nothing here is privileged: one call from the market's own borrower.
+    function test_fixedBorrowCannotLeaveTheMarketLiquidatable() public {
+        FixedMarket market = _fixedMarketOnSlope(2e27);
+
+        vm.prank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, type(uint256).max, 30 days);
+
+        emit log_named_uint("debt                 ", market.debt(id));
+        emit log_named_uint("liquidation threshold", market.debtLiquidationThreshold());
+        emit log_named_uint("healthiness          ", market.healthiness());
+
+        assertGe(market.healthiness(), 1e27, "a borrow must not leave the market liquidatable");
+    }
+
+    /// @dev The bound has to hold across the whole curve, not just where it was first noticed. The
+    /// reserve is what decides how far the borrow moves utilization: at zero the draw pins it at
+    /// one ray and the projection is exact, while a deep reserve barely moves it and the discount
+    /// carries real slack. Both ends and everything between have to stay inside the limit.
+    /// forge-config: default.fuzz.runs = 512
+    function testFuzz_fixedBorrowNeverOutrunsItsLimit(uint96 rawReserve, uint32 rawTerm, uint8 rawSlope) public {
+        FixedMarket market = _fixedMarketOnSlope(bound(rawSlope, 0, 20) * 0.1e27);
+
+        uint256 reserve = bound(rawReserve, 0, 20_000e18);
+        if (reserve > 0) _depositStable(makeAddr("saver"), reserve);
+        uint256 term = bound(rawTerm, capConfig.defaultMinimumTermLimit, capConfig.defaultMaximumTermLimit);
+
+        uint256 limit = market.creditLimit();
+        vm.prank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, type(uint256).max, term);
+
+        assertLe(market.debt(id), limit, "debt must fit the limit at every reserve, term and slope");
+        assertGe(market.healthiness(), 1e27, "and must never arrive liquidatable");
+    }
+
+    /// @dev A fixed market whose liquidity rate genuinely responds to utilization, on the tightest
+    /// ltv the buffer allows so that the ltv-to-lt corridor is as thin as governance can make it.
+    /// The steepness of the second slope is what scales the rate move a borrow causes.
+    /// @param slope1 The post-kink slope of the liquidity curve
+    function _fixedMarketOnSlope(uint256 slope1) internal returns (FixedMarket market) {
+        irm.setLiquiditySlopes(
+            IInterestRateModel.Slopes({ base: 0.05e27, slope0: 0.05e27, slope1: slope1, kink: 0.8e27 })
+        );
+
+        (address marketAddr, address tranche,) = _createFixedMarket("fixed");
+        market = FixedMarket(marketAddr);
+        market.setUnderwriterRate(capConfig.defaultUnderwriterRate);
+        // let the collateral-backed limit bind rather than the flat cap
+        market.setFixedCreditLimit(type(uint256).max);
+        market.setLtv(capConfig.defaultLt - capConfig.defaultBuffer);
+        _fundTranche(tranche, alice, 10_000e18);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // A FIXED PREMIUM CANNOT BE PRICED OFF A SINGLE BLOCK'S UTILIZATION
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// @dev {Stablecoin-deposit} and {Stablecoin-redeem} are permissionless and round-trip at par
+    /// with no fee, so utilization could be moved and moved back inside one transaction for the
+    /// cost of the gas. A floating loan shrugs that off because its index re-accrues, but a fixed
+    /// loan mints its whole term's premium upfront at whatever it reads in that block, so a single
+    /// observation was charged for up to a month. Pricing off the time-weighted supplies closes it:
+    /// a reading that has stood for no time carries no weight.
+    function test_aFlashDepositCannotSuppressAFixedPremium() public {
+        FixedMarket market = _fixedMarketOnSlope(0.9e27);
+        _depositStable(makeAddr("saver"), 1_000e18);
+        vm.warp(block.timestamp + 2 hours);
+
+        uint256 honest = _quotedPremium(market);
+
+        // the borrower flashes in a deposit deep enough to halve utilization, borrows against the
+        // suppressed reading, and takes every wei back out again — all in one transaction
+        _depositStable(defaultBorrower, 4_000e18);
+        uint256 manipulated = _quotedPremium(market);
+
+        emit log_named_uint("honest premium     ", honest);
+        emit log_named_uint("manipulated premium", manipulated);
+
+        assertGt(honest, 0, "there is a premium to suppress");
+        assertEq(manipulated, honest, "a deposit that has stood for no time may not move the price");
+    }
+
+    /// @dev And the mirror, which is the direction that lets a third party grief rather than the
+    /// borrower save: burning supply spikes utilization, and the victim locks that in for a month.
+    function test_aFlashRedeemCannotInflateAVictimsFixedPremium() public {
+        FixedMarket market = _fixedMarketOnSlope(0.9e27);
+        address saver = makeAddr("saver");
+        _depositStable(saver, 4_000e18);
+        vm.warp(block.timestamp + 2 hours);
+
+        uint256 honest = _quotedPremium(market);
+
+        vm.prank(saver);
+        stablecoin.redeem(3_000e18, saver, saver);
+        uint256 griefed = _quotedPremium(market);
+
+        emit log_named_uint("honest premium", honest);
+        emit log_named_uint("griefed premium", griefed);
+
+        assertEq(griefed, honest, "a redemption that has stood for no time may not move it either");
+    }
+
+    /// @dev Smoothing must not become a way to never pay. A shift that is real, and held, is fully
+    /// priced once the averaging period has passed.
+    function test_aSustainedShiftIsPricedOnceThePeriodHasPassed() public {
+        FixedMarket market = _fixedMarketOnSlope(0.9e27);
+        _depositStable(makeAddr("saver"), 1_000e18);
+        vm.warp(block.timestamp + 2 hours);
+
+        uint256 before = _quotedPremium(market);
+
+        _depositStable(defaultBorrower, 4_000e18);
+        assertEq(_quotedPremium(market), before, "not felt at all in the block it lands");
+
+        vm.warp(block.timestamp + irm.averagingPeriod() / 2);
+        uint256 halfway = _quotedPremium(market);
+
+        vm.warp(block.timestamp + irm.averagingPeriod());
+        uint256 settled = _quotedPremium(market);
+
+        emit log_named_uint("before ", before);
+        emit log_named_uint("halfway", halfway);
+        emit log_named_uint("settled", settled);
+
+        assertLt(halfway, before, "a held deposit starts being felt as time passes");
+        assertLt(settled, halfway, "and keeps being felt");
+        assertApproxEqRel(
+            settled,
+            _premiumAt(market, stablecoin.utilizationRateAfterMint(QUOTED_PRINCIPAL)),
+            0.001e18,
+            "until the average has fully caught up with the live reading"
+        );
+    }
+
+    /// @dev The averaging must not swallow the borrower's own draw. Utilization is smoothed, but
+    /// the principal about to be minted is added to the smoothed supplies rather than waiting an
+    /// hour to be noticed, so a borrower still pays for the crowding they cause.
+    function test_theBorrowersOwnMintStillRaisesTheirPremium() public {
+        FixedMarket market = _fixedMarketOnSlope(0.9e27);
+        _depositStable(makeAddr("saver"), 1_000e18);
+        vm.warp(block.timestamp + 2 hours);
+
+        (uint256 withoutLiquidity, uint256 withoutUnderwriter) = market.premiumForExtension(QUOTED_PRINCIPAL, 30 days);
+        (uint256 withLiquidity, uint256 withUnderwriter) = market.premiumForBorrow(QUOTED_PRINCIPAL, 30 days);
+
+        emit log_named_uint("premium ignoring the draw", withoutLiquidity + withoutUnderwriter);
+        emit log_named_uint("premium counting the draw", withLiquidity + withUnderwriter);
+
+        assertGt(withLiquidity, withoutLiquidity, "the draw's own effect on utilization is still charged");
+    }
+
+    /// @dev A borrow of this size against the reserves used above lands above the kink, which is
+    /// where the curve is steep enough for a manipulation to be worth attempting.
+    uint256 internal constant QUOTED_PRINCIPAL = 1_000e18;
+
+    /// @dev What a 30 day borrow of {QUOTED_PRINCIPAL} would be charged as things stand
+    function _quotedPremium(FixedMarket market) internal view returns (uint256 premium) {
+        (uint256 liquidity, uint256 underwriter) = market.premiumForBorrow(QUOTED_PRINCIPAL, 30 days);
+        premium = liquidity + underwriter;
+    }
+
+    /// @dev The same premium recomputed from a utilization supplied directly, to check what the
+    /// average settles on rather than only that it moved
+    function _premiumAt(FixedMarket market, uint256 utilization) internal view returns (uint256 premium) {
+        (uint256 base, uint256 slope0, uint256 slope1, uint256 kink) = irm.liquiditySlopes();
+        uint256 rate = utilization <= kink
+            ? base + slope0 * utilization / kink
+            : base + slope0 + slope1 * (utilization - kink) / (1e27 - kink);
+        rate = rate * irm.termMultiplier(uint256(30 days) * 1e27 / market.maximumTermLimit()) / 1e27;
+        premium = QUOTED_PRINCIPAL * (rate + irm.underwriterRate(address(market))) * 30 days / (1e27 * 365 days);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // PARAMETER AND INTERFACE HARDENING
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -603,7 +1148,8 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         _deployProxy(
             address(impl),
             abi.encodeCall(
-                InterestRateModel.initialize, (address(accessManager), address(stablecoin), 1e27, 2e27, 1e27, 0.2e27)
+                InterestRateModel.initialize,
+                (address(accessManager), address(stablecoin), 1e27, 2e27, 1e27, 0.2e27, 1 hours)
             )
         );
 
@@ -611,7 +1157,28 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         _deployProxy(
             address(impl),
             abi.encodeCall(
-                InterestRateModel.initialize, (address(accessManager), address(stablecoin), 2e27, 1e27, 1e27, 0.05e27)
+                InterestRateModel.initialize,
+                (address(accessManager), address(stablecoin), 2e27, 1e27, 1e27, 0.05e27, 1 hours)
+            )
+        );
+
+        // a period of zero would divide by nothing in the weighting, and any period short enough to
+        // fit inside a transaction is spot pricing wearing a time-weighted name
+        vm.expectRevert(IInterestRateModel.InvalidAveragingPeriod.selector);
+        _deployProxy(
+            address(impl),
+            abi.encodeCall(
+                InterestRateModel.initialize,
+                (address(accessManager), address(stablecoin), 1e27, 2e27, 1e27, 0.05e27, 0)
+            )
+        );
+
+        vm.expectRevert(IInterestRateModel.InvalidAveragingPeriod.selector);
+        _deployProxy(
+            address(impl),
+            abi.encodeCall(
+                InterestRateModel.initialize,
+                (address(accessManager), address(stablecoin), 1e27, 2e27, 1e27, 0.05e27, 8 days)
             )
         );
     }

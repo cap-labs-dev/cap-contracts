@@ -25,7 +25,7 @@ contract InterestRateModelTest is BaseTest {
                 address(impl),
                 abi.encodeCall(
                     InterestRateModel.initialize,
-                    (address(accessManager), address(stablecoin), 0.5e27, 2e27, 1e27, 0.02e27)
+                    (address(accessManager), address(stablecoin), 0.5e27, 2e27, 1e27, 0.02e27, 1 hours)
                 )
             )
         );
@@ -117,6 +117,102 @@ contract InterestRateModelTest is BaseTest {
         vm.prank(market);
         vm.expectRevert(IInterestRateModel.InvalidRate.selector);
         irm.updateUnderwriterRate(tooHigh);
+    }
+
+    /// @dev The stablecoin calls in after its supplies have already moved, so the accrual has to
+    /// credit the elapsed interval with the observation from the previous call rather than the one
+    /// arriving now. A reading that has existed for no time must earn nothing.
+    function test_averageIgnoresAReadingThatHasStoodForNoTime() public {
+        stablecoin.setSupplyUtilization(0.2e27);
+        irm.updateLiquidityRate();
+
+        skip(irm.averagingPeriod());
+        irm.updateLiquidityRate();
+        assertEq(irm.averageUtilization(), 0.2e27, "a full quiet period settles on what stood through it");
+
+        // the move and the report of it land together, exactly as the stablecoin does it
+        stablecoin.setSupplyUtilization(0.9e27);
+        irm.updateLiquidityRate();
+        assertEq(irm.averageUtilization(), 0.2e27, "and the new reading starts from zero weight");
+    }
+
+    /// @dev Anyone may call {updateLiquidityRate}, so forcing an accrual is free. It buys nothing:
+    /// the fold uses the observation from before the caller's own move, and the move that follows
+    /// is left with no elapsed time to be weighted on.
+    function test_forcingAnAccrualDoesNotAdvanceAManipulation() public {
+        stablecoin.setSupplyUtilization(0.2e27);
+        irm.updateLiquidityRate();
+        skip(irm.averagingPeriod());
+
+        vm.startPrank(stranger);
+        irm.updateLiquidityRate();
+        stablecoin.setSupplyUtilization(0.9e27);
+        irm.updateLiquidityRate();
+        vm.stopPrank();
+
+        assertEq(irm.averageUtilization(), 0.2e27, "the clock was reset before the manipulation, not after");
+    }
+
+    /// @dev Half a period of a sustained shift is half of the distance travelled
+    function test_averageConvergesWithTheTimeAReadingHolds() public {
+        stablecoin.setSupplyUtilization(0.2e27);
+        irm.updateLiquidityRate();
+        skip(irm.averagingPeriod());
+        irm.updateLiquidityRate();
+
+        stablecoin.setSupplyUtilization(0.4e27);
+        irm.updateLiquidityRate();
+
+        skip(irm.averagingPeriod() / 2);
+        assertEq(irm.averageUtilization(), 0.3e27, "halfway there after half the window");
+    }
+
+    /// @dev The mint is added to the averaged supplies rather than smoothed away, so a borrower
+    /// still pays for the utilization their own draw creates
+    function test_averageStillCountsAMintThatHasNotHappenedYet() public {
+        stablecoin.setSupplyUtilization(0.5e27);
+        irm.updateLiquidityRate();
+        skip(irm.averagingPeriod());
+        irm.updateLiquidityRate();
+
+        // the mock reports the pair as (0.5e27, 1e27), so a quarter-ray mint lands at 0.75/1.25
+        assertEq(irm.averageUtilizationAfterMint(0.25e27), 0.6e27, "the draw moves the level it is priced at");
+    }
+
+    function test_setAveragingPeriod_movesTheWindowAndSettlesTheOldOne() public {
+        stablecoin.setSupplyUtilization(0.2e27);
+        irm.updateLiquidityRate();
+        skip(irm.averagingPeriod());
+        irm.updateLiquidityRate();
+
+        stablecoin.setSupplyUtilization(0.4e27);
+        irm.updateLiquidityRate();
+        skip(30 minutes);
+
+        // half of the old hour has run, so half the distance is already earned and widening the
+        // window must not claw that back
+        irm.setAveragingPeriod(2 hours);
+        assertEq(irm.averagingPeriod(), 2 hours);
+        assertEq(irm.averageUtilization(), 0.3e27, "time already served keeps the weight it was served under");
+    }
+
+    function test_setAveragingPeriod_outsideTheBand_reverts() public {
+        uint256 tooShort = irm.MINIMUM_AVERAGING_PERIOD() - 1;
+        uint256 tooLong = irm.MAXIMUM_AVERAGING_PERIOD() + 1;
+
+        vm.expectRevert(IInterestRateModel.InvalidAveragingPeriod.selector);
+        irm.setAveragingPeriod(tooShort);
+
+        vm.expectRevert(IInterestRateModel.InvalidAveragingPeriod.selector);
+        irm.setAveragingPeriod(tooLong);
+
+        assertEq(irm.averagingPeriod(), 1 hours, "and the window it started with is untouched");
+    }
+
+    function test_setAveragingPeriod_onlyAuthority() public {
+        vm.prank(stranger);
+        vm.expectRevert();
+        irm.setAveragingPeriod(2 hours);
     }
 
     function test_upgrade_authorized() public {

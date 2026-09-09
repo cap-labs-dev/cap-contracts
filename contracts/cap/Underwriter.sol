@@ -10,6 +10,7 @@ import { PremiumVesting } from "../utils/PremiumVesting.sol";
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
+import { IERC1155Receiver } from "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
@@ -22,6 +23,7 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 contract Underwriter layout at erc7201("cap.storage.Underwriter")
     is
     IUnderwriter,
+    IERC1155Receiver,
     AccessManagedUpgradeable,
     ERC7540AsyncRedeem
 {
@@ -49,6 +51,12 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
 
     /// @dev The list of registered tranches
     EnumerableSet.AddressSet private _registeredTranches;
+
+    /// @inheritdoc IUnderwriter
+    mapping(address => uint256) public queuedShares;
+
+    /// @inheritdoc IUnderwriter
+    mapping(address => mapping(uint256 => uint256)) public queuedRequest;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -84,6 +92,14 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     function removeTranche(address _tranche) external restricted {
         _registeredTranches.remove(_tranche);
         IVault(vault).setOperator(_tranche, false);
+        // every deposit routes through {_transferIn} into {_allocate}, which insists on
+        // registration, so a deregistered tranche left as the default would revert each one.
+        // Clearing it holds incoming assets in the vault instead, which is what an unset default
+        // already means, and the curator can point it somewhere live at their leisure
+        if (defaultTranche == _tranche) {
+            defaultTranche = address(0);
+            emit SetDefaultTranche(address(0));
+        }
         emit RemoveTranche(_tranche);
     }
 
@@ -95,12 +111,8 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     /// @dev Allocate assets to a tranche
     function _allocate(address tranche, uint256 assets) internal {
         if (!_registeredTranches.contains(tranche)) revert NotRegisteredTranche();
-        uint256 shares = ITranche(tranche).deposit(assets, address(this));
-        uint256 newDebt = ITranche(tranche).previewRedeem(shares);
-
-        debt[tranche] += newDebt;
-        totalDebt += newDebt;
-        emit DebtIncreased(tranche, newDebt);
+        ITranche(tranche).deposit(assets, address(this));
+        _mark(tranche);
     }
 
     /// @inheritdoc IUnderwriter
@@ -111,9 +123,10 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         uint256 available =
             Math.min(ITranche(tranche).balanceOf(address(this)), ITranche(tranche).instantUnlockedSupply());
         deallocated = Math.min(shares, available);
-        if (deallocated > 0) {
-            _recordDeallocation(tranche, IERC4626(tranche).redeem(deallocated, address(this), address(this)));
-        }
+        if (deallocated > 0) IERC4626(tranche).redeem(deallocated, address(this), address(this));
+        // outside the branch, so the postcondition is simply that this tranche's mark is fresh when
+        // the call returns, whether or not there was anything to pull out
+        _mark(tranche);
     }
 
     /// @inheritdoc IUnderwriter
@@ -122,31 +135,77 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         if (shares > balance) shares = balance;
 
         requestId = ITranche(tranche).requestRedeem(shares, address(this), address(this));
+
+        // the request itself gives nothing up, so these two only move the position from one column
+        // to the other: the shares have left this contract's balance for the tranche's own, and
+        // this is what keeps {_mark} able to see them while they sit there
+        queuedShares[tranche] += shares;
+        queuedRequest[tranche][requestId] = shares;
+
+        _mark(tranche);
+
         emit RequestedRedeem(tranche, shares, requestId);
     }
 
     /// @inheritdoc IUnderwriter
     function finalizeDeallocateAsync(address tranche, uint256 requestId, uint256 shares) external restricted {
-        _recordDeallocation(tranche, ITranche(tranche).redeem(requestId, shares, address(this), address(this)));
+        // a request is only settled down against what this contract queued under that id. Anyone
+        // can name this vault as the controller of a redemption they request against their own
+        // shares, which mints a receipt here that no allocation of ours backs. Settling one of
+        // those against the aggregate would retire shares still genuinely queued and take the mark
+        // back below the position, so an unrecognised id is refused and the gift simply ignored.
+        uint256 recorded = queuedRequest[tranche][requestId];
+        if (shares > recorded) revert UnknownQueuedRequest();
+
+        ITranche(tranche).redeem(requestId, shares, address(this), address(this));
+
+        queuedRequest[tranche][requestId] = recorded - shares;
+        queuedShares[tranche] -= shares;
+
+        _mark(tranche);
     }
 
-    /// @dev Write assets returned by a tranche off that tranche's recorded debt.
+    /// @dev Re-value this contract's position in a tranche and carry the difference into
+    /// `totalDebt`. Every path that moves a position ends here, so the cached valuation is refreshed
+    /// whenever the underwriter touches a tranche rather than only when the curator reports.
     ///
-    /// `withdrawn` is a figure the tranche chose, so the subtraction is saturated rather than
-    /// trusted. It cannot exceed the recorded debt as things stand, because a tranche's share price
-    /// never rises: only deposits add assets and only slashing removes them, so a redemption
-    /// returns at most what allocation put in. That invariant is real but it lives in {Tranche},
-    /// nowhere near the subtraction relying on it, and a tranche upgrade that ever paid out yield
-    /// would turn it into an underflow that bricks every deallocation. One comparison buys
-    /// independence from it.
-    /// @param tranche The tranche the assets came back from
-    /// @param withdrawn The assets the tranche returned
-    function _recordDeallocation(address tranche, uint256 withdrawn) internal {
+    /// Writing the position down by whatever came back from a redemption is not enough, and was the
+    /// bug this replaces. A slashed tranche returns less than was allocated, so the shortfall stayed
+    /// on the books as debt against a position that had already been exited, and the same call
+    /// released the idle assets that made that phantom extractable. Deriving the mark from the
+    /// remaining shares instead means a full exit always leaves nothing recorded.
+    ///
+    /// Nothing the tranche returns is trusted here: the mark is read from the position rather than
+    /// from a withdrawal figure, so `totalDebt` cannot be driven negative by a tranche that ever
+    /// paid out more than it took in. It stays the exact sum of every `debt` entry.
+    ///
+    /// The position is not the balance alone. {IERC7540AsyncRedeem-requestRedeem} moves the shares
+    /// to the tranche and hands back a receipt, so a queued deallocation would read as a position
+    /// wiped out while its assets are still in flight — and a depositor arriving in that window
+    /// would mint against a valuation of nearly nothing and capture the rebound on settlement.
+    /// `queuedShares` carries them until they settle. Both parts price at the same live figure:
+    /// queued shares stay in the tranche's supply against assets that stay in the tranche until the
+    /// burn, and {IERC7540AsyncRedeem-redeem} pays out at the price on the day it is claimed, so a
+    /// slash landing mid-queue is felt here exactly as it would be on shares still held.
+    /// @param tranche The tranche to re-value
+    /// @return gain The increase in the recorded position, if any
+    /// @return loss The decrease in the recorded position, if any
+    function _mark(address tranche) internal returns (uint256 gain, uint256 loss) {
         uint256 recorded = debt[tranche];
-        uint256 applied = Math.min(withdrawn, recorded);
-        debt[tranche] = recorded - applied;
-        totalDebt -= applied;
-        emit DebtDecreased(tranche, applied);
+        uint256 position = ITranche(tranche).balanceOf(address(this)) + queuedShares[tranche];
+        uint256 assets = ITranche(tranche).previewRedeem(position);
+        if (assets == recorded) return (0, 0);
+
+        if (assets < recorded) {
+            loss = recorded - assets;
+            totalDebt -= loss;
+            emit DebtDecreased(tranche, loss);
+        } else {
+            gain = assets - recorded;
+            totalDebt += gain;
+            emit DebtIncreased(tranche, gain);
+        }
+        debt[tranche] = assets;
     }
 
     /// @inheritdoc IUnderwriter
@@ -169,23 +228,7 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     /// @inheritdoc IUnderwriter
     function report(address _tranche) external restricted {
         if (!_registeredTranches.contains(_tranche)) revert NotRegisteredTranche();
-        uint256 trancheDebt = debt[_tranche];
-        uint256 assets = ITranche(_tranche).previewRedeem(ITranche(_tranche).balanceOf(address(this)));
-        uint256 gain;
-        uint256 loss;
-
-        if (assets != trancheDebt) {
-            if (assets < trancheDebt) {
-                loss = trancheDebt - assets;
-                totalDebt -= loss;
-                emit DebtDecreased(_tranche, loss);
-            } else {
-                gain = assets - trancheDebt;
-                totalDebt += gain;
-                emit DebtIncreased(_tranche, gain);
-            }
-            debt[_tranche] = assets;
-        }
+        (uint256 gain, uint256 loss) = _mark(_tranche);
 
         // settle any premiums accrued under the previous schedule before re-vesting
         _updatePremiums();
@@ -200,6 +243,12 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     function claim() external returns (uint256 premium) {
         _updatePremiums();
         premium = _premium.settle(msg.sender, balanceOf(msg.sender));
+        // clamped for the same rounding reason as {Tranche-claim}, against the balance directly
+        // since every stablecoin this holds is premium swept from {report}. Unclamped the overrun
+        // surfaces as a failed transfer rather than an underflow, but it strands the claim either
+        // way
+        uint256 held = IERC20(stablecoin).balanceOf(address(this));
+        if (premium > held) premium = held;
         if (premium == 0) return 0;
         IERC20(stablecoin).safeTransfer(msg.sender, premium);
         emit Claimed(msg.sender, premium);
@@ -379,8 +428,31 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         IVault(vault).transfer(to, asset(), assets);
     }
 
+    /// @inheritdoc IERC1155Receiver
+    /// @dev Accepting the queue receipt is what makes an async deallocation possible at all: the
+    /// receipt is minted to the controller, {deallocateAsync} names this contract as its own
+    /// controller, and a mint to a contract that refuses ERC-1155 reverts, so the whole path was
+    /// unreachable without this. Unconditional, as {ERC1155Holder} is. A receipt this contract did
+    /// not ask for changes nothing, because {finalizeDeallocateAsync} settles only against ids
+    /// recorded by {deallocateAsync} and the mark is read from those.
+    function onERC1155Received(address, address, uint256, uint256, bytes calldata) external pure returns (bytes4) {
+        return IERC1155Receiver.onERC1155Received.selector;
+    }
+
+    /// @inheritdoc IERC1155Receiver
+    /// @dev The queue only ever mints one id at a time, so nothing here produces a batch; accepted
+    /// for the same reason as the single form, to complete the interface this claims to support
+    function onERC1155BatchReceived(address, address, uint256[] calldata, uint256[] calldata, bytes calldata)
+        external
+        pure
+        returns (bytes4)
+    {
+        return IERC1155Receiver.onERC1155BatchReceived.selector;
+    }
+
     /// @inheritdoc IERC165
-    function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
-        return interfaceId == type(IUnderwriter).interfaceId || super.supportsInterface(interfaceId);
+    function supportsInterface(bytes4 interfaceId) public view override(ERC7540AsyncRedeem, IERC165) returns (bool) {
+        return interfaceId == type(IUnderwriter).interfaceId || interfaceId == type(IERC1155Receiver).interfaceId
+            || super.supportsInterface(interfaceId);
     }
 }

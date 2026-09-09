@@ -39,6 +39,7 @@ contract ERC7540AsyncRedeemTest is Test {
 
     address internal alice = makeAddr("alice");
     address internal bob = makeAddr("bob");
+    address internal carol = makeAddr("carol");
 
     function setUp() public {
         asset = new MockERC20("Token", "TKN", 18);
@@ -202,6 +203,58 @@ contract ERC7540AsyncRedeemTest is Test {
         uint256 id = vault.requestRedeem(300e18, bob, alice);
         // receipt controlled by bob
         assertEq(vault.claimableRedeemRequest(id, bob), 300e18);
+    }
+
+    /// @dev ERC-7540 allows a share allowance to stand in for the owner when a redeem request is
+    /// made, but requires controller or operator to claim one. Honouring an allowance on the claim
+    /// let a spender take the settled payout to an address of their choosing: the queued burn comes
+    /// from the vault rather than the controller, so nothing checked the controller's balance —
+    /// and queueing drops that balance to zero, which is exactly the point an outstanding approval
+    /// looks spent. An infinite one is never deducted, so the ceiling was the whole position.
+    function test_allowanceDoesNotAuthoriseClaimingAQueuedRedemption() public {
+        vault.setUnlocked(1_000e18);
+
+        // the approval alice would reason about as covering 300 shares of transfer
+        vm.prank(alice);
+        vault.approve(bob, type(uint256).max);
+
+        vm.prank(alice);
+        uint256 id = vault.requestRedeem(300e18, alice, alice);
+        assertEq(vault.balanceOf(alice), 700e18, "the queued shares have left her balance");
+        assertEq(vault.claimableRedeemRequest(id, alice), 300e18, "and are hers to claim");
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(IERC7540AsyncRedeem.NotAuthorized.selector, bob));
+        vault.redeem(id, 300e18, bob, alice);
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(IERC7540AsyncRedeem.NotAuthorized.selector, bob));
+        vault.withdraw(id, 300e18, bob, alice);
+
+        assertEq(asset.balanceOf(bob), 0, "bob took nothing");
+
+        // and the claim is still alice's to make, in full
+        vm.prank(alice);
+        assertEq(vault.redeem(id, 300e18, alice, alice), 300e18, "her claim is intact");
+        assertEq(asset.balanceOf(alice), 300e18);
+    }
+
+    /// @dev The narrowing is on the claim only. A request still accepts an allowance, since the
+    /// shares genuinely leave the owner there, and an operator can still do both.
+    function test_operatorStillClaimsAndAllowanceStillRequests() public {
+        vault.setUnlocked(1_000e18);
+
+        vm.startPrank(alice);
+        vault.approve(bob, 300e18);
+        vault.setOperator(carol, true);
+        vm.stopPrank();
+
+        vm.prank(bob);
+        uint256 id = vault.requestRedeem(300e18, alice, alice);
+
+        vm.prank(carol);
+        assertEq(vault.redeem(id, 300e18, alice, alice), 300e18, "the operator claims for her");
+        assertEq(asset.balanceOf(alice), 300e18);
     }
 
     function test_withdraw_exceedingClaimable_reverts() public {

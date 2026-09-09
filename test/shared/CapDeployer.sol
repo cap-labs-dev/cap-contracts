@@ -63,6 +63,7 @@ abstract contract CapDeployer is BaseTest {
         uint256 defaultMultiplier;
         uint256 defaultTargetHealth;
         uint256 defaultLiquidationBonus;
+        uint256 defaultAveragingPeriod;
         uint256 defaultMinimumMarketMultiplier;
         uint256 defaultMaximumMarketMultiplier;
         uint256 defaultMaximumUnderwriterRate;
@@ -95,6 +96,7 @@ abstract contract CapDeployer is BaseTest {
         cfg.defaultMultiplier = 1e27;
         cfg.defaultTargetHealth = 1.25e27;
         cfg.defaultLiquidationBonus = 0.02e27;
+        cfg.defaultAveragingPeriod = 1 hours;
         cfg.defaultMinimumMarketMultiplier = 1e27;
         cfg.defaultMaximumMarketMultiplier = 2e27;
         cfg.defaultMaximumUnderwriterRate = 1e27;
@@ -164,7 +166,8 @@ abstract contract CapDeployer is BaseTest {
                         capConfig.defaultMinimumMarketMultiplier,
                         capConfig.defaultMaximumMarketMultiplier,
                         capConfig.defaultMaximumUnderwriterRate,
-                        capConfig.defaultLiquidationBonus
+                        capConfig.defaultLiquidationBonus,
+                        capConfig.defaultAveragingPeriod
                     )
                 )
             )
@@ -477,6 +480,17 @@ abstract contract CapDeployer is BaseTest {
 
     function _mintStable(address to, uint256 amount) internal {
         stablecoin.mintCreditBacked(to, amount);
+    }
+
+    /// @dev An ordinary permissionless deposit into the stablecoin. This is idle reserve rather
+    /// than credit, so it raises total supply without raising credit-backed supply and therefore
+    /// dilutes utilization
+    function _depositStable(address who, uint256 amount) internal {
+        cusdUnderlying.mint(who, amount);
+        vm.startPrank(who);
+        cusdUnderlying.approve(address(stablecoin), amount);
+        stablecoin.deposit(amount, who);
+        vm.stopPrank();
     }
 
     // ── underwriter helpers ───────────────────────────────────────────────────

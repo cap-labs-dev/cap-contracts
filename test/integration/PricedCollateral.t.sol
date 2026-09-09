@@ -93,9 +93,41 @@ contract PricedCollateralTest is CapDeployer {
         assertEq(collateral.balanceOf(defaultLiquidator), 51e18, "51 tokens total at $2");
     }
 
-    /// After a collateral crash the debt exceeds the whole market, so slashing is capped at what
-    /// the tranches still hold and valued at the new price.
-    function test_slash_cappedByTrancheHoldingsAfterPriceCrash() public {
+    /// The whole point of {IBaseMarket-maxLiquidatable} is to be the repayment that restores
+    /// {IBaseMarket-targetHealth}, so liquidating exactly that figure has to land on it. Each unit
+    /// of debt cleared costs `1 + bonus` of collateral rather than one, and pricing the collateral
+    /// leg at par instead left the divisor too large: the same crash below used to be quoted at
+    /// 722 and settle at a health of 1.185 against a target of 1.25.
+    function test_liquidatingTheMaximumLandsOnTargetHealth() public {
+        (FloatingMarket market,,) = _setUpMarketAtPrice(2e18, 500e18, 500e18);
+
+        vm.prank(defaultBorrower);
+        market.borrow(defaultBorrower, 900e18);
+
+        // halve the collateral: $1000 against $900 of debt is unhealthy but still fully recoverable,
+        // so the cap is not what is being measured here
+        oracle.setPrice(address(collateral), 1e18);
+        assertEq(market.totalCapital(), 1_000e18, "capital repriced");
+        assertLt(market.healthiness(), 1e27, "and the market is unhealthy");
+        assertGt(market.recoverableDebt(), 900e18, "with every dollar of it still recoverable");
+
+        uint256 max = market.maxLiquidatable();
+        assertLt(max, 900e18, "so the debt itself is not the binding cap");
+
+        _mintStable(defaultLiquidator, max);
+        vm.prank(defaultLiquidator);
+        market.liquidate(defaultLiquidator, max);
+
+        assertApproxEqRel(market.healthiness(), market.targetHealth(), 0.0001e18, "lands on target, not short of it");
+    }
+
+    /// After a collateral crash the debt far exceeds the whole market, and the binding cap is
+    /// {IBaseMarket-recoverableDebt} rather than the debt itself. The tranches can only hand over
+    /// what they hold, so past that point every further unit of cUSD burned buys collateral that
+    /// is not there: the liquidator eats the difference and health falls instead of rising. Left
+    /// uncapped this call took $900 for $100 of collateral. What remains is a shortfall for
+    /// {IBaseMarket-writeOff}, not something a liquidation can reach.
+    function test_liquidationAfterAPriceCrashStopsAtTheRecoverablePoint() public {
         (FloatingMarket market, address senior, address junior) = _setUpMarketAtPrice(2e18, 500e18, 500e18);
 
         vm.prank(defaultBorrower);
@@ -105,17 +137,25 @@ contract PricedCollateralTest is CapDeployer {
         oracle.setPrice(address(collateral), 0.1e18);
         assertEq(market.totalCapital(), 100e18, "capital repriced");
 
-        uint256 max = market.maxLiquidatable();
-        assertEq(max, 900e18, "whole debt is liquidatable");
-        _mintStable(defaultLiquidator, max);
+        uint256 recoverable = market.recoverableDebt();
+        assertEq(market.maxLiquidatable(), recoverable, "capped at what the collateral can clear");
+        assertLt(recoverable, 900e18, "which is well short of the debt");
 
+        // ask for the whole debt anyway, so the cap is what does the trimming
+        _mintStable(defaultLiquidator, 900e18);
         vm.prank(defaultLiquidator);
-        (uint256 repaid, uint256 slashed) = market.liquidate(defaultLiquidator, max);
+        (uint256 repaid, uint256 slashed) = market.liquidate(defaultLiquidator, 900e18);
 
-        assertEq(repaid, 900e18, "repaid the full debt");
-        assertEq(slashed, 100e18, "capped at 1000 tokens worth $100");
+        assertEq(repaid, recoverable, "an oversized request is trimmed to the cap");
+        assertEq(slashed, 100e18, "which is exactly the $100 the tranches still held");
         assertEq(collateral.balanceOf(defaultLiquidator), 1_000e18, "all collateral seized");
         assertEq(Tranche(senior).totalAssets(), 0, "senior drained");
         assertEq(Tranche(junior).totalAssets(), 0, "junior drained");
+
+        // the liquidator collects their bonus rather than paying a penalty, and the rest of the
+        // debt is left standing as the shortfall the guardian writes off
+        assertApproxEqRel(slashed, repaid * 102 / 100, 0.0001e18, "paid at the bonus, not below it");
+        assertEq(market.totalDebt(), 900e18 - recoverable, "the shortfall survives the liquidation");
+        assertEq(market.unrecoverableDebt(), 900e18 - recoverable, "and is exactly what writeOff is for");
     }
 }

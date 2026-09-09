@@ -13,6 +13,9 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice The vesting period is zero
     error InvalidVestingPeriod();
 
+    /// @notice More shares were named than this vault has queued under that request id
+    error UnknownQueuedRequest();
+
     /// @notice Emitted when a tranche is registered with the underwriter
     /// @param tranche The tranche address
     event AddTranche(address indexed tranche);
@@ -125,7 +128,10 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @param vestingPeriod The new vesting period in seconds
     function setVestingPeriod(uint256 vestingPeriod) external;
 
-    /// @notice Update recorded tranche debt and claim premium into the underwriter
+    /// @notice Re-value a tranche position and claim its premium into the underwriter
+    /// @dev The re-valuation is the same one every allocation and deallocation performs, so this is
+    /// only the way to reach a position nothing else has touched — a slash, most of all. The
+    /// premium sweep is what makes it worth calling on a cadence rather than on demand.
     /// @param tranche The tranche address
     function report(address tranche) external;
 
@@ -172,11 +178,30 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice Get the default allocation tranche
     function defaultTranche() external view returns (address);
 
-    /// @notice Get recorded debt for a tranche
+    /// @notice Get the shares of a tranche this vault has queued for redemption but not yet settled
+    /// @dev Part of the position for valuation purposes even though they have left this vault's
+    /// balance for the tranche's own; see {debt}
+    /// @param tranche The tranche address
+    function queuedShares(address tranche) external view returns (uint256);
+
+    /// @notice Get the shares this vault queued under one redemption request id
+    /// @dev Only ids opened by {deallocateAsync} are recorded, which is what {finalizeDeallocateAsync}
+    /// settles against
+    /// @param tranche The tranche address
+    /// @param requestId The ERC-7540 request id
+    function queuedRequest(address tranche, uint256 requestId) external view returns (uint256);
+
+    /// @notice Get the recorded value of this contract's position in a tranche
+    /// @dev What the position was worth when the underwriter last touched that tranche, which is
+    /// every allocation, every deallocation and every {report}. A slash in between moves the
+    /// position without moving this, so it is an upper bound on what the position would return.
+    /// The position counts shares held plus {queuedShares}, so a pending async deallocation is
+    /// carried at value rather than read as a write-off.
     /// @param tranche The tranche address
     function debt(address tranche) external view returns (uint256);
 
-    /// @notice Get total recorded debt across all tranches
+    /// @notice Get the total recorded value of every tranche position
+    /// @dev The exact sum of every {debt} entry, and the half of {totalAssets} that is not idle
     function totalDebt() external view returns (uint256);
 
     /// @notice Get claimable premium for an account

@@ -18,6 +18,13 @@ contract MockUtilizationSource {
         return supplyUtilization;
     }
 
+    /// @dev A supply pair whose ratio is the utilization the test asked for, so the averaged path
+    /// and the spot path move off the same single knob
+    function supplies() external view returns (uint256 credit, uint256 supply) {
+        credit = supplyUtilization;
+        supply = 1e27;
+    }
+
     function utilization() external view returns (uint256) {
         return marketUtilization[address(this)];
     }

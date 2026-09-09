@@ -47,7 +47,7 @@ contract DeployInfra is ProxyUtils {
         infra.irm = _proxy(
             implementations.irm,
             abi.encodeCall(
-                InterestRateModel.initialize, (infra.accessManager, stablecoinAddr, 1e27, 2e27, 1e27, 0.02e27)
+                InterestRateModel.initialize, (infra.accessManager, stablecoinAddr, 1e27, 2e27, 1e27, 0.02e27, 1 hours)
             )
         );
 

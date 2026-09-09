@@ -139,23 +139,45 @@ interface IFixedMarket is IBaseMarket {
     /// @param minimumTermLimit The minimum term of a loan, must not exceed the maximum
     function setTermLimits(uint256 maximumTermLimit, uint256 minimumTermLimit) external;
 
-    /// @notice Get the liquidity and underwriter premiums
+    /// @notice Get the liquidity and underwriter premiums an extension would be charged
+    /// @dev Quoted at the rates standing now, which is exactly what {extend} and {extendAdmin} pay:
+    /// they charge against debt already outstanding and mint nothing before doing so, so the rate
+    /// does not move first. Use {premiumForBorrow} for a new draw, which does move it.
     /// @param chargeableDebt The amount of debt that a premium is being charged on
     /// @param term The term of the loan
     /// @return liquidityPremium The liquidity premium
     /// @return underwriterPremium The underwriter premium
-    function premium(uint256 chargeableDebt, uint256 term)
+    function premiumForExtension(uint256 chargeableDebt, uint256 term)
         external
         view
         returns (uint256 liquidityPremium, uint256 underwriterPremium);
 
-    /// @notice Get the available credit for a term, discounted so that the principal plus its
-    /// upfront premium fits inside the credit limit
-    /// @dev The discount uses the liquidity rate as it stands now. Borrowing mints credit-backed
-    /// stablecoin, which raises utilization and so the liquidity rate, and the premium is charged
-    /// at that higher post-mint rate. Final debt can therefore exceed the credit limit by the width
-    /// of that rate move, which is largest on a market with little unlocked supply. The gap is
-    /// bounded by the ltv-to-lt corridor and cannot by itself make the market unhealthy.
+    /// @notice Get the liquidity and underwriter premiums a new borrow would be charged
+    /// @dev A borrow mints its principal before its premium is priced, so it pays on the far side
+    /// of the utilization its own draw creates and the rates standing now would understate it. This
+    /// prices at the rate the draw will produce; see {IInterestRateModel-fixedRatesAfterMint}. The
+    /// principal has to be one {availableCredit} would actually grant, or the quote describes a
+    /// borrow that would be refused.
+    /// @param principal The principal of the loan
+    /// @param term The term of the loan
+    /// @return liquidityPremium The liquidity premium
+    /// @return underwriterPremium The underwriter premium
+    function premiumForBorrow(uint256 principal, uint256 term)
+        external
+        view
+        returns (uint256 liquidityPremium, uint256 underwriterPremium);
+
+    /// @notice Get the largest principal borrowable over a term, leaving room for the upfront
+    /// premium it owes from the outset so that the two together stay inside the credit limit
+    /// @dev Borrowing mints credit-backed stablecoin, which raises utilization and so the liquidity
+    /// rate, and the premium is charged at that higher post-mint rate. A borrower pays for the
+    /// utilization they create rather than being handed the rate that stood before them, so the
+    /// room left has to be sized against a rate that does not exist yet; see
+    /// {IInterestRateModel-fixedRatesAfterMint}. It uses the worst case, the rate a draw of the
+    /// whole limit would produce, which avoids any circularity between the size and the rate at a
+    /// cost measured in fractions of a basis point of capacity. Leaving room at the pre-borrow rate
+    /// instead left the debt above the credit limit and could leave the market instantly
+    /// liquidatable.
     /// @param term The term of the loan
     /// @return credit The available credit
     function availableCredit(uint256 term) external view returns (uint256 credit);

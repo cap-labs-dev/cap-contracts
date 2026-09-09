@@ -285,13 +285,8 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         internal
         returns (address tranche)
     {
-        // Checked here because nothing downstream does. {IBaseMarket-setTranches} looks like it
-        // would, since it ends in a health check, but that short-circuits while a market has no
-        // debt, so an asset the oracle cannot price is admitted and only fails on first use. By
-        // then it fails inside {IBaseMarket-lockedValue}, which every senior tranche's
-        // {ITranche-unlockedSupply} runs through, so it would take their redemptions with it.
-        (uint256 price,) = IOracle(oracle).getPrice(_asset);
-        if (price == 0) revert AssetNotPriced(_asset);
+        // Reverts if the asset is not priced
+        IOracle(oracle).price(_asset);
 
         string memory trancheName = string.concat(_name, " Tranche ", Strings.toString(index));
         string memory trancheSymbol = string.concat("TR", Strings.toString(index));
@@ -387,13 +382,15 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         ownerSelectors[0] = ITranche.setVestingPeriod.selector;
         manager.setTargetFunctionRole(tranche, ownerSelectors, ownerRole);
 
-        bytes4[] memory marketSelectors = new bytes4[](1);
+        // {ITranche-notifyPremium} re-anchors the vesting epoch, so leaving it public let anyone
+        // restart the release schedule by donating a wei of premium and poking it: the remaining
+        // locked balance was re-spread over a fresh full period each time, turning linear release
+        // into decay that never finishes. The market is the only caller with a reason to be here,
+        // since it notifies in the same breath as minting the premium
+        bytes4[] memory marketSelectors = new bytes4[](2);
         marketSelectors[0] = ITranche.slash.selector;
+        marketSelectors[1] = ITranche.notifyPremium.selector;
         manager.setTargetFunctionRole(tranche, marketSelectors, CapRoles.MARKET);
-
-        bytes4[] memory publicSelectors = new bytes4[](1);
-        publicSelectors[0] = ITranche.notifyPremium.selector;
-        manager.setTargetFunctionRole(tranche, publicSelectors, type(uint64).max);
 
         // admission is the gate on the entry points themselves, so the allowlist is the membership
         // of this role and there is nothing to keep in step on the tranche. Registering an

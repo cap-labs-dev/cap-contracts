@@ -90,6 +90,28 @@ contract UnderwriterIntegrationTest is CapDeployer {
         assertEq(vault.balanceOf(address(underwriter), address(collateral)), DEPOSIT - DEAD_SHARES);
     }
 
+    /// @dev Deregistration deliberately leaves the exits open while closing new allocations, but
+    /// every deposit routes through the default tranche and allocation is one of the things it
+    /// closes. Left pointing at a removed tranche the default jammed each subsequent deposit, so
+    /// retiring a curator's only tranche also stopped the vault taking money.
+    function test_removingTheDefaultTrancheDoesNotJamDeposits() public {
+        _useTranche0AsDefault();
+        _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
+
+        underwriter.removeTranche(address(tranche0));
+        assertEq(underwriter.defaultTranche(), address(0), "the default cannot outlive its registration");
+
+        address latecomer = makeAddr("latecomer");
+        _fundUnderwriter(address(underwriter), latecomer, DEPOSIT);
+
+        assertGt(underwriter.balanceOf(latecomer), 0, "the deposit still lands");
+        assertEq(
+            vault.balanceOf(address(underwriter), address(collateral)),
+            DEPOSIT,
+            "and sits idle in the vault, which is what an unset default has always meant"
+        );
+    }
+
     function test_allocate_nonTranche_reverts() public {
         _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
         vm.expectRevert(IUnderwriter.NotRegisteredTranche.selector);

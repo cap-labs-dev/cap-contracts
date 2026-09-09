@@ -8,6 +8,7 @@ import { BaseTest } from "../../shared/BaseTest.sol";
 import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
 import { MockIRM } from "../../shared/mocks/MockIRM.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract StablecoinTest is BaseTest {
     Stablecoin internal scoin;
@@ -105,6 +106,64 @@ contract StablecoinTest is BaseTest {
         assertEq(scoin.totalAssets(), 70e18);
     }
 
+    // ── the previews round at whatever scale the underlying uses ──────────────
+
+    /// @dev Deploy against an underlying of a given width, so the preview arithmetic can be
+    /// exercised at the six decimals real USDC carries. The rest of the suite runs on an
+    /// eighteen-decimal mock, where both directions divide exactly and nothing can round at all,
+    /// which is precisely why this went unnoticed.
+    function _stablecoinOn(uint8 assetDecimals) internal returns (Stablecoin deployed) {
+        MockERC20 underlying = new MockERC20("Scaled", "SCL", assetDecimals);
+        deployed = Stablecoin(
+            _deployProxy(
+                address(new Stablecoin()),
+                abi.encodeCall(
+                    Stablecoin.initialize,
+                    (address(accessManager), address(underlying), "Cap USD", "cUSD", "", address(irm))
+                )
+            )
+        );
+    }
+
+    /// @dev ERC-4626 puts the rounding on the quoting side in the vault's favour, and truncating
+    /// instead hands out shares for nothing: against six decimals every share count below 1e12
+    /// divides to zero assets owed. The sums are dust, but the reserve identity the redemption
+    /// gate rests on should not be standing on a rounding direction.
+    function test_previewMint_roundsUpAgainstASixDecimalUnderlying() public {
+        Stablecoin usdc = _stablecoinOn(6);
+
+        assertEq(usdc.previewMint(1), 1, "a single wei of cUSD still costs a base unit");
+        assertEq(usdc.previewMint(1e12 - 1), 1, "and so does anything short of a whole one");
+        assertEq(usdc.previewMint(1e12), 1, "which is what a whole one costs exactly");
+        assertEq(usdc.previewMint(1e12 + 1), 2, "a wei over rounds on to the next");
+        assertEq(usdc.previewMint(1e18), 1e6, "exact multiples are untouched");
+    }
+
+    /// @dev The deposit side keeps its floor, and at any width the vault accepts the division is
+    /// exact anyway, so the asymmetry costs a depositor nothing.
+    function test_previewDeposit_isExactAtSixDecimals() public {
+        Stablecoin usdc = _stablecoinOn(6);
+
+        assertEq(usdc.previewDeposit(1), 1e12, "one base unit buys a whole scaled share");
+        assertEq(usdc.previewDeposit(1e6), 1e18, "and a dollar buys a dollar");
+    }
+
+    /// @dev Wider than the share the losing direction flips to the deposit side, where rounding up
+    /// is not available: the assets have already been pulled by then, so anything too small to
+    /// mint a share would simply be donated. Refused at initialize rather than carried.
+    function test_initialize_rejectsAnUnderlyingWiderThanTheShare() public {
+        MockERC20 wide = new MockERC20("Wide", "WIDE", 19);
+        address impl = address(new Stablecoin());
+
+        vm.expectRevert(IStablecoin.UnsupportedDecimals.selector);
+        _deployProxy(
+            impl,
+            abi.encodeCall(
+                Stablecoin.initialize, (address(accessManager), address(wide), "Cap USD", "cUSD", "", address(irm))
+            )
+        );
+    }
+
     function test_deposit_oneToOne() public {
         vm.prank(alice);
         uint256 shares = scoin.deposit(100e18, alice);
@@ -183,6 +242,46 @@ contract StablecoinTest is BaseTest {
         assertEq(assetsBefore - scoin.totalAssets(), paid, "totalAssets falls by exactly what was paid");
         assertEq(heldBefore - asset.balanceOf(address(scoin)), paid, "and so does the reserve");
         assertApproxEqAbs(scoin.badDebt(), 100e18 - (1_000e18 - paid), 2, "absorbs exactly what it left behind");
+    }
+
+    /// @dev The property the shortfall curve rests on, and the reason chopping a redemption up
+    /// cannot beat taking it in one call: `badDebt / (totalSupply * totalAssets)` is conserved by a
+    /// redemption. Since what a redemption retains is `remaining / (1 + k * remaining)` for that
+    /// same `k`, the payout depends only on where the supply ends up and not on the route taken.
+    ///
+    /// What would break it is charging the marginal price — the backing ratio squared — on a whole
+    /// redemption, since each slice lifts the ratio for the next and a sliced exit would harvest
+    /// its own repair. The curve is that process integrated and charged upfront, which is what
+    /// collapses the difference between one call and twenty.
+    function testFuzz_slicingARedemptionCannotBeatTakingItWhole(uint8 slices) public {
+        slices = uint8(bound(slices, 2, 20));
+
+        vm.prank(alice);
+        scoin.deposit(1_000e18, alice);
+        scoin.mintCreditBacked(bob, 500e18);
+        scoin.recognizeBadDebt(100e18);
+
+        uint256 k = _shortfallInvariant();
+        uint256 whole = scoin.previewRedeem(600e18);
+
+        // the same 600e18 exit, taken a slice at a time and re-priced against the state each
+        // slice leaves behind
+        uint256 taken;
+        uint256 each = 600e18 / slices;
+        for (uint256 i; i < slices; ++i) {
+            uint256 shares = i + 1 == slices ? 600e18 - each * (slices - 1) : each;
+            vm.prank(alice);
+            taken += scoin.redeem(shares, alice, alice);
+            assertApproxEqRel(_shortfallInvariant(), k, 1e6, "the invariant survives every slice");
+        }
+
+        assertApproxEqRel(taken, whole, 1e6, "and slicing pays no more than the single call");
+    }
+
+    /// @dev `badDebt * 1e36 / (totalSupply * totalAssets)`, scaled so the ratio is comparable
+    /// across states without losing it to integer division
+    function _shortfallInvariant() internal view returns (uint256 k) {
+        k = Math.mulDiv(scoin.badDebt(), 1e36, scoin.totalSupply() * scoin.totalAssets());
     }
 
     /// previewWithdraw must be the inverse of previewRedeem above the shortfall.
