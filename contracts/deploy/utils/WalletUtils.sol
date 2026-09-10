@@ -2,6 +2,8 @@
 pragma solidity 0.8.36;
 
 contract WalletUtils {
+    /// @dev Resolve the deploying wallet, rejecting the Foundry default sender
+    /// @return wallet The deployer address
     function getWalletAddress() public view returns (address wallet) {
         wallet = tx.origin;
         if (wallet == address(0)) {

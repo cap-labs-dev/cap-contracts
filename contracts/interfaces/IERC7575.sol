@@ -2,7 +2,7 @@
 pragma solidity 0.8.36;
 
 /// @title IERC7575
-/// @notice IERC7575 is the interface for the ERC7575 standard
+/// @notice ERC-7575 share-token pointer
 interface IERC7575 {
     /// @notice Get the address of the share token
     /// @return shareTokenAddress The address of the share token

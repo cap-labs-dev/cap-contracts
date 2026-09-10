@@ -42,7 +42,7 @@ contract RewardRoutingTest is CapDeployer {
         m.setFixedCreditLimit(1_000e18);
     }
 
-    function test_emptyTranche0_leftoverGoesToStakedStablecoin() public {
+    function test_emptyTranche0_leftoverVestsOnStablecoin() public {
         (FloatingMarket m, address tranche0, address tranche1) = _setupMarket("Tranche0 Empty", 0, 1_000e18);
 
         vm.prank(borrower);
@@ -53,14 +53,17 @@ contract RewardRoutingTest is CapDeployer {
         uint256 juniorShare = underwriterPremium * 0.5e27 / 1e27;
         uint256 leftover = underwriterPremium - juniorShare;
 
-        address staked = m.stakedStablecoin();
-        uint256 stakedBefore = stablecoin.balanceOf(staked);
         uint256 t1Before = stablecoin.balanceOf(tranche1);
+        uint256 vestedBefore = stablecoin.balanceOf(address(stablecoin));
 
         m.chargePremium();
 
         assertEq(stablecoin.balanceOf(tranche1) - t1Before, juniorShare, "junior takes only its weight");
-        assertEq(stablecoin.balanceOf(staked) - stakedBefore, liquidityPremium + leftover, "leftover to staked");
+        assertEq(
+            stablecoin.balanceOf(address(stablecoin)) - vestedBefore,
+            liquidityPremium + leftover,
+            "liquidity and leftover vest on cUSD"
+        );
         assertEq(Tranche(tranche0).claimable(supplier0), 0);
     }
 

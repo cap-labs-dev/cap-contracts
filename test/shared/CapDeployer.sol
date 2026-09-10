@@ -3,8 +3,8 @@ pragma solidity 0.8.36;
 
 import { BaseTest } from "./BaseTest.sol";
 import { CapRoles } from "./CapRoles.sol";
+import { MockAggregator } from "./mocks/MockChainlinkFeeds.sol";
 import { MockERC20 } from "./mocks/MockERC20.sol";
-import { MockOracle } from "./mocks/MockOracle.sol";
 
 import { BeaconFactory } from "../../contracts/cap/BeaconFactory.sol";
 import { InterestRateModel } from "../../contracts/cap/InterestRateModel.sol";
@@ -15,8 +15,10 @@ import { Underwriter } from "../../contracts/cap/Underwriter.sol";
 import { Vault } from "../../contracts/cap/Vault.sol";
 import { FixedMarket } from "../../contracts/cap/market/FixedMarket.sol";
 import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
-import { IBeaconFactory } from "../../contracts/interfaces/IBeaconFactory.sol";
+import { ChainlinkAdapter } from "../../contracts/cap/oracle/ChainlinkAdapter.sol";
+import { Oracle } from "../../contracts/cap/oracle/Oracle.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
+import { IOracle } from "../../contracts/interfaces/IOracle.sol";
 import { IRegistry } from "../../contracts/interfaces/IRegistry.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
@@ -30,10 +32,26 @@ abstract contract CapDeployer is BaseTest {
     /// this much per vault it passes through, and tests asserting an exact round trip net it out.
     uint256 internal constant DEAD_SHARES = 1e3;
 
+    /// @dev Decimals the harness gives every mock feed, which is what a real Chainlink USD feed
+    /// reports. Deliberately not {IOracle-DECIMALS}: the gap between the two is the adapter's
+    /// normalisation, and the suite is only worth running against the real stack if it crosses it.
+    uint8 internal constant FEED_DECIMALS = 8;
+
+    /// @dev Staleness window every asset gets unless a test narrows it with {_setStaleness}. Long,
+    /// because the suite warps months ahead for vesting and interest accrual without re-posting a
+    /// price, and a realistic window would turn all of that into an oracle failure. Cannot be zero
+    /// or unlimited: a zero window only accepts an answer stamped in this block.
+    uint256 internal constant FEED_STALENESS = 3650 days;
+
     // ── protocol instances ────────────────────────────────────────────────────
-    MockOracle internal oracle;
+    Oracle internal oracle;
+    address internal chainlinkAdapter;
     MockERC20 internal cusdUnderlying;
     MockERC20 internal collateral;
+
+    /// @dev The feed standing behind each asset, so {_setPrice} can move a price by writing to the
+    /// aggregator the way a real one moves rather than by overwriting the oracle's answer
+    mapping(address asset => MockAggregator feed) internal feeds;
 
     Vault internal vault;
     Stablecoin internal stablecoin;
@@ -56,7 +74,6 @@ abstract contract CapDeployer is BaseTest {
 
     struct CapConfig {
         uint256 collateralPrice;
-        address stablecoinYield;
         uint256 defaultLtv;
         uint256 defaultBuffer;
         uint256 defaultLt;
@@ -89,7 +106,6 @@ abstract contract CapDeployer is BaseTest {
 
     function _defaultCapConfig() internal pure returns (CapConfig memory cfg) {
         cfg.collateralPrice = 1e18;
-        cfg.stablecoinYield = address(0);
         cfg.defaultLtv = 0.5e27;
         cfg.defaultBuffer = 0.1e27;
         cfg.defaultLt = 0.8e27;
@@ -121,9 +137,6 @@ abstract contract CapDeployer is BaseTest {
     }
 
     function _deployCapWithConfig(CapConfig memory cfg) internal {
-        if (cfg.stablecoinYield == address(0)) {
-            cfg.stablecoinYield = makeAddr("stcUSD");
-        }
         capConfig = cfg;
         defaultMarketOwner = address(this);
         defaultBorrower = makeAddr("borrower");
@@ -136,13 +149,22 @@ abstract contract CapDeployer is BaseTest {
         _assignOperator(defaultMarketOwner);
         _assignOperator(defaultBorrower);
 
-        oracle.setPrice(address(collateral), capConfig.collateralPrice);
+        _setPrice(address(collateral), capConfig.collateralPrice);
     }
 
     function _deployCoreContracts() internal {
         address authority = address(accessManager);
 
-        oracle = new MockOracle();
+        // The production oracle rather than a mock of it. A mock is free to answer in whatever
+        // scale the tests were written in, so it cannot catch the oracle and its consumers
+        // disagreeing about that scale, which is the one thing composing prices puts at risk
+        oracle = Oracle(_deployProxy(address(new Oracle()), abi.encodeCall(Oracle.initialize, (authority))));
+        bytes memory adapterCode = type(ChainlinkAdapter).creationCode;
+        address adapter;
+        assembly {
+            adapter := create(0, add(adapterCode, 0x20), mload(adapterCode))
+        }
+        chainlinkAdapter = adapter;
         cusdUnderlying = new MockERC20("USD Coin", "USDC", 18);
         collateral = new MockERC20("Wrapped Ether", "WETH", 18);
 
@@ -176,7 +198,8 @@ abstract contract CapDeployer is BaseTest {
             _deployProxy(
                 address(stablecoinImpl),
                 abi.encodeCall(
-                    Stablecoin.initialize, (authority, address(cusdUnderlying), "Cap USD", "cUSD", "", irmAddr)
+                    Stablecoin.initialize,
+                    (authority, address(cusdUnderlying), "Cap USD", "cUSD", "", irmAddr, address(0))
                 )
             )
         );
@@ -201,16 +224,20 @@ abstract contract CapDeployer is BaseTest {
     }
 
     function _deployRegistry() internal {
+        Registry impl = new Registry();
+        address registryAddr = vm.computeCreateAddress(address(this), vm.getNonce(address(this)));
+        accessManager.grantRole(CapRoles.ADMIN, registryAddr, 0);
+        accessManager.grantRole(CapRoles.REGISTRY, registryAddr, 0);
+
         registry = Registry(
             _deployProxy(
-                address(new Registry()),
+                address(impl),
                 abi.encodeCall(
                     Registry.initialize,
                     (
                         address(accessManager),
                         IRegistry.InitParams({
                             stablecoin: address(stablecoin),
-                            stakedStablecoin: capConfig.stablecoinYield,
                             vault: address(vault),
                             oracle: address(oracle),
                             irm: address(irm),
@@ -227,51 +254,18 @@ abstract contract CapDeployer is BaseTest {
                 )
             )
         );
+        require(address(registry) == registryAddr, "registry addr");
     }
 
     function _configureAccess() internal {
-        accessManager.grantRole(CapRoles.ADMIN, address(registry), 0);
-        accessManager.grantRole(CapRoles.REGISTRY, address(registry), 0);
         accessManager.grantRole(CapRoles.GOVERNOR, address(this), 0);
         accessManager.grantRole(CapRoles.KEEPER, address(this), 0);
         accessManager.grantRole(CapRoles.GUARDIAN, address(this), 0);
         accessManager.grantRole(CapRoles.ADMIN, address(this), 0);
         accessManager.grantRole(CapRoles.LIQUIDATOR, defaultLiquidator, 0);
-
-        bytes4[] memory factorySelectors = new bytes4[](1);
-        factorySelectors[0] = IBeaconFactory.create.selector;
-        accessManager.setTargetFunctionRole(address(beaconFactory), factorySelectors, CapRoles.REGISTRY);
-
-        bytes4[] memory governorSelectors = new bytes4[](1);
-        governorSelectors[0] = Registry.assignOperator.selector;
-        accessManager.setTargetFunctionRole(address(registry), governorSelectors, CapRoles.GOVERNOR);
-
-        bytes4[] memory keeperSelectors = new bytes4[](3);
-        keeperSelectors[0] = Registry.createMarket.selector;
-        keeperSelectors[1] = Registry.createFixedMarket.selector;
-        keeperSelectors[2] = Registry.createUnderwriter.selector;
-        accessManager.setTargetFunctionRole(address(registry), keeperSelectors, CapRoles.KEEPER);
-
-        bytes4[] memory registryAdminSelectors = new bytes4[](1);
-        registryAdminSelectors[0] = Registry.createTranche.selector;
-        accessManager.setTargetFunctionRole(address(registry), registryAdminSelectors, CapRoles.ADMIN);
-
-        bytes4[] memory minterSelectors = new bytes4[](3);
-        minterSelectors[0] = Stablecoin.mintCreditBacked.selector;
-        minterSelectors[1] = Stablecoin.burnCreditBacked.selector;
-        minterSelectors[2] = Stablecoin.recognizeBadDebt.selector;
-        accessManager.setTargetFunctionRole(address(stablecoin), minterSelectors, CapRoles.MINTER);
-        accessManager.grantRole(CapRoles.MINTER, address(this), 0);
-
-        bytes4[] memory stablecoinGovernorSelectors = new bytes4[](1);
-        stablecoinGovernorSelectors[0] = Stablecoin.coverBadDebt.selector;
-        accessManager.setTargetFunctionRole(address(stablecoin), stablecoinGovernorSelectors, CapRoles.GOVERNOR);
-
-        bytes4[] memory irmGovernorSelectors = new bytes4[](3);
-        irmGovernorSelectors[0] = InterestRateModel.setLiquiditySlopes.selector;
-        irmGovernorSelectors[1] = InterestRateModel.setTermMultiplierSlope.selector;
-        irmGovernorSelectors[2] = InterestRateModel.setLiquidationBonus.selector;
-        accessManager.setTargetFunctionRole(address(irm), irmGovernorSelectors, CapRoles.GOVERNOR);
+        // integration tests mint and write off on the protocol stablecoin without going through a
+        // market, so this contract holds the same role the markets do
+        accessManager.grantRole(CapRoles.MARKET, address(this), 0);
     }
 
     // ── operator helpers ──────────────────────────────────────────────────────
@@ -308,7 +302,7 @@ abstract contract CapDeployer is BaseTest {
         if (registry.operatorRole(marketOwner) == 0) _assignOperator(marketOwner);
         if (registry.operatorRole(borrower) == 0) _assignOperator(borrower);
 
-        (market, tranches) = registry.createMarket(assets, weights, name, marketOwner, borrower);
+        (market, tranches) = registry.createFloatingMarket(assets, weights, name, marketOwner, borrower);
         _applyMarketDefaults(FloatingMarket(market));
     }
 
@@ -440,6 +434,47 @@ abstract contract CapDeployer is BaseTest {
         (allowed,) = accessManager.canCall(account, capVault, IERC4626.deposit.selector);
     }
 
+    // ── oracle helpers ────────────────────────────────────────────────────────
+
+    /// @dev Post a price for an asset, standing a feed up behind it on first use.
+    ///
+    /// Takes the price in {IOracle-DECIMALS} because that is the scale every consumer reads it in
+    /// and so the scale the assertions are written in, but posts it to the aggregator in the
+    /// feed's own, leaving the adapter to normalise it back. So the value asserted against is only
+    /// the value posted if the adapter and the oracle agree, which is the point of routing the
+    /// suite through them. Refuses a price the feed cannot express rather than quietly truncating
+    /// it, since a test that lost precision here would read as a pricing bug somewhere else.
+    function _setPrice(address asset, uint256 price) internal {
+        uint256 scale = 10 ** (oracle.DECIMALS() - FEED_DECIMALS);
+        require(price % scale == 0, "price too fine for the feed's decimals");
+
+        MockAggregator feed = feeds[asset];
+        if (address(feed) == address(0)) {
+            feed = new MockAggregator(FEED_DECIMALS, 0, 0);
+            feeds[asset] = feed;
+        }
+
+        uint256 scaled = price / scale;
+        require(scaled <= uint256(type(int256).max), "price exceeds the feed's signed range");
+        // casting to 'int256' is safe because scaled is checked against int256.max
+        // forge-lint: disable-next-line(unsafe-typecast)
+        feed.setAnswer(int256(scaled));
+        feed.setUpdatedAt(block.timestamp);
+
+        if (oracle.sources(asset).length == 0) _setStaleness(asset, FEED_STALENESS);
+    }
+
+    /// @dev Narrow an asset's staleness window, keeping the feed it already points at
+    function _setStaleness(address asset, uint256 staleness) internal {
+        IOracle.Sources[] memory hops = new IOracle.Sources[](1);
+        hops[0].primary = IOracle.Source({
+            adapter: chainlinkAdapter,
+            payload: abi.encodeWithSelector(ChainlinkAdapter.price.selector, address(feeds[asset])),
+            staleness: staleness
+        });
+        oracle.setSource(asset, hops);
+    }
+
     // ── funding helpers ───────────────────────────────────────────────────────
 
     /// @dev A second collateral the oracle can price, for markets whose tranches do not all hold
@@ -449,7 +484,7 @@ abstract contract CapDeployer is BaseTest {
         returns (MockERC20 token)
     {
         token = new MockERC20(name, symbol, decimals);
-        oracle.setPrice(address(token), price);
+        _setPrice(address(token), price);
     }
 
     function _fundTranche(address tranche, address supplier, uint256 amount) internal {
@@ -466,8 +501,10 @@ abstract contract CapDeployer is BaseTest {
 
         _admitDepositor(tranche, supplier);
 
-        vm.prank(supplier);
+        vm.startPrank(supplier);
         Tranche(tranche).deposit(amount, supplier);
+        Tranche(tranche).optIn();
+        vm.stopPrank();
     }
 
     function _fundVault(address who, uint256 amount) internal {
@@ -507,6 +544,7 @@ abstract contract CapDeployer is BaseTest {
         vm.startPrank(supplier);
         vault.setOperator(underwriter, true);
         Underwriter(underwriter).deposit(amount, supplier);
+        Underwriter(underwriter).optIn();
         vm.stopPrank();
     }
 }

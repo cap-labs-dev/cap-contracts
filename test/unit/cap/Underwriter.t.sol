@@ -7,6 +7,7 @@ import { DeadShares } from "../../../contracts/utils/DeadShares.sol";
 import { BaseTest } from "../../shared/BaseTest.sol";
 import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
+import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 contract UnderwriterUnitTest is BaseTest {
@@ -51,6 +52,12 @@ contract UnderwriterUnitTest is BaseTest {
 
         // addTranche and removeTranche toggle vault operator rights on the mocked vault
         vm.mockCall(vault, abi.encodeWithSignature("setOperator(address,bool)"), abi.encode(true));
+        // and opt the vault into the tranche's vesting so it can earn what {report} later claims
+        vm.mockCall(tranche, abi.encodeWithSignature("optIn()"), abi.encode());
+        vm.mockCall(tranche, abi.encodeWithSignature("optOut()"), abi.encode());
+        vm.mockCall(tranche, abi.encodeWithSignature("claim(address)", address(underwriter)), abi.encode(uint256(0)));
+        vm.mockCall(tranche, abi.encodeWithSelector(IERC20.balanceOf.selector, address(underwriter)), abi.encode(0));
+        vm.mockCall(tranche, abi.encodeWithSignature("previewRedeem(uint256)"), abi.encode(0));
     }
 
     /// @dev The gate is nothing but the AccessManager's answer for the gated selector, so this
@@ -314,34 +321,45 @@ contract UnderwriterUnitTest is BaseTest {
         assertEq(underwriter.unlockedSupply(), 0);
     }
 
-    function test_vestedReward_zeroInitially() public view {
-        assertEq(underwriter.vestedReward(), 0);
+    function test_remaining_zeroInitially() public view {
+        assertEq(underwriter.remaining(), 0);
+        assertEq(underwriter.vested(), 0);
+        assertEq(underwriter.premiumPerSecond(), 0);
     }
 
-    /// @dev The schedule is anchored at deployment, so an empty epoch ends one default period out.
-    /// This used to read a bare `6 hours`, which held only because the anchor sat uninitialised at
-    /// zero and put the epoch back at the unix epoch.
-    function test_vestingEnd_isDefaultVestingPeriod() public view {
-        assertEq(underwriter.vestingEnd(), block.timestamp + 6 hours);
-    }
-
-    function test_setVestingPeriod_onlyAuthority() public {
-        vm.prank(stranger);
-        vm.expectRevert();
-        underwriter.setVestingPeriod(1 days);
-    }
-
-    function test_setVestingPeriod_zero_reverts() public {
-        vm.expectRevert(IUnderwriter.InvalidVestingPeriod.selector);
-        underwriter.setVestingPeriod(0);
-    }
-
-    function test_setVestingPeriod_updatesVestingEnd() public {
-        underwriter.setVestingPeriod(1 days);
-        assertEq(underwriter.vestingEnd(), block.timestamp + 1 days);
+    function test_vestingPeriod_isTwelveHours() public view {
+        assertEq(underwriter.vestingPeriod(), 12 hours);
     }
 
     function test_claimable_zeroInitially() public view {
         assertEq(underwriter.claimable(supplier), 0);
+    }
+
+    function test_addTranche_optsTheVaultIntoTheTranche() public {
+        vm.expectCall(tranche, abi.encodeWithSignature("optIn()"));
+        underwriter.addTranche(tranche);
+    }
+
+    function test_report_foldsClaimedPremiumIntoTheRemainder() public {
+        underwriter.addTranche(tranche);
+        vm.mockCall(tranche, abi.encodeWithSignature("claim(address)", address(underwriter)), abi.encode(uint256(5e18)));
+
+        vm.expectCall(tranche, abi.encodeWithSignature("claim(address)", address(underwriter)));
+        underwriter.report(tranche);
+
+        assertEq(underwriter.remaining(), 5e18);
+        assertEq(underwriter.lastReported(), block.timestamp);
+    }
+
+    function test_removeTranche_reportsBeforeDeregistering() public {
+        underwriter.addTranche(tranche);
+        underwriter.setDefaultTranche(tranche);
+        vm.mockCall(tranche, abi.encodeWithSignature("claim(address)", address(underwriter)), abi.encode(uint256(2e18)));
+
+        vm.expectCall(tranche, abi.encodeWithSignature("claim(address)", address(underwriter)));
+        underwriter.removeTranche(tranche);
+
+        assertEq(underwriter.remaining(), 2e18);
+        assertEq(underwriter.defaultTranche(), address(0));
     }
 }

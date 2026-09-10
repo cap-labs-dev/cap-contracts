@@ -2,7 +2,7 @@
 pragma solidity 0.8.36;
 
 import { ChainlinkAdapter } from "../../../../contracts/cap/oracle/ChainlinkAdapter.sol";
-import { MockAggregator, MockBareFeed } from "./MockChainlinkFeeds.sol";
+import { MockAggregator } from "../../../shared/mocks/MockChainlinkFeeds.sol";
 import { Test } from "forge-std/Test.sol";
 
 /// @notice Direct tests for the adapter {Oracle} reads every price leg through.
@@ -12,45 +12,50 @@ import { Test } from "forge-std/Test.sol";
 /// nothing uses. Composition is not tested here at all: the adapter answers one feed and {Oracle}
 /// chains them, so that belongs in Oracle.t.sol.
 contract ChainlinkAdapterTest is Test {
-    ChainlinkAdapter internal adapter;
+    address internal adapter;
 
     function setUp() public {
         vm.warp(1_000_000);
-        adapter = new ChainlinkAdapter();
+        bytes memory adapterCode = type(ChainlinkAdapter).creationCode;
+        address deployed;
+        assembly {
+            deployed := create(0, add(adapterCode, 0x20), mload(adapterCode))
+        }
+        adapter = deployed;
     }
 
     function _read(address source) internal view returns (uint256 answer, uint256 updatedAt) {
-        (bool ok, bytes memory ret) = address(adapter).staticcall(abi.encodeCall(ChainlinkAdapter.price, (source)));
+        (bool ok, bytes memory ret) =
+            adapter.staticcall(abi.encodeWithSelector(ChainlinkAdapter.price.selector, source));
         require(ok, "adapter reverted");
         (answer, updatedAt) = abi.decode(ret, (uint256, uint256));
     }
 
-    function _expect(address source, bytes memory err) internal view {
-        (bool ok, bytes memory ret) = address(adapter).staticcall(abi.encodeCall(ChainlinkAdapter.price, (source)));
-        assertFalse(ok, "expected the adapter to refuse");
-        assertEq(keccak256(ret), keccak256(err), "refused for the wrong reason");
+    function _expectZero(address source) internal view {
+        (uint256 answer,) = _read(source);
+        assertEq(answer, 0, "unusable feed is a zero, not a revert");
     }
 
     // ── the ordinary path ─────────────────────────────────────────────────────
 
-    /// @dev The payload {Oracle} stores is built with abi.encodeCall, which is the whole reason
-    /// this is a contract and not a library. If it ever goes back to being a library this stops
-    /// compiling, which is the intended alarm.
-    function test_price_readsAnEightDecimalFeedThroughAStaticcall() public {
+    function test_price_normalisesAnEightDecimalFeedUp() public {
         MockAggregator feed = new MockAggregator(8, 2000e8, block.timestamp);
 
         (uint256 answer, uint256 updatedAt) = _read(address(feed));
 
-        assertEq(answer, 2000e8, "passed through untouched at the adapter's own scale");
+        assertEq(answer, 2000e18, "eight is what a real USD feed reports, and it scales up to meet the oracle");
         assertEq(updatedAt, block.timestamp, "and stamped when the feed was");
     }
 
-    function test_price_normalisesAnEighteenDecimalFeedDown() public {
+    /// @dev Nothing to do, and the case worth naming: the adapter's scale is the oracle's, so a
+    /// feed already reporting eighteen is passed through. Pins the constant from the outside,
+    /// since it is private, and a drift back down to a feed's native eight would land here.
+    function test_price_readsAnEighteenDecimalFeedUntouched() public {
         MockAggregator feed = new MockAggregator(18, 2000e18, block.timestamp);
 
         (uint256 answer,) = _read(address(feed));
 
-        assertEq(answer, 2000e8, "scaled to eight decimals");
+        assertEq(answer, 2000e18, "already in the oracle's scale");
     }
 
     function test_price_normalisesASixDecimalFeedUp() public {
@@ -58,85 +63,41 @@ contract ChainlinkAdapterTest is Test {
 
         (uint256 answer,) = _read(address(feed));
 
-        assertEq(answer, 2000e8, "scaled to eight decimals");
+        assertEq(answer, 2000e18, "scaled to eighteen decimals");
     }
 
-    // ── the circuit breaker ───────────────────────────────────────────────────
-
-    /// @dev The finding worth having. An aggregator clamps to its bound instead of reporting
-    /// through it, and keeps publishing the clamped figure on a fresh timestamp, so no staleness
-    /// check anywhere upstream can see it. Collateral that has crashed goes on being valued at the
-    /// floor, which keeps a market borrowing and out of reach of liquidation.
-    function test_price_refusesAnAnswerRestingOnTheFloor() public {
-        MockAggregator feed = new MockAggregator(8, 2000e8, block.timestamp);
-        feed.setBounds(100e8, 10_000e8);
-
-        // the real price collapses through the floor; the feed reports the floor, freshly stamped
-        feed.setAnswer(100e8);
-
-        _expect(
-            address(feed),
-            abi.encodeWithSelector(ChainlinkAdapter.AtCircuitBreaker.selector, address(feed), int256(100e8))
-        );
-    }
-
-    function test_price_refusesAnAnswerRestingOnTheCeiling() public {
-        MockAggregator feed = new MockAggregator(8, 10_000e8, block.timestamp);
-        feed.setBounds(100e8, 10_000e8);
-
-        _expect(
-            address(feed),
-            abi.encodeWithSelector(ChainlinkAdapter.AtCircuitBreaker.selector, address(feed), int256(10_000e8))
-        );
-    }
-
-    function test_price_acceptsAnAnswerOneUnitInsideTheBounds() public {
-        MockAggregator feed = new MockAggregator(8, 100e8 + 1, block.timestamp);
-        feed.setBounds(100e8, 10_000e8);
+    /// @dev No USD feed reports above eighteen, but the branch exists and truncates, so it is
+    /// held to the direction it truncates in rather than left to be discovered.
+    function test_price_normalisesAFeedAboveTheScaleDown() public {
+        MockAggregator feed = new MockAggregator(21, 2000e21 + 999, block.timestamp);
 
         (uint256 answer,) = _read(address(feed));
 
-        assertEq(answer, 100e8 + 1, "inside is inside; only resting on the bound is a clamp");
-    }
-
-    /// @dev Fail-open, deliberately. Plenty of feeds answer neither hop, and refusing them would
-    /// make serviceable feeds unusable while leaving them exactly where they were before the check
-    /// existed.
-    function test_price_acceptsAFeedThatPublishesNoBounds() public {
-        MockBareFeed feed = new MockBareFeed(2000e8, block.timestamp);
-
-        (uint256 answer,) = _read(address(feed));
-
-        assertEq(answer, 2000e8, "no bounds published means no bounds enforced");
+        assertEq(answer, 2000e18, "scaled down, and the sub-wei remainder dropped rather than rounded up");
     }
 
     // ── feeds that should be refused ──────────────────────────────────────────
 
-    /// @dev Chainlink signals an unsettled round with a zero timestamp and documents its answer as
-    /// not yet meaningful. Passing it on stamps a live price at the unix epoch, which only fails
-    /// closed further up because the staleness check happens to measure against that stamp.
-    function test_price_refusesAnUnsettledRound() public {
+    /// @dev An unsettled round is stamped at zero. The adapter still answers; staleness is the
+    /// oracle's to measure.
+    function test_price_passesThroughAnUnsettledRound() public {
         MockAggregator feed = new MockAggregator(8, 2000e8, 0);
 
-        _expect(address(feed), abi.encodeWithSelector(ChainlinkAdapter.IncompleteRound.selector, address(feed)));
+        (uint256 answer, uint256 updatedAt) = _read(address(feed));
+
+        assertEq(answer, 2000e18);
+        assertEq(updatedAt, 0);
     }
 
     function test_price_refusesANegativeAnswer() public {
         MockAggregator feed = new MockAggregator(8, -1, block.timestamp);
 
-        _expect(
-            address(feed),
-            abi.encodeWithSelector(ChainlinkAdapter.NonPositiveAnswer.selector, address(feed), int256(-1))
-        );
+        _expectZero(address(feed));
     }
 
-    /// @dev Named rather than folded into a zero, so a chain that composes to nothing says which
-    /// leg did it.
     function test_price_refusesAZeroAnswer() public {
         MockAggregator feed = new MockAggregator(8, 0, block.timestamp);
 
-        _expect(
-            address(feed), abi.encodeWithSelector(ChainlinkAdapter.NonPositiveAnswer.selector, address(feed), int256(0))
-        );
+        _expectZero(address(feed));
     }
 }

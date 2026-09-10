@@ -9,13 +9,17 @@ import { Underwriter } from "../../cap/Underwriter.sol";
 import { Vault } from "../../cap/Vault.sol";
 import { FixedMarket } from "../../cap/market/FixedMarket.sol";
 import { FloatingMarket } from "../../cap/market/FloatingMarket.sol";
+import { Oracle } from "../../cap/oracle/Oracle.sol";
 import { ImplementationsConfig } from "../interfaces/DeployConfigs.sol";
 
 contract DeployImplems {
+    /// @dev Deploy every implementation the infrastructure proxies and beacons point at
+    /// @return implems The implementation addresses
     function _deployImplementations() internal returns (ImplementationsConfig memory implems) {
         implems.vault = address(new Vault());
         implems.stablecoin = address(new Stablecoin());
         implems.irm = address(new InterestRateModel());
+        implems.oracle = address(new Oracle());
         implems.registry = address(new Registry());
         implems.floatingMarket = address(new FloatingMarket());
         implems.fixedMarket = address(new FixedMarket());

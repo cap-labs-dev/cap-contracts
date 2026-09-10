@@ -9,7 +9,10 @@ import { InterestRateModel } from "../../cap/InterestRateModel.sol";
 import { Registry } from "../../cap/Registry.sol";
 import { Stablecoin } from "../../cap/Stablecoin.sol";
 import { Vault } from "../../cap/Vault.sol";
+import { ChainlinkAdapter } from "../../cap/oracle/ChainlinkAdapter.sol";
+import { Oracle } from "../../cap/oracle/Oracle.sol";
 import { IRegistry } from "../../interfaces/IRegistry.sol";
+import { CapRoles } from "../../utils/CapRoles.sol";
 import { ImplementationsConfig, InfraConfig, UsersConfig } from "../interfaces/DeployConfigs.sol";
 import { ProxyUtils } from "../utils/ProxyUtils.sol";
 import { Vm } from "forge-std/Vm.sol";
@@ -17,6 +20,10 @@ import { Vm } from "forge-std/Vm.sol";
 contract DeployInfra is ProxyUtils {
     Vm private constant VM = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
+    /// @dev Deploy the shared infrastructure and initialize it
+    /// @param implementations The implementation addresses
+    /// @param users The admin and token configuration
+    /// @return infra The deployed infrastructure addresses
     function _deployInfra(ImplementationsConfig memory implementations, UsersConfig memory users)
         internal
         returns (InfraConfig memory infra)
@@ -24,6 +31,10 @@ contract DeployInfra is ProxyUtils {
         infra = _deployInfra(implementations, users, 0);
     }
 
+    /// @dev Deploy the shared infrastructure and initialize it
+    /// @param implementations The implementation addresses
+    /// @param users The admin and token configuration
+    /// @return infra The deployed infrastructure addresses
     function _deployInfra(
         ImplementationsConfig memory implementations,
         UsersConfig memory users,
@@ -33,12 +44,24 @@ contract DeployInfra is ProxyUtils {
         returns (InfraConfig memory infra)
     {
         require(users.stablecoinUnderlying != address(0), "stablecoinUnderlying required");
-        require(users.stakedStablecoin != address(0), "stakedStablecoin required");
-        require(users.oracle != address(0), "oracle required");
 
         infra.accessManager = address(new AccessManager(users.admin));
 
         infra.vault = _proxy(implementations.vault, abi.encodeCall(Vault.initialize, (infra.accessManager)));
+
+        // Deployed here rather than passed in. Handing the registry a foreign address meant the
+        // real oracle was never built or read by anything that runs, so its answer scale went
+        // unchecked against the consumers that carry it into collateral value. The adapter is
+        // stateless and holds no per-asset configuration, so one instance serves every feed; the
+        // governor still has to point each asset at it with {Oracle-setSource} before that asset
+        // can back a market, which {Registry} enforces by pricing it at launch
+        infra.oracle = _proxy(implementations.oracle, abi.encodeCall(Oracle.initialize, (infra.accessManager)));
+        bytes memory adapterCode = type(ChainlinkAdapter).creationCode;
+        address adapter;
+        assembly {
+            adapter := create(0, add(adapterCode, 0x20), mload(adapterCode))
+        }
+        infra.chainlinkAdapter = adapter;
 
         uint256 n = VM.getNonce(address(this));
         address irmAddr = VM.computeCreateAddress(address(this), n);
@@ -54,7 +77,8 @@ contract DeployInfra is ProxyUtils {
         infra.stablecoin = _proxy(
             implementations.stablecoin,
             abi.encodeCall(
-                Stablecoin.initialize, (infra.accessManager, users.stablecoinUnderlying, "Cap USD", "cUSD", "", irmAddr)
+                Stablecoin.initialize,
+                (infra.accessManager, users.stablecoinUnderlying, "Cap USD", "cUSD", "", irmAddr, users.reserveVault)
             )
         );
 
@@ -68,6 +92,12 @@ contract DeployInfra is ProxyUtils {
         infra.trancheBeacon = address(new UpgradeableBeacon(implementations.tranche, users.admin));
         infra.underwriterBeacon = address(new UpgradeableBeacon(implementations.underwriter, users.admin));
 
+        // {Registry-initialize} wires every shared selector, which is an ADMIN call on the
+        // manager. Grant that before the proxy is created so the initializer can do its job
+        address registryAddr = VM.computeCreateAddress(address(this), VM.getNonce(address(this)));
+        AccessManager(infra.accessManager).grantRole(CapRoles.ADMIN, registryAddr, 0);
+        AccessManager(infra.accessManager).grantRole(CapRoles.REGISTRY, registryAddr, 0);
+
         infra.registry = _proxy(
             implementations.registry,
             abi.encodeCall(
@@ -76,9 +106,8 @@ contract DeployInfra is ProxyUtils {
                     infra.accessManager,
                     IRegistry.InitParams({
                         stablecoin: infra.stablecoin,
-                        stakedStablecoin: users.stakedStablecoin,
                         vault: infra.vault,
-                        oracle: users.oracle,
+                        oracle: infra.oracle,
                         irm: infra.irm,
                         factory: infra.factory,
                         floatingMarketBeacon: infra.floatingMarketBeacon,
@@ -92,5 +121,7 @@ contract DeployInfra is ProxyUtils {
                 )
             )
         );
+
+        require(infra.registry == registryAddr, "registry addr");
     }
 }

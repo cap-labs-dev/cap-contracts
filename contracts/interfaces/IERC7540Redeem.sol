@@ -2,7 +2,7 @@
 pragma solidity 0.8.36;
 
 /// @title IERC7540Redeem
-/// @notice IERC7540Redeem is required for ERC165 support of the ERC7540 async redemption standard.
+/// @notice ERC-165 marker for ERC-7540 async redemption
 interface IERC7540Redeem {
     /// @dev Assumes control of shares from sender into the Vault and submits a Request for asynchronous redeem.
     ///

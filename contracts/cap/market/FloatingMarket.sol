@@ -40,18 +40,13 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
     }
 
     /// @inheritdoc IBaseMarket
-    /// @dev The multiplier sits inside the liquidity index, so changing it would otherwise reprice
-    /// every outstanding loan. Accrue first, then rewrite scaledDebt so
-    /// `scaledDebt × index` is unchanged.
-    ///
-    /// Unchanged only to the nearest wei. `rayMul` steps by `index / RAY`, so once the index has
-    /// grown past one ray not every debt is exactly representable and the reading can land a wei
-    /// either side of where it was. The exactness {_floorReduction} gets is not available here:
-    /// it works by deriving the settlement from the reduction, and there is nothing to settle
-    /// against on a reindex, no cUSD minted or burned to match. Rounding to nearest is the closest
-    /// available and the drift is not directional, so it cannot accumulate through repeated
-    /// governance calls the way a one-sided rounding would.
-    function setMarketMultiplier(uint256 multiplier) external override(BaseMarket, IBaseMarket) restricted {
+    /// @dev Accrue first, then rewrite `scaledDebt` so `scaledDebt × index` is unchanged to the nearest wei.
+    function setMarketMultiplier(uint256 multiplier)
+        external
+        override(BaseMarket, IBaseMarket)
+        restricted
+        nonReentrant
+    {
         _chargePremium();
         uint256 debt = totalDebt();
         IInterestRateModel(irm()).updateMarketMultiplier(multiplier);
@@ -65,7 +60,12 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
     }
 
     /// @inheritdoc IFloatingMarket
-    function borrow(address recipient, uint256 principal) external restricted returns (uint256 actualPrincipal) {
+    function borrow(address recipient, uint256 principal)
+        external
+        restricted
+        nonReentrant
+        returns (uint256 actualPrincipal)
+    {
         _chargePremium();
 
         actualPrincipal = _creditCheck(availableCredit(), principal);
@@ -77,7 +77,7 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
     }
 
     /// @inheritdoc IFloatingMarket
-    function repay(uint256 amount) external returns (uint256 repaid) {
+    function repay(uint256 amount) external nonReentrant returns (uint256 repaid) {
         _chargePremium();
         uint256 debt = totalDebt();
         (uint256 remainingScaled, uint256 cleared) = _floorReduction(debt, _debtCheck(debt, amount));
@@ -90,6 +90,7 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
     function liquidate(address recipient, uint256 amount)
         external
         restricted
+        nonReentrant
         returns (uint256 repaid, uint256 assetsSlashed)
     {
         _chargePremium();
@@ -103,12 +104,12 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
     }
 
     /// @inheritdoc IFloatingMarket
-    function chargePremium() external {
+    function chargePremium() external nonReentrant {
         _chargePremium();
     }
 
     /// @inheritdoc IFloatingMarket
-    function writeOff() external restricted returns (uint256 amount) {
+    function writeOff() external restricted nonReentrant returns (uint256 amount) {
         _chargePremium();
         uint256 debt = totalDebt();
         (uint256 remainingScaled, uint256 cleared) = _floorReduction(debt, unrecoverableDebt());
@@ -146,29 +147,7 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
         combinedIndex = liquidityIndex.rayMul(underwriterIndex);
     }
 
-    /// @dev Work out the scaled debt that clears `target`, and how much debt that actually clears.
-    ///
-    /// `scaledDebt` is the source of truth and {totalDebt} is a rounded reading of it, so the debt
-    /// a reduction clears is not `target` but whatever the reading falls by. Settling `target`
-    /// conflated the two: `rayDiv` rounds half up, so the reading fell by more than the cUSD
-    /// burned and left credit-backed supply with no debt behind it. At an index of 1.4907,
-    /// repaying one wei cleared two.
-    ///
-    /// Rounding the other way does not fix it, it only moves the drift: the reading can only take
-    /// values `index / RAY` apart, so once the index is above one ray most debt figures are not
-    /// representable at all and no direction reconciles a lattice with an exact counter. Deriving
-    /// the settlement from the reading's own movement is what makes them agree.
-    ///
-    /// Flooring is what bounds it: the reduction is at most `target * RAY / index`, so the reading
-    /// falls by at most `target` and a caller is never charged above their request. A payment too
-    /// small to move a whole scaled unit clears nothing, so it reverts rather than being taken for
-    /// a no-op. Clearing in full is the one case flooring cannot express, since the floor can leave
-    /// a scaled wei that reads back as dust debt nobody can retire: doing so would need more
-    /// credit-backed supply burned than exists to decrement. It is zeroed outright instead.
-    ///
-    /// Returning `remainingScaled` rather than storing it leaves callers free to order their side
-    /// effects, which both {liquidate} and {writeOff} need: each has a check that reads {totalDebt}
-    /// and must run before the reduction lands.
+    /// @dev Scaled reduction that clears at most `target`. Settlement is the drop in {totalDebt}.
     /// @param debt The debt before the reduction, as read by {totalDebt}
     /// @param target The debt to clear
     /// @return remainingScaled The scaled debt to store

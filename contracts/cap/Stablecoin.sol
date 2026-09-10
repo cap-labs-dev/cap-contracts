@@ -2,26 +2,31 @@
 pragma solidity 0.8.36;
 
 import { ERC4626Upgradeable, ERC7540AsyncRedeem, IERC4626 } from "../ERC7540/ERC7540AsyncRedeem.sol";
+import { IAeraVault } from "../interfaces/IAeraVault.sol";
 import { IInterestRateModel } from "../interfaces/IInterestRateModel.sol";
 import { IStablecoin } from "../interfaces/IStablecoin.sol";
+import { PremiumVesting } from "../utils/PremiumVesting.sol";
 import { WadRayMath } from "../utils/WadRayMath.sol";
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title Stablecoin
 /// @author kexley, Cap Labs
-/// @notice The Stablecoin is a token that is backed by the underlying asset and can be used to borrow and repay debt.
+/// @notice Credit-backed ERC-7540 stablecoin
 contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     is
     IStablecoin,
     AccessManagedUpgradeable,
-    ERC7540AsyncRedeem,
+    PremiumVesting,
     UUPSUpgradeable
 {
+    using SafeERC20 for IERC20;
     using WadRayMath for uint256;
 
     /// @inheritdoc IStablecoin
@@ -36,6 +41,9 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     /// @inheritdoc IStablecoin
     uint256 public badDebt;
 
+    /// @inheritdoc IStablecoin
+    address public reserveVault;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -48,10 +56,11 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         string memory _name,
         string memory _symbol,
         string memory _uri,
-        address _irm
+        address _irm,
+        address _reserveVault
     ) external initializer {
         __AccessManaged_init(_authority);
-        __ERC7540AsyncRedeem_init(IERC20Metadata(_asset), _name, _symbol, _uri);
+        __PremiumVesting_init(IERC20Metadata(_asset), _name, _symbol, _uri, address(this));
         // both previews scale between the two units, and only the direction that divides can lose
         // anything. Below 18 that is the mint side, which rounds up so the vault keeps the dust;
         // above 18 it would be the deposit side, where rounding up is not available because the
@@ -62,14 +71,24 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         if (assetDecimals > decimals()) revert UnsupportedDecimals();
         underlyingDecimals = assetDecimals;
         irm = _irm;
+        reserveVault = _reserveVault;
+    }
+
+    /// @inheritdoc IStablecoin
+    function fund(uint256 premium) external {
+        uint256 shares = deposit(premium, address(this));
+        _fund(shares);
+    }
+
+    /// @inheritdoc IStablecoin
+    function fundCreditBacked(uint256 premium) external restricted {
+        _mintCreditBacked(address(this), premium);
+        _fund(premium);
     }
 
     /// @inheritdoc IStablecoin
     function mintCreditBacked(address _to, uint256 _amount) external restricted {
-        _mint(_to, _amount);
-        creditBackedSupply += _amount;
-        IInterestRateModel(irm).updateLiquidityRate();
-        emit MintCreditBacked(_to, _amount);
+        _mintCreditBacked(_to, _amount);
     }
 
     /// @inheritdoc IStablecoin
@@ -78,6 +97,24 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         creditBackedSupply -= _amount;
         IInterestRateModel(irm).updateLiquidityRate();
         emit BurnCreditBacked(_from, _amount);
+    }
+
+    /// @inheritdoc IStablecoin
+    function invest(uint256 amount) external restricted {
+        IERC20 token = IERC20(asset());
+        token.forceApprove(reserveVault, amount);
+        IAeraVault.TokenAmount[] memory amounts = new IAeraVault.TokenAmount[](1);
+        amounts[0] = IAeraVault.TokenAmount({ token: token, amount: amount });
+        IAeraVault(reserveVault).deposit(amounts);
+        emit Invested(amount);
+    }
+
+    /// @inheritdoc IStablecoin
+    function recall(uint256 amount) external restricted {
+        IAeraVault.TokenAmount[] memory amounts = new IAeraVault.TokenAmount[](1);
+        amounts[0] = IAeraVault.TokenAmount({ token: IERC20(asset()), amount: amount });
+        IAeraVault(reserveVault).withdraw(amounts);
+        emit Recalled(amount);
     }
 
     /// @inheritdoc IStablecoin
@@ -96,7 +133,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         supply = totalSupply();
     }
 
-    /// @dev Shared so that the projection cannot drift from the live figure it projects
+    /// @dev Calculates the utilization rate between the credit-backed supply and the total supply.
     /// @param _credit The credit-backed supply
     /// @param _supply The total supply
     /// @return rate The utilization rate in ray decimals
@@ -108,27 +145,20 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     /// @inheritdoc IStablecoin
     function recognizeBadDebt(uint256 _amount) external restricted {
         badDebt += _amount;
-        // the borrower will never repay, so this cUSD will never be burned by {burnCreditBacked}.
-        // Leaving it counted would hold `creditBackedSupply` permanently too high.
-        //
-        // Removing it does not make it redeemable: {unlockedSupply} subtracts `creditBackedSupply`
-        // and `badDebt` together, and `badDebt` just rose by the same amount, so the total held
-        // back is unchanged. Holders bear the loss through {totalAssets}, which nets off `badDebt`
-        // so that each share redeems below par.
+        // will never be repaid, so drop it from credit-backed supply. unlockedSupply is unchanged
+        // because badDebt rose by the same amount. Holders take the loss through totalAssets.
         creditBackedSupply -= _amount;
         IInterestRateModel(irm).updateLiquidityRate();
         emit BadDebtRecognized(_amount);
     }
 
     /// @inheritdoc IStablecoin
-    function coverBadDebt(uint256 _amount) external restricted returns (uint256 covered) {
+    function coverBadDebt(uint256 _amount) external returns (uint256 covered) {
         uint256 shortfall = badDebt;
         if (shortfall == 0) revert NoBadDebt();
         covered = _amount < shortfall ? _amount : shortfall;
 
-        // supply and shortfall fall together, so totalAssets is unchanged and the same backing now
-        // stands behind fewer shares. The reserve is untouched: this retires written off supply
-        // rather than adding new deposits
+        // supply and shortfall fall together; totalAssets and the reserve are unchanged
         badDebt = shortfall - covered;
         _burn(msg.sender, covered);
 
@@ -138,8 +168,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
 
     /// @inheritdoc IStablecoin
     function unlockedSupply() public view override(ERC7540AsyncRedeem, IStablecoin) returns (uint256 unlocked) {
-        // credit-backed supply is a claim on borrowers rather than on the deposits held here, and
-        // written off supply is a claim on nothing at all. Neither may redeem against the reserve.
+        // neither credit-backed nor written-off supply may redeem against the reserve
         uint256 locked = creditBackedSupply + badDebt;
         uint256 supply = totalSupply();
         if (supply > locked) unlocked = supply - locked;
@@ -151,14 +180,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     }
 
     /// @inheritdoc IStablecoin
-    /// @dev Deliberately at par even while bad debt is outstanding, rather than at the backing
-    /// ratio, and markets rely on this. Minting at the ratio would let anyone turn a dollar into
-    /// more than a dollar of cUSD, which a liquidator could burn against debt at face value to
-    /// collect `1 + bonus` of collateral on cUSD they conjured for less, and that excess would
-    /// come straight out of the underwriters. Holding the mint at par caps the cost of acquiring
-    /// cUSD at a dollar, so a liquidation can never release more collateral than the liquidator
-    /// paid for plus the intended bonus. It also means new deposits top the reserve back up, at
-    /// the cost of the depositor taking a share of the outstanding shortfall when they leave.
+    /// @dev Always at par, even with bad debt.
     function previewDeposit(uint256 _assets)
         public
         view
@@ -169,13 +191,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     }
 
     /// @inheritdoc IStablecoin
-    /// @dev At par while bad debt is outstanding; see {previewDeposit}.
-    ///
-    /// Rounded up, as ERC-4626 requires of the side that quotes what a mint costs. Truncating here
-    /// hands out shares for nothing whenever the requested amount does not divide the scale
-    /// exactly, which against a six decimal underlying is anything below 1e12 wei of cUSD. The
-    /// amounts are dust, but the reserve identity the redemption gate rests on is not something to
-    /// leave standing on a rounding direction.
+    /// @dev At par; see {previewDeposit}. Rounded up.
     function previewMint(uint256 _shares)
         public
         view
@@ -190,34 +206,8 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         return 18;
     }
 
-    /// @dev While a shortfall is outstanding, redemptions are priced below the pool's own backing
-    /// ratio, so exiting repairs the peg for whoever stays instead of passing the loss on. The gap
-    /// the redeemer leaves is burned off the bad debt in {_onWithdraw}.
-    ///
-    /// The shares that stay retain `remaining * supply * backing / (supply * backing + remaining *
-    /// shortfall)` and the redeemer takes the rest, which works out at `backing` squared over
-    /// `supply * backing + remaining * shortfall`, per share. So a whole-supply exit is paid the
-    /// backing ratio exactly, and the marginal redeemer that ratio squared, with everything in
-    /// between on the curve joining them. Repair is asymptotic by construction, since the haircut
-    /// has to fade out as the shortfall does or there would be a cliff at the moment it cleared,
-    /// so {coverBadDebt} is what closes the gap outright.
-    ///
-    /// Charging under the ratio is what makes exiting first the worst time to exit, which is the
-    /// point: during a shortfall the incentive runs towards waiting rather than racing for the
-    /// door. Nobody gets that improvement for free, since it only arrives once another holder has
-    /// actually left and taken the haircut. Pricing at the flat ratio would leave exit timing
-    /// neutral instead, and hand the loss to whoever was still holding at the end.
-    ///
-    /// None of it can be gamed by chopping a redemption up, because the curve conserves
-    /// `shortfall / (supply * backing)`. Call that `k`: retaining `remaining / (1 + k * remaining)`
-    /// depends on nothing but the remaining supply and `k`, and a redemption leaves `k` where it
-    /// found it, so every route from one supply to another arrives at the same payout. Splitting,
-    /// batching, and interleaving with other people's redemptions are exactly equal, not equal up
-    /// to dust. That invariant is the thing to test against.
-    ///
-    /// Only this side is bad debt aware. {previewDeposit} and {previewMint} bypass it to mint at
-    /// par; see {previewDeposit} for why. Depositing to improve an exit does not work either:
-    /// minting at par lowers `k`, but by less than the par mint costs.
+    /// @dev During a shortfall, redemptions price below the backing ratio so exit repairs the peg.
+    /// Redemptions are priced at roughly (totalAssets / totalSupply) ^2
     /// @param _shares The number of shares to convert to assets
     /// @param _rounding The rounding direction
     /// @return assets The number of assets
@@ -248,9 +238,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         assets = Math.mulDiv(value, 10 ** underlyingDecimals, 10 ** decimals(), _rounding);
     }
 
-    /// @dev Inverse of {_convertToAssets}, solving the same curve for the shares that must burn to
-    /// leave a given payout. Exact rather than approximate, so a redeem and a withdraw of the same
-    /// size agree.
+    /// @dev Inverse of {_convertToAssets}.
     /// @param _assets The number of assets to convert to shares
     /// @param _rounding The rounding direction
     /// @return shares The number of shares
@@ -276,8 +264,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         shares = supply > remaining ? supply - remaining : 0;
     }
 
-    /// @dev Flip a rounding direction, for the intermediate terms that are subtracted rather than
-    /// returned. Rounding those up is what rounds the final result down.
+    /// @dev Flip rounding for subtracted intermediate terms.
     /// @param _rounding The rounding direction to invert
     /// @return flipped The opposite rounding direction
     function _opposite(Math.Rounding _rounding) private pure returns (Math.Rounding flipped) {
@@ -294,17 +281,17 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         IInterestRateModel(irm).updateLiquidityRate();
     }
 
-    /// @dev Retire the shortfall this redemption absorbed and refresh the rate. Whatever the
-    /// redeemer left on the table relative to their share count burns off the bad debt, which is
-    /// what lifts the backing ratio for the remaining supply. Deriving it from the assets actually
-    /// paid is what keeps `totalAssets` exact: it falls by precisely that payout, so no part of
-    /// the loss can be erased from the accounting or counted twice.
-    ///
-    /// This hangs off {ERC7540AsyncRedeem-_onWithdraw} rather than `_withdraw` so that queued
-    /// redemptions retire their share too. Overriding `_withdraw` reaches only the instant path,
-    /// which would leave every queued redeemer paying the haircut without the shortfall ever
-    /// falling, so exiting would push the ratio down for whoever stayed and the difference would
-    /// strand in the reserve with nothing left to claim it.
+    /// @dev Mint credit-backed stablecoin and update the liquidity rate
+    /// @param _to The address to mint the credit-backed stablecoin to
+    /// @param _amount The amount of credit-backed stablecoin to mint
+    function _mintCreditBacked(address _to, uint256 _amount) internal {
+        _mint(_to, _amount);
+        creditBackedSupply += _amount;
+        IInterestRateModel(irm).updateLiquidityRate();
+        emit MintCreditBacked(_to, _amount);
+    }
+
+    /// @dev Retire the shortfall this redemption absorbed. Hooked here so queued redemptions count too.
     /// @param _owner The address whose shares were burned
     /// @param _assets The amount of assets withdrawn
     /// @param _shares The amount of shares burned

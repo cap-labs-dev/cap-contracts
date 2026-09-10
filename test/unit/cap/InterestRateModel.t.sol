@@ -153,47 +153,134 @@ contract InterestRateModelTest is BaseTest {
         assertEq(irm.averageUtilization(), 0.2e27, "the clock was reset before the manipulation, not after");
     }
 
-    /// @dev Half a period of a sustained shift is half of the distance travelled
+    /// @dev A sustained shift is partly in after part of a window and asymptotically the rest of
+    /// the way after that.
+    ///
+    /// The window is a time constant rather than a deadline: the average sheds
+    /// {retentionPerSecond} of its distance per second, so one whole period carries it about 63%
+    /// of the way and no finite time carries it exactly all of it. That is what makes the average
+    /// independent of how often the accrual runs, and it costs the clean arithmetic the linear
+    /// weight had — half a period used to land on exactly half the distance. Ordering is pinned
+    /// strictly and the endpoints loosely, since the figure is the quotient of two decays.
     function test_averageConvergesWithTheTimeAReadingHolds() public {
         stablecoin.setSupplyUtilization(0.2e27);
         irm.updateLiquidityRate();
-        skip(irm.averagingPeriod());
+        skip(_untilSettled());
         irm.updateLiquidityRate();
+        assertApproxEqRel(irm.averageUtilization(), 0.2e27, 1e12, "settled on the standing reading");
 
         stablecoin.setSupplyUtilization(0.4e27);
         irm.updateLiquidityRate();
 
         skip(irm.averagingPeriod() / 2);
-        assertEq(irm.averageUtilization(), 0.3e27, "halfway there after half the window");
+        uint256 halfway = irm.averageUtilization();
+
+        skip(_untilSettled());
+        uint256 settled = irm.averageUtilization();
+
+        assertGt(halfway, 0.2e27, "half a period moves it off the reading it had settled on");
+        assertLt(halfway, 0.4e27, "without taking it all the way to the new one");
+        assertApproxEqRel(settled, 0.4e27, 1e12, "which enough quiet time does");
     }
 
     /// @dev The mint is added to the averaged supplies rather than smoothed away, so a borrower
-    /// still pays for the utilization their own draw creates
+    /// still pays for the utilization their own draw creates.
+    ///
+    /// Settled first, because the mint is an absolute amount added to averaged supplies: measured
+    /// against supplies still climbing towards their true level it would read as a larger share
+    /// of the pool than it is, and this is about the arithmetic rather than the convergence.
     function test_averageStillCountsAMintThatHasNotHappenedYet() public {
         stablecoin.setSupplyUtilization(0.5e27);
         irm.updateLiquidityRate();
-        skip(irm.averagingPeriod());
+        skip(_untilSettled());
         irm.updateLiquidityRate();
 
         // the mock reports the pair as (0.5e27, 1e27), so a quarter-ray mint lands at 0.75/1.25
-        assertEq(irm.averageUtilizationAfterMint(0.25e27), 0.6e27, "the draw moves the level it is priced at");
+        assertApproxEqRel(
+            irm.averageUtilizationAfterMint(0.25e27), 0.6e27, 1e12, "the draw moves the level it is priced at"
+        );
     }
 
+    /// @dev Compared against the figure standing immediately before the change rather than a
+    /// constant, which is the actual claim: the interval that has run is settled under the window
+    /// it ran under, so widening cannot reach back and reweight it.
     function test_setAveragingPeriod_movesTheWindowAndSettlesTheOldOne() public {
         stablecoin.setSupplyUtilization(0.2e27);
         irm.updateLiquidityRate();
-        skip(irm.averagingPeriod());
+        skip(_untilSettled());
         irm.updateLiquidityRate();
 
         stablecoin.setSupplyUtilization(0.4e27);
         irm.updateLiquidityRate();
         skip(30 minutes);
+        uint256 earned = irm.averageUtilization();
 
-        // half of the old hour has run, so half the distance is already earned and widening the
-        // window must not claw that back
         irm.setAveragingPeriod(2 hours);
+
         assertEq(irm.averagingPeriod(), 2 hours);
-        assertEq(irm.averageUtilization(), 0.3e27, "time already served keeps the weight it was served under");
+        assertEq(irm.averageUtilization(), earned, "time already served keeps the weight it was served under");
+    }
+
+    /// @dev Long enough that the residual is beneath the tolerances above. Twenty time constants
+    /// leaves `e^-20`, around two parts in a billion.
+    function _untilSettled() internal view returns (uint256 quiet) {
+        quiet = 20 * irm.averagingPeriod();
+    }
+
+    // ── the average does not depend on how often it is accrued ────────────────
+
+    /// @dev Advance a period's worth of time in `slices` equal steps, accruing at each one
+    function _runAPeriodIn(uint256 slices) internal returns (uint256 average) {
+        uint256 step = irm.averagingPeriod() / slices;
+        for (uint256 i; i < slices; ++i) {
+            skip(step);
+            irm.updateLiquidityRate();
+        }
+        average = irm.averageUtilization();
+    }
+
+    /// @dev The property the whole averaging rests on, and the one it did not have.
+    ///
+    /// {updateLiquidityRate} is permissionless, and worse, the stablecoin runs the same accrual on
+    /// every deposit, mint and withdrawal — so a one-wei deposit triggers it and there is no way
+    /// to gate it. Under the old per-call weight of `elapsed / period`, cutting an interval up
+    /// made the average converge more slowly: half the interval twice retained a quarter of the
+    /// stale average where the whole interval retained none, and finer cuts converged on `1/e`,
+    /// leaving 36.8% of a stale reading in place. A fixed borrower could hold the average down
+    /// near an old low reading and be quoted off utilisation that had already moved, and even
+    /// without an attacker the figure depended on how busy the protocol happened to be.
+    ///
+    /// A per-second retention raised to the elapsed seconds composes instead, so the number of
+    /// slices cannot matter. Compared against a single accrual over the whole interval, so this
+    /// pins the value and not merely that the slices agree with each other.
+    function test_theAverageIsTheSameHoweverOftenItIsAccrued() public {
+        uint256 fixture = vm.snapshotState();
+
+        stablecoin.setSupplyUtilization(0.2e27);
+        irm.updateLiquidityRate();
+        skip(_untilSettled());
+        irm.updateLiquidityRate();
+        stablecoin.setSupplyUtilization(0.9e27);
+        irm.updateLiquidityRate();
+        uint256 shifted = vm.snapshotState();
+
+        uint256 once = _runAPeriodIn(1);
+
+        uint256[4] memory splits = [uint256(2), 10, 60, 360];
+        for (uint256 i; i < splits.length; ++i) {
+            vm.revertToState(shifted);
+            uint256 spammed = _runAPeriodIn(splits[i]);
+
+            // a ray of headroom on a ray-scaled figure: the rounding in `rayPow` is half-up per
+            // squaring, so a longer path can retain a few ulps more. Nothing an attacker can
+            // widen, and nine orders of magnitude off the 36.8% the old weight gave away
+            assertApproxEqAbs(spammed, once, 1e9, "the number of accruals cannot move the average");
+        }
+
+        // and the fixture really was one where the old weight would have differed
+        vm.revertToState(fixture);
+        assertLt(once, 0.9e27, "the average is mid-shift, so a slower convergence would show");
+        assertGt(once, 0.2e27, "and has left the reading it started from");
     }
 
     function test_setAveragingPeriod_outsideTheBand_reverts() public {

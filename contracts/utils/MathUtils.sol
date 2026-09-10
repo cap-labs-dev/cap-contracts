@@ -38,6 +38,7 @@ library MathUtils {
     /// error per different time periods
     /// @param rate The interest rate, in ray
     /// @param lastUpdateTimestamp The timestamp of the last update of the interest
+    /// @param currentTimestamp The timestamp to accumulate interest up to
     /// @return interestRate The interest rate compounded during the timeDelta, in ray
     function calculateCompoundedInterest(uint256 rate, uint256 lastUpdateTimestamp, uint256 currentTimestamp)
         internal

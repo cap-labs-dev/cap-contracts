@@ -92,8 +92,9 @@ contract PremiumBackingTest is CapDeployer {
         assertEq(stablecoin.balanceOf(t0) - seniorBefore, underwriterPremium, "senior absorbs leftover");
     }
 
-    /// An empty senior cannot take leftover, so it is minted to the staked stablecoin instead.
-    function test_emptySenior_leftoverGoesToStakedStablecoin() public {
+    /// An empty senior cannot take leftover, so leftover and liquidity premium vest on the
+    /// stablecoin for whoever has opted in.
+    function test_emptySenior_leftoverVestsOnStablecoin() public {
         _deployCap();
         (address marketAddr, address t0, address t1) = _createMarket("M");
         FloatingMarket market = FloatingMarket(marketAddr);
@@ -113,15 +114,17 @@ contract PremiumBackingTest is CapDeployer {
         uint256 juniorShare = underwriterPremium * 0.05e27 / 1e27;
         uint256 leftover = underwriterPremium - juniorShare;
 
-        address staked = market.stakedStablecoin();
-        uint256 stakedBefore = stablecoin.balanceOf(staked);
         uint256 juniorBefore = stablecoin.balanceOf(t1);
+        uint256 vestedBefore = stablecoin.balanceOf(address(stablecoin));
 
         market.chargePremium();
 
         assertApproxEqAbs(stablecoin.balanceOf(t1) - juniorBefore, juniorShare, 1, "junior takes only its weight");
         assertApproxEqAbs(
-            stablecoin.balanceOf(staked) - stakedBefore, liquidityPremium + leftover, 1, "leftover to staked"
+            stablecoin.balanceOf(address(stablecoin)) - vestedBefore,
+            liquidityPremium + leftover,
+            1,
+            "liquidity and leftover vest on cUSD"
         );
         assertEq(market.totalDebt() - debtBefore, stablecoin.creditBackedSupply() - supplyBefore, "full premium minted");
     }

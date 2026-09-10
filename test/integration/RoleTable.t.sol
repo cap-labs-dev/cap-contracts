@@ -7,6 +7,8 @@ import { IBeaconFactory } from "../../contracts/interfaces/IBeaconFactory.sol";
 import { IFixedMarket } from "../../contracts/interfaces/IFixedMarket.sol";
 import { IFloatingMarket } from "../../contracts/interfaces/IFloatingMarket.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
+import { IOracle } from "../../contracts/interfaces/IOracle.sol";
+import { IRegistry } from "../../contracts/interfaces/IRegistry.sol";
 import { IStablecoin } from "../../contracts/interfaces/IStablecoin.sol";
 import { ITranche } from "../../contracts/interfaces/ITranche.sol";
 import { IUnderwriter } from "../../contracts/interfaces/IUnderwriter.sol";
@@ -24,7 +26,7 @@ import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 /// Three selectors had reached ADMIN by omission before this test existed. Asserting the table
 /// means the next one has to be argued for in a diff rather than arrived at silently.
 ///
-/// Covers all 49 gated selectors in the protocol, across per-market instances and the shared
+/// Covers all 48 gated selectors in the protocol, across per-market instances and the shared
 /// infrastructure. The table is a snapshot and does not discover new selectors by itself. What it
 /// does do is make the intended role explicit for each one, so a selector that is later rewired,
 /// or a new instance wired differently from the last, fails here.
@@ -52,6 +54,9 @@ contract RoleTableTest is CapDeployer {
         _expectRole(market, IBaseMarket.setTrancheWeights.selector, ownerRole, "setTrancheWeights");
         _expectRole(market, IBaseMarket.setMarketMultiplier.selector, ownerRole, "setMarketMultiplier");
         _expectRole(market, IBaseMarket.setUnderwriterRate.selector, ownerRole, "setUnderwriterRate");
+        // the waterfall can only be rearranged while the market stays healthy, so the owner
+        // may add, drop, or reorder tranches rather than waiting on ADMIN
+        _expectRole(market, IBaseMarket.setTranches.selector, ownerRole, "setTranches");
 
         // only the designated borrower can draw credit
         _expectRole(market, IFloatingMarket.borrow.selector, borrowerRole, "borrow");
@@ -67,10 +72,6 @@ contract RoleTableTest is CapDeployer {
 
         _expectRole(market, IFloatingMarket.liquidate.selector, CapRoles.LIQUIDATOR, "liquidate");
 
-        // rewiring the tranche set or the premium sink is infrastructure, held at ADMIN on purpose
-        _expectRole(market, IBaseMarket.setTranches.selector, CapRoles.ADMIN, "setTranches");
-        _expectRole(market, IBaseMarket.setStakedStablecoin.selector, CapRoles.ADMIN, "setStakedStablecoin");
-
         // markets, and only markets, drive the rate model and slash their tranches
         _expectRole(
             address(irm), IInterestRateModel.updateUnderwriterRate.selector, CapRoles.MARKET, "irm underwriter rate"
@@ -79,9 +80,7 @@ contract RoleTableTest is CapDeployer {
             address(irm), IInterestRateModel.updateMarketMultiplier.selector, CapRoles.MARKET, "irm market multiplier"
         );
         (bool isMarket,) = accessManager.hasRole(CapRoles.MARKET, market);
-        (bool isMinter,) = accessManager.hasRole(CapRoles.MINTER, market);
         assertTrue(isMarket, "market holds MARKET");
-        assertTrue(isMinter, "market holds MINTER");
 
         _assertTrancheRoleTable(tranches[0], ownerRole);
     }
@@ -106,11 +105,8 @@ contract RoleTableTest is CapDeployer {
     }
 
     function _assertTrancheRoleTable(address tranche, uint64 ownerRole) internal view {
-        _expectRole(tranche, ITranche.setVestingPeriod.selector, ownerRole, "tranche setVestingPeriod");
-        _expectRole(tranche, ITranche.slash.selector, CapRoles.MARKET, "slash");
-        // premium is pushed in by whichever market charged it, and notifying re-anchors the
-        // vesting epoch, so this may not be open: see {test_dustCannotStallPremiumRelease}
-        _expectRole(tranche, ITranche.notifyPremium.selector, CapRoles.MARKET, "notifyPremium");
+        // premium is pushed in by whichever market charged it, so this may not be open
+        _expectRole(tranche, ITranche.fund.selector, CapRoles.MARKET, "fund");
 
         // admission is a row like any other, same as on the underwriter: the entry points are
         // gated to a role of their own, and the market owner administers that role's membership
@@ -130,7 +126,10 @@ contract RoleTableTest is CapDeployer {
         uint64 originalRole = registry.operatorRole(defaultMarketOwner);
         assertEq(registry.marketOwnerRole(marketAddr), originalRole, "the deploying owner to begin with");
 
-        uint64 newRole = _assignOperator(makeAddr("newMarketOwner"));
+        address newOwner = makeAddr("newMarketOwner");
+        uint64 newRole = _assignOperator(newOwner);
+        vm.prank(address(registry));
+        accessManager.grantRole(newRole, newOwner, 0);
 
         bytes4[] memory ownerSelectors = new bytes4[](1);
         ownerSelectors[0] = IBaseMarket.setTrancheWeights.selector;
@@ -143,11 +142,17 @@ contract RoleTableTest is CapDeployer {
         weights[0] = 0.5e27;
         weights[1] = 0.3e27;
         weights[2] = 0.2e27;
+
+        vm.expectRevert(IRegistry.NotMarketOwner.selector);
+        registry.createTranche(marketAddr, address(collateral), weights);
+
+        vm.prank(newOwner);
         address added = registry.createTranche(marketAddr, address(collateral), weights);
 
-        _expectRole(added, ITranche.setVestingPeriod.selector, newRole, "new tranche follows the new owner");
-        assertEq(accessManager.getRoleAdmin(_depositorRole(added)), newRole, "and so does its depositor role");
-        _expectRole(existing[0], ITranche.setVestingPeriod.selector, originalRole, "the older tranches do not move");
+        assertEq(accessManager.getRoleAdmin(_depositorRole(added)), newRole, "the next tranche follows the new owner");
+        assertEq(
+            accessManager.getRoleAdmin(_depositorRole(existing[0])), originalRole, "the older tranches do not move"
+        );
     }
 
     function test_marketOwnerRole_isZeroForAMarketItDidNotDeploy() public {
@@ -175,13 +180,14 @@ contract RoleTableTest is CapDeployer {
         uint64 curatorRole = registry.operatorRole(address(this));
         assertTrue(curatorRole != 0, "curator role must not collide with ADMIN");
 
-        // the curator moves capital between the tranches it has been given
+        // the curator lists tranches and moves capital between them
         _expectRole(underwriter, IUnderwriter.allocate.selector, curatorRole, "allocate");
         _expectRole(underwriter, IUnderwriter.deallocate.selector, curatorRole, "deallocate");
         _expectRole(underwriter, IUnderwriter.deallocateAsync.selector, curatorRole, "deallocateAsync");
         _expectRole(underwriter, IUnderwriter.finalizeDeallocateAsync.selector, curatorRole, "finalizeDeallocateAsync");
         _expectRole(underwriter, IUnderwriter.setDefaultTranche.selector, curatorRole, "setDefaultTranche");
-        _expectRole(underwriter, IUnderwriter.setVestingPeriod.selector, curatorRole, "setVestingPeriod");
+        _expectRole(underwriter, IUnderwriter.addTranche.selector, curatorRole, "addTranche");
+        _expectRole(underwriter, IUnderwriter.removeTranche.selector, curatorRole, "removeTranche");
 
         _expectRole(underwriter, IUnderwriter.report.selector, CapRoles.KEEPER, "report");
 
@@ -192,24 +198,21 @@ contract RoleTableTest is CapDeployer {
         _expectRole(underwriter, IERC4626.deposit.selector, depositorRole, "deposit");
         _expectRole(underwriter, IERC4626.mint.selector, depositorRole, "mint");
         assertEq(accessManager.getRoleAdmin(depositorRole), curatorRole, "administered by the curator");
-
-        // addTranche grants its argument operator rights over the whole vault balance and does not
-        // check that the address is a tranche this registry deployed, so it stays above the curator
-        _expectRole(underwriter, IUnderwriter.addTranche.selector, CapRoles.ADMIN, "addTranche");
-        _expectRole(underwriter, IUnderwriter.removeTranche.selector, CapRoles.ADMIN, "removeTranche");
     }
 
-    /// @dev The shared infrastructure, wired by the deploy script rather than by the Registry.
-    /// Included so the table covers every gated selector in the protocol, not just the ones on
-    /// per-market instances.
+    /// @dev The shared infrastructure, wired by {Registry-initialize} rather than by the deploy
+    /// script. Included so the table covers every gated selector in the protocol, not just the
+    /// ones on per-market instances.
     function test_infraRoleTable() public view {
-        // markets are the only MINTER holders, so writing off their own credit sits with the role
-        // that mints it, while covering a shortfall burns the caller's own cUSD and needs funding
-        // rather than authority
-        _expectRole(address(stablecoin), IStablecoin.mintCreditBacked.selector, CapRoles.MINTER, "mintCreditBacked");
-        _expectRole(address(stablecoin), IStablecoin.burnCreditBacked.selector, CapRoles.MINTER, "burnCreditBacked");
-        _expectRole(address(stablecoin), IStablecoin.recognizeBadDebt.selector, CapRoles.MINTER, "recognizeBadDebt");
-        _expectRole(address(stablecoin), IStablecoin.coverBadDebt.selector, CapRoles.GOVERNOR, "coverBadDebt");
+        // markets are the only MARKET holders, so writing off their own credit sits with the role
+        // that slashes and prices. Covering a shortfall burns the caller's own cUSD and is
+        // permissionless. Parking idle reserve and bringing it back is keeper maintenance
+        _expectRole(address(stablecoin), IStablecoin.mintCreditBacked.selector, CapRoles.MARKET, "mintCreditBacked");
+        _expectRole(address(stablecoin), IStablecoin.burnCreditBacked.selector, CapRoles.MARKET, "burnCreditBacked");
+        _expectRole(address(stablecoin), IStablecoin.recognizeBadDebt.selector, CapRoles.MARKET, "recognizeBadDebt");
+        _expectRole(address(stablecoin), IStablecoin.fundCreditBacked.selector, CapRoles.MARKET, "fundCreditBacked");
+        _expectRole(address(stablecoin), IStablecoin.invest.selector, CapRoles.KEEPER, "invest");
+        _expectRole(address(stablecoin), IStablecoin.recall.selector, CapRoles.KEEPER, "recall");
 
         // the rate curve is economic policy; the per-market knobs are wired to MARKET by the
         // Registry and asserted alongside the market table
@@ -218,14 +221,13 @@ contract RoleTableTest is CapDeployer {
         _expectRole(
             address(irm), IInterestRateModel.setLiquidationBonus.selector, CapRoles.GOVERNOR, "liquidation bonus"
         );
+        _expectRole(address(oracle), IOracle.setSource.selector, CapRoles.GOVERNOR, "setSource");
 
         // onboarding an operator is policy, deploying instances for one is routine
         _expectRole(address(registry), Registry.assignOperator.selector, CapRoles.GOVERNOR, "assignOperator");
-        _expectRole(address(registry), Registry.createMarket.selector, CapRoles.KEEPER, "createMarket");
+        _expectRole(address(registry), Registry.createFloatingMarket.selector, CapRoles.KEEPER, "createFloatingMarket");
         _expectRole(address(registry), Registry.createFixedMarket.selector, CapRoles.KEEPER, "createFixedMarket");
         _expectRole(address(registry), Registry.createUnderwriter.selector, CapRoles.KEEPER, "createUnderwriter");
-        // adding a tranche ends in a setTranches call, so it carries that call's authority
-        _expectRole(address(registry), Registry.createTranche.selector, CapRoles.ADMIN, "createTranche");
 
         // only the Registry deploys through the factory
         _expectRole(address(beaconFactory), IBeaconFactory.create.selector, CapRoles.REGISTRY, "factory create");
@@ -265,15 +267,14 @@ contract RoleTableTest is CapDeployer {
         accessManager.grantRole(depositorRole, stranger, 0);
     }
 
-    /// @dev The point of holding registration at ADMIN is that a curator cannot reach it, so the
-    /// role table alone is not the assertion: this checks the gate actually bites.
-    function test_curatorCannotRegisterATranche() public {
+    /// @dev Registration is the curator's, so an account that is not this vault's curator cannot
+    /// list a tranche on it.
+    function test_strangerCannotRegisterATranche() public {
         address underwriter = address(_deployUnderwriter());
-        address curator = makeAddr("curator");
-        _assignOperator(curator);
+        address stranger = makeAddr("stranger");
 
-        vm.prank(curator);
-        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, curator));
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, stranger));
         IUnderwriter(underwriter).addTranche(makeAddr("not-a-tranche"));
     }
 }

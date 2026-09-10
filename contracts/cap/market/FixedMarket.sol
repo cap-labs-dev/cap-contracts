@@ -56,7 +56,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @inheritdoc IFixedMarket
-    function setTermLimits(uint256 _maximumTermLimit, uint256 _minimumTermLimit) external restricted {
+    function setTermLimits(uint256 _maximumTermLimit, uint256 _minimumTermLimit) external restricted nonReentrant {
         _setTermLimits(_maximumTermLimit, _minimumTermLimit);
     }
 
@@ -64,6 +64,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     function borrow(address recipient, uint256 principal, uint256 term)
         external
         restricted
+        nonReentrant
         returns (uint256 id, uint256 actualPrincipal)
     {
         if (term == type(uint256).max) term = maximumTermLimit;
@@ -77,6 +78,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     function borrowMore(uint256 id, address recipient, uint256 principal)
         external
         restricted
+        nonReentrant
         returns (uint256 actualPrincipal)
     {
         if (block.timestamp >= expiry[id]) revert LoanExpired();
@@ -86,7 +88,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @inheritdoc IFixedMarket
-    function extend(uint256 id, uint256 extension) external restricted returns (uint256 actualExtension) {
+    function extend(uint256 id, uint256 extension) external restricted nonReentrant returns (uint256 actualExtension) {
         uint256 previousExpiry = expiry[id];
         if (block.timestamp >= previousExpiry) {
             actualExtension = _rollFromNow(previousExpiry, extension);
@@ -102,7 +104,12 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @inheritdoc IFixedMarket
-    function extendAdmin(uint256 id, uint256 extension) external restricted returns (uint256 actualExtension) {
+    function extendAdmin(uint256 id, uint256 extension)
+        external
+        restricted
+        nonReentrant
+        returns (uint256 actualExtension)
+    {
         uint256 previousExpiry = expiry[id];
         if (block.timestamp < previousExpiry + grace) revert StillInGracePeriod();
         actualExtension = _rollFromNow(previousExpiry, extension);
@@ -110,7 +117,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @inheritdoc IFixedMarket
-    function repay(uint256 id, uint256 amount) external returns (uint256 repaid) {
+    function repay(uint256 id, uint256 amount) external nonReentrant returns (uint256 repaid) {
         repaid = _debtCheck(debt[id], amount);
         debt[id] -= repaid;
         _totalDebt -= repaid;
@@ -122,6 +129,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     function liquidate(uint256 id, address recipient, uint256 amount)
         external
         restricted
+        nonReentrant
         returns (uint256 repaid, uint256 assetsSlashed)
     {
         (repaid, assetsSlashed) = _liquidate(recipient, _debtCheck(debt[id], amount));
@@ -131,7 +139,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @inheritdoc IFixedMarket
-    function writeOff(uint256 id) external restricted returns (uint256 amount) {
+    function writeOff(uint256 id) external restricted nonReentrant returns (uint256 amount) {
         uint256 loanDebt = debt[id];
         uint256 unrecoverable = unrecoverableDebt();
         amount = loanDebt < unrecoverable ? loanDebt : unrecoverable;
@@ -182,6 +190,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     /// @param recipient The address to borrow to
     /// @param principal The principal of the loan
     /// @param term The term of the loan
+    /// @return actualPrincipal The principal actually drawn
     function _borrow(uint256 id, address recipient, uint256 principal, uint256 term)
         internal
         returns (uint256 actualPrincipal)
@@ -203,15 +212,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         emit BorrowFixed(id, recipient, term, actualPrincipal, chargedPremium);
     }
 
-    /// @dev The rates a premium is owed at when `mintAmount` of credit-backed supply is still to be
-    /// minted before it is charged. Every rate read in this contract goes through here, and the
-    /// mint amount is the only thing that varies: zero when the charge is imminent and nothing more
-    /// will be minted first, the principal when quoting a borrow that has yet to draw it, the whole
-    /// limit when sizing the largest draw the market could offer.
-    ///
-    /// Two unrelated senses of utilization meet here. The term as a fraction of the maximum drives
-    /// the term multiplier, so shorter loans pay more; the mint amount drives the stablecoin's
-    /// utilization, and through it the liquidity rate.
+    /// @dev Rates after `mintAmount` of credit-backed supply is minted.
     /// @param term The term of the loan in seconds, already capped at the maximum
     /// @param mintAmount The credit-backed supply still to be minted before the charge
     /// @return liquidityRate The liquidity rate per year in ray decimals
@@ -249,13 +250,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         rate = liquidityRate + underwriterRate;
     }
 
-    /// @dev The largest principal that fits inside `limit` once its own upfront premium is counted
-    /// alongside it. A fixed loan owes its whole term's premium from the moment it is taken, so what
-    /// has to fit is not the principal but the debt it immediately becomes.
-    ///
-    /// The premium is `principal * term * rate / year`, so the debt is `principal * (1 + term * rate
-    /// / year)` and the principal that lands it exactly on `limit` is `limit` over that same factor.
-    /// Floored, so the premium charged on the result cannot round the debt back over the limit.
+    /// @dev Largest principal whose debt (principal + upfront premium) fits in `limit`.
     /// @param limit The credit that the principal and its premium together have to fit inside
     /// @param term The term of the loan in seconds
     /// @param rate The combined liquidity and underwriter rate per year in ray decimals
@@ -276,9 +271,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         emit SetTermLimits(_maximumTermLimit, _minimumTermLimit);
     }
 
-    /// @dev Size an extension that lands the new expiry a full term from now on an expired loan.
-    /// The term limits bound the requested term only; the arrears are then added on top so that
-    /// the borrower is charged a premium for the period the loan sat expired.
+    /// @dev Size an expired-loan extension. Limits bound the requested term; arrears are added on top.
     /// @param previousExpiry The expiry the loan is being rolled from
     /// @param extension The requested new term, or `type(uint256).max` for the maximum
     /// @return actualExtension The arrears plus the requested term
@@ -321,9 +314,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         _chargePremium(liquidityPremium, underwriterPremium);
     }
 
-    /// @dev Fetch the premium for a loan
-    /// @dev Rates are annualized, so the term is prorated against a year to match the floating
-    /// market's accrual through {MathUtils}
+    /// @dev Premium on `chargeableDebt` over `term`. Rates are annualized.
     /// @param chargeableDebt The amount of debt that a premium is being charged on
     /// @param term The term of the loan in seconds
     /// @param liquidityRate The liquidity rate per year in ray decimals

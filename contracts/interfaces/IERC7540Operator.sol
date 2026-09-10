@@ -11,9 +11,15 @@ interface IERC7540Operator {
      * - MUST set the operator status to the `approved` value.
      * - MUST emit the {OperatorSet} event when the operator status is set.
      * - MUST return true.
+     * @param operator The account to grant or revoke
+     * @param approved Whether the operator is approved
+     * @return Whether the status was set
      */
     function setOperator(address operator, bool approved) external returns (bool);
 
     /// @dev Returns `true` if the `operator` is approved as an operator for a `controller`.
+    /// @param controller The account whose operators are being queried
+    /// @param operator The account to check
+    /// @return status Whether the operator is approved
     function isOperator(address controller, address operator) external view returns (bool status);
 }

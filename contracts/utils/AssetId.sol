@@ -3,14 +3,18 @@ pragma solidity 0.8.36;
 
 /// @title AssetId
 /// @author kexley
-/// @notice AssetId is a library that converts between asset addresses and ERC6909 token IDs
+/// @notice Convert between asset addresses and ERC6909 token IDs
 library AssetId {
     /// @dev Convert an ERC20 address to an ERC6909 token id
+    /// @param token The ERC20 address
+    /// @return id The ERC6909 token id
     function toId(address token) internal pure returns (uint256 id) {
         id = uint160(token);
     }
 
     /// @dev Convert an ERC6909 token id back to an ERC20 address
+    /// @param id The ERC6909 token id
+    /// @return token The ERC20 address
     function toAsset(uint256 id) internal pure returns (address token) {
         // casting to 'uint160' is safe because ids are always address-derived via toId
         // forge-lint: disable-next-line(unsafe-typecast)

@@ -10,23 +10,16 @@ import {
     ERC4626Upgradeable,
     IERC4626
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import { ERC165Upgradeable } from "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { ERC165 } from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 /// @title ERC7540AsyncRedeem
 /// @author kexley
-/// @notice ERC7540AsyncRedeem is a contract that implements the ERC7540 standard for async redemptions.
-/// @dev The function unlockedSupply() should be overridden to return the number of shares available for redemption.
-/// @dev Preview ERC4626 functions are NOT reverting as instant redemptions are supported when there is liquidity. Integrators must implement ERC1155Holder to request async redemptions.
-abstract contract ERC7540AsyncRedeem is
-    IERC7540AsyncRedeem,
-    ERC7540Operator,
-    ERC4626Upgradeable,
-    ERC7575,
-    ERC165Upgradeable
-{
+/// @notice ERC7540 async redemptions on an ERC4626 vault
+/// @dev Override {unlockedSupply}. Instant redeem is supported when there is liquidity; integrators need ERC1155Holder for async.
+abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ERC4626Upgradeable, ERC7575, ERC165 {
     using SafeERC20 for IERC20;
 
     /// @custom:storage-location cap.storage.ERC7540AsyncRedeem
@@ -65,7 +58,6 @@ abstract contract ERC7540AsyncRedeem is
     {
         __ERC20_init(_name, _symbol);
         __ERC4626_init(_asset);
-        __ERC165_init();
         _getERC7540AsyncRedeemStorage().queueNft = address(new ERC1155Queue(_uri));
     }
 
@@ -192,24 +184,17 @@ abstract contract ERC7540AsyncRedeem is
         if (totalUnlocked > queue) unlocked = totalUnlocked - queue;
     }
 
-    /// @dev Internal function to check if the caller is the controller or an authorized operator, or spend allowance for the shares
+    /// @dev Controller, operator, or spend share allowance.
     /// @param _controller The controller of the request
     /// @param _caller The caller of the request
+    /// @param _shares The shares the caller is spending allowance against
     function _checkAllowance(address _controller, address _caller, uint256 _shares) internal {
         if (_caller != _controller && !isOperator(_controller, _caller)) {
             _spendAllowance(_controller, _caller, _shares);
         }
     }
 
-    /// @dev The authorization a queued claim takes, which is narrower than {_checkAllowance} by
-    /// design. ERC-7540 allows a share allowance to stand in for the owner when a request is
-    /// *made*, because the shares genuinely leave the owner there, but requires controller or
-    /// operator to *claim* one. The distinction matters here rather than being pedantry: a queued
-    /// claim burns from this contract, not from the controller, so an allowance spent here is
-    /// spent against a balance the controller no longer has. It would let an approval outlive the
-    /// exposure anyone would reason about — queueing a position drops `balanceOf` to zero, which
-    /// is exactly when an outstanding approval looks spent — and an infinite one is never
-    /// deducted, so the ceiling would be the whole queued position, paid to any named receiver.
+    /// @dev Queued claim: controller or operator only. Allowance cannot stand in.
     /// @param _controller The controller of the request
     /// @param _caller The caller of the claim
     function _checkController(address _controller, address _caller) internal view {
@@ -246,7 +231,7 @@ abstract contract ERC7540AsyncRedeem is
         emit Withdraw(_caller, _receiver, _controller, _assets, _shares);
     }
 
-    /// @dev Override the ERC4626 _withdraw function to enable the ERC7540Operator to withdraw assets
+    /// @dev Instant withdraw. Allowance may stand in for the owner.
     /// @param _caller The caller of the withdraw
     /// @param _receiver The receiver of the assets
     /// @param _owner The owner of the shares
@@ -266,13 +251,7 @@ abstract contract ERC7540AsyncRedeem is
         emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
     }
 
-    /// @dev Settle accounting that every redemption shares, whichever path it took. Both instant
-    /// and queued redemptions route through here, which is the only place they meet: the queued
-    /// path cannot reuse the instant one because it burns from this contract rather than from the
-    /// owner, so anything overriding only that would silently skip the whole queue.
-    ///
-    /// Runs after the burn, so the new supply is visible, and before {_transferOut}, so an asset
-    /// token that calls back finds the accounting already settled.
+    /// @dev Shared hook after the burn, before {_transferOut}. Instant and queued both land here.
     /// @param _owner The account whose shares were burned, or the controller of a queued request
     /// @param _assets The number of assets being paid out
     /// @param _shares The number of shares burned
@@ -283,7 +262,7 @@ abstract contract ERC7540AsyncRedeem is
     //////////////////////////////////////////////////////////////////////////////
 
     /// @inheritdoc IERC165
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165Upgradeable) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165) returns (bool) {
         return interfaceId == type(IERC4626).interfaceId || interfaceId == type(IERC7540Operator).interfaceId
             || interfaceId == type(IERC7575).interfaceId || interfaceId == type(IERC7540Redeem).interfaceId
             || interfaceId == type(IERC7540AsyncRedeem).interfaceId || interfaceId == type(IERC1155Queue).interfaceId

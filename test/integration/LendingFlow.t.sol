@@ -113,17 +113,14 @@ contract LendingFlowTest is CapDeployer {
         assertApproxEqAbs(market.totalDebt(), 0, 2);
     }
 
-    function test_supplyReward_accruesToYieldRecipient() public {
-        address stcUsd = makeAddr("stcUSD");
-        market.setStakedStablecoin(stcUsd);
-
+    function test_supplyReward_vestsOnStablecoin() public {
         vm.prank(borrower);
         market.borrow(borrower, 400e18);
 
         vm.warp(block.timestamp + 365 days);
         market.chargePremium();
 
-        assertGt(stablecoin.balanceOf(stcUsd), 0);
+        assertGt(stablecoin.remaining() + stablecoin.vested(), 0);
     }
 
     function test_underwriterReward_accruesAndClaims() public {

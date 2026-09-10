@@ -3,6 +3,7 @@ pragma solidity 0.8.36;
 
 import { IBaseMarket } from "../../interfaces/IBaseMarket.sol";
 import { IInterestRateModel } from "../../interfaces/IInterestRateModel.sol";
+import { IPremiumVesting } from "../../interfaces/IPremiumVesting.sol";
 import { IRegistry } from "../../interfaces/IRegistry.sol";
 import { IStablecoin } from "../../interfaces/IStablecoin.sol";
 import { ITranche } from "../../interfaces/ITranche.sol";
@@ -10,12 +11,14 @@ import { WadRayMath } from "../../utils/WadRayMath.sol";
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { ReentrancyGuardTransient } from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title BaseMarket
 /// @author kexley, Cap Labs
 /// @notice Shared base contract for fixed and floating markets
-abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
+abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, ReentrancyGuardTransient, UUPSUpgradeable {
     using WadRayMath for uint256;
 
     // keccak256(abi.encode(uint256(keccak256("cap.storage.BaseMarket")) - 1)) & ~bytes32(uint256(0xff))
@@ -49,14 +52,13 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
         IRegistry registry = IRegistry(_registry);
         $.irm = registry.irm();
         $.stablecoin = registry.stablecoin();
-        $.stakedStablecoin = registry.stakedStablecoin();
         $.lt = registry.lt();
         $.buffer = registry.buffer();
         $.targetHealth = registry.targetHealth();
     }
 
     /// @inheritdoc IBaseMarket
-    function setLtv(uint256 _ltv) external restricted {
+    function setLtv(uint256 _ltv) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         if (_ltv + $.buffer > $.lt) revert InvalidLtv();
         $.ltv = _ltv;
@@ -64,41 +66,34 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     }
 
     /// @inheritdoc IBaseMarket
-    function setBuffer(uint256 _buffer) external restricted {
+    function setBuffer(uint256 _buffer) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        // lockedValue divides by lt - buffer, so the buffer must stay strictly below lt.
-        // Deliberately not re-checking ltv + buffer <= lt the way setLtv does, for the same reason
-        // setLt permits dropping lt below ltv: raising the buffer only shrinks lt - buffer, which
-        // locks more capital per unit of debt, so every direction this opens up is a tightening.
-        // Past lt - ltv it locks the tranches entirely, which is severe but is exactly what a
-        // guardian reaching for this in a hurry is asking for, and blocking them on a stale ltv
-        // would be worse. setLtv keeps the strict check because relaxing ltv is the loosening side.
+        // must stay below lt (lockedValue divides by lt - buffer). Raising the buffer only
+        // tightens, so ltv is not re-checked.
         if (_buffer >= $.lt) revert InvalidBuffer();
         $.buffer = _buffer;
         emit SetBuffer(_buffer);
     }
 
     /// @inheritdoc IBaseMarket
-    function setLt(uint256 _lt) external restricted {
+    function setLt(uint256 _lt) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         if (_lt > 1e27) revert InvalidLt();
-        // lockedValue divides by lt - buffer, so lt must stay strictly above the buffer. Dropping
-        // lt below ltv is still allowed: that just makes the market unhealthy, which is a valid
-        // state for a guardian to force.
+        // must stay above the buffer. Dropping below ltv is allowed (forces unhealthy).
         if (_lt <= $.buffer) revert InvalidLt();
         $.lt = _lt;
         emit SetLt(_lt);
     }
 
     /// @inheritdoc IBaseMarket
-    function setFixedCreditLimit(uint256 _fixedCreditLimit) external restricted {
+    function setFixedCreditLimit(uint256 _fixedCreditLimit) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         $.fixedCreditLimit = _fixedCreditLimit;
         emit SetFixedCreditLimit(_fixedCreditLimit);
     }
 
     /// @inheritdoc IBaseMarket
-    function setTargetHealth(uint256 _targetHealth) external restricted {
+    function setTargetHealth(uint256 _targetHealth) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         if (_targetHealth < 1.25e27) revert InvalidTargetHealth();
         $.targetHealth = _targetHealth;
@@ -106,21 +101,12 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     }
 
     /// @inheritdoc IBaseMarket
-    function setStakedStablecoin(address _stakedStablecoin) external restricted {
-        BaseMarketStorage storage $ = _getBaseMarketStorage();
-        // the liquidity premium is minted straight to this address, so it must never be zero
-        if (_stakedStablecoin == address(0)) revert ZeroAddress();
-        $.stakedStablecoin = _stakedStablecoin;
-        emit SetStakedStablecoin(_stakedStablecoin);
-    }
-
-    /// @inheritdoc IBaseMarket
-    function setTranches(Tranche[] calldata _tranches) external restricted {
+    function setTranches(Tranche[] calldata _tranches) external restricted nonReentrant {
         _setTranches(_tranches);
     }
 
     /// @inheritdoc IBaseMarket
-    function setTrancheWeights(uint256[] calldata _weights) external restricted {
+    function setTrancheWeights(uint256[] calldata _weights) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         if (_weights.length != $.tranches.length) revert InvalidMarket();
         Tranche[] memory updatedTranches = new Tranche[]($.tranches.length);
@@ -131,14 +117,14 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     }
 
     /// @inheritdoc IBaseMarket
-    function setUnderwriterRate(uint256 rate) external restricted {
+    function setUnderwriterRate(uint256 rate) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         IInterestRateModel($.irm).updateUnderwriterRate(rate);
         emit SetUnderwriterRate(rate);
     }
 
     /// @inheritdoc IBaseMarket
-    function setMarketMultiplier(uint256 multiplier) external virtual restricted {
+    function setMarketMultiplier(uint256 multiplier) external virtual restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         IInterestRateModel($.irm).updateMarketMultiplier(multiplier);
         emit SetMarketMultiplier(multiplier);
@@ -154,12 +140,6 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     function stablecoin() public view returns (address stablecoinAddress) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         stablecoinAddress = $.stablecoin;
-    }
-
-    /// @inheritdoc IBaseMarket
-    function stakedStablecoin() public view returns (address stakedStablecoinAddress) {
-        BaseMarketStorage storage $ = _getBaseMarketStorage();
-        stakedStablecoinAddress = $.stakedStablecoin;
     }
 
     /// @inheritdoc IBaseMarket
@@ -228,20 +208,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     }
 
     /// @inheritdoc IBaseMarket
-    /// @dev Solving `(capital - repaid * perDebt) * lt = targetHealth * (debt - repaid)` for the
-    /// repayment that lands health exactly on target gives a denominator of
-    /// `targetHealth - perDebt * lt`, where `perDebt` is {_slashPerDebt}. The bonus belongs there
-    /// because each unit of debt cleared takes `perDebt` of collateral with it rather than one:
-    /// pricing the collateral leg at par makes the divisor too large and undershoots the target,
-    /// so a liquidation sized at exactly this figure would leave the market short of it.
-    ///
-    /// The denominator cannot reach zero at any setting governance can select. {setTargetHealth}
-    /// floors the numerator side at 1.25 ray, while `perDebt * lt` is capped at 1.1 ray between
-    /// {setLt} and {IInterestRateModel-setLiquidationBonus}, so 0.15 ray of slack always remains.
-    ///
-    /// Capped at {recoverableDebt} as well as at the debt itself. Past the recoverable point the
-    /// tranches cannot cover the slash, so further repayment buys collateral that is not there and
-    /// health falls with every unit cleared instead of rising.
+    /// @dev Repayment that lands health on {targetHealth}, capped at {recoverableDebt}.
     function maxLiquidatable() public view returns (uint256 liquidatable) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         uint256 liquidationThreshold = debtLiquidationThreshold();
@@ -314,6 +281,8 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     }
 
     /// @dev Mint credit-backed stablecoin to the recipient
+    /// @param recipient The account receiving the minted principal
+    /// @param principal The amount of credit-backed stablecoin to mint
     function _borrow(address recipient, uint256 principal) internal {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         IStablecoin($.stablecoin).mintCreditBacked(recipient, principal);
@@ -321,25 +290,14 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     }
 
     /// @dev Burn credit-backed stablecoin from the caller
+    /// @param amount The amount of credit-backed stablecoin to burn
     function _repay(uint256 amount) internal {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         IStablecoin($.stablecoin).burnCreditBacked(msg.sender, amount);
         emit Repay(msg.sender, amount);
     }
 
-    /// @dev Collateral value released per unit of debt repaid in a liquidation.
-    ///
-    /// The cUSD a liquidator burns is taken at par even while bad debt is outstanding. It is
-    /// tempting to discount it by the stablecoin's backing ratio, on the grounds that a liquidator
-    /// sourcing depressed cUSD repays with something worth less than a dollar. That would be
-    /// wrong: {IStablecoin-previewDeposit} always mints at par, so the marginal cost of acquiring
-    /// cUSD is a dollar no matter what it trades at, and the tranches never give up more than
-    /// `1 + bonus` per unit of debt cleared. A liquidator who buys below par is capturing value
-    /// from whoever sold to them, not from the underwriters. Discounting would only underpay
-    /// liquidators and stall liquidation exactly when the market most needs it.
-    ///
-    /// Shared with {recoverableDebt} so the debt the capital is assumed to clear always matches
-    /// what a liquidation actually charges for it.
+    /// @dev Collateral released per unit of debt repaid: `1 + liquidationBonus`, at par.
     /// @return perDebt The collateral value released per unit of debt, in ray decimals
     function _slashPerDebt() internal view returns (uint256 perDebt) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
@@ -347,6 +305,10 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     }
 
     /// @dev Repay debt and slash tranche collateral when the market is unhealthy
+    /// @param recipient The account receiving slashed collateral
+    /// @param amount The debt the caller is offering to repay
+    /// @return repaid The debt actually repaid
+    /// @return slashed The collateral value slashed, in USD (18 decimals)
     function _liquidate(address recipient, uint256 amount) internal returns (uint256 repaid, uint256 slashed) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         if (healthiness() >= 1e27) revert Healthy();
@@ -369,13 +331,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
         emit Liquidate(msg.sender, recipient, repaid, slashed);
     }
 
-    /// @dev Write off debt that liquidation could never recover. The stablecoin records the
-    /// shortfall as bad debt and drops it out of the credit-backed supply, so the market stops
-    /// accruing and minting premium against debt nobody will repay. Bounded by
-    /// {unrecoverableDebt} rather than by the tranches being empty: an unprofitable liquidation
-    /// leaves the collateral untouched, and waiting for someone to take it would only let the
-    /// shortfall keep compounding. Writing off exactly the unrecoverable slice leaves the debt at
-    /// the level the remaining collateral can still clear, so liquidation stays viable afterwards.
+    /// @dev Record the shortfall as bad debt. Bounded by {unrecoverableDebt}.
     /// @param amount The amount of debt to write off
     function _writeOff(uint256 amount) internal {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
@@ -386,6 +342,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     }
 
     /// @dev Set the tranches and weights
+    /// @param _tranches The tranches and their weights, index 0 is most senior
     function _setTranches(Tranche[] memory _tranches) internal {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         delete $.tranches;
@@ -405,6 +362,9 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     }
 
     /// @dev Check available credit before a borrow
+    /// @param credit The credit available
+    /// @param principal The principal requested, or `type(uint256).max` for the full credit
+    /// @return actualPrincipal The principal that will be drawn
     function _creditCheck(uint256 credit, uint256 principal) internal pure returns (uint256 actualPrincipal) {
         if (principal == type(uint256).max) actualPrincipal = credit;
         else if (principal > credit) revert InsufficientLiquidity();
@@ -413,6 +373,9 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     }
 
     /// @dev Check debt before a repayment
+    /// @param debt The outstanding debt
+    /// @param repayAmount The amount offered, or `type(uint256).max` for the full debt
+    /// @return actualToRepay The amount that will be repaid
     function _debtCheck(uint256 debt, uint256 repayAmount) internal pure returns (uint256 actualToRepay) {
         if (repayAmount == type(uint256).max) actualToRepay = debt;
         else actualToRepay = Math.min(debt, repayAmount);
@@ -420,27 +383,17 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
     }
 
     /// @dev Charge the premium
-    /// @dev Each active tranche is paid its weight of the underwriter premium. Rounding dust and
-    /// the weight of any empty tranche are leftover: they go to the most senior tranche (index 0)
-    /// when that tranche is underwriting, otherwise to the staked stablecoin like the liquidity
-    /// premium. The full premium is always minted so that debt can always be repaid.
-    ///
-    /// Each share is clamped to what is left rather than trusting the weights to behave. `rayMul`
-    /// rounds half up, so weighted shares can total more than the premium even when the weights
-    /// themselves are exactly one ray: two junior tranches at half a ray each claim `(P + 1) / 2`
-    /// apiece on an odd premium. Normally the senior weight absorbs that, but a zero senior weight
-    /// leaves no slack and the overrun would underflow, which fails closed on every borrow, repay
-    /// and liquidation for good. The clamp keeps the loop total-safe for any weights that sum to
-    /// one ray, so the configuration stays a distribution choice rather than a way to brick a
-    /// market. It costs one comparison and never binds on a sane split.
+    /// @dev Active tranches take their weight of the underwriter premium. Dust and empty-tranche
+    /// weight go to the senior tranche, or vest on the stablecoin. Shares are clamped so rounding
+    /// cannot overflow.
     /// @param liquidityPremium The amount of liquidity premium to charge
     /// @param underwriterPremium The amount of underwriter premium to charge
     function _chargePremium(uint256 liquidityPremium, uint256 underwriterPremium) internal {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
 
         if (liquidityPremium > 0) {
-            IStablecoin($.stablecoin).mintCreditBacked($.stakedStablecoin, liquidityPremium);
-            emit ChargePremium($.stakedStablecoin, liquidityPremium);
+            IStablecoin($.stablecoin).fundCreditBacked(liquidityPremium);
+            emit ChargePremium($.stablecoin, liquidityPremium);
         }
 
         if (underwriterPremium == 0) return;
@@ -450,9 +403,9 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
         uint256 length = $.tranches.length;
         for (uint256 i; i < length; ++i) {
             address tranche = $.tranches[i].tranche;
-            // stakedSupply rather than activeSupply: a tranche holding nothing but its dead
-            // shares is not underwriting, and premium sent there would sit unclaimable
-            if (ITranche(tranche).stakedSupply() == 0) continue;
+            // stakedSupply rather than activeSupply: nobody opted in, so premium sent there
+            // would sit unclaimable
+            if (IPremiumVesting(tranche).stakedSupply() == 0) continue;
             if (i == 0) {
                 seniorActive = true;
                 continue;
@@ -462,7 +415,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
             if (premium == 0) continue;
             remaining -= premium;
             IStablecoin($.stablecoin).mintCreditBacked(tranche, premium);
-            ITranche(tranche).notifyPremium();
+            ITranche(tranche).fund(premium);
             emit ChargePremium(tranche, premium);
         }
 
@@ -471,11 +424,14 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable {
         if (seniorActive) {
             address senior = $.tranches[0].tranche;
             IStablecoin($.stablecoin).mintCreditBacked(senior, remaining);
-            ITranche(senior).notifyPremium();
+            ITranche(senior).fund(remaining);
             emit ChargePremium(senior, remaining);
         } else {
-            IStablecoin($.stablecoin).mintCreditBacked($.stakedStablecoin, remaining);
-            emit ChargePremium($.stakedStablecoin, remaining);
+            IStablecoin($.stablecoin).fundCreditBacked(remaining);
+            emit ChargePremium($.stablecoin, remaining);
         }
     }
+
+    /// @inheritdoc UUPSUpgradeable
+    function _authorizeUpgrade(address) internal override restricted { }
 }

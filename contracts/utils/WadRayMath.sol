@@ -2,7 +2,7 @@
 pragma solidity 0.8.36;
 
 /// @title WadRayMath library
-/// @author Aave
+/// @author Cap Labs & Aave
 /// @notice Provides functions to perform calculations with Wad and Ray units
 /// @dev Provides mul and div function for wads (decimal numbers with 18 digits of precision) and rays (decimal numbers
 /// with 27 digits of precision)
@@ -70,6 +70,32 @@ library WadRayMath {
             if or(iszero(b), iszero(iszero(gt(a, div(sub(not(0), div(b, 2)), RAY))))) { revert(0, 0) }
 
             c := div(add(mul(a, RAY), div(b, 2)), b)
+        }
+    }
+
+    /// @dev Raises a ray to an integer power by squaring.
+    ///
+    /// The reason to have this rather than repeated {rayMul} is that `a^m raypow a^n == a^(m+n)`,
+    /// so a quantity decayed in one step over an interval matches the same quantity decayed in any
+    /// number of steps across it. A caller that needs to be indifferent to how often it is called
+    /// cannot get that from a per-call factor, which compounds differently depending on how the
+    /// interval was cut up.
+    ///
+    /// The equality holds up to rounding rather than exactly: each {rayMul} rounds half up, so a
+    /// path through more steps can retain a few ulps more than a path through fewer. For `a < RAY`
+    /// there is no overflow to consider, since the result only decays.
+    ///
+    /// @param a Ray base
+    /// @param n Integer exponent, not a ray
+    /// @return c = a raypow n, in ray
+    function rayPow(uint256 a, uint256 n) internal pure returns (uint256 c) {
+        c = RAY;
+        while (n > 0) {
+            if (n & 1 == 1) c = rayMul(c, a);
+            n >>= 1;
+            // squaring the base on the last iteration would be thrown away, and for a decaying
+            // base it is the multiplication most likely to be the one that underflows to zero
+            if (n > 0) a = rayMul(a, a);
         }
     }
 

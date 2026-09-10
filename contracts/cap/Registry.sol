@@ -12,6 +12,7 @@ import { IFloatingMarket } from "../interfaces/IFloatingMarket.sol";
 import { IInterestRateModel } from "../interfaces/IInterestRateModel.sol";
 import { IOracle } from "../interfaces/IOracle.sol";
 import { IRegistry } from "../interfaces/IRegistry.sol";
+import { IStablecoin } from "../interfaces/IStablecoin.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
 import { IUnderwriter } from "../interfaces/IUnderwriter.sol";
 import { CapRoles } from "../utils/CapRoles.sol";
@@ -25,18 +26,8 @@ import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 /// @title Registry
 /// @author kexley, Cap Labs
-/// @notice Deploys markets and underwriters and wires AccessManager roles on new instances.
-/// @dev GOVERNOR assigns operator role ids via {assignOperator}. KEEPER deploys with operator addresses.
-/// Registry holds REGISTRY_ROLE on AccessManager and is admin of each assigned operator role.
-///
-/// Trust assumption: Registry must also hold ADMIN on the AccessManager, and this is accepted
-/// rather than fixed. OpenZeppelin's AccessManager hardcodes `setTargetFunctionRole` and
-/// `setRoleAdmin` to ADMIN_ROLE in `_getAdminRestrictions`, with no way to delegate them to a
-/// narrower role. Since wiring a freshly deployed instance means calling both, no lesser role can
-/// do this contract's job. Only `grantRole` is delegable, through `getRoleAdmin(roleId)`, which is
-/// why {assignOperator} makes REGISTRY_ROLE the admin of each operator role. The practical
-/// consequence is that a Registry upgrade is equivalent to full control of the AccessManager, so
-/// the upgrade path must be governed as tightly as ADMIN itself.
+/// @notice Deploys markets and underwriters and wires AccessManager roles
+/// @dev This contract must hold ADMIN: `setTargetFunctionRole` cannot be delegated.
 contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, AccessManagedUpgradeable, UUPSUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -45,9 +36,6 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
 
     /// @inheritdoc IRegistry
     address public stablecoin;
-
-    /// @inheritdoc IRegistry
-    address public stakedStablecoin;
 
     /// @inheritdoc IRegistry
     address public oracle;
@@ -88,9 +76,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     /// @inheritdoc IRegistry
     mapping(address market => bool deployed) public isMarket;
 
-    /// @dev Tranches ever deployed for a market, which is what names their suffix. Counts
-    /// deployments rather than seats so it only ever increases, and a tranche added to take over
-    /// from a retired one is named apart from it rather than inheriting its number.
+    /// @dev Deployments per market, used to name tranche suffixes. Only ever increases.
     mapping(address market => uint256 count) private _trancheCount;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -102,14 +88,13 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     function initialize(address _authority, IRegistry.InitParams calldata init) external initializer {
         __AccessManaged_init(_authority);
         if (
-            init.vault == address(0) || init.stablecoin == address(0) || init.stakedStablecoin == address(0)
-                || init.oracle == address(0) || init.irm == address(0) || init.factory == address(0)
-                || init.floatingMarketBeacon == address(0) || init.fixedMarketBeacon == address(0)
-                || init.trancheBeacon == address(0) || init.underwriterBeacon == address(0)
+            init.vault == address(0) || init.stablecoin == address(0) || init.oracle == address(0)
+                || init.irm == address(0) || init.factory == address(0) || init.floatingMarketBeacon == address(0)
+                || init.fixedMarketBeacon == address(0) || init.trancheBeacon == address(0)
+                || init.underwriterBeacon == address(0)
         ) revert ZeroAddress();
         vault = init.vault;
         stablecoin = init.stablecoin;
-        stakedStablecoin = init.stakedStablecoin;
         oracle = init.oracle;
         irm = init.irm;
         factory = init.factory;
@@ -121,6 +106,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         buffer = init.buffer;
         targetHealth = init.targetHealth;
         _nextOperatorRoleId = CapRoles.FIRST_OPERATOR_ROLE;
+        _configureInfraRoles();
     }
 
     /// @inheritdoc IRegistry
@@ -138,7 +124,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     /// @inheritdoc IRegistry
-    function createMarket(
+    function createFloatingMarket(
         address[] calldata _assets,
         uint256[] calldata _weights,
         string memory _name,
@@ -192,9 +178,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
 
         _grantOperatorRole(roleId, _operator);
 
-        // the depositor set is a role of its own rather than a list on the vault, so the curator
-        // can admit and remove depositors through the AccessManager without the Registry standing
-        // in the middle
+        // depositor allowlist is an AccessManager role the curator administers
         uint64 depositorRoleId = _nextOperatorRoleId++;
 
         underwriter = _deploy(
@@ -210,11 +194,12 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     /// @inheritdoc IRegistry
     function createTranche(address _market, address _asset, uint256[] calldata _weights)
         external
-        restricted
         returns (address tranche)
     {
         if (!isMarket[_market]) revert UnknownMarket();
         uint64 ownerRole = marketOwnerRole(_market);
+        (bool isOwner,) = IAccessManager(authority()).hasRole(ownerRole, msg.sender);
+        if (!isOwner) revert NotMarketOwner();
 
         IBaseMarket.Tranche[] memory existing = IBaseMarket(_market).tranches();
         if (_weights.length != existing.length + 1) revert InvalidTrancheCount();
@@ -233,15 +218,21 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
 
     /// @inheritdoc IRegistry
     function marketOwnerRole(address _market) public view returns (uint64 roleId) {
-        // Derived rather than recorded at deployment, so that repointing a market's owner
-        // selectors moves the owner for later tranches too instead of leaving a copy here saying
-        // otherwise. {IBaseMarket-setTrancheWeights} is the anchor because it is the one owner
-        // selector whose authority is the waterfall, which is what a new tranche joins.
+        // Live from the AccessManager, so rehoming owner selectors moves this too.
         if (!isMarket[_market]) return 0;
         roleId = IAccessManager(authority()).getTargetFunctionRole(_market, IBaseMarket.setTrancheWeights.selector);
     }
 
     /// @dev Deploy a market with tranches and wire AccessManager roles
+    /// @param beacon The market implementation beacon
+    /// @param marketInitData The encoded market initializer call
+    /// @param _assets The asset of each tranche, index 0 is most senior
+    /// @param _weights Tranche weights in ray decimals, index 0 is most senior
+    /// @param _name The market name
+    /// @param _marketOwner The market owner operator address
+    /// @param _borrower The borrower operator address
+    /// @return market The deployed market
+    /// @return deployedTranches The deployed tranche addresses in seniority order
     function _createMarket(
         address beacon,
         bytes memory marketInitData,
@@ -281,12 +272,17 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     /// @dev Deploy and register a tranche for a market
+    /// @param _asset The tranche asset
+    /// @param _name The market name, used to build the tranche name
+    /// @param market The market the tranche underwrites
+    /// @param ownerRole The market owner role that will administer depositors
+    /// @param index The tranche's seniority index
+    /// @return tranche The deployed tranche
     function _deployTranche(address _asset, string memory _name, address market, uint64 ownerRole, uint256 index)
         internal
         returns (address tranche)
     {
-        // Reverts if the asset is not priced
-        IOracle(oracle).price(_asset);
+        if (IOracle(oracle).price(_asset) == 0) revert IOracle.PriceError(_asset);
 
         string memory trancheName = string.concat(_name, " Tranche ", Strings.toString(index));
         string memory trancheSymbol = string.concat("TR", Strings.toString(index));
@@ -297,10 +293,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
             )
         );
 
-        // the depositor set is a role of its own rather than a list on the tranche, so the market
-        // owner can admit and remove depositors through the AccessManager without the Registry
-        // standing in the middle. One role per tranche rather than per market, so a waterfall can
-        // be open at one level and closed at another
+        // one depositor role per tranche, administered by the market owner
         uint64 depositorRoleId = _nextOperatorRoleId++;
         _configureTrancheRoles(tranche, ownerRole, depositorRoleId);
 
@@ -308,26 +301,87 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     /// @dev Deploy a beacon proxy through the shared factory
+    /// @param beacon The implementation beacon
+    /// @param initData The encoded initializer call
+    /// @return instance The deployed proxy
     function _deploy(address beacon, bytes memory initData) internal returns (address instance) {
         instance = IBeaconFactory(factory).create(beacon, initData);
     }
 
     /// @dev Grant an operator role to an account. Registry must hold REGISTRY_ROLE and be role admin.
+    /// @param roleId The operator role to grant
+    /// @param account The account receiving the role
     function _grantOperatorRole(uint64 roleId, address account) internal {
         IAccessManager(authority()).grantRole(roleId, account, 0);
     }
 
+    /// @dev Wire shared-infrastructure selectors. This contract must hold ADMIN.
+    function _configureInfraRoles() internal {
+        IAccessManager manager = IAccessManager(authority());
+
+        bytes4[] memory factorySelectors = new bytes4[](1);
+        factorySelectors[0] = IBeaconFactory.create.selector;
+        manager.setTargetFunctionRole(factory, factorySelectors, CapRoles.REGISTRY);
+
+        bytes4[] memory registryGovernorSelectors = new bytes4[](1);
+        registryGovernorSelectors[0] = IRegistry.assignOperator.selector;
+        manager.setTargetFunctionRole(address(this), registryGovernorSelectors, CapRoles.GOVERNOR);
+
+        bytes4[] memory registryKeeperSelectors = new bytes4[](3);
+        registryKeeperSelectors[0] = IRegistry.createFloatingMarket.selector;
+        registryKeeperSelectors[1] = IRegistry.createFixedMarket.selector;
+        registryKeeperSelectors[2] = IRegistry.createUnderwriter.selector;
+        manager.setTargetFunctionRole(address(this), registryKeeperSelectors, CapRoles.KEEPER);
+
+        // mint, burn, write-off, and credit-backed premium — markets only
+        bytes4[] memory marketSelectors = new bytes4[](4);
+        marketSelectors[0] = IStablecoin.mintCreditBacked.selector;
+        marketSelectors[1] = IStablecoin.burnCreditBacked.selector;
+        marketSelectors[2] = IStablecoin.recognizeBadDebt.selector;
+        marketSelectors[3] = IStablecoin.fundCreditBacked.selector;
+        manager.setTargetFunctionRole(stablecoin, marketSelectors, CapRoles.MARKET);
+
+        // parking reserve is keeper work
+        bytes4[] memory stablecoinKeeperSelectors = new bytes4[](2);
+        stablecoinKeeperSelectors[0] = IStablecoin.invest.selector;
+        stablecoinKeeperSelectors[1] = IStablecoin.recall.selector;
+        manager.setTargetFunctionRole(stablecoin, stablecoinKeeperSelectors, CapRoles.KEEPER);
+
+        bytes4[] memory irmMarketSelectors = new bytes4[](2);
+        irmMarketSelectors[0] = IInterestRateModel.updateUnderwriterRate.selector;
+        irmMarketSelectors[1] = IInterestRateModel.updateMarketMultiplier.selector;
+        manager.setTargetFunctionRole(irm, irmMarketSelectors, CapRoles.MARKET);
+
+        bytes4[] memory irmGovernorSelectors = new bytes4[](4);
+        irmGovernorSelectors[0] = IInterestRateModel.setLiquiditySlopes.selector;
+        irmGovernorSelectors[1] = IInterestRateModel.setTermMultiplierSlope.selector;
+        irmGovernorSelectors[2] = IInterestRateModel.setLiquidationBonus.selector;
+        irmGovernorSelectors[3] = IInterestRateModel.setAveragingPeriod.selector;
+        manager.setTargetFunctionRole(irm, irmGovernorSelectors, CapRoles.GOVERNOR);
+
+        // feeds are economic policy, same as the rate curve
+        bytes4[] memory oracleGovernorSelectors = new bytes4[](1);
+        oracleGovernorSelectors[0] = IOracle.setSource.selector;
+        manager.setTargetFunctionRole(oracle, oracleGovernorSelectors, CapRoles.GOVERNOR);
+    }
+
     /// @dev Wire market function selectors to protocol and operator roles
+    /// @param market The market to configure
+    /// @param ownerRole The operator role that owns the market
+    /// @param borrowerRole The operator role that may borrow
     function _configureMarketRoles(address market, uint64 ownerRole, uint64 borrowerRole) internal {
         IAccessManager manager = IAccessManager(authority());
 
-        bytes4[] memory ownerSelectors = new bytes4[](5);
+        bytes4[] memory ownerSelectors = new bytes4[](6);
         ownerSelectors[0] = IBaseMarket.setTrancheWeights.selector;
         ownerSelectors[1] = IBaseMarket.setLtv.selector;
         ownerSelectors[2] = IBaseMarket.setMarketMultiplier.selector;
         ownerSelectors[3] = IFixedMarket.extend.selector;
         ownerSelectors[4] = IBaseMarket.setUnderwriterRate.selector;
+        ownerSelectors[5] = IBaseMarket.setTranches.selector;
         manager.setTargetFunctionRole(market, ownerSelectors, ownerRole);
+        // this contract calls setTranches from createFloatingMarket / createTranche
+        manager.grantRole(ownerRole, address(this), 0);
 
         bytes4[] memory borrowerSelectors = new bytes4[](3);
         borrowerSelectors[0] = IFloatingMarket.borrow.selector;
@@ -344,15 +398,10 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         bytes4[] memory guardianSelectors = new bytes4[](4);
         guardianSelectors[0] = IBaseMarket.setBuffer.selector;
         guardianSelectors[1] = IBaseMarket.setLt.selector;
-        // writing off debt recognises a loss, so it sits with the guardian rather than the keeper
+        // write-off recognises a loss
         guardianSelectors[2] = IFloatingMarket.writeOff.selector;
         guardianSelectors[3] = IFixedMarket.writeOff.selector;
         manager.setTargetFunctionRole(market, guardianSelectors, CapRoles.GUARDIAN);
-
-        bytes4[] memory adminSelectors = new bytes4[](2);
-        adminSelectors[0] = IBaseMarket.setTranches.selector;
-        adminSelectors[1] = IBaseMarket.setStakedStablecoin.selector;
-        manager.setTargetFunctionRole(market, adminSelectors, CapRoles.ADMIN);
 
         bytes4[] memory keeperSelectors = new bytes4[](1);
         keeperSelectors[0] = IFixedMarket.extendAdmin.selector;
@@ -363,87 +412,59 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         liquidatorSelectors[1] = IFixedMarket.liquidate.selector;
         manager.setTargetFunctionRole(market, liquidatorSelectors, CapRoles.LIQUIDATOR);
 
-        manager.grantRole(CapRoles.MINTER, market, 0);
-
-        bytes4[] memory irmSelectors = new bytes4[](2);
-        irmSelectors[0] = IInterestRateModel.updateUnderwriterRate.selector;
-        irmSelectors[1] = IInterestRateModel.updateMarketMultiplier.selector;
-        manager.setTargetFunctionRole(irm, irmSelectors, CapRoles.MARKET);
         manager.grantRole(CapRoles.MARKET, market, 0);
     }
 
     /// @dev Wire tranche function selectors to the market owner, market and depositor roles
+    /// @param tranche The tranche to configure
+    /// @param ownerRole The market owner role that administers depositors
+    /// @param depositorRoleId The role whose members may deposit
     function _configureTrancheRoles(address tranche, uint64 ownerRole, uint64 depositorRoleId) internal {
         IAccessManager manager = IAccessManager(authority());
 
-        bytes4[] memory ownerSelectors = new bytes4[](1);
-        // matches IUnderwriter.setVestingPeriod sitting with the underwriter's operator: the
-        // smoothing window on premium is a curator knob, and the worst it can do is re-vest
-        ownerSelectors[0] = ITranche.setVestingPeriod.selector;
-        manager.setTargetFunctionRole(tranche, ownerSelectors, ownerRole);
-
-        // {ITranche-notifyPremium} re-anchors the vesting epoch, so leaving it public let anyone
-        // restart the release schedule by donating a wei of premium and poking it: the remaining
-        // locked balance was re-spread over a fresh full period each time, turning linear release
-        // into decay that never finishes. The market is the only caller with a reason to be here,
-        // since it notifies in the same breath as minting the premium
-        bytes4[] memory marketSelectors = new bytes4[](2);
-        marketSelectors[0] = ITranche.slash.selector;
-        marketSelectors[1] = ITranche.notifyPremium.selector;
+        // premium is pushed by the market that charged it. slash is gated on `msg.sender == market`
+        bytes4[] memory marketSelectors = new bytes4[](1);
+        marketSelectors[0] = ITranche.fund.selector;
         manager.setTargetFunctionRole(tranche, marketSelectors, CapRoles.MARKET);
 
-        // admission is the gate on the entry points themselves, so the allowlist is the membership
-        // of this role and there is nothing to keep in step on the tranche. Registering an
-        // underwriter to allocate here is the same grant. Repointing it later means another
-        // setTargetFunctionRole, which AccessManager reserves to ADMIN
+        // depositor role is the whitelist for entry into the tranche
         bytes4[] memory depositorSelectors = new bytes4[](2);
         depositorSelectors[0] = IERC4626.deposit.selector;
         depositorSelectors[1] = IERC4626.mint.selector;
         manager.setTargetFunctionRole(tranche, depositorSelectors, depositorRoleId);
 
-        // grant and revoke over the depositor role, and nothing else: they are the only
-        // AccessManager calls delegable to a role other than ADMIN
+        // depositor role is administered by the market owner
         manager.setRoleAdmin(depositorRoleId, ownerRole);
     }
 
     /// @dev Wire underwriter function selectors to the operator, keeper and depositor roles
+    /// @param underwriter The underwriter to configure
+    /// @param roleId The curator operator role
+    /// @param depositorRoleId The role whose members may deposit
     function _configureUnderwriterRoles(address underwriter, uint64 roleId, uint64 depositorRoleId) internal {
         IAccessManager manager = IAccessManager(authority());
 
-        bytes4[] memory operatorSelectors = new bytes4[](6);
+        bytes4[] memory operatorSelectors = new bytes4[](7);
         operatorSelectors[0] = IUnderwriter.allocate.selector;
         operatorSelectors[1] = IUnderwriter.deallocate.selector;
         operatorSelectors[2] = IUnderwriter.deallocateAsync.selector;
         operatorSelectors[3] = IUnderwriter.finalizeDeallocateAsync.selector;
         operatorSelectors[4] = IUnderwriter.setDefaultTranche.selector;
-        operatorSelectors[5] = IUnderwriter.setVestingPeriod.selector;
+        operatorSelectors[5] = IUnderwriter.addTranche.selector;
+        operatorSelectors[6] = IUnderwriter.removeTranche.selector;
         manager.setTargetFunctionRole(underwriter, operatorSelectors, roleId);
 
         bytes4[] memory keeperSelectors = new bytes4[](1);
         keeperSelectors[0] = IUnderwriter.report.selector;
         manager.setTargetFunctionRole(underwriter, keeperSelectors, CapRoles.KEEPER);
 
-        // Registration is held above the curator on purpose. addTranche hands its argument vault
-        // operator rights over the underwriter's entire balance and does not check that the address
-        // is a tranche this registry deployed, so a curator holding it could register a contract of
-        // their own and move the balance out. Wired explicitly even though ADMIN is AccessManager's
-        // default for an unconfigured selector, so the role table shows a decision rather than an
-        // omission.
-        bytes4[] memory adminSelectors = new bytes4[](2);
-        adminSelectors[0] = IUnderwriter.addTranche.selector;
-        adminSelectors[1] = IUnderwriter.removeTranche.selector;
-        manager.setTargetFunctionRole(underwriter, adminSelectors, CapRoles.ADMIN);
-
-        // admission is the gate on the entry points themselves, so the allowlist is the membership
-        // of this role and there is nothing to keep in step on the vault. Repointing it later means
-        // another setTargetFunctionRole, which AccessManager reserves to ADMIN
+        // depositor role is the whitelist for entry into the underwriter
         bytes4[] memory depositorSelectors = new bytes4[](2);
         depositorSelectors[0] = IERC4626.deposit.selector;
         depositorSelectors[1] = IERC4626.mint.selector;
         manager.setTargetFunctionRole(underwriter, depositorSelectors, depositorRoleId);
 
-        // grant and revoke over the depositor role, and nothing else: they are the only
-        // AccessManager calls delegable to a role other than ADMIN
+        // depositor role is administered by the underwriter operator
         manager.setRoleAdmin(depositorRoleId, roleId);
     }
 

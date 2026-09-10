@@ -5,7 +5,6 @@ import { Underwriter } from "../../contracts/cap/Underwriter.sol";
 import { FixedMarket } from "../../contracts/cap/market/FixedMarket.sol";
 import { IBaseMarket } from "../../contracts/interfaces/IBaseMarket.sol";
 import { IFixedMarket } from "../../contracts/interfaces/IFixedMarket.sol";
-import { IOracle } from "../../contracts/interfaces/IOracle.sol";
 import { ITranche } from "../../contracts/interfaces/ITranche.sol";
 import { WadRayMath } from "../../contracts/utils/WadRayMath.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
@@ -173,7 +172,7 @@ contract DebtLifecycleTest is CapDeployer {
         bundle.market.borrow(defaultBorrower, 500e18);
 
         // collateral falls from $1 to $0.10, so 1000 tokens now back only $100 of the $500 debt
-        oracle.setPrice(address(collateral), 0.1e18);
+        _setPrice(address(collateral), 0.1e18);
         assertEq(bundle.market.totalCapital(), 100e18, "capital repriced");
 
         // $100 of collateral can only clear $100 / 1.02 of debt once the bonus is paid
@@ -221,7 +220,7 @@ contract DebtLifecycleTest is CapDeployer {
         vm.prank(defaultBorrower);
         (uint256 id,) = market.borrow(defaultBorrower, 4_000e18, 30 days);
 
-        oracle.setPrice(address(collateral), 0.1e18);
+        _setPrice(address(collateral), 0.1e18);
 
         uint256 shortfall = market.unrecoverableDebt();
         assertGt(shortfall, 0, "market is short");
@@ -246,7 +245,7 @@ contract DebtLifecycleTest is CapDeployer {
         vm.prank(defaultBorrower);
         bundle.market.borrow(defaultBorrower, 500e18);
 
-        oracle.setPrice(address(collateral), 0.1e18);
+        _setPrice(address(collateral), 0.1e18);
         bundle.market.writeOff();
         assertGt(stablecoin.badDebt(), 0, "the supply is carrying a loss");
 
@@ -259,23 +258,91 @@ contract DebtLifecycleTest is CapDeployer {
         assertApproxEqRel(slashedValue, repaid.rayMul(1e27 + irm.liquidationBonus()), 0.001e18, "plain bonus");
     }
 
+    // ── a distressed market can still be recapitalised ───────────────────────
+
+    /// @dev Stand up a market that is unhealthy and still fully collateralised: $1000 of capital
+    /// against $900 of debt, then the collateral halves. Every dollar is still recoverable, so
+    /// this is distress rather than insolvency — the state where adding capital is the remedy.
+    function _distressedMarket() internal returns (MarketBundle memory bundle) {
+        bundle = _createReadyMarket("Distressed");
+        _fundTranche(bundle.tranche0Addr, makeAddr("senior"), 1_000e18);
+        _fundTranche(bundle.tranche1Addr, makeAddr("junior"), 1_000e18);
+
+        vm.prank(defaultBorrower);
+        bundle.market.borrow(defaultBorrower, 900e18);
+
+        _setPrice(address(collateral), 0.5e18);
+        assertLt(bundle.market.healthiness(), 1e27, "unhealthy");
+        assertEq(bundle.market.unrecoverableDebt(), 0, "but not yet insolvent");
+    }
+
+    /// @dev {IRegistry-createTranche} ends in {IBaseMarket-setTranches}, which still requires the
+    /// market to come out healthy. An empty tranche cannot lift health over the threshold, so a
+    /// distressed market cannot be recapitalised this way.
+    function test_createTranche_cannotRecapitaliseAnUnhealthyMarket() public {
+        MarketBundle memory bundle = _distressedMarket();
+
+        vm.expectRevert(IBaseMarket.Unhealthy.selector);
+        registry.createTranche(bundle.marketAddr, address(collateral), _thirds());
+    }
+
+    /// @dev The other half, and the reason the gate exists. Removing a tranche that still holds
+    /// collateral takes its capital out from under the debt, which is refused whether or not the
+    /// market was healthy to begin with.
+    function test_setTranches_stillRefusesToTakeCapitalOutFromUnderTheDebt() public {
+        MarketBundle memory bundle = _distressedMarket();
+
+        IBaseMarket.Tranche[] memory withoutTheJunior = new IBaseMarket.Tranche[](1);
+        withoutTheJunior[0] = IBaseMarket.Tranche({ tranche: bundle.tranche0Addr, weight: 1e27 });
+
+        vm.expectRevert(IBaseMarket.Unhealthy.selector);
+        bundle.market.setTranches(withoutTheJunior);
+    }
+
+    /// @dev The gate is on the result being healthy *or* no worse, not on health never falling. A
+    /// healthy market with room to spare may still be rebalanced downwards, which is what the
+    /// original absolute check allowed and the fix has to keep allowing — tightening this to "may
+    /// never fall" would strand capital in any market carrying debt.
+    function test_setTranches_letsAHealthyMarketGiveUpSpareCapital() public {
+        MarketBundle memory bundle = _createReadyMarket("Spare");
+        _fundTranche(bundle.tranche0Addr, makeAddr("senior"), 1_000e18);
+        _fundTranche(bundle.tranche1Addr, makeAddr("junior"), 1_000e18);
+
+        vm.prank(defaultBorrower);
+        bundle.market.borrow(defaultBorrower, 100e18);
+        uint256 healthBefore = bundle.market.healthiness();
+
+        IBaseMarket.Tranche[] memory justTheSenior = new IBaseMarket.Tranche[](1);
+        justTheSenior[0] = IBaseMarket.Tranche({ tranche: bundle.tranche0Addr, weight: 1e27 });
+        bundle.market.setTranches(justTheSenior);
+
+        assertEq(bundle.market.tranches().length, 1, "the junior is out, collateral and all");
+        assertLt(bundle.market.healthiness(), healthBefore, "health fell");
+        assertGe(bundle.market.healthiness(), 1e27, "but there was enough spare to stay healthy");
+    }
+
+    function _thirds() internal pure returns (uint256[] memory weights) {
+        weights = new uint256[](3);
+        weights[0] = 0.4e27;
+        weights[1] = 0.4e27;
+        weights[2] = 0.2e27;
+    }
+
     // ── a zero oracle price fails closed ─────────────────────────────────────
 
-    /// @dev The refusal comes from the oracle now rather than from the tranche. {Oracle-price}
-    /// treats a zero from its source as no answer at all, tries the backup and gives up, so the
-    /// tranche never sees the zero it used to guard against. {Tranche-getPrice} keeps that guard
-    /// anyway, since it is one comparison standing between a misbehaving oracle and a division by
-    /// zero in every conversion the tranche performs, but a conformant oracle never reaches it.
+    /// @dev {Oracle-price} returns zero when both feeds fail. {Tranche-getPrice} treats that as
+    /// {InvalidPrice}, which is the comparison standing between a missing price and a division by
+    /// zero in every conversion the tranche performs.
     function test_zeroPrice_revertsInsteadOfDividingByZero() public {
         MarketBundle memory bundle = _createReadyMarket("Floating");
         _fundTranche(bundle.tranche0Addr, makeAddr("senior"), 10_000e18);
 
-        oracle.setPrice(address(collateral), 0);
+        _setPrice(address(collateral), 0);
 
-        vm.expectRevert(abi.encodeWithSelector(IOracle.PriceError.selector, address(collateral)));
+        vm.expectRevert(ITranche.InvalidPrice.selector);
         bundle.tranche0.totalCapital();
 
-        vm.expectRevert(abi.encodeWithSelector(IOracle.PriceError.selector, address(collateral)));
+        vm.expectRevert(ITranche.InvalidPrice.selector);
         bundle.tranche0.unlockedSupply();
     }
 

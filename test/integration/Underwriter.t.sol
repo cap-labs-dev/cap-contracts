@@ -128,7 +128,7 @@ contract UnderwriterIntegrationTest is CapDeployer {
         vm.warp(block.timestamp + 365 days);
         market.chargePremium();
 
-        vm.warp(block.timestamp + 6 hours);
+        vm.warp(block.timestamp + 20 * underwriter.vestingPeriod());
 
         underwriter.report(address(tranche0));
         uint256 pulled = stablecoin.balanceOf(address(underwriter));
@@ -136,15 +136,15 @@ contract UnderwriterIntegrationTest is CapDeployer {
 
         assertEq(stablecoin.balanceOf(depositor), 0);
 
-        vm.warp(block.timestamp + 6 hours);
+        vm.warp(block.timestamp + 20 * underwriter.vestingPeriod());
         uint256 claimable = underwriter.claimable(depositor);
         assertGt(claimable, 0);
 
         vm.prank(depositor);
-        underwriter.claim();
+        underwriter.claim(depositor);
 
         assertApproxEqAbs(stablecoin.balanceOf(depositor), claimable, 1e6);
-        assertApproxEqAbs(stablecoin.balanceOf(address(underwriter)), 0, 1e6);
+        assertLt(stablecoin.balanceOf(address(underwriter)), pulled / 1e6, "only the exponential tail is left");
     }
 
     function test_asyncRedemption_pendingUntilDeallocated() public {

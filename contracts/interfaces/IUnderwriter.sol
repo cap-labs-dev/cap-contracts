@@ -10,9 +10,6 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice The tranche is not registered with the underwriter
     error NotRegisteredTranche();
 
-    /// @notice The vesting period is zero
-    error InvalidVestingPeriod();
-
     /// @notice More shares were named than this vault has queued under that request id
     error UnknownQueuedRequest();
 
@@ -51,15 +48,6 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @param tranche The new default tranche address
     event SetDefaultTranche(address tranche);
 
-    /// @notice Emitted when the premium vesting period is updated
-    /// @param vestingPeriod The new vesting period in seconds
-    event SetVestingPeriod(uint256 vestingPeriod);
-
-    /// @notice Emitted when a depositor claims vested premium
-    /// @param user The account that claimed
-    /// @param amount The amount of premium claimed
-    event Claimed(address indexed user, uint256 amount);
-
     /// @notice Initialize the underwriter
     /// @param authority The access manager address
     /// @param name The share token name
@@ -77,14 +65,12 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     ) external;
 
     /// @notice Register a tranche for allocation and reporting
-    /// @dev Grants the tranche vault operator rights so it can pull assets on allocation. The
-    /// grant lasts until {removeTranche} revokes it.
+    /// @dev Grants the tranche vault operator rights until {removeTranche}.
     /// @param tranche The tranche address
     function addTranche(address tranche) external;
 
-    /// @notice Remove a tranche from the underwriter to block new allocations
-    /// @dev Revokes the tranche's vault operator rights. Existing shares can still be redeemed,
-    /// since the deallocation functions deliberately do not require registration.
+    /// @notice Remove a tranche and block new allocations
+    /// @dev Revokes vault operator rights. Existing shares can still be redeemed.
     /// @param tranche The tranche address
     function removeTranche(address tranche) external;
 
@@ -94,26 +80,21 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     function allocate(address tranche, uint256 assets) external;
 
     /// @notice Instantly redeem unlocked tranche shares back to the vault
-    /// @dev Registration is deliberately not checked. Removing a tranche must block new
-    /// allocations without trapping the capital already sitting in it, so every exit path stays
-    /// open to unregistered tranches.
-    ///
-    /// Clamped by both this contract's holding and the tranche's unlocked supply, so an oversized
-    /// request is a short fill rather than a revert, matching {deallocateAsync}.
+    /// @dev Tranches can be removed registration and still deallocated from
     /// @param tranche The tranche address
     /// @param shares The shares to redeem
     /// @return deallocated The amount of shares redeemed
     function deallocate(address tranche, uint256 shares) external returns (uint256 deallocated);
 
     /// @notice Request async redemption of tranche shares back to the vault
-    /// @dev Registration is deliberately not checked; see {deallocate}
+    /// @dev Registration is not checked; see {deallocate}.
     /// @param tranche The tranche address
     /// @param shares The shares to redeem
     /// @return requestId The ERC-7540 request id
     function deallocateAsync(address tranche, uint256 shares) external returns (uint256 requestId);
 
     /// @notice Finalize an async tranche redemption
-    /// @dev Registration is deliberately not checked; see {deallocate}
+    /// @dev Registration is not checked; see {deallocate}.
     /// @param tranche The tranche address
     /// @param requestId The ERC-7540 request id
     /// @param shares The shares to redeem
@@ -123,117 +104,50 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @param tranche The default tranche address
     function setDefaultTranche(address tranche) external;
 
-    /// @notice Set the premium vesting period
-    /// @dev Remaining locked premium is recaptured and re-vested over the new period
-    /// @param vestingPeriod The new vesting period in seconds
-    function setVestingPeriod(uint256 vestingPeriod) external;
-
-    /// @notice Re-value a tranche position and claim its premium into the underwriter
-    /// @dev The re-valuation is the same one every allocation and deallocation performs, so this is
-    /// only the way to reach a position nothing else has touched — a slash, most of all. The
-    /// premium sweep is what makes it worth calling on a cadence rather than on demand.
+    /// @notice Re-value a tranche position and claim its premium
+    /// @dev Same revaluation as {allocate} and {deallocate}
     /// @param tranche The tranche address
     function report(address tranche) external;
 
-    /// @notice Claim vested premium for the caller
-    /// @dev Pays the caller, where {ITranche-claim} takes a recipient. That asymmetry is deliberate
-    /// rather than an omission: the tranche needs one because the underwriter claims a tranche's
-    /// premium to itself in {report}, whereas nothing claims on a depositor's behalf here.
-    /// @return premium The amount of premium claimed
-    function claim() external returns (uint256 premium);
-
     /// @notice Get the vault holding curator assets
+    /// @return The vault address
     function vault() external view returns (address);
 
-    /// @notice Get the stablecoin used for premium payments
-    function stablecoin() external view returns (address);
-
-    /// @notice Get the premium vesting period in seconds
-    function vestingPeriod() external view returns (uint256);
-
-    /// @notice Get the anchor the premium vesting schedule runs from
-    /// @dev Set to the report time by {report}, then slid forward by any window in which nothing was
-    /// staked, so it is not necessarily the timestamp of the last report
+    /// @notice When {report} last folded premium into the remainder
+    /// @return The last report timestamp
     function lastReported() external view returns (uint256);
 
-    /// @notice Get the total premium from the last report that is vesting to depositors
-    function vestedPremium() external view returns (uint256);
-
-    /// @notice Get the nominal premium accrual rate per second
-    /// @dev Reported for convenience and not what accrual uses. {PremiumVesting} scales the vesting
-    /// lump by elapsed time instead, so it does not truncate this figure and then multiply the
-    /// error back up. Expect accrual to run marginally ahead of `premiumPerSecond × elapsed`.
-    function premiumPerSecond() external view returns (uint256);
-
-    /// @notice Get the timestamp of the last premium accrual update
-    function lastPremiumUpdate() external view returns (uint256);
-
-    /// @notice Get the accumulated premium per share in ray decimals
-    function premiumPerShare() external view returns (uint256);
-
-    /// @notice Get pending premium already settled for an account
-    /// @param user The account to query
-    function pendingPremium(address user) external view returns (uint256);
-
     /// @notice Get the default allocation tranche
+    /// @return The default tranche address
     function defaultTranche() external view returns (address);
 
-    /// @notice Get the shares of a tranche this vault has queued for redemption but not yet settled
-    /// @dev Part of the position for valuation purposes even though they have left this vault's
-    /// balance for the tranche's own; see {debt}
+    /// @notice Shares queued for redemption but not yet settled
+    /// @dev Still counted in {debt}.
     /// @param tranche The tranche address
+    /// @return The queued share count
     function queuedShares(address tranche) external view returns (uint256);
 
-    /// @notice Get the shares this vault queued under one redemption request id
-    /// @dev Only ids opened by {deallocateAsync} are recorded, which is what {finalizeDeallocateAsync}
-    /// settles against
+    /// @notice Shares queued under one {deallocateAsync} request
     /// @param tranche The tranche address
     /// @param requestId The ERC-7540 request id
+    /// @return The shares queued under that request
     function queuedRequest(address tranche, uint256 requestId) external view returns (uint256);
 
-    /// @notice Get the recorded value of this contract's position in a tranche
-    /// @dev What the position was worth when the underwriter last touched that tranche, which is
-    /// every allocation, every deallocation and every {report}. A slash in between moves the
-    /// position without moving this, so it is an upper bound on what the position would return.
-    /// The position counts shares held plus {queuedShares}, so a pending async deallocation is
-    /// carried at value rather than read as a write-off.
+    /// @notice Recorded value of this vault's position in a tranche.
     /// @param tranche The tranche address
+    /// @return The recorded position value
     function debt(address tranche) external view returns (uint256);
 
-    /// @notice Get the total recorded value of every tranche position
-    /// @dev The exact sum of every {debt} entry, and the half of {totalAssets} that is not idle
+    /// @notice Sum of every {debt} entry
+    /// @return The sum of every recorded position
     function totalDebt() external view returns (uint256);
 
-    /// @notice Get claimable premium for an account
-    /// @param user The account to query
-    /// @return premium The claimable premium
-    function claimable(address user) external view returns (uint256 premium);
-
-    /// @notice Get the premium from the last report that has not yet vested
-    /// @return vested The remaining unvested premium
-    function vestedReward() external view returns (uint256 vested);
-
-    /// @notice Get the timestamp when the current vesting epoch ends
-    /// @return end The vesting end timestamp
-    function vestingEnd() external view returns (uint256 end);
-
     /// @notice Total assets including vault balance and recorded tranche debt
-    /// @dev Overrides IERC4626: returns vault ERC6909 balance plus totalDebt
+    /// @dev Vault ERC6909 balance plus {totalDebt}.
     /// @return assets The total assets
     function totalAssets() external view returns (uint256 assets);
 
-    /// @notice Get the number of shares that can earn, which is the active supply net of the dead
-    /// shares seeded out of the first deposit
-    /// @dev Distinct from {IERC7540AsyncRedeem-activeSupply} because the dead shares sit at an
-    /// address nothing can spend from, so premium divided across them could never be collected.
-    /// This figure also returns to zero once every real holder has left, which is what lets callers
-    /// read zero as "no capital at work here". `activeSupply` and `activeAssets` stay gross of
-    /// them, since the assets behind the dead shares are really held and really do back debt.
-    /// @return supply The number of shares that can earn
-    function stakedSupply() external view returns (uint256 supply);
-
     /// @notice Shares available for instant redemption based on vault liquidity
-    /// @dev Overrides IERC7540AsyncRedeem unlockedSupply
     /// @return unlocked Shares redeemable against vault-held assets
     function unlockedSupply() external view returns (uint256 unlocked);
 }

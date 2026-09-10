@@ -41,7 +41,7 @@ contract MarketTest is CapDeployer {
         market.setTargetHealth(1.2e27);
     }
 
-    function test_createMarket_returnsNonZeroAddresses() public {
+    function test_createFloatingMarket_returnsNonZeroAddresses() public {
         address marketAddr;
         address tranche0;
         address tranche1;

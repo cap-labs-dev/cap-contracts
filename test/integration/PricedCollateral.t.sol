@@ -30,6 +30,43 @@ contract PricedCollateralTest is CapDeployer {
         _fundTranche(junior, makeAddr("junior"), juniorAssets);
     }
 
+    /// @dev The scale itself, which none of the cases below can pin because they all quote a price
+    /// and an expectation in the same units and so hold only for the ratio between them.
+    ///
+    /// A price is never used on its own here. Every consumer multiplies a token amount by one to
+    /// get a USD value and then compares that value against cUSD debt, so the oracle's scale has
+    /// to be cUSD's or the comparison is off by the difference. It was: the oracle answered in a
+    /// feed's native eight while {ITranche-totalCapital} and {IBaseMarket-lockedValue} carried
+    /// that straight into eighteen-decimal terms, undervaluing all collateral by ten orders of
+    /// magnitude and leaving every market both unable to lend and instantly liquidatable. Nothing
+    /// caught it because the harness mocked the oracle and answered in eighteen regardless of what
+    /// the real one did, so this suite runs on the real {Oracle} and the real {ChainlinkAdapter}
+    /// over an eight-decimal feed, and the normalisation between them is live.
+    ///
+    /// Both halves are needed. The equality states the invariant and would survive someone moving
+    /// both constants together; the amounts are absolute, so they would not.
+    function test_aPriceIsDenominatedInTheSameScaleAsTheDebtItIsComparedAgainst() public {
+        (FloatingMarket market,,) = _setUpMarketAtPrice(1e18, 1e18, 1e18);
+
+        assertEq(oracle.DECIMALS(), stablecoin.decimals(), "a price is a cUSD value, so it carries cUSD's scale");
+        assertEq(market.totalCapital(), 2e18, "two whole tokens at a dollar each back two whole cUSD");
+
+        // and the route is genuinely crossed. Feeds reporting in the oracle's own scale would make
+        // the adapter's normalisation a no-op, which is the shape the suite had when it mocked the
+        // oracle: still green, and blind to exactly the disagreement above
+        assertTrue(FEED_DECIMALS != oracle.DECIMALS(), "the feeds behind these prices need normalising");
+
+        // and the value is load-bearing, not just reported: at the default half LTV it has to buy
+        // a whole cUSD of credit rather than a ten-billionth of one
+        assertEq(market.creditLimit(), 1e18, "half of two dollars is a dollar of borrowing power");
+
+        vm.prank(defaultBorrower);
+        market.borrow(defaultBorrower, 1e18);
+
+        assertEq(stablecoin.balanceOf(defaultBorrower), 1e18, "and it is actually borrowable");
+        assertGe(market.healthiness(), 1e27, "leaving the market healthy at exactly its limit");
+    }
+
     /// Collateral worth $2 means $102 of slashing should remove 51 tokens, not 102.
     function test_slash_convertsValueToAssets_priceAboveOne() public {
         (FloatingMarket market,, address junior) = _setUpMarketAtPrice(2e18, 500e18, 500e18);
@@ -106,7 +143,7 @@ contract PricedCollateralTest is CapDeployer {
 
         // halve the collateral: $1000 against $900 of debt is unhealthy but still fully recoverable,
         // so the cap is not what is being measured here
-        oracle.setPrice(address(collateral), 1e18);
+        _setPrice(address(collateral), 1e18);
         assertEq(market.totalCapital(), 1_000e18, "capital repriced");
         assertLt(market.healthiness(), 1e27, "and the market is unhealthy");
         assertGt(market.recoverableDebt(), 900e18, "with every dollar of it still recoverable");
@@ -134,7 +171,7 @@ contract PricedCollateralTest is CapDeployer {
         market.borrow(defaultBorrower, 900e18);
 
         // collateral falls from $2 to $0.10, leaving 1000 tokens worth only $100
-        oracle.setPrice(address(collateral), 0.1e18);
+        _setPrice(address(collateral), 0.1e18);
         assertEq(market.totalCapital(), 100e18, "capital repriced");
 
         uint256 recoverable = market.recoverableDebt();

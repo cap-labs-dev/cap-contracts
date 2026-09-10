@@ -9,14 +9,14 @@ struct UsersConfig {
     address admin;
     address liquidator;
     address stablecoinUnderlying;
-    address stakedStablecoin;
-    address oracle;
+    address reserveVault;
 }
 
 struct ImplementationsConfig {
     address vault;
     address stablecoin;
     address irm;
+    address oracle;
     address registry;
     address floatingMarket;
     address fixedMarket;
@@ -33,6 +33,8 @@ struct InfraConfig {
     address vault;
     address stablecoin;
     address irm;
+    address oracle;
+    address chainlinkAdapter;
     address registry;
     address factory;
     address floatingMarketBeacon;

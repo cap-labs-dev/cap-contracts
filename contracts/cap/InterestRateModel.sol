@@ -12,12 +12,12 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 
 /// @title InterestRateModel
 /// @author kexley, Cap Labs
-/// @notice The InterestRateModel calculates the canonical variable and fixed interest rates for Stablecoin.
+/// @notice Variable and fixed interest rates for the stablecoin
 contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     is
     IInterestRateModel,
-    UUPSUpgradeable,
-    AccessManagedUpgradeable
+    AccessManagedUpgradeable,
+    UUPSUpgradeable
 {
     using WadRayMath for uint256;
 
@@ -56,6 +56,9 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
 
     /// @inheritdoc IInterestRateModel
     uint256 public averagingPeriod;
+
+    /// @inheritdoc IInterestRateModel
+    uint256 public retentionPerSecond;
 
     /// @inheritdoc IInterestRateModel
     uint256 public constant MINIMUM_AVERAGING_PERIOD = 5 minutes;
@@ -172,12 +175,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     }
 
     /// @inheritdoc IInterestRateModel
-    /// @dev The only route to a fixed rate, and it deliberately does not reuse {liquidityRate}.
-    /// A floating loan is repriced every time the supplies move and its index re-accrues, so spot
-    /// is the honest reading for it and a stale one would be wrong. A fixed loan locks its whole
-    /// term's premium in the block it is taken, which turns a single observation into up to a
-    /// month of charge, so it builds on the time-weighted figure instead; see
-    /// {averageUtilizationAfterMint}.
+    /// @dev Uses the time-weighted utilization, not {liquidityRate}. See {averageUtilizationAfterMint}.
     function fixedRatesAfterMint(address market, uint256 termUtilization, uint256 mintAmount)
         public
         view
@@ -190,8 +188,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
 
     /// @inheritdoc IInterestRateModel
     function termMultiplier(uint256 termUtilization) public view returns (uint256 multiplier) {
-        // a term at or beyond the maximum pays the plain liquidity rate. Both branches meet at one
-        // ray, so the curve is continuous there and never dips below it
+        // at or beyond the maximum term, pay the plain liquidity rate
         if (termUtilization >= 1e27) return 1e27;
         multiplier = 1e27 + termMultiplierSlope.rayMul(1e27 - termUtilization);
     }
@@ -201,10 +198,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         _setLiquidationBonus(_liquidationBonus);
     }
 
-    /// @dev Shared with {initialize} so a deployment cannot start outside the band governance is
-    /// allowed to move within. The bonus feeds {BaseMarket-_slashPerDebt}, which sets what every
-    /// liquidation takes out of the tranches, and the only route back from an out-of-range value
-    /// would have been a setter that rejects the value already stored.
+    /// @dev Shared with {initialize}. Same bounds as the setter.
     /// @param _liquidationBonus The liquidation bonus in ray decimals
     function _setLiquidationBonus(uint256 _liquidationBonus) internal {
         if (_liquidationBonus > 0.1e27) revert InvalidLiquidationBonus();
@@ -214,22 +208,20 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
 
     /// @inheritdoc IInterestRateModel
     function setAveragingPeriod(uint256 _averagingPeriod) external restricted {
-        // settle the interval that has run so far under the window that was in force for it,
-        // otherwise changing the window silently reweights time that has already passed
+        // settle the running interval under the old window first
         _accrueAverage();
         _setAveragingPeriod(_averagingPeriod);
     }
 
-    /// @dev Shared with {initialize} on the same grounds as {_setLiquidationBonus}. Banded at both
-    /// ends because both ends are harmful in their own way: a window shorter than a handful of
-    /// blocks converges on spot and gives a flash borrower their manipulation back, while a long
-    /// one leaves fixed loans priced off liquidity conditions that have since moved on.
+    /// @dev Shared with {initialize}. Banded at both ends.
     /// @param _averagingPeriod The averaging period in seconds
     function _setAveragingPeriod(uint256 _averagingPeriod) internal {
         if (_averagingPeriod < MINIMUM_AVERAGING_PERIOD || _averagingPeriod > MAXIMUM_AVERAGING_PERIOD) {
             revert InvalidAveragingPeriod();
         }
         averagingPeriod = _averagingPeriod;
+        // per-second retention; residual after one window is ~1/e
+        retentionPerSecond = 1e27 - 1e27 / _averagingPeriod;
         emit SetAveragingPeriod(_averagingPeriod);
     }
 
@@ -253,8 +245,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         rate = _ratio(credit + mintAmount, supply + mintAmount);
     }
 
-    /// @dev Update the liquidity rate based on the utilization of the stablecoin, folding the
-    /// interval that has just ended into the time-weighted supplies on the way past
+    /// @dev Accrue the averages, then set the liquidity rate from live utilization.
     function _updateLiquidityRate() internal {
         _accrueAverage();
         liquidityData.index = _index(liquidityData);
@@ -263,20 +254,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         liquidityData.ratePerYear = _nextLiquidityRate(utilization);
     }
 
-    /// @dev Fold the observation that has stood since the last accrual into the stored averages,
-    /// then record the reading that takes over from here.
-    ///
-    /// The stablecoin calls into this after its supplies have already moved, so the live reading is
-    /// the wrong thing to credit the elapsed interval with: it has existed for zero seconds and
-    /// would arrive carrying the full weight of the interval before it, which is precisely the
-    /// flash manipulation the averaging exists to stop. What held over that interval is the
-    /// observation taken at the previous accrual, so that is what gets folded in, and the reading
-    /// arriving now is only stored — it starts earning weight from the next accrual onwards.
-    ///
-    /// The fold is skipped when no time has passed, so a transaction that moves the supplies
-    /// several times — a premium charge splitting across tranches does — folds once and then only
-    /// rolls the observation forward. That leaves the last reading of a block as the one credited
-    /// with the interval that follows it, which is what weighting by time means.
+    /// @dev Fold the prior observation into the averages, then store the live reading.
     function _accrueAverage() internal {
         UtilizationAverage memory average = utilizationAverage;
 
@@ -293,15 +271,11 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         if (supply != average.observedSupply) utilizationAverage.observedSupply = supply;
     }
 
-    /// @dev The share of the distance to the standing observation that an interval has earned. Zero
-    /// for an interval of no length and a full ray once a whole period has run, so an observation
-    /// that has only just arrived counts for nothing and one that has held out a full quiet period
-    /// is taken at face value.
-    /// @param elapsed The length of the interval in seconds
-    /// @return weight The share, in ray decimals
+    /// @dev Share of the distance to the observation earned over `elapsed`. Compounds.
+    /// @param elapsed Seconds since the last fold
+    /// @return weight Share in ray decimals
     function _averagingWeight(uint256 elapsed) internal view returns (uint256 weight) {
-        uint256 period = averagingPeriod;
-        weight = elapsed >= period ? 1e27 : elapsed * 1e27 / period;
+        weight = 1e27 - retentionPerSecond.rayPow(elapsed);
     }
 
     /// @dev Move an average a `weight` share of the way towards an observation, in either direction
@@ -315,8 +289,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
             : average - (average - observed).rayMul(weight);
     }
 
-    /// @dev Utilization as the stablecoin defines it, applied to the time-weighted supplies rather
-    /// than the live ones; see {IStablecoin-utilizationRate}
+    /// @dev Utilization as the stablecoin defines it, on the given supplies.
     /// @param credit The credit-backed supply
     /// @param supply The total supply
     /// @return rate The utilization rate in ray decimals
@@ -326,6 +299,8 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     }
 
     /// @dev Calculate the liquidity rate based on the utilization
+    /// @param utilization The utilization rate in ray decimals
+    /// @return rate The liquidity rate per year in ray decimals
     function _nextLiquidityRate(uint256 utilization) internal view returns (uint256 rate) {
         Slopes memory slopes = liquiditySlopes;
         if (utilization <= slopes.kink) {

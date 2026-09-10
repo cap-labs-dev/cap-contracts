@@ -103,33 +103,21 @@ interface IFixedMarket is IBaseMarket {
         returns (uint256 repaid, uint256 assetsSlashed);
 
     /// @notice Extend the term of a loan
-    /// @dev A live loan can be extended up to the room left under the maximum term. An expired loan
-    /// is rolled a full `extension` forward from now, so the arrears are added on top of the
-    /// requested term and charged a premium; only the requested term is bound by the term limits.
-    /// Passing `type(uint256).max` takes the largest extension available in either case.
+    /// @dev Extends current `id` debt by `extension` and charges arrears if expired
     /// @param id The id of the loan
     /// @param extension The extension of the term
     /// @return actualExtension The actual extension of the term
     function extend(uint256 id, uint256 extension) external returns (uint256 actualExtension);
 
-    /// @notice Roll an overdue loan forward and charge it a premium for the overdue period
-    /// @dev This is how an overdue loan is handled rather than by liquidation, which would take
-    /// collateral from the underwriters instead of charging the borrower. Only callable once the
-    /// loan is past its expiry plus grace period, at which point the keeper rolls it a full
-    /// `extension` forward from now and the borrower's debt grows by the premium on the arrears
-    /// plus the new term. Health is not checked: an overdue loan must be rollable even when the
-    /// market is already unhealthy.
+    /// @notice Roll an overdue loan forward and charge premium for the arrears
+    /// @dev Health is not checked potentially making loan liquidatable
     /// @param id The id of the loan
     /// @param extension The new term to roll the loan forward by
     /// @return actualExtension The arrears plus the new term
     function extendAdmin(uint256 id, uint256 extension) external returns (uint256 actualExtension);
 
-    /// @notice Write off a loan's share of the market's unrecoverable debt as bad debt
-    /// @dev Callable at any time, not just once the tranches are empty, because a liquidation that
-    /// is unprofitable never happens and would otherwise let the shortfall compound. The amount is
-    /// derived from the tranches rather than supplied: it is the loan's debt capped at the market
-    /// wide {unrecoverableDebt}, so the guardian chooses which loans absorb the shortfall but can
-    /// never write off more than the collateral shortfall in total.
+    /// @notice Write off this loan's share of {unrecoverableDebt}
+    /// @dev Capped at the market-wide shortfall.
     /// @param id The id of the loan
     /// @return amount The amount of debt written off
     function writeOff(uint256 id) external returns (uint256 amount);
@@ -139,10 +127,8 @@ interface IFixedMarket is IBaseMarket {
     /// @param minimumTermLimit The minimum term of a loan, must not exceed the maximum
     function setTermLimits(uint256 maximumTermLimit, uint256 minimumTermLimit) external;
 
-    /// @notice Get the liquidity and underwriter premiums an extension would be charged
-    /// @dev Quoted at the rates standing now, which is exactly what {extend} and {extendAdmin} pay:
-    /// they charge against debt already outstanding and mint nothing before doing so, so the rate
-    /// does not move first. Use {premiumForBorrow} for a new draw, which does move it.
+    /// @notice Premium an extension would be charged
+    /// @dev At current rates. Use {premiumForBorrow} for a new draw.
     /// @param chargeableDebt The amount of debt that a premium is being charged on
     /// @param term The term of the loan
     /// @return liquidityPremium The liquidity premium
@@ -152,12 +138,8 @@ interface IFixedMarket is IBaseMarket {
         view
         returns (uint256 liquidityPremium, uint256 underwriterPremium);
 
-    /// @notice Get the liquidity and underwriter premiums a new borrow would be charged
-    /// @dev A borrow mints its principal before its premium is priced, so it pays on the far side
-    /// of the utilization its own draw creates and the rates standing now would understate it. This
-    /// prices at the rate the draw will produce; see {IInterestRateModel-fixedRatesAfterMint}. The
-    /// principal has to be one {availableCredit} would actually grant, or the quote describes a
-    /// borrow that would be refused.
+    /// @notice Premium a new borrow would be charged
+    /// @dev Priced after the mint; see {IInterestRateModel-fixedRatesAfterMint}.
     /// @param principal The principal of the loan
     /// @param term The term of the loan
     /// @return liquidityPremium The liquidity premium
@@ -167,17 +149,8 @@ interface IFixedMarket is IBaseMarket {
         view
         returns (uint256 liquidityPremium, uint256 underwriterPremium);
 
-    /// @notice Get the largest principal borrowable over a term, leaving room for the upfront
-    /// premium it owes from the outset so that the two together stay inside the credit limit
-    /// @dev Borrowing mints credit-backed stablecoin, which raises utilization and so the liquidity
-    /// rate, and the premium is charged at that higher post-mint rate. A borrower pays for the
-    /// utilization they create rather than being handed the rate that stood before them, so the
-    /// room left has to be sized against a rate that does not exist yet; see
-    /// {IInterestRateModel-fixedRatesAfterMint}. It uses the worst case, the rate a draw of the
-    /// whole limit would produce, which avoids any circularity between the size and the rate at a
-    /// cost measured in fractions of a basis point of capacity. Leaving room at the pre-borrow rate
-    /// instead left the debt above the credit limit and could leave the market instantly
-    /// liquidatable.
+    /// @notice Largest principal borrowable over a term, leaving room for the upfront premium
+    /// @dev Sized at the post-mint rate for a full-limit draw.
     /// @param term The term of the loan
     /// @return credit The available credit
     function availableCredit(uint256 term) external view returns (uint256 credit);

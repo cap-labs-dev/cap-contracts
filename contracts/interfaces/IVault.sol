@@ -6,18 +6,14 @@ import { IERC6909TokenSupply } from "@openzeppelin/contracts/interfaces/IERC6909
 /// @title IVault
 /// @author kexley, Cap Labs
 /// @notice Interface for the collateral vault (ERC6909)
-/// @dev Balances are minted one-for-one with the amount passed to {deposit}, so the vault only
-/// supports plain ERC20 collateral. Fee-on-transfer and rebasing tokens are out of scope: the
-/// former would mint more than the vault received, the latter would drift from the minted supply.
-/// Collateral is permissioned per market, so this is enforced by the listing process rather than
-/// in code.
+/// @dev 1:1 mint. Fee-on-transfer and rebasing tokens are unsupported.
 interface IVault is IERC6909TokenSupply {
     /// @notice Initialize the vault
     /// @param authority The access manager address
     function initialize(address authority) external;
 
     /// @notice Deposit an ERC20 asset and mint the corresponding ERC6909 balance
-    /// @dev Mints `amount` exactly, so the asset must transfer the full amount requested
+    /// @dev Mints `amount` exactly.
     /// @param asset The ERC20 asset to deposit
     /// @param amount The amount to deposit
     /// @param recipient The address to receive the minted balance

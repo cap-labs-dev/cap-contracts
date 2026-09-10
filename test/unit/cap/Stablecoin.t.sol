@@ -5,6 +5,7 @@ import { Stablecoin } from "../../../contracts/cap/Stablecoin.sol";
 import { IStablecoin } from "../../../contracts/interfaces/IStablecoin.sol";
 import { CapRoles } from "../../../contracts/utils/CapRoles.sol";
 import { BaseTest } from "../../shared/BaseTest.sol";
+import { MockAeraVault } from "../../shared/mocks/MockAeraVault.sol";
 import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
 import { MockIRM } from "../../shared/mocks/MockIRM.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -14,22 +15,26 @@ contract StablecoinTest is BaseTest {
     Stablecoin internal scoin;
     MockERC20 internal asset;
     MockIRM internal irm;
+    MockAeraVault internal reserve;
 
     address internal alice = makeAddr("alice");
     address internal bob = makeAddr("bob");
     address internal treasury = makeAddr("treasury");
+    address internal keeper = makeAddr("keeper");
 
     function setUp() public {
         _setUpAccessManager();
         asset = new MockERC20("USD Coin", "USDC", 18);
         irm = new MockIRM();
+        reserve = new MockAeraVault();
 
         Stablecoin impl = new Stablecoin();
         scoin = Stablecoin(
             _deployProxy(
                 address(impl),
                 abi.encodeCall(
-                    Stablecoin.initialize, (address(accessManager), address(asset), "Cap USD", "cUSD", "", address(irm))
+                    Stablecoin.initialize,
+                    (address(accessManager), address(asset), "Cap USD", "cUSD", "", address(irm), address(reserve))
                 )
             )
         );
@@ -38,8 +43,11 @@ contract StablecoinTest is BaseTest {
         vm.prank(alice);
         asset.approve(address(scoin), type(uint256).max);
 
-        // covering a shortfall is a governor action, matching the production wiring
-        _grantRoleForTarget(CapRoles.GOVERNOR, treasury, address(scoin), _selectors(Stablecoin.coverBadDebt.selector));
+        // parking reserve is keeper maintenance; covering a shortfall is permissionless
+        bytes4[] memory keeperSelectors = new bytes4[](2);
+        keeperSelectors[0] = Stablecoin.invest.selector;
+        keeperSelectors[1] = Stablecoin.recall.selector;
+        _grantRoleForTarget(CapRoles.KEEPER, keeper, address(scoin), keeperSelectors);
     }
 
     /// @dev Bad debt only ever arises from a market writing off credit it minted, so the credit
@@ -119,7 +127,7 @@ contract StablecoinTest is BaseTest {
                 address(new Stablecoin()),
                 abi.encodeCall(
                     Stablecoin.initialize,
-                    (address(accessManager), address(underlying), "Cap USD", "cUSD", "", address(irm))
+                    (address(accessManager), address(underlying), "Cap USD", "cUSD", "", address(irm), address(0))
                 )
             )
         );
@@ -159,7 +167,8 @@ contract StablecoinTest is BaseTest {
         _deployProxy(
             impl,
             abi.encodeCall(
-                Stablecoin.initialize, (address(accessManager), address(wide), "Cap USD", "cUSD", "", address(irm))
+                Stablecoin.initialize,
+                (address(accessManager), address(wide), "Cap USD", "cUSD", "", address(irm), address(0))
             )
         );
     }
@@ -518,13 +527,14 @@ contract StablecoinTest is BaseTest {
         scoin.coverBadDebt(50e18);
     }
 
-    function test_coverBadDebt_onlyAuthority() public {
+    function test_coverBadDebt_isPermissionless() public {
         scoin.mintCreditBacked(bob, 500e18);
         scoin.recognizeBadDebt(100e18);
 
         vm.prank(bob);
-        vm.expectRevert();
-        scoin.coverBadDebt(100e18);
+        assertEq(scoin.coverBadDebt(100e18), 100e18);
+        assertEq(scoin.badDebt(), 0);
+        assertEq(scoin.balanceOf(bob), 400e18);
     }
 
     /// Burning cUSD without retiring the shortfall moves the ratio the wrong way, which is why a
@@ -545,7 +555,7 @@ contract StablecoinTest is BaseTest {
 
         // burning supply that is already outstanding, without touching badDebt, is not
         vm.prank(treasury);
-        scoin.transfer(bob, 100e18);
+        assertTrue(scoin.transfer(bob, 100e18));
         scoin.burnCreditBacked(bob, 100e18);
         assertLt(scoin.totalAssets() * 1e27 / scoin.totalSupply(), ratioBefore, "ratio gets worse");
     }
@@ -578,5 +588,169 @@ contract StablecoinTest is BaseTest {
         vm.prank(alice);
         vm.expectRevert();
         UUPSUpgradeable(address(scoin)).upgradeToAndCall(address(newImpl), "");
+    }
+
+    function test_fund_depositsUnderlyingAndVestsTheShares() public {
+        asset.mint(address(this), 10e18);
+        asset.approve(address(scoin), 10e18);
+
+        uint256 shares = scoin.previewDeposit(10e18);
+        scoin.fund(10e18);
+
+        assertEq(scoin.balanceOf(address(scoin)), shares);
+        assertEq(scoin.creditBackedSupply(), 0, "backed by the deposit, not by credit");
+        assertEq(asset.balanceOf(address(scoin)), 10e18);
+        assertEq(scoin.remaining(), shares);
+        assertEq(scoin.vested(), 0);
+        assertEq(scoin.stablecoin(), address(scoin));
+    }
+
+    function test_fund_isPermissionless() public {
+        vm.prank(alice);
+        scoin.fund(10e18);
+
+        assertEq(scoin.balanceOf(address(scoin)), 10e18);
+        assertEq(scoin.remaining(), 10e18);
+        assertEq(asset.balanceOf(address(scoin)), 10e18);
+    }
+
+    function test_fund_theReserveVaultCanReturnYield() public {
+        asset.mint(address(reserve), 10e18);
+        vm.startPrank(address(reserve));
+        asset.approve(address(scoin), 10e18);
+        scoin.fund(10e18);
+        vm.stopPrank();
+
+        assertEq(scoin.balanceOf(address(scoin)), 10e18);
+        assertEq(scoin.remaining(), 10e18);
+        assertEq(asset.balanceOf(address(reserve)), 0);
+        assertEq(asset.balanceOf(address(scoin)), 10e18);
+    }
+
+    function test_fundCreditBacked_mintsToItselfAndOpensTheRemainder() public {
+        scoin.fundCreditBacked(10e18);
+        assertEq(scoin.balanceOf(address(scoin)), 10e18);
+        assertEq(scoin.creditBackedSupply(), 10e18);
+        assertEq(scoin.remaining(), 10e18);
+        assertEq(scoin.vested(), 0);
+        assertEq(scoin.stablecoin(), address(scoin));
+    }
+
+    function test_fundCreditBacked_onlyAuthority() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        scoin.fundCreditBacked(1e18);
+    }
+
+    function test_optInHolderClaimsVestedPremium() public {
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+        vm.prank(alice);
+        scoin.optIn();
+
+        scoin.fundCreditBacked(10e18);
+        vm.warp(block.timestamp + 20 * scoin.vestingPeriod());
+
+        uint256 owed = scoin.claimable(alice);
+        assertApproxEqRel(owed, 10e18, 1e12);
+
+        vm.prank(alice);
+        uint256 paid = scoin.claim(alice);
+        assertEq(paid, owed);
+        assertEq(scoin.balanceOf(alice), 100e18 + paid);
+        assertEq(scoin.claimable(alice), 0);
+    }
+
+    function test_nonOptedHolderEarnsNothingOnTheStablecoin() public {
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+
+        scoin.fundCreditBacked(10e18);
+        vm.warp(block.timestamp + 20 * scoin.vestingPeriod());
+
+        assertFalse(scoin.optedIn(alice));
+        assertEq(scoin.claimable(alice), 0);
+        assertEq(scoin.stakedSupply(), 0);
+    }
+
+    function test_idleStablecoinFreezesUntilSomeoneOptsIn() public {
+        scoin.fundCreditBacked(10e18);
+        vm.warp(block.timestamp + scoin.vestingPeriod());
+        uint256 pot = scoin.remaining() + scoin.vested();
+
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+        vm.prank(alice);
+        scoin.optIn();
+
+        assertEq(scoin.claimable(alice), 0, "the idle window is not hers");
+        assertEq(scoin.remaining(), pot, "and the remainder is still held");
+    }
+
+    // ── idle reserve can sit in Aera without changing the share price ─────────
+
+    function test_initialize_setsReserveVault() public view {
+        assertEq(scoin.reserveVault(), address(reserve));
+    }
+
+    function test_invest_movesReserveAndLeavesSharePrice() public {
+        vm.prank(alice);
+        scoin.deposit(1_000e18, alice);
+        assertEq(scoin.totalAssets(), 1_000e18);
+
+        vm.prank(keeper);
+        scoin.invest(400e18);
+
+        assertEq(asset.balanceOf(address(scoin)), 600e18, "reserve left on the vault");
+        assertEq(asset.balanceOf(address(reserve)), 400e18, "parked in Aera");
+        assertEq(scoin.totalAssets(), 1_000e18, "accounting is not the token balance");
+        assertEq(asset.allowance(address(scoin), address(reserve)), 0, "Aera requires a spent allowance");
+    }
+
+    function test_recall_returnsReserve() public {
+        vm.prank(alice);
+        scoin.deposit(1_000e18, alice);
+
+        vm.prank(keeper);
+        scoin.invest(400e18);
+        vm.prank(keeper);
+        scoin.recall(400e18);
+
+        assertEq(asset.balanceOf(address(scoin)), 1_000e18);
+        assertEq(asset.balanceOf(address(reserve)), 0);
+        assertEq(scoin.totalAssets(), 1_000e18);
+    }
+
+    function test_invest_onlyAuthority() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        scoin.invest(1e18);
+    }
+
+    function test_recall_onlyAuthority() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        scoin.recall(1e18);
+    }
+
+    /// Parking reserve does not change what a share is worth, but the tokens still have to be
+    /// back on this contract before anyone can redeem them.
+    function test_redeemAfterInvest_needsARecall() public {
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+
+        vm.prank(keeper);
+        scoin.invest(100e18);
+
+        vm.prank(alice);
+        vm.expectRevert();
+        scoin.redeem(100e18, alice, alice);
+
+        vm.prank(keeper);
+        scoin.recall(100e18);
+
+        vm.prank(alice);
+        scoin.redeem(100e18, alice, alice);
+        assertEq(asset.balanceOf(alice), 1_000e18);
     }
 }

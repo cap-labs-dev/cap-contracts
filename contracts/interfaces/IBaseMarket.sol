@@ -16,7 +16,6 @@ interface IBaseMarket {
     /// @custom:storage-location cap.storage.BaseMarket
     /// @param name The market name
     /// @param stablecoin The stablecoin address
-    /// @param stakedStablecoin The staked stablecoin address
     /// @param irm The interest rate model address
     /// @param targetHealth The target health in ray decimals
     /// @param ltv The loan-to-value ratio in ray decimals
@@ -27,7 +26,6 @@ interface IBaseMarket {
     struct BaseMarketStorage {
         string name;
         address stablecoin;
-        address stakedStablecoin;
         address irm;
         uint256 targetHealth;
         uint256 ltv;
@@ -121,10 +119,6 @@ interface IBaseMarket {
     /// @param targetHealth The new target health in ray decimals
     event SetTargetHealth(uint256 targetHealth);
 
-    /// @notice Emitted when the staked stablecoin is updated
-    /// @param stakedStablecoin The new staked stablecoin address
-    event SetStakedStablecoin(address stakedStablecoin);
-
     /// @notice Emitted when the tranches and their weights are updated
     /// @param tranche The tranche address
     /// @param weight The tranche weight in ray decimals
@@ -164,10 +158,6 @@ interface IBaseMarket {
     /// @param targetHealth The new target health in ray decimals
     function setTargetHealth(uint256 targetHealth) external;
 
-    /// @notice Set the staked stablecoin
-    /// @param stakedStablecoin The new staked stablecoin address
-    function setStakedStablecoin(address stakedStablecoin) external;
-
     /// @notice Set the tranches and their weights
     /// @param tranches The new tranche addresses and weights
     function setTranches(Tranche[] calldata tranches) external;
@@ -181,35 +171,40 @@ interface IBaseMarket {
     function setUnderwriterRate(uint256 rate) external;
 
     /// @notice Set the market multiplier
-    /// @dev On a floating market this reindexes scaled debt so outstanding principal is unchanged
+    /// @dev On a floating market, reindexes scaled debt so principal is unchanged.
     /// @param multiplier The new market multiplier in ray decimals
     function setMarketMultiplier(uint256 multiplier) external;
 
     /// @notice Get the market name
+    /// @return The market name
     function name() external view returns (string memory);
 
     /// @notice Get the stablecoin address
+    /// @return The stablecoin address
     function stablecoin() external view returns (address);
 
-    /// @notice Get the staked stablecoin address
-    function stakedStablecoin() external view returns (address);
-
     /// @notice Get the interest rate model address
+    /// @return The interest rate model address
     function irm() external view returns (address);
 
     /// @notice Get the liquidation threshold in ray decimals
+    /// @return The liquidation threshold
     function lt() external view returns (uint256);
 
     /// @notice Get the liquidation buffer in ray decimals
+    /// @return The liquidation buffer
     function buffer() external view returns (uint256);
 
     /// @notice Get the target health in ray decimals
+    /// @return The target health
     function targetHealth() external view returns (uint256);
 
     /// @notice Get the loan-to-value ratio in ray decimals
+    /// @return The loan-to-value ratio
     function ltv() external view returns (uint256);
 
     /// @notice Get the fixed credit limit
+    /// @return The fixed credit limit
     function fixedCreditLimit() external view returns (uint256);
 
     /// @notice Get the tranche addresses and weights
@@ -236,24 +231,18 @@ interface IBaseMarket {
     /// @return liquidatable The maximum liquidatable debt
     function maxLiquidatable() external view returns (uint256 liquidatable);
 
-    /// @notice Get the debt that fully liquidating every tranche could still repay
-    /// @dev A liquidator takes `1 + liquidationBonus` of collateral value for each unit of debt
-    /// they repay, so the tranche capital can only ever clear its value discounted by the bonus.
+    /// @notice Debt that fully liquidating every tranche could still repay
+    /// @dev Collateral clears at `1 + liquidationBonus` per unit of debt.
     /// @return recoverable The recoverable debt
     function recoverableDebt() external view returns (uint256 recoverable);
 
-    /// @notice Get the debt that no amount of liquidation could ever repay
-    /// @dev This is the market's true bad debt: the excess of total debt over {recoverableDebt}.
-    /// It does not require the tranches to be empty, because a liquidation that is unprofitable
-    /// or simply never called still leaves the collateral untouched while the debt is already
-    /// beyond what that collateral can cover.
+    /// @notice Debt no liquidation can repay
+    /// @dev `totalDebt - recoverableDebt`. Tranches need not be empty.
     /// @return unrecoverable The unrecoverable debt
     function unrecoverableDebt() external view returns (uint256 unrecoverable);
 
-    /// @notice Get the capital value a tranche must keep locked to back the market's debt
-    /// @dev Denominated in USD (18 decimals), not in collateral tokens. More junior tranches are
-    /// locked first, so a tranche only locks what the tranches below it cannot cover. Callers
-    /// holding collateral must convert at the oracle price before comparing against balances.
+    /// @notice Capital a tranche must keep locked to back the market's debt
+    /// @dev USD, 18 decimals. Juniors lock first.
     /// @param tranche The tranche address
     /// @return value The locked capital value in USD (18 decimals)
     function lockedValue(address tranche) external view returns (uint256 value);

@@ -5,7 +5,7 @@ import { IERC7575 } from "../interfaces/IERC7575.sol";
 
 /// @title ERC7575
 /// @author kexley
-/// @notice This contract implements the ERC7575 standard
+/// @notice ERC-7575 share-token pointer
 contract ERC7575 is IERC7575 {
     /// @inheritdoc IERC7575
     function share() public view virtual returns (address shareTokenAddress) {

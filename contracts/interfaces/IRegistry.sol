@@ -23,9 +23,11 @@ interface IRegistry {
     /// @notice The market was not deployed by this registry
     error UnknownMarket();
 
+    /// @notice The caller does not hold the market's owner role
+    error NotMarketOwner();
+
     /// @notice Shared initialization parameters for the registry
     /// @param stablecoin The stablecoin address
-    /// @param stakedStablecoin The staked stablecoin address
     /// @param vault The vault address
     /// @param oracle The oracle address
     /// @param irm The interest rate model address
@@ -39,7 +41,6 @@ interface IRegistry {
     /// @param targetHealth Default target health for new markets in ray decimals (min 1.25e27)
     struct InitParams {
         address stablecoin;
-        address stakedStablecoin;
         address vault;
         address oracle;
         address irm;
@@ -79,14 +80,11 @@ interface IRegistry {
     );
 
     /// @notice A tranche has been deployed for a market
-    /// @dev Emitted for every tranche, both the ones a market is created with and the ones added
-    /// to it later, so the depositor role of each one is observable from a single event
     /// @param market The market the tranche was deployed for
     /// @param tranche The deployed tranche
     /// @param asset The tranche asset
-    /// @param marketOwnerRole The market owner role id the tranche was wired to
-    /// @param depositorRole The role whose members may deposit, administered by the market owner
-    /// role
+    /// @param marketOwnerRole The owner role the tranche was wired to
+    /// @param depositorRole The role that may deposit, administered by the market owner
     event CreateTranche(
         address indexed market, address tranche, address asset, uint64 marketOwnerRole, uint64 depositorRole
     );
@@ -109,7 +107,8 @@ interface IRegistry {
         uint64 depositorRole
     );
 
-    /// @notice Initialize the registry
+    /// @notice Initialize the registry and wire shared infrastructure roles
+    /// @dev This contract must hold ADMIN to call `setTargetFunctionRole`. Per-market roles are wired on create.
     /// @param authority The access manager address
     /// @param init The registry initialization parameters
     function initialize(address authority, InitParams calldata init) external;
@@ -125,10 +124,7 @@ interface IRegistry {
     function operatorRole(address account) external view returns (uint64 roleId);
 
     /// @notice Deploy a floating market with tranches at the given assets and weights
-    /// @dev One tranche is deployed per entry, so `assets` and `weights` must be the same length.
-    /// The assets may differ from each other: the market never touches a collateral token, it
-    /// values every tranche in USD through {ITranche-totalCapital}, so a waterfall can be built
-    /// out of whatever mix of collateral the oracle can price.
+    /// @dev One tranche per entry of `assets` and `weights`
     /// @param assets The asset of each tranche, index 0 is most senior
     /// @param weights Tranche weights in ray decimals, index 0 is most senior
     /// @param name The market name
@@ -136,7 +132,7 @@ interface IRegistry {
     /// @param borrower The borrower operator address
     /// @return market The deployed market
     /// @return deployedTranches The deployed tranche addresses in seniority order
-    function createMarket(
+    function createFloatingMarket(
         address[] calldata assets,
         uint256[] calldata weights,
         string memory name,
@@ -145,7 +141,7 @@ interface IRegistry {
     ) external returns (address market, address[] memory deployedTranches);
 
     /// @notice Deploy a fixed market with tranches at the given assets and weights
-    /// @dev See {createMarket} for how `assets` and `weights` pair up
+    /// @dev See {createFloatingMarket} for how `assets` and `weights` pair up
     /// @param assets The asset of each tranche, index 0 is most senior
     /// @param weights Tranche weights in ray decimals, index 0 is most senior
     /// @param name The market name
@@ -167,38 +163,21 @@ interface IRegistry {
         uint256 grace
     ) external returns (address market, address[] memory deployedTranches);
 
-    /// @notice Add a tranche to a market this registry already created and reweight the waterfall
-    /// @dev The tranche joins as the most junior position, so `weights` must be one entry longer
-    /// than the market's current list and is applied to the whole waterfall in one go. Ordering
-    /// and removals are left to {IBaseMarket-setTranches}: to retire a tranche, add its
-    /// replacement here and then call that with the list you want. The owner role is taken from
-    /// the market rather than from an argument, so a new tranche cannot be wired to somebody
-    /// else's operator role. It opens with an empty depositor role, reported by {CreateTranche},
-    /// which the market owner fills through the AccessManager.
-    ///
-    /// This is ADMIN rather than KEEPER because it ends in a {IBaseMarket-setTranches} call. That
-    /// still enforces the weight total and market health, but choosing who backs a market's debt
-    /// is not routine deployment work.
+    /// @notice Add a junior tranche to a market and reweight the waterfall
+    /// @dev Caller must hold the market owner role. `weights` covers the whole waterfall, including the new junior.
     /// @param market The market to deploy a tranche for
-    /// @param asset The asset for the new tranche, which need not match the existing tranches
-    /// @param weights Tranche weights in ray decimals for the resulting waterfall, index 0 is most
-    /// senior and the last entry is the new tranche
+    /// @param asset The asset for the new tranche
+    /// @param weights Resulting waterfall weights in ray, last entry is the new tranche
     /// @return tranche The deployed tranche
     function createTranche(address market, address asset, uint256[] calldata weights) external returns (address tranche);
 
-    /// @notice Get whether a market was deployed by this registry
-    /// @dev The record {createTranche} checks. Kept as a flag rather than as a copy of the market
-    /// owner role, so that nothing here can disagree with the AccessManager about who the owner
-    /// is; see {marketOwnerRole}.
+    /// @notice Whether this registry deployed the market
     /// @param market The market to query
     /// @return deployed Whether this registry deployed the market
     function isMarket(address market) external view returns (bool deployed);
 
-    /// @notice Get the market owner role id for a market deployed by this registry
-    /// @dev Read live from the AccessManager off the role wired to
-    /// {IBaseMarket-setTrancheWeights}, so repointing a market's owner selectors moves the owner
-    /// this reports. Zero for a market this registry did not deploy, which is also the id of
-    /// ADMIN, so callers wanting to tell those apart should ask {isMarket}.
+    /// @notice Owner role for a market this registry deployed
+    /// @dev From {IBaseMarket-setTrancheWeights}. Zero if unknown.
     /// @param market The market to query
     /// @return roleId The market owner role id, or zero if the market is unknown
     function marketOwnerRole(address market) external view returns (uint64 roleId);
@@ -214,41 +193,50 @@ interface IRegistry {
         returns (address underwriter);
 
     /// @notice Get the interest rate model address
+    /// @return The interest rate model address
     function irm() external view returns (address);
 
     /// @notice Get the stablecoin address
+    /// @return The stablecoin address
     function stablecoin() external view returns (address);
 
-    /// @notice Get the staked stablecoin address
-    function stakedStablecoin() external view returns (address);
-
     /// @notice Get the vault address
+    /// @return The vault address
     function vault() external view returns (address);
 
     /// @notice Get the oracle address
+    /// @return The oracle address
     function oracle() external view returns (address);
 
     /// @notice Get the shared beacon proxy factory address
+    /// @return The factory address
     function factory() external view returns (address);
 
     /// @notice Get the floating market upgradeable beacon address
+    /// @return The floating market beacon
     function floatingMarketBeacon() external view returns (address);
 
     /// @notice Get the fixed market upgradeable beacon address
+    /// @return The fixed market beacon
     function fixedMarketBeacon() external view returns (address);
 
     /// @notice Get the tranche upgradeable beacon address
+    /// @return The tranche beacon
     function trancheBeacon() external view returns (address);
 
     /// @notice Get the underwriter upgradeable beacon address
+    /// @return The underwriter beacon
     function underwriterBeacon() external view returns (address);
 
     /// @notice Default liquidation threshold for new markets in ray decimals
+    /// @return The default liquidation threshold
     function lt() external view returns (uint256);
 
     /// @notice Default liquidation buffer for new markets in ray decimals
+    /// @return The default liquidation buffer
     function buffer() external view returns (uint256);
 
     /// @notice Default target health for new markets in ray decimals
+    /// @return The default target health
     function targetHealth() external view returns (uint256);
 }

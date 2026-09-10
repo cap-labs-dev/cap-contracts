@@ -17,17 +17,14 @@ library CapRoles {
     /// @dev Routine operations — deploy instances, maintenance calls
     uint64 internal constant KEEPER = 3;
 
-    /// @dev Stablecoin mint/burn for markets
-    uint64 internal constant MINTER = 4;
+    /// @dev Markets — mint/burn cUSD, slash and fund tranches, drive the rate model
+    uint64 internal constant MARKET = 4;
 
     /// @dev Registry contract — admin of dynamically assigned operator roles
     uint64 internal constant REGISTRY = 5;
 
-    /// @dev Market contracts — callers authorized on the interest rate model
-    uint64 internal constant MARKET = 6;
-
     /// @dev Permissioned liquidation of unhealthy markets
-    uint64 internal constant LIQUIDATOR = 7;
+    uint64 internal constant LIQUIDATOR = 6;
 
     /// @dev First role id assigned by {Registry-assignOperator}
     uint64 internal constant FIRST_OPERATOR_ROLE = 100;

@@ -10,13 +10,13 @@ import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
 import { IBaseMarket } from "../../contracts/interfaces/IBaseMarket.sol";
 import { IFloatingMarket } from "../../contracts/interfaces/IFloatingMarket.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
+import { IPremiumVesting } from "../../contracts/interfaces/IPremiumVesting.sol";
 import { IUnderwriter } from "../../contracts/interfaces/IUnderwriter.sol";
 import { CapRoles } from "../../contracts/utils/CapRoles.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
 import { MockERC20 } from "../shared/mocks/MockERC20.sol";
 import { MockIRM } from "../shared/mocks/MockIRM.sol";
 import { ERC1155Holder } from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
-import { stdError } from "forge-std/StdError.sol";
 
 /// @notice Pins the accounting the protocol has to get exactly right: that a redemption retires
 /// the shortfall it absorbed, that premium reaches the capital which was exposed while it vested,
@@ -43,7 +43,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
                 address(impl),
                 abi.encodeCall(
                     Stablecoin.initialize,
-                    (address(accessManager), address(usdc), "Cap USD", "cUSD", "", address(mockIrm))
+                    (address(accessManager), address(usdc), "Cap USD", "cUSD", "", address(mockIrm), address(0))
                 )
             )
         );
@@ -51,8 +51,8 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         sels[0] = Stablecoin.mintCreditBacked.selector;
         sels[1] = Stablecoin.burnCreditBacked.selector;
         sels[2] = Stablecoin.recognizeBadDebt.selector;
-        accessManager.setTargetFunctionRole(address(scoin), sels, CapRoles.MINTER);
-        accessManager.grantRole(CapRoles.MINTER, address(this), 0);
+        accessManager.setTargetFunctionRole(address(scoin), sels, CapRoles.MARKET);
+        accessManager.grantRole(CapRoles.MARKET, address(this), 0);
 
         usdc.mint(address(this), 10_000e18);
         usdc.approve(address(scoin), type(uint256).max);
@@ -155,13 +155,13 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
 
         vm.warp(block.timestamp + 30 days);
         b.market.chargePremium();
-        // let the tranche's own vesting finish so report() pulls the whole premium across
-        vm.warp(block.timestamp + 7 hours);
+        // let the tranche vest long enough that report() pulls essentially the whole premium
+        vm.warp(block.timestamp + 20 * uw.vestingPeriod());
         uw.report(b.tranche0Addr);
 
         uint256 buffered = stablecoin.balanceOf(address(uw));
         assertGt(buffered, 0, "there is premium at stake");
-        assertEq(uw.vestedPremium(), buffered, "the whole buffer is vesting");
+        assertEq(uw.remaining(), buffered, "the whole buffer is vesting");
 
         // alice queues her whole position, so activeSupply hits zero
         uint256 aliceShares = uw.balanceOf(alice);
@@ -169,26 +169,27 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         uw.requestRedeem(aliceShares, alice, alice);
         assertEq(uw.stakedSupply(), 0, "vault is idle");
 
-        // three of the six hours pass against nobody
+        // a few hours pass against nobody
         vm.warp(block.timestamp + 3 hours);
 
         _fundVault(address(this), 1);
         _admitDepositor(address(uw), address(this));
         vault.setOperator(address(uw), true);
         uw.deposit(1, address(this));
+        uw.optIn();
 
         assertEq(uw.claimable(address(this)), 0, "the window it missed is not payable to it");
-        assertEq(uw.vestedReward(), buffered, "and none of it was burned either");
+        assertEq(uw.remaining(), buffered, "and none of it was burned either");
 
-        // it earns only as the clock runs, at the original rate
-        vm.warp(block.timestamp + 3 hours);
-        assertApproxEqAbs(uw.claimable(address(this)), buffered / 2, 1e6, "half the remaining drip");
+        vm.warp(block.timestamp + uw.vestingPeriod());
+        assertApproxEqRel(uw.claimable(address(this)), buffered * 632 / 1000, 0.02e18, "one window vests about 63%");
+        assertLt(uw.claimable(address(this)), buffered, "and not the rest");
 
-        vm.warp(block.timestamp + 3 hours);
-        assertApproxEqAbs(uw.claimable(address(this)), buffered, 1e6, "and the rest once it is due");
+        vm.warp(block.timestamp + 20 * uw.vestingPeriod());
+        assertApproxEqRel(uw.claimable(address(this)), buffered, 1e12, "the tail comes out over more windows");
 
-        uw.claim();
-        assertApproxEqAbs(stablecoin.balanceOf(address(this)), buffered, 1e6, "payable in full");
+        uw.claim(address(this));
+        assertApproxEqRel(stablecoin.balanceOf(address(this)), buffered, 1e12, "payable in full, dust aside");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -419,7 +420,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
 
         uint256 buffered = stablecoin.balanceOf(b.tranche0Addr);
         assertGt(buffered, 0, "there is premium at stake");
-        assertEq(b.tranche0.vested(), buffered, "the whole buffer is vesting");
+        assertEq(b.tranche0.remaining(), buffered, "the whole buffer is vesting");
 
         // alice queues out, so the tranche has no active supply
         uint256 aliceShares = b.tranche0.balanceOf(alice);
@@ -427,40 +428,32 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         b.tranche0.requestRedeem(aliceShares, alice, alice);
         assertEq(b.tranche0.stakedSupply(), 0, "tranche is idle");
 
-        // the whole epoch runs out against nobody
-        uint256 idleEnd = b.tranche0.periodEnd();
-        vm.warp(idleEnd);
+        // a window runs against nobody; the remainder freezes rather than dumping on the next deposit
+        vm.warp(block.timestamp + b.tranche0.vestingPeriod());
 
         _fundVault(address(this), 1);
         _admitDepositor(address(b.tranche0), address(this));
         vault.setOperator(b.tranche0Addr, true);
         b.tranche0.deposit(1, address(this));
+        b.tranche0.optIn();
 
-        assertEq(b.tranche0.claimable(address(this)), 0, "the epoch it missed is not payable to it");
-        assertEq(b.tranche0.periodEnd(), idleEnd + 6 hours, "the epoch slid instead of collapsing");
-        assertEq(b.tranche0.vested(), buffered, "with nothing burned");
+        assertEq(b.tranche0.claimable(address(this)), 0, "the window it missed is not payable to it");
+        assertEq(b.tranche0.remaining(), buffered, "with nothing burned");
 
-        vm.warp(block.timestamp + 3 hours);
-        assertApproxEqAbs(b.tranche0.claimable(address(this)), buffered / 2, 1e6, "half the slid epoch");
+        vm.warp(block.timestamp + b.tranche0.vestingPeriod());
+        assertApproxEqRel(
+            b.tranche0.claimable(address(this)), buffered * 632 / 1000, 0.02e18, "one window vests about 63%"
+        );
 
-        vm.warp(block.timestamp + 3 hours);
-        assertApproxEqAbs(b.tranche0.claimable(address(this)), buffered, 1e6, "and the rest at the new end");
+        vm.warp(block.timestamp + 20 * b.tranche0.vestingPeriod());
+        assertApproxEqRel(b.tranche0.claimable(address(this)), buffered, 1e12, "the tail comes out over more windows");
 
         b.tranche0.claim(address(this));
-        assertApproxEqAbs(stablecoin.balanceOf(address(this)), buffered, 1e6, "payable in full");
+        assertApproxEqRel(stablecoin.balanceOf(address(this)), buffered, 1e12, "payable in full, dust aside");
     }
 
-    /// @dev {ITranche-notifyPremium} re-anchors the vesting epoch, and it used to sit on
-    /// PUBLIC_ROLE, where `restricted` is a no-op. Its only other gate on reaching
-    /// {PremiumVesting-fund} is a balance above the last one it saw, which one wei satisfies, so
-    /// anyone could donate dust and poke it every block: the still-locked balance was re-spread
-    /// over a fresh full period each time and linear release decayed towards never finishing.
-    /// A depositor could claim only 26.20e15 of 41.44e15 at the point the epoch should have
-    /// closed, and it transfers as well as delays, since anyone redeeming during the grief
-    /// forfeits their share of what is still locked.
-    ///
-    /// The market notifies in the same breath as minting the premium, so it is the only caller
-    /// with a reason to be here and the selector now sits with {CapRoles-MARKET}.
+    /// @dev {ITranche-fund} used to sit on PUBLIC_ROLE, where `restricted` is a no-op, so
+    /// anyone could donate dust and poke it. The selector now sits with {CapRoles-MARKET}.
     function test_dustCannotStallPremiumRelease() public {
         MarketBundle memory b = _createReadyMarket("m");
         _fundTranche(b.tranche0Addr, alice, 1_000e18);
@@ -473,30 +466,31 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
 
         uint256 buffered = stablecoin.balanceOf(b.tranche0Addr);
         assertGt(buffered, 0, "there is premium at stake");
-        uint256 epochEnd = b.tranche0.periodEnd();
+        uint256 leftoverBefore = b.tranche0.remaining() + b.tranche0.vested();
 
-        // the griefer holds a wei of cUSD to donate and no role at all
         address griefer = makeAddr("griefer");
         _depositStable(griefer, 1e18);
 
         vm.startPrank(griefer);
-        stablecoin.transfer(b.tranche0Addr, 1);
+        assertTrue(stablecoin.transfer(b.tranche0Addr, 1));
         vm.expectRevert();
-        b.tranche0.notifyPremium();
+        b.tranche0.fund(1);
         vm.stopPrank();
 
-        // poking it every block is what re-anchored the epoch, so try the whole grief
-        while (block.timestamp < epochEnd) {
+        uint256 until = block.timestamp + b.tranche0.vestingPeriod();
+        while (block.timestamp < until) {
             vm.warp(block.timestamp + 12);
             vm.startPrank(griefer);
-            stablecoin.transfer(b.tranche0Addr, 1);
+            assertTrue(stablecoin.transfer(b.tranche0Addr, 1));
             vm.expectRevert();
-            b.tranche0.notifyPremium();
+            b.tranche0.fund(1);
             vm.stopPrank();
         }
 
-        assertEq(b.tranche0.periodEnd(), epochEnd, "the epoch never moved");
-        assertApproxEqAbs(b.tranche0.claimable(alice), buffered, 1e6, "and released in full on time");
+        assertEq(
+            b.tranche0.remaining() + b.tranche0.vested(), leftoverBefore, "the pot is untouched until someone accrues"
+        );
+        assertApproxEqRel(b.tranche0.claimable(alice), buffered * 632 / 1000, 0.02e18, "but the view still leaks");
 
         // the donated dust is not stranded either: the next legitimate charge sweeps it in
         uint256 donated = stablecoin.balanceOf(b.tranche0Addr) - buffered;
@@ -505,10 +499,12 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         vm.prank(alice);
         b.tranche0.claim(alice);
 
-        uint256 fundedBefore = b.tranche0.vested();
+        uint256 fundedBefore = b.tranche0.remaining() + b.tranche0.vested();
         vm.warp(block.timestamp + 30 days);
         b.market.chargePremium();
-        assertGe(b.tranche0.vested() - fundedBefore, donated, "and is swept into the next epoch");
+        assertGe(
+            (b.tranche0.remaining() + b.tranche0.vested()) - fundedBefore, donated, "and is swept into the next epoch"
+        );
     }
 
     /// @dev The end-to-end read on the rounding direction. Both conversions in the per-share
@@ -529,6 +525,8 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
 
         vm.prank(alice);
         b.tranche0.transfer(bob, 1);
+        vm.prank(bob);
+        b.tranche0.optIn();
         assertEq(b.tranche0.balanceOf(alice), 1, "one each");
         assertEq(b.tranche0.balanceOf(bob), 1, "one each");
 
@@ -536,9 +534,9 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         address donor = makeAddr("donor");
         _depositStable(donor, 1e18);
         vm.prank(donor);
-        stablecoin.transfer(b.tranche0Addr, 1);
+        assertTrue(stablecoin.transfer(b.tranche0Addr, 1));
         vm.prank(b.tranche0.market());
-        b.tranche0.notifyPremium();
+        b.tranche0.fund(1);
 
         vm.warp(block.timestamp + b.tranche0.vestingPeriod() + 1);
         assertEq(b.tranche0.claimable(alice) + b.tranche0.claimable(bob), 0, "half a wei each rounds to none");
@@ -552,13 +550,10 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         assertEq(stablecoin.balanceOf(b.tranche0Addr), 1, "the wei is retained rather than promised twice");
     }
 
-    /// @dev The other half of it: re-vesting on top of an idle window used to strand the idle part
-    /// for good. `setVestingPeriod` rebuilds the lump from {PremiumVesting-locked}, which counts
-    /// only what is not yet due and so skips time that elapsed without releasing. Under the frozen
-    /// clock that was the whole idle window, and since `_storedPremiumBalance` still counted it, no
-    /// later notify could pick it back up. Sliding leaves `locked` equal to the full un-released
-    /// remainder, so re-vesting carries all of it.
-    function test_trancheIdleWindowSurvivesReVesting() public {
+    /// @dev Accruing on top of an idle window used to strand the idle part for good. The freeze
+    /// leaves the remainder intact, so a later notify picks the whole pot back up rather than only
+    /// the not-yet-due slice.
+    function test_trancheIdleWindowSurvivesTheNextNotify() public {
         MarketBundle memory b = _createReadyMarket("m");
         _fundTranche(b.tranche0Addr, alice, 1_000e18);
 
@@ -567,24 +562,25 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
 
         vm.warp(block.timestamp + 30 days);
         b.market.chargePremium();
-        uint256 buffered = b.tranche0.vested();
+        uint256 buffered = b.tranche0.remaining();
 
         uint256 aliceShares = b.tranche0.balanceOf(alice);
         vm.prank(alice);
         b.tranche0.requestRedeem(aliceShares, alice, alice);
         assertEq(b.tranche0.stakedSupply(), 0, "tranche is idle");
 
-        // half the epoch elapses against nobody, then the schedule is re-vested over it
+        // half the window elapses against nobody, then a zero-amount fund accrues with a zero supply
         vm.warp(block.timestamp + 3 hours);
-        b.tranche0.setVestingPeriod(6 hours);
+        vm.prank(b.tranche0.market());
+        b.tranche0.fund(0);
 
-        assertEq(b.tranche0.vested(), buffered, "the idle half is carried, not written off");
+        assertEq(b.tranche0.remaining(), buffered, "the idle half is carried, not written off");
         assertEq(stablecoin.balanceOf(b.tranche0Addr), buffered, "and it is all still held");
     }
 
     /// @dev The underwriter mirror of the above. Here {report} is the reachable re-vest: it is a
-    /// curator call with no supply precondition, and it rebuilds `vestedPremium` from
-    /// {vestedReward}. Sliding `lastReported` is what makes that read back the un-accrued remainder
+    /// curator call with no supply precondition, and it rebuilds the remainder from
+    /// {remaining}. Sliding `lastReported` is what makes that read back the un-accrued remainder
     /// rather than only the not-yet-due part.
     function test_underwriterIdleWindowSurvivesTheNextReport() public {
         Underwriter uw = _deployUnderwriter();
@@ -604,7 +600,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         vm.warp(block.timestamp + 7 hours);
         uw.report(b.tranche0Addr);
 
-        uint256 buffered = uw.vestedPremium();
+        uint256 buffered = uw.remaining();
         assertGt(buffered, 0, "there is premium at stake");
 
         uint256 aliceShares = uw.balanceOf(alice);
@@ -612,24 +608,23 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         uw.requestRedeem(aliceShares, alice, alice);
         assertEq(uw.stakedSupply(), 0, "vault is idle");
 
-        // half the schedule elapses against nobody, then a report re-vests over it
         vm.warp(block.timestamp + 3 hours);
         uw.report(b.tranche0Addr);
 
-        assertEq(uw.vestedPremium(), buffered, "the idle half is carried, not written off");
-        assertEq(stablecoin.balanceOf(address(uw)), buffered, "and it is all still held");
+        assertGe(uw.remaining(), buffered, "the idle leftover is carried, and a report may add to it");
+        assertGe(stablecoin.balanceOf(address(uw)), buffered, "none of what was held was burned");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // THE QUEUE COUNTERS AND THE STAKED SUPPLY STAY IN STEP
     // ─────────────────────────────────────────────────────────────────────────
 
-    /// @dev Premium is divided by `stakedSupply`, which is read off the queue counters rather than
-    /// off balances, and the share transfer inside `requestRedeem` is what triggers that division.
-    /// Bumping `redeemQueue` before the transfer dropped the requester out of the divisor while
-    /// they still held the shares and were a line away from being checkpointed at the rate it
-    /// produced, so two equal holders splitting one vested epoch were each owed the whole pot the
-    /// moment either of them queued. The counter has to move after the shares do.
+    /// @dev Premium is divided by the opted-in supply, and the share transfer inside
+    /// `requestRedeem` is what drops the requester out of it. Bumping a queue counter before the
+    /// transfer dropped them out of the divisor while they still held the shares and were a line
+    /// away from being checkpointed at the rate it produced, so two equal holders splitting one
+    /// vested epoch were each owed the whole pot the moment either of them queued. The staked
+    /// figure has to move with the shares.
     function test_queueingDoesNotInflateTheRequestersPremiumShare() public {
         MarketBundle memory b = _createReadyMarket("m");
         _fundTranche(b.tranche0Addr, alice, 500e18);
@@ -643,7 +638,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
 
         // the epoch runs out with nobody touching the tranche, so all of it is still pending and
         // the accrual inside `requestRedeem` is the one that hands it out
-        vm.warp(b.tranche0.periodEnd());
+        vm.warp(block.timestamp + 20 * b.tranche0.vestingPeriod());
         uint256 held = stablecoin.balanceOf(b.tranche0Addr);
         assertGt(held, 0, "there is premium at stake");
 
@@ -682,7 +677,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         uint256 id = b.tranche0.requestRedeem(aliceShares, alice, alice);
         assertEq(b.tranche0.claimable(alice), 0, "she earned nothing before queueing");
 
-        vm.warp(b.tranche0.periodEnd());
+        vm.warp(block.timestamp + 20 * b.tranche0.vestingPeriod());
         uint256 held = stablecoin.balanceOf(b.tranche0Addr);
 
         // the burn inside her settlement is the accrual that releases the epoch
@@ -1039,9 +1034,14 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         assertEq(griefed, honest, "a redemption that has stood for no time may not move it either");
     }
 
-    /// @dev Smoothing must not become a way to never pay. A shift that is real, and held, is fully
-    /// priced once the averaging period has passed.
-    function test_aSustainedShiftIsPricedOnceThePeriodHasPassed() public {
+    /// @dev Smoothing must not become a way to never pay. A shift that is real, and held, ends up
+    /// fully priced.
+    ///
+    /// "Fully" takes several windows rather than one. The averaging period is a time constant: the
+    /// average closes a fixed fraction of the remaining distance per second, which is what stops
+    /// the result depending on how often the accrual is run, and the price of that is that no
+    /// finite wait closes the distance exactly. One period gets about 63% of the way.
+    function test_aSustainedShiftIsPricedInFullOnceTheAverageHasSettled() public {
         FixedMarket market = _fixedMarketOnSlope(0.9e27);
         _depositStable(makeAddr("saver"), 1_000e18);
         vm.warp(block.timestamp + 2 hours);
@@ -1054,7 +1054,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         vm.warp(block.timestamp + irm.averagingPeriod() / 2);
         uint256 halfway = _quotedPremium(market);
 
-        vm.warp(block.timestamp + irm.averagingPeriod());
+        vm.warp(block.timestamp + 20 * irm.averagingPeriod());
         uint256 settled = _quotedPremium(market);
 
         emit log_named_uint("before ", before);
@@ -1246,10 +1246,10 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         uint256 expected = uw.claimable(alice);
         assertGt(expected, 0, "there is premium to claim");
 
-        vm.expectEmit(true, false, false, true, address(uw));
-        emit IUnderwriter.Claimed(alice, expected);
+        vm.expectEmit(true, true, false, true, address(uw));
+        emit IPremiumVesting.Claimed(alice, alice, expected);
         vm.prank(alice);
-        uint256 claimed = uw.claim();
+        uint256 claimed = uw.claim(alice);
 
         assertEq(claimed, expected, "the call reports what it paid");
         assertEq(stablecoin.balanceOf(alice), claimed, "and that is what arrived");

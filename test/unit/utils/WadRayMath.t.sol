@@ -29,6 +29,10 @@ contract WadRayMathHarness {
     function wadToRay(uint256 a) external pure returns (uint256) {
         return WadRayMath.wadToRay(a);
     }
+
+    function rayPow(uint256 a, uint256 n) external pure returns (uint256) {
+        return WadRayMath.rayPow(a, n);
+    }
 }
 
 contract WadRayMathTest is Test {
@@ -120,6 +124,54 @@ contract WadRayMathTest is Test {
 
     function testFuzz_rayMul_commutative(uint128 a, uint128 b) public view {
         assertEq(m.rayMul(a, b), m.rayMul(b, a));
+    }
+
+    // ── rayPow ────────────────────────────────────────────────────────────────
+
+    function test_rayPow_zeroExponentIsOne() public view {
+        assertEq(m.rayPow(0.5e27, 0), RAY, "anything to the zero is one ray");
+    }
+
+    function test_rayPow_oneExponentIsTheBase() public view {
+        assertEq(m.rayPow(0.5e27, 1), 0.5e27);
+    }
+
+    /// @dev The property {IInterestRateModel-averagingPeriod} depends on, and the reason this
+    /// exists rather than a loop of {rayMul}: splitting an exponent must not change the result, so
+    /// a decay applied across an interval matches the same decay applied across its parts.
+    function testFuzz_rayPow_exponentsAdd(uint8 m1, uint8 n1) public view {
+        uint256 base = 0.999e27;
+        assertApproxEqAbs(
+            m.rayMul(m.rayPow(base, m1), m.rayPow(base, n1)),
+            m.rayPow(base, uint256(m1) + n1),
+            10,
+            "a^m raymul a^n has to be a^(m+n), give or take the half-up rounding in each step"
+        );
+    }
+
+    function test_rayPow_decaysMonotonically() public view {
+        uint256 base = 0.9e27;
+        uint256 previous = RAY;
+        for (uint256 n = 1; n <= 20; ++n) {
+            uint256 current = m.rayPow(base, n);
+            assertLt(current, previous, "a base under one ray only shrinks");
+            previous = current;
+        }
+    }
+
+    /// @dev Squaring the base on the final iteration would be thrown away, and for a base this
+    /// far above one ray it overflows {rayMul} on the way to being thrown away. Nothing in the
+    /// protocol raises a base above one, but a library that reverts on an answer it already holds
+    /// is a trap for whatever calls it next.
+    function test_rayPow_doesNotSquareTheBaseItNoLongerNeeds() public view {
+        uint256 enormous = 1e40;
+        assertEq(m.rayPow(enormous, 1), enormous, "the answer was already in hand");
+    }
+
+    function test_rayPow_largeExponentRunsInLogTime() public view {
+        // 0.999^100000 has long since underflowed the ray, and getting there must not need
+        // 100000 multiplications
+        assertEq(m.rayPow(0.999e27, 100_000), 0, "decayed past the smallest representable ray");
     }
 
     function testFuzz_rayMul_identity(uint128 a) public view {

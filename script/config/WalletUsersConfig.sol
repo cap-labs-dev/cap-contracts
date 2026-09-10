@@ -18,7 +18,7 @@ contract WalletUsersConfig is WalletUtils {
             admin: wallet,
             liquidator: wallet,
             stablecoinUnderlying: VM.envOr("STABLECOIN_UNDERLYING", address(0)),
-            stakedStablecoin: VM.envOr("STAKED_STABLECOIN", wallet)
+            reserveVault: VM.envOr("RESERVE_VAULT", address(0))
         });
     }
 }

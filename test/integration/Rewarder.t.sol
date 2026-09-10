@@ -20,18 +20,6 @@ contract RewarderTest is CapDeployer {
         market = FloatingMarket(marketAddr);
     }
 
-    function test_setStakedStablecoin_onlyAuthority() public {
-        vm.prank(stranger);
-        vm.expectRevert();
-        market.setStakedStablecoin(address(0xCAFE));
-    }
-
-    function test_setStakedStablecoin_emits() public {
-        vm.expectEmit(false, false, false, true);
-        emit IBaseMarket.SetStakedStablecoin(address(0xCAFE));
-        market.setStakedStablecoin(address(0xCAFE));
-    }
-
     function test_setTrancheWeights_onlyAuthority() public {
         vm.prank(stranger);
         vm.expectRevert();

@@ -15,7 +15,7 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 
 /// @title Vault
 /// @author kexley, Cap Labs
-/// @notice The Vault is a contract that allows users to deposit and withdraw ERC20 assets.
+/// @notice ERC6909 collateral vault
 contract Vault is IVault, AccessManagedUpgradeable, ERC6909TokenSupplyUpgradeable, UUPSUpgradeable {
     using SafeERC20 for IERC20;
     using AssetId for address;

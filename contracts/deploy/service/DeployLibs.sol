@@ -4,6 +4,8 @@ pragma solidity 0.8.36;
 import { LibsConfig } from "../interfaces/DeployConfigs.sol";
 
 contract DeployLibs {
+    /// @dev Placeholder library config; no libraries are deployed
+    /// @return libs The empty library addresses
     function _deployLibs() internal pure returns (LibsConfig memory libs) {
         libs.unused = address(0);
     }

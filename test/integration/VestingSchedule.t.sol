@@ -4,13 +4,11 @@ pragma solidity 0.8.36;
 import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { Underwriter } from "../../contracts/cap/Underwriter.sol";
 import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
-import { ITranche } from "../../contracts/interfaces/ITranche.sol";
-import { IUnderwriter } from "../../contracts/interfaces/IUnderwriter.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
 
 /// @title VestingScheduleTest
-/// @notice Premium accrual divides by the vesting period and clamps at the vesting end, so both
-/// are reachable from governance setters and both used to be able to brick the contracts.
+/// @notice The time constant is twelve hours, so a day releases most of a pot without a setter that
+/// can move the schedule out from under accrual.
 contract VestingScheduleTest is CapDeployer {
     FloatingMarket internal market;
     address internal senior;
@@ -34,23 +32,31 @@ contract VestingScheduleTest is CapDeployer {
         market.chargePremium();
     }
 
-    function test_tranche_zeroVestingPeriodRejected() public {
-        _accrueSomePremium();
-        vm.expectRevert(ITranche.InvalidVestingPeriod.selector);
-        Tranche(senior).setVestingPeriod(0);
+    function test_vestingPeriodIsSixHours() public view {
+        assertEq(Tranche(senior).vestingPeriod(), 12 hours);
+        assertEq(Tranche(senior).VESTING_PERIOD(), 12 hours);
     }
 
-    /// Changing the period must not brick share movement, claims or deposits.
-    function test_tranche_vestingPeriodChangeKeepsTrancheLive() public {
+    /// After two time constants a day has passed and about `1 - 1/e^2` has been released.
+    function test_aDayReleasesMostOfThePot() public {
         _accrueSomePremium();
-        assertGt(Tranche(senior).vested(), 0, "premium should be vesting");
+        uint256 pot = Tranche(senior).remaining() + Tranche(senior).vested();
+        assertGt(pot, 0, "premium is vesting");
 
-        vm.warp(block.timestamp + 1 hours);
-        Tranche(senior).setVestingPeriod(1 days);
+        vm.warp(block.timestamp + 24 hours);
+        assertApproxEqRel(Tranche(senior).vested(), pot * 8647 / 10_000, 0.01e18, "1 - 1/e^2");
+        assertLt(Tranche(senior).remaining(), pot / 5, "less than twenty percent still locked");
+    }
+
+    /// The fixed schedule must not brick share movement, claims or deposits.
+    function test_trancheStaysLiveWhilePremiumVests() public {
+        _accrueSomePremium();
+        assertGt(Tranche(senior).remaining(), 0, "premium should be vesting");
+
         vm.warp(block.timestamp + 1 hours);
 
         vm.prank(supplier);
-        Tranche(senior).transfer(makeAddr("bob"), 1e18);
+        assertTrue(Tranche(senior).transfer(makeAddr("bob"), 1e18));
 
         vm.prank(supplier);
         Tranche(senior).claim(supplier);
@@ -58,83 +64,9 @@ contract VestingScheduleTest is CapDeployer {
         _fundTranche(senior, makeAddr("second"), 10e18);
     }
 
-    /// Shortening the period must not release premium that has not vested under the new schedule.
-    function test_tranche_shorteningPeriodDoesNotOverRelease() public {
-        _accrueSomePremium();
-        vm.warp(block.timestamp + 1 hours);
-
-        uint256 claimableBefore = Tranche(senior).claimable(supplier);
-        Tranche(senior).setVestingPeriod(1 days);
-
-        assertApproxEqAbs(
-            Tranche(senior).claimable(supplier), claimableBefore, 1e12, "reschedule must not release a jump"
-        );
-    }
-
-    function test_underwriter_zeroVestingPeriodRejected() public {
+    function test_underwriterUsesTheSameConstant() public {
         Underwriter uw = _deployUnderwriter();
-        vm.expectRevert(IUnderwriter.InvalidVestingPeriod.selector);
-        uw.setVestingPeriod(0);
-    }
-
-    /// Shrinking the period used to move vestingEnd behind lastPremiumUpdate and revert. Accrual
-    /// still clamps; the leftover locked premium is recaptured into the new window.
-    function test_underwriter_shrinkingPeriodKeepsUnderwriterLive() public {
-        _admitDepositor(address(senior), address(this));
-        Underwriter uw = _deployUnderwriter();
-        _admitDepositor(address(senior), address(uw));
-        _fundUnderwriter(address(uw), supplier, 1_000e18);
-        uw.addTranche(senior);
-        uw.allocate(senior, 500e18);
-
-        _accrueSomePremium();
-        uw.report(senior);
-
-        vm.warp(block.timestamp + 5 hours);
-        uw.claim();
-        assertGt(uw.lastPremiumUpdate(), 0, "accrual happened");
-
-        uw.setVestingPeriod(1 hours);
-        assertEq(uw.vestingEnd(), block.timestamp + 1 hours, "clock restarts over the new period");
-        assertEq(uw.lastPremiumUpdate(), block.timestamp, "accrual cursor reset to now");
-
-        uw.claimable(supplier);
-        uw.claim();
-        uw.report(senior);
-
-        vm.prank(supplier);
-        uw.transfer(makeAddr("bob"), 1e18);
-
-        vm.prank(supplier);
-        uw.requestRedeem(1e18, supplier, supplier);
-    }
-
-    /// Shortening the period must not strand the unvested remainder on the contract.
-    function test_underwriter_shorteningPeriodDoesNotStrandPremium() public {
-        _admitDepositor(address(senior), address(this));
-        Underwriter uw = _deployUnderwriter();
-        _admitDepositor(address(senior), address(uw));
-        _fundUnderwriter(address(uw), supplier, 1_000e18);
-        uw.addTranche(senior);
-        uw.allocate(senior, 500e18);
-
-        _accrueSomePremium();
-        // let the tranche vest so report actually pulls cUSD
-        vm.warp(block.timestamp + 6 hours);
-        uw.report(senior);
-        assertGt(uw.vestedPremium(), 0, "underwriter has premium to vest");
-
-        vm.warp(block.timestamp + 5 hours);
-        uint256 leftover = uw.vestedReward();
-        assertGt(leftover, 0, "some premium still locked");
-        uint256 claimableBefore = uw.claimable(supplier);
-
-        uw.setVestingPeriod(1 hours);
-        assertEq(uw.vestedPremium(), leftover, "locked remainder recaptured");
-
-        vm.warp(block.timestamp + 1 hours);
-        assertApproxEqAbs(
-            uw.claimable(supplier) - claimableBefore, leftover, 1 hours, "remainder unlocks over the new period"
-        );
+        assertEq(uw.vestingPeriod(), 12 hours);
+        assertEq(uw.VESTING_PERIOD(), 12 hours);
     }
 }

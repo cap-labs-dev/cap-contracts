@@ -1,245 +1,341 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
+import { ERC7540AsyncRedeem } from "../ERC7540/ERC7540AsyncRedeem.sol";
+import { IPremiumVesting } from "../interfaces/IPremiumVesting.sol";
+import { DeadShares } from "./DeadShares.sol";
 import { WadRayMath } from "./WadRayMath.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title PremiumVesting
 /// @author kexley, Cap Labs
-/// @notice Linear premium vesting with per-share distribution, shared by {Tranche} and {Underwriter}.
-///
-/// A schedule holds a lump of premium and releases it evenly across an epoch. Whatever comes due is
-/// divided by the supply staked at that moment and added to a cumulative per-share figure, so a
-/// holder's entitlement is `perShare × balance` net of a checkpoint taken whenever their balance
-/// moved. Topping the schedule up or repointing it at a new period restarts the epoch carrying
-/// whatever was still locked, so premium is never dropped and never released early.
-///
-/// The per-share accumulator is part of this library rather than left to the caller because
-/// {accrue} is the only thing that writes it. Splitting the two would put the epoch on one side of
-/// the boundary and the division that consumes it on the other.
-///
-/// Callers own the supply figure and pass it in, since what counts as staked is theirs to define —
-/// both of ours use `stakedSupply`, which excludes shares queued for redemption as well as the
-/// dead shares parked at {DeadShares-HOLDER}.
-///
-/// The one precondition is that `period` is never zero, because every release divides by it. Both
-/// callers hardcode it at initialization and reject zero in their setters.
-library PremiumVesting {
-    /// @dev Both conversions between a premium amount and the per-share figure round down, so the
-    /// arithmetic can only ever under-attribute and the remainder stays in the vault.
-    ///
-    /// Not {WadRayMath}, whose rayMul and rayDiv round half up. Rounding up on the release makes
-    /// `perShare` overstate what was funded and over-credits every holder at once, and rounding up
-    /// on an entitlement over-credits that holder. Both bias the wrong way for a pot that is paid
-    /// out of a finite balance, and the direction matters more here than matching the convention
-    /// the rate maths uses, where the same helpers are compounding an index rather than dividing
-    /// something up.
-    ///
-    /// It does not make the pot-level clamp in the callers redundant, which is worth being precise
-    /// about since it looks as though it should. `debt` rounds down alongside the credit it is
-    /// subtracted from, and a debt rounded down understates what has already been accounted for,
-    /// so a balance falling or an account arriving mid-epoch banks the fraction. Rounding `debt`
-    /// up instead is what would close it, and cannot be done here: two checkpoints with no accrual
-    /// between them would then subtract more than they credit, so it needs a saturating
-    /// subtraction that erodes an active account's entitlement on every transfer. Searched over
-    /// random schedules at a small ray, this leaves the entitlements able to exceed the pot in
-    /// 0.01% of runs and by a single wei, against 2.2% and four wei rounding half up.
+/// @notice Exponential premium vesting over a 12-hour time constant
+/// @dev Only opted-in balances earn. Zero staked supply freezes the remainder.
+abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
+    using SafeERC20 for IERC20;
+    using WadRayMath for uint256;
+
+    /// @dev Emitted when premium is added to the remainder
+    event Fund(uint256 amount);
+
+    /// @dev Both conversions floor, so they can only under-attribute.
     uint256 private constant RAY = WadRayMath.RAY;
 
-    /// @param period The epoch length in seconds
-    /// @param start The epoch anchor. Set to now when the epoch restarts, then slid forward by any
-    /// window in which nothing was staked, so it is not necessarily when premium last arrived
-    /// @param vested The premium being released across the epoch
-    /// @param lastUpdate The point accrual has been settled up to, never beyond the epoch end
-    /// @param perShare The cumulative premium released per staked share, in ray decimals
+    /// @notice Twelve-hour time constant. After a day most of a pot has vested
+    uint256 public constant VESTING_PERIOD = 12 hours;
+
+    /// @custom:storage-location cap.storage.PremiumVesting
+    /// @param remainder Premium still held
+    /// @param lastUpdate The point accrual has been settled up to
+    /// @param perShare Cumulative premium released per staked share, in ray decimals
     /// @param pending Premium credited to an account and awaiting collection
     /// @param debt Premium already accounted to an account at its last balance checkpoint
-    struct Schedule {
-        uint256 period;
-        uint256 start;
-        uint256 vested;
+    /// @param stablecoin The token premium is paid in
+    /// @param optedIn Whether an account earns
+    /// @param staked Sum of opted-in balances
+    struct PremiumVestingStorage {
+        uint256 remainder;
         uint256 lastUpdate;
         uint256 perShare;
         mapping(address account => uint256 amount) pending;
         mapping(address account => uint256 amount) debt;
+        address stablecoin;
+        mapping(address account => bool opted) optedIn;
+        uint256 staked;
     }
 
-    /// @dev Open an empty schedule anchored at now.
-    ///
-    /// Anchoring matters even with nothing to release. Left at zero, `start` would put the epoch at
-    /// the unix epoch, and the first {accrue} would slide it forward by fifty-odd years or park the
-    /// cursor at a timestamp in the past. Both are harmless while `vested` is zero, and both make
-    /// every reader of {end} or {locked} wrong until premium first arrives.
-    /// @param s The schedule to open
-    /// @param period The epoch length in seconds, which must not be zero
-    function open(Schedule storage s, uint256 period) internal {
-        s.period = period;
-        s.start = block.timestamp;
-        s.lastUpdate = block.timestamp;
+    // keccak256(abi.encode(uint256(keccak256("cap.storage.PremiumVesting")) - 1)) & ~bytes32(uint256(0xff))
+    /// @dev ERC-7201 storage slot for PremiumVesting
+    bytes32 private constant PREMIUM_VESTING_STORAGE_LOCATION =
+        0xcd5f59be90fcb6cd1e07c030ed45d88d80c86b8efb27e0d1fc4732fdedcd1c00;
+
+    /// @dev Accrue vested premium into per-share before the wrapped call
+    modifier updatePremium() {
+        _updatePremium();
+        _;
     }
 
-    /// @dev Release whatever premium has come due to the supply that was staked for it.
-    ///
-    /// While nothing is staked the epoch slides forward by the idle time rather than the clock
-    /// being frozen. Freezing preserves the premium only as a cliff: the moment supply returns the
-    /// whole idle window releases against whatever is there, so a one wei deposit sweeps the buffer
-    /// having borne no risk for a second of it. Sliding keeps every wei and still drips it over the
-    /// time the epoch had left, so premium only reaches capital that was exposed while it vested.
-    ///
-    /// Sliding also leaves {locked} equal to the un-released remainder rather than only the
-    /// not-yet-due part, which is the figure {fund} and {setPeriod} carry across. Under a frozen
-    /// clock they read back less than was actually held and stranded the difference for good.
-    /// @param s The schedule to accrue
-    /// @param supply The shares staked as of now
-    function accrue(Schedule storage s, uint256 supply) internal {
-        uint256 until = Math.min(block.timestamp, s.start + s.period);
-        if (until <= s.lastUpdate) return;
+    /// @inheritdoc IPremiumVesting
+    function vestingPeriod() public pure returns (uint256 period) {
+        period = VESTING_PERIOD;
+    }
+
+    /// @inheritdoc IPremiumVesting
+    function vested() public view returns (uint256 amount) {
+        amount = _vested(_getPremiumVestingStorage());
+    }
+
+    /// @inheritdoc IPremiumVesting
+    function remaining() public view returns (uint256 amount) {
+        PremiumVestingStorage storage $ = _getPremiumVestingStorage();
+        amount = $.remainder - _vested($);
+    }
+
+    /// @inheritdoc IPremiumVesting
+    function premiumPerSecond() public view returns (uint256 perSecond) {
+        perSecond = remaining() / VESTING_PERIOD;
+    }
+
+    /// @inheritdoc IPremiumVesting
+    function lastPremiumUpdate() public view returns (uint256 timestamp) {
+        timestamp = _getPremiumVestingStorage().lastUpdate;
+    }
+
+    /// @inheritdoc IPremiumVesting
+    function premiumPerShare() public view returns (uint256 perShare) {
+        perShare = _getPremiumVestingStorage().perShare;
+    }
+
+    /// @inheritdoc IPremiumVesting
+    function pendingPremium(address user) public view returns (uint256 premium) {
+        premium = _getPremiumVestingStorage().pending[user];
+    }
+
+    /// @inheritdoc IPremiumVesting
+    function claimable(address user) public view returns (uint256 premium) {
+        PremiumVestingStorage storage $ = _getPremiumVestingStorage();
+        uint256 earning = $.optedIn[user] ? balanceOf(user) : 0;
+        premium = _claimable($, user, earning, $.staked);
+    }
+
+    /// @inheritdoc IPremiumVesting
+    function stakedSupply() public view returns (uint256 supply) {
+        supply = _getPremiumVestingStorage().staked;
+    }
+
+    /// @inheritdoc IPremiumVesting
+    function optedIn(address account) public view returns (bool opted) {
+        opted = _getPremiumVestingStorage().optedIn[account];
+    }
+
+    /// @inheritdoc IPremiumVesting
+    function optIn() public updatePremium {
+        PremiumVestingStorage storage $ = _getPremiumVestingStorage();
+        if ($.optedIn[msg.sender] || msg.sender == address(this) || msg.sender == DeadShares.HOLDER) return;
+        uint256 bal = balanceOf(msg.sender);
+        // start from the current per-share so the window before this call is not theirs
+        $.debt[msg.sender] = _owed($.perShare, bal);
+        $.optedIn[msg.sender] = true;
+        $.staked += bal;
+        emit OptIn(msg.sender);
+    }
+
+    /// @inheritdoc IPremiumVesting
+    function optOut() public updatePremium {
+        PremiumVestingStorage storage $ = _getPremiumVestingStorage();
+        if (!$.optedIn[msg.sender]) return;
+        uint256 bal = balanceOf(msg.sender);
+        _checkpoint($, msg.sender, bal, 0);
+        $.optedIn[msg.sender] = false;
+        $.staked -= bal;
+        emit OptOut(msg.sender);
+    }
+
+    /// @inheritdoc IPremiumVesting
+    function stablecoin() public view returns (address token) {
+        token = _getPremiumVestingStorage().stablecoin;
+    }
+
+    /// @inheritdoc IPremiumVesting
+    function claim(address recipient) public returns (uint256 premium) {
+        premium = _settlePremium(msg.sender);
+        // the per-share arithmetic floors in both directions, so the ordinary case under-pays and
+        // the remainder stays here. The clamp is still load-bearing: a debt rounded down can let
+        // entitlements sum past the pot, and without it the last holder out hits a failed transfer.
+        // Pay what is there.
+        address token = stablecoin();
+        uint256 held = IERC20(token).balanceOf(address(this));
+        if (premium > held) premium = held;
+        if (premium == 0) return 0;
+
+        IERC20(token).safeTransfer(recipient, premium);
+        emit Claimed(msg.sender, recipient, premium);
+    }
+
+    /// @dev Initialize the ERC7540 vault
+    /// @param asset The vault asset
+    /// @param name The token name
+    /// @param symbol The token symbol
+    /// @param uri The URI for ERC1155 metadata
+    /// @param token The stablecoin premium is paid in
+    // forge-lint: disable-next-item(mixed-case-function)
+    function __PremiumVesting_init(
+        IERC20 asset,
+        string memory name,
+        string memory symbol,
+        string memory uri,
+        address token
+    ) internal onlyInitializing {
+        __ERC7540AsyncRedeem_init(asset, name, symbol, uri);
+        _getPremiumVestingStorage().stablecoin = token;
+    }
+
+    /// @dev Credit whatever has vested since the last accrual to the current supply
+    function _updatePremium() internal {
+        _accrue(_getPremiumVestingStorage(), stakedSupply());
+    }
+
+    /// @dev Add premium to the remainder and update the rate
+    /// @param premium The premium being folded in
+    function _fund(uint256 premium) internal updatePremium {
+        _getPremiumVestingStorage().remainder += premium;
+        emit Fund(premium);
+    }
+
+    /// @dev Record the claimable premium for an account. Caller must {_updatePremium} first.
+    /// @param account The account collecting
+    /// @return premium The entitlement just cleared
+    function _settlePremium(address account) internal updatePremium returns (uint256 premium) {
+        PremiumVestingStorage storage $ = _getPremiumVestingStorage();
+        // a holder that is out still collects what was banked on the way out, but their live
+        // balance is not earning and must not be valued against perShare
+        uint256 earning = $.optedIn[account] ? balanceOf(account) : 0;
+        premium = _settle($, account, earning);
+    }
+
+    /// @dev Bank what each opted-in side has earned before its balance moves
+    /// @param from The sender, skipped when zero, this contract, or not opted in
+    /// @param to The recipient, skipped when zero, this contract, or not opted in
+    /// @param amount The shares about to move
+    function _checkpointShares(address from, address to, uint256 amount) internal {
+        PremiumVestingStorage storage $ = _getPremiumVestingStorage();
+        if ($.optedIn[from]) {
+            uint256 balance = balanceOf(from);
+            _checkpoint($, from, balance, balance - amount);
+        }
+        if ($.optedIn[to]) {
+            uint256 balance = balanceOf(to);
+            _checkpoint($, to, balance, balance + amount);
+        }
+    }
+
+    /// @dev Accrue, checkpoint, and keep the opted-in supply in step before the share balances move
+    /// @param from The sender, or zero on mint
+    /// @param to The recipient, or zero on burn
+    /// @param amount The shares moving
+    function _update(address from, address to, uint256 amount) internal virtual override updatePremium {
+        if (from != to) {
+            _checkpointShares(from, to, amount);
+            PremiumVestingStorage storage $ = _getPremiumVestingStorage();
+            if ($.optedIn[from]) $.staked -= amount;
+            if ($.optedIn[to]) $.staked += amount;
+        }
+        super._update(from, to, amount);
+    }
+
+    /// @dev Get the ERC-7201 namespaced storage pointer
+    /// @return $ The PremiumVesting storage
+    function _getPremiumVestingStorage() internal pure returns (PremiumVestingStorage storage $) {
+        bytes32 slot = PREMIUM_VESTING_STORAGE_LOCATION;
+        assembly {
+            $.slot := slot
+        }
+    }
+
+    /// @dev Credit vested premium to `supply` and take it off the remainder. Zero supply freezes.
+    /// @param $ The PremiumVesting storage
+    /// @param supply The shares that earn, against which the vest is divided
+    function _accrue(PremiumVestingStorage storage $, uint256 supply) internal {
+        if (block.timestamp <= $.lastUpdate) return;
 
         if (supply == 0) {
-            // slid by the elapsed time rather than to `until`, so an epoch that has already ended
-            // still moves whole and the remaining fraction {locked} reports is untouched
-            s.start += block.timestamp - s.lastUpdate;
-            s.lastUpdate = block.timestamp;
+            $.lastUpdate = block.timestamp;
             return;
         }
 
-        uint256 amount = unlocked(s);
-        if (amount > 0) s.perShare += Math.mulDiv(amount, RAY, supply, Math.Rounding.Floor);
-        s.lastUpdate = until;
+        uint256 amount = _vested($);
+        if (amount > 0) {
+            $.perShare += Math.mulDiv(amount, RAY, supply, Math.Rounding.Floor);
+            $.remainder -= amount;
+        }
+        $.lastUpdate = block.timestamp;
     }
 
-    /// @dev Add premium and restart the epoch over the current period, carrying anything locked
-    /// @param s The schedule to fund
-    /// @param amount The premium to add
-    function fund(Schedule storage s, uint256 amount) internal {
-        _restart(s, locked(s) + amount, s.period);
+    /// @dev Bank what an account has earned before its balance moves
+    /// @param $ The PremiumVesting storage
+    /// @param account The account whose balance is about to change
+    /// @param balance The share balance before the move
+    /// @param newBalance The share balance after the move
+    function _checkpoint(PremiumVestingStorage storage $, address account, uint256 balance, uint256 newBalance)
+        internal
+    {
+        uint256 perShare = $.perShare;
+        $.pending[account] += _owed(perShare, balance) - $.debt[account];
+        $.debt[account] = _owed(perShare, newBalance);
     }
 
-    /// @dev Restart the epoch over a new period, carrying anything locked. Shortening a period can
-    /// put the new end behind the old one, which is why {accrue} clamps rather than assuming the
-    /// end only ever moves forward.
-    /// @param s The schedule to repoint
-    /// @param period The new epoch length in seconds
-    function setPeriod(Schedule storage s, uint256 period) internal {
-        _restart(s, locked(s), period);
-    }
-
-    /// @dev Move an account's checkpoint across a balance change, banking what it has earned so far
-    /// @param s The schedule to checkpoint against
-    /// @param account The account whose balance is moving
-    /// @param balance The balance the account holds now
-    /// @param newBalance The balance the account will hold
-    function checkpoint(Schedule storage s, address account, uint256 balance, uint256 newBalance) internal {
-        uint256 perShare = s.perShare;
-        s.pending[account] += _owed(perShare, balance) - s.debt[account];
-        s.debt[account] = _owed(perShare, newBalance);
-    }
-
-    /// @dev Zero an account's entitlement and hand it back for payment.
-    ///
-    /// Reads the settled `perShare` rather than the projection {claimable} uses, so the caller must
-    /// {accrue} first. After an accrual the two agree, since anything the projection would add has
-    /// been written.
-    /// @param s The schedule to settle against
-    /// @param account The account being paid
-    /// @param balance The account's share balance
-    /// @return premium The premium owed to the account
-    function settle(Schedule storage s, address account, uint256 balance) internal returns (uint256 premium) {
-        uint256 perShare = s.perShare;
-        premium = s.pending[account] + _owed(perShare, balance) - s.debt[account];
+    /// @dev Zero an account's entitlement and hand it back
+    /// @param $ The PremiumVesting storage
+    /// @param account The account collecting
+    /// @param balance The account's current share balance
+    /// @return premium The entitlement just cleared
+    function _settle(PremiumVestingStorage storage $, address account, uint256 balance)
+        internal
+        returns (uint256 premium)
+    {
+        uint256 perShare = $.perShare;
+        premium = $.pending[account] + _owed(perShare, balance) - $.debt[account];
         if (premium > 0) {
-            s.pending[account] = 0;
-            s.debt[account] = _owed(perShare, balance);
+            $.pending[account] = 0;
+            $.debt[account] = _owed(perShare, balance);
         }
     }
 
-    /// @dev The premium an account could collect, including accrual not yet written to storage
-    /// @param s The schedule to read
+    /// @dev Premium an account could collect, including vest not yet written
+    /// @param $ The PremiumVesting storage
     /// @param account The account to query
-    /// @param balance The account's share balance
-    /// @param supply The shares staked as of now
-    /// @return premium The premium owed to the account
-    function claimable(Schedule storage s, address account, uint256 balance, uint256 supply)
+    /// @param balance The account's current share balance
+    /// @param supply The shares that earn, used to project unwritten vest
+    /// @return premium Pending plus unwritten vest, less already-accounted debt
+    function _claimable(PremiumVestingStorage storage $, address account, uint256 balance, uint256 supply)
         internal
         view
         returns (uint256 premium)
     {
-        premium = s.pending[account] + _owed(projectedPerShare(s, supply), balance) - s.debt[account];
+        premium = $.pending[account] + _owed(_projectedPerShare($, supply), balance) - $.debt[account];
     }
 
-    /// @dev The per-share figure including accrual not yet written to storage
-    /// @param s The schedule to read
-    /// @param supply The shares staked as of now
-    /// @return perShare The projected premium per share in ray decimals
-    function projectedPerShare(Schedule storage s, uint256 supply) internal view returns (uint256 perShare) {
-        perShare = s.perShare;
+    /// @dev `perShare` plus the vest not yet written
+    /// @param $ The PremiumVesting storage
+    /// @param supply The shares that earn. Zero skips the projection, matching a freeze
+    /// @return perShare Settled per-share plus the unwritten vest, in ray
+    function _projectedPerShare(PremiumVestingStorage storage $, uint256 supply)
+        internal
+        view
+        returns (uint256 perShare)
+    {
+        perShare = $.perShare;
         if (supply > 0) {
-            uint256 amount = unlocked(s);
+            uint256 amount = _vested($);
             if (amount > 0) perShare += Math.mulDiv(amount, RAY, supply, Math.Rounding.Floor);
         }
     }
 
-    /// @dev The premium that has come due since the last accrual
-    /// @param s The schedule to read
-    /// @return amount The premium awaiting release
-    function unlocked(Schedule storage s) internal view returns (uint256 amount) {
-        uint256 until = Math.min(block.timestamp, s.start + s.period);
-        if (until <= s.lastUpdate) return 0;
-        amount = s.vested * (until - s.lastUpdate) / s.period;
+    /// @dev Premium newly available since `lastUpdate`. A zero-supply accrue freezes, so this can read ahead.
+    /// @param $ The PremiumVesting storage
+    /// @return amount Premium newly available since `lastUpdate`
+    function _vested(PremiumVestingStorage storage $) internal view returns (uint256 amount) {
+        if (block.timestamp <= $.lastUpdate) return 0;
+        uint256 weight = _weight(block.timestamp - $.lastUpdate);
+        if (weight == 0) return 0;
+        amount = Math.mulDiv($.remainder, weight, RAY, Math.Rounding.Floor);
     }
 
-    /// @dev The premium still held back by the epoch.
-    ///
-    /// Written against the epoch end rather than as `period - (now - start)` so it cannot
-    /// underflow, and so it stays correct across the slide in {accrue}, which moves `start` past
-    /// the point premium last arrived.
-    ///
-    /// Reads settled state, so an idle window that has not been accrued yet reads as zero once the
-    /// epoch end has passed, when the truth is that the whole remainder is still held. It cannot
-    /// project its way out of that: the pending accrual either releases or slides depending on the
-    /// supply, and the supply is the caller's to know. {fund} and {setPeriod} are unaffected
-    /// because both callers accrue first, which is what turns that remainder into a real reading.
-    /// @param s The schedule to read
-    /// @return amount The premium not yet released
-    function locked(Schedule storage s) internal view returns (uint256 amount) {
-        uint256 finish = s.start + s.period;
-        if (block.timestamp >= finish) return 0;
-        amount = s.vested * (finish - block.timestamp) / s.period;
-    }
-
-    /// @dev The point the epoch releases its last premium
-    /// @param s The schedule to read
-    /// @return timestamp The epoch end
-    function end(Schedule storage s) internal view returns (uint256 timestamp) {
-        timestamp = s.start + s.period;
-    }
-
-    /// @dev The nominal release rate. Reported for callers that expose it, and not used to accrue:
-    /// {unlocked} scales the lump by elapsed time instead, which avoids truncating the rate and
-    /// then multiplying the error back up.
-    /// @param s The schedule to read
-    /// @return perSecond The premium released per second
-    function rate(Schedule storage s) internal view returns (uint256 perSecond) {
-        perSecond = s.vested / s.period;
-    }
-
-    /// @dev What a balance has been credited at a given per-share figure, rounded down.
-    ///
-    /// Used for the entitlement and for the `debt` subtracted from it, so the two agree. Any two
-    /// checkpoints at the same per-share figure therefore net to exactly zero rather than to a
-    /// negative that would have to be saturated away.
-    /// @param perShare The cumulative premium per share in ray decimals
-    /// @param balance The balance to value
-    /// @return amount The premium accounted to that balance
+    /// @dev Premium attributed to `balance` at `perShare`. Floors, so it can only under-attribute
+    /// @param perShare Cumulative premium released per staked share, in ray
+    /// @param balance The share balance being valued
+    /// @return amount The attributed premium
     function _owed(uint256 perShare, uint256 balance) private pure returns (uint256 amount) {
         amount = Math.mulDiv(perShare, balance, RAY, Math.Rounding.Floor);
     }
 
-    /// @dev Restart the epoch now, releasing `total` across `period`
-    function _restart(Schedule storage s, uint256 total, uint256 period) private {
-        s.period = period;
-        s.vested = total;
-        s.start = block.timestamp;
-        s.lastUpdate = block.timestamp;
+    /// @dev `1 - retention^elapsed`, so splits of the interval compose
+    /// @param elapsed Seconds since the last accrual
+    /// @return weight Fraction of the remainder that has vested, in ray
+    function _weight(uint256 elapsed) private pure returns (uint256 weight) {
+        uint256 retention = RAY - RAY / VESTING_PERIOD;
+        weight = RAY - retention.rayPow(elapsed);
     }
 }
