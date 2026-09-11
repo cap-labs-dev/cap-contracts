@@ -32,6 +32,7 @@ contract FixedExtendTest is CapDeployer {
         uint256 expiryBefore = market.expiry(id);
         uint256 debtBefore = market.debt(id);
 
+        vm.prank(defaultBorrower);
         uint256 actual = market.extend(id, 7 days);
 
         assertEq(actual, 7 days, "returns the requested extension");
@@ -45,6 +46,7 @@ contract FixedExtendTest is CapDeployer {
         vm.prank(defaultBorrower);
         (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days);
 
+        vm.prank(defaultBorrower);
         uint256 actual = market.extend(id, type(uint256).max);
 
         assertEq(actual, 29 days, "max term is 30 days, 1 day already used");
@@ -57,6 +59,7 @@ contract FixedExtendTest is CapDeployer {
         vm.prank(defaultBorrower);
         (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days);
 
+        vm.prank(defaultBorrower);
         vm.expectRevert(IFixedMarket.InvalidTerm.selector);
         market.extend(id, 30 days);
     }

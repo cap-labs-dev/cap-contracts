@@ -143,13 +143,21 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     }
 
     /// @inheritdoc IStablecoin
-    function recognizeBadDebt(uint256 _amount) external restricted {
+    function recognizeBadDebtInReserve(uint256 _amount) external restricted {
         badDebt += _amount;
+        if (badDebt > totalSupply()) revert BadDebtExceedsSupply();
+        emit BadDebtRecognizedInReserve(_amount);
+    }
+
+    /// @inheritdoc IStablecoin
+    function recognizeBadDebtInCredit(uint256 _amount) external restricted {
+        badDebt += _amount;
+        if (badDebt > totalSupply()) revert BadDebtExceedsSupply();
         // will never be repaid, so drop it from credit-backed supply. unlockedSupply is unchanged
         // because badDebt rose by the same amount. Holders take the loss through totalAssets.
         creditBackedSupply -= _amount;
         IInterestRateModel(irm).updateLiquidityRate();
-        emit BadDebtRecognized(_amount);
+        emit BadDebtRecognizedInCredit(_amount);
     }
 
     /// @inheritdoc IStablecoin
@@ -172,6 +180,9 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         uint256 locked = creditBackedSupply + badDebt;
         uint256 supply = totalSupply();
         if (supply > locked) unlocked = supply - locked;
+
+        uint256 available = previewWithdraw(IERC20(asset()).balanceOf(address(this)));
+        if (unlocked > available) unlocked = available;
     }
 
     /// @inheritdoc IStablecoin

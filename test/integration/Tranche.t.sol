@@ -94,21 +94,19 @@ contract TrancheTest is CapDeployer {
         address[] memory assets = new address[](2);
         assets[0] = address(collateral);
         assets[1] = address(unpriced);
+        uint64 ownerRole = _operatorRoleOf(defaultMarketOwner);
 
         vm.expectRevert(abi.encodeWithSelector(IOracle.PriceError.selector, address(unpriced)));
-        registry.createFloatingMarket(
-            assets, capConfig.defaultTrancheWeights, "Ghostly", defaultMarketOwner, defaultBorrower
-        );
+        registry.createFloatingMarket(assets, capConfig.defaultTrancheWeights, "Ghostly", ownerRole);
     }
 
     function test_createFloatingMarket_rejectsAssetsAndWeightsOfDifferentLengths() public {
         address[] memory assets = new address[](1);
         assets[0] = address(collateral);
+        uint64 ownerRole = _operatorRoleOf(defaultMarketOwner);
 
         vm.expectRevert(IRegistry.TrancheAssetsMismatch.selector);
-        registry.createFloatingMarket(
-            assets, capConfig.defaultTrancheWeights, "Lopsided", defaultMarketOwner, defaultBorrower
-        );
+        registry.createFloatingMarket(assets, capConfig.defaultTrancheWeights, "Lopsided", ownerRole);
     }
 
     // ── admission is the AccessManager's, not a list on the tranche ───────────
@@ -290,30 +288,30 @@ contract TrancheTest is CapDeployer {
         assertTrue(tranche0.killed(), "one wei under the threshold kills it");
     }
 
-    /// @dev The point of killing is to retire the tranche, so the market has to be able to drop it
-    /// out of the waterfall afterwards and carry on with the survivors.
-    function test_killedTrancheCanBeDroppedFromTheMarket() public {
+    /// @dev Market owners cannot remove a dead tranche directly. It remains in the liquidation
+    /// queue and can only be assigned zero weight.
+    function test_killedTrancheRemainsInTheMarket() public {
         _fundTranche(address(tranche0), supplier, 100e18);
         _slashTo(100e18, 0.5e18);
 
         IBaseMarket.Tranche[] memory replacement = new IBaseMarket.Tranche[](1);
         replacement[0] = IBaseMarket.Tranche({ tranche: address(tranche1), weight: 1e27 });
+
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, address(this)));
         market.setTranches(replacement);
 
-        assertEq(market.tranches().length, 1, "the dead tranche is out of the waterfall");
-        assertEq(market.tranches()[0].tranche, address(tranche1));
+        assertEq(market.tranches().length, 2, "the queue is unchanged");
+        assertEq(market.tranches()[0].tranche, address(tranche0), "the dead tranche remains");
     }
 
-    /// @dev The whole replacement story end to end. {IRegistry-createTranche} only ever adds, so
-    /// retiring a tranche is two steps: mint the successor into the waterfall, then call
-    /// {IBaseMarket-setTranches} with the list that leaves the dead one out.
-    function test_killedTrancheCanBeReplacedByAddingItsSuccessorThenDroppingIt() public {
+    /// @dev A successor is appended through the registry while the dead tranche remains at zero
+    /// weight in its original queue position.
+    function test_killedTrancheCanBeSucceededWithoutLeavingTheQueue() public {
         _fundTranche(address(tranche0), supplier, 100e18);
         uint256 seniorWeight = market.tranches()[0].weight;
         uint256 juniorWeight = market.tranches()[1].weight;
         _slashTo(100e18, 0.5e18);
 
-        // the dead tranche keeps its seat for now, but at no weight
         address fresh =
             registry.createTranche(address(market), address(collateral), _weights3(0, juniorWeight, seniorWeight));
 
@@ -322,16 +320,11 @@ contract TrancheTest is CapDeployer {
         assertEq(ITranche(fresh).decimals(), tranche0.decimals(), "at the same decimals");
         assertFalse(ITranche(fresh).killed(), "the replacement starts alive");
         assertEq(ITranche(fresh).totalSupply(), 0, "and at par");
-        assertEq(market.tranches().length, 3, "it joined the waterfall on the way out of the call");
-
-        IBaseMarket.Tranche[] memory updated = new IBaseMarket.Tranche[](2);
-        updated[0] = IBaseMarket.Tranche({ tranche: fresh, weight: seniorWeight });
-        updated[1] = IBaseMarket.Tranche({ tranche: address(tranche1), weight: juniorWeight });
-        market.setTranches(updated);
-
-        assertEq(market.tranches().length, 2, "the dead tranche is out");
-        assertEq(market.tranches()[0].tranche, fresh, "the replacement took the senior seat");
-        assertEq(market.tranches()[0].weight, seniorWeight, "at the weight it replaced");
+        assertEq(market.tranches().length, 3, "the successor was appended");
+        assertEq(market.tranches()[0].tranche, address(tranche0), "the dead tranche remains first");
+        assertEq(market.tranches()[0].weight, 0, "with no premium weight");
+        assertEq(market.tranches()[2].tranche, fresh, "the successor is in the queue");
+        assertEq(market.tranches()[2].weight, seniorWeight, "with the reassigned weight");
 
         // and it takes deposits, which the tranche it replaced no longer does
         assertEq(tranche0.maxDeposit(supplier), 0, "the dead tranche stays shut");
@@ -403,10 +396,8 @@ contract TrancheTest is CapDeployer {
         registry.createTranche(address(market), address(collateral), weights);
 
         address otherOwner = makeAddr("otherOwner");
-        _assignOperator(otherOwner);
-        registry.createFloatingMarket(
-            _uniformAssets(2), capConfig.defaultTrancheWeights, "other", otherOwner, defaultBorrower
-        );
+        uint64 otherOwnerRole = _assignOperator(otherOwner);
+        registry.createFloatingMarket(_uniformAssets(2), capConfig.defaultTrancheWeights, "other", otherOwnerRole);
         vm.prank(otherOwner);
         vm.expectRevert(IRegistry.NotMarketOwner.selector);
         registry.createTranche(address(market), address(collateral), weights);

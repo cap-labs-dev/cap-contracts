@@ -8,6 +8,7 @@ import { IFixedMarket } from "../../contracts/interfaces/IFixedMarket.sol";
 import { ITranche } from "../../contracts/interfaces/ITranche.sol";
 import { WadRayMath } from "../../contracts/utils/WadRayMath.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
 /// @notice Pins how a market's debt behaves across its life: drawn against a credit-backed mint,
 /// priced by a continuous term curve, rolled when it falls overdue, liquidated when it breaches,
@@ -139,6 +140,7 @@ contract DebtLifecycleTest is CapDeployer {
 
         vm.warp(market.expiry(id) + 2 days);
 
+        vm.prank(defaultBorrower);
         uint256 actual = market.extend(id, type(uint256).max);
 
         assertEq(actual, 2 days + 30 days, "arrears plus the maximum term");
@@ -152,8 +154,10 @@ contract DebtLifecycleTest is CapDeployer {
         vm.prank(defaultBorrower);
         (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days);
 
+        vm.prank(defaultBorrower);
         assertEq(market.extend(id, type(uint256).max), 29 days, "fills the room under the maximum");
 
+        vm.prank(defaultBorrower);
         vm.expectRevert(IFixedMarket.InvalidTerm.selector);
         market.extend(id, 1 days);
     }
@@ -286,39 +290,34 @@ contract DebtLifecycleTest is CapDeployer {
         registry.createTranche(bundle.marketAddr, address(collateral), _thirds());
     }
 
-    /// @dev The other half, and the reason the gate exists. Removing a tranche that still holds
-    /// collateral takes its capital out from under the debt, which is refused whether or not the
-    /// market was healthy to begin with.
-    function test_setTranches_stillRefusesToTakeCapitalOutFromUnderTheDebt() public {
+    /// @dev Membership changes go through the registry, so a market owner cannot remove
+    /// collateral from the liquidation queue directly.
+    function test_setTranches_rejectsTheMarketOwner() public {
         MarketBundle memory bundle = _distressedMarket();
 
         IBaseMarket.Tranche[] memory withoutTheJunior = new IBaseMarket.Tranche[](1);
         withoutTheJunior[0] = IBaseMarket.Tranche({ tranche: bundle.tranche0Addr, weight: 1e27 });
 
-        vm.expectRevert(IBaseMarket.Unhealthy.selector);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, address(this)));
         bundle.market.setTranches(withoutTheJunior);
+
+        assertEq(bundle.market.tranches().length, 2, "the queue is unchanged");
     }
 
-    /// @dev The gate is on the result being healthy *or* no worse, not on health never falling. A
-    /// healthy market with room to spare may still be rebalanced downwards, which is what the
-    /// original absolute check allowed and the fix has to keep allowing — tightening this to "may
-    /// never fall" would strand capital in any market carrying debt.
-    function test_setTranches_letsAHealthyMarketGiveUpSpareCapital() public {
+    /// @dev The owner can still change premium weights without changing queue membership.
+    function test_setTrancheWeights_preservesMembership() public {
         MarketBundle memory bundle = _createReadyMarket("Spare");
         _fundTranche(bundle.tranche0Addr, makeAddr("senior"), 1_000e18);
         _fundTranche(bundle.tranche1Addr, makeAddr("junior"), 1_000e18);
 
-        vm.prank(defaultBorrower);
-        bundle.market.borrow(defaultBorrower, 100e18);
-        uint256 healthBefore = bundle.market.healthiness();
+        uint256[] memory weights = new uint256[](2);
+        weights[0] = 1e27;
+        weights[1] = 0;
+        bundle.market.setTrancheWeights(weights);
 
-        IBaseMarket.Tranche[] memory justTheSenior = new IBaseMarket.Tranche[](1);
-        justTheSenior[0] = IBaseMarket.Tranche({ tranche: bundle.tranche0Addr, weight: 1e27 });
-        bundle.market.setTranches(justTheSenior);
-
-        assertEq(bundle.market.tranches().length, 1, "the junior is out, collateral and all");
-        assertLt(bundle.market.healthiness(), healthBefore, "health fell");
-        assertGe(bundle.market.healthiness(), 1e27, "but there was enough spare to stay healthy");
+        assertEq(bundle.market.tranches().length, 2, "both tranches remain");
+        assertEq(bundle.market.tranches()[0].weight, 1e27);
+        assertEq(bundle.market.tranches()[1].weight, 0);
     }
 
     function _thirds() internal pure returns (uint256[] memory weights) {
@@ -373,10 +372,9 @@ contract DebtLifecycleTest is CapDeployer {
 
     function test_createFixedMarket_withZeroMaximumTerm_reverts() public {
         uint256[] memory weights = capConfig.defaultTrancheWeights;
+        uint64 ownerRole = _operatorRoleOf(defaultMarketOwner);
         vm.expectRevert(IFixedMarket.InvalidTermLimits.selector);
-        registry.createFixedMarket(
-            _uniformAssets(weights.length), weights, "Bad", defaultMarketOwner, defaultBorrower, 0, 0, 1 days
-        );
+        registry.createFixedMarket(_uniformAssets(weights.length), weights, "Bad", ownerRole, 0, 0, 1 days);
     }
 
     // ── vault operator rights track tranche registration ─────────────────────

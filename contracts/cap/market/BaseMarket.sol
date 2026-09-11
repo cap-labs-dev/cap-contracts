@@ -48,13 +48,23 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
         __AccessManaged_init(_authority);
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         $.name = _name;
+        $.registry = _registry;
 
-        IRegistry registry = IRegistry(_registry);
-        $.irm = registry.irm();
-        $.stablecoin = registry.stablecoin();
-        $.lt = registry.lt();
-        $.buffer = registry.buffer();
-        $.targetHealth = registry.targetHealth();
+        $.irm = IRegistry(_registry).irm();
+        $.stablecoin = IRegistry(_registry).stablecoin();
+        $.lt = IRegistry(_registry).lt();
+        $.buffer = IRegistry(_registry).buffer();
+        $.targetHealth = IRegistry(_registry).targetHealth();
+    }
+
+    /// @inheritdoc IBaseMarket
+    function setDepositorRole(uint64 roleId) external restricted nonReentrant {
+        IRegistry(_getBaseMarketStorage().registry).setDepositorRole(roleId);
+    }
+
+    /// @inheritdoc IBaseMarket
+    function setBorrowerRole(uint64 roleId) external restricted nonReentrant {
+        IRegistry(_getBaseMarketStorage().registry).setBorrowerRole(roleId);
     }
 
     /// @inheritdoc IBaseMarket
@@ -146,6 +156,12 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     function irm() public view returns (address irmAddress) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         irmAddress = $.irm;
+    }
+
+    /// @inheritdoc IBaseMarket
+    function registry() public view returns (address registryAddress) {
+        BaseMarketStorage storage $ = _getBaseMarketStorage();
+        registryAddress = $.registry;
     }
 
     /// @inheritdoc IBaseMarket
@@ -337,7 +353,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         if (amount == 0) revert InvalidAmount();
         if (amount > unrecoverableDebt()) revert ExceedsUnrecoverableDebt();
-        IStablecoin($.stablecoin).recognizeBadDebt(amount);
+        IStablecoin($.stablecoin).recognizeBadDebtInCredit(amount);
         emit WriteOff(msg.sender, amount);
     }
 

@@ -11,21 +11,24 @@ library CapRoles {
     /// @dev Emergency actions — pause, tighten risk parameters
     uint64 internal constant GUARDIAN = 1;
 
-    /// @dev Economic policy and operator onboarding
+    /// @dev Protocol-wide economic and risk policy
     uint64 internal constant GOVERNOR = 2;
 
-    /// @dev Routine operations — deploy instances, maintenance calls
+    /// @dev Routine protocol maintenance
     uint64 internal constant KEEPER = 3;
 
     /// @dev Markets — mint/burn cUSD, slash and fund tranches, drive the rate model
     uint64 internal constant MARKET = 4;
 
-    /// @dev Registry contract — admin of dynamically assigned operator roles
+    /// @dev Registry contract — instance deployment and access-control wiring
     uint64 internal constant REGISTRY = 5;
 
     /// @dev Permissioned liquidation of unhealthy markets
     uint64 internal constant LIQUIDATOR = 6;
 
-    /// @dev First role id assigned by {Registry-assignOperator}
+    /// @dev Approved platform participants that may create roles and protocol instances
+    uint64 internal constant WHITELISTED = 7;
+
+    /// @dev First role id assigned by {Registry-createChildRoles}
     uint64 internal constant FIRST_OPERATOR_ROLE = 100;
 }

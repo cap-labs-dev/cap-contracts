@@ -8,11 +8,14 @@ interface IRegistry {
     /// @notice The address is the zero address
     error ZeroAddress();
 
-    /// @notice The operator role is already assigned
-    error AlreadyAssigned();
-
     /// @notice The operator role is not assigned
     error OperatorNotAssigned();
+
+    /// @notice The role is not a dynamic operator role
+    error NotOperatorRole();
+
+    /// @notice The public role cannot perform privileged operations
+    error PublicRole();
 
     /// @notice The tranche count is invalid
     error InvalidTrancheCount();
@@ -54,30 +57,19 @@ interface IRegistry {
         uint256 targetHealth;
     }
 
-    /// @notice An operator role has been assigned
-    /// @param account The account assigned the role
-    /// @param roleId The assigned role id
-    event OperatorAssigned(address indexed account, uint64 roleId);
+    /// @notice Child roles were created with their initial members
+    /// @param parentRoleId The role that administers the child roles
+    /// @param members The initial members for each corresponding child role
+    /// @param roleIds The created child role ids
+    event CreateChildRoles(uint64 indexed parentRoleId, address[][] members, uint64[] roleIds);
 
     /// @notice A market has been created
     /// @param market The deployed market
     /// @param assets The asset of each tranche, in the same order as `tranches`
     /// @param name The market name
-    /// @param marketOwner The market owner operator address
-    /// @param borrower The borrower operator address
     /// @param marketOwnerRole The market owner role id
-    /// @param borrowerRole The borrower role id
     /// @param tranches The deployed tranche addresses in seniority order
-    event CreateMarket(
-        address market,
-        address[] assets,
-        string name,
-        address marketOwner,
-        address borrower,
-        uint64 marketOwnerRole,
-        uint64 borrowerRole,
-        address[] tranches
-    );
+    event CreateMarket(address market, address[] assets, string name, uint64 marketOwnerRole, address[] tranches);
 
     /// @notice A tranche has been deployed for a market
     /// @param market The market the tranche was deployed for
@@ -94,18 +86,23 @@ interface IRegistry {
     /// @param asset The underwriter asset
     /// @param name The underwriter name
     /// @param symbol The underwriter symbol
-    /// @param operator The operator address
-    /// @param operatorRole The operator role id
-    /// @param depositorRole The role whose members may deposit, administered by the operator role
-    event CreateUnderwriter(
-        address underwriter,
-        address asset,
-        string name,
-        string symbol,
-        address operator,
-        uint64 operatorRole,
-        uint64 depositorRole
-    );
+    /// @param curatorRole The curator role id
+    event CreateUnderwriter(address underwriter, address asset, string name, string symbol, uint64 curatorRole);
+
+    /// @notice The depositor role was updated
+    /// @param target The market, tranche, or underwriter whose depositor role changed
+    /// @param roleId The new depositor role id
+    event SetDepositorRole(address indexed target, uint64 indexed roleId);
+
+    /// @notice The borrower role was updated
+    /// @param market The market whose borrower role changed
+    /// @param roleId The new borrower role id
+    event SetBorrowerRole(address indexed market, uint64 indexed roleId);
+
+    /// @notice The allocator role was updated
+    /// @param underwriter The underwriter whose allocator role changed
+    /// @param roleId The new allocator role id
+    event SetAllocatorRole(address indexed underwriter, uint64 indexed roleId);
 
     /// @notice Initialize the registry and wire shared infrastructure roles
     /// @dev This contract must hold ADMIN to call `setTargetFunctionRole`. Per-market roles are wired on create.
@@ -113,40 +110,41 @@ interface IRegistry {
     /// @param init The registry initialization parameters
     function initialize(address authority, InitParams calldata init) external;
 
-    /// @notice Assign the next operator role id to an account (GOVERNOR)
-    /// @param account The account to assign
-    /// @return roleId The assigned role id
-    function assignOperator(address account) external returns (uint64 roleId);
+    /// @notice Create child roles and seed their initial members in one transaction
+    /// @dev Restricted to whitelisted platform participants.
+    /// @param parentRoleId The role that will administer every new child role
+    /// @param members The initial members for each corresponding child role
+    /// @return roleIds The created child role ids
+    function createChildRoles(uint64 parentRoleId, address[][] calldata members)
+        external
+        returns (uint64[] memory roleIds);
 
-    /// @notice Get the operator role id for an account
-    /// @param account The account to query
-    /// @return roleId The operator role id, or zero if unassigned
-    function operatorRole(address account) external view returns (uint64 roleId);
+    /// @notice Whether a role id was created as an operator role
+    /// @param roleId The role id to query
+    /// @return assigned Whether the role is an operator role
+    function isOperatorRole(uint64 roleId) external view returns (bool assigned);
 
     /// @notice Deploy a floating market with tranches at the given assets and weights
-    /// @dev One tranche per entry of `assets` and `weights`
+    /// @dev Restricted to whitelisted platform participants. One tranche per entry of `assets` and `weights`.
     /// @param assets The asset of each tranche, index 0 is most senior
     /// @param weights Tranche weights in ray decimals, index 0 is most senior
     /// @param name The market name
-    /// @param marketOwner The market owner operator address
-    /// @param borrower The borrower operator address
+    /// @param marketOwnerRole The market owner operator role id
     /// @return market The deployed market
     /// @return deployedTranches The deployed tranche addresses in seniority order
     function createFloatingMarket(
         address[] calldata assets,
         uint256[] calldata weights,
         string memory name,
-        address marketOwner,
-        address borrower
+        uint64 marketOwnerRole
     ) external returns (address market, address[] memory deployedTranches);
 
     /// @notice Deploy a fixed market with tranches at the given assets and weights
-    /// @dev See {createFloatingMarket} for how `assets` and `weights` pair up
+    /// @dev Restricted to whitelisted platform participants. See {createFloatingMarket} for tranche inputs.
     /// @param assets The asset of each tranche, index 0 is most senior
     /// @param weights Tranche weights in ray decimals, index 0 is most senior
     /// @param name The market name
-    /// @param marketOwner The market owner operator address
-    /// @param borrower The borrower operator address
+    /// @param marketOwnerRole The market owner operator role id
     /// @param maximumTermLimit The maximum loan term
     /// @param minimumTermLimit The minimum loan term
     /// @param grace The grace period after expiry for admin extensions
@@ -156,8 +154,7 @@ interface IRegistry {
         address[] calldata assets,
         uint256[] calldata weights,
         string memory name,
-        address marketOwner,
-        address borrower,
+        uint64 marketOwnerRole,
         uint256 maximumTermLimit,
         uint256 minimumTermLimit,
         uint256 grace
@@ -171,6 +168,18 @@ interface IRegistry {
     /// @return tranche The deployed tranche
     function createTranche(address market, address asset, uint256[] calldata weights) external returns (address tranche);
 
+    /// @notice Set the depositor role on the calling market, tranche, or underwriter
+    /// @param roleId The depositor role id
+    function setDepositorRole(uint64 roleId) external;
+
+    /// @notice Set the borrower role on the calling market
+    /// @param roleId The borrower role id
+    function setBorrowerRole(uint64 roleId) external;
+
+    /// @notice Set the allocator role on the calling underwriter
+    /// @param roleId The allocator role id
+    function setAllocatorRole(uint64 roleId) external;
+
     /// @notice Whether this registry deployed the market
     /// @param market The market to query
     /// @return deployed Whether this registry deployed the market
@@ -183,12 +192,13 @@ interface IRegistry {
     function marketOwnerRole(address market) external view returns (uint64 roleId);
 
     /// @notice Deploy an underwriter for an asset
+    /// @dev Restricted to whitelisted platform participants.
     /// @param asset The underwriter asset
     /// @param name The underwriter name
     /// @param symbol The underwriter symbol
-    /// @param operator The operator address
+    /// @param curatorRole The curator operator role id
     /// @return underwriter The deployed underwriter
-    function createUnderwriter(address asset, string memory name, string memory symbol, address operator)
+    function createUnderwriter(address asset, string memory name, string memory symbol, uint64 curatorRole)
         external
         returns (address underwriter);
 

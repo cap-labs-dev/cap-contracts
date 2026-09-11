@@ -15,9 +15,13 @@ interface IStablecoin {
     /// @param amount The amount burned
     event BurnCreditBacked(address indexed from, uint256 amount);
 
-    /// @notice Emitted when bad debt is recognized
+    /// @notice Emitted when a reserve loss is recognized
     /// @param amount The amount of bad debt recognized
-    event BadDebtRecognized(uint256 amount);
+    event BadDebtRecognizedInReserve(uint256 amount);
+
+    /// @notice Emitted when a credit loss is recognized
+    /// @param amount The amount of bad debt recognized
+    event BadDebtRecognizedInCredit(uint256 amount);
 
     /// @notice Emitted when bad debt is reduced
     /// @param owner The account whose redemption reduced bad debt
@@ -45,6 +49,9 @@ interface IStablecoin {
 
     /// @notice The amount is zero
     error InvalidAmount();
+
+    /// @notice Bad debt cannot exceed the outstanding supply
+    error BadDebtExceedsSupply();
 
     /// @notice Initialize the stablecoin
     /// @param authority The access manager address
@@ -92,10 +99,15 @@ interface IStablecoin {
     /// @param amount The underlying amount to recall
     function recall(uint256 amount) external;
 
-    /// @notice Recognize unrecoverable debt, socializing the loss across holders
-    /// @dev Also drops credit-backed supply. Redeemers take the haircut via {totalAssets}.
+    /// @notice Recognize a loss in the reserve vault, socializing it across holders
+    /// @dev Guardian only. Credit-backed supply is unchanged because no borrower debt was lost.
     /// @param amount The amount of bad debt to recognize
-    function recognizeBadDebt(uint256 amount) external;
+    function recognizeBadDebtInReserve(uint256 amount) external;
+
+    /// @notice Recognize unrecoverable borrower debt, socializing the loss across holders
+    /// @dev Market only. Also drops credit-backed supply. Redeemers take the haircut via {totalAssets}.
+    /// @param amount The amount of bad debt to recognize
+    function recognizeBadDebtInCredit(uint256 amount) external;
 
     /// @notice Burn cUSD to retire bad debt and restore the peg
     /// @dev Permissionless

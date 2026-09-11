@@ -6,6 +6,8 @@ import { IERC7540AsyncRedeem } from "./IERC7540AsyncRedeem.sol";
 /// @title IUnderwriter
 /// @author kexley, Cap Labs
 /// @notice Interface for the curator vault that allocates vault assets into tranches and distributes premium
+/// @dev The curator role is expected to be held by a timelock or secure multisig, while the
+/// allocator role is intended for an operational wallet with narrower permissions.
 interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice The tranche is not registered with the underwriter
     error NotRegisteredTranche();
@@ -50,6 +52,7 @@ interface IUnderwriter is IERC7540AsyncRedeem {
 
     /// @notice Initialize the underwriter
     /// @param authority The access manager address
+    /// @param registryAddress The registry that configures access roles
     /// @param name The share token name
     /// @param symbol The share token symbol
     /// @param asset The vault asset deposited by curators
@@ -57,6 +60,7 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @param stablecoinAddress The stablecoin used for premium payments
     function initialize(
         address authority,
+        address registryAddress,
         string memory name,
         string memory symbol,
         address asset,
@@ -64,43 +68,53 @@ interface IUnderwriter is IERC7540AsyncRedeem {
         address stablecoinAddress
     ) external;
 
+    /// @notice Set the role permitted to deposit
+    /// @param roleId The depositor role id
+    function setDepositorRole(uint64 roleId) external;
+
+    /// @notice Set the role permitted to allocate and deallocate
+    /// @param roleId The allocator role id
+    function setAllocatorRole(uint64 roleId) external;
+
     /// @notice Register a tranche for allocation and reporting
-    /// @dev Grants the tranche vault operator rights until {removeTranche}.
+    /// @dev Curator only. Grants the tranche vault operator rights until {removeTranche}.
     /// @param tranche The tranche address
     function addTranche(address tranche) external;
 
     /// @notice Remove a tranche and block new allocations
-    /// @dev Revokes vault operator rights. Existing shares can still be redeemed.
+    /// @dev Curator only. Revokes vault operator rights. Existing shares can still be redeemed.
     /// @param tranche The tranche address
     function removeTranche(address tranche) external;
 
     /// @notice Allocate vault assets into a registered tranche
+    /// @dev Allocator only.
     /// @param tranche The tranche address
     /// @param assets The amount of assets to allocate
     function allocate(address tranche, uint256 assets) external;
 
     /// @notice Instantly redeem unlocked tranche shares back to the vault
-    /// @dev Tranches can be removed registration and still deallocated from
+    /// @dev Allocator only. Tranches can be removed from registration and still deallocated.
     /// @param tranche The tranche address
     /// @param shares The shares to redeem
     /// @return deallocated The amount of shares redeemed
     function deallocate(address tranche, uint256 shares) external returns (uint256 deallocated);
 
     /// @notice Request async redemption of tranche shares back to the vault
-    /// @dev Registration is not checked; see {deallocate}.
+    /// @dev Allocator only. Registration is not checked; see {deallocate}.
     /// @param tranche The tranche address
     /// @param shares The shares to redeem
     /// @return requestId The ERC-7540 request id
     function deallocateAsync(address tranche, uint256 shares) external returns (uint256 requestId);
 
     /// @notice Finalize an async tranche redemption
-    /// @dev Registration is not checked; see {deallocate}.
+    /// @dev Allocator only. Registration is not checked; see {deallocate}.
     /// @param tranche The tranche address
     /// @param requestId The ERC-7540 request id
     /// @param shares The shares to redeem
     function finalizeDeallocateAsync(address tranche, uint256 requestId, uint256 shares) external;
 
     /// @notice Set the registered tranche that receives deposits by default
+    /// @dev Allocator only.
     /// @param tranche The default tranche address
     function setDefaultTranche(address tranche) external;
 
@@ -112,6 +126,10 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice Get the vault holding curator assets
     /// @return The vault address
     function vault() external view returns (address);
+
+    /// @notice Get the registry that configures access roles
+    /// @return The registry address
+    function registry() external view returns (address);
 
     /// @notice When {report} last folded premium into the remainder
     /// @return The last report timestamp

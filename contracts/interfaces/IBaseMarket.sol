@@ -23,8 +23,10 @@ interface IBaseMarket {
     /// @param lt The liquidation threshold in ray decimals
     /// @param fixedCreditLimit The fixed credit limit
     /// @param tranches The tranches and their weights
+    /// @param registry The registry that deployed and configures the market
     struct BaseMarketStorage {
         string name;
+        address registry;
         address stablecoin;
         address irm;
         uint256 targetHealth;
@@ -158,7 +160,16 @@ interface IBaseMarket {
     /// @param targetHealth The new target health in ray decimals
     function setTargetHealth(uint256 targetHealth) external;
 
+    /// @notice Set the role permitted to deposit into the market
+    /// @param roleId The depositor role id
+    function setDepositorRole(uint64 roleId) external;
+
+    /// @notice Set the role permitted to borrow from the market
+    /// @param roleId The borrower role id
+    function setBorrowerRole(uint64 roleId) external;
+
     /// @notice Set the tranches and their weights
+    /// @dev Restricted to the registry; market owners may only change weights.
     /// @param tranches The new tranche addresses and weights
     function setTranches(Tranche[] calldata tranches) external;
 
@@ -186,6 +197,10 @@ interface IBaseMarket {
     /// @notice Get the interest rate model address
     /// @return The interest rate model address
     function irm() external view returns (address);
+
+    /// @notice Get the registry that deployed the market
+    /// @return The registry address
+    function registry() external view returns (address);
 
     /// @notice Get the liquidation threshold in ray decimals
     /// @return The liquidation threshold

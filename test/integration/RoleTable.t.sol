@@ -26,7 +26,7 @@ import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 /// Three selectors had reached ADMIN by omission before this test existed. Asserting the table
 /// means the next one has to be argued for in a diff rather than arrived at silently.
 ///
-/// Covers all 48 gated selectors in the protocol, across per-market instances and the shared
+/// Covers all 51 gated selectors in the protocol, across per-market instances and the shared
 /// infrastructure. The table is a snapshot and does not discover new selectors by itself. What it
 /// does do is make the intended role explicit for each one, so a selector that is later rewired,
 /// or a new instance wired differently from the last, fails here.
@@ -45,18 +45,17 @@ contract RoleTableTest is CapDeployer {
     function test_floatingMarketRoleTable() public {
         (address market, address[] memory tranches) =
             _createMarket("roles", defaultMarketOwner, defaultBorrower, capConfig.defaultTrancheWeights);
-        uint64 ownerRole = registry.operatorRole(defaultMarketOwner);
-        uint64 borrowerRole = registry.operatorRole(defaultBorrower);
+        uint64 ownerRole = _operatorRoleOf(defaultMarketOwner);
+        uint64 borrowerRole = _operatorRoleOf(defaultBorrower);
         assertTrue(ownerRole != 0 && borrowerRole != 0, "operator roles must not collide with ADMIN");
 
-        // the market owner tunes its own market's risk and pricing
+        // the market owner tunes its own market's risk, pricing and tranche weights
         _expectRole(market, IBaseMarket.setLtv.selector, ownerRole, "setLtv");
         _expectRole(market, IBaseMarket.setTrancheWeights.selector, ownerRole, "setTrancheWeights");
         _expectRole(market, IBaseMarket.setMarketMultiplier.selector, ownerRole, "setMarketMultiplier");
         _expectRole(market, IBaseMarket.setUnderwriterRate.selector, ownerRole, "setUnderwriterRate");
-        // the waterfall can only be rearranged while the market stays healthy, so the owner
-        // may add, drop, or reorder tranches rather than waiting on ADMIN
-        _expectRole(market, IBaseMarket.setTranches.selector, ownerRole, "setTranches");
+        _expectRole(market, IBaseMarket.setDepositorRole.selector, ownerRole, "setDepositorRole");
+        _expectRole(market, IBaseMarket.setTranches.selector, CapRoles.REGISTRY, "setTranches");
 
         // only the designated borrower can draw credit
         _expectRole(market, IFloatingMarket.borrow.selector, borrowerRole, "borrow");
@@ -88,12 +87,12 @@ contract RoleTableTest is CapDeployer {
     function test_fixedMarketRoleTable() public {
         (address market, address[] memory tranches) =
             _createFixedMarket("fixed-roles", defaultMarketOwner, defaultBorrower, capConfig.defaultTrancheWeights);
-        uint64 ownerRole = registry.operatorRole(defaultMarketOwner);
-        uint64 borrowerRole = registry.operatorRole(defaultBorrower);
+        uint64 ownerRole = _operatorRoleOf(defaultMarketOwner);
+        uint64 borrowerRole = _operatorRoleOf(defaultBorrower);
 
         _expectRole(market, IFixedMarket.borrow.selector, borrowerRole, "fixed borrow");
         _expectRole(market, IFixedMarket.borrowMore.selector, borrowerRole, "borrowMore");
-        _expectRole(market, IFixedMarket.extend.selector, ownerRole, "extend");
+        _expectRole(market, IFixedMarket.extend.selector, borrowerRole, "extend");
         // rolling an overdue loan is routine and must not wait on the owner, but it raises debt,
         // so it sits with the keeper rather than with the borrower
         _expectRole(market, IFixedMarket.extendAdmin.selector, CapRoles.KEEPER, "extendAdmin");
@@ -102,6 +101,133 @@ contract RoleTableTest is CapDeployer {
         _expectRole(market, IFixedMarket.writeOff.selector, CapRoles.GUARDIAN, "fixed writeOff");
 
         _assertTrancheRoleTable(tranches[0], ownerRole);
+    }
+
+    function test_createChildRoles_registersAndGrantsTheRole() public {
+        address operator = makeAddr("operator");
+        uint64 roleId = _assignOperator(operator);
+
+        assertTrue(registry.isOperatorRole(roleId));
+        (bool holdsRole,) = accessManager.hasRole(roleId, operator);
+        assertTrue(holdsRole);
+    }
+
+    function test_createChildRoles_createsAndSeedsABatch() public {
+        address first = makeAddr("firstChildMember");
+        address second = makeAddr("secondChildMember");
+        address coMember = makeAddr("secondChildCoMember");
+        uint64 parentRole = _operatorRoleOf(defaultMarketOwner);
+
+        address[][] memory members = new address[][](2);
+        members[0] = new address[](1);
+        members[0][0] = first;
+        members[1] = new address[](2);
+        members[1][0] = second;
+        members[1][1] = coMember;
+
+        uint64[] memory roleIds = registry.createChildRoles(parentRole, members);
+
+        assertEq(roleIds.length, 2);
+        assertEq(roleIds[1], roleIds[0] + 1);
+        for (uint256 i; i < roleIds.length; ++i) {
+            assertTrue(registry.isOperatorRole(roleIds[i]));
+            assertEq(accessManager.getRoleAdmin(roleIds[i]), parentRole);
+        }
+        (bool firstHoldsRole,) = accessManager.hasRole(roleIds[0], first);
+        (bool secondHoldsRole,) = accessManager.hasRole(roleIds[1], second);
+        (bool coMemberHoldsRole,) = accessManager.hasRole(roleIds[1], coMember);
+        assertTrue(firstHoldsRole && secondHoldsRole && coMemberHoldsRole);
+    }
+
+    function test_createChildRoles_rejectsPublicParentRole() public {
+        vm.expectRevert(IRegistry.PublicRole.selector);
+        registry.createChildRoles(PUBLIC_ROLE, new address[][](0));
+    }
+
+    function test_createChildRoles_rejectsZeroAddressMember() public {
+        address[][] memory members = new address[][](1);
+        members[0] = new address[](1);
+
+        vm.expectRevert(IRegistry.ZeroAddress.selector);
+        registry.createChildRoles(_operatorRoleOf(defaultMarketOwner), members);
+    }
+
+    function test_nonWhitelistedAccountCannotCreateRolesOrInstances() public {
+        address stranger = makeAddr("unapprovedCreator");
+        uint64 ownerRole = _operatorRoleOf(defaultMarketOwner);
+        bytes memory unauthorized = abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, stranger);
+
+        vm.prank(stranger);
+        vm.expectRevert(unauthorized);
+        registry.createChildRoles(ownerRole, new address[][](0));
+
+        vm.prank(stranger);
+        vm.expectRevert(unauthorized);
+        registry.createFloatingMarket(_uniformAssets(2), capConfig.defaultTrancheWeights, "floating", ownerRole);
+
+        vm.prank(stranger);
+        vm.expectRevert(unauthorized);
+        registry.createFixedMarket(_uniformAssets(2), capConfig.defaultTrancheWeights, "fixed", ownerRole, 0, 0, 0);
+
+        vm.prank(stranger);
+        vm.expectRevert(unauthorized);
+        registry.createUnderwriter(address(collateral), "Underwriter", "UW", ownerRole);
+    }
+
+    function test_createMarket_acceptsRegisteredOperatorRoleIds() public {
+        address coOwner = makeAddr("coOwner");
+        uint64 ownerRole = _operatorRoleOf(defaultMarketOwner);
+        accessManager.grantRole(ownerRole, coOwner, 0);
+
+        (address market,) =
+            registry.createFloatingMarket(_uniformAssets(2), capConfig.defaultTrancheWeights, "role-owned", ownerRole);
+
+        vm.prank(coOwner);
+        IBaseMarket(market).setLtv(capConfig.defaultLtv);
+    }
+
+    function test_whitelistedCreatorDoesNotNeedTheMarketOwnerRole() public {
+        address creator = makeAddr("whitelistedCreator");
+        address owner = makeAddr("marketOwner");
+        accessManager.grantRole(CapRoles.WHITELISTED, creator, 0);
+
+        address[][] memory members = new address[][](1);
+        members[0] = new address[](1);
+        members[0][0] = owner;
+
+        vm.prank(creator);
+        uint64 ownerRole = registry.createChildRoles(CapRoles.GOVERNOR, members)[0];
+
+        vm.prank(creator);
+        (address market,) =
+            registry.createFloatingMarket(_uniformAssets(2), capConfig.defaultTrancheWeights, "third-party", ownerRole);
+
+        (bool creatorIsOwner,) = accessManager.hasRole(ownerRole, creator);
+        assertFalse(creatorIsOwner);
+
+        vm.prank(creator);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, creator));
+        IBaseMarket(market).setLtv(capConfig.defaultLtv);
+
+        vm.prank(owner);
+        IBaseMarket(market).setLtv(capConfig.defaultLtv);
+    }
+
+    function test_createMarket_rejectsRolesThatAreNotOperatorRoles() public {
+        vm.expectRevert(IRegistry.OperatorNotAssigned.selector);
+        registry.createFloatingMarket(
+            _uniformAssets(2), capConfig.defaultTrancheWeights, "protocol-role", CapRoles.GOVERNOR
+        );
+
+        (, address[] memory tranches) =
+            _createMarket("capability-role", defaultMarketOwner, defaultBorrower, capConfig.defaultTrancheWeights);
+        uint64 depositorRole = _depositorRole(tranches[0]);
+        assertFalse(registry.isOperatorRole(depositorRole));
+
+        vm.expectRevert(IRegistry.OperatorNotAssigned.selector);
+        registry.createFloatingMarket(
+            _uniformAssets(2), capConfig.defaultTrancheWeights, "capability-role", depositorRole
+        );
     }
 
     function _assertTrancheRoleTable(address tranche, uint64 ownerRole) internal view {
@@ -123,16 +249,14 @@ contract RoleTableTest is CapDeployer {
     function test_marketOwnerRoleFollowsTheAccessManager() public {
         (address marketAddr, address[] memory existing) =
             _createMarket("rehomed", defaultMarketOwner, defaultBorrower, capConfig.defaultTrancheWeights);
-        uint64 originalRole = registry.operatorRole(defaultMarketOwner);
+        uint64 originalRole = _operatorRoleOf(defaultMarketOwner);
         assertEq(registry.marketOwnerRole(marketAddr), originalRole, "the deploying owner to begin with");
 
         address newOwner = makeAddr("newMarketOwner");
         uint64 newRole = _assignOperator(newOwner);
-        vm.prank(address(registry));
-        accessManager.grantRole(newRole, newOwner, 0);
 
         bytes4[] memory ownerSelectors = new bytes4[](1);
-        ownerSelectors[0] = IBaseMarket.setTrancheWeights.selector;
+        ownerSelectors[0] = IBaseMarket.setLtv.selector;
         accessManager.setTargetFunctionRole(marketAddr, ownerSelectors, newRole);
 
         assertEq(registry.marketOwnerRole(marketAddr), newRole, "and the new one once it is rehomed");
@@ -175,19 +299,44 @@ contract RoleTableTest is CapDeployer {
         assertFalse(_mayDeposit(tranches[1], depositor), "and not to the junior one");
     }
 
+    function test_marketOwnerCanSetEachTrancheDepositorRole() public {
+        (, address[] memory tranches) =
+            _createMarket("shared-admission", defaultMarketOwner, defaultBorrower, capConfig.defaultTrancheWeights);
+        uint64 juniorRole = _depositorRole(tranches[1]);
+
+        address[][] memory members = new address[][](1);
+        members[0] = new address[](1);
+        members[0][0] = makeAddr("marketDepositors");
+        uint64 roleId = registry.createChildRoles(_operatorRoleOf(defaultMarketOwner), members)[0];
+        ITranche(tranches[0]).setDepositorRole(roleId);
+
+        _expectRole(tranches[0], IERC4626.deposit.selector, roleId, "senior deposit");
+        _expectRole(tranches[1], IERC4626.deposit.selector, juniorRole, "junior deposit");
+        assertEq(accessManager.getRoleAdmin(roleId), _operatorRoleOf(defaultMarketOwner));
+    }
+
     function test_underwriterRoleTable() public {
         address underwriter = address(_deployUnderwriter());
-        uint64 curatorRole = registry.operatorRole(address(this));
+        uint64 curatorRole = _operatorRoleOf(address(this));
         assertTrue(curatorRole != 0, "curator role must not collide with ADMIN");
 
-        // the curator lists tranches and moves capital between them
-        _expectRole(underwriter, IUnderwriter.allocate.selector, curatorRole, "allocate");
-        _expectRole(underwriter, IUnderwriter.deallocate.selector, curatorRole, "deallocate");
-        _expectRole(underwriter, IUnderwriter.deallocateAsync.selector, curatorRole, "deallocateAsync");
-        _expectRole(underwriter, IUnderwriter.finalizeDeallocateAsync.selector, curatorRole, "finalizeDeallocateAsync");
-        _expectRole(underwriter, IUnderwriter.setDefaultTranche.selector, curatorRole, "setDefaultTranche");
+        // the allocator moves capital; the curator administers that role
+        uint64 allocatorRole = _allocatorRole(underwriter);
+        assertTrue(allocatorRole != 0 && allocatorRole != curatorRole, "allocator is a distinct role");
+        _expectRole(underwriter, IUnderwriter.allocate.selector, allocatorRole, "allocate");
+        _expectRole(underwriter, IUnderwriter.deallocate.selector, allocatorRole, "deallocate");
+        _expectRole(underwriter, IUnderwriter.deallocateAsync.selector, allocatorRole, "deallocateAsync");
+        _expectRole(
+            underwriter, IUnderwriter.finalizeDeallocateAsync.selector, allocatorRole, "finalizeDeallocateAsync"
+        );
+        assertEq(accessManager.getRoleAdmin(allocatorRole), curatorRole, "allocator administered by curator");
+
+        // the curator controls strategy membership
         _expectRole(underwriter, IUnderwriter.addTranche.selector, curatorRole, "addTranche");
         _expectRole(underwriter, IUnderwriter.removeTranche.selector, curatorRole, "removeTranche");
+
+        // the allocator moves capital and selects its default route
+        _expectRole(underwriter, IUnderwriter.setDefaultTranche.selector, allocatorRole, "setDefaultTranche");
 
         _expectRole(underwriter, IUnderwriter.report.selector, CapRoles.KEEPER, "report");
 
@@ -200,16 +349,55 @@ contract RoleTableTest is CapDeployer {
         assertEq(accessManager.getRoleAdmin(depositorRole), curatorRole, "administered by the curator");
     }
 
+    function test_roleSetterEventsAreEmittedByRegistry() public {
+        (address market,) =
+            _createMarket("role-events", defaultMarketOwner, defaultBorrower, capConfig.defaultTrancheWeights);
+        uint64 depositorRole = _assignOperator(makeAddr("eventDepositor"));
+        uint64 borrowerRole = _assignOperator(makeAddr("eventBorrower"));
+
+        vm.expectEmit(true, true, false, true, address(registry));
+        emit IRegistry.SetDepositorRole(market, depositorRole);
+        vm.prank(defaultMarketOwner);
+        IBaseMarket(market).setDepositorRole(depositorRole);
+
+        vm.expectEmit(true, true, false, true, address(registry));
+        emit IRegistry.SetBorrowerRole(market, borrowerRole);
+        vm.prank(defaultMarketOwner);
+        IBaseMarket(market).setBorrowerRole(borrowerRole);
+
+        address underwriter = address(_deployUnderwriter());
+        uint64 allocatorRole = _assignOperator(makeAddr("eventAllocator"));
+        vm.expectEmit(true, true, false, true, address(registry));
+        emit IRegistry.SetAllocatorRole(underwriter, allocatorRole);
+        IUnderwriter(underwriter).setAllocatorRole(allocatorRole);
+    }
+
+    function test_createUnderwriter_rejectsARoleThatIsNotAnOperatorRole() public {
+        vm.expectRevert(IRegistry.OperatorNotAssigned.selector);
+        registry.createUnderwriter(address(collateral), "Invalid", "INV", CapRoles.GOVERNOR);
+    }
+
     /// @dev The shared infrastructure, wired by {Registry-initialize} rather than by the deploy
     /// script. Included so the table covers every gated selector in the protocol, not just the
     /// ones on per-market instances.
     function test_infraRoleTable() public view {
-        // markets are the only MARKET holders, so writing off their own credit sits with the role
-        // that slashes and prices. Covering a shortfall burns the caller's own cUSD and is
-        // permissionless. Parking idle reserve and bringing it back is keeper maintenance
+        // Markets recognize losses on their own credit; the guardian recognizes exceptional
+        // reserve losses. Covering a shortfall burns the caller's own cUSD and is permissionless.
+        // Parking idle reserve and bringing it back is keeper maintenance.
         _expectRole(address(stablecoin), IStablecoin.mintCreditBacked.selector, CapRoles.MARKET, "mintCreditBacked");
         _expectRole(address(stablecoin), IStablecoin.burnCreditBacked.selector, CapRoles.MARKET, "burnCreditBacked");
-        _expectRole(address(stablecoin), IStablecoin.recognizeBadDebt.selector, CapRoles.MARKET, "recognizeBadDebt");
+        _expectRole(
+            address(stablecoin),
+            IStablecoin.recognizeBadDebtInCredit.selector,
+            CapRoles.MARKET,
+            "recognizeBadDebtInCredit"
+        );
+        _expectRole(
+            address(stablecoin),
+            IStablecoin.recognizeBadDebtInReserve.selector,
+            CapRoles.GUARDIAN,
+            "recognizeBadDebtInReserve"
+        );
         _expectRole(address(stablecoin), IStablecoin.fundCreditBacked.selector, CapRoles.MARKET, "fundCreditBacked");
         _expectRole(address(stablecoin), IStablecoin.invest.selector, CapRoles.KEEPER, "invest");
         _expectRole(address(stablecoin), IStablecoin.recall.selector, CapRoles.KEEPER, "recall");
@@ -223,11 +411,13 @@ contract RoleTableTest is CapDeployer {
         );
         _expectRole(address(oracle), IOracle.setSource.selector, CapRoles.GOVERNOR, "setSource");
 
-        // onboarding an operator is policy, deploying instances for one is routine
-        _expectRole(address(registry), Registry.assignOperator.selector, CapRoles.GOVERNOR, "assignOperator");
-        _expectRole(address(registry), Registry.createFloatingMarket.selector, CapRoles.KEEPER, "createFloatingMarket");
-        _expectRole(address(registry), Registry.createFixedMarket.selector, CapRoles.KEEPER, "createFixedMarket");
-        _expectRole(address(registry), Registry.createUnderwriter.selector, CapRoles.KEEPER, "createUnderwriter");
+        // approved platform participants can create roles and instances without owning them
+        _expectRole(address(registry), Registry.createChildRoles.selector, CapRoles.WHITELISTED, "createChildRoles");
+        _expectRole(
+            address(registry), Registry.createFloatingMarket.selector, CapRoles.WHITELISTED, "createFloatingMarket"
+        );
+        _expectRole(address(registry), Registry.createFixedMarket.selector, CapRoles.WHITELISTED, "createFixedMarket");
+        _expectRole(address(registry), Registry.createUnderwriter.selector, CapRoles.WHITELISTED, "createUnderwriter");
 
         // only the Registry deploys through the factory
         _expectRole(address(beaconFactory), IBeaconFactory.create.selector, CapRoles.REGISTRY, "factory create");
@@ -255,7 +445,7 @@ contract RoleTableTest is CapDeployer {
     function test_strangerCannotAdmitDepositors() public {
         address underwriter = address(_deployUnderwriter());
         uint64 depositorRole = _depositorRole(underwriter);
-        uint64 curatorRole = registry.operatorRole(address(this));
+        uint64 curatorRole = _operatorRoleOf(address(this));
         address stranger = makeAddr("stranger");
 
         // the role named in the error is the curator's, not the depositor's: what the caller lacks

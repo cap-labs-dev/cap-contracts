@@ -7,6 +7,7 @@ import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
 import { IUnderwriter } from "../../contracts/interfaces/IUnderwriter.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
 contract UnderwriterIntegrationTest is CapDeployer {
     address internal borrower = makeAddr("borrower");
@@ -71,6 +72,28 @@ contract UnderwriterIntegrationTest is CapDeployer {
         uint256 freed = underwriter.deallocate(address(tranche0), DEPOSIT);
         assertEq(freed, DEPOSIT - DEAD_SHARES);
         assertEq(vault.balanceOf(address(underwriter), address(collateral)), DEPOSIT - DEAD_SHARES);
+    }
+
+    function test_curatorControlsTheAllocatorRole() public {
+        _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
+        underwriter.addTranche(address(tranche0));
+
+        uint64 allocatorRole = _allocatorRole(address(underwriter));
+        accessManager.revokeRole(allocatorRole, address(this));
+
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, address(this)));
+        underwriter.allocate(address(tranche0), DEPOSIT);
+
+        address allocator = makeAddr("allocator");
+        accessManager.grantRole(allocatorRole, allocator, 0);
+        vm.prank(allocator);
+        underwriter.allocate(address(tranche0), DEPOSIT);
+
+        assertEq(tranche0.balanceOf(address(underwriter)), DEPOSIT - DEAD_SHARES);
+
+        vm.prank(allocator);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, allocator));
+        underwriter.addTranche(address(tranche1));
     }
 
     function test_deallocate_afterRemoveTranche() public {

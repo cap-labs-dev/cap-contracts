@@ -21,6 +21,7 @@ contract StablecoinTest is BaseTest {
     address internal bob = makeAddr("bob");
     address internal treasury = makeAddr("treasury");
     address internal keeper = makeAddr("keeper");
+    address internal guardian = makeAddr("guardian");
 
     function setUp() public {
         _setUpAccessManager();
@@ -48,13 +49,17 @@ contract StablecoinTest is BaseTest {
         keeperSelectors[0] = Stablecoin.invest.selector;
         keeperSelectors[1] = Stablecoin.recall.selector;
         _grantRoleForTarget(CapRoles.KEEPER, keeper, address(scoin), keeperSelectors);
+
+        bytes4[] memory guardianSelectors = new bytes4[](1);
+        guardianSelectors[0] = Stablecoin.recognizeBadDebtInReserve.selector;
+        _grantRoleForTarget(CapRoles.GUARDIAN, guardian, address(scoin), guardianSelectors);
     }
 
     /// @dev Bad debt only ever arises from a market writing off credit it minted, so the credit
     /// must exist before it can be written off. Mint it to a sink first to reach that state.
     function _writeOffCredit(uint256 amount) internal {
         scoin.mintCreditBacked(makeAddr("defaultedBorrower"), amount);
-        scoin.recognizeBadDebt(amount);
+        scoin.recognizeBadDebtInCredit(amount);
     }
 
     function test_decimalsIs18() public view {
@@ -100,18 +105,50 @@ contract StablecoinTest is BaseTest {
         assertEq(scoin.utilizationRate(), 0.25e27);
     }
 
-    function test_recognizeBadDebt_onlyAuthority() public {
+    function test_recognizeBadDebtInCredit_onlyAuthority() public {
         vm.prank(alice);
         vm.expectRevert();
-        scoin.recognizeBadDebt(1e18);
+        scoin.recognizeBadDebtInCredit(1e18);
     }
 
     function test_badDebt_reducesTotalAssets() public {
         scoin.mintCreditBacked(bob, 100e18);
         assertEq(scoin.totalAssets(), 100e18);
-        scoin.recognizeBadDebt(30e18);
+        scoin.recognizeBadDebtInCredit(30e18);
         assertEq(scoin.badDebt(), 30e18);
         assertEq(scoin.totalAssets(), 70e18);
+    }
+
+    function test_recognizeBadDebtInReserve_onlyGuardian() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        scoin.recognizeBadDebtInReserve(1e18);
+    }
+
+    function test_recognizeBadDebtInReserve_socializesReserveLoss() public {
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+        scoin.mintCreditBacked(bob, 50e18);
+        uint256 rateUpdates = irm.updateCalls();
+
+        vm.expectEmit(false, false, false, true);
+        emit IStablecoin.BadDebtRecognizedInReserve(30e18);
+        vm.prank(guardian);
+        scoin.recognizeBadDebtInReserve(30e18);
+
+        assertEq(scoin.badDebt(), 30e18);
+        assertEq(scoin.totalAssets(), 120e18);
+        assertEq(scoin.creditBackedSupply(), 50e18, "reserve loss does not write off borrower credit");
+        assertEq(irm.updateCalls(), rateUpdates, "reserve loss does not change utilization");
+    }
+
+    function test_recognizeBadDebtInReserve_revertsAboveSupply() public {
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+
+        vm.prank(guardian);
+        vm.expectRevert(IStablecoin.BadDebtExceedsSupply.selector);
+        scoin.recognizeBadDebtInReserve(100e18 + 1);
     }
 
     // ── the previews round at whatever scale the underlying uses ──────────────
@@ -225,7 +262,7 @@ contract StablecoinTest is BaseTest {
         vm.prank(alice);
         scoin.deposit(1_000e18, alice);
         scoin.mintCreditBacked(bob, 500e18);
-        scoin.recognizeBadDebt(100e18);
+        scoin.recognizeBadDebtInCredit(100e18);
 
         assertEq(scoin.previewRedeem(scoin.totalSupply()), scoin.totalAssets(), "pays the whole reserve");
     }
@@ -237,7 +274,7 @@ contract StablecoinTest is BaseTest {
         vm.prank(alice);
         scoin.deposit(1_000e18, alice);
         scoin.mintCreditBacked(bob, 500e18);
-        scoin.recognizeBadDebt(100e18);
+        scoin.recognizeBadDebtInCredit(100e18);
 
         uint256 assetsBefore = scoin.totalAssets();
         uint256 heldBefore = asset.balanceOf(address(scoin));
@@ -268,7 +305,7 @@ contract StablecoinTest is BaseTest {
         vm.prank(alice);
         scoin.deposit(1_000e18, alice);
         scoin.mintCreditBacked(bob, 500e18);
-        scoin.recognizeBadDebt(100e18);
+        scoin.recognizeBadDebtInCredit(100e18);
 
         uint256 k = _shortfallInvariant();
         uint256 whole = scoin.previewRedeem(600e18);
@@ -465,7 +502,7 @@ contract StablecoinTest is BaseTest {
         assertEq(scoin.creditBackedSupply(), 100e18);
         assertEq(scoin.unlockedSupply(), 0, "no deposits, so nothing is redeemable");
 
-        scoin.recognizeBadDebt(30e18);
+        scoin.recognizeBadDebtInCredit(30e18);
 
         assertEq(scoin.badDebt(), 30e18);
         assertEq(scoin.creditBackedSupply(), 70e18, "written off credit leaves the utilization base");
@@ -478,7 +515,7 @@ contract StablecoinTest is BaseTest {
         vm.prank(alice);
         scoin.deposit(1_000e18, alice);
         scoin.mintCreditBacked(treasury, 500e18);
-        scoin.recognizeBadDebt(100e18);
+        scoin.recognizeBadDebtInCredit(100e18);
 
         uint256 backingBefore = scoin.totalAssets();
         uint256 reserveBefore = asset.balanceOf(address(scoin));
@@ -499,7 +536,7 @@ contract StablecoinTest is BaseTest {
         vm.prank(alice);
         scoin.deposit(1_000e18, alice);
         scoin.mintCreditBacked(treasury, 500e18);
-        scoin.recognizeBadDebt(100e18);
+        scoin.recognizeBadDebtInCredit(100e18);
 
         vm.prank(treasury);
         assertEq(scoin.coverBadDebt(40e18), 40e18, "covers what was asked");
@@ -512,7 +549,7 @@ contract StablecoinTest is BaseTest {
     /// Overpaying is capped at the outstanding shortfall rather than burning the difference.
     function test_coverBadDebt_cappedAtOutstandingShortfall() public {
         scoin.mintCreditBacked(treasury, 500e18);
-        scoin.recognizeBadDebt(100e18);
+        scoin.recognizeBadDebtInCredit(100e18);
 
         vm.prank(treasury);
         assertEq(scoin.coverBadDebt(type(uint256).max), 100e18, "capped at the shortfall");
@@ -529,7 +566,7 @@ contract StablecoinTest is BaseTest {
 
     function test_coverBadDebt_isPermissionless() public {
         scoin.mintCreditBacked(bob, 500e18);
-        scoin.recognizeBadDebt(100e18);
+        scoin.recognizeBadDebtInCredit(100e18);
 
         vm.prank(bob);
         assertEq(scoin.coverBadDebt(100e18), 100e18);
@@ -543,7 +580,7 @@ contract StablecoinTest is BaseTest {
         vm.prank(alice);
         scoin.deposit(1_000e18, alice);
         scoin.mintCreditBacked(treasury, 500e18);
-        scoin.recognizeBadDebt(100e18);
+        scoin.recognizeBadDebtInCredit(100e18);
 
         uint256 ratioBefore = scoin.totalAssets() * 1e27 / scoin.totalSupply();
 
@@ -568,7 +605,7 @@ contract StablecoinTest is BaseTest {
 
         assertEq(scoin.unlockedSupply(), 1_000e18, "only the deposits are redeemable");
 
-        scoin.recognizeBadDebt(100e18);
+        scoin.recognizeBadDebtInCredit(100e18);
 
         // the write off moves 100e18 out of creditBackedSupply and into badDebt, and the gate
         // excludes both, so the redeemable amount is unchanged rather than inflated by the loss

@@ -41,7 +41,7 @@ contract UnderwriterUnitTest is BaseTest {
                 address(impl),
                 abi.encodeCall(
                     Underwriter.initialize,
-                    (address(accessManager), "Underwriter", "UW", address(collateral), vault, stablecoin)
+                    (address(accessManager), address(this), "Underwriter", "UW", address(collateral), vault, stablecoin)
                 )
             )
         );
@@ -75,6 +75,7 @@ contract UnderwriterUnitTest is BaseTest {
     function test_initializedState() public view {
         assertEq(underwriter.asset(), address(collateral));
         assertEq(underwriter.vault(), vault);
+        assertEq(underwriter.registry(), address(this));
         assertEq(underwriter.authority(), address(accessManager));
         assertEq(underwriter.totalSupply(), 0);
         assertEq(underwriter.stablecoin(), stablecoin);
@@ -82,7 +83,9 @@ contract UnderwriterUnitTest is BaseTest {
 
     function test_initialize_cannotReinit() public {
         vm.expectRevert();
-        underwriter.initialize(address(accessManager), "Underwriter", "UW", address(collateral), vault, stablecoin);
+        underwriter.initialize(
+            address(accessManager), address(this), "Underwriter", "UW", address(collateral), vault, stablecoin
+        );
     }
 
     /// @dev Admission is membership of the role the entry points are gated to, so the gate is
@@ -354,6 +357,10 @@ contract UnderwriterUnitTest is BaseTest {
     function test_removeTranche_reportsBeforeDeregistering() public {
         underwriter.addTranche(tranche);
         underwriter.setDefaultTranche(tranche);
+        vm.mockCall(tranche, abi.encodeWithSelector(IERC20.balanceOf.selector, address(underwriter)), abi.encode(1e18));
+        vm.mockCall(tranche, abi.encodeWithSignature("previewRedeem(uint256)"), abi.encode(1e18));
+        underwriter.report(tranche);
+
         vm.mockCall(tranche, abi.encodeWithSignature("claim(address)", address(underwriter)), abi.encode(uint256(2e18)));
 
         vm.expectCall(tranche, abi.encodeWithSignature("claim(address)", address(underwriter)));

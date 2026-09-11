@@ -3,6 +3,7 @@ pragma solidity 0.8.36;
 
 import { ERC4626Upgradeable, ERC7540AsyncRedeem, IERC4626 } from "../ERC7540/ERC7540AsyncRedeem.sol";
 import { IPremiumVesting } from "../interfaces/IPremiumVesting.sol";
+import { IRegistry } from "../interfaces/IRegistry.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
 import { IUnderwriter } from "../interfaces/IUnderwriter.sol";
 import { IVault } from "../interfaces/IVault.sol";
@@ -30,6 +31,9 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     UUPSUpgradeable
 {
     using EnumerableSet for EnumerableSet.AddressSet;
+
+    /// @inheritdoc IUnderwriter
+    address public registry;
 
     /// @inheritdoc IUnderwriter
     address public vault;
@@ -63,6 +67,7 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     /// @inheritdoc IUnderwriter
     function initialize(
         address _authority,
+        address _registry,
         string memory _name,
         string memory _symbol,
         address _asset,
@@ -71,7 +76,18 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     ) external override initializer {
         __AccessManaged_init(_authority);
         __PremiumVesting_init(IERC20(_asset), _name, _symbol, hex"", _stablecoinAddress);
+        registry = _registry;
         vault = _vaultAddress;
+    }
+
+    /// @inheritdoc IUnderwriter
+    function setDepositorRole(uint64 roleId) external restricted {
+        IRegistry(registry).setDepositorRole(roleId);
+    }
+
+    /// @inheritdoc IUnderwriter
+    function setAllocatorRole(uint64 roleId) external restricted {
+        IRegistry(registry).setAllocatorRole(roleId);
     }
 
     /// @inheritdoc IUnderwriter
@@ -88,7 +104,7 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
 
     /// @inheritdoc IUnderwriter
     function removeTranche(address _tranche) external restricted {
-        _report(_tranche);
+        if (debt[_tranche] > 0) _report(_tranche);
         _registeredTranches.remove(_tranche);
         IVault(vault).setOperator(_tranche, false);
         // every deposit routes through {_transferIn} into {_allocate}, which insists on

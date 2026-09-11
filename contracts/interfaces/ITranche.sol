@@ -24,6 +24,7 @@ interface ITranche is IERC7540AsyncRedeem {
 
     /// @notice Initialize the tranche
     /// @param authority The access manager address
+    /// @param registryAddress The registry that configures access roles
     /// @param asset The asset to underwrite
     /// @param name The tranche name
     /// @param symbol The tranche symbol
@@ -32,6 +33,7 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @param oracle The oracle used for price feeds
     function initialize(
         address authority,
+        address registryAddress,
         address asset,
         string memory name,
         string memory symbol,
@@ -39,6 +41,10 @@ interface ITranche is IERC7540AsyncRedeem {
         address vault,
         address oracle
     ) external;
+
+    /// @notice Set the role permitted to deposit
+    /// @param roleId The depositor role id
+    function setDepositorRole(uint64 roleId) external;
 
     /// @notice Slash assets worth `value`, capped by holdings
     /// @dev Caller must be this tranche's market
@@ -54,6 +60,10 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @notice Get the market this tranche underwrites
     /// @return The market address
     function market() external view returns (address);
+
+    /// @notice Get the registry that configures access roles
+    /// @return The registry address
+    function registry() external view returns (address);
 
     /// @notice Get the vault holding tranche assets
     /// @return The vault address

@@ -50,7 +50,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         bytes4[] memory sels = new bytes4[](3);
         sels[0] = Stablecoin.mintCreditBacked.selector;
         sels[1] = Stablecoin.burnCreditBacked.selector;
-        sels[2] = Stablecoin.recognizeBadDebt.selector;
+        sels[2] = Stablecoin.recognizeBadDebtInCredit.selector;
         accessManager.setTargetFunctionRole(address(scoin), sels, CapRoles.MARKET);
         accessManager.grantRole(CapRoles.MARKET, address(this), 0);
 
@@ -60,7 +60,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
 
     function _writeOffCredit(uint256 amount) internal {
         scoin.mintCreditBacked(makeAddr("defaulted"), amount);
-        scoin.recognizeBadDebt(amount);
+        scoin.recognizeBadDebtInCredit(amount);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

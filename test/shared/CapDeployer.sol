@@ -17,9 +17,11 @@ import { FixedMarket } from "../../contracts/cap/market/FixedMarket.sol";
 import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
 import { ChainlinkAdapter } from "../../contracts/cap/oracle/ChainlinkAdapter.sol";
 import { Oracle } from "../../contracts/cap/oracle/Oracle.sol";
+import { IBaseMarket } from "../../contracts/interfaces/IBaseMarket.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
 import { IOracle } from "../../contracts/interfaces/IOracle.sol";
 import { IRegistry } from "../../contracts/interfaces/IRegistry.sol";
+import { IUnderwriter } from "../../contracts/interfaces/IUnderwriter.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
@@ -68,6 +70,8 @@ abstract contract CapDeployer is BaseTest {
     address internal defaultMarketOwner;
     address internal defaultBorrower;
     address internal defaultLiquidator;
+    uint256 private _underwriterDeploymentCount;
+    mapping(address account => uint64 roleId) private _operatorRole;
 
     // ── tunable deployment config (mutate before _deployCap) ─────────────────
     CapConfig internal capConfig;
@@ -262,6 +266,7 @@ abstract contract CapDeployer is BaseTest {
         accessManager.grantRole(CapRoles.KEEPER, address(this), 0);
         accessManager.grantRole(CapRoles.GUARDIAN, address(this), 0);
         accessManager.grantRole(CapRoles.ADMIN, address(this), 0);
+        accessManager.grantRole(CapRoles.WHITELISTED, address(this), 0);
         accessManager.grantRole(CapRoles.LIQUIDATOR, defaultLiquidator, 0);
         // integration tests mint and write off on the protocol stablecoin without going through a
         // market, so this contract holds the same role the markets do
@@ -271,7 +276,15 @@ abstract contract CapDeployer is BaseTest {
     // ── operator helpers ──────────────────────────────────────────────────────
 
     function _assignOperator(address account) internal returns (uint64 roleId) {
-        roleId = registry.assignOperator(account);
+        address[][] memory members = new address[][](1);
+        members[0] = new address[](1);
+        members[0][0] = account;
+        roleId = registry.createChildRoles(CapRoles.GOVERNOR, members)[0];
+        _operatorRole[account] = roleId;
+    }
+
+    function _operatorRoleOf(address account) internal view returns (uint64 roleId) {
+        roleId = _operatorRole[account];
     }
 
     // ── market helpers ────────────────────────────────────────────────────────
@@ -299,10 +312,12 @@ abstract contract CapDeployer is BaseTest {
         address[] memory assets,
         uint256[] memory weights
     ) internal returns (address market, address[] memory tranches) {
-        if (registry.operatorRole(marketOwner) == 0) _assignOperator(marketOwner);
-        if (registry.operatorRole(borrower) == 0) _assignOperator(borrower);
+        if (_operatorRoleOf(marketOwner) == 0) _assignOperator(marketOwner);
+        if (_operatorRoleOf(borrower) == 0) _assignOperator(borrower);
 
-        (market, tranches) = registry.createFloatingMarket(assets, weights, name, marketOwner, borrower);
+        (market, tranches) = registry.createFloatingMarket(assets, weights, name, _operatorRoleOf(marketOwner));
+        vm.prank(marketOwner);
+        IBaseMarket(market).setBorrowerRole(_operatorRoleOf(borrower));
         _applyMarketDefaults(FloatingMarket(market));
     }
 
@@ -327,19 +342,20 @@ abstract contract CapDeployer is BaseTest {
         internal
         returns (address market, address[] memory tranches)
     {
-        if (registry.operatorRole(marketOwner) == 0) _assignOperator(marketOwner);
-        if (registry.operatorRole(borrower) == 0) _assignOperator(borrower);
+        if (_operatorRoleOf(marketOwner) == 0) _assignOperator(marketOwner);
+        if (_operatorRoleOf(borrower) == 0) _assignOperator(borrower);
 
         (market, tranches) = registry.createFixedMarket(
             _uniformAssets(weights.length),
             weights,
             name,
-            marketOwner,
-            borrower,
+            _operatorRoleOf(marketOwner),
             capConfig.defaultMaximumTermLimit,
             capConfig.defaultMinimumTermLimit,
             capConfig.defaultGrace
         );
+        vm.prank(marketOwner);
+        IBaseMarket(market).setBorrowerRole(_operatorRoleOf(borrower));
         _applyMarketDefaults(FloatingMarket(market));
     }
 
@@ -418,6 +434,10 @@ abstract contract CapDeployer is BaseTest {
     /// from them -- which in these tests is the deployer itself.
     function _depositorRole(address capVault) internal view returns (uint64 roleId) {
         roleId = accessManager.getTargetFunctionRole(capVault, IERC4626.deposit.selector);
+    }
+
+    function _allocatorRole(address underwriter) internal view returns (uint64 roleId) {
+        roleId = accessManager.getTargetFunctionRole(underwriter, IUnderwriter.allocate.selector);
     }
 
     function _admitDepositor(address capVault, address account) internal {
@@ -533,9 +553,23 @@ abstract contract CapDeployer is BaseTest {
     // ── underwriter helpers ───────────────────────────────────────────────────
 
     function _deployUnderwriter() internal returns (Underwriter underwriter) {
-        if (registry.operatorRole(address(this)) == 0) _assignOperator(address(this));
-        address uw = registry.createUnderwriter(address(collateral), "Cap Underwriter", "cUW", address(this));
+        if (_operatorRoleOf(address(this)) == 0) _assignOperator(address(this));
+        string memory suffix = vm.toString(_underwriterDeploymentCount++);
+        uint64 curatorRole = _operatorRoleOf(address(this));
+        address[][] memory members = new address[][](2);
+        members[0] = new address[](2);
+        members[0][0] = makeAddr(string.concat("underwriterAllocator", suffix));
+        members[0][1] = address(this);
+        members[1] = new address[](1);
+        members[1][0] = makeAddr(string.concat("underwriterDepositor", suffix));
+        uint64[] memory roleIds = registry.createChildRoles(curatorRole, members);
+        uint64 allocatorRole = roleIds[0];
+        uint64 depositorRole = roleIds[1];
+
+        address uw = registry.createUnderwriter(address(collateral), "Cap Underwriter", "cUW", curatorRole);
         underwriter = Underwriter(uw);
+        underwriter.setAllocatorRole(allocatorRole);
+        underwriter.setDepositorRole(depositorRole);
     }
 
     function _fundUnderwriter(address underwriter, address supplier, uint256 amount) internal {

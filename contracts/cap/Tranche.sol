@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 import { ERC4626Upgradeable, ERC7540AsyncRedeem, IERC4626 } from "../ERC7540/ERC7540AsyncRedeem.sol";
 import { IBaseMarket } from "../interfaces/IBaseMarket.sol";
 import { IOracle } from "../interfaces/IOracle.sol";
+import { IRegistry } from "../interfaces/IRegistry.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import { DeadShares } from "../utils/DeadShares.sol";
@@ -25,6 +26,9 @@ contract Tranche layout at erc7201("cap.storage.Tranche")
     PremiumVesting,
     UUPSUpgradeable
 {
+    /// @inheritdoc ITranche
+    address public registry;
+
     /// @inheritdoc ITranche
     address public market;
 
@@ -48,6 +52,7 @@ contract Tranche layout at erc7201("cap.storage.Tranche")
     /// @inheritdoc ITranche
     function initialize(
         address _authority,
+        address _registry,
         address _asset,
         string memory _name,
         string memory _symbol,
@@ -57,9 +62,15 @@ contract Tranche layout at erc7201("cap.storage.Tranche")
     ) external initializer {
         __AccessManaged_init(_authority);
         __PremiumVesting_init(IERC20(_asset), _name, _symbol, hex"", IBaseMarket(_market).stablecoin());
+        registry = _registry;
         market = _market;
         vault = _vault;
         oracle = _oracle;
+    }
+
+    /// @inheritdoc ITranche
+    function setDepositorRole(uint64 roleId) external restricted {
+        IRegistry(registry).setDepositorRole(roleId);
     }
 
     /// @inheritdoc ITranche
