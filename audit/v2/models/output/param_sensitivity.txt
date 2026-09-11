@@ -1,0 +1,91 @@
+param_sensitivity.py - permitted vs unsafe ranges (exact arithmetic where a number is given)
+
+parameter (where)                          | permitted                                                              | OVERLAP     
+----------------------------------------------------------------------------------------------------------------------------------
+lt                                         | buffer < lt <= 1e27 (lt < ltv allowed)                                 | YES
+   unsafe: lt > 1/(1+bonus) = 0.9804: healthiness>=1 while unrecoverableDebt>0 (solvency_waterfall); lt <= ltv+buffer: every borrow reverts Unhealthy / instant liquidation
+   note:   Registry.initialize copies lt with NO check: lt=0 or lt<=buffer bricks lockedValue (div by zero) on every market created
+   setter: BaseMarket.setLt
+ltv                                        | ltv + buffer <= lt                                                     | no
+   unsafe: none found (ltv=0 disables borrowing, safe)
+   setter: BaseMarket.setLtv
+buffer                                     | buffer < lt (may exceed lt - ltv, documented)                          | YES (documented as intended tightening)
+   unsafe: buffer >= lt - ltv locks 100% of tranche capital (lockedValue $100M on $50M debt at buffer=0.3; $50000M at 0.799)
+   note:   Registry.initialize: buffer >= lt => rayDiv(debt, 0) reverts in lockedValue -> Tranche.unlockedSupply/maxRedeem/claimable all revert
+   setter: BaseMarket.setBuffer
+targetHealth                               | >= 1.25e27, NO upper bound                                             | YES (economic)
+   unsafe: maxLiquidatable denominator min = 0.15 ray (safe); first liquidation at h=1 clears 58%@TH1.25, 73%@TH1.50, 84%@TH2.00, 96%@TH5.00 of debt; rayMul overflow at TH > 4.6e+23 ray (absurd)
+   note:   Registry.initialize: NO 1.25 floor. TH < (1+bonus)*lt => maxLiquidatable underflows => liquidate() reverts => no liquidation possible at all
+   setter: BaseMarket.setTargetHealth
+liquidationBonus                           | 0 <= bonus <= 0.1e27                                                   | YES
+   unsafe: bonus = 0: liquidation never profitable (liquidation_cascade); bonus > 1/lt - 1 = 25.00% at lt 0.8: never; (1+bonus)*lt > 1 with lt > 0.9804: health lags
+   note:   0 is permitted; combined with lt in (0.9804, 1] the pair is permitted and unsafe
+   setter: IRM.setLiquidationBonus / initialize
+base / slope0 / slope1                     | UNBOUNDED (only kink <= 1e27 checked)                                  | YES
+   unsafe: rate >= 17207%/yr pushes a fully-drawn market (h=1.6) unhealthy within 1 day, >= 412989%/yr within 1 hour, >= 126199032%/yr within one 12s block; calculateCompoundedInterest reverts at rate > 3.40e+11 ray (1y gap) / 3.40e+11 ray (1s gap)
+   note:   a rate above the revert point bricks _index() -> every borrow/repay/liquidate on floating markets reverts until slopes are lowered
+   setter: IRM.setLiquiditySlopes
+kink                                       | kink <= 1e27 (0 allowed, handled)                                      | no
+   unsafe: none found
+   setter: IRM.setLiquiditySlopes
+termMultiplierSlope                        | UNBOUNDED                                                              | YES (grief/DoS of short terms only)
+   unsafe: slope >= 2516 ray: a 1-day loan's premium >= its principal at 15% rate (availableCredit(term) -> ~0, borrow reverts InvalidPrincipal); rayMul overflow at slope > 7.7e+23 ray
+   setter: IRM.setTermMultiplierSlope
+underwriterRate                            | 0 <= rate <= maximumUnderwriterRate (init-only, 1e27 in deploy)        | YES (economic)
+   unsafe: rate < (1+bonus)*p_default: underwriting negative EV (rate_sweep: 2.04% at 2% default risk); 0 is legal and documented
+   note:   set by the borrowing side, not by governance or the underwriters
+   setter: BaseMarket.setUnderwriterRate (MARKET OWNER) -> IRM.updateUnderwriterRate
+marketMultiplier                           | [minimumMarketMultiplier, maximumMarketMultiplier] init-only ([1e27, 2 | no
+   unsafe: none within the deploy band; band itself has NO setter so a bad init is permanent
+   setter: BaseMarket.setMarketMultiplier (OWNER) -> IRM.updateMarketMultiplier
+averagingPeriod                            | [5 min, 1 day]                                                         | YES (economic)
+   unsafe: entire band: EMA depression is profitable at every period for L >= $10M (ema_manipulation, exponential fold cuts the take to 63% at t=P but not the sign)
+   setter: IRM.setAveragingPeriod (GOVERNOR @ 3dad5ef; was ADMIN-by-omission)
+retentionPerSecond (derived)               | 1e27 - 1e27/period: 5 min -> 996666666666666666666666667; 1 day -> 999 | no
+   unsafe: none: max |rayPow - exact| over periods {5m,1h,1d,12h} x elapsed {1s..1y} = 2376 ray-wei (2.4e-24 rel); 5-min retention^86400 = 0 (exact 5.2e-126) so weight saturates to exactly 1e27 after a day; no overflow (base < 1e27)
+   setter: IRM._setAveragingPeriod / PremiumVesting._weight (rayPow)
+tranche weights                            | sum == 1e27; individual weight unbounded incl. 0; reverts if healthine | no (economic only)
+   unsafe: weight 0 on a tranche = no premium but full slash exposure (junior-first) - accepted by code; clamp keeps rayMul half-up rounding from underflowing
+   setter: BaseMarket.setTrancheWeights / setTranches / Registry.createTranche
+fixedCreditLimit                           | UNBOUNDED (0 disables borrowing)                                       | no
+   unsafe: none: creditLimit = min(fixed, variable) so variable always binds
+   setter: BaseMarket.setFixedCreditLimit
+maximumTermLimit / minimumTermLimit        | max != 0, min <= max, otherwise UNBOUNDED                              | YES (economic)
+   unsafe: term > 2.9 years: whole-term premium >= principal at 35% carry (borrow of the limit yields ~0 principal); term*debt overflow at term > 4.6e+50 s (absurd). Long max terms also lock a manipulated EMA rate for the whole term
+   setter: FixedMarket.setTermLimits
+grace                                      | UNBOUNDED, init-only                                                   | YES (economic)
+   unsafe: grace = 0: KEEPER may extendAdmin (skips health check, adds arrears premium) the instant a loan expires (H3)
+   setter: FixedMarket.initialize (NO setter)
+VESTING_PERIOD                             | fixed: 43200 s                                                         | no (fixed), JIT residual
+   unsafe: round-1 'vestingPeriod = 1 s' row is gone. Residual: exponential 12 h still vests 39% in 6 h, so a JIT depositor takes 19.7% of a front-loaded fixed premium per 6 h of matched capital (run_dynamics part C)
+   setter: PremiumVesting constant 12 h (setter REMOVED @ 3dad5ef)
+minimum/maximumMarketMultiplier, maximumUnderwriterRate | min <= max checked; otherwise UNBOUNDED                                | YES
+   unsafe: maximumUnderwriterRate huge => owner can set 1000%/yr underwriter rate: premium minted to tranches outpaces reserve (reserve_decay); no way to repair without upgrade
+   setter: IRM.initialize (NO setter)
+Registry lt/buffer/targetHealth            | ANY uint256                                                            | YES
+   unsafe: lt <= buffer: lockedValue reverts (tranche exits bricked); targetHealth < (1+b)*lt: maxLiquidatable reverts; lt > 1e27: over-collateral credit. BaseMarket copies them unchecked at market creation
+   setter: Registry.initialize (NO setter, NO validation)
+----------------------------------------------------------------------------------------------------------------------------------
+overlaps: 12 of 19 parameters
+
+== numeric details ==
+compoundedInterest revert thresholds: rate > 3.403e+11 ray (3.4e+13 %/yr) for a 1y gap; > 3.403e+11 ray for 30y; > 3.403e+11 ray for 1s
+rate to push h=1.6 -> 1.0: 1 day 17207%/yr, 1 hour 412989%/yr, 1 block 126199032%/yr
+maxLiquidatable perCleared at permitted extremes: TH 1.25, lt 1.0, bonus 10%: 0.15 ray (>0, safe by 0.15 as the NatSpec says)
+healthiness lag threshold: lt > 0.9804 at bonus 2%; at bonus 10%: lt > 0.9091
+termMultiplierSlope making 1-day loans cost >= principal at 15% rate: 2516 ray
+  first liquidation at h=1: TH 1.25 lt 0.80 bonus 2%: 58% of debt
+  first liquidation at h=1: TH 1.25 lt 0.95 bonus 2%: 89% of debt
+  first liquidation at h=1: TH 1.25 lt 1.00 bonus 2%: 100% of debt
+  first liquidation at h=1: TH 1.50 lt 0.80 bonus 2%: 73% of debt
+  first liquidation at h=1: TH 1.50 lt 0.95 bonus 2%: 94% of debt
+  first liquidation at h=1: TH 1.50 lt 1.00 bonus 2%: 100% of debt
+  first liquidation at h=1: TH 2.00 lt 0.80 bonus 2%: 84% of debt
+  first liquidation at h=1: TH 2.00 lt 0.95 bonus 2%: 97% of debt
+  first liquidation at h=1: TH 2.00 lt 1.00 bonus 2%: 100% of debt
+
+=== HEADLINE ===
+12 of 19 governance parameters have a permitted range that overlaps an unsafe one. The three that break
+accounting (not just economics): lt in (0.9804, 1] with bonus 2% (health lags unrecoverable debt); unbounded slopes
+(>= 17207%/yr renders a full market liquidatable within a day; >3.4e+11 ray reverts the index); and Registry.initialize
+accepting lt/buffer/targetHealth with no validation (lt<=buffer or TH<(1+b)lt bricks exits/liquidations on every market).

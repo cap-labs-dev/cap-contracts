@@ -1,0 +1,104 @@
+liquidation_cascade.py  K0=$100M ETH-like, debt = ltv*K0 = $50M, carry 30%, 30d hourly GBM, 80 paths/cell
+impact: LAMBDA 1.0, depth 5000 units per 1%, PERM 0.5
+
+== 1. Defaults (lt 0.8, targetHealth 1.25, bonus 2%): P(cUSD loss within 30d) by vol ==
+vol   | P(loss) | avg unrec when loss | clips/path | max cUSD burned in one hour (liquidator capital) | stalled steps/path
+  40% |  0.00   |    $    0.00M      |       0.00        |            $   0.0M                    |   0.0
+  60% |  0.00   |    $    0.00M      |       0.00        |            $   0.0M                    |   0.0
+  80% |  0.00   |    $    0.00M      |       0.03        |            $  11.1M                    |   0.0
+ 100% |  0.00   |    $    0.00M      |       0.39        |            $  11.3M                    |   0.0
+ 125% |  0.00   |    $    0.00M      |       0.72        |            $  11.3M                    |   0.0
+ 150% |  0.00   |    $    0.00M      |       1.00        |            $  21.4M                    |   0.0
+ 200% |  0.00   |    $    0.00M      |       2.12        |            $  21.4M                    |   0.0
+ 300% |  0.00   |    $    0.00M      |       3.71        |            $  31.0M                    |   0.0
+
+== 2. Liquidator OFFLINE (H11: single privileged actor): P(loss) by vol ==
+ vol  60%: P(loss) 0.00  avg unrec $0.00M
+ vol  80%: P(loss) 0.00  avg unrec $0.00M
+ vol 100%: P(loss) 0.04  avg unrec $7.44M
+ vol 150%: P(loss) 0.12  avg unrec $9.40M
+
+== 3a. Liquidator LATENCY x lt at 100% vol, bonus 2%, TH 1.25: P(cUSD loss in 30d) ==
+  (the liquidator checks the market every N hours; 'never' = offline). cushion = 1-(1+b)*lt = price drop from h=1 to unrec>0
+  lt   | cushion |  1h   |  6h   |  24h  |  72h  | never
+  0.70 |  28.6%  |  0.00 |  0.00 |  0.00 |  0.00 |  0.00
+  0.80 |  18.4%  |  0.00 |  0.00 |  0.00 |  0.00 |  0.02
+  0.90 |   8.2%  |  0.00 |  0.02 |  0.00 |  0.05 |  0.05
+  0.95 |   3.1%  |  0.00 |  0.02 |  0.05 |  0.05 |  0.08
+
+== 3b. Same at 150% vol ==
+  lt   | cushion |  1h   |  6h   |  24h  |  72h  | never
+  0.70 |  28.6%  |  0.00 |  0.00 |  0.00 |  0.00 |  0.13
+  0.80 |  18.4%  |  0.00 |  0.00 |  0.00 |  0.02 |  0.12
+  0.90 |   8.2%  |  0.00 |  0.03 |  0.12 |  0.15 |  0.15
+  0.95 |   3.1%  |  0.12 |  0.08 |  0.15 |  0.15 |  0.15
+
+== 3c. bonus x lt x targetHealth: first-liquidation size at h=1 and vol at which an ONLINE liquidator still loses ==
+bonus | lt   | targetHealth | perCleared = TH-(1+b)*lt | first-liq size at h=1 (% of debt) | vol threshold P(loss)>=50%
+   0%  | 0.70 |     1.25     |        0.550             |    45%                          |    300%
+   0%  | 0.70 |     1.50     |        0.800             |    62%                          |    >300%
+   0%  | 0.70 |     2.00     |        1.300             |    77%                          |    300%
+   0%  | 0.80 |     1.25     |        0.450             |    56%                          |    300%
+   0%  | 0.80 |     1.50     |        0.700             |    71%                          |    >300%
+   0%  | 0.80 |     2.00     |        1.200             |    83%                          |    >300%
+   0%  | 0.90 |     1.25     |        0.350             |    71%                          |    300%
+   0%  | 0.90 |     1.50     |        0.600             |    83%                          |    300%
+   0%  | 0.90 |     2.00     |        1.100             |    91%                          |    300%
+   2%  | 0.70 |     1.25     |        0.536             |    47%                          |    >300%
+   2%  | 0.70 |     1.50     |        0.786             |    64%                          |    >300%
+   2%  | 0.70 |     2.00     |        1.286             |    78%                          |    >300%
+   2%  | 0.80 |     1.25     |        0.434             |    58%                          |    >300%
+   2%  | 0.80 |     1.50     |        0.684             |    73%                          |    >300%
+   2%  | 0.80 |     2.00     |        1.184             |    84%                          |    >300%
+   2%  | 0.90 |     1.25     |        0.332             |    75%                          |    >300%
+   2%  | 0.90 |     1.50     |        0.582             |    86%                          |    >300%
+   2%  | 0.90 |     2.00     |        1.082             |    92%                          |    >300%
+  10%  | 0.70 |     1.25     |        0.480             |    52%                          |    >300%
+  10%  | 0.70 |     1.50     |        0.730             |    68%                          |    >300%
+  10%  | 0.70 |     2.00     |        1.230             |    81%                          |    >300%
+  10%  | 0.80 |     1.25     |        0.370             |    68%                          |    >300%
+  10%  | 0.80 |     1.50     |        0.620             |    81%                          |    >300%
+  10%  | 0.80 |     2.00     |        1.120             |    89%                          |    >300%
+  10%  | 0.90 |     1.25     |        0.260             |    96%                          |    300%
+  10%  | 0.90 |     1.50     |        0.510             |    98%                          |    300%
+  10%  | 0.90 |     2.00     |        1.010             |    99%                          |    300%
+  bonus 0% rows equal the OFFLINE case: no clip is ever profitable, so the liquidator never acts.
+
+== 4. Liquidator economics per unit of debt cleared (no path; static) ==
+collateral/debt | recoverable share | bonus 0% | bonus 2% | bonus 5% | bonus 10%   (profit per $1 cUSD burned, before impact)
+     1.50       |   1.00/1.00/1.00/1.00   |  +0.0% |  +2.0% |  +5.0% | +10.0%
+     1.25       |   1.00/1.00/1.00/1.00   |  +0.0% |  +2.0% |  +5.0% | +10.0%
+     1.10       |   1.00/1.00/1.00/1.00   |  +0.0% |  +2.0% |  +5.0% | +10.0%
+     1.05       |   1.00/1.00/1.00/0.95   |  +0.0% |  +2.0% |  +5.0% | +10.0%
+     1.02       |   1.00/1.00/0.97/0.93   |  +0.0% |  +2.0% |  +5.0% | +10.0%
+     1.00       |   1.00/0.98/0.95/0.91   |  +0.0% |  +2.0% |  +5.0% | +10.0%
+     0.90       |   0.90/0.88/0.86/0.82   |  +0.0% |  +2.0% |  +5.0% | +10.0%
+     0.50       |   0.50/0.49/0.48/0.45   |  +0.0% |  +2.0% |  +5.0% | +10.0%
+  The liquidator ALWAYS earns exactly the bonus per unit cleared (maxLiquidatable is capped at
+  recoverableDebt, so the tranche is never asked for more than it holds). Below 100% collateral the
+  liquidator still profits on the recoverable slice; the UNRECOVERABLE slice is simply not liquidatable
+  and lands on cUSD holders via writeOff. Net of impact the trade is profitable iff bonus > impact:
+   bonus   0%: liquidation is NEVER profitable (proceeds <= cUSD burned); permitted by setLiquidationBonus(0)
+   bonus   2%: largest single clip that still clears =  10000 units (~$20.0M at $2000, depth 5000/1%)
+   bonus   5%: largest single clip that still clears =  25000 units (~$50.0M at $2000, depth 5000/1%)
+   bonus  10%: largest single clip that still clears =  50000 units (~$100.0M at $2000, depth 5000/1%)
+
+== 4b. Depth sensitivity at 100% vol, defaults: P(loss) and clips by book depth ==
+  depth  1000 units/1% (~$  2M): P(loss) 0.00  clips/path   2.3  max cUSD/hour $27.3M  stalled 0.0
+  depth  2000 units/1% (~$  4M): P(loss) 0.00  clips/path   0.8  max cUSD/hour $8.8M  stalled 0.0
+  depth  5000 units/1% (~$ 10M): P(loss) 0.00  clips/path   0.3  max cUSD/hour $11.3M  stalled 0.0
+  depth 20000 units/1% (~$ 40M): P(loss) 0.00  clips/path   0.2  max cUSD/hour $31.3M  stalled 0.0
+
+== 5. Capital requirement: cUSD the liquidator must hold at the first liquidation ==
+  credit-util  50% shock 69.0%: debt $25M, maxLiquidatable $14.9M (59% of debt) -> liquidator needs $14.9M cUSD at par
+  credit-util  50% shock 72.0%: debt $25M, maxLiquidatable $20.4M (82% of debt) -> liquidator needs $20.4M cUSD at par
+  credit-util  50% shock 74.5%: debt $25M, maxLiquidatable $25.0M (100% of debt) -> liquidator needs $25.0M cUSD at par
+  credit-util 100% shock 38.0%: debt $50M, maxLiquidatable $29.7M (59% of debt) -> liquidator needs $29.7M cUSD at par
+  credit-util 100% shock 45.0%: debt $50M, maxLiquidatable $42.6M (85% of debt) -> liquidator needs $42.6M cUSD at par
+  credit-util 100% shock 49.0%: debt $50M, maxLiquidatable $50.0M (100% of debt) -> liquidator needs $50.0M cUSD at par
+
+=== HEADLINE ===
+Defaults, ETH at 80% vol, 30d: P(cUSD loss) = 0.00 with a clip-sizing liquidator online vs 0.00 offline; P(loss) >= 50% only above ~300% annualised vol.
+The first liquidation at health=1 wants 58% of debt at TH 1.25 (73% at TH 1.5, 84% at TH 2.0); at 2% bonus the
+largest clip with positive edge is ~$20M at the stated depth, so restoring health takes several clips whose
+permanent impact lowers the oracle price for the next. Bonus 0% (permitted) makes every liquidation unprofitable.

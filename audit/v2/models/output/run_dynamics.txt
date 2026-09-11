@@ -1,0 +1,91 @@
+run_dynamics.py  S0=$100M, u0 80%, reserve $20M, underlying 6dp
+
+== A. Queue wait vs daily withdrawal fraction w and FRESH-funded repayment rate r (badDebt 0, 120 days) ==
+  Reserve 20% serves instantly; beyond it the queue settles only as fresh underlying enters via repayment.
+  w/day | r=0.0%/d | r=0.5%/d | r=1%/d | r=2%/d | r=5%/d      (max wait in days; 'stuck' = never claimable in 120d)
+   0.5% |   0d +77 stuck |   0d         |   0d         |   0d         |   0d        
+   1.0% |   0d +99 stuck |  38d +39 stuck |   0d         |   0d         |   0d        
+   2.0% |   0d +110 stuck |  80d +80 stuck |  50d +50 stuck |   0d         |   0d        
+   5.0% |   0d +117 stuck | 104d +105 stuck |  93d +93 stuck |  69d +69 stuck |   0d        
+  10.0% |   0d +119 stuck |  96d +114 stuck | 102d +108 stuck |  95d +96 stuck |  60d +60 stuck
+  20.0% |   0d +121 stuck |  87d +118 stuck | 106d +115 stuck | 100d +110 stuck |  90d +93 stuck
+
+  Same grid, SECONDARY-funded repayment (borrower buys cUSD from holders): unlockedSupply never moves
+   0.5% | r=0:   0d +77 stuck | r=1%:   0d +64 stuck | r=5%:   0d        
+   2.0% | r=0:   0d +110 stuck | r=1%:   0d +69 stuck | r=5%:   0d +30 stuck
+  10.0% | r=0:   0d +119 stuck | r=1%:   0d +25 stuck | r=5%:   0d +14 stuck
+
+  Threshold (fresh-funded): smallest w such that max wait > T
+   T= 7d repay 0.5%/d: orderly redemption breaks at w >= 0.62%/day (cumulative 4% of supply in 7 days)
+   T= 7d repay 1.0%/d: orderly redemption breaks at w >= 1.12%/day (cumulative 8% of supply in 7 days)
+   T= 7d repay 2.0%/d: orderly redemption breaks at w >= 2.12%/day (cumulative 14% of supply in 7 days)
+   T= 7d repay 5.0%/d: orderly redemption breaks at w >= 5.12%/day (cumulative 31% of supply in 7 days)
+   T=30d repay 0.5%/d: orderly redemption breaks at w >= 0.62%/day (cumulative 17% of supply in 30 days)
+   T=30d repay 1.0%/d: orderly redemption breaks at w >= 1.12%/day (cumulative 29% of supply in 30 days)
+   T=30d repay 2.0%/d: orderly redemption breaks at w >= 2.12%/day (cumulative 47% of supply in 30 days)
+   T=30d repay 5.0%/d: orderly redemption breaks at w >= 5.12%/day (cumulative 79% of supply in 30 days)
+
+== B. Early vs late redeemer under the exact curve (badDebt 10% recognised day 0, w rises with badDebt) ==
+  claim day | requested day | payout per share (underlying)
+       0    |       0       |   0.815710
+       1    |       1       |   0.826634
+       2    |       2       |   0.836547
+       5    |       5       |   0.858271
+      32    |      10       |   0.890982
+  payout per share non-decreasing along the queue: True   badDebt end: $1.67M (from $10M)  claims settled: 72
+  => under RECOGNISED bad debt the curve does what it claims: the early redeemer gets LESS per share.
+
+  Contrast - the par channel the curve does not cover: borrower repays $10M with cUSD bought from holders
+  backing ratio 0.9000 -> 0.8889; whole-supply exit per share 0.9000 -> 0.8889. The seller left at par, the
+  borrower discharged $1 of debt per cUSD, and the survivors' backing fell: burnCreditBacked is a
+  haircut-free exit for whoever sells cUSD to a repaying borrower.
+
+== C. Recognition lag: unrecoverable debt exists at day 0 but writeOff lands at day t_w ==
+  Before t_w the reserve pays par; after t_w the survivors carry the whole shortfall.
+  t_w | exits before t_w (share of supply) | paid at par | loss borne by survivors | survivors' payout/share after t_w
+    0 |   0.0%                              | $ 0.00M    | $0.00M transferred       | 0.9000
+    3 |   5.9%                              | $ 5.88M    | $0.59M transferred       | 0.8938
+    7 |  13.2%                              | $13.19M    | $1.32M transferred       | 0.8848
+   14 |  20.0%                              | $20.00M    | $2.00M transferred       | 0.8750
+   30 |  20.0%                              | $20.00M    | $2.00M transferred       | 0.8750
+  With a 10% shortfall, every $1 that exits before writeOff moves $0.10 of loss onto those who stay.
+  writeOff is a discretionary GUARDIAN action bounded only by unrecoverableDebt (H3), so the lag is unbounded.
+
+== C. JIT depositor vs the 12 h exponential opt-in vest (3dad5ef) ==
+Pot P = liquidity premium of a $10M 30-day fixed borrow at u=90%: $127024, minted at borrow.
+JIT: opt-in with J = honest stake H right after the borrow, hold h, claim, opt-out/redeem at par (no fee).
+Round-1 M-3 (settable vestingPeriod, 6 h default): 50% of the premium for 6 h. Now:
+  hold h | w(h)    | JIT take (50% of vested) | $ at P | per-6h-equivalent | vs time-pro-rata over T=1d / 7d / 30d
+     1h   | 0.0800  |   4.0%                   | $5078   |  24.0%           | 0.021 (1.9x) / 0.003 (13.4x) / 0.001 (57.6x)
+     3h   | 0.2212  |  11.1%                   | $14049  |  22.1%           | 0.062 (1.8x) / 0.009 (12.4x) / 0.002 (53.1x)
+     6h   | 0.3935  |  19.7%                   | $24990  |  19.7%           | 0.125 (1.6x) / 0.018 (11.0x) / 0.004 (47.2x)
+    12h   | 0.6321  |  31.6%                   | $40147  |  15.8%           | 0.250 (1.3x) / 0.036 (8.8x) / 0.008 (37.9x)
+    24h   | 0.8647  |  43.2%                   | $54917  |  10.8%           | 0.500 (0.9x) / 0.071 (6.1x) / 0.017 (25.9x)
+    48h   | 0.9817  |  49.1%                   | $62349  |   6.1%           | 0.500 (1.0x) / 0.143 (3.4x) / 0.033 (14.7x)
+    96h   | 0.9997  |  50.0%                   | $63491  |   3.1%           | 0.500 (1.0x) / 0.286 (1.7x) / 0.067 (7.5x)
+  Crossover (JIT take = time-pro-rata share, i.e. w(h) = h/T):
+   term  1d: JIT beats time-pro-rata for every h < 19.1h
+   term  7d: JIT beats time-pro-rata for every h < T (never crosses inside the term: w(h) -> 1 while h/T < 1)
+   term 30d: JIT beats time-pro-rata for every h < T (never crosses inside the term: w(h) -> 1 while h/T < 1)
+  Cost side: JIT capital J = H (matching stake) at 5%/yr opportunity cost; net = take - cost:
+   H=J=$ 1M h= 6h: take $24990   cost $34     net $24956   (20% of pot)
+   H=J=$ 1M h=12h: take $40147   cost $68     net $40079   (32% of pot)
+   H=J=$ 1M h=24h: take $54917   cost $137    net $54780   (43% of pot)
+   H=J=$10M h= 6h: take $24990   cost $342    net $24648   (20% of pot)
+   H=J=$10M h=12h: take $40147   cost $685    net $39462   (32% of pot)
+   H=J=$10M h=24h: take $54917   cost $1370   net $53547   (43% of pot)
+   H=J=$50M h= 6h: take $24990   cost $1712   net $23278   (20% of pot)
+   H=J=$50M h=12h: take $40147   cost $3425   net $36723   (32% of pot)
+   H=J=$50M h=24h: take $54917   cost $6849   net $48067   (43% of pot)
+  Reading: the 12 h exponential vest cuts the 6 h take from 50% (instant/short vest) to 19.7% and the 12 h take
+  to 31.6%; but it is time-constant 12 h against a premium that pays for 30 days, so a JIT holder still
+  earns 10-60x the time-pro-rata share and never falls below it inside a 7 or 30 day term. Only a vest
+  time-constant comparable to the loan term (or streaming the fixed premium over the term) removes the JIT edge.
+  Floating markets accrue premium continuously, so the JIT surplus there is bounded by one accrual step.
+
+=== HEADLINE ===
+Orderly redemption (wait <= 7d) breaks once daily requests exceed ~1% of supply at 1%/day repayment
+(the 20% reserve absorbs ~10 days of it); with no repayment anything past the reserve is stuck indefinitely.
+The convex haircut DOES remove the first-mover advantage for RECOGNISED bad debt (payout/share is monotone
+increasing along the queue). It does NOT touch unrecognised bad debt: exits before writeOff are paid par,
+and each $1 out before recognition shifts (shortfall/supply) of loss onto the survivors.

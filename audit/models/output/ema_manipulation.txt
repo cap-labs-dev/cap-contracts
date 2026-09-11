@@ -1,0 +1,76 @@
+ema_manipulation.py  S=$100M, r_alt 5%, term = max = 30d, gas $20
+
+== live utilization 80% (rate 10.00%) ==
+  loan $1M: honest 30d premium $8301 (rate at u_after_mint 10.10%)
+  period   | t=period: break-even D | best D      | profit    | saved     | u_manip | t=period/2 profit@bestD
+       5m  | $0.1M                  | $153M       | $2460     | $2553     |  31.89% | $1790
+      15m  | $0.1M                  | $153M       | $2314     | $2553     |  31.89% | $1718
+       1h  | $0.1M                  | $153M       | $1660     | $2553     |  31.89% | $1390
+       4h  | $0.1M                  | $35M        | $312      | $1138     |  59.43% | $261
+      12h  | $0.1M                  | $0M         | $44       | $82       |  79.99% | $14
+      24h  | $0.1M                  | $0M         | $26       | $82       |  79.99% | $5
+  loan $10M: honest 30d premium $89664 (rate at u_after_mint 10.91%)
+  period   | t=period: break-even D | best D      | profit    | saved     | u_manip | t=period/2 profit@bestD
+       5m  | $0.1M                  | $153M       | $30896    | $30989    |  34.22% | $23722
+      15m  | $0.1M                  | $153M       | $30751    | $30989    |  34.22% | $23649
+       1h  | $0.1M                  | $153M       | $30096    | $30989    |  34.22% | $23322
+       4h  | $0.1M                  | $153M       | $27476    | $30989    |  34.22% | $22012
+      12h  | $0.1M                  | $153M       | $20489    | $30989    |  34.22% | $18519
+      24h  | $0.1M                  | $73M        | $13284    | $23372    |  49.05% | $12009
+  loan $50M: honest 30d premium $547945 (rate at u_after_mint 13.33%)
+  period   | t=period: break-even D | best D      | profit    | saved     | u_manip | t=period/2 profit@bestD
+       5m  | $0.1M                  | $153M       | $232176   | $232268   |  42.90% | $194992
+      15m  | $0.1M                  | $153M       | $232030   | $232268   |  42.90% | $194919
+       1h  | $0.1M                  | $153M       | $231375   | $232268   |  42.90% | $194592
+       4h  | $0.1M                  | $153M       | $228755   | $232268   |  42.90% | $193282
+      12h  | $0.1M                  | $153M       | $221769   | $232268   |  42.90% | $189789
+      24h  | $0.1M                  | $153M       | $211289   | $232268   |  42.90% | $184549
+
+== live utilization 90% (rate 15.00%) ==
+  loan $1M: honest 30d premium $12369 (rate at u_after_mint 15.05%)
+  period   | t=period: break-even D | best D      | profit    | saved     | u_manip | t=period/2 profit@bestD
+       5m  | $0.1M                  | $153M       | $6327     | $6419     |  35.83% | $5570
+      15m  | $0.1M                  | $153M       | $6181     | $6419     |  35.83% | $5497
+       1h  | $0.1M                  | $153M       | $5526     | $6419     |  35.83% | $5170
+       4h  | $0.1M                  | $40M        | $4011     | $4942     |  64.59% | $3919
+      12h  | $0.1M                  | $13M        | $3240     | $4169     |  79.63% | $1809
+      24h  | $0.1M                  | $13M        | $2330     | $4169     |  79.63% | $1354
+  loan $10M: honest 30d premium $127024 (rate at u_after_mint 15.45%)
+  period   | t=period: break-even D | best D      | profit    | saved     | u_manip | t=period/2 profit@bestD
+       5m  | $0.1M                  | $153M       | $66303    | $66396    |  38.02% | $58328
+      15m  | $0.1M                  | $153M       | $66158    | $66396    |  38.02% | $58255
+       1h  | $0.1M                  | $153M       | $65503    | $66396    |  38.02% | $57927
+       4h  | $0.1M                  | $153M       | $62883    | $66396    |  38.02% | $56617
+      12h  | $0.1M                  | $153M       | $55896    | $66396    |  38.02% | $53124
+      24h  | $0.1M                  | $83M        | $47921    | $59317    |  51.80% | $46317
+  loan $50M: honest 30d premium $684932 (rate at u_after_mint 16.67%)
+  period   | t=period: break-even D | best D      | profit    | saved     | u_manip | t=period/2 profit@bestD
+       5m  | $0.1M                  | $153M       | $360685   | $360778   |  46.20% | $320639
+      15m  | $0.1M                  | $153M       | $360540   | $360778   |  46.20% | $320566
+       1h  | $0.1M                  | $153M       | $359885   | $360778   |  46.20% | $320238
+       4h  | $0.1M                  | $153M       | $357265   | $360778   |  46.20% | $318928
+      12h  | $0.1M                  | $153M       | $350278   | $360778   |  46.20% | $315435
+      24h  | $0.1M                  | $153M       | $339798   | $360778   |  46.20% | $310195
+
+== termMultiplier: shorter terms pay MORE (slope 0.5e27), so the max term is both the cheapest and the
+   one that locks the manipulated rate longest; the multiplier does not touch the attack at max term ==
+  term  1d slope 0.0: multiplier 1.000 honest $4234    manipulated(D=1x S, t=1d) $2185    saved $2049
+  term  1d slope 0.5: multiplier 1.483 honest $6281    manipulated(D=1x S, t=1d) $3241    saved $3039
+  term  7d slope 0.0: multiplier 1.000 honest $29639   manipulated(D=1x S, t=1d) $15297   saved $14342
+  term  7d slope 0.5: multiplier 1.383 honest $41000   manipulated(D=1x S, t=1d) $21161   saved $19840
+  term 15d slope 0.0: multiplier 1.000 honest $63512   manipulated(D=1x S, t=1d) $32779   saved $30733
+  term 15d slope 0.5: multiplier 1.250 honest $79390   manipulated(D=1x S, t=1d) $40974   saved $38416
+  term 30d slope 0.0: multiplier 1.000 honest $127024  manipulated(D=1x S, t=1d) $65558   saved $61466
+  term 30d slope 0.5: multiplier 1.000 honest $127024  manipulated(D=1x S, t=1d) $65558   saved $61466
+
+== Why the band does not help: benefit saturates at t = period, cost is linear in t ==
+  period    300s: t=0.25P: saved $47876 cost $32 | t=0.50P: saved $53822 cost $44 | t=1.00P: saved $61466 cost $68 | t=2.00P: saved $61466 cost $115
+  period   3600s: t=0.25P: saved $47876 cost $163 | t=0.50P: saved $53822 cost $305 | t=1.00P: saved $61466 cost $591 | t=2.00P: saved $61466 cost $1162
+  period  86400s: t=0.25P: saved $47876 cost $3445 | t=0.50P: saved $53822 cost $6869 | t=1.00P: saved $61466 cost $13719 | t=2.00P: saved $61466 cost $27417
+
+== Attacker needs BORROWER role; but the same lever prices EVERY fixed borrow in the window: ==
+   a $100M deposit held 1 day depresses the average for all borrowers for the next period.
+
+=== HEADLINE ===
+At the MAXIMUM averaging period (1 day), u=90%, a $100M par deposit held 24h cuts a $10M 30-day fixed premium from $127024 to $65558 (saves $61466) at a cost of $13719: 4x return. At the minimum (5 min) the cost is $68.
+The band [5 min, 1 day] bounds the attack's DURATION, not its profitability; break-even D is < 1x supply at every period.
