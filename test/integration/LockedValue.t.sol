@@ -23,7 +23,7 @@ contract LockedValueTest is CapDeployer {
         (marketAddr, senior, junior) = _createMarket("M");
         market = FloatingMarket(marketAddr);
         _setMarketSlopes(marketAddr);
-        _setFixedCreditLimit(market, 100_000e18);
+        _setMaxCapital(market, 100_000e18);
         _fundTranche(senior, makeAddr("senior"), 1_000e18);
         _fundTranche(junior, makeAddr("junior"), 1_000e18);
     }
@@ -95,7 +95,7 @@ contract LockedValueTest is CapDeployer {
         FloatingMarket market = FloatingMarket(marketAddr);
         market.setBuffer(0);
         market.setLtv(market.lt());
-        _setFixedCreditLimit(market, type(uint256).max);
+        _setMaxCapital(market, type(uint256).max);
 
         address seniorLp = makeAddr("senior-lp");
         address juniorLp = makeAddr("junior-lp");

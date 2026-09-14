@@ -35,7 +35,7 @@ contract UnderwriterIntegrationTest is CapDeployer {
             IInterestRateModel.Slopes({ base: 0.05e27, slope0: 0.05e27, slope1: 0.1e27, kink: 0.8e27 })
         );
         market.setMarketMultiplier(1e27);
-        _setFixedCreditLimit(market, 1_000e18);
+        _setMaxCapital(market, 1_000e18);
 
         underwriter = _deployUnderwriter();
         _admitDepositor(address(tranche0), address(underwriter));

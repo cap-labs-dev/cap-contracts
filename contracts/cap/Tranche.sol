@@ -36,7 +36,7 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     bool public killed;
 
     /// @inheritdoc ITranche
-    uint256 public fixedCreditLimit;
+    uint256 public maxCapital;
 
     /// @dev Shares per remaining asset at which the tranche is retired (1% of par)
     uint256 private constant KILL_RATIO = 100;
@@ -71,9 +71,9 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     }
 
     /// @inheritdoc ITranche
-    function setFixedCreditLimit(uint256 _fixedCreditLimit) external restricted {
-        fixedCreditLimit = _fixedCreditLimit;
-        emit SetFixedCreditLimit(_fixedCreditLimit);
+    function setMaxCapital(uint256 _maxCapital) external restricted {
+        maxCapital = _maxCapital;
+        emit SetMaxCapital(_maxCapital);
     }
 
     /// @inheritdoc ITranche
@@ -194,6 +194,11 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
         uint256 assets = activeAssets();
         if (assets == 0) return 0;
         capital = assets * getPrice() / 10 ** decimals();
+    }
+
+    /// @inheritdoc ITranche
+    function capitalLimit() public view returns (uint256 limit) {
+        limit = Math.min(activeCapital(), maxCapital);
     }
 
     /// @dev Mint the seed on the first deposit. Already deducted from the quote.

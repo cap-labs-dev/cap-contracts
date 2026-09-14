@@ -222,11 +222,6 @@ interface IBaseMarket {
     /// @return The market multiplier
     function marketMultiplier() external view returns (uint256);
 
-    /// @notice Sum of each attached tranche's fixed credit limit
-    /// @dev Saturates at `type(uint256).max`. Set on the tranche, not here.
-    /// @return The fixed credit limit
-    function fixedCreditLimit() external view returns (uint256);
-
     /// @notice Get the tranche addresses and weights
     /// @return tranches The tranches and their weights
     function tranches() external view returns (Tranche[] memory tranches);
@@ -277,13 +272,9 @@ interface IBaseMarket {
     function availableCredit() external view returns (uint256 credit);
 
     /// @notice Get the credit limit
-    /// @dev `min` of the summed tranche caps and {variableCreditLimit}.
+    /// @dev Sum of each attached tranche's {ITranche-capitalLimit}, then `min(ltv, lt)`.
+    /// The per-tranche `min` is on the tranche and does not see LTV. Guardian tightening of
+    /// `lt` below `ltv` cuts new credit here.
     /// @return limit The credit limit
     function creditLimit() external view returns (uint256 limit);
-
-    /// @notice Get the variable credit limit
-    /// @dev Active capital times `min(ltv, lt)`, so a guardian drop of `lt` below `ltv` reduces
-    /// new credit without rewriting the owner's origination LTV.
-    /// @return limit The variable credit limit
-    function variableCreditLimit() external view returns (uint256 limit);
 }

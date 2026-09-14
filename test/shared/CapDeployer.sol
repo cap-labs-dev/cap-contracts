@@ -93,7 +93,7 @@ abstract contract CapDeployer is BaseTest {
         uint256 defaultMaximumUnderwriterRate;
         uint256 defaultUnderwriterRate;
         uint256[] defaultTrancheWeights;
-        uint256 defaultFixedCreditLimit;
+        uint256 defaultMaxCapital;
         uint256 defaultMaximumTermLimit;
         uint256 defaultMinimumTermLimit;
         uint256 defaultGrace;
@@ -127,7 +127,7 @@ abstract contract CapDeployer is BaseTest {
         cfg.defaultTrancheWeights = new uint256[](2);
         cfg.defaultTrancheWeights[0] = 1e27 - 0.05e27;
         cfg.defaultTrancheWeights[1] = 0.05e27;
-        cfg.defaultFixedCreditLimit = 1_000e18;
+        cfg.defaultMaxCapital = 1_000e18;
         cfg.defaultMaximumTermLimit = 30 days;
         cfg.defaultMinimumTermLimit = 1 days;
         cfg.defaultGrace = 1 days;
@@ -399,11 +399,11 @@ abstract contract CapDeployer is BaseTest {
         bundle.tranche1 = Tranche(bundle.tranche1Addr);
     }
 
-    /// @dev Create market, apply slopes, and split the default fixed credit limit across tranches.
+    /// @dev Create market, apply slopes, and split the default max capital across tranches.
     function _createReadyMarket(string memory name) internal returns (MarketBundle memory bundle) {
         bundle = _createMarketBundle(name);
         _configureMarketRates(bundle.market);
-        _setFixedCreditLimit(bundle.market, capConfig.defaultFixedCreditLimit);
+        _setMaxCapital(bundle.market, capConfig.defaultMaxCapital);
     }
 
     function _applyMarketDefaults(FloatingMarket market) internal {
@@ -412,19 +412,38 @@ abstract contract CapDeployer is BaseTest {
         market.setLt(capConfig.defaultLt);
         market.setMarketMultiplier(capConfig.defaultMultiplier);
         market.setTargetHealth(capConfig.defaultTargetHealth);
-        _setFixedCreditLimit(market, capConfig.defaultFixedCreditLimit);
+        _setMaxCapital(market, capConfig.defaultMaxCapital);
     }
 
-    /// @dev Split `limit` across the market's tranches so {IBaseMarket-fixedCreditLimit} equals `limit`.
-    function _setFixedCreditLimit(IBaseMarket market, uint256 limit) internal {
+    /// @dev Split `limit` across the market's tranches. Each tranche's {ITranche-capitalLimit}
+    ///      mins its slice against its own capital, so an empty neighbour's share of the
+    ///      split cannot be borrowed against a funded sibling.
+    function _setMaxCapital(IBaseMarket market, uint256 limit) internal {
         IBaseMarket.Tranche[] memory ts = market.tranches();
         uint256 n = ts.length;
         if (n == 0) return;
         uint256 each = limit / n;
         uint256 rem = limit - each * n;
         for (uint256 i; i < n; ++i) {
-            ITranche(ts[i].tranche).setFixedCreditLimit(i == 0 ? each + rem : each);
+            ITranche(ts[i].tranche).setMaxCapital(i == 0 ? each + rem : each);
         }
+    }
+
+    /// @dev Put the whole `limit` on `tranche` and zero every sibling. Use when only that
+    ///      tranche will be funded, so the cap sits on the collateral that can actually back it.
+    function _setMaxCapitalOn(IBaseMarket market, address tranche, uint256 limit) internal {
+        IBaseMarket.Tranche[] memory ts = market.tranches();
+        for (uint256 i; i < ts.length; ++i) {
+            ITranche(ts[i].tranche).setMaxCapital(ts[i].tranche == tranche ? limit : 0);
+        }
+    }
+
+    /// @dev Size `tranche`'s cap so the market's LTV-scaled credit from it equals `limit`
+    ///      when the tranche has the capital. Empty siblings stay at zero.
+    function _setBorrowableOn(IBaseMarket market, address tranche, uint256 limit) internal {
+        uint256 ltvBound = market.ltv() < market.lt() ? market.ltv() : market.lt();
+        uint256 cap = ltvBound == 0 ? 0 : (limit * 1e27 + ltvBound - 1) / ltvBound;
+        _setMaxCapitalOn(market, tranche, cap);
     }
 
     function _configureMarketRates(FloatingMarket market) internal {

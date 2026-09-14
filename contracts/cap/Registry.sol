@@ -534,7 +534,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     function _trancheGovernorSelectors() private pure returns (bytes4[] memory selectors) {
-        selectors = _one(ITranche.setFixedCreditLimit.selector);
+        selectors = _one(ITranche.setMaxCapital.selector);
     }
 
     function _trancheMarketSelectors() private pure returns (bytes4[] memory selectors) {

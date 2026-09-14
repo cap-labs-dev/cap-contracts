@@ -17,9 +17,10 @@ contract AuditValidationTest is CapDeployer {
     function test_guardianLtReductionConstrainsFloatingBorrow() public {
         (address m, address t,) = _createMarket("risk limits");
         FloatingMarket market = FloatingMarket(m);
+        _setMaxCapitalOn(market, t, type(uint256).max);
         _fundTranche(t, makeAddr("supplier"), 2_000e18);
         market.setLt(0.2e27);
-        assertEq(market.variableCreditLimit(), 400e18);
+        assertEq(market.creditLimit(), 400e18);
         vm.prank(defaultBorrower);
         vm.expectRevert(IBaseMarket.InsufficientLiquidity.selector);
         market.borrow(defaultBorrower, 900e18);
@@ -32,6 +33,7 @@ contract AuditValidationTest is CapDeployer {
         (address m, address t,) = _createFixedMarket("maturity");
         FixedMarket market = FixedMarket(m);
         market.setUnderwriterRate(0.2e27);
+        _setBorrowableOn(market, t, 1_000e18);
         _fundTranche(t, makeAddr("supplier"), 10_000e18);
         vm.prank(defaultBorrower);
         (uint256 id,) = market.borrow(defaultBorrower, 500e18, 1 days);
@@ -46,6 +48,7 @@ contract AuditValidationTest is CapDeployer {
     function test_audit_lowerMaximumTermBreaksLiveExtension() public {
         (address m, address t,) = _createFixedMarket("term changes");
         FixedMarket market = FixedMarket(m);
+        _setBorrowableOn(market, t, 1_000e18);
         _fundTranche(t, makeAddr("supplier"), 10_000e18);
         vm.prank(defaultBorrower);
         (uint256 id,) = market.borrow(defaultBorrower, 500e18, 30 days);

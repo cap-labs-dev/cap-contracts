@@ -256,13 +256,7 @@ contract CheckRoles is Script, InfraSerializer {
             uint64 depositor = manager.getTargetFunctionRole(tranche, IERC4626.deposit.selector);
             uint64 owner = manager.getRoleAdmin(depositor);
             _wired(manager, "Tranche.fund", tranche, ITranche.fund.selector, CapRoles.MARKET);
-            _wired(
-                manager,
-                "Tranche.setFixedCreditLimit",
-                tranche,
-                ITranche.setFixedCreditLimit.selector,
-                CapRoles.GOVERNOR
-            );
+            _wired(manager, "Tranche.setMaxCapital", tranche, ITranche.setMaxCapital.selector, CapRoles.GOVERNOR);
             _wired(manager, "Tranche.deposit", tranche, IERC4626.deposit.selector, depositor);
             _wired(manager, "Tranche.mint", tranche, IERC4626.mint.selector, depositor);
             console.log("  depositor role", depositor, "admin", owner);

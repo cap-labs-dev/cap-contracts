@@ -23,9 +23,9 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @notice Emitted once when a slash retires the tranche
     event Killed();
 
-    /// @notice Emitted when this tranche's fixed credit limit is updated
-    /// @param fixedCreditLimit The new fixed credit limit
-    event SetFixedCreditLimit(uint256 fixedCreditLimit);
+    /// @notice Emitted when this tranche's maximum capital is updated
+    /// @param maxCapital The new maximum capital
+    event SetMaxCapital(uint256 maxCapital);
 
     /// @notice Initialize the tranche
     /// @param authority The access manager address
@@ -52,10 +52,10 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @param roleId The depositor role id
     function setDepositorRole(uint64 roleId) external;
 
-    /// @notice Set this tranche's contribution to the market's fixed credit limit
-    /// @dev The market's {IBaseMarket-fixedCreditLimit} is the sum across attached tranches.
-    /// @param fixedCreditLimit The new fixed credit limit
-    function setFixedCreditLimit(uint256 fixedCreditLimit) external;
+    /// @notice Set this tranche's maximum capital
+    /// @dev {capitalLimit} is `min` of this and {activeCapital}. Caps only this tranche.
+    /// @param maxCapital The new maximum capital
+    function setMaxCapital(uint256 maxCapital) external;
 
     /// @notice Slash assets worth `value`, capped by holdings
     /// @dev Caller must be this tranche's market. Returns the floored USD value of
@@ -93,10 +93,17 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @return Whether the tranche has been retired
     function killed() external view returns (bool);
 
-    /// @notice This tranche's fixed credit limit
-    /// @dev The market sums these across its attached list.
-    /// @return The fixed credit limit
-    function fixedCreditLimit() external view returns (uint256);
+    /// @notice Maximum capital this tranche can contribute
+    /// @dev {capitalLimit} mins this against {activeCapital}. Caps only this tranche.
+    /// @return The maximum capital
+    function maxCapital() external view returns (uint256);
+
+    /// @notice Capital this tranche can contribute
+    /// @dev `min` of {activeCapital} and {maxCapital}. Empty capital or a zero cap
+    /// yields zero; another tranche's numbers cannot be substituted. LTV is applied
+    /// on the market, not here.
+    /// @return limit The capital limit
+    function capitalLimit() external view returns (uint256 limit);
 
     /// @notice Total assets held for this tranche in the vault
     /// @dev Vault ERC6909 balance, not tokens held here.

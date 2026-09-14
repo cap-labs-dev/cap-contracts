@@ -26,6 +26,7 @@ contract MarketMultiplierTest is CapDeployer {
         market = FloatingMarket(marketAddr);
         market.setUnderwriterRate(0);
         market.setMarketMultiplier(multiplier);
+        _setMaxCapitalOn(market, senior, 10_000e18);
         _fundTranche(senior, makeAddr(string.concat(name, "-lp")), 10_000e18);
     }
 
@@ -34,7 +35,7 @@ contract MarketMultiplierTest is CapDeployer {
         market = FixedMarket(marketAddr);
         market.setUnderwriterRate(0);
         market.setMarketMultiplier(multiplier);
-        _setFixedCreditLimit(market, 10_000e18);
+        _setMaxCapitalOn(market, senior, 10_000e18);
         _fundTranche(senior, makeAddr(string.concat(name, "-lp")), 10_000e18);
     }
 

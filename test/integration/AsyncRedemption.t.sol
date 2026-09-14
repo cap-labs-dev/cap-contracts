@@ -27,7 +27,7 @@ contract AsyncRedemptionTest is CapDeployer {
         irm.setLiquiditySlopes(
             IInterestRateModel.Slopes({ base: 0.05e27, slope0: 0.05e27, slope1: 0.1e27, kink: 0.8e27 })
         );
-        _setFixedCreditLimit(market, 1_000e18);
+        _setMaxCapital(market, 1_000e18);
 
         _fundTranche(t0, supplier, 1_000e18);
         vm.prank(borrower);

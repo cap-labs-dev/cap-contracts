@@ -19,7 +19,7 @@ contract PremiumBackingTest is CapDeployer {
         (marketAddr, t0, t1) = _createMarket("M");
         market = FloatingMarket(marketAddr);
         _setMarketSlopes(marketAddr);
-        _setFixedCreditLimit(market, 100_000e18);
+        _setMaxCapital(market, 100_000e18);
         _fundTranche(t0, makeAddr("senior"), 10_000e18);
     }
 
@@ -99,7 +99,7 @@ contract PremiumBackingTest is CapDeployer {
         (address marketAddr, address t0, address t1) = _createMarket("M");
         FloatingMarket market = FloatingMarket(marketAddr);
         _setMarketSlopes(marketAddr);
-        _setFixedCreditLimit(market, 100_000e18);
+        _setMaxCapital(market, 100_000e18);
         _fundTranche(t1, makeAddr("junior"), 10_000e18);
         assertEq(Tranche(t0).activeSupply(), 0, "senior must be empty");
 
@@ -139,7 +139,7 @@ contract PremiumBackingTest is CapDeployer {
         (address marketAddr, address t0, address t1) = _createMarket("M");
         FloatingMarket market = FloatingMarket(marketAddr);
         market.setUnderwriterRate(0.01e27); // 1% underwriter against 50% liquidity
-        _setFixedCreditLimit(market, 100_000e18);
+        _setMaxCapital(market, 100_000e18);
         _fundTranche(t0, makeAddr("senior"), 10_000e18);
         _fundTranche(t1, makeAddr("junior"), 10_000e18);
 
@@ -170,7 +170,7 @@ contract PremiumBackingTest is CapDeployer {
         (address marketAddr, address t0, address t1) = _createFixedMarket("F");
         FixedMarket market = FixedMarket(marketAddr);
         market.setUnderwriterRate(capConfig.defaultUnderwriterRate);
-        _setFixedCreditLimit(market, 100_000e18);
+        _setMaxCapital(market, 100_000e18);
         _fundTranche(t0, makeAddr("senior"), 10_000e18);
         assertEq(Tranche(t1).activeSupply(), 0, "junior must be empty");
 

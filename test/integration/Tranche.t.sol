@@ -66,6 +66,7 @@ contract TrancheTest is CapDeployer {
         assertEq(tranche0.totalAssets(), 0);
         assertEq(tranche0.totalSupply(), 0);
         assertEq(tranche0.market(), address(market));
+        assertEq(tranche0.capitalLimit(), 0);
     }
 
     function test_supportsInterface() public view {
@@ -312,6 +313,7 @@ contract TrancheTest is CapDeployer {
     /// who still earns; repayment stays live through the outage.
     function test_floatingRepayDoesNotDependOnTheOracle() public {
         MarketBundle memory b = _createReadyMarket("repay-oracle");
+        _setMaxCapitalOn(b.market, b.tranche0Addr, 10_000e18);
         _fundTranche(b.tranche0Addr, supplier, 10_000e18);
 
         vm.prank(defaultBorrower);

@@ -199,16 +199,6 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @inheritdoc IBaseMarket
-    function fixedCreditLimit() public view returns (uint256 fixedCreditLimitValue) {
-        BaseMarketStorage storage $ = _getBaseMarketStorage();
-        for (uint256 i; i < $.tranches.length; ++i) {
-            uint256 cap = ITranche($.tranches[i].tranche).fixedCreditLimit();
-            if (fixedCreditLimitValue > type(uint256).max - cap) return type(uint256).max;
-            fixedCreditLimitValue += cap;
-        }
-    }
-
-    /// @inheritdoc IBaseMarket
     function tranches() public view returns (Tranche[] memory) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         return $.tranches;
@@ -302,19 +292,13 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
 
     /// @inheritdoc IBaseMarket
     function creditLimit() public view returns (uint256 limit) {
-        limit = Math.min(fixedCreditLimit(), variableCreditLimit());
-    }
-
-    /// @inheritdoc IBaseMarket
-    /// @dev `activeCapital * min(ltv, lt)`. Guardian tightening of `lt` below `ltv` cuts new
-    /// credit immediately; existing debt can still sit unhealthy.
-    function variableCreditLimit() public view returns (uint256 limit) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        uint256 _limit;
         for (uint256 i; i < $.tranches.length; ++i) {
-            _limit += ITranche($.tranches[i].tranche).activeCapital();
+            uint256 contribution = ITranche($.tranches[i].tranche).capitalLimit();
+            if (limit > type(uint256).max - contribution) return type(uint256).max;
+            limit += contribution;
         }
-        limit = _limit.rayMul(Math.min($.ltv, $.lt));
+        limit = limit.rayMul(Math.min($.ltv, $.lt));
     }
 
     /// @dev Mint credit-backed stablecoin to the recipient

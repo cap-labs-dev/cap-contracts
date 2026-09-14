@@ -22,22 +22,21 @@ contract MarketTest is CapDeployer {
         m = FloatingMarket(marketAddr);
     }
 
-    function test_setFixedCreditLimit_onlyAuthority() public {
+    function test_setMaxCapital_onlyAuthority() public {
         market = _market();
         address tranche = market.tranches()[0].tranche;
         vm.prank(stranger);
         vm.expectRevert();
-        ITranche(tranche).setFixedCreditLimit(1e18);
+        ITranche(tranche).setMaxCapital(1e18);
     }
 
-    function test_setFixedCreditLimit_effect() public {
+    function test_setMaxCapital_effect() public {
         market = _market();
         IBaseMarket.Tranche[] memory ts = market.tranches();
-        ITranche(ts[0].tranche).setFixedCreditLimit(100e18);
-        ITranche(ts[1].tranche).setFixedCreditLimit(23e18);
-        assertEq(ITranche(ts[0].tranche).fixedCreditLimit(), 100e18);
-        assertEq(ITranche(ts[1].tranche).fixedCreditLimit(), 23e18);
-        assertEq(market.fixedCreditLimit(), 123e18);
+        ITranche(ts[0].tranche).setMaxCapital(100e18);
+        ITranche(ts[1].tranche).setMaxCapital(23e18);
+        assertEq(ITranche(ts[0].tranche).maxCapital(), 100e18);
+        assertEq(ITranche(ts[1].tranche).maxCapital(), 23e18);
     }
 
     function test_setTargetHealth_onlyAuthority() public {

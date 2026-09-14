@@ -37,7 +37,8 @@ contract LendingFlowTest is CapDeployer {
         _fundTranche(tranche1, supplier1, TRANCHE1_DEPOSIT);
         _fundTranche(tranche0, supplier0, TRANCHE0_DEPOSIT);
 
-        _setFixedCreditLimit(market, 1_000e18);
+        // each tranche's cap sits at or above its own capital, so LTV of the book binds
+        _setMaxCapital(market, 2_000e18);
     }
 
     function test_availableCredit_isLtvOfCapital() public view {

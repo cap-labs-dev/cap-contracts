@@ -39,7 +39,7 @@ contract RewardRoutingTest is CapDeployer {
         if (tranche0Amt > 0) _fundTranche(tranche0, supplier0, tranche0Amt);
         if (tranche1Amt > 0) _fundTranche(tranche1, supplier1, tranche1Amt);
 
-        _setFixedCreditLimit(m, 1_000e18);
+        _setMaxCapital(m, 1_000e18);
     }
 
     function test_emptyTranche0_leftoverVestsOnStablecoin() public {

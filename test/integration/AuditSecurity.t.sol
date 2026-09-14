@@ -17,6 +17,8 @@ contract AuditSecurityTest is CapDeployer {
         (address a, address ta,) = _createMarket("one");
         (address b, address tb,) = _createMarket("two");
         FloatingMarket(b).setMarketMultiplier(2e27);
+        _setMaxCapitalOn(FloatingMarket(a), ta, 10_000e18);
+        _setMaxCapitalOn(FloatingMarket(b), tb, 10_000e18);
         _fundTranche(ta, makeAddr("lp1"), 10_000e18);
         _fundTranche(tb, makeAddr("lp2"), 10_000e18);
         vm.startPrank(defaultBorrower);
@@ -37,6 +39,8 @@ contract AuditSecurityTest is CapDeployer {
         (address busy, address tb,) = _createMarket("busy");
         FloatingMarket(quiet).setMarketMultiplier(2e27);
         FloatingMarket(busy).setMarketMultiplier(2e27);
+        _setMaxCapitalOn(FloatingMarket(quiet), tq, 10_000e18);
+        _setMaxCapitalOn(FloatingMarket(busy), tb, 10_000e18);
         _fundTranche(tq, makeAddr("lpq"), 10_000e18);
         _fundTranche(tb, makeAddr("lpb"), 10_000e18);
         vm.startPrank(defaultBorrower);
