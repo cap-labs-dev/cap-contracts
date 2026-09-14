@@ -304,10 +304,12 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         IVault(vault).transfer(to, asset(), assets);
     }
 
-    /// @dev Report a tranche and claim premium
+    /// @dev Re-value an already-opened book and claim premium. Registration is not required:
+    /// {removeTranche} only closes new allocations, and leftover shares keep earning until they
+    /// are redeemed. Gating this the same way as {allocate} stranded that later premium until a
+    /// re-add.
     /// @param _tranche The tranche to report
     function _report(address _tranche) internal {
-        if (!_registeredTranches.contains(_tranche)) revert NotRegisteredTranche();
         (uint256 gain, uint256 loss) = _mark(_tranche);
 
         uint256 premium = IPremiumVesting(_tranche).claim(address(this));

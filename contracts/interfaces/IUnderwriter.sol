@@ -77,14 +77,15 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @param roleId The allocator role id
     function setAllocatorRole(uint64 roleId) external;
 
-    /// @notice Register a tranche for allocation and reporting
+    /// @notice Register a tranche for allocation
     /// @dev Curator only. The curator is trusted to name a real protocol tranche for this vault
     /// and asset. Grants the tranche vault operator rights until {removeTranche}.
     /// @param tranche The tranche address
     function addTranche(address tranche) external;
 
     /// @notice Remove a tranche and block new allocations
-    /// @dev Curator only. Revokes vault operator rights. Existing shares can still be redeemed.
+    /// @dev Curator only. Revokes vault operator rights. Existing shares can still be redeemed,
+    /// and {report} can still claim later premium on that leftover position.
     /// @param tranche The tranche address
     function removeTranche(address tranche) external;
 
@@ -122,8 +123,9 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     function setDefaultTranche(address tranche) external;
 
     /// @notice Re-value a tranche position and claim its premium
-    /// @dev Remakes the mark only if {allocate} already opened one. Share price stays on that
-    /// book until this runs; that lag is intentional, not a live NAV walk.
+    /// @dev Registration is not checked; see {deallocate}. Remakes the mark only if {allocate}
+    /// already opened one. Share price stays on that book until this runs; that lag is
+    /// intentional, not a live NAV walk.
     /// @param tranche The tranche address
     function report(address tranche) external;
 

@@ -316,9 +316,15 @@ contract UnderwriterUnitTest is BaseTest {
         underwriter.allocate(tranche, 1e18);
     }
 
-    function test_report_invalidTranche_reverts() public {
-        vm.expectRevert(IUnderwriter.NotRegisteredTranche.selector);
+    /// @dev {report} is not gated on registration. {removeTranche} only closes allocations; leftover
+    /// shares keep earning, and a re-add must not be the only way to collect that later premium.
+    function test_report_doesNotRequireRegistration() public {
+        vm.mockCall(tranche, abi.encodeWithSignature("claim(address)", address(underwriter)), abi.encode(uint256(4e18)));
+
         underwriter.report(tranche);
+
+        assertEq(underwriter.remaining(), 4e18);
+        assertEq(underwriter.lastReported(), block.timestamp);
     }
 
     function test_setDefaultTranche_onlyAuthority() public {
@@ -400,6 +406,10 @@ contract UnderwriterUnitTest is BaseTest {
 
         assertEq(underwriter.remaining(), 2e18);
         assertEq(underwriter.defaultTranche(), address(0));
+
+        vm.mockCall(tranche, abi.encodeWithSignature("claim(address)", address(underwriter)), abi.encode(uint256(3e18)));
+        underwriter.report(tranche);
+        assertEq(underwriter.remaining(), 5e18, "later premium is still claimable after remove");
     }
 
     /// @dev deallocate remakes a book that allocate already opened. An airdropped vault with a
@@ -417,8 +427,8 @@ contract UnderwriterUnitTest is BaseTest {
         assertEq(underwriter.debt(dumped), 0);
     }
 
-    /// @dev report is the same gate: claiming premium on a registered tranche does not book an
-    /// airdrop that allocate never opened.
+    /// @dev report is the same gate: claiming premium does not book an airdrop that allocate never
+    /// opened.
     function test_report_doesNotOpenABookFromAnAirdrop() public {
         underwriter.addTranche(tranche);
         vm.mockCall(tranche, abi.encodeWithSelector(IERC20.balanceOf.selector, address(underwriter)), abi.encode(1e18));

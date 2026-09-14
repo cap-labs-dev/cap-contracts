@@ -141,6 +141,34 @@ contract UnderwriterIntegrationTest is CapDeployer {
         underwriter.allocate(makeAddr("notTranche"), 1e18);
     }
 
+    /// @dev {removeTranche} used to refuse {report}, so leftover shares kept earning on the
+    /// tranche and that later premium sat there until a re-add. Deregistration only closes new
+    /// allocations; the remaining position must still be claimable.
+    function test_removeTranche_laterPremiumStillClaimableWithoutReAdd() public {
+        _useTranche0AsDefault();
+        _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
+
+        vm.prank(borrower);
+        market.borrow(borrower, 400e18);
+
+        vm.warp(block.timestamp + 365 days);
+        market.chargePremium();
+        vm.warp(block.timestamp + 20 * underwriter.vestingPeriod());
+
+        underwriter.removeTranche(address(tranche0));
+        uint256 pulledOnRemove = stablecoin.balanceOf(address(underwriter));
+        assertGt(pulledOnRemove, 0, "remove reports what has already vested");
+
+        vm.warp(block.timestamp + 365 days);
+        market.chargePremium();
+        vm.warp(block.timestamp + 20 * underwriter.vestingPeriod());
+
+        underwriter.report(address(tranche0));
+        assertGt(
+            stablecoin.balanceOf(address(underwriter)), pulledOnRemove, "later premium is not stranded until a re-add"
+        );
+    }
+
     function test_curatorEarnsPremiumAndDistributesToDepositor() public {
         _useTranche0AsDefault();
         _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
