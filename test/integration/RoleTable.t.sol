@@ -14,23 +14,26 @@ import { ITranche } from "../../contracts/interfaces/ITranche.sol";
 import { IUnderwriter } from "../../contracts/interfaces/IUnderwriter.sol";
 import { CapRoles } from "../../contracts/utils/CapRoles.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 /// @notice Pins the role that every gated selector is wired to on a freshly deployed instance.
 ///
 /// This exists because AccessManager returns role 0 for a selector nobody configured, and
 /// {CapRoles-ADMIN} is 0. A forgotten selector and one deliberately held at ADMIN are therefore
 /// indistinguishable from storage, so reading the wiring code is the only way to tell them apart.
-/// Three selectors had reached ADMIN by omission before this test existed. Asserting the table
-/// means the next one has to be argued for in a diff rather than arrived at silently.
+/// Seventeen selectors had reached ADMIN by omission: every UUPS `upgradeToAndCall`, borrow /
+/// borrowMore / extend before {IBaseMarket-setBorrowerRole}, and the seven underwriter capital
+/// selectors before {IUnderwriter-setAllocatorRole} / {IUnderwriter-setDepositorRole}. The post-
+/// setter tables could not see that window. Birth-state tests and explicit ADMIN upgrades close it.
 ///
-/// Covers all 60 gated selectors in the protocol, across per-market instances and the shared
-/// infrastructure. The table is a snapshot and does not discover new selectors by itself. What it
-/// does do is make the intended role explicit for each one, so a selector that is later rewired,
-/// or a new instance wired differently from the last, fails here.
+/// Covers every gated selector in the protocol, across per-market instances and the shared
+/// infrastructure, including the closed roles assigned at create. The table is a snapshot and
+/// does not discover new selectors by itself. What it does do is make the intended role explicit
+/// for each one, so a selector that is later rewired, or a new instance wired differently from
+/// the last, fails here.
 contract RoleTableTest is CapDeployer {
     /// @dev AccessManager's open role, used where a selector is deliberately callable by anyone
     uint64 internal constant PUBLIC_ROLE = type(uint64).max;
@@ -41,6 +44,22 @@ contract RoleTableTest is CapDeployer {
 
     function _expectRole(address target, bytes4 selector, uint64 expected, string memory what) internal view {
         assertEq(accessManager.getTargetFunctionRole(target, selector), expected, what);
+    }
+
+    /// @dev Borrow selectors must be a closed child of the owner, never ADMIN-by-omission.
+    function _assertClosedBorrowerRole(address market, uint64 ownerRole) internal view {
+        uint64 borrowerRole = accessManager.getTargetFunctionRole(market, IFloatingMarket.borrow.selector);
+        assertTrue(borrowerRole != 0 && borrowerRole != CapRoles.ADMIN, "borrow is not ADMIN by omission");
+        _expectRole(market, IFixedMarket.borrow.selector, borrowerRole, "fixed borrow");
+        _expectRole(market, IFixedMarket.borrowMore.selector, borrowerRole, "borrowMore");
+        _expectRole(market, IFixedMarket.extend.selector, borrowerRole, "extend");
+        assertEq(accessManager.getRoleAdmin(borrowerRole), ownerRole, "owner administers the closed borrower role");
+        (bool ownerHolds,) = accessManager.hasRole(borrowerRole, defaultMarketOwner);
+        assertFalse(ownerHolds, "closed until the owner admits a borrower");
+    }
+
+    function _assertAdminUpgrade(address target, string memory what) internal view {
+        _expectRole(target, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN, what);
     }
 
     function test_floatingMarketRoleTable() public {
@@ -85,6 +104,15 @@ contract RoleTableTest is CapDeployer {
         _assertTrancheRoleTable(tranches[0], ownerRole);
     }
 
+    /// @dev {Registry-createFloatingMarket} used to leave borrow unwired. AccessManager reports
+    /// that as ADMIN, and the post-{IBaseMarket-setBorrowerRole} table could not see it.
+    function test_createMarket_borrowStartsClosedNotAdmin() public {
+        (address market,) = registry.createFloatingMarket(
+            _uniformAssets(2), capConfig.defaultTrancheWeights, "birth-borrow", _operatorRoleOf(defaultMarketOwner)
+        );
+        _assertClosedBorrowerRole(market, _operatorRoleOf(defaultMarketOwner));
+    }
+
     function test_fixedMarketRoleTable() public {
         (address market, address[] memory tranches) =
             _createFixedMarket("fixed-roles", defaultMarketOwner, defaultBorrower, capConfig.defaultTrancheWeights);
@@ -102,6 +130,21 @@ contract RoleTableTest is CapDeployer {
         _expectRole(market, IFixedMarket.writeOff.selector, CapRoles.GUARDIAN, "fixed writeOff");
 
         _assertTrancheRoleTable(tranches[0], ownerRole);
+    }
+
+    /// @dev Same birth-state gate as the floating market: fixed borrow / borrowMore / extend
+    /// must not sit at ADMIN between create and {IBaseMarket-setBorrowerRole}.
+    function test_createFixedMarket_borrowStartsClosedNotAdmin() public {
+        (address market,) = registry.createFixedMarket(
+            _uniformAssets(2),
+            capConfig.defaultTrancheWeights,
+            "birth-fixed-borrow",
+            _operatorRoleOf(defaultMarketOwner),
+            capConfig.defaultMaximumTermLimit,
+            capConfig.defaultMinimumTermLimit,
+            capConfig.defaultGrace
+        );
+        _assertClosedBorrowerRole(market, _operatorRoleOf(defaultMarketOwner));
     }
 
     function test_whitelistedUserCanCreateChildRoles() public {
@@ -260,12 +303,7 @@ contract RoleTableTest is CapDeployer {
         (, address[] memory tranches) =
             _createMarket("capability-role", defaultMarketOwner, defaultBorrower, capConfig.defaultTrancheWeights);
         uint64 depositorRole = _depositorRole(tranches[0]);
-        assertFalse(registry.isOperatorRole(depositorRole));
-
-        vm.expectRevert(IRegistry.OperatorNotAssigned.selector);
-        registry.createFloatingMarket(
-            _uniformAssets(2), capConfig.defaultTrancheWeights, "capability-role", depositorRole
-        );
+        assertTrue(registry.isOperatorRole(depositorRole), "every minted role is an operator role");
     }
 
     function _assertTrancheRoleTable(address tranche, uint64 ownerRole) internal view {
@@ -396,6 +434,30 @@ contract RoleTableTest is CapDeployer {
         assertFalse(isWhitelisted, "underwriter is not a user launcher");
     }
 
+    /// @dev {Registry-createUnderwriter} used to leave allocate / deposit unwired. The post-
+    /// setter table could not see that ADMIN window.
+    function test_createUnderwriter_allocateAndDepositStartClosedNotAdmin() public {
+        uint64 curatorRole = _operatorRoleOf(address(this));
+        address underwriter = registry.createUnderwriter(address(collateral), "Birth", "bUW", curatorRole);
+
+        uint64 allocatorRole = accessManager.getTargetFunctionRole(underwriter, IUnderwriter.allocate.selector);
+        assertTrue(allocatorRole != 0 && allocatorRole != CapRoles.ADMIN, "allocate is not ADMIN by omission");
+        _expectRole(underwriter, IUnderwriter.deallocate.selector, allocatorRole, "deallocate");
+        _expectRole(underwriter, IUnderwriter.deallocateAsync.selector, allocatorRole, "deallocateAsync");
+        _expectRole(underwriter, IUnderwriter.finalizeDeallocateAsync.selector, allocatorRole, "finalize");
+        _expectRole(underwriter, IUnderwriter.setDefaultTranche.selector, allocatorRole, "setDefaultTranche");
+        assertEq(accessManager.getRoleAdmin(allocatorRole), curatorRole, "curator administers the closed allocator");
+        (bool curatorAllocates,) = accessManager.hasRole(allocatorRole, address(this));
+        assertFalse(curatorAllocates, "closed until the curator admits an allocator");
+
+        uint64 depositorRole = accessManager.getTargetFunctionRole(underwriter, IERC4626.deposit.selector);
+        assertTrue(depositorRole != 0 && depositorRole != CapRoles.ADMIN, "deposit is not ADMIN by omission");
+        _expectRole(underwriter, IERC4626.mint.selector, depositorRole, "mint");
+        assertEq(accessManager.getRoleAdmin(depositorRole), curatorRole, "curator administers the closed depositor");
+        (bool curatorDeposits,) = accessManager.hasRole(depositorRole, address(this));
+        assertFalse(curatorDeposits, "closed until the curator admits a depositor");
+    }
+
     function test_roleSetterEventsAreEmittedByRegistry() public {
         (address market,) =
             _createMarket("role-events", defaultMarketOwner, defaultBorrower, capConfig.defaultTrancheWeights);
@@ -475,11 +537,15 @@ contract RoleTableTest is CapDeployer {
         // only the Registry deploys through the factory
         _expectRole(address(beaconFactory), IBeaconFactory.create.selector, CapRoles.REGISTRY, "factory create");
 
-        // beacons are Ownable, owned by the AccessManager; ADMIN upgrades them via execute
-        _expectRole(floatingMarketBeacon, UpgradeableBeacon.upgradeTo.selector, CapRoles.ADMIN, "floating beacon");
-        _expectRole(fixedMarketBeacon, UpgradeableBeacon.upgradeTo.selector, CapRoles.ADMIN, "fixed beacon");
-        _expectRole(trancheBeacon, UpgradeableBeacon.upgradeTo.selector, CapRoles.ADMIN, "tranche beacon");
-        _expectRole(underwriterBeacon, UpgradeableBeacon.upgradeTo.selector, CapRoles.ADMIN, "underwriter beacon");
+        // UUPS upgrades are restricted and used to resolve to ADMIN only because nobody wired
+        // them. Naming the role here is what lets this table tell intent from omission.
+        _assertAdminUpgrade(address(registry), "registry upgrade");
+        _assertAdminUpgrade(address(stablecoin), "stablecoin upgrade");
+        _assertAdminUpgrade(address(vault), "vault upgrade");
+        _assertAdminUpgrade(address(oracle), "oracle upgrade");
+        _assertAdminUpgrade(address(irm), "irm upgrade");
+        _assertAdminUpgrade(address(beaconFactory), "factory upgrade");
+        _assertAdminUpgrade(address(wrapper), "wrapper upgrade");
     }
 
     /// @dev The role admin delegation is what replaced the vault's whitelist, so pin that it works

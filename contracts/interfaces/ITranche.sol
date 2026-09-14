@@ -48,6 +48,7 @@ interface ITranche is IERC7540AsyncRedeem {
     ) external;
 
     /// @notice Set the role permitted to deposit
+    /// @dev Can be opened to PUBLIC or kept closed.
     /// @param roleId The depositor role id
     function setDepositorRole(uint64 roleId) external;
 

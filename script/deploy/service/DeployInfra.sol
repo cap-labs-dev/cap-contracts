@@ -165,6 +165,7 @@ contract DeployInfra is CreateXUtils {
                         fixedMarketBeacon: infra.fixedMarketBeacon,
                         trancheBeacon: infra.trancheBeacon,
                         underwriterBeacon: infra.underwriterBeacon,
+                        wrapper: infra.wrapper,
                         lt: 0.8e27,
                         buffer: 0.1e27,
                         targetHealth: 1.25e27

@@ -24,6 +24,7 @@ import { ImplementationsConfig, InfraConfig, UsersConfig } from "../../script/de
 import { ConfigureAccessControl } from "../../script/deploy/service/ConfigureAccessControl.sol";
 import { DeployImplems } from "../../script/deploy/service/DeployImplems.sol";
 import { DeployInfra } from "../../script/deploy/service/DeployInfra.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
@@ -125,7 +126,13 @@ contract DeploymentTest is Test, DeployImplems, DeployInfra, ConfigureAccessCont
         _expectRole(manager, infra.oracle, IOracle.setSource.selector, CapRoles.GOVERNOR);
         _expectRole(manager, infra.registry, IRegistry.createFloatingMarket.selector, CapRoles.WHITELISTED);
         _expectRole(manager, infra.factory, IBeaconFactory.create.selector, CapRoles.REGISTRY);
-        _expectRole(manager, infra.trancheBeacon, UpgradeableBeacon.upgradeTo.selector, CapRoles.ADMIN);
+        _expectRole(manager, infra.registry, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
+        _expectRole(manager, infra.stablecoin, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
+        _expectRole(manager, infra.vault, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
+        _expectRole(manager, infra.oracle, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
+        _expectRole(manager, infra.irm, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
+        _expectRole(manager, infra.factory, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
+        _expectRole(manager, infra.wrapper, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
     }
 
     function test_theDeployedWrapperIsSeeded() public view {

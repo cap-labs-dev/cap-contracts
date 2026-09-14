@@ -15,9 +15,9 @@ import { IUnderwriter } from "../../contracts/interfaces/IUnderwriter.sol";
 import { CapRoles } from "../../contracts/utils/CapRoles.sol";
 import { InfraSerializer } from "../config/InfraSerializer.sol";
 import { InfraConfig } from "../deploy/interfaces/DeployConfigs.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import { Script } from "forge-std/Script.sol";
 import { console } from "forge-std/console.sol";
 
@@ -186,30 +186,37 @@ contract CheckRoles is Script, InfraSerializer {
 
         _wired(
             manager,
-            "Beacon.floating.upgradeTo",
-            infra.floatingMarketBeacon,
-            UpgradeableBeacon.upgradeTo.selector,
+            "Registry.upgradeToAndCall",
+            infra.registry,
+            UUPSUpgradeable.upgradeToAndCall.selector,
             CapRoles.ADMIN
         );
         _wired(
             manager,
-            "Beacon.fixed.upgradeTo",
-            infra.fixedMarketBeacon,
-            UpgradeableBeacon.upgradeTo.selector,
+            "Stablecoin.upgradeToAndCall",
+            infra.stablecoin,
+            UUPSUpgradeable.upgradeToAndCall.selector,
+            CapRoles.ADMIN
+        );
+        _wired(
+            manager, "Vault.upgradeToAndCall", infra.vault, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN
+        );
+        _wired(
+            manager, "Oracle.upgradeToAndCall", infra.oracle, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN
+        );
+        _wired(manager, "IRM.upgradeToAndCall", infra.irm, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
+        _wired(
+            manager,
+            "Factory.upgradeToAndCall",
+            infra.factory,
+            UUPSUpgradeable.upgradeToAndCall.selector,
             CapRoles.ADMIN
         );
         _wired(
             manager,
-            "Beacon.tranche.upgradeTo",
-            infra.trancheBeacon,
-            UpgradeableBeacon.upgradeTo.selector,
-            CapRoles.ADMIN
-        );
-        _wired(
-            manager,
-            "Beacon.underwriter.upgradeTo",
-            infra.underwriterBeacon,
-            UpgradeableBeacon.upgradeTo.selector,
+            "Wrapper.upgradeToAndCall",
+            infra.wrapper,
+            UUPSUpgradeable.upgradeToAndCall.selector,
             CapRoles.ADMIN
         );
         console.log("");
@@ -233,15 +240,14 @@ contract CheckRoles is Script, InfraSerializer {
             _wired(manager, "Market.setTargetHealth", market, IBaseMarket.setTargetHealth.selector, CapRoles.GOVERNOR);
             _wired(manager, "Market.setBuffer", market, IBaseMarket.setBuffer.selector, CapRoles.GUARDIAN);
             _wired(manager, "Market.setLt", market, IBaseMarket.setLt.selector, CapRoles.GUARDIAN);
-            _dump(manager, "Market.borrow", market, IFloatingMarket.borrow.selector);
             _wired(manager, "Market.liquidate", market, IFloatingMarket.liquidate.selector, CapRoles.LIQUIDATOR);
             _wired(manager, "Market.writeOff", market, IFloatingMarket.writeOff.selector, CapRoles.GUARDIAN);
-            if (manager.getTargetFunctionRole(market, IFixedMarket.borrowMore.selector) != CapRoles.ADMIN) {
-                _dump(manager, "Fixed.borrowMore", market, IFixedMarket.borrowMore.selector);
-                _dump(manager, "Fixed.extend", market, IFixedMarket.extend.selector);
-                _wired(manager, "Fixed.extendAdmin", market, IFixedMarket.extendAdmin.selector, CapRoles.KEEPER);
-                _wired(manager, "Fixed.setTermLimits", market, IFixedMarket.setTermLimits.selector, CapRoles.GOVERNOR);
-            }
+            _notAdmin(manager, "Market.borrow", market, IFloatingMarket.borrow.selector);
+            _notAdmin(manager, "Market.fixedBorrow", market, IFixedMarket.borrow.selector);
+            _notAdmin(manager, "Market.borrowMore", market, IFixedMarket.borrowMore.selector);
+            _notAdmin(manager, "Market.extend", market, IFixedMarket.extend.selector);
+            _wired(manager, "Fixed.extendAdmin", market, IFixedMarket.extendAdmin.selector, CapRoles.KEEPER);
+            _wired(manager, "Fixed.setTermLimits", market, IFixedMarket.setTermLimits.selector, CapRoles.GOVERNOR);
             console.log("");
         }
 
@@ -270,6 +276,8 @@ contract CheckRoles is Script, InfraSerializer {
             _wired(
                 manager, "Underwriter.setAllocatorRole", underwriter, IUnderwriter.setAllocatorRole.selector, curator
             );
+            _notAdmin(manager, "Underwriter.allocate", underwriter, IUnderwriter.allocate.selector);
+            _notAdmin(manager, "Underwriter.deposit", underwriter, IERC4626.deposit.selector);
             console.log("  curator role", curator);
             console.log("");
         }
@@ -301,9 +309,15 @@ contract CheckRoles is Script, InfraSerializer {
         }
     }
 
-    function _dump(IAccessManager manager, string memory name, address target, bytes4 selector) internal view {
+    function _notAdmin(IAccessManager manager, string memory name, address target, bytes4 selector) internal {
         uint64 actual = manager.getTargetFunctionRole(target, selector);
-        console.log(string.concat(name, " -> ", _roleName(actual)), uint256(actual));
+        string memory line = string.concat(name, " -> ", _roleName(actual));
+        if (actual == CapRoles.ADMIN) {
+            console.log(string.concat("!! ", line, " (ADMIN by omission)"));
+            mismatches++;
+        } else {
+            console.log(line, uint256(actual));
+        }
     }
 
     function _roleName(uint64 roleId) private pure returns (string memory name) {

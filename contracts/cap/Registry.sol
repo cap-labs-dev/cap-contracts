@@ -23,7 +23,6 @@ import {
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 /// @title Registry
 /// @author kexley, Cap Labs
@@ -60,6 +59,9 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     address public underwriterBeacon;
 
     /// @inheritdoc IRegistry
+    address public wrapper;
+
+    /// @inheritdoc IRegistry
     uint256 public lt;
 
     /// @inheritdoc IRegistry
@@ -92,7 +94,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
             init.vault == address(0) || init.stablecoin == address(0) || init.oracle == address(0)
                 || init.irm == address(0) || init.factory == address(0) || init.floatingMarketBeacon == address(0)
                 || init.fixedMarketBeacon == address(0) || init.trancheBeacon == address(0)
-                || init.underwriterBeacon == address(0)
+                || init.underwriterBeacon == address(0) || init.wrapper == address(0)
         ) revert ZeroAddress();
         vault = init.vault;
         stablecoin = init.stablecoin;
@@ -103,6 +105,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         fixedMarketBeacon = init.fixedMarketBeacon;
         trancheBeacon = init.trancheBeacon;
         underwriterBeacon = init.underwriterBeacon;
+        wrapper = init.wrapper;
         if (init.lt > 1e27 || init.lt <= init.buffer) revert IBaseMarket.InvalidLt();
         if (init.targetHealth < 1.25e27) revert IBaseMarket.InvalidTargetHealth();
         lt = init.lt;
@@ -201,11 +204,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     /// @inheritdoc IRegistry
     function setDepositorRole(uint64 roleId) external restricted {
         IAccessManager manager = IAccessManager(authority());
-        bytes4[] memory depositorSelectors = new bytes4[](2);
-        depositorSelectors[0] = IERC4626.deposit.selector;
-        depositorSelectors[1] = IERC4626.mint.selector;
-
-        manager.setTargetFunctionRole(msg.sender, depositorSelectors, roleId);
+        manager.setTargetFunctionRole(msg.sender, _depositorSelectors(), roleId);
         emit SetDepositorRole(msg.sender, roleId);
     }
 
@@ -215,13 +214,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         if (!isOperatorRole[roleId]) revert NotOperatorRole();
 
         IAccessManager manager = IAccessManager(authority());
-        bytes4[] memory borrowerSelectors = new bytes4[](4);
-        borrowerSelectors[0] = IFloatingMarket.borrow.selector;
-        borrowerSelectors[1] = IFixedMarket.borrow.selector;
-        borrowerSelectors[2] = IFixedMarket.borrowMore.selector;
-        borrowerSelectors[3] = IFixedMarket.extend.selector;
-
-        manager.setTargetFunctionRole(msg.sender, borrowerSelectors, roleId);
+        manager.setTargetFunctionRole(msg.sender, _borrowerSelectors(), roleId);
         emit SetBorrowerRole(msg.sender, roleId);
     }
 
@@ -230,14 +223,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         if (roleId == type(uint64).max) revert PublicRole();
         if (!isOperatorRole[roleId]) revert NotOperatorRole();
         IAccessManager manager = IAccessManager(authority());
-        bytes4[] memory allocatorSelectors = new bytes4[](5);
-        allocatorSelectors[0] = IUnderwriter.allocate.selector;
-        allocatorSelectors[1] = IUnderwriter.deallocate.selector;
-        allocatorSelectors[2] = IUnderwriter.deallocateAsync.selector;
-        allocatorSelectors[3] = IUnderwriter.finalizeDeallocateAsync.selector;
-        allocatorSelectors[4] = IUnderwriter.setDefaultTranche.selector;
-
-        manager.setTargetFunctionRole(msg.sender, allocatorSelectors, roleId);
+        manager.setTargetFunctionRole(msg.sender, _allocatorSelectors(), roleId);
         emit SetAllocatorRole(msg.sender, roleId);
     }
 
@@ -333,7 +319,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
             )
         );
 
-        uint64 depositorRoleId = _nextOperatorRoleId++;
+        uint64 depositorRoleId = _newClosedRole(IAccessManager(authority()), ownerRole);
         _configureTrancheRoles(tranche, ownerRole, depositorRoleId);
 
         emit CreateTranche(market, tranche, _asset, ownerRole, depositorRoleId);
@@ -348,74 +334,31 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     /// @dev Wire shared-infrastructure selectors. This contract must hold ADMIN.
+    /// Every UUPS `upgradeToAndCall` is named here so it cannot sit at ADMIN by omission.
     function _configureInfraRoles() internal {
         IAccessManager manager = IAccessManager(authority());
 
-        bytes4[] memory factorySelectors = new bytes4[](1);
-        factorySelectors[0] = IBeaconFactory.create.selector;
-        manager.setTargetFunctionRole(factory, factorySelectors, CapRoles.REGISTRY);
+        bytes4[] memory upgrades = _upgradeSelectors();
+        manager.setTargetFunctionRole(address(this), upgrades, CapRoles.ADMIN);
+        manager.setTargetFunctionRole(stablecoin, upgrades, CapRoles.ADMIN);
+        manager.setTargetFunctionRole(vault, upgrades, CapRoles.ADMIN);
+        manager.setTargetFunctionRole(oracle, upgrades, CapRoles.ADMIN);
+        manager.setTargetFunctionRole(irm, upgrades, CapRoles.ADMIN);
+        manager.setTargetFunctionRole(factory, upgrades, CapRoles.ADMIN);
+        manager.setTargetFunctionRole(wrapper, upgrades, CapRoles.ADMIN);
 
-        bytes4[] memory registryWhitelistedSelectors = new bytes4[](4);
-        registryWhitelistedSelectors[0] = IRegistry.createChildRoles.selector;
-        registryWhitelistedSelectors[1] = IRegistry.createFloatingMarket.selector;
-        registryWhitelistedSelectors[2] = IRegistry.createFixedMarket.selector;
-        registryWhitelistedSelectors[3] = IRegistry.createUnderwriter.selector;
-        manager.setTargetFunctionRole(address(this), registryWhitelistedSelectors, CapRoles.WHITELISTED);
+        manager.setTargetFunctionRole(factory, _factorySelectors(), CapRoles.REGISTRY);
+        manager.setTargetFunctionRole(address(this), _registryWhitelistedSelectors(), CapRoles.WHITELISTED);
+        manager.setTargetFunctionRole(address(this), _registryProtocolSelectors(), CapRoles.PROTOCOL);
 
-        bytes4[] memory registryProtocolSelectors = new bytes4[](3);
-        registryProtocolSelectors[0] = IRegistry.setDepositorRole.selector;
-        registryProtocolSelectors[1] = IRegistry.setBorrowerRole.selector;
-        registryProtocolSelectors[2] = IRegistry.setAllocatorRole.selector;
-        manager.setTargetFunctionRole(address(this), registryProtocolSelectors, CapRoles.PROTOCOL);
+        manager.setTargetFunctionRole(stablecoin, _stablecoinMarketSelectors(), CapRoles.MARKET);
+        manager.setTargetFunctionRole(stablecoin, _stablecoinGuardianSelectors(), CapRoles.GUARDIAN);
+        manager.setTargetFunctionRole(stablecoin, _stablecoinKeeperSelectors(), CapRoles.KEEPER);
+        manager.setTargetFunctionRole(stablecoin, _stablecoinGovernorSelectors(), CapRoles.GOVERNOR);
 
-        // mint, burn, credit write-off, and credit-backed premium — markets only
-        bytes4[] memory marketSelectors = new bytes4[](4);
-        marketSelectors[0] = IStablecoin.mintCreditBacked.selector;
-        marketSelectors[1] = IStablecoin.burnCreditBacked.selector;
-        marketSelectors[2] = IStablecoin.recognizeBadDebtInCredit.selector;
-        marketSelectors[3] = IStablecoin.fundCreditBacked.selector;
-        manager.setTargetFunctionRole(stablecoin, marketSelectors, CapRoles.MARKET);
-
-        // reserve losses are exceptional and must be recognized by the guardian
-        bytes4[] memory stablecoinGuardianSelectors = new bytes4[](3);
-        stablecoinGuardianSelectors[0] = IStablecoin.recognizeBadDebtInReserve.selector;
-        stablecoinGuardianSelectors[1] = IStablecoin.pause.selector;
-        stablecoinGuardianSelectors[2] = IStablecoin.unpause.selector;
-        manager.setTargetFunctionRole(stablecoin, stablecoinGuardianSelectors, CapRoles.GUARDIAN);
-
-        // parking reserve is keeper work
-        bytes4[] memory stablecoinKeeperSelectors = new bytes4[](2);
-        stablecoinKeeperSelectors[0] = IStablecoin.invest.selector;
-        stablecoinKeeperSelectors[1] = IStablecoin.recall.selector;
-        manager.setTargetFunctionRole(stablecoin, stablecoinKeeperSelectors, CapRoles.KEEPER);
-
-        bytes4[] memory stablecoinGovernorSelectors = new bytes4[](1);
-        stablecoinGovernorSelectors[0] = IStablecoin.setReserveVault.selector;
-        manager.setTargetFunctionRole(stablecoin, stablecoinGovernorSelectors, CapRoles.GOVERNOR);
-
-        bytes4[] memory irmMarketSelectors = new bytes4[](1);
-        irmMarketSelectors[0] = IInterestRateModel.updateUnderwriterRate.selector;
-        manager.setTargetFunctionRole(irm, irmMarketSelectors, CapRoles.MARKET);
-
-        bytes4[] memory irmGovernorSelectors = new bytes4[](4);
-        irmGovernorSelectors[0] = IInterestRateModel.setLiquiditySlopes.selector;
-        irmGovernorSelectors[1] = IInterestRateModel.setTermMultiplierSlope.selector;
-        irmGovernorSelectors[2] = IInterestRateModel.setLiquidationBonus.selector;
-        irmGovernorSelectors[3] = IInterestRateModel.setAveragingPeriod.selector;
-        manager.setTargetFunctionRole(irm, irmGovernorSelectors, CapRoles.GOVERNOR);
-
-        // feeds are economic policy, same as the rate curve
-        bytes4[] memory oracleGovernorSelectors = new bytes4[](1);
-        oracleGovernorSelectors[0] = IOracle.setSource.selector;
-        manager.setTargetFunctionRole(oracle, oracleGovernorSelectors, CapRoles.GOVERNOR);
-
-        // beacons are Ownable; the manager is the owner, so ADMIN upgrades via execute
-        bytes4[] memory beaconSelectors = new bytes4[](1);
-        beaconSelectors[0] = UpgradeableBeacon.upgradeTo.selector;
-        manager.setTargetFunctionRole(floatingMarketBeacon, beaconSelectors, CapRoles.ADMIN);
-        manager.setTargetFunctionRole(fixedMarketBeacon, beaconSelectors, CapRoles.ADMIN);
-        manager.setTargetFunctionRole(trancheBeacon, beaconSelectors, CapRoles.ADMIN);
-        manager.setTargetFunctionRole(underwriterBeacon, beaconSelectors, CapRoles.ADMIN);
+        manager.setTargetFunctionRole(irm, _irmMarketSelectors(), CapRoles.MARKET);
+        manager.setTargetFunctionRole(irm, _irmGovernorSelectors(), CapRoles.GOVERNOR);
+        manager.setTargetFunctionRole(oracle, _oracleGovernorSelectors(), CapRoles.GOVERNOR);
     }
 
     /// @dev Wire market function selectors to protocol and operator roles
@@ -424,41 +367,18 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     function _configureMarketRoles(address market, uint64 ownerRole) internal {
         IAccessManager manager = IAccessManager(authority());
 
-        bytes4[] memory ownerSelectors = new bytes4[](7);
-        ownerSelectors[0] = IBaseMarket.setTrancheWeights.selector;
-        ownerSelectors[1] = IBaseMarket.setLtv.selector;
-        ownerSelectors[2] = IBaseMarket.setMarketMultiplier.selector;
-        ownerSelectors[3] = IFixedMarket.extend.selector;
-        ownerSelectors[4] = IBaseMarket.setUnderwriterRate.selector;
-        ownerSelectors[5] = IBaseMarket.setBorrowerRole.selector;
-        ownerSelectors[6] = IBaseMarket.setDepositorRole.selector;
-        manager.setTargetFunctionRole(market, ownerSelectors, ownerRole);
+        manager.setTargetFunctionRole(market, _marketOwnerSelectors(), ownerRole);
 
-        bytes4[] memory registrySelectors = new bytes4[](1);
-        registrySelectors[0] = IBaseMarket.setTranches.selector;
-        manager.setTargetFunctionRole(market, registrySelectors, CapRoles.REGISTRY);
+        // borrow / borrowMore / extend used to sit unwired until {setBorrowerRole}, which
+        // AccessManager reports as ADMIN. A closed role the owner administers is the same
+        // pattern as the tranche depositor role: nobody can draw until they are admitted.
+        manager.setTargetFunctionRole(market, _borrowerSelectors(), _newClosedRole(manager, ownerRole));
 
-        bytes4[] memory governorSelectors = new bytes4[](2);
-        governorSelectors[0] = IBaseMarket.setTargetHealth.selector;
-        governorSelectors[1] = IFixedMarket.setTermLimits.selector;
-        manager.setTargetFunctionRole(market, governorSelectors, CapRoles.GOVERNOR);
-
-        bytes4[] memory guardianSelectors = new bytes4[](4);
-        guardianSelectors[0] = IBaseMarket.setBuffer.selector;
-        guardianSelectors[1] = IBaseMarket.setLt.selector;
-        // write-off recognises a loss
-        guardianSelectors[2] = IFloatingMarket.writeOff.selector;
-        guardianSelectors[3] = IFixedMarket.writeOff.selector;
-        manager.setTargetFunctionRole(market, guardianSelectors, CapRoles.GUARDIAN);
-
-        bytes4[] memory keeperSelectors = new bytes4[](1);
-        keeperSelectors[0] = IFixedMarket.extendAdmin.selector;
-        manager.setTargetFunctionRole(market, keeperSelectors, CapRoles.KEEPER);
-
-        bytes4[] memory liquidatorSelectors = new bytes4[](2);
-        liquidatorSelectors[0] = IFloatingMarket.liquidate.selector;
-        liquidatorSelectors[1] = IFixedMarket.liquidate.selector;
-        manager.setTargetFunctionRole(market, liquidatorSelectors, CapRoles.LIQUIDATOR);
+        manager.setTargetFunctionRole(market, _marketRegistrySelectors(), CapRoles.REGISTRY);
+        manager.setTargetFunctionRole(market, _marketGovernorSelectors(), CapRoles.GOVERNOR);
+        manager.setTargetFunctionRole(market, _marketGuardianSelectors(), CapRoles.GUARDIAN);
+        manager.setTargetFunctionRole(market, _marketKeeperSelectors(), CapRoles.KEEPER);
+        manager.setTargetFunctionRole(market, _marketLiquidatorSelectors(), CapRoles.LIQUIDATOR);
 
         manager.grantRole(CapRoles.MARKET, market, 0);
         manager.grantRole(CapRoles.PROTOCOL, market, 0);
@@ -471,27 +391,10 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     function _configureTrancheRoles(address tranche, uint64 ownerRole, uint64 depositorRoleId) internal {
         IAccessManager manager = IAccessManager(authority());
 
-        bytes4[] memory ownerSelectors = new bytes4[](1);
-        ownerSelectors[0] = ITranche.setDepositorRole.selector;
-        manager.setTargetFunctionRole(tranche, ownerSelectors, ownerRole);
-
-        bytes4[] memory governorSelectors = new bytes4[](1);
-        governorSelectors[0] = ITranche.setFixedCreditLimit.selector;
-        manager.setTargetFunctionRole(tranche, governorSelectors, CapRoles.GOVERNOR);
-
-        // premium is pushed by the market that charged it. slash is gated on `msg.sender == market`
-        bytes4[] memory marketSelectors = new bytes4[](1);
-        marketSelectors[0] = ITranche.fund.selector;
-        manager.setTargetFunctionRole(tranche, marketSelectors, CapRoles.MARKET);
-
-        // depositor role is the whitelist for entry into the tranche
-        bytes4[] memory depositorSelectors = new bytes4[](2);
-        depositorSelectors[0] = IERC4626.deposit.selector;
-        depositorSelectors[1] = IERC4626.mint.selector;
-        manager.setTargetFunctionRole(tranche, depositorSelectors, depositorRoleId);
-
-        // depositor role is administered by the market owner
-        manager.setRoleAdmin(depositorRoleId, ownerRole);
+        manager.setTargetFunctionRole(tranche, _trancheOwnerSelectors(), ownerRole);
+        manager.setTargetFunctionRole(tranche, _trancheGovernorSelectors(), CapRoles.GOVERNOR);
+        manager.setTargetFunctionRole(tranche, _trancheMarketSelectors(), CapRoles.MARKET);
+        manager.setTargetFunctionRole(tranche, _depositorSelectors(), depositorRoleId);
         manager.grantRole(CapRoles.PROTOCOL, tranche, 0);
     }
 
@@ -501,18 +404,184 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     function _configureUnderwriterRoles(address underwriter, uint64 curatorRoleId) internal {
         IAccessManager manager = IAccessManager(authority());
 
-        bytes4[] memory curatorSelectors = new bytes4[](4);
-        curatorSelectors[0] = IUnderwriter.addTranche.selector;
-        curatorSelectors[1] = IUnderwriter.removeTranche.selector;
-        curatorSelectors[2] = IUnderwriter.setDepositorRole.selector;
-        curatorSelectors[3] = IUnderwriter.setAllocatorRole.selector;
-        manager.setTargetFunctionRole(underwriter, curatorSelectors, curatorRoleId);
+        manager.setTargetFunctionRole(underwriter, _underwriterCuratorSelectors(), curatorRoleId);
+        manager.setTargetFunctionRole(underwriter, _underwriterKeeperSelectors(), CapRoles.KEEPER);
 
-        bytes4[] memory keeperSelectors = new bytes4[](1);
-        keeperSelectors[0] = IUnderwriter.report.selector;
-        manager.setTargetFunctionRole(underwriter, keeperSelectors, CapRoles.KEEPER);
+        // the seven capital-moving selectors used to sit unwired until {setAllocatorRole} /
+        // {setDepositorRole}. Closed roles the curator administers close that ADMIN window.
+        manager.setTargetFunctionRole(underwriter, _allocatorSelectors(), _newClosedRole(manager, curatorRoleId));
+        manager.setTargetFunctionRole(underwriter, _depositorSelectors(), _newClosedRole(manager, curatorRoleId));
 
         manager.grantRole(CapRoles.PROTOCOL, underwriter, 0);
+    }
+
+    /// @dev A fresh operator role with no members. Same list {createChildRoles} writes, so a
+    /// depositor or borrower role minted at create can later be named as an owner, borrower, or
+    /// allocator.
+    /// @param manager The access manager
+    /// @param adminRole The role that will administer the new role
+    /// @return roleId The new role id
+    function _newClosedRole(IAccessManager manager, uint64 adminRole) internal returns (uint64 roleId) {
+        roleId = _nextOperatorRoleId++;
+        manager.setRoleAdmin(roleId, adminRole);
+        isOperatorRole[roleId] = true;
+    }
+
+    function _upgradeSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = _one(UUPSUpgradeable.upgradeToAndCall.selector);
+    }
+
+    function _factorySelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = _one(IBeaconFactory.create.selector);
+    }
+
+    function _registryWhitelistedSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](4);
+        selectors[0] = IRegistry.createChildRoles.selector;
+        selectors[1] = IRegistry.createFloatingMarket.selector;
+        selectors[2] = IRegistry.createFixedMarket.selector;
+        selectors[3] = IRegistry.createUnderwriter.selector;
+    }
+
+    function _registryProtocolSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](3);
+        selectors[0] = IRegistry.setDepositorRole.selector;
+        selectors[1] = IRegistry.setBorrowerRole.selector;
+        selectors[2] = IRegistry.setAllocatorRole.selector;
+    }
+
+    function _stablecoinMarketSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](4);
+        selectors[0] = IStablecoin.mintCreditBacked.selector;
+        selectors[1] = IStablecoin.burnCreditBacked.selector;
+        selectors[2] = IStablecoin.recognizeBadDebtInCredit.selector;
+        selectors[3] = IStablecoin.fundCreditBacked.selector;
+    }
+
+    function _stablecoinGuardianSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](3);
+        selectors[0] = IStablecoin.recognizeBadDebtInReserve.selector;
+        selectors[1] = IStablecoin.pause.selector;
+        selectors[2] = IStablecoin.unpause.selector;
+    }
+
+    function _stablecoinKeeperSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](2);
+        selectors[0] = IStablecoin.invest.selector;
+        selectors[1] = IStablecoin.recall.selector;
+    }
+
+    function _stablecoinGovernorSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = _one(IStablecoin.setReserveVault.selector);
+    }
+
+    function _irmMarketSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = _one(IInterestRateModel.updateUnderwriterRate.selector);
+    }
+
+    function _irmGovernorSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](4);
+        selectors[0] = IInterestRateModel.setLiquiditySlopes.selector;
+        selectors[1] = IInterestRateModel.setTermMultiplierSlope.selector;
+        selectors[2] = IInterestRateModel.setLiquidationBonus.selector;
+        selectors[3] = IInterestRateModel.setAveragingPeriod.selector;
+    }
+
+    function _oracleGovernorSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = _one(IOracle.setSource.selector);
+    }
+
+    function _marketOwnerSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](6);
+        selectors[0] = IBaseMarket.setTrancheWeights.selector;
+        selectors[1] = IBaseMarket.setLtv.selector;
+        selectors[2] = IBaseMarket.setMarketMultiplier.selector;
+        selectors[3] = IBaseMarket.setUnderwriterRate.selector;
+        selectors[4] = IBaseMarket.setBorrowerRole.selector;
+        selectors[5] = IBaseMarket.setDepositorRole.selector;
+    }
+
+    function _marketRegistrySelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = _one(IBaseMarket.setTranches.selector);
+    }
+
+    function _marketGovernorSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](2);
+        selectors[0] = IBaseMarket.setTargetHealth.selector;
+        selectors[1] = IFixedMarket.setTermLimits.selector;
+    }
+
+    function _marketGuardianSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](4);
+        selectors[0] = IBaseMarket.setBuffer.selector;
+        selectors[1] = IBaseMarket.setLt.selector;
+        selectors[2] = IFloatingMarket.writeOff.selector;
+        selectors[3] = IFixedMarket.writeOff.selector;
+    }
+
+    function _marketKeeperSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = _one(IFixedMarket.extendAdmin.selector);
+    }
+
+    function _marketLiquidatorSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](2);
+        selectors[0] = IFloatingMarket.liquidate.selector;
+        selectors[1] = IFixedMarket.liquidate.selector;
+    }
+
+    function _trancheOwnerSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = _one(ITranche.setDepositorRole.selector);
+    }
+
+    function _trancheGovernorSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = _one(ITranche.setFixedCreditLimit.selector);
+    }
+
+    function _trancheMarketSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = _one(ITranche.fund.selector);
+    }
+
+    function _underwriterCuratorSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](4);
+        selectors[0] = IUnderwriter.addTranche.selector;
+        selectors[1] = IUnderwriter.removeTranche.selector;
+        selectors[2] = IUnderwriter.setDepositorRole.selector;
+        selectors[3] = IUnderwriter.setAllocatorRole.selector;
+    }
+
+    function _underwriterKeeperSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = _one(IUnderwriter.report.selector);
+    }
+
+    /// @dev Borrow, borrowMore, and extend. Shared by create and {setBorrowerRole}.
+    function _borrowerSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](4);
+        selectors[0] = IFloatingMarket.borrow.selector;
+        selectors[1] = IFixedMarket.borrow.selector;
+        selectors[2] = IFixedMarket.borrowMore.selector;
+        selectors[3] = IFixedMarket.extend.selector;
+    }
+
+    /// @dev Allocate, deallocate, and the default route. Shared by create and {setAllocatorRole}.
+    function _allocatorSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](5);
+        selectors[0] = IUnderwriter.allocate.selector;
+        selectors[1] = IUnderwriter.deallocate.selector;
+        selectors[2] = IUnderwriter.deallocateAsync.selector;
+        selectors[3] = IUnderwriter.finalizeDeallocateAsync.selector;
+        selectors[4] = IUnderwriter.setDefaultTranche.selector;
+    }
+
+    /// @dev ERC-4626 entry points. Shared by tranche create, underwriter create, and {setDepositorRole}.
+    function _depositorSelectors() private pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](2);
+        selectors[0] = IERC4626.deposit.selector;
+        selectors[1] = IERC4626.mint.selector;
+    }
+
+    function _one(bytes4 selector) private pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](1);
+        selectors[0] = selector;
     }
 
     /// @inheritdoc UUPSUpgradeable

@@ -39,6 +39,7 @@ interface IRegistry {
     /// @param fixedMarketBeacon The fixed market beacon address
     /// @param trancheBeacon The tranche beacon address
     /// @param underwriterBeacon The underwriter beacon address
+    /// @param wrapper The staked-stablecoin wrapper address
     /// @param lt Default liquidation threshold for new markets in ray decimals (at most one ray, above buffer)
     /// @param buffer Default liquidation buffer for new markets in ray decimals (strictly below lt)
     /// @param targetHealth Default target health for new markets in ray decimals (min 1.25e27)
@@ -52,6 +53,7 @@ interface IRegistry {
         address fixedMarketBeacon;
         address trancheBeacon;
         address underwriterBeacon;
+        address wrapper;
         uint256 lt;
         uint256 buffer;
         uint256 targetHealth;
@@ -105,7 +107,9 @@ interface IRegistry {
     event SetAllocatorRole(address indexed underwriter, uint64 indexed roleId);
 
     /// @notice Initialize the registry and wire shared infrastructure roles
-    /// @dev This contract must hold ADMIN to call `setTargetFunctionRole`. Per-market roles are wired on create.
+    /// @dev This contract must hold ADMIN to call `setTargetFunctionRole`. Per-market roles are
+    /// wired on create. Every UUPS `upgradeToAndCall` is named as ADMIN here so it cannot sit
+    /// at ADMIN only by omission.
     /// @param authority The access manager address
     /// @param init The registry initialization parameters
     function initialize(address authority, InitParams calldata init) external;
@@ -126,6 +130,8 @@ interface IRegistry {
 
     /// @notice Deploy a floating market with tranches at the given assets and weights
     /// @dev Restricted to WHITELISTED. One tranche per entry of `assets` and `weights`.
+    /// Borrow, borrowMore and extend start on a closed role the owner administers, so they
+    /// cannot sit at ADMIN until {setBorrowerRole}.
     /// @param assets The asset of each tranche, index 0 is most senior
     /// @param weights Tranche weights in ray decimals, index 0 is most senior
     /// @param name The market name
@@ -175,12 +181,15 @@ interface IRegistry {
     function setDepositorRole(uint64 roleId) external;
 
     /// @notice Set the borrower role on the calling market
-    /// @dev Restricted to PROTOCOL. Deployed markets hold that role so {IBaseMarket-setBorrowerRole} can forward here.
+    /// @dev Restricted to PROTOCOL. Deployed markets hold that role so {IBaseMarket-setBorrowerRole}
+    /// can forward here. Replaces the closed borrower role assigned at create.
     /// @param roleId The borrower role id
     function setBorrowerRole(uint64 roleId) external;
 
     /// @notice Set the allocator role on the calling underwriter
-    /// @dev Restricted to PROTOCOL. Deployed underwriters hold that role so {IUnderwriter-setAllocatorRole} can forward here.
+    /// @dev Restricted to PROTOCOL. Deployed underwriters hold that role so
+    /// {IUnderwriter-setAllocatorRole} can forward here. Replaces the closed allocator role
+    /// assigned at create.
     /// @param roleId The allocator role id
     function setAllocatorRole(uint64 roleId) external;
 
@@ -196,7 +205,9 @@ interface IRegistry {
     function marketOwnerRole(address market) external view returns (uint64 roleId);
 
     /// @notice Deploy an underwriter for an asset
-    /// @dev Restricted to WHITELISTED.
+    /// @dev Restricted to WHITELISTED. Allocate, deallocate, the default route, and deposit
+    /// start on closed roles the curator administers, so they cannot sit at ADMIN until
+    /// {setAllocatorRole} / {setDepositorRole}.
     /// @param asset The underwriter asset
     /// @param name The underwriter name
     /// @param symbol The underwriter symbol
@@ -241,6 +252,10 @@ interface IRegistry {
     /// @notice Get the underwriter upgradeable beacon address
     /// @return The underwriter beacon
     function underwriterBeacon() external view returns (address);
+
+    /// @notice Get the staked-stablecoin wrapper address
+    /// @return The wrapper address
+    function wrapper() external view returns (address);
 
     /// @notice Default liquidation threshold for new markets in ray decimals
     /// @return The default liquidation threshold

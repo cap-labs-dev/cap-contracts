@@ -13,6 +13,7 @@ import { Stablecoin } from "../../contracts/cap/Stablecoin.sol";
 import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { Underwriter } from "../../contracts/cap/Underwriter.sol";
 import { Vault } from "../../contracts/cap/Vault.sol";
+import { Wrapper } from "../../contracts/cap/Wrapper.sol";
 import { FixedMarket } from "../../contracts/cap/market/FixedMarket.sol";
 import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
 import { ChainlinkAdapter } from "../../contracts/cap/oracle/ChainlinkAdapter.sol";
@@ -57,6 +58,7 @@ abstract contract CapDeployer is BaseTest {
     mapping(address asset => MockAggregator feed) internal feeds;
 
     Vault internal vault;
+    Wrapper internal wrapper;
     Stablecoin internal stablecoin;
     InterestRateModel internal irm;
     Registry internal registry;
@@ -211,6 +213,10 @@ abstract contract CapDeployer is BaseTest {
         require(address(irm) == irmAddr, "irm addr");
         require(address(stablecoin) == stablecoinAddr, "stablecoin addr");
 
+        wrapper = Wrapper(
+            _deployProxy(address(new Wrapper()), abi.encodeCall(Wrapper.initialize, (authority, address(stablecoin))))
+        );
+
         FloatingMarket marketImpl = new FloatingMarket();
         FixedMarket fixedMarketImpl = new FixedMarket();
         Tranche trancheImpl = new Tranche();
@@ -250,6 +256,7 @@ abstract contract CapDeployer is BaseTest {
                             fixedMarketBeacon: fixedMarketBeacon,
                             trancheBeacon: trancheBeacon,
                             underwriterBeacon: underwriterBeacon,
+                            wrapper: address(wrapper),
                             lt: capConfig.defaultLt,
                             buffer: capConfig.defaultBuffer,
                             targetHealth: capConfig.defaultTargetHealth

@@ -20,6 +20,7 @@ contract RegistryTest is BaseTest {
             fixedMarketBeacon: address(7),
             trancheBeacon: address(8),
             underwriterBeacon: address(9),
+            wrapper: address(10),
             lt: 0.8e27,
             buffer: 0.1e27,
             targetHealth: 1.25e27
@@ -73,6 +74,10 @@ contract RegistryTest is BaseTest {
 
         init = _validInit();
         init.underwriterBeacon = address(0);
+        _initRevertsOnZero(init);
+
+        init = _validInit();
+        init.wrapper = address(0);
         _initRevertsOnZero(init);
     }
 
