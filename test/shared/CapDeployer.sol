@@ -399,7 +399,7 @@ abstract contract CapDeployer is BaseTest {
         bundle.tranche1 = Tranche(bundle.tranche1Addr);
     }
 
-    /// @dev Create market, apply slopes, and split the default max capital across tranches.
+    /// @dev Create market, apply slopes, and give each tranche the default max capital.
     function _createReadyMarket(string memory name) internal returns (MarketBundle memory bundle) {
         bundle = _createMarketBundle(name);
         _configureMarketRates(bundle.market);
@@ -415,22 +415,18 @@ abstract contract CapDeployer is BaseTest {
         _setMaxCapital(market, capConfig.defaultMaxCapital);
     }
 
-    /// @dev Split `limit` across the market's tranches. Each tranche's {ITranche-capitalLimit}
-    ///      mins its slice against its own capital, so an empty neighbour's share of the
-    ///      split cannot be borrowed against a funded sibling.
+    /// @dev Set each attached tranche's {ITranche-maxCapital} to `limit`. This is a per-tranche
+    ///      ceiling on capital, not a market-wide pot: an empty neighbour still contributes
+    ///      nothing, and a sibling cannot spend this tranche's unused room.
     function _setMaxCapital(IBaseMarket market, uint256 limit) internal {
         IBaseMarket.Tranche[] memory ts = market.tranches();
-        uint256 n = ts.length;
-        if (n == 0) return;
-        uint256 each = limit / n;
-        uint256 rem = limit - each * n;
-        for (uint256 i; i < n; ++i) {
-            ITranche(ts[i].tranche).setMaxCapital(i == 0 ? each + rem : each);
+        for (uint256 i; i < ts.length; ++i) {
+            ITranche(ts[i].tranche).setMaxCapital(limit);
         }
     }
 
-    /// @dev Put the whole `limit` on `tranche` and zero every sibling. Use when only that
-    ///      tranche will be funded, so the cap sits on the collateral that can actually back it.
+    /// @dev Put `limit` on `tranche` and zero every sibling. Use when only that tranche
+    ///      should be allowed to contribute capital.
     function _setMaxCapitalOn(IBaseMarket market, address tranche, uint256 limit) internal {
         IBaseMarket.Tranche[] memory ts = market.tranches();
         for (uint256 i; i < ts.length; ++i) {
