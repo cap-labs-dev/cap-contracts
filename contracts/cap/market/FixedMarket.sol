@@ -156,8 +156,10 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         amount = loanDebt < unrecoverable ? loanDebt : unrecoverable;
         // record against the pre-write-off debt, since that is what bounds the write off
         _writeOff(amount);
-        debt[id] = loanDebt - amount;
+        uint256 remainingDebt = loanDebt - amount;
+        debt[id] = remainingDebt;
         _totalDebt -= amount;
+        emit WriteOffFixed(id, amount, remainingDebt);
     }
 
     /// @inheritdoc IBaseMarket

@@ -102,7 +102,8 @@ interface IBaseMarket {
     /// @notice Emitted when unrecoverable debt is written off the market
     /// @param caller The address initiating the write off
     /// @param amount The amount of debt written off
-    event WriteOff(address caller, uint256 amount);
+    /// @param remainingDebt The market's debt after the write off
+    event WriteOff(address indexed caller, uint256 amount, uint256 remainingDebt);
 
     /// @notice Emitted when the loan-to-value ratio is updated
     /// @param ltv The new loan-to-value ratio in ray decimals

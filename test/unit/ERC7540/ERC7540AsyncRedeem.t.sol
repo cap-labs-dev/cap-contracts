@@ -236,6 +236,8 @@ contract ERC7540AsyncRedeemTest is Test {
         vault.setUnlocked(1_000e18);
         vm.startPrank(alice);
         uint256 id = vault.requestRedeem(400e18, alice, alice);
+        vm.expectEmit(true, true, false, true, address(vault));
+        emit IERC7540AsyncRedeem.RedeemRequestConsumed(id, alice, 400e18, 0);
         uint256 assets = vault.redeem(id, 400e18, alice, alice);
         vm.stopPrank();
 
@@ -436,6 +438,10 @@ contract ERC7540AsyncRedeemTest is Test {
         vm.startPrank(alice);
         vault.requestRedeem(400e18, alice, alice);
         vault.requestRedeem(400e18, alice, alice);
+        vm.expectEmit(true, true, false, true, address(vault));
+        emit IERC7540AsyncRedeem.RedeemRequestConsumed(1, alice, 400e18, 0);
+        vm.expectEmit(true, true, false, true, address(vault));
+        emit IERC7540AsyncRedeem.RedeemRequestConsumed(2, alice, 100e18, 300e18);
         uint256 shares = vault.withdraw(500e18, alice, alice);
         vm.stopPrank();
 

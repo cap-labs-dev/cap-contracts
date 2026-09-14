@@ -187,6 +187,9 @@ contract DebtLifecycleTest is CapDeployer {
         assertEq(shortfall, bundle.market.totalDebt() - recoverable, "the rest is unrecoverable");
 
         uint256 creditBefore = stablecoin.creditBackedSupply();
+        uint256 remaining = bundle.market.totalDebt() - shortfall;
+        vm.expectEmit(false, false, false, true, address(bundle.market));
+        emit IBaseMarket.WriteOff(address(this), shortfall, remaining);
         uint256 written = bundle.market.writeOff();
 
         assertEq(written, shortfall, "the shortfall is written off");
@@ -231,10 +234,15 @@ contract DebtLifecycleTest is CapDeployer {
         assertLt(shortfall, market.debt(id), "but the loan is larger than the shortfall");
 
         uint256 loanBefore = market.debt(id);
+        uint256 remaining = loanBefore - shortfall;
+        vm.expectEmit(false, false, false, true, address(market));
+        emit IBaseMarket.WriteOff(address(this), shortfall, remaining);
+        vm.expectEmit(true, false, false, true, address(market));
+        emit IFixedMarket.WriteOffFixed(id, shortfall, remaining);
         uint256 written = market.writeOff(id);
 
         assertEq(written, shortfall, "capped at the market shortfall, not the whole loan");
-        assertEq(market.debt(id), loanBefore - shortfall, "loan keeps its recoverable debt");
+        assertEq(market.debt(id), remaining, "loan keeps its recoverable debt");
         assertEq(market.unrecoverableDebt(), 0, "shortfall is absorbed");
     }
 

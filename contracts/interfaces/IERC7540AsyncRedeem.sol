@@ -15,6 +15,12 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     /// @dev Emitted when control of a request moves to another controller.
     event TransferRequest(address indexed from, address indexed to, uint256 indexed requestId);
 
+    /// @dev A settlement burned `shares` from `requestId`. `remainingShares` is what is still queued.
+    ///      {Withdraw} still reports the aggregate asset payment; this names the receipt.
+    event RedeemRequestConsumed(
+        uint256 indexed requestId, address indexed controller, uint256 shares, uint256 remainingShares
+    );
+
     /// @dev Revert when attempting to request a redeem with zero shares.
     error ZeroShares();
 

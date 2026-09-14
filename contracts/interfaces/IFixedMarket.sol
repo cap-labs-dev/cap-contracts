@@ -61,6 +61,13 @@ interface IFixedMarket is IBaseMarket {
         uint256 indexed id, address indexed sender, address indexed recipient, uint256 amount, uint256 assetsSlashed
     );
 
+    /// @notice Wrote off unrecoverable debt on a loan
+    /// @dev Complements the market-level {IBaseMarket-WriteOff}, which does not name the loan.
+    /// @param id The id of the loan
+    /// @param amount The amount of debt written off
+    /// @param remainingDebt The loan's debt after the write off
+    event WriteOffFixed(uint256 indexed id, uint256 amount, uint256 remainingDebt);
+
     /// @notice Initialize the market
     /// @dev Term limits must satisfy {setTermLimits}. `grace` is the delay before {extendAdmin}.
     /// @param authority The authority of the market

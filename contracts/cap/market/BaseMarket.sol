@@ -382,7 +382,8 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
         if (amount == 0) revert InvalidAmount();
         if (amount > unrecoverableDebt()) revert ExceedsUnrecoverableDebt();
         IStablecoin($.stablecoin).recognizeBadDebtInCredit(amount);
-        emit WriteOff(msg.sender, amount);
+        // callers have not yet reduced their books; subtract here so the log is post-write-off
+        emit WriteOff(msg.sender, amount, totalDebt() - amount);
     }
 
     /// @dev Floating realises outstanding premium under the current list first.

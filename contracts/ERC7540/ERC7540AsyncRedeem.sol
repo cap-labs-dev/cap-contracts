@@ -439,6 +439,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     }
 
     /// @dev Take `_shares` off a request and burn them. Does not pay assets.
+    ///      Emits {RedeemRequestConsumed} so individual and FIFO claims both name the receipt.
     /// @param _controller The request controller
     /// @param _shares The shares to consume
     /// @param _requestId The request id
@@ -454,6 +455,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
 
         _burn(address(this), _shares);
         $.settledQueue += _shares;
+        emit RedeemRequestConsumed(_requestId, _controller, _shares, remaining);
     }
 
     /// @dev Pay `_assets` once for a completed consume of `_shares`.
