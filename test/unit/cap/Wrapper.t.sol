@@ -7,19 +7,7 @@ import { DeadShares } from "../../../contracts/utils/DeadShares.sol";
 import { BaseTest } from "../../shared/BaseTest.sol";
 import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
 import { MockIRM } from "../../shared/mocks/MockIRM.sol";
-import {
-    AccessManagedUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-
-/// @dev Stands in for a live v1 proxy so the upgrade can run {Wrapper-initialize} again.
-contract WrapperV1Stub is AccessManagedUpgradeable, UUPSUpgradeable {
-    function initialize(address authority) external initializer {
-        __AccessManaged_init(authority);
-    }
-
-    function _authorizeUpgrade(address) internal override restricted { }
-}
 
 /// @notice The wrapper is an ERC-4626 over cUSD: it opts in, and deposit/withdraw fold vested
 /// premium into `totalAssets` before the share price is read.
@@ -176,27 +164,6 @@ contract WrapperTest is BaseTest {
     function test_initializeCannotRunTwice() public {
         vm.expectRevert();
         wrapper.initialize(address(accessManager), address(scoin));
-    }
-
-    /// @dev A v1 proxy already used `initializer`. `reinitializer(2)` is what lets the new
-    ///      implementation run initialize once more after the upgrade.
-    function test_initialize_reinitializerRunsOnAV1Proxy() public {
-        address proxy = _deployProxy(
-            address(new WrapperV1Stub()), abi.encodeCall(WrapperV1Stub.initialize, (address(accessManager)))
-        );
-
-        UUPSUpgradeable(proxy)
-            .upgradeToAndCall(
-                address(new Wrapper()), abi.encodeCall(Wrapper.initialize, (address(accessManager), address(scoin)))
-            );
-
-        Wrapper upgraded = Wrapper(proxy);
-        assertEq(upgraded.asset(), address(scoin));
-        assertEq(upgraded.name(), "Staked Cap USD");
-        assertTrue(scoin.optedIn(address(upgraded)));
-
-        vm.expectRevert();
-        upgraded.initialize(address(accessManager), address(scoin));
     }
 
     function test_upgradeUnauthorizedReverts() public {

@@ -112,6 +112,15 @@ interface IStablecoin {
     /// @param newReserveVault The new reserve vault
     function setReserveVault(address newReserveVault) external;
 
+    /// @notice Pause minting and burning
+    /// @dev Guardian only. Transfers still work. A panic switch while an issue is sorted out.
+    /// Reverts {Pausable-EnforcedPause} on a mint or burn while paused.
+    function pause() external;
+
+    /// @notice Resume minting and burning
+    /// @dev Guardian only.
+    function unpause() external;
+
     /// @notice Recognize a loss in the reserve vault, socializing it across holders
     /// @dev Guardian only. Credit-backed supply is unchanged because no borrower debt was lost.
     /// `amount` is cUSD share units (18 decimals), not underlying reserve-token units.

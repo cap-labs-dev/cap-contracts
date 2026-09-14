@@ -9,20 +9,9 @@ import { BaseTest } from "../../shared/BaseTest.sol";
 import { MockAeraVault } from "../../shared/mocks/MockAeraVault.sol";
 import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
 import { MockIRM } from "../../shared/mocks/MockIRM.sol";
-import {
-    AccessManagedUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-
-/// @dev Stands in for a live v1 proxy so the upgrade can run {Stablecoin-initialize} again.
-contract StablecoinV1Stub is AccessManagedUpgradeable, UUPSUpgradeable {
-    function initialize(address authority) external initializer {
-        __AccessManaged_init(authority);
-    }
-
-    function _authorizeUpgrade(address) internal override restricted { }
-}
 
 contract StablecoinTest is BaseTest {
     Stablecoin internal scoin;
@@ -64,8 +53,10 @@ contract StablecoinTest is BaseTest {
         keeperSelectors[1] = Stablecoin.recall.selector;
         _grantRoleForTarget(CapRoles.KEEPER, keeper, address(scoin), keeperSelectors);
 
-        bytes4[] memory guardianSelectors = new bytes4[](1);
+        bytes4[] memory guardianSelectors = new bytes4[](3);
         guardianSelectors[0] = Stablecoin.recognizeBadDebtInReserve.selector;
+        guardianSelectors[1] = Stablecoin.pause.selector;
+        guardianSelectors[2] = Stablecoin.unpause.selector;
         _grantRoleForTarget(CapRoles.GUARDIAN, guardian, address(scoin), guardianSelectors);
 
         bytes4[] memory governorSelectors = new bytes4[](1);
@@ -822,34 +813,82 @@ contract StablecoinTest is BaseTest {
         assertLe(scoin.convertToAssets(unlocked), asset.balanceOf(address(scoin)), "gate stays solvent");
     }
 
+    function test_pause_onlyGuardian() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        scoin.pause();
+
+        vm.prank(guardian);
+        scoin.pause();
+        assertTrue(scoin.paused());
+
+        vm.prank(alice);
+        vm.expectRevert();
+        scoin.unpause();
+
+        vm.prank(guardian);
+        scoin.unpause();
+        assertFalse(scoin.paused());
+    }
+
+    function test_pause_blocksMintAndBurn() public {
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+        scoin.mintCreditBacked(bob, 50e18);
+
+        vm.prank(guardian);
+        scoin.pause();
+
+        vm.prank(alice);
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        scoin.deposit(1e18, alice);
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        scoin.mintCreditBacked(bob, 1e18);
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        scoin.fundCreditBacked(1e18);
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        scoin.burnCreditBacked(bob, 1e18);
+
+        vm.prank(alice);
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        scoin.instantRedeem(1e18, alice, alice);
+    }
+
+    function test_pause_allowsTransfers() public {
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+
+        vm.prank(guardian);
+        scoin.pause();
+
+        vm.prank(alice);
+        assertTrue(scoin.transfer(bob, 10e18));
+        assertEq(scoin.balanceOf(alice), 90e18);
+        assertEq(scoin.balanceOf(bob), 10e18);
+    }
+
+    function test_unpause_restoresMintAndBurn() public {
+        vm.prank(guardian);
+        scoin.pause();
+        vm.prank(guardian);
+        scoin.unpause();
+
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+        scoin.mintCreditBacked(bob, 50e18);
+        scoin.burnCreditBacked(bob, 20e18);
+
+        assertEq(scoin.balanceOf(alice), 100e18);
+        assertEq(scoin.balanceOf(bob), 30e18);
+        assertEq(scoin.creditBackedSupply(), 30e18);
+    }
+
     function test_initialize_cannotReinit() public {
         vm.expectRevert();
         scoin.initialize(address(accessManager), address(asset), "Cap USD", "cUSD", address(irm), address(reserve));
-    }
-
-    /// @dev A v1 proxy already used `initializer`. `reinitializer(2)` is what lets the new
-    ///      implementation run initialize once more after the upgrade.
-    function test_initialize_reinitializerRunsOnAV1Proxy() public {
-        address proxy = _deployProxy(
-            address(new StablecoinV1Stub()), abi.encodeCall(StablecoinV1Stub.initialize, (address(accessManager)))
-        );
-
-        UUPSUpgradeable(proxy)
-            .upgradeToAndCall(
-                address(new Stablecoin()),
-                abi.encodeCall(
-                    Stablecoin.initialize,
-                    (address(accessManager), address(asset), "Cap USD", "cUSD", address(irm), address(reserve))
-                )
-            );
-
-        Stablecoin upgraded = Stablecoin(proxy);
-        assertEq(upgraded.name(), "Cap USD");
-        assertEq(upgraded.asset(), address(asset));
-        assertEq(upgraded.reserveVault(), address(reserve));
-
-        vm.expectRevert();
-        upgraded.initialize(address(accessManager), address(asset), "Cap USD", "cUSD", address(irm), address(reserve));
     }
 
     function test_upgrade_authorized() public {

@@ -94,6 +94,8 @@ contract CheckRoles is Script, InfraSerializer {
             IStablecoin.recognizeBadDebtInReserve.selector,
             CapRoles.GUARDIAN
         );
+        _wired(manager, "Stablecoin.pause", infra.stablecoin, IStablecoin.pause.selector, CapRoles.GUARDIAN);
+        _wired(manager, "Stablecoin.unpause", infra.stablecoin, IStablecoin.unpause.selector, CapRoles.GUARDIAN);
         _wired(manager, "Stablecoin.invest", infra.stablecoin, IStablecoin.invest.selector, CapRoles.KEEPER);
         _wired(manager, "Stablecoin.recall", infra.stablecoin, IStablecoin.recall.selector, CapRoles.KEEPER);
         _wired(

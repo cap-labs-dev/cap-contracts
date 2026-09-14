@@ -1,7 +1,7 @@
 {
     "1": {
         "deployer": "0xc1ab5a9593E6e1662A9a44F84Df4F31Fc8A76B52",
-        "timelock": "0x7731129a10d51e18cDE607C5C115F26503D2c683",
+        "timelock": "0xD8236031d8279d82E615aF2BFab5FC0127A329ab",
         "multisig": "0xb8FC49402dF3ee4f8587268FB89fda4d621a8793",
         "stablecoinUnderlying": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
         "reserveVault": "0x0000000000000000000000000000000000000000",

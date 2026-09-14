@@ -27,7 +27,7 @@ import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/Upgradea
 /// Three selectors had reached ADMIN by omission before this test existed. Asserting the table
 /// means the next one has to be argued for in a diff rather than arrived at silently.
 ///
-/// Covers all 58 gated selectors in the protocol, across per-market instances and the shared
+/// Covers all 60 gated selectors in the protocol, across per-market instances and the shared
 /// infrastructure. The table is a snapshot and does not discover new selectors by itself. What it
 /// does do is make the intended role explicit for each one, so a selector that is later rewired,
 /// or a new instance wired differently from the last, fails here.
@@ -445,6 +445,8 @@ contract RoleTableTest is CapDeployer {
             CapRoles.GUARDIAN,
             "recognizeBadDebtInReserve"
         );
+        _expectRole(address(stablecoin), IStablecoin.pause.selector, CapRoles.GUARDIAN, "pause");
+        _expectRole(address(stablecoin), IStablecoin.unpause.selector, CapRoles.GUARDIAN, "unpause");
         _expectRole(address(stablecoin), IStablecoin.fundCreditBacked.selector, CapRoles.MARKET, "fundCreditBacked");
         _expectRole(address(stablecoin), IStablecoin.invest.selector, CapRoles.KEEPER, "invest");
         _expectRole(address(stablecoin), IStablecoin.recall.selector, CapRoles.KEEPER, "recall");

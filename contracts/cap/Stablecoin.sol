@@ -11,6 +11,7 @@ import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -23,6 +24,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     is
     IStablecoin,
     AccessManagedUpgradeable,
+    PausableUpgradeable,
     PremiumVesting,
     UUPSUpgradeable
 {
@@ -59,6 +61,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         address _reserveVault
     ) external reinitializer(2) {
         __AccessManaged_init(_authority);
+        __Pausable_init();
         __PremiumVesting_init(IERC20Metadata(_asset), _name, _symbol, address(this));
         // both previews scale between the two units, and only the direction that divides can lose
         // anything. Below 18 that is the mint side, which rounds up so the vault keeps the dust;
@@ -121,6 +124,16 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         address previousVault = reserveVault;
         reserveVault = newReserveVault;
         emit SetReserveVault(previousVault, newReserveVault);
+    }
+
+    /// @inheritdoc IStablecoin
+    function pause() external restricted {
+        _pause();
+    }
+
+    /// @inheritdoc IStablecoin
+    function unpause() external restricted {
+        _unpause();
     }
 
     /// @inheritdoc IStablecoin
@@ -303,6 +316,15 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     /// @return flipped The opposite rounding direction
     function _opposite(Math.Rounding _rounding) private pure returns (Math.Rounding flipped) {
         flipped = _rounding == Math.Rounding.Ceil ? Math.Rounding.Floor : Math.Rounding.Ceil;
+    }
+
+    /// @dev Freeze supply while paused. Transfers between holders still go through.
+    /// @param from The sender, or zero on mint
+    /// @param to The recipient, or zero on burn
+    /// @param amount The shares moving
+    function _update(address from, address to, uint256 amount) internal override {
+        if (from == address(0) || to == address(0)) _requireNotPaused();
+        super._update(from, to, amount);
     }
 
     /// @dev Override the internal deposit function to update the IRM

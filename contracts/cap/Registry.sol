@@ -377,8 +377,10 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         manager.setTargetFunctionRole(stablecoin, marketSelectors, CapRoles.MARKET);
 
         // reserve losses are exceptional and must be recognized by the guardian
-        bytes4[] memory stablecoinGuardianSelectors = new bytes4[](1);
+        bytes4[] memory stablecoinGuardianSelectors = new bytes4[](3);
         stablecoinGuardianSelectors[0] = IStablecoin.recognizeBadDebtInReserve.selector;
+        stablecoinGuardianSelectors[1] = IStablecoin.pause.selector;
+        stablecoinGuardianSelectors[2] = IStablecoin.unpause.selector;
         manager.setTargetFunctionRole(stablecoin, stablecoinGuardianSelectors, CapRoles.GUARDIAN);
 
         // parking reserve is keeper work
