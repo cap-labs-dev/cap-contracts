@@ -13,6 +13,7 @@ import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateMode
 import { IPremiumVesting } from "../../contracts/interfaces/IPremiumVesting.sol";
 import { IUnderwriter } from "../../contracts/interfaces/IUnderwriter.sol";
 import { CapRoles } from "../../contracts/utils/CapRoles.sol";
+import { WadRayMath } from "../../contracts/utils/WadRayMath.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
 import { MockERC20 } from "../shared/mocks/MockERC20.sol";
 import { MockIRM } from "../shared/mocks/MockIRM.sol";
@@ -1155,6 +1156,103 @@ contract AccountingIntegrityTest is CapDeployer {
         assertGe(market.healthiness(), 1e27, "and must never arrive liquidatable");
     }
 
+    /// @dev `availableCredit(term)` used to price a catch-up at the rate a *full-limit* draw
+    /// would produce. When that hypothetical catch-up exceeded the remaining limit it returned
+    /// zero, and `_borrow` then rejected every positive principal — including a 1-token loan
+    /// whose own quote still fitted. The duration of that lock depended on unsmoothed credit
+    /// and the curve; it was not a permanent brick, but it was a liveness hole on an allowed
+    /// 365-day / 2× configuration.
+    function test_smallFixedBorrowFitsWhenFullLimitCatchUpDoesNot() public {
+        FixedMarket market = _steepYearFixedMarket(100e18);
+        _settleReserve(2_000e18);
+        _mintRecentCredit(10_000e18);
+
+        uint256 term = 365 days;
+        uint256 raw = market.availableCredit();
+        assertEq(raw, 100e18, "raw remaining credit");
+        assertGt(irm.unsmoothedCredit(), 0, "a same-window credit mint is still unabsorbed");
+
+        (uint256 liquidity, uint256 underwriter) = market.premiumForBorrow(1e18, term);
+        uint256 cost = 1e18 + liquidity + underwriter;
+        assertLe(cost, raw, "a 1-token loan plus its quote fits the raw limit");
+        assertEq(_legacyTermCredit(market, term), 0, "the full-limit catch-up used to report zero");
+
+        uint256 sized = market.availableCredit(term);
+        assertGe(sized, 1e18, "a smaller affordable draw must still be offered");
+
+        (uint256 sizedLiq, uint256 sizedUw) = market.premiumForBorrow(sized, term);
+        assertLe(sized + sizedLiq + sizedUw, raw, "the advertised max must itself fit");
+
+        vm.prank(defaultBorrower);
+        (uint256 id, uint256 drawn) = market.borrow(defaultBorrower, 1e18, term);
+        assertEq(drawn, 1e18);
+        assertLe(market.debt(id), raw);
+        assertGe(market.healthiness(), 1e27);
+    }
+
+    /// @dev The same configuration must still fill a maximum borrow inside the raw limit, and
+    /// an explicit principal whose quote overshoots must still be refused.
+    function test_yearFixedBorrowMaxFillsAndOversizeReverts() public {
+        FixedMarket market = _steepYearFixedMarket(100e18);
+        _settleReserve(2_000e18);
+        _mintRecentCredit(10_000e18);
+
+        uint256 term = 365 days;
+        uint256 raw = market.availableCredit();
+        uint256 sized = market.availableCredit(term);
+        assertGt(sized, 0, "something smaller than the limit is still drawable");
+
+        vm.prank(defaultBorrower);
+        vm.expectRevert(IBaseMarket.InsufficientLiquidity.selector);
+        market.borrow(defaultBorrower, raw, term);
+
+        vm.prank(defaultBorrower);
+        (uint256 id, uint256 drawn) = market.borrow(defaultBorrower, type(uint256).max, term);
+        assertEq(drawn, sized, "max fills the term-adjusted offer");
+        assertLe(market.debt(id), raw);
+        assertGe(market.healthiness(), 1e27);
+    }
+
+    /// @dev The credit-limit and health bounds have to hold on the whole allowed term and
+    /// multiplier range, not only the default 30-day book. Prior unsmoothed credit is what
+    /// used to zero the term-adjusted offer.
+    /// forge-config: default.fuzz.runs = 256
+    function testFuzz_fixedBorrowAcrossAllowedTerms(
+        uint96 rawPrior,
+        uint96 rawReserve,
+        uint32 rawTerm,
+        uint8 rawSlope,
+        bool doubleMultiplier
+    ) public {
+        FixedMarket market = _fixedMarketOnSlope(bound(rawSlope, 0, 20) * 0.1e27);
+        market.setTermLimits(365 days, 1 days);
+        if (doubleMultiplier) market.setMarketMultiplier(2e27);
+
+        uint256 reserve = bound(rawReserve, 0, 20_000e18);
+        if (reserve > 0) _depositStable(makeAddr("saver"), reserve);
+        uint256 prior = bound(rawPrior, 0, 20_000e18);
+        if (prior > 0) _mintRecentCredit(prior);
+
+        uint256 term = bound(rawTerm, 1 days, 365 days);
+        uint256 limit = market.availableCredit();
+        if (limit == 0) return;
+
+        uint256 sized = market.availableCredit(term);
+        if (sized == 0) {
+            (uint256 liq, uint256 uw) = market.premiumForBorrow(1, term);
+            assertGt(1 + liq + uw, limit, "zero means even a wei overshoots");
+            return;
+        }
+
+        (uint256 sizedLiq, uint256 sizedUw) = market.premiumForBorrow(sized, term);
+        assertLe(sized + sizedLiq + sizedUw, limit, "the offer must fit the raw limit");
+
+        vm.prank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, type(uint256).max, term);
+        assertLe(market.debt(id), limit, "max borrow stays inside the raw limit");
+        assertGe(market.healthiness(), 1e27, "and must never arrive liquidatable");
+    }
+
     /// @dev A fixed market whose liquidity rate genuinely responds to utilization, on the tightest
     /// ltv the buffer allows so that the ltv-to-lt corridor is as thin as governance can make it.
     /// The steepness of the second slope is what scales the rate move a borrow causes.
@@ -1171,6 +1269,67 @@ contract AccountingIntegrityTest is CapDeployer {
         market.setFixedCreditLimit(type(uint256).max);
         market.setLtv(capConfig.defaultLt - capConfig.defaultBuffer);
         _fundTranche(tranche, alice, 10_000e18);
+    }
+
+    /// @dev The configuration the finding used: a year-long book, a steep post-kink slope, and
+    /// a 2× market multiplier, with a tight remaining limit so a full-limit catch-up can
+    /// overshoot it.
+    function _steepYearFixedMarket(uint256 fixedLimit) internal returns (FixedMarket market) {
+        irm.setLiquiditySlopes(
+            IInterestRateModel.Slopes({ base: 0.05e27, slope0: 0.05e27, slope1: 2e27, kink: 0.8e27 })
+        );
+
+        (address marketAddr, address tranche,) = _createFixedMarket("year-fixed");
+        market = FixedMarket(marketAddr);
+        market.setUnderwriterRate(capConfig.defaultUnderwriterRate);
+        market.setMarketMultiplier(2e27);
+        market.setTermLimits(365 days, 1 days);
+        market.setFixedCreditLimit(fixedLimit);
+        _fundTranche(tranche, alice, 10_000e18);
+    }
+
+    /// @dev Park reserve long enough for the average to feel it. A same-block deposit would
+    /// not move utilization, and a book already pinned at one ray has no rate delta left
+    /// for a full-limit catch-up to overshoot on.
+    function _settleReserve(uint256 amount) internal {
+        _depositStable(makeAddr("term-reserve"), amount);
+        vm.warp(block.timestamp + 20 * irm.averagingPeriod());
+    }
+
+    /// @dev Same-window credit from another market. It sits in {unsmoothedCredit} until the
+    /// average absorbs it, which is what the old catch-up priced as if this book had drawn
+    /// its entire remaining limit.
+    function _mintRecentCredit(uint256 amount) internal {
+        MarketBundle memory prior = _createReadyMarket("prior-credit");
+        prior.market.setFixedCreditLimit(type(uint256).max);
+        _fundTranche(prior.tranche0Addr, alice, amount * 4 + 1_000e18);
+        vm.prank(defaultBorrower);
+        prior.market.borrow(defaultBorrower, amount);
+    }
+
+    /// @dev The previous `availableCredit(term)`: invert at the full-limit post-mint rate, and
+    /// return zero when the catch-up on already-unsmoothed credit exceeds the remaining limit.
+    function _legacyTermCredit(FixedMarket market, uint256 term) internal view returns (uint256 credit) {
+        uint256 limit = market.availableCredit();
+        if (term > market.maximumTermLimit()) term = market.maximumTermLimit();
+
+        uint256 termUtilization = uint256(term) * 1e27 / market.maximumTermLimit();
+        (uint256 liquidityRate, uint256 underwriterRate) =
+            irm.fixedRatesAfterMint(address(market), termUtilization, limit);
+        uint256 rate = WadRayMath.rayMul(liquidityRate, market.marketMultiplier()) + underwriterRate;
+
+        uint256 prior = irm.unsmoothedCredit();
+        if (prior > 0) {
+            (uint256 lowLiquidity, uint256 lowUnderwriter) =
+                irm.fixedRatesAfterMint(address(market), termUtilization, 0);
+            uint256 low = WadRayMath.rayMul(lowLiquidity, market.marketMultiplier()) + lowUnderwriter;
+            if (rate > low) {
+                uint256 catchUp = WadRayMath.rayMul(prior * term, rate - low) / 365 days;
+                if (catchUp >= limit) return 0;
+                limit -= catchUp;
+            }
+        }
+        credit = limit * 1e27 / (1e27 + (term * rate) / 365 days);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

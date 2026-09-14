@@ -186,25 +186,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     function availableCredit(uint256 term) public view returns (uint256 credit) {
         uint256 limit = availableCredit();
         if (term > maximumTermLimit) term = maximumTermLimit;
-
-        // the premium is charged only once this draw's own mint has moved the liquidity rate, so the
-        // rate it will pay cannot be read off the market as it stands today. Price it against the
-        // worst case instead: the rate that drawing the whole limit would produce. Nothing here can
-        // return more than the limit, and a smaller mint can only mean a lower rate, so the premium
-        // finally charged is at most the one priced in here and the debt lands inside the limit.
-        // A same-window draw already minted is in the rate via {unsmoothedCredit}; the catch-up
-        // is the incremental premium on that prior notional at the higher rate.
-        uint256 rate = _termRate(term, limit);
-        uint256 prior = IInterestRateModel(irm()).unsmoothedCredit();
-        if (prior > 0) {
-            uint256 low = _termRate(term, 0);
-            if (rate > low) {
-                uint256 catchUp = (prior * term).rayMul(rate - low) / MathUtils.SECONDS_PER_YEAR;
-                if (catchUp >= limit) return 0;
-                limit -= catchUp;
-            }
-        }
-        credit = _principalWithin(limit, term, rate);
+        credit = _principalFor(limit, term);
     }
 
     /// @dev A loan created by {borrow}, including fully repaid ones.
@@ -231,13 +213,15 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         internal
         returns (uint256 actualPrincipal)
     {
-        actualPrincipal = _creditCheck(availableCredit(term), principal);
+        uint256 limit = availableCredit();
+        actualPrincipal = principal == type(uint256).max ? _principalFor(limit, term) : principal;
+        if (actualPrincipal == 0) revert InvalidPrincipal();
+
         (uint256 liquidityPremium, uint256 underwriterPremium) = _borrowPremium(actualPrincipal, term);
+        if (actualPrincipal + liquidityPremium + underwriterPremium > limit) revert InsufficientLiquidity();
+
         debt[id] += actualPrincipal;
         _totalDebt += actualPrincipal;
-        // the mint raises utilization, so the premium below is charged at a higher liquidity rate
-        // than the one standing before this call. That is the intent, and availableCredit sizes
-        // against it; see {IFixedMarket-availableCredit}
         _borrow(recipient, actualPrincipal);
         uint256 chargedPremium = _applyPremium(id, liquidityPremium, underwriterPremium);
         // credit is min(ltv, lt) against active capital; the threshold is lt against total. A full
@@ -277,20 +261,39 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         (liquidityPremium, underwriterPremium) = _premium(chargeableDebt, term, liquidityRate, underwriterRate);
     }
 
-    /// @dev The combined rate, for sizing rather than charging; see {_ratesStillToMint}
-    /// @param term The term of the loan in seconds, already capped at the maximum
-    /// @param mintAmount The credit-backed supply still to be minted before the charge
-    /// @return rate The combined rate per year in ray decimals
+    /// @dev Combined liquidity and underwriter rate after `mintAmount` is minted.
     function _termRate(uint256 term, uint256 mintAmount) internal view returns (uint256 rate) {
         (uint256 liquidityRate, uint256 underwriterRate) = _ratesStillToMint(term, mintAmount);
         rate = liquidityRate + underwriterRate;
     }
 
-    /// @dev Largest principal whose debt (principal + upfront premium) fits in `limit`.
-    /// @param limit The credit that the principal and its premium together have to fit inside
-    /// @param term The term of the loan in seconds
-    /// @param rate The combined liquidity and underwriter rate per year in ray decimals
-    /// @return principal The largest principal that fits
+    /// @dev A principal that, with its {_borrowPremium}, fits in `limit`. Invert at today's
+    /// rate, then scale by `limit/cost` if the real quote is heavier. Four passes is enough
+    /// because cost is nearly linear in principal. May sit below the exact maximum.
+    function _principalFor(uint256 limit, uint256 term) internal view returns (uint256 principal) {
+        if (limit == 0) return 0;
+
+        principal = _principalWithin(limit, term, _termRate(term, 0));
+        if (principal > limit) principal = limit;
+
+        for (uint256 i; i < 4; ++i) {
+            uint256 cost = _borrowCost(principal, term);
+            if (cost <= limit) return principal;
+
+            uint256 next = Math.mulDiv(principal, limit, cost);
+            if (next == 0 || next >= principal) return 0;
+            principal = next;
+        }
+        return 0;
+    }
+
+    /// @dev Principal plus the premium that draw would be charged.
+    function _borrowCost(uint256 principal, uint256 term) internal view returns (uint256 cost) {
+        (uint256 liquidityPremium, uint256 underwriterPremium) = _borrowPremium(principal, term);
+        cost = principal + liquidityPremium + underwriterPremium;
+    }
+
+    /// @dev Invert `principal + principal * term * rate / year = limit` at a constant rate.
     function _principalWithin(uint256 limit, uint256 term, uint256 rate) internal pure returns (uint256 principal) {
         principal = Math.mulDiv(limit, 1e27, 1e27 + (term * rate) / MathUtils.SECONDS_PER_YEAR);
     }

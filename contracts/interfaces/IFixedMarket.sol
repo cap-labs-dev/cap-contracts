@@ -168,8 +168,9 @@ interface IFixedMarket is IBaseMarket {
         view
         returns (uint256 liquidityPremium, uint256 underwriterPremium);
 
-    /// @notice Largest principal borrowable over a term, leaving room for the upfront premium
-    /// @dev Sized at the post-mint rate for a full-limit draw, including unsmoothed credit.
+    /// @notice A principal borrowable over a term, leaving room for the upfront premium
+    /// @dev Sized so principal plus {premiumForBorrow} fits in the raw {IBaseMarket-availableCredit}.
+    /// May be below the exact maximum.
     /// @param term The term of the loan
     /// @return credit The available credit
     function availableCredit(uint256 term) external view returns (uint256 credit);
