@@ -151,7 +151,11 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     /// @inheritdoc IStablecoin
     function recognizeBadDebtInReserve(uint256 _amount) external restricted {
         badDebt += _amount;
-        if (badDebt > totalSupply()) revert BadDebtExceedsSupply();
+        // only reserve-backed shares can absorb a reserve loss. Credit is still owed by
+        // borrowers; writing it off here would let a later repay drive {backing} under zero.
+        uint256 supply = totalSupply();
+        uint256 credit = creditBackedSupply;
+        if (credit > supply || badDebt > supply - credit) revert BadDebtExceedsSupply();
         emit BadDebtRecognizedInReserve(_amount);
     }
 

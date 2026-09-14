@@ -229,6 +229,35 @@ contract StablecoinTest is BaseTest {
         scoin.recognizeBadDebtInReserve(100e18 + 1);
     }
 
+    /// @dev A reserve loss that fits under total supply can still exceed the reserve-backed
+    /// slice. The extra would be charged against credit that a later repay burns, and
+    /// {backing} would underflow.
+    function test_recognizeBadDebtInReserve_revertsAboveReserveBackedSupply() public {
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+        scoin.mintCreditBacked(bob, 50e18);
+
+        vm.prank(guardian);
+        vm.expectRevert(IStablecoin.BadDebtExceedsSupply.selector);
+        scoin.recognizeBadDebtInReserve(100e18 + 1);
+    }
+
+    function test_recognizeBadDebtInReserve_thenRepayKeepsBackingSolvent() public {
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+        scoin.mintCreditBacked(bob, 50e18);
+
+        vm.prank(guardian);
+        scoin.recognizeBadDebtInReserve(100e18);
+
+        assertEq(scoin.badDebt() + scoin.creditBackedSupply(), scoin.totalSupply());
+        scoin.burnCreditBacked(bob, 50e18);
+
+        assertEq(scoin.backing(), 0, "the repaid credit is not subtracted from a reserve shortfall");
+        assertEq(scoin.badDebt(), 100e18);
+        assertEq(scoin.totalSupply(), 100e18);
+    }
+
     // ── the previews round at whatever scale the underlying uses ──────────────
 
     /// @dev Deploy against an underlying of a given width, so the preview arithmetic can be

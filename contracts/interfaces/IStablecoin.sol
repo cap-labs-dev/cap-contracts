@@ -55,7 +55,9 @@ interface IStablecoin {
     /// @notice The amount is zero
     error InvalidAmount();
 
-    /// @notice Bad debt cannot exceed the outstanding supply
+    /// @notice Bad debt cannot exceed the supply that can bear it
+    /// @dev Credit write-offs are bounded by total supply. Reserve losses are bounded by
+    /// `totalSupply - creditBackedSupply`, so `badDebt + creditBackedSupply` never exceeds supply.
     error BadDebtExceedsSupply();
 
     /// @notice Initialize the stablecoin
@@ -111,6 +113,7 @@ interface IStablecoin {
     /// @notice Recognize a loss in the reserve vault, socializing it across holders
     /// @dev Guardian only. Credit-backed supply is unchanged because no borrower debt was lost.
     /// `amount` is cUSD share units (18 decimals), not underlying reserve-token units.
+    /// Reverts unless `badDebt + creditBackedSupply <= totalSupply` after the recognition.
     /// @param amount Bad debt to recognize, in cUSD share units (18 decimals)
     function recognizeBadDebtInReserve(uint256 amount) external;
 
