@@ -12,9 +12,7 @@ import { PremiumVesting } from "../utils/PremiumVesting.sol";
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
-import { ERC1155Holder } from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -25,7 +23,6 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 contract Underwriter layout at erc7201("cap.storage.Underwriter")
     is
     IUnderwriter,
-    ERC1155Holder,
     AccessManagedUpgradeable,
     PremiumVesting
 {
@@ -74,7 +71,7 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         address _stablecoinAddress
     ) external override initializer {
         __AccessManaged_init(_authority);
-        __PremiumVesting_init(IERC20(_asset), _name, _symbol, hex"", _stablecoinAddress);
+        __PremiumVesting_init(IERC20(_asset), _name, _symbol, _stablecoinAddress);
         registry = _registry;
         vault = _vaultAddress;
     }
@@ -92,8 +89,9 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     /// @inheritdoc IUnderwriter
     function addTranche(address _tranche) external restricted {
         _registeredTranches.add(_tranche);
-        // the tranche pulls this contract's vault balance on deposit, so it needs operator rights
-        // for as long as it is registered and no longer
+        // curator is trusted to name a real protocol tranche for this vault and asset. The tranche
+        // pulls this contract's vault balance on deposit, so it needs operator rights for as long
+        // as it is registered and no longer
         IVault(vault).setOperator(_tranche, true);
         // this vault holds the tranche shares and claims them in {report}, so it has to earn.
         // A third-party market holding the same token would stay out
@@ -139,7 +137,7 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         uint256 available =
             Math.min(ITranche(tranche).balanceOf(address(this)), ITranche(tranche).instantUnlockedSupply());
         deallocated = Math.min(shares, available);
-        if (deallocated > 0) IERC4626(tranche).redeem(deallocated, address(this), address(this));
+        if (deallocated > 0) ITranche(tranche).instantRedeem(deallocated, address(this), address(this));
         // outside the branch, so the postcondition is simply that this tranche's mark is fresh when
         // the call returns, whether or not there was anything to pull out
         _mark(tranche);
@@ -181,14 +179,15 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         _mark(tranche);
     }
 
-    /// @dev Re-value from remaining plus queued shares. A slash between reports is a loss.
+    /// @dev Re-value from remaining plus queued shares. A slash between reports is a loss that
+    /// waits here on purpose: share price is this cached book, not a live walk of every position.
     /// @param tranche The tranche to re-value
     /// @return gain The increase in the recorded position, if any
     /// @return loss The decrease in the recorded position, if any
     function _mark(address tranche) internal returns (uint256 gain, uint256 loss) {
         uint256 recorded = debt[tranche];
         uint256 position = ITranche(tranche).balanceOf(address(this)) + queuedShares[tranche];
-        uint256 assets = ITranche(tranche).previewRedeem(position);
+        uint256 assets = ITranche(tranche).convertToAssets(position);
         if (assets == recorded) return (0, 0);
 
         if (assets < recorded) {
@@ -238,6 +237,9 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     }
 
     /// @inheritdoc IUnderwriter
+    /// @dev Idle vault balance plus the last marked tranche positions. A slash hits the tranche
+    /// immediately, but this vault only folds it in when {_mark} runs (allocate, deallocate, or
+    /// report). Positions are not priced live.
     function totalAssets() public view override(ERC4626Upgradeable, IERC4626, IUnderwriter) returns (uint256) {
         return IVault(vault).balanceOf(address(this), asset()) + totalDebt;
     }
@@ -261,7 +263,7 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
 
     /// @inheritdoc IUnderwriter
     function unlockedSupply() public view override(ERC7540AsyncRedeem, IUnderwriter) returns (uint256) {
-        return previewWithdraw(IVault(vault).balanceOf(address(this), asset()));
+        return _quoteWithdraw(IVault(vault).balanceOf(address(this), asset()));
     }
 
     /// @dev Mint the seed on the first deposit. Already deducted from the quote.
@@ -303,15 +305,5 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         lastReported = block.timestamp;
 
         emit Reported(_tranche, premium, gain, loss);
-    }
-
-    /// @inheritdoc IERC165
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(ERC7540AsyncRedeem, ERC1155Holder)
-        returns (bool)
-    {
-        return interfaceId == type(IUnderwriter).interfaceId || super.supportsInterface(interfaceId);
     }
 }

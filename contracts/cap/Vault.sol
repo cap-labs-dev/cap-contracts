@@ -32,8 +32,8 @@ contract Vault is IVault, AccessManagedUpgradeable, ERC6909TokenSupplyUpgradeabl
 
     /// @inheritdoc IVault
     function deposit(address _asset, uint256 _amount, address _recipient) external {
-        _mint(_recipient, _asset.toId(), _amount);
         IERC20(_asset).safeTransferFrom(msg.sender, address(this), _amount);
+        _mint(_recipient, _asset.toId(), _amount);
     }
 
     /// @inheritdoc IVault

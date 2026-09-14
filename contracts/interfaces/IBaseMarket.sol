@@ -25,6 +25,7 @@ interface IBaseMarket {
     /// @param fixedCreditLimit The fixed credit limit
     /// @param tranches The tranches and their weights
     /// @param registry The registry that deployed and configures the market
+    /// @param marketMultiplier Liquidity-rate multiplier in ray decimals. Zero reads as one ray.
     struct BaseMarketStorage {
         string name;
         address registry;
@@ -36,6 +37,7 @@ interface IBaseMarket {
         uint256 lt;
         uint256 fixedCreditLimit;
         Tranche[] tranches;
+        uint256 marketMultiplier;
     }
 
     /// @notice The loan-to-value ratio exceeds the liquidation threshold minus buffer
@@ -183,7 +185,9 @@ interface IBaseMarket {
     function setUnderwriterRate(uint256 rate) external;
 
     /// @notice Set the market multiplier
-    /// @dev On a floating market, reindexes scaled debt so principal is unchanged.
+    /// @dev Bounded by the IRM min/max. Floating accrues first so the new factor applies only
+    /// going forward; fixed applies it to the next term's liquidity rate. Outstanding principal
+    /// does not jump.
     /// @param multiplier The new market multiplier in ray decimals
     function setMarketMultiplier(uint256 multiplier) external;
 
@@ -218,6 +222,11 @@ interface IBaseMarket {
     /// @notice Get the loan-to-value ratio in ray decimals
     /// @return The loan-to-value ratio
     function ltv() external view returns (uint256);
+
+    /// @notice Get the liquidity-rate multiplier in ray decimals
+    /// @dev Unset reads as one ray.
+    /// @return The market multiplier
+    function marketMultiplier() external view returns (uint256);
 
     /// @notice Get the fixed credit limit
     /// @return The fixed credit limit
@@ -276,6 +285,8 @@ interface IBaseMarket {
     function creditLimit() external view returns (uint256 limit);
 
     /// @notice Get the variable credit limit
+    /// @dev Active capital times `min(ltv, lt)`, so a guardian drop of `lt` below `ltv` reduces
+    /// new credit without rewriting the owner's origination LTV.
     /// @return limit The variable credit limit
     function variableCreditLimit() external view returns (uint256 limit);
 }

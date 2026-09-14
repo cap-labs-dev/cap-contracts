@@ -23,7 +23,7 @@ contract PremiumVestingHarness is PremiumVesting {
     }
 
     function initialize(IERC20 asset, address premium) external initializer {
-        __PremiumVesting_init(asset, "Vault", "VLT", "", premium);
+        __PremiumVesting_init(asset, "Vault", "VLT", premium);
     }
 
     function mint(address to, uint256 amount) external {

@@ -5,7 +5,10 @@ import { Vault } from "../../../contracts/cap/Vault.sol";
 import { AssetId } from "../../../contracts/utils/AssetId.sol";
 import { BaseTest } from "../../shared/BaseTest.sol";
 import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
+import { MockReentrantERC20 } from "../../shared/mocks/MockReentrantERC20.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { IERC6909, IERC6909TokenSupply } from "@openzeppelin/contracts/interfaces/IERC6909.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 contract VaultTest is BaseTest {
     Vault internal vault;
@@ -31,6 +34,14 @@ contract VaultTest is BaseTest {
         vault.initialize(address(accessManager));
     }
 
+    function test_supportsInterface() public view {
+        assertEq(type(IERC6909).interfaceId, bytes4(0x0f632fb3), "EIP-6909 id");
+        assertTrue(vault.supportsInterface(type(IERC6909TokenSupply).interfaceId));
+        assertTrue(vault.supportsInterface(type(IERC6909).interfaceId));
+        assertTrue(vault.supportsInterface(type(IERC165).interfaceId));
+        assertFalse(vault.supportsInterface(0xffffffff));
+    }
+
     function test_id_and_asset_roundtrip() public view {
         uint256 expected = AssetId.toId(address(token));
         assertEq(vault.id(address(token)), expected);
@@ -45,6 +56,29 @@ contract VaultTest is BaseTest {
         assertEq(token.balanceOf(address(vault)), 100e18);
         assertEq(token.balanceOf(alice), 900e18);
         assertEq(vault.totalSupply(AssetId.toId(address(token))), 100e18);
+    }
+
+    function test_deposit_pullsTokensBeforeMinting() public {
+        MockReentrantERC20 hook = new MockReentrantERC20("Hook", "HOOK", 18);
+        hook.mint(alice, 100e18);
+        hook.mint(bob, 500e18);
+        vm.prank(bob);
+        hook.approve(address(vault), type(uint256).max);
+        vm.prank(bob);
+        vault.deposit(address(hook), 500e18, bob);
+
+        vm.prank(alice);
+        hook.approve(address(vault), type(uint256).max);
+        hook.arm(address(vault), abi.encodeCall(Vault.balanceOf, (alice, address(hook))));
+
+        vm.prank(alice);
+        vault.deposit(address(hook), 100e18, alice);
+
+        assertTrue(hook.reentered(), "callback fired while the pull was in flight");
+        assertTrue(hook.reentrySucceeded());
+        assertEq(abi.decode(hook.reentryReturn(), (uint256)), 0, "shares are minted only after the pull");
+        assertEq(vault.balanceOf(alice, address(hook)), 100e18);
+        assertEq(vault.balanceOf(bob, address(hook)), 500e18);
     }
 
     function test_deposit_toOtherRecipient() public {

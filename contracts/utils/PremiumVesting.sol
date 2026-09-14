@@ -158,17 +158,13 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
     /// @param asset The vault asset
     /// @param name The token name
     /// @param symbol The token symbol
-    /// @param uri The URI for ERC1155 metadata
     /// @param token The stablecoin premium is paid in
     // forge-lint: disable-next-item(mixed-case-function)
-    function __PremiumVesting_init(
-        IERC20 asset,
-        string memory name,
-        string memory symbol,
-        string memory uri,
-        address token
-    ) internal onlyInitializing {
-        __ERC7540AsyncRedeem_init(asset, name, symbol, uri);
+    function __PremiumVesting_init(IERC20 asset, string memory name, string memory symbol, address token)
+        internal
+        onlyInitializing
+    {
+        __ERC7540AsyncRedeem_init(asset, name, symbol);
         _getPremiumVestingStorage().stablecoin = token;
     }
 

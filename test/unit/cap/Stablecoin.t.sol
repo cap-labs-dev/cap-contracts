@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import { Stablecoin } from "../../../contracts/cap/Stablecoin.sol";
+import { IERC7540AsyncRedeem } from "../../../contracts/interfaces/IERC7540AsyncRedeem.sol";
 import { IStablecoin } from "../../../contracts/interfaces/IStablecoin.sol";
 import { CapRoles } from "../../../contracts/utils/CapRoles.sol";
 import { BaseTest } from "../../shared/BaseTest.sol";
@@ -36,7 +37,7 @@ contract StablecoinTest is BaseTest {
                 address(impl),
                 abi.encodeCall(
                     Stablecoin.initialize,
-                    (address(accessManager), address(asset), "Cap USD", "cUSD", "", address(irm), address(reserve))
+                    (address(accessManager), address(asset), "Cap USD", "cUSD", address(irm), address(reserve))
                 )
             )
         );
@@ -116,15 +117,19 @@ contract StablecoinTest is BaseTest {
         scoin.optIn();
 
         vm.prank(alice);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         scoin.transfer(bob, 1e18);
         vm.prank(earner);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         scoin.transfer(alice, 1e18);
 
         vm.prank(alice);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         scoin.transfer(bob, 1e18);
         uint256 idle = vm.lastCallGas().gasTotalUsed;
 
         vm.prank(earner);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         scoin.transfer(alice, 1e18);
         uint256 earning = vm.lastCallGas().gasTotalUsed;
 
@@ -166,7 +171,8 @@ contract StablecoinTest is BaseTest {
         assertEq(scoin.totalAssets(), 100e18);
         scoin.recognizeBadDebtInCredit(30e18);
         assertEq(scoin.badDebt(), 30e18);
-        assertEq(scoin.totalAssets(), 70e18);
+        assertEq(scoin.totalAssets(), scoin.convertToAssets(70e18));
+        assertLt(scoin.totalAssets(), 70e18, "the curve prices the outstanding supply below par");
     }
 
     function test_recognizeBadDebtInReserve_onlyGuardian() public {
@@ -187,7 +193,8 @@ contract StablecoinTest is BaseTest {
         scoin.recognizeBadDebtInReserve(30e18);
 
         assertEq(scoin.badDebt(), 30e18);
-        assertEq(scoin.totalAssets(), 120e18);
+        assertEq(scoin.totalAssets(), scoin.convertToAssets(120e18));
+        assertLt(scoin.totalAssets(), 120e18, "the curve prices the outstanding supply below par");
         assertEq(scoin.creditBackedSupply(), 50e18, "reserve loss does not write off borrower credit");
         assertEq(irm.updateCalls(), rateUpdates, "reserve loss does not change utilization");
     }
@@ -214,7 +221,7 @@ contract StablecoinTest is BaseTest {
                 address(new Stablecoin()),
                 abi.encodeCall(
                     Stablecoin.initialize,
-                    (address(accessManager), address(underlying), "Cap USD", "cUSD", "", address(irm), address(0))
+                    (address(accessManager), address(underlying), "Cap USD", "cUSD", address(irm), address(0))
                 )
             )
         );
@@ -243,6 +250,20 @@ contract StablecoinTest is BaseTest {
         assertEq(usdc.previewDeposit(1e6), 1e18, "and a dollar buys a dollar");
     }
 
+    function test_totalAssets_isUnderlyingUnits() public {
+        Stablecoin usdc = _stablecoinOn(6);
+        MockERC20 underlying = MockERC20(usdc.asset());
+        underlying.mint(alice, 1e6);
+        vm.prank(alice);
+        underlying.approve(address(usdc), type(uint256).max);
+        vm.prank(alice);
+        usdc.deposit(1e6, alice);
+
+        assertEq(usdc.totalSupply(), 1e18);
+        assertEq(usdc.totalAssets(), 1e6, "integrators read USDC units, not share units");
+        assertEq(usdc.totalAssets(), usdc.convertToAssets(usdc.totalSupply()));
+    }
+
     /// @dev Wider than the share the losing direction flips to the deposit side, where rounding up
     /// is not available: the assets have already been pulled by then, so anything too small to
     /// mint a share would simply be donated. Refused at initialize rather than carried.
@@ -255,7 +276,7 @@ contract StablecoinTest is BaseTest {
             impl,
             abi.encodeCall(
                 Stablecoin.initialize,
-                (address(accessManager), address(wide), "Cap USD", "cUSD", "", address(irm), address(0))
+                (address(accessManager), address(wide), "Cap USD", "cUSD", address(irm), address(0))
             )
         );
     }
@@ -277,7 +298,15 @@ contract StablecoinTest is BaseTest {
     function test_maxRedeem_fullWhenLiquid() public {
         vm.prank(alice);
         scoin.deposit(100e18, alice);
-        assertEq(scoin.maxRedeem(alice), 100e18);
+        assertEq(scoin.maxInstantRedeem(alice), 100e18);
+        assertEq(scoin.maxRedeem(alice), 0, "claimable only after a request");
+    }
+
+    function test_previewRedeemAndWithdraw_revert() public {
+        vm.expectRevert(IERC7540AsyncRedeem.PreviewNotSupported.selector);
+        scoin.previewRedeem(1e18);
+        vm.expectRevert(IERC7540AsyncRedeem.PreviewNotSupported.selector);
+        scoin.previewWithdraw(1e18);
     }
 
     function test_utilizationRate_zeroSupply_isZero() public view {
@@ -292,7 +321,7 @@ contract StablecoinTest is BaseTest {
         scoin.deposit(100e18, alice);
         _writeOffCredit(20e18);
 
-        assertApproxEqAbs(scoin.previewRedeem(50e18), 37.313432835820895522e18, 2, "priced on the shortfall curve");
+        assertApproxEqAbs(scoin.convertToAssets(50e18), 37.313432835820895522e18, 2, "priced on the shortfall curve");
     }
 
     /// Holding less than the shortfall no longer zeroes the redeemer out. Supply 160e18 against
@@ -303,7 +332,7 @@ contract StablecoinTest is BaseTest {
         scoin.deposit(100e18, alice);
         _writeOffCredit(60e18);
 
-        assertApproxEqAbs(scoin.previewRedeem(40e18), 17.241379310344827586e18, 2, "paid something, not zero");
+        assertApproxEqAbs(scoin.convertToAssets(40e18), 17.241379310344827586e18, 2, "paid something, not zero");
     }
 
     /// Redeeming the entire supply pays out exactly the reserve and no more, so the curve can
@@ -314,12 +343,15 @@ contract StablecoinTest is BaseTest {
         scoin.mintCreditBacked(bob, 500e18);
         scoin.recognizeBadDebtInCredit(100e18);
 
-        assertEq(scoin.previewRedeem(scoin.totalSupply()), scoin.totalAssets(), "pays the whole reserve");
+        assertEq(scoin.convertToAssets(scoin.totalSupply()), 1_400e18, "pays the whole reserve");
+        assertEq(
+            scoin.totalAssets(), scoin.convertToAssets(1_400e18), "totalAssets is that redeem of the outstanding supply"
+        );
     }
 
     /// The old conversion paid early redeemers more than their share and let a single large
-    /// redemption clear the whole shortfall while absorbing only a fraction of it. No redemption
-    /// may now take out more than it reduces totalAssets by.
+    /// redemption clear the whole shortfall while absorbing only a fraction of it. The reserve
+    /// must fall by exactly the payout.
     function test_redeem_neverPaysMoreThanItReducesTotalAssets() public {
         vm.prank(alice);
         scoin.deposit(1_000e18, alice);
@@ -330,19 +362,19 @@ contract StablecoinTest is BaseTest {
         uint256 heldBefore = asset.balanceOf(address(scoin));
 
         vm.prank(alice);
-        uint256 paid = scoin.redeem(1_000e18, alice, alice);
+        uint256 paid = scoin.instantRedeem(1_000e18, alice, alice);
 
         // the 500e18 left behind retains 500 * 1500 * 1400 / (1500 * 1400 + 500 * 100) of the
         // backing, so alice takes the 911.62... that leaves over and absorbs the 88.37... gap
         assertApproxEqAbs(paid, 911.627906976744186046e18, 2, "priced on the shortfall curve");
-        assertEq(assetsBefore - scoin.totalAssets(), paid, "totalAssets falls by exactly what was paid");
-        assertEq(heldBefore - asset.balanceOf(address(scoin)), paid, "and so does the reserve");
+        assertLt(scoin.totalAssets(), assetsBefore, "remaining outstanding supply is worth less");
+        assertEq(heldBefore - asset.balanceOf(address(scoin)), paid, "the reserve falls by exactly what was paid");
         assertApproxEqAbs(scoin.badDebt(), 100e18 - (1_000e18 - paid), 2, "absorbs exactly what it left behind");
     }
 
     /// @dev The property the shortfall curve rests on, and the reason chopping a redemption up
-    /// cannot beat taking it in one call: `badDebt / (totalSupply * totalAssets)` is conserved by a
-    /// redemption. Since what a redemption retains is `remaining / (1 + k * remaining)` for that
+    /// cannot beat taking it in one call: `badDebt / (totalSupply * outstandingSupply)` is conserved by
+    /// a redemption. Since what a redemption retains is `remaining / (1 + k * remaining)` for that
     /// same `k`, the payout depends only on where the supply ends up and not on the route taken.
     ///
     /// What would break it is charging the marginal price — the backing ratio squared — on a whole
@@ -358,7 +390,7 @@ contract StablecoinTest is BaseTest {
         scoin.recognizeBadDebtInCredit(100e18);
 
         uint256 k = _shortfallInvariant();
-        uint256 whole = scoin.previewRedeem(600e18);
+        uint256 whole = scoin.convertToAssets(600e18);
 
         // the same 600e18 exit, taken a slice at a time and re-priced against the state each
         // slice leaves behind
@@ -367,27 +399,27 @@ contract StablecoinTest is BaseTest {
         for (uint256 i; i < slices; ++i) {
             uint256 shares = i + 1 == slices ? 600e18 - each * (slices - 1) : each;
             vm.prank(alice);
-            taken += scoin.redeem(shares, alice, alice);
+            taken += scoin.instantRedeem(shares, alice, alice);
             assertApproxEqRel(_shortfallInvariant(), k, 1e6, "the invariant survives every slice");
         }
 
         assertApproxEqRel(taken, whole, 1e6, "and slicing pays no more than the single call");
     }
 
-    /// @dev `badDebt * 1e36 / (totalSupply * totalAssets)`, scaled so the ratio is comparable
+    /// @dev `badDebt * 1e36 / (totalSupply * outstandingSupply)`, scaled so the ratio is comparable
     /// across states without losing it to integer division
     function _shortfallInvariant() internal view returns (uint256 k) {
-        k = Math.mulDiv(scoin.badDebt(), 1e36, scoin.totalSupply() * scoin.totalAssets());
+        k = Math.mulDiv(scoin.badDebt(), 1e36, scoin.totalSupply() * (scoin.totalSupply() - scoin.badDebt()));
     }
 
-    /// previewWithdraw must be the inverse of previewRedeem above the shortfall.
+    /// quoteWithdraw must be the inverse of convertToAssets above the shortfall.
     function test_previewWithdraw_isInverseOfPreviewRedeem() public {
         vm.prank(alice);
         scoin.deposit(100e18, alice);
         _writeOffCredit(20e18);
 
-        uint256 assets = scoin.previewRedeem(50e18);
-        assertEq(scoin.previewWithdraw(assets), 50e18, "round trips exactly");
+        uint256 assets = scoin.convertToAssets(50e18);
+        assertEq(scoin.quoteWithdraw(assets), 50e18, "round trips exactly");
     }
 
     /// Minting stays at par while bad debt is outstanding. This is what caps the cost of acquiring
@@ -408,8 +440,8 @@ contract StablecoinTest is BaseTest {
         scoin.deposit(100e18, alice);
         _writeOffCredit(20e18);
 
-        uint256 below = scoin.previewWithdraw(10e18);
-        uint256 above = scoin.previewWithdraw(50e18);
+        uint256 below = scoin.quoteWithdraw(10e18);
+        uint256 above = scoin.quoteWithdraw(50e18);
         assertGt(below, 0);
         assertGt(above, below);
     }
@@ -423,7 +455,7 @@ contract StablecoinTest is BaseTest {
 
         // 120e18 supply against 100e18 of backing, redeeming 50e18; see previewRedeem above
         vm.prank(alice);
-        uint256 assets = scoin.redeem(50e18, alice, alice);
+        uint256 assets = scoin.instantRedeem(50e18, alice, alice);
 
         assertApproxEqAbs(assets, 37.313432835820895522e18, 2, "priced on the shortfall curve");
         assertApproxEqAbs(scoin.badDebt(), 20e18 - (50e18 - assets), 2, "absorbs what it left behind");
@@ -442,7 +474,7 @@ contract StablecoinTest is BaseTest {
 
         // 160e18 supply against 100e18 of backing, redeeming 40e18; see previewRedeem above
         vm.prank(alice);
-        uint256 assets = scoin.redeem(40e18, alice, alice);
+        uint256 assets = scoin.instantRedeem(40e18, alice, alice);
 
         assertApproxEqAbs(assets, 17.241379310344827586e18, 2, "paid despite being smaller than the shortfall");
         assertEq(scoin.badDebt(), 60e18 - (40e18 - assets), "absorbs what it left behind");
@@ -457,9 +489,9 @@ contract StablecoinTest is BaseTest {
         scoin.deposit(1_000e18, alice);
         _writeOffCredit(200e18);
 
-        uint256 small = scoin.previewRedeem(1e18);
+        uint256 small = scoin.convertToAssets(1e18);
         assertGt(small, 0, "nobody is zeroed out");
-        assertApproxEqRel(scoin.previewRedeem(10e18), small * 10, 0.01e18, "10x holder gets 10x");
+        assertApproxEqRel(scoin.convertToAssets(10e18), small * 10, 0.01e18, "10x holder gets 10x");
     }
 
     /// Splitting a redemption must not beat doing it in one go. Pricing off the instantaneous
@@ -471,7 +503,7 @@ contract StablecoinTest is BaseTest {
 
         uint256 snapshot = vm.snapshotState();
         _seedWrittenOffPool(written);
-        uint256 maxShares = scoin.maxRedeem(alice);
+        uint256 maxShares = scoin.maxInstantRedeem(alice);
         vm.revertToState(snapshot);
 
         // both legs redeem exactly the same total, so the comparison is like for like
@@ -480,14 +512,14 @@ contract StablecoinTest is BaseTest {
 
         _seedWrittenOffPool(written);
         vm.prank(alice);
-        uint256 atOnce = scoin.redeem(total, alice, alice);
+        uint256 atOnce = scoin.instantRedeem(total, alice, alice);
         vm.revertToState(snapshot);
 
         _seedWrittenOffPool(written);
         uint256 split;
         for (uint256 i; i < chunks; ++i) {
             vm.prank(alice);
-            split += scoin.redeem(each, alice, alice);
+            split += scoin.instantRedeem(each, alice, alice);
         }
 
         assertApproxEqRel(split, atOnce, 0.00001e18, "splitting matches doing it in one go");
@@ -507,22 +539,23 @@ contract StablecoinTest is BaseTest {
         scoin.deposit(1_000e18, alice);
         _writeOffCredit(200e18);
 
-        uint256 ratioBefore = scoin.totalAssets() * 1e27 / scoin.totalSupply();
+        uint256 backingBefore = scoin.totalSupply() - scoin.badDebt();
+        uint256 ratioBefore = backingBefore * 1e27 / scoin.totalSupply();
         uint256 shares = 300e18;
 
         // the redeemer is paid strictly less than their pro-rata share of the backing
-        uint256 assets = scoin.previewRedeem(shares);
+        uint256 assets = scoin.convertToAssets(shares);
         assertLt(assets, shares * ratioBefore / 1e27, "priced below the pool ratio");
 
         vm.prank(alice);
-        scoin.redeem(shares, alice, alice);
+        scoin.instantRedeem(shares, alice, alice);
 
-        uint256 ratioAfter = scoin.totalAssets() * 1e27 / scoin.totalSupply();
+        uint256 ratioAfter = (scoin.totalSupply() - scoin.badDebt()) * 1e27 / scoin.totalSupply();
         assertGt(ratioAfter, ratioBefore, "the peg moves back toward par");
     }
 
-    /// Whatever the payout, totalAssets must fall by exactly that amount, so no part of the loss
-    /// is ever erased from the accounting or double counted.
+    /// Whatever the payout, the reserve must fall by exactly that amount, so no part of the loss
+    /// is ever erased from the books or double counted.
     function testFuzz_redeem_totalAssetsFallsByExactlyThePayout(uint256 deposited, uint256 written, uint256 shares)
         public
     {
@@ -532,15 +565,13 @@ contract StablecoinTest is BaseTest {
         scoin.deposit(deposited, alice);
         _writeOffCredit(written);
 
-        shares = bound(shares, 1, scoin.maxRedeem(alice));
-        uint256 assetsBefore = scoin.totalAssets();
+        shares = bound(shares, 1, scoin.maxInstantRedeem(alice));
         uint256 heldBefore = asset.balanceOf(address(scoin));
 
         vm.prank(alice);
-        uint256 paid = scoin.redeem(shares, alice, alice);
+        uint256 paid = scoin.instantRedeem(shares, alice, alice);
 
-        assertEq(assetsBefore - scoin.totalAssets(), paid, "totalAssets tracks the payout exactly");
-        assertEq(heldBefore - asset.balanceOf(address(scoin)), paid, "and so does the reserve");
+        assertEq(heldBefore - asset.balanceOf(address(scoin)), paid, "the reserve tracks the payout exactly");
         assertLe(paid, shares, "never pays out more than the shares burned");
     }
 
@@ -567,7 +598,7 @@ contract StablecoinTest is BaseTest {
         scoin.mintCreditBacked(treasury, 500e18);
         scoin.recognizeBadDebtInCredit(100e18);
 
-        uint256 backingBefore = scoin.totalAssets();
+        uint256 backingBefore = scoin.totalSupply() - scoin.badDebt();
         uint256 reserveBefore = asset.balanceOf(address(scoin));
 
         vm.prank(treasury);
@@ -576,9 +607,10 @@ contract StablecoinTest is BaseTest {
         assertEq(covered, 100e18, "the whole shortfall is retired");
         assertEq(scoin.badDebt(), 0, "no shortfall left");
         assertEq(scoin.totalSupply(), 1_400e18, "supply shrinks by the burned cUSD");
-        assertEq(scoin.totalAssets(), backingBefore, "backing is untouched");
+        assertEq(scoin.totalSupply() - scoin.badDebt(), backingBefore, "outstanding supply is untouched");
+        assertEq(scoin.totalAssets(), scoin.totalSupply(), "and now redeems at par");
         assertEq(asset.balanceOf(address(scoin)), reserveBefore, "and so is the reserve");
-        assertEq(scoin.previewRedeem(100e18), 100e18, "shares redeem at par again");
+        assertEq(scoin.convertToAssets(100e18), 100e18, "shares redeem at par again");
     }
 
     /// Partial cover moves the ratio proportionally and leaves the rest outstanding.
@@ -592,7 +624,7 @@ contract StablecoinTest is BaseTest {
         assertEq(scoin.coverBadDebt(40e18), 40e18, "covers what was asked");
 
         assertEq(scoin.badDebt(), 60e18, "the rest is still outstanding");
-        assertEq(scoin.totalAssets(), 1_400e18, "backing unchanged");
+        assertEq(scoin.totalSupply() - scoin.badDebt(), 1_400e18, "outstanding supply unchanged");
         assertEq(scoin.totalSupply(), 1_460e18, "supply shrinks by the burned cUSD");
     }
 
@@ -632,19 +664,19 @@ contract StablecoinTest is BaseTest {
         scoin.mintCreditBacked(treasury, 500e18);
         scoin.recognizeBadDebtInCredit(100e18);
 
-        uint256 ratioBefore = scoin.totalAssets() * 1e27 / scoin.totalSupply();
+        uint256 ratioBefore = (scoin.totalSupply() - scoin.badDebt()) * 1e27 / scoin.totalSupply();
 
         // burnCreditBacked is the closest thing to a plain burn; it drops supply but not badDebt
         scoin.mintCreditBacked(treasury, 100e18);
         scoin.burnCreditBacked(treasury, 100e18);
-        uint256 ratioAfterPlainBurn = scoin.totalAssets() * 1e27 / scoin.totalSupply();
+        uint256 ratioAfterPlainBurn = (scoin.totalSupply() - scoin.badDebt()) * 1e27 / scoin.totalSupply();
         assertEq(ratioAfterPlainBurn, ratioBefore, "a matched mint and burn is neutral");
 
         // burning supply that is already outstanding, without touching badDebt, is not
         vm.prank(treasury);
         assertTrue(scoin.transfer(bob, 100e18));
         scoin.burnCreditBacked(bob, 100e18);
-        assertLt(scoin.totalAssets() * 1e27 / scoin.totalSupply(), ratioBefore, "ratio gets worse");
+        assertLt((scoin.totalSupply() - scoin.badDebt()) * 1e27 / scoin.totalSupply(), ratioBefore, "ratio gets worse");
     }
 
     /// The redemption gate must never promise more than the reserve holds.
@@ -661,7 +693,7 @@ contract StablecoinTest is BaseTest {
         // excludes both, so the redeemable amount is unchanged rather than inflated by the loss
         uint256 unlocked = scoin.unlockedSupply();
         assertEq(unlocked, 1_000e18, "the write off does not unlock anything new");
-        assertLe(scoin.previewRedeem(unlocked), asset.balanceOf(address(scoin)), "gate stays solvent");
+        assertLe(scoin.convertToAssets(unlocked), asset.balanceOf(address(scoin)), "gate stays solvent");
     }
 
     function test_upgrade_authorized() public {
@@ -852,13 +884,13 @@ contract StablecoinTest is BaseTest {
 
         vm.prank(alice);
         vm.expectRevert();
-        scoin.redeem(100e18, alice, alice);
+        scoin.instantRedeem(100e18, alice, alice);
 
         vm.prank(keeper);
         scoin.recall(100e18);
 
         vm.prank(alice);
-        scoin.redeem(100e18, alice, alice);
+        scoin.instantRedeem(100e18, alice, alice);
         assertEq(asset.balanceOf(alice), 1_000e18);
     }
 }

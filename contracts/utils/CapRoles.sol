@@ -26,9 +26,13 @@ library CapRoles {
     /// @dev Permissioned liquidation of unhealthy markets
     uint64 internal constant LIQUIDATOR = 6;
 
-    /// @dev Approved callers of Registry create and role-setter functions. Held by platform
-    /// participants and by deployed markets, tranches, and underwriters.
+    /// @dev Users of the system. Opens {createChildRoles} and Registry create* so they can
+    /// stand up operator groups, markets, and underwriters.
     uint64 internal constant WHITELISTED = 7;
+
+    /// @dev Deployed markets, tranches, and underwriters. Opens only the Registry role setters
+    /// those instances forward ({setDepositorRole}, {setBorrowerRole}, {setAllocatorRole}).
+    uint64 internal constant PROTOCOL = 8;
 
     /// @dev First role id assigned by {Registry-createChildRoles}
     uint64 internal constant FIRST_OPERATOR_ROLE = 100;

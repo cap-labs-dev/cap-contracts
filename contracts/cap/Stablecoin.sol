@@ -55,12 +55,11 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         address _asset,
         string memory _name,
         string memory _symbol,
-        string memory _uri,
         address _irm,
         address _reserveVault
     ) external initializer {
         __AccessManaged_init(_authority);
-        __PremiumVesting_init(IERC20Metadata(_asset), _name, _symbol, _uri, address(this));
+        __PremiumVesting_init(IERC20Metadata(_asset), _name, _symbol, address(this));
         // both previews scale between the two units, and only the direction that divides can lose
         // anything. Below 18 that is the mint side, which rounds up so the vault keeps the dust;
         // above 18 it would be the deposit side, where rounding up is not available because the
@@ -173,7 +172,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         if (shortfall == 0) revert NoBadDebt();
         covered = _amount < shortfall ? _amount : shortfall;
 
-        // supply and shortfall fall together; totalAssets and the reserve are unchanged
+        // supply and shortfall fall together; outstanding supply and the reserve are unchanged
         badDebt = shortfall - covered;
         _burn(msg.sender, covered);
 
@@ -188,13 +187,20 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         uint256 supply = totalSupply();
         if (supply > locked) unlocked = supply - locked;
 
-        uint256 available = previewWithdraw(IERC20(asset()).balanceOf(address(this)));
+        uint256 available = _quoteWithdraw(IERC20(asset()).balanceOf(address(this)));
         if (unlocked > available) unlocked = available;
     }
 
     /// @inheritdoc IStablecoin
     function totalAssets() public view override(ERC4626Upgradeable, IERC4626, IStablecoin) returns (uint256 assets) {
-        assets = totalSupply() - badDebt;
+        assets = convertToAssets(_outstandingSupply());
+    }
+
+    /// @dev Shares still recognized after write-offs. {_convertToAssets} reads this rather than
+    /// {totalAssets} so the ERC-4626 getter can quote the same figure without recursing.
+    /// @return outstanding `totalSupply - badDebt`, in share units
+    function _outstandingSupply() internal view returns (uint256 outstanding) {
+        outstanding = totalSupply() - badDebt;
     }
 
     /// @inheritdoc IStablecoin
@@ -241,7 +247,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
             value = _shares;
         } else {
             uint256 supply = totalSupply();
-            uint256 backing = totalAssets();
+            uint256 backing = _outstandingSupply();
             if (_shares >= supply) {
                 value = backing;
             } else {
@@ -272,7 +278,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         if (shortfall == 0) return value;
 
         uint256 supply = totalSupply();
-        uint256 backing = totalAssets();
+        uint256 backing = _outstandingSupply();
         // more than the whole reserve can ever pay out, so the entire supply would not cover it
         if (value >= backing) return supply;
 

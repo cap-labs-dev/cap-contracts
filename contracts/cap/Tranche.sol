@@ -13,7 +13,6 @@ import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 /// @title Tranche
 /// @author kexley, Cap Labs
@@ -55,7 +54,7 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
         address _oracle
     ) external initializer {
         __AccessManaged_init(_authority);
-        __PremiumVesting_init(IERC20(_asset), _name, _symbol, hex"", IBaseMarket(_market).stablecoin());
+        __PremiumVesting_init(IERC20(_asset), _name, _symbol, IBaseMarket(_market).stablecoin());
         registry = _registry;
         market = _market;
         vault = _vault;
@@ -160,7 +159,7 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     function unlockedSupply() public view override(ERC7540AsyncRedeem, ITranche) returns (uint256 unlocked) {
         // market accounts in USD; convert locked value back to collateral
         uint256 lockedAssets = IBaseMarket(market).lockedValue(address(this)) * 10 ** decimals() / getPrice();
-        uint256 lockedShares = previewWithdraw(lockedAssets);
+        uint256 lockedShares = _quoteWithdraw(lockedAssets);
         uint256 totalSupply = totalSupply();
         if (totalSupply > lockedShares) unlocked = totalSupply - lockedShares;
     }
@@ -204,10 +203,5 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     function getPrice() internal view returns (uint256 price) {
         price = IOracle(oracle).price(asset());
         if (price == 0) revert InvalidPrice();
-    }
-
-    /// @inheritdoc IERC165
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC7540AsyncRedeem) returns (bool) {
-        return interfaceId == type(ITranche).interfaceId || super.supportsInterface(interfaceId);
     }
 }

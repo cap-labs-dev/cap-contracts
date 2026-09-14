@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+
 /// @title WadRayMath library
 /// @author Cap Labs & Aave
 /// @notice Provides functions to perform calculations with Wad and Ray units
@@ -16,6 +18,9 @@ library WadRayMath {
     uint256 internal constant HALF_RAY = 0.5e27;
 
     uint256 internal constant WAD_RAY_RATIO = 1e9;
+
+    /// @dev `ln(2)` in ray. Used to reduce {rayLn} / {rayExp} onto `[0, ln 2)`.
+    uint256 internal constant LN2_RAY = 693147180559945309417232121;
 
     /// @dev Multiplies two wad, rounding half up to the nearest wad
     /// @dev assembly optimized for improved gas savings, see https://twitter.com/transmissions11/status/1451131036377571328
@@ -97,6 +102,68 @@ library WadRayMath {
             // base it is the multiplication most likely to be the one that underflows to zero
             if (n > 0) a = rayMul(a, a);
         }
+    }
+
+    /// @dev `base^exp` with both in ray. Integer exponents go through {rayPow}; the
+    /// fractional part is `exp(frac × ln(base))`, so `a^m × a^n == a^(m+n)` the same
+    /// way and a growth factor raised in one step matches the same factor raised in
+    /// any number of steps.
+    /// @param base Ray base, typically a growth factor at or above one ray
+    /// @param exp Ray exponent (`2e27` is square)
+    /// @return c = base ** exp, in ray
+    function rayPowRay(uint256 base, uint256 exp) internal pure returns (uint256 c) {
+        if (exp == 0 || base == RAY) return RAY;
+        if (exp == RAY) return base;
+
+        uint256 integer = exp / RAY;
+        c = integer == 0 ? RAY : rayPow(base, integer);
+        uint256 frac = exp % RAY;
+        if (frac == 0) return c;
+        c = rayMul(c, rayExp(rayMul(frac, rayLn(base))));
+    }
+
+    /// @dev `RAY × ln(x / RAY)` for `x >= RAY`. Zero at one ray.
+    /// @param x Ray, at or above one ray
+    /// @return ln `ln(x / RAY)` in ray
+    function rayLn(uint256 x) internal pure returns (uint256 ln) {
+        if (x <= RAY) return 0;
+
+        uint256 k;
+        while (x >= 2 * RAY) {
+            x /= 2;
+            ++k;
+        }
+
+        // artanh series: ln(1+u) = 2(v + v^3/3 + v^5/5 + …), v = u/(2+u), u = x/RAY - 1
+        uint256 z = x - RAY;
+        uint256 v = Math.mulDiv(z, RAY, 2 * RAY + z);
+        uint256 v2 = rayMul(v, v);
+        uint256 term = v;
+        uint256 sum = v;
+        for (uint256 n = 3; n < 64; n += 2) {
+            term = rayMul(term, v2);
+            if (term < n) break;
+            sum += term / n;
+        }
+        ln = 2 * sum + k * LN2_RAY;
+    }
+
+    /// @dev `RAY × exp(x / RAY)` for `x >= 0`.
+    /// @param x Exponent in ray
+    /// @return exp `exp(x / RAY)` in ray
+    function rayExp(uint256 x) internal pure returns (uint256 exp) {
+        if (x == 0) return RAY;
+
+        uint256 k = x / LN2_RAY;
+        uint256 r = x % LN2_RAY;
+        exp = RAY;
+        uint256 term = RAY;
+        for (uint256 n = 1; n < 48; ++n) {
+            term = Math.mulDiv(term, r, n * RAY);
+            if (term == 0) break;
+            exp += term;
+        }
+        exp <<= k;
     }
 
     /// @dev Casts ray down to wad

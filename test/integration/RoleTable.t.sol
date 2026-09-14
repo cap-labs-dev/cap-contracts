@@ -27,7 +27,7 @@ import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/Upgradea
 /// Three selectors had reached ADMIN by omission before this test existed. Asserting the table
 /// means the next one has to be argued for in a diff rather than arrived at silently.
 ///
-/// Covers all 59 gated selectors in the protocol, across per-market instances and the shared
+/// Covers all 58 gated selectors in the protocol, across per-market instances and the shared
 /// infrastructure. The table is a snapshot and does not discover new selectors by itself. What it
 /// does do is make the intended role explicit for each one, so a selector that is later rewired,
 /// or a new instance wired differently from the last, fails here.
@@ -76,13 +76,12 @@ contract RoleTableTest is CapDeployer {
         _expectRole(
             address(irm), IInterestRateModel.updateUnderwriterRate.selector, CapRoles.MARKET, "irm underwriter rate"
         );
-        _expectRole(
-            address(irm), IInterestRateModel.updateMarketMultiplier.selector, CapRoles.MARKET, "irm market multiplier"
-        );
         (bool isMarket,) = accessManager.hasRole(CapRoles.MARKET, market);
         assertTrue(isMarket, "market holds MARKET");
+        (bool isProtocol,) = accessManager.hasRole(CapRoles.PROTOCOL, market);
+        assertTrue(isProtocol, "market holds PROTOCOL so it can forward role setters");
         (bool isWhitelisted,) = accessManager.hasRole(CapRoles.WHITELISTED, market);
-        assertTrue(isWhitelisted, "market holds WHITELISTED so it can forward role setters");
+        assertFalse(isWhitelisted, "market is not a user launcher");
 
         _assertTrancheRoleTable(tranches[0], ownerRole);
     }
@@ -104,6 +103,23 @@ contract RoleTableTest is CapDeployer {
         _expectRole(market, IFixedMarket.writeOff.selector, CapRoles.GUARDIAN, "fixed writeOff");
 
         _assertTrancheRoleTable(tranches[0], ownerRole);
+    }
+
+    function test_whitelistedUserCanCreateChildRoles() public {
+        address user = makeAddr("whitelistedUser");
+        address member = makeAddr("groupMember");
+        accessManager.grantRole(CapRoles.WHITELISTED, user, 0);
+
+        address[][] memory members = new address[][](1);
+        members[0] = new address[](1);
+        members[0][0] = member;
+
+        vm.prank(user);
+        uint64 roleId = registry.createChildRoles(CapRoles.GOVERNOR, members)[0];
+
+        assertTrue(registry.isOperatorRole(roleId));
+        (bool holdsRole,) = accessManager.hasRole(roleId, member);
+        assertTrue(holdsRole);
     }
 
     function test_createChildRoles_registersAndGrantsTheRole() public {
@@ -228,6 +244,14 @@ contract RoleTableTest is CapDeployer {
         IBaseMarket(market).setLtv(capConfig.defaultLtv);
     }
 
+    function test_instanceCannotLaunch() public {
+        (address market,) =
+            _createMarket("no-launch", defaultMarketOwner, defaultBorrower, capConfig.defaultTrancheWeights);
+        vm.prank(market);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, market));
+        registry.createFloatingMarket(_uniformAssets(2), capConfig.defaultTrancheWeights, "hijack", 0);
+    }
+
     function test_createMarket_rejectsRolesThatAreNotOperatorRoles() public {
         vm.expectRevert(IRegistry.OperatorNotAssigned.selector);
         registry.createFloatingMarket(
@@ -257,8 +281,10 @@ contract RoleTableTest is CapDeployer {
         _expectRole(tranche, IERC4626.deposit.selector, depositorRole, "tranche deposit");
         _expectRole(tranche, IERC4626.mint.selector, depositorRole, "tranche mint");
         assertEq(accessManager.getRoleAdmin(depositorRole), ownerRole, "administered by the market owner");
+        (bool isProtocol,) = accessManager.hasRole(CapRoles.PROTOCOL, tranche);
+        assertTrue(isProtocol, "tranche holds PROTOCOL so it can forward setDepositorRole");
         (bool isWhitelisted,) = accessManager.hasRole(CapRoles.WHITELISTED, tranche);
-        assertTrue(isWhitelisted, "tranche holds WHITELISTED so it can forward setDepositorRole");
+        assertFalse(isWhitelisted, "tranche is not a user launcher");
     }
 
     /// @dev The Registry keeps no copy of the market owner role, so handing a market to a new
@@ -364,8 +390,10 @@ contract RoleTableTest is CapDeployer {
         _expectRole(underwriter, IERC4626.deposit.selector, depositorRole, "deposit");
         _expectRole(underwriter, IERC4626.mint.selector, depositorRole, "mint");
         assertEq(accessManager.getRoleAdmin(depositorRole), curatorRole, "administered by the curator");
+        (bool isProtocol,) = accessManager.hasRole(CapRoles.PROTOCOL, underwriter);
+        assertTrue(isProtocol, "underwriter holds PROTOCOL so it can forward role setters");
         (bool isWhitelisted,) = accessManager.hasRole(CapRoles.WHITELISTED, underwriter);
-        assertTrue(isWhitelisted, "underwriter holds WHITELISTED so it can forward role setters");
+        assertFalse(isWhitelisted, "underwriter is not a user launcher");
     }
 
     function test_roleSetterEventsAreEmittedByRegistry() public {
@@ -431,16 +459,16 @@ contract RoleTableTest is CapDeployer {
         );
         _expectRole(address(oracle), IOracle.setSource.selector, CapRoles.GOVERNOR, "setSource");
 
-        // approved platform participants can create roles and instances without owning them
+        // users create groups and instances; deployed instances only forward the three setters
         _expectRole(address(registry), Registry.createChildRoles.selector, CapRoles.WHITELISTED, "createChildRoles");
         _expectRole(
             address(registry), Registry.createFloatingMarket.selector, CapRoles.WHITELISTED, "createFloatingMarket"
         );
         _expectRole(address(registry), Registry.createFixedMarket.selector, CapRoles.WHITELISTED, "createFixedMarket");
         _expectRole(address(registry), Registry.createUnderwriter.selector, CapRoles.WHITELISTED, "createUnderwriter");
-        _expectRole(address(registry), Registry.setDepositorRole.selector, CapRoles.WHITELISTED, "setDepositorRole");
-        _expectRole(address(registry), Registry.setBorrowerRole.selector, CapRoles.WHITELISTED, "setBorrowerRole");
-        _expectRole(address(registry), Registry.setAllocatorRole.selector, CapRoles.WHITELISTED, "setAllocatorRole");
+        _expectRole(address(registry), Registry.setDepositorRole.selector, CapRoles.PROTOCOL, "setDepositorRole");
+        _expectRole(address(registry), Registry.setBorrowerRole.selector, CapRoles.PROTOCOL, "setBorrowerRole");
+        _expectRole(address(registry), Registry.setAllocatorRole.selector, CapRoles.PROTOCOL, "setAllocatorRole");
 
         // only the Registry deploys through the factory
         _expectRole(address(beaconFactory), IBeaconFactory.create.selector, CapRoles.REGISTRY, "factory create");

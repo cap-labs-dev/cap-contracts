@@ -135,8 +135,19 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
 
     /// @inheritdoc IBaseMarket
     function setMarketMultiplier(uint256 multiplier) external virtual restricted nonReentrant {
+        _setMarketMultiplier(multiplier);
+    }
+
+    /// @dev Store a multiplier inside the IRM band. Floating overrides {setMarketMultiplier} to
+    /// accrue first so the new factor applies only to subsequent growth.
+    /// @param multiplier The new market multiplier in ray decimals
+    function _setMarketMultiplier(uint256 multiplier) internal {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        IInterestRateModel($.irm).updateMarketMultiplier(multiplier);
+        IInterestRateModel irm_ = IInterestRateModel($.irm);
+        if (multiplier < irm_.minimumMarketMultiplier() || multiplier > irm_.maximumMarketMultiplier()) {
+            revert IInterestRateModel.InvalidMultiplier();
+        }
+        $.marketMultiplier = multiplier;
         emit SetMarketMultiplier(multiplier);
     }
 
@@ -186,6 +197,12 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     function ltv() public view returns (uint256 ltvValue) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         ltvValue = $.ltv;
+    }
+
+    /// @inheritdoc IBaseMarket
+    function marketMultiplier() public view returns (uint256 multiplier) {
+        multiplier = _getBaseMarketStorage().marketMultiplier;
+        if (multiplier == 0) multiplier = 1e27;
     }
 
     /// @inheritdoc IBaseMarket
@@ -288,12 +305,15 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @inheritdoc IBaseMarket
+    /// @dev `activeCapital * min(ltv, lt)`. Guardian tightening of `lt` below `ltv` cuts new
+    /// credit immediately; existing debt can still sit unhealthy.
     function variableCreditLimit() public view returns (uint256 limit) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
+        uint256 _limit;
         for (uint256 i; i < $.tranches.length; ++i) {
-            limit += ITranche($.tranches[i].tranche).activeCapital();
+            _limit += ITranche($.tranches[i].tranche).activeCapital();
         }
-        limit = limit.rayMul($.ltv);
+        limit = _limit.rayMul(Math.min($.ltv, $.lt));
     }
 
     /// @dev Mint credit-backed stablecoin to the recipient

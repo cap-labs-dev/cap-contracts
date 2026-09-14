@@ -3,6 +3,9 @@ pragma solidity 0.8.36;
 
 import { Underwriter } from "../../../contracts/cap/Underwriter.sol";
 import { IERC7540AsyncRedeem } from "../../../contracts/interfaces/IERC7540AsyncRedeem.sol";
+import { IERC7540Operator } from "../../../contracts/interfaces/IERC7540Operator.sol";
+import { IERC7540Redeem } from "../../../contracts/interfaces/IERC7540Redeem.sol";
+import { IERC7575 } from "../../../contracts/interfaces/IERC7575.sol";
 import { IUnderwriter } from "../../../contracts/interfaces/IUnderwriter.sol";
 import { DeadShares } from "../../../contracts/utils/DeadShares.sol";
 import { BaseTest } from "../../shared/BaseTest.sol";
@@ -58,7 +61,7 @@ contract UnderwriterUnitTest is BaseTest {
         vm.mockCall(tranche, abi.encodeWithSignature("optOut()"), abi.encode());
         vm.mockCall(tranche, abi.encodeWithSignature("claim(address)", address(underwriter)), abi.encode(uint256(0)));
         vm.mockCall(tranche, abi.encodeWithSelector(IERC20.balanceOf.selector, address(underwriter)), abi.encode(0));
-        vm.mockCall(tranche, abi.encodeWithSignature("previewRedeem(uint256)"), abi.encode(0));
+        vm.mockCall(tranche, abi.encodeWithSignature("convertToAssets(uint256)"), abi.encode(0));
     }
 
     /// @dev The gate is nothing but the AccessManager's answer for the gated selector, so this
@@ -94,9 +97,13 @@ contract UnderwriterUnitTest is BaseTest {
     }
 
     function test_supportsInterface() public view {
-        assertTrue(underwriter.supportsInterface(type(IUnderwriter).interfaceId));
         assertTrue(underwriter.supportsInterface(type(IERC7540AsyncRedeem).interfaceId));
+        assertTrue(underwriter.supportsInterface(type(IERC7540Redeem).interfaceId));
+        assertTrue(underwriter.supportsInterface(type(IERC7540Operator).interfaceId));
+        assertTrue(underwriter.supportsInterface(type(IERC7575).interfaceId));
+        assertTrue(underwriter.supportsInterface(type(IERC4626).interfaceId));
         assertFalse(underwriter.supportsInterface(0xffffffff));
+        assertFalse(underwriter.supportsInterface(0xce3bbe50), "not async deposit");
     }
 
     function test_initializedState() public view {
@@ -385,7 +392,7 @@ contract UnderwriterUnitTest is BaseTest {
         underwriter.addTranche(tranche);
         underwriter.setDefaultTranche(tranche);
         vm.mockCall(tranche, abi.encodeWithSelector(IERC20.balanceOf.selector, address(underwriter)), abi.encode(1e18));
-        vm.mockCall(tranche, abi.encodeWithSignature("previewRedeem(uint256)"), abi.encode(1e18));
+        vm.mockCall(tranche, abi.encodeWithSignature("convertToAssets(uint256)"), abi.encode(1e18));
         underwriter.report(tranche);
 
         vm.mockCall(tranche, abi.encodeWithSignature("claim(address)", address(underwriter)), abi.encode(uint256(2e18)));

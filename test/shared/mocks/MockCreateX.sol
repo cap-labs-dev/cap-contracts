@@ -13,7 +13,8 @@ contract MockCreateX {
     /// @param initCode Creation bytecode, including constructor arguments
     /// @return newContract The deployed address
     function deployCreate3(bytes32 salt, bytes memory initCode) external payable returns (address newContract) {
-        // first 20 bytes are an address by construction
+        // first 20 bytes are the caller address by CreateX salt construction
+        // forge-lint: disable-next-line(unsafe-typecast)
         require(address(bytes20(salt)) == msg.sender && bytes1(salt[20]) == 0x00, "salt");
         bytes32 guarded = keccak256(abi.encodePacked(bytes32(uint256(uint160(msg.sender))), salt));
 

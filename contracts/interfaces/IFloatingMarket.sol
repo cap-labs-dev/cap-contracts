@@ -49,7 +49,8 @@ interface IFloatingMarket is IBaseMarket {
     function premium() external view returns (uint256 liquidityPremium, uint256 underwriterPremium);
 
     /// @notice Get the liquidity and underwriter premium indexes
-    /// @return liquidityIndex The liquidity index
+    /// @dev Liquidity is this market's local index: the global increment times {marketMultiplier}.
+    /// @return liquidityIndex The market-local liquidity index
     /// @return underwriterIndex The underwriter index
     function premiumIndices() external view returns (uint256 liquidityIndex, uint256 underwriterIndex);
 

@@ -103,6 +103,8 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         fixedMarketBeacon = init.fixedMarketBeacon;
         trancheBeacon = init.trancheBeacon;
         underwriterBeacon = init.underwriterBeacon;
+        if (init.lt > 1e27 || init.lt <= init.buffer) revert IBaseMarket.InvalidLt();
+        if (init.targetHealth < 1.25e27) revert IBaseMarket.InvalidTargetHealth();
         lt = init.lt;
         buffer = init.buffer;
         targetHealth = init.targetHealth;
@@ -353,15 +355,18 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         factorySelectors[0] = IBeaconFactory.create.selector;
         manager.setTargetFunctionRole(factory, factorySelectors, CapRoles.REGISTRY);
 
-        bytes4[] memory registryWhitelistedSelectors = new bytes4[](7);
+        bytes4[] memory registryWhitelistedSelectors = new bytes4[](4);
         registryWhitelistedSelectors[0] = IRegistry.createChildRoles.selector;
         registryWhitelistedSelectors[1] = IRegistry.createFloatingMarket.selector;
         registryWhitelistedSelectors[2] = IRegistry.createFixedMarket.selector;
         registryWhitelistedSelectors[3] = IRegistry.createUnderwriter.selector;
-        registryWhitelistedSelectors[4] = IRegistry.setDepositorRole.selector;
-        registryWhitelistedSelectors[5] = IRegistry.setBorrowerRole.selector;
-        registryWhitelistedSelectors[6] = IRegistry.setAllocatorRole.selector;
         manager.setTargetFunctionRole(address(this), registryWhitelistedSelectors, CapRoles.WHITELISTED);
+
+        bytes4[] memory registryProtocolSelectors = new bytes4[](3);
+        registryProtocolSelectors[0] = IRegistry.setDepositorRole.selector;
+        registryProtocolSelectors[1] = IRegistry.setBorrowerRole.selector;
+        registryProtocolSelectors[2] = IRegistry.setAllocatorRole.selector;
+        manager.setTargetFunctionRole(address(this), registryProtocolSelectors, CapRoles.PROTOCOL);
 
         // mint, burn, credit write-off, and credit-backed premium — markets only
         bytes4[] memory marketSelectors = new bytes4[](4);
@@ -386,9 +391,8 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         stablecoinGovernorSelectors[0] = IStablecoin.setReserveVault.selector;
         manager.setTargetFunctionRole(stablecoin, stablecoinGovernorSelectors, CapRoles.GOVERNOR);
 
-        bytes4[] memory irmMarketSelectors = new bytes4[](2);
+        bytes4[] memory irmMarketSelectors = new bytes4[](1);
         irmMarketSelectors[0] = IInterestRateModel.updateUnderwriterRate.selector;
-        irmMarketSelectors[1] = IInterestRateModel.updateMarketMultiplier.selector;
         manager.setTargetFunctionRole(irm, irmMarketSelectors, CapRoles.MARKET);
 
         bytes4[] memory irmGovernorSelectors = new bytes4[](4);
@@ -456,7 +460,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         manager.setTargetFunctionRole(market, liquidatorSelectors, CapRoles.LIQUIDATOR);
 
         manager.grantRole(CapRoles.MARKET, market, 0);
-        manager.grantRole(CapRoles.WHITELISTED, market, 0);
+        manager.grantRole(CapRoles.PROTOCOL, market, 0);
     }
 
     /// @dev Wire tranche function selectors to the market owner, market and depositor roles
@@ -483,7 +487,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
 
         // depositor role is administered by the market owner
         manager.setRoleAdmin(depositorRoleId, ownerRole);
-        manager.grantRole(CapRoles.WHITELISTED, tranche, 0);
+        manager.grantRole(CapRoles.PROTOCOL, tranche, 0);
     }
 
     /// @dev Wire underwriter function selectors to the curator and keeper roles
@@ -503,7 +507,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         keeperSelectors[0] = IUnderwriter.report.selector;
         manager.setTargetFunctionRole(underwriter, keeperSelectors, CapRoles.KEEPER);
 
-        manager.grantRole(CapRoles.WHITELISTED, underwriter, 0);
+        manager.grantRole(CapRoles.PROTOCOL, underwriter, 0);
     }
 
     /// @inheritdoc UUPSUpgradeable

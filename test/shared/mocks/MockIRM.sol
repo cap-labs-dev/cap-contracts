@@ -9,12 +9,8 @@ contract MockIRM {
         updateCalls++;
     }
 
-    function liquidityIndex(address) external pure returns (uint256) {
+    function liquidityIndex() external pure returns (uint256) {
         return 1e27;
-    }
-
-    function indices(address) external pure returns (uint256 liquidity, uint256 underwriter) {
-        return (1e27, 1e27);
     }
 
     function underwriterIndex(address) external pure returns (uint256) {

@@ -43,6 +43,7 @@ contract MarketUnitTest is CapDeployer {
         assertEq(market.registry(), address(registry));
         assertEq(market.utilization(), 0);
         assertEq(market.variableCreditLimit(), 0);
+        assertEq(market.marketMultiplier(), 1e27);
     }
 
     function test_utilizationAndPremiumIndicesAfterADraw() public {

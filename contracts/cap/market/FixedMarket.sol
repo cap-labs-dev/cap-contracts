@@ -93,7 +93,11 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         if (block.timestamp >= previousExpiry) {
             actualExtension = _rollFromNow(previousExpiry, extension);
         } else {
-            uint256 remaining = maximumTermLimit - (previousExpiry - block.timestamp);
+            uint256 remainingTerm = previousExpiry - block.timestamp;
+            // a lowered maximum can sit below a grandfathered remaining term; that loan keeps
+            // its expiry, it just has no room to grow
+            if (remainingTerm >= maximumTermLimit) revert InvalidTerm();
+            uint256 remaining = maximumTermLimit - remainingTerm;
             if (extension == type(uint256).max) actualExtension = remaining;
             else if (extension > remaining) revert InvalidTerm();
             else actualExtension = extension;
@@ -203,11 +207,9 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         // against it; see {IFixedMarket-availableCredit}
         _borrow(recipient, actualPrincipal);
         uint256 chargedPremium = _chargePremiumForTerm(id, actualPrincipal, term, actualPrincipal);
-        // unreachable on the sizing above: it holds the debt inside the credit limit, the limit is
-        // the ltv against active capital, and the threshold is the strictly larger lt against total
-        // capital. That chain leans on invariants owned elsewhere though — {setLtv} and {setBuffer}
-        // keeping ltv within lt, and active capital never exceeding total — so it is asserted here
-        // rather than assumed. {extend} asserts the same bound after charging its own premium
+        // credit is min(ltv, lt) against active capital; the threshold is lt against total. A full
+        // draw can land on health of one when those match. The Unhealthy assert is for the premium
+        // stacked on top, and for any active < total gap. {extend} asserts the same after its charge
         if (healthiness() < 1e27) revert Unhealthy();
         emit BorrowFixed(id, recipient, term, actualPrincipal, chargedPremium);
     }
@@ -224,6 +226,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     {
         (liquidityRate, underwriterRate) =
             IInterestRateModel(irm()).fixedRatesAfterMint(address(this), term.rayDiv(maximumTermLimit), mintAmount);
+        liquidityRate = liquidityRate.rayMul(marketMultiplier());
     }
 
     /// @dev The premium on `chargeableDebt` over `term`, priced per {_ratesStillToMint}

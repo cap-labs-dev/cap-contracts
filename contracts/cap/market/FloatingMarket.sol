@@ -14,8 +14,11 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloatingMarket, BaseMarket {
     using WadRayMath for uint256;
 
-    /// @dev Last cached liquidity index at premium charge
+    /// @dev Market-local liquidity index at the last premium charge
     uint256 private lastLiquidityIndex;
+
+    /// @dev Unmultiplied global liquidity index at the last premium charge
+    uint256 private lastGlobalIndex;
 
     /// @dev Last cached underwriter index at premium charge
     uint256 private lastUnderwriterIndex;
@@ -35,12 +38,14 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
     function initialize(address _authority, address _registry, string memory _name) external initializer {
         __BaseMarket_init(_authority, _registry, _name);
 
-        (lastLiquidityIndex, lastUnderwriterIndex) = premiumIndices();
+        lastLiquidityIndex = 1e27;
+        lastGlobalIndex = IInterestRateModel(irm()).liquidityIndex();
+        lastUnderwriterIndex = IInterestRateModel(irm()).underwriterIndex(address(this));
         lastPremiumUpdate = block.timestamp;
     }
 
     /// @inheritdoc IBaseMarket
-    /// @dev Accrue first, then rewrite `scaledDebt` so `scaledDebt × index` is unchanged to the nearest wei.
+    /// @dev Accrue at the old multiplier first so the new factor applies only going forward.
     function setMarketMultiplier(uint256 multiplier)
         external
         override(BaseMarket, IBaseMarket)
@@ -48,15 +53,7 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
         nonReentrant
     {
         _chargePremium();
-        uint256 debt = totalDebt();
-        IInterestRateModel(irm()).updateMarketMultiplier(multiplier);
-        lastLiquidityIndex = IInterestRateModel(irm()).liquidityIndex(address(this));
-        if (debt > 0) {
-            uint256 scaled = debt.rayDiv(index());
-            if (scaled == 0) revert InvalidScaledAmount();
-            scaledDebt = scaled;
-        }
-        emit SetMarketMultiplier(multiplier);
+        _setMarketMultiplier(multiplier);
     }
 
     /// @inheritdoc IFloatingMarket
@@ -137,7 +134,10 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
     /// @inheritdoc IFloatingMarket
     function premiumIndices() public view returns (uint256 liquidityIndex, uint256 underwriterIndex) {
         if (lastPremiumUpdate == block.timestamp) return (lastLiquidityIndex, lastUnderwriterIndex);
-        (liquidityIndex, underwriterIndex) = IInterestRateModel(irm()).indices(address(this));
+        liquidityIndex = _growIndex(
+            lastLiquidityIndex, lastGlobalIndex, IInterestRateModel(irm()).liquidityIndex(), marketMultiplier()
+        );
+        underwriterIndex = IInterestRateModel(irm()).underwriterIndex(address(this));
     }
 
     /// @inheritdoc IFloatingMarket
@@ -183,8 +183,26 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
         }
 
         lastLiquidityIndex = liquidityIndex;
+        lastGlobalIndex = IInterestRateModel(irm()).liquidityIndex();
         lastUnderwriterIndex = underwriterIndex;
         lastPremiumUpdate = block.timestamp;
+    }
+
+    /// @dev Grow the market-local index by the global growth factor raised to `multiplier`.
+    /// `2e27` squares the factor, so a year of 10% is 21%, and splitting that year into any
+    /// number of realisations does not change the result.
+    /// @param lastLocal The market-local index at the last checkpoint
+    /// @param lastGlobal The unmultiplied global liquidity index at the last checkpoint
+    /// @param globalNow The current unmultiplied global liquidity index
+    /// @param multiplier The market multiplier in ray decimals
+    /// @return localNow The grown market-local index
+    function _growIndex(uint256 lastLocal, uint256 lastGlobal, uint256 globalNow, uint256 multiplier)
+        private
+        pure
+        returns (uint256 localNow)
+    {
+        if (lastGlobal == 0 || globalNow <= lastGlobal) return lastLocal;
+        localNow = lastLocal.rayMul((globalNow.rayDiv(lastGlobal)).rayPowRay(multiplier));
     }
 
     /// @dev Calculate the liquidity and underwriter premiums

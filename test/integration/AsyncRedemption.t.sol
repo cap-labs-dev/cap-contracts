@@ -88,8 +88,8 @@ contract AsyncRedemptionTest is CapDeployer {
         cusdUnderlying.approve(address(stablecoin), 100e18);
         stablecoin.deposit(100e18, cusdDepositor);
 
-        assertEq(stablecoin.maxRedeem(cusdDepositor), 100e18);
-        uint256 assets = stablecoin.redeem(100e18, cusdDepositor, cusdDepositor);
+        assertEq(stablecoin.maxInstantRedeem(cusdDepositor), 100e18);
+        uint256 assets = stablecoin.instantRedeem(100e18, cusdDepositor, cusdDepositor);
         vm.stopPrank();
 
         assertEq(assets, 100e18);

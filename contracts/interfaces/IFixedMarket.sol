@@ -87,6 +87,8 @@ interface IFixedMarket is IBaseMarket {
     function borrowMore(uint256 id, address recipient, uint256 principal) external returns (uint256 actualPrincipal);
 
     /// @notice Repay assets to the market
+    /// @dev Burns the recorded amount. Arrears accrue only when {extend} or {extendAdmin} runs
+    /// after expiry; a keeper must call that after the grace period.
     /// @param id The id of the loan
     /// @param amount The amount of assets to repay
     /// @return repaid The actual amount of assets repaid
@@ -103,7 +105,9 @@ interface IFixedMarket is IBaseMarket {
         returns (uint256 repaid, uint256 assetsSlashed);
 
     /// @notice Extend the term of a loan
-    /// @dev Extends current `id` debt by `extension` and charges arrears if expired
+    /// @dev Live loans can grow only up to the current {maximumTermLimit}. If that limit was
+    /// lowered below remaining term, there is no room and the call reverts {InvalidTerm}; the
+    /// existing expiry is unchanged. Expired loans roll from now and charge arrears.
     /// @param id The id of the loan
     /// @param extension The extension of the term
     /// @return actualExtension The actual extension of the term
@@ -139,7 +143,8 @@ interface IFixedMarket is IBaseMarket {
         returns (uint256 liquidityPremium, uint256 underwriterPremium);
 
     /// @notice Premium a new borrow would be charged
-    /// @dev Priced after the mint; see {IInterestRateModel-fixedRatesAfterMint}.
+    /// @dev Priced after the mint; see {IInterestRateModel-fixedRatesAfterMint}. This market
+    /// then applies {marketMultiplier} to the liquidity rate.
     /// @param principal The principal of the loan
     /// @param term The term of the loan
     /// @return liquidityPremium The liquidity premium

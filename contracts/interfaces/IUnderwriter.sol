@@ -78,7 +78,8 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     function setAllocatorRole(uint64 roleId) external;
 
     /// @notice Register a tranche for allocation and reporting
-    /// @dev Curator only. Grants the tranche vault operator rights until {removeTranche}.
+    /// @dev Curator only. The curator is trusted to name a real protocol tranche for this vault
+    /// and asset. Grants the tranche vault operator rights until {removeTranche}.
     /// @param tranche The tranche address
     function addTranche(address tranche) external;
 
@@ -120,7 +121,8 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     function setDefaultTranche(address tranche) external;
 
     /// @notice Re-value a tranche position and claim its premium
-    /// @dev Same revaluation as {allocate} and {deallocate}
+    /// @dev Same revaluation as {allocate} and {deallocate}. Share price stays on the last mark
+    /// until this runs; that lag is intentional, not a live NAV walk.
     /// @param tranche The tranche address
     function report(address tranche) external;
 
@@ -162,7 +164,8 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     function totalDebt() external view returns (uint256);
 
     /// @notice Total assets including vault balance and recorded tranche debt
-    /// @dev Vault ERC6909 balance plus {totalDebt}.
+    /// @dev Vault ERC6909 balance plus {totalDebt}. A slash is folded in only when {report},
+    /// {allocate}, or {deallocate} remakes the mark — Yearn-style, not a live price of positions.
     /// @return assets The total assets
     function totalAssets() external view returns (uint256 assets);
 

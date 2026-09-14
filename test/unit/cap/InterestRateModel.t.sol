@@ -40,11 +40,6 @@ contract InterestRateModelTest is BaseTest {
         s = IInterestRateModel.Slopes({ base: 0, slope0: 0.1e27, slope1: 0.9e27, kink: 0.8e27 });
     }
 
-    function test_marketMultiplier_defaultsToOneRay() public view {
-        assertEq(irm.marketMultiplier(market), RAY);
-        assertEq(irm.marketMultiplier(address(uint160(0xBEEF))), RAY);
-    }
-
     function test_averageSupplies_tracksTheSource() public {
         stablecoin.setSupplyUtilization(0.5e27);
         irm.updateLiquidityRate();
@@ -97,9 +92,9 @@ contract InterestRateModelTest is BaseTest {
         irm.setLiquiditySlopes(_liquiditySlopes());
         stablecoin.setSupplyUtilization(0.8e27);
         irm.updateLiquidityRate();
-        uint256 before = irm.liquidityIndex(market);
+        uint256 before = irm.liquidityIndex();
         vm.warp(block.timestamp + 365 days);
-        assertGt(irm.liquidityIndex(market), before);
+        assertGt(irm.liquidityIndex(), before);
     }
 
     function test_updateUnderwriterRate_fromMarket() public {

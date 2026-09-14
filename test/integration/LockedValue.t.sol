@@ -39,7 +39,7 @@ contract LockedValueTest is CapDeployer {
         assertGt(market.lockedValue(junior), Tranche(junior).totalCapital(), "requirement exceeds its capital");
 
         assertEq(Tranche(junior).unlockedSupply(), 0, "junior must be fully locked");
-        assertEq(Tranche(junior).maxRedeem(makeAddr("junior")), 0, "nothing redeemable");
+        assertEq(Tranche(junior).maxInstantRedeem(makeAddr("junior")), 0, "nothing redeemable");
     }
 
     /// An underwriter must never be able to exit collateral that is backing live debt, which shows
@@ -50,10 +50,10 @@ contract LockedValueTest is CapDeployer {
         vm.prank(defaultBorrower);
         market.borrow(defaultBorrower, 500e18);
 
-        uint256 redeemable = Tranche(junior).maxRedeem(makeAddr("junior"));
+        uint256 redeemable = Tranche(junior).maxInstantRedeem(makeAddr("junior"));
         if (redeemable > 0) {
             vm.prank(makeAddr("junior"));
-            Tranche(junior).redeem(redeemable, makeAddr("junior"), makeAddr("junior"));
+            Tranche(junior).instantRedeem(redeemable, makeAddr("junior"), makeAddr("junior"));
         }
 
         assertGe(market.creditLimit(), market.totalDebt(), "credit limit must still cover the debt");

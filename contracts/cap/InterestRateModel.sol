@@ -30,9 +30,6 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     /// @inheritdoc IInterestRateModel
     uint256 public termMultiplierSlope;
 
-    /// @dev Per-market liquidity rate multiplier in ray decimals
-    mapping(address => uint256) private _marketMultiplier;
-
     /// @inheritdoc IInterestRateModel
     uint256 public minimumMarketMultiplier;
 
@@ -82,8 +79,8 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         uint256 _averagingPeriod
     ) external initializer {
         __AccessManaged_init(_authority);
-        // the multiplier band has no setter, so an inverted one would leave
-        // {updateMarketMultiplier} permanently unsatisfiable with no way to repair it
+        // the multiplier band has no setter, so an inverted one would leave every
+        // {IBaseMarket-setMarketMultiplier} permanently unsatisfiable with no way to repair it
         if (_minimumMarketMultiplier > _maximumMarketMultiplier) revert InvalidMultiplier();
         stablecoin = _stablecoin;
         minimumMarketMultiplier = _minimumMarketMultiplier;
@@ -144,28 +141,8 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     }
 
     /// @inheritdoc IInterestRateModel
-    function updateMarketMultiplier(uint256 _multiplier) external restricted {
-        address market = msg.sender;
-        if (_multiplier < minimumMarketMultiplier || _multiplier > maximumMarketMultiplier) revert InvalidMultiplier();
-        _marketMultiplier[market] = _multiplier;
-        emit UpdateMarketMultiplier(market, _multiplier);
-    }
-
-    /// @inheritdoc IInterestRateModel
-    function marketMultiplier(address market) public view returns (uint256 multiplier) {
-        multiplier = _marketMultiplier[market];
-        if (multiplier == 0) multiplier = 1e27;
-    }
-
-    /// @inheritdoc IInterestRateModel
-    function indices(address market) public view returns (uint256 liquidity, uint256 underwriter) {
-        liquidity = liquidityIndex(market);
-        underwriter = underwriterIndex(market);
-    }
-
-    /// @inheritdoc IInterestRateModel
-    function liquidityIndex(address market) public view returns (uint256 index) {
-        index = _index(liquidityData).rayMul(marketMultiplier(market));
+    function liquidityIndex() public view returns (uint256 index) {
+        index = _index(liquidityData);
     }
 
     /// @inheritdoc IInterestRateModel
@@ -182,7 +159,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         returns (uint256 liquidity, uint256 underwriter)
     {
         uint256 projected = _nextLiquidityRate(averageUtilizationAfterMint(mintAmount));
-        liquidity = projected.rayMul(termMultiplier(termUtilization)).rayMul(marketMultiplier(market));
+        liquidity = projected.rayMul(termMultiplier(termUtilization));
         underwriter = underwriterRate(market);
     }
 

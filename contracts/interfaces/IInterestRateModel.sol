@@ -71,11 +71,6 @@ interface IInterestRateModel {
     /// @param slope The new term multiplier slope in ray decimals
     event SetTermMultiplierSlope(uint256 slope);
 
-    /// @notice Emitted when a market multiplier is set
-    /// @param market The market that set the multiplier
-    /// @param multiplier The new market multiplier in ray decimals
-    event UpdateMarketMultiplier(address indexed market, uint256 multiplier);
-
     /// @notice Emitted when the liquidation bonus is set
     /// @param liquidationBonus The new liquidation bonus in ray decimals
     event SetLiquidationBonus(uint256 liquidationBonus);
@@ -88,7 +83,8 @@ interface IInterestRateModel {
     /// @dev Same bounds as the setters.
     /// @param authority The access manager
     /// @param stablecoin The stablecoin
-    /// @param minimumMarketMultiplier Minimum market multiplier in ray, at or below the maximum
+    /// @param minimumMarketMultiplier Minimum market multiplier in ray, at or below the maximum.
+    /// Markets read this band in {IBaseMarket-setMarketMultiplier}.
     /// @param maximumMarketMultiplier Maximum market multiplier in ray
     /// @param maximumUnderwriterRate Maximum underwriter rate per year in ray
     /// @param liquidationBonus Liquidation bonus in ray
@@ -127,10 +123,6 @@ interface IInterestRateModel {
     /// @notice Update the underwriter rate for the calling market ({CapRoles-MARKET})
     /// @param rate The new underwriter rate per year in ray decimals
     function updateUnderwriterRate(uint256 rate) external;
-
-    /// @notice Update the multiplier for the calling market ({CapRoles-MARKET})
-    /// @param multiplier The new market multiplier in ray decimals
-    function updateMarketMultiplier(uint256 multiplier) external;
 
     /// @notice The address of the Stablecoin token
     /// @return The stablecoin address
@@ -239,25 +231,17 @@ interface IInterestRateModel {
     /// @return rate The underwriter rate per year in ray decimals
     function underwriterRate(address market) external view returns (uint256 rate);
 
-    /// @notice The current multiplier for a market's liquidity interest rate in ray decimals
-    /// @param market The market to query
-    /// @return multiplier The market multiplier
-    function marketMultiplier(address market) external view returns (uint256 multiplier);
-
-    /// @notice The current liquidity and underwriter indices for a market
-    /// @param market The market to query
-    /// @return liquidity The liquidity index
-    /// @return underwriter The underwriter index
-    function indices(address market) external view returns (uint256 liquidity, uint256 underwriter);
-
-    /// @notice The current liquidity index for a market
-    /// @param market The market to query
+    /// @notice The current global liquidity index
+    /// @dev Unmultiplied. Floating markets grow a local index from this; fixed markets multiply
+    /// the annual rate.
     /// @return index The liquidity index
-    function liquidityIndex(address market) external view returns (uint256 index);
+    function liquidityIndex() external view returns (uint256 index);
 
     /// @notice Fixed rates after a credit-backed mint
-    /// @dev Non-decreasing in `mintAmount`. See {averageUtilizationAfterMint}.
-    /// @param market The market the rates are for
+    /// @dev Non-decreasing in `mintAmount`. See {averageUtilizationAfterMint}. The liquidity
+    /// rate is the protocol curve times the term multiplier; the caller applies its market
+    /// multiplier.
+    /// @param market The market the underwriter rate is for
     /// @param termUtilization The term as a fraction of the market's maximum term in ray decimals
     /// @param mintAmount The credit-backed supply about to be minted
     /// @return liquidityRate The projected liquidity rate per year in ray decimals

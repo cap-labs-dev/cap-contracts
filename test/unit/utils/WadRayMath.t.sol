@@ -33,6 +33,18 @@ contract WadRayMathHarness {
     function rayPow(uint256 a, uint256 n) external pure returns (uint256) {
         return WadRayMath.rayPow(a, n);
     }
+
+    function rayPowRay(uint256 base, uint256 exp) external pure returns (uint256) {
+        return WadRayMath.rayPowRay(base, exp);
+    }
+
+    function rayLn(uint256 x) external pure returns (uint256) {
+        return WadRayMath.rayLn(x);
+    }
+
+    function rayExp(uint256 x) external pure returns (uint256) {
+        return WadRayMath.rayExp(x);
+    }
 }
 
 contract WadRayMathTest is Test {
@@ -172,6 +184,53 @@ contract WadRayMathTest is Test {
         // 0.999^100000 has long since underflowed the ray, and getting there must not need
         // 100000 multiplications
         assertEq(m.rayPow(0.999e27, 100_000), 0, "decayed past the smallest representable ray");
+    }
+
+    function test_rayPowRay_zeroExponentIsOne() public view {
+        assertEq(m.rayPowRay(1.1e27, 0), RAY);
+    }
+
+    function test_rayPowRay_oneIsIdentity() public view {
+        assertEq(m.rayPowRay(1.1e27, RAY), 1.1e27);
+        assertEq(m.rayPowRay(RAY, 2e27), RAY);
+    }
+
+    function test_rayPowRay_twoIsSquare() public view {
+        assertEq(m.rayPowRay(1.1e27, 2e27), m.rayMul(1.1e27, 1.1e27));
+    }
+
+    function test_rayPowRay_halfThenTwiceRecoversTheBase() public view {
+        uint256 half = m.rayPowRay(1.1e27, 0.5e27);
+        assertApproxEqRel(m.rayMul(half, half), 1.1e27, 1e12);
+    }
+
+    function test_rayPowRay_oneAndAHalfIsGeometricMeanOfOneAndTwo() public view {
+        uint256 base = 1.1e27;
+        uint256 oneAndAHalf = m.rayPowRay(base, 1.5e27);
+        uint256 geo = m.rayPowRay(m.rayMul(base, m.rayMul(base, base)), 0.5e27);
+        assertApproxEqRel(oneAndAHalf, geo, 1e12);
+        assertGt(oneAndAHalf, base);
+        assertLt(oneAndAHalf, m.rayMul(base, base));
+    }
+
+    function test_rayPowRay_halfPlusOneIsOneAndAHalf() public view {
+        uint256 base = 1.1e27;
+        uint256 composed = m.rayMul(m.rayPowRay(base, 0.5e27), m.rayPowRay(base, RAY));
+        assertApproxEqRel(composed, m.rayPowRay(base, 1.5e27), 1e12);
+    }
+
+    function test_rayPowRay_oneStepMatchesTwoSteps() public view {
+        uint256 oneShot = m.rayPowRay(m.rayMul(1.05e27, 1.05e27), 2e27);
+        uint256 twoShot = m.rayMul(m.rayPowRay(1.05e27, 2e27), m.rayPowRay(1.05e27, 2e27));
+        assertApproxEqRel(oneShot, twoShot, 1e12);
+    }
+
+    function test_rayLnExp_roundtrip() public view {
+        assertEq(m.rayLn(RAY), 0);
+        assertEq(m.rayLn(RAY - 1), 0);
+        assertEq(m.rayExp(0), RAY);
+        assertApproxEqRel(m.rayExp(m.rayLn(1.1e27)), 1.1e27, 1e12);
+        assertApproxEqRel(m.rayExp(m.rayLn(2e27)), 2e27, 1e12);
     }
 
     function testFuzz_rayMul_identity(uint128 a) public view {

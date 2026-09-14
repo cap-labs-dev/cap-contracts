@@ -16,7 +16,6 @@ import { CapRoles } from "../../contracts/utils/CapRoles.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
 import { MockERC20 } from "../shared/mocks/MockERC20.sol";
 import { MockIRM } from "../shared/mocks/MockIRM.sol";
-import { ERC1155Holder } from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
 /// @notice Pins the accounting the protocol has to get exactly right: that a redemption retires
 /// the shortfall it absorbed, that premium reaches the capital which was exposed while it vested,
@@ -24,7 +23,7 @@ import { ERC1155Holder } from "@openzeppelin/contracts/token/ERC1155/utils/ERC11
 /// against it. Each test below is a bug that was real once, so a regression is a repeat rather
 /// than a novelty. The tail of the file covers parameter and interface hardening on the same
 /// paths.
-contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
+contract AccountingIntegrityTest is CapDeployer {
     Stablecoin internal scoin;
     MockERC20 internal usdc;
     MockIRM internal mockIrm;
@@ -43,7 +42,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
                 address(impl),
                 abi.encodeCall(
                     Stablecoin.initialize,
-                    (address(accessManager), address(usdc), "Cap USD", "cUSD", "", address(mockIrm), address(0))
+                    (address(accessManager), address(usdc), "Cap USD", "cUSD", address(mockIrm), address(0))
                 )
             )
         );
@@ -75,9 +74,9 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         _writeOffCredit(100e18);
 
         uint256 badBefore = scoin.badDebt();
-        uint256 ratioBefore = scoin.totalAssets() * 1e27 / scoin.totalSupply();
+        uint256 ratioBefore = (scoin.totalSupply() - scoin.badDebt()) * 1e27 / scoin.totalSupply();
 
-        uint256 quoted = scoin.previewRedeem(100e18);
+        uint256 quoted = scoin.convertToAssets(100e18);
         uint256 id = scoin.requestRedeem(100e18, address(this), address(this));
         uint256 paid = scoin.redeem(id, 100e18, address(this), address(this));
 
@@ -86,8 +85,14 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
 
         // the haircut retires the shortfall rather than stranding in the reserve
         assertEq(scoin.badDebt(), badBefore - (100e18 - paid), "shortfall retires by exactly the haircut");
-        assertGt(scoin.totalAssets() * 1e27 / scoin.totalSupply(), ratioBefore, "redeeming heals the peg");
-        assertEq(scoin.totalAssets(), usdc.balanceOf(address(scoin)), "no reserve stranded off the books");
+        assertGt(
+            (scoin.totalSupply() - scoin.badDebt()) * 1e27 / scoin.totalSupply(), ratioBefore, "redeeming heals the peg"
+        );
+        assertEq(
+            scoin.convertToAssets(scoin.totalSupply()),
+            usdc.balanceOf(address(scoin)),
+            "no reserve stranded off the books"
+        );
     }
 
     /// @dev Queueing a redemption must be worth exactly what taking it instantly would have been.
@@ -100,7 +105,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
 
         uint256 snapshot = vm.snapshotState();
 
-        uint256 instantPaid = scoin.redeem(shares, address(this), address(this));
+        uint256 instantPaid = scoin.instantRedeem(shares, address(this), address(this));
         uint256 instantBad = scoin.badDebt();
         uint256 instantAssets = scoin.totalAssets();
         uint256 instantReserve = usdc.balanceOf(address(scoin));
@@ -114,7 +119,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         assertEq(scoin.badDebt(), instantBad, "same shortfall retired");
         assertEq(scoin.totalAssets(), instantAssets, "same backing");
         assertEq(usdc.balanceOf(address(scoin)), instantReserve, "same reserve");
-        assertEq(scoin.totalAssets(), usdc.balanceOf(address(scoin)), "books match the reserve");
+        assertEq(scoin.convertToAssets(scoin.totalSupply()), usdc.balanceOf(address(scoin)), "books match the reserve");
     }
 
     function test_instantRedeemRetiresBadDebt() public {
@@ -122,12 +127,14 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         _writeOffCredit(100e18);
 
         uint256 badBefore = scoin.badDebt();
-        uint256 ratioBefore = scoin.totalAssets() * 1e27 / scoin.totalSupply();
+        uint256 ratioBefore = (scoin.totalSupply() - scoin.badDebt()) * 1e27 / scoin.totalSupply();
 
-        scoin.redeem(100e18, address(this), address(this));
+        scoin.instantRedeem(100e18, address(this), address(this));
 
         assertLt(scoin.badDebt(), badBefore, "instant path retires shortfall");
-        assertGt(scoin.totalAssets() * 1e27 / scoin.totalSupply(), ratioBefore, "instant path heals");
+        assertGt(
+            (scoin.totalSupply() - scoin.badDebt()) * 1e27 / scoin.totalSupply(), ratioBefore, "instant path heals"
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -705,17 +712,15 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
 
         // collateral is now backing live debt, so most of it must not be withdrawable
         uint256 balance = b.tranche0.balanceOf(alice);
-        uint256 gated = b.tranche0.maxWithdraw(alice);
+        uint256 gated = b.tranche0.maxInstantWithdraw(alice);
         emit log_named_uint("share balance ", balance);
         emit log_named_uint("maxWithdraw   ", gated);
         assertLt(gated, balance, "gate must bite");
 
-        // ERC4626Upgradeable.maxWithdraw is previewRedeem(maxRedeem(owner)) in OZ 5.7, and
-        // maxRedeem is the override that applies instantUnlockedSupply. Only that delegation
-        // keeps withdraw() behind the same gate as redeem()
+        // instant exits sit behind instantUnlockedSupply, the same lock that used to cap maxRedeem
         vm.prank(alice);
         vm.expectRevert();
-        b.tranche0.withdraw(balance, alice, alice);
+        b.tranche0.instantWithdraw(balance, alice, alice);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -769,16 +774,16 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         assertEq(uw.totalAssets(), vault.balanceOf(address(uw), address(collateral)), "the books match the assets held");
 
         uint256 pool = uw.totalAssets();
-        uint256 aliceRedeemable = uw.maxRedeem(alice);
+        uint256 aliceRedeemable = uw.maxInstantRedeem(alice);
         vm.prank(alice);
-        uint256 paid = uw.redeem(aliceRedeemable, alice, alice);
+        uint256 paid = uw.instantRedeem(aliceRedeemable, alice, alice);
 
         emit log_named_uint("pool after the slash", pool);
         emit log_named_uint("alice took          ", paid);
-        emit log_named_uint("bob left with       ", uw.previewRedeem(uw.balanceOf(bob)));
+        emit log_named_uint("bob left with       ", uw.convertToAssets(uw.balanceOf(bob)));
 
         assertApproxEqRel(paid, pool / 2, 0.001e18, "a half holder takes half the slashed pool, not all of it");
-        assertApproxEqRel(uw.previewRedeem(uw.balanceOf(bob)), pool / 2, 0.001e18, "the rest stays bob's");
+        assertApproxEqRel(uw.convertToAssets(uw.balanceOf(bob)), pool / 2, 0.001e18, "the rest stays bob's");
     }
 
     /// @dev The invariant underneath it. Once the underwriter has touched a tranche its books must
@@ -799,7 +804,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         uw.deallocate(address(t), held * bound(rawFraction, 0, 10_000) / 10_000);
 
         uint256 realisable =
-            vault.balanceOf(address(uw), address(collateral)) + t.previewRedeem(t.balanceOf(address(uw)));
+            vault.balanceOf(address(uw), address(collateral)) + t.convertToAssets(t.balanceOf(address(uw)));
         assertEq(uw.totalAssets(), realisable, "the books must equal what the underwriter could realise");
     }
 
@@ -1025,7 +1030,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
         uint256 honest = _quotedPremium(market);
 
         vm.prank(saver);
-        stablecoin.redeem(3_000e18, saver, saver);
+        stablecoin.instantRedeem(3_000e18, saver, saver);
         uint256 griefed = _quotedPremium(market);
 
         emit log_named_uint("honest premium", honest);
@@ -1140,7 +1145,7 @@ contract AccountingIntegrityTest is CapDeployer, ERC1155Holder {
 
     /// @dev `initialize` accepted a liquidation bonus `setLiquidationBonus` would refuse and an
     /// inverted multiplier band. The band has no setter at all, so an inverted one left
-    /// {updateMarketMultiplier} unsatisfiable with nothing able to repair it.
+    /// {IBaseMarket-setMarketMultiplier} unsatisfiable with nothing able to repair it.
     function test_irmInitRejectsWhatTheSettersReject() public {
         InterestRateModel impl = new InterestRateModel();
 

@@ -3,6 +3,7 @@ pragma solidity 0.8.36;
 
 import { BeaconFactory } from "../../../contracts/cap/BeaconFactory.sol";
 import { Registry } from "../../../contracts/cap/Registry.sol";
+import { IBaseMarket } from "../../../contracts/interfaces/IBaseMarket.sol";
 import { IRegistry } from "../../../contracts/interfaces/IRegistry.sol";
 import { BaseTest } from "../../shared/BaseTest.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -73,6 +74,26 @@ contract RegistryTest is BaseTest {
         init = _validInit();
         init.underwriterBeacon = address(0);
         _initRevertsOnZero(init);
+    }
+
+    function test_initialize_rejectsInvalidRiskParams() public {
+        Registry impl = new Registry();
+
+        IRegistry.InitParams memory init = _validInit();
+        init.lt = 1e27 + 1;
+        vm.expectRevert(IBaseMarket.InvalidLt.selector);
+        _deployProxy(address(impl), abi.encodeCall(Registry.initialize, (address(accessManager), init)));
+
+        init = _validInit();
+        init.lt = 0.1e27;
+        init.buffer = 0.1e27;
+        vm.expectRevert(IBaseMarket.InvalidLt.selector);
+        _deployProxy(address(impl), abi.encodeCall(Registry.initialize, (address(accessManager), init)));
+
+        init = _validInit();
+        init.targetHealth = 1.24e27;
+        vm.expectRevert(IBaseMarket.InvalidTargetHealth.selector);
+        _deployProxy(address(impl), abi.encodeCall(Registry.initialize, (address(accessManager), init)));
     }
 
     function _deployRegistry(IRegistry.InitParams memory init) internal returns (Registry registry) {

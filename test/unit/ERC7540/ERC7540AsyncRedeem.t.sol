@@ -3,6 +3,9 @@ pragma solidity 0.8.36;
 
 import { ERC7540AsyncRedeem } from "../../../contracts/ERC7540/ERC7540AsyncRedeem.sol";
 import { IERC7540AsyncRedeem } from "../../../contracts/interfaces/IERC7540AsyncRedeem.sol";
+import { IERC7540Operator } from "../../../contracts/interfaces/IERC7540Operator.sol";
+import { IERC7540Redeem } from "../../../contracts/interfaces/IERC7540Redeem.sol";
+import { IERC7575 } from "../../../contracts/interfaces/IERC7575.sol";
 import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
@@ -14,7 +17,7 @@ contract MockAsyncVault is ERC7540AsyncRedeem {
     uint256 private _unlocked;
 
     function initialize(IERC20 asset_) external initializer {
-        __ERC7540AsyncRedeem_init(asset_, "Mock Vault", "mVLT", "");
+        __ERC7540AsyncRedeem_init(asset_, "Mock Vault", "mVLT");
     }
 
     function unlockedSupply() public view override returns (uint256) {
@@ -29,7 +32,7 @@ contract MockAsyncVault is ERC7540AsyncRedeem {
 /// @dev A vault that does NOT override unlockedSupply, exercising the base (zero) implementation.
 contract MockBareVault is ERC7540AsyncRedeem {
     function initialize(IERC20 asset_) external initializer {
-        __ERC7540AsyncRedeem_init(asset_, "Bare Vault", "bVLT", "");
+        __ERC7540AsyncRedeem_init(asset_, "Bare Vault", "bVLT");
     }
 }
 
@@ -55,12 +58,12 @@ contract ERC7540AsyncRedeemTest is Test {
 
     // --- request mechanics ---
 
-    function test_requestRedeem_escrowsSharesAndMintsReceipt() public {
+    function test_requestRedeem_escrowsShares() public {
         vault.setUnlocked(1_000e18);
         vm.prank(alice);
         uint256 id = vault.requestRedeem(400e18, alice, alice);
 
-        assertEq(id, 0);
+        assertEq(id, 1, "nonzero ids must never start at 0");
         assertEq(vault.balanceOf(alice), 600e18); // shares moved into escrow
         assertEq(vault.balanceOf(address(vault)), 400e18);
         assertEq(vault.redemptionQueue(), 400e18);
@@ -161,14 +164,16 @@ contract ERC7540AsyncRedeemTest is Test {
 
     // --- instant redeem accounting ---
 
-    function test_maxRedeem_capByInstantUnlocked() public {
+    function test_maxInstantRedeem_capByInstantUnlocked() public {
         vault.setUnlocked(700e18);
-        assertEq(vault.maxRedeem(alice), 700e18); // min(balance 1000, unlocked 700)
+        assertEq(vault.maxInstantRedeem(alice), 700e18); // min(balance 1000, unlocked 700)
+        assertEq(vault.maxRedeem(alice), 0, "no request, so nothing is claimable");
 
         vm.prank(alice);
         vault.requestRedeem(200e18, alice, alice);
         // instantUnlocked = unlocked - redemptionQueue = 700 - 200 = 500; balance now 800
-        assertEq(vault.maxRedeem(alice), 500e18);
+        assertEq(vault.maxInstantRedeem(alice), 500e18);
+        assertEq(vault.maxRedeem(alice), 200e18, "the queued request is fully claimable");
     }
 
     // --- operator / allowance ---
@@ -201,7 +206,7 @@ contract ERC7540AsyncRedeemTest is Test {
 
         vm.prank(bob);
         uint256 id = vault.requestRedeem(300e18, bob, alice);
-        // receipt controlled by bob
+        // bob is the controller
         assertEq(vault.claimableRedeemRequest(id, bob), 300e18);
     }
 
@@ -268,10 +273,10 @@ contract ERC7540AsyncRedeemTest is Test {
 
     // --- instant ERC4626 path (no request) hits the 5-arg _withdraw override ---
 
-    function test_instantRedeem_ERC4626() public {
+    function test_instantRedeem_whenLiquid() public {
         vault.setUnlocked(1_000e18);
         vm.prank(alice);
-        uint256 assets = vault.redeem(400e18, alice, alice);
+        uint256 assets = vault.instantRedeem(400e18, alice, alice);
 
         assertEq(assets, 400e18);
         assertEq(asset.balanceOf(alice), 400e18);
@@ -279,10 +284,10 @@ contract ERC7540AsyncRedeemTest is Test {
         assertEq(vault.totalSupply(), 600e18);
     }
 
-    function test_instantWithdraw_ERC4626() public {
+    function test_instantWithdraw_whenLiquid() public {
         vault.setUnlocked(1_000e18);
         vm.prank(alice);
-        uint256 shares = vault.withdraw(250e18, alice, alice);
+        uint256 shares = vault.instantWithdraw(250e18, alice, alice);
 
         assertEq(shares, 250e18);
         assertEq(asset.balanceOf(alice), 250e18);
@@ -295,10 +300,132 @@ contract ERC7540AsyncRedeemTest is Test {
         vault.setOperator(bob, true);
 
         vm.prank(bob);
-        uint256 assets = vault.redeem(100e18, bob, alice);
+        uint256 assets = vault.instantRedeem(100e18, bob, alice);
         assertEq(assets, 100e18);
         assertEq(asset.balanceOf(bob), 100e18);
         assertEq(vault.balanceOf(alice), 900e18);
+    }
+
+    function test_previewRedeemAndWithdraw_revert() public {
+        vm.expectRevert(IERC7540AsyncRedeem.PreviewNotSupported.selector);
+        vault.previewRedeem(1);
+        vm.expectRevert(IERC7540AsyncRedeem.PreviewNotSupported.selector);
+        vault.previewWithdraw(1);
+    }
+
+    function test_threeArgRedeem_claimsTheRequest() public {
+        vault.setUnlocked(1_000e18);
+        vm.startPrank(alice);
+        vault.requestRedeem(400e18, alice, alice);
+        assertEq(vault.maxRedeem(alice), 400e18);
+        uint256 assets = vault.redeem(400e18, alice, alice);
+        vm.stopPrank();
+
+        assertEq(assets, 400e18);
+        assertEq(asset.balanceOf(alice), 400e18);
+        assertEq(vault.maxRedeem(alice), 0);
+        assertEq(vault.balanceOf(address(vault)), 0);
+    }
+
+    function test_threeArgRedeem_claimsFifoAcrossRequests() public {
+        vault.setUnlocked(500e18);
+        vm.startPrank(alice);
+        vault.requestRedeem(400e18, alice, alice);
+        vault.requestRedeem(400e18, alice, alice);
+        assertEq(vault.maxRedeem(alice), 500e18);
+        uint256 assets = vault.redeem(500e18, alice, alice);
+        vm.stopPrank();
+
+        assertEq(assets, 500e18);
+        assertEq(vault.claimableRedeemRequest(1, alice), 0, "the older request is fully claimed");
+        assertEq(
+            vault.claimableRedeemRequest(2, alice) + vault.pendingRedeemRequest(2, alice),
+            300e18,
+            "the newer request still holds the rest"
+        );
+    }
+
+    function test_transferRequest_movesControlAndKeepsTheQueuePlace() public {
+        vault.setUnlocked(300e18);
+        vm.prank(alice);
+        uint256 id = vault.requestRedeem(400e18, alice, alice);
+
+        assertEq(vault.claimableRedeemRequest(id, alice), 300e18);
+        assertEq(vault.pendingRedeemRequest(id, alice), 100e18);
+
+        vm.prank(alice);
+        vault.transferRequest(id, bob);
+
+        assertEq(vault.controllerOf(id), bob);
+        assertEq(vault.maxRedeem(alice), 0);
+        assertEq(vault.maxRedeem(bob), 300e18);
+        assertEq(vault.claimableRedeemRequest(id, bob), 300e18);
+        assertEq(vault.pendingRedeemRequest(id, bob), 100e18);
+        assertEq(vault.claimableRedeemRequest(id, alice), 0);
+
+        vm.prank(bob);
+        assertEq(vault.redeem(id, 300e18, bob, bob), 300e18);
+        assertEq(asset.balanceOf(bob), 300e18);
+    }
+
+    function test_transferRequest_operatorCanMoveIt() public {
+        vault.setUnlocked(1_000e18);
+        vm.prank(alice);
+        uint256 id = vault.requestRedeem(200e18, alice, alice);
+        vm.prank(alice);
+        vault.setOperator(carol, true);
+
+        vm.prank(carol);
+        vault.transferRequest(id, bob);
+
+        assertEq(vault.controllerOf(id), bob);
+        vm.prank(bob);
+        assertEq(vault.redeem(200e18, bob, bob), 200e18);
+    }
+
+    function test_transferRequest_allowanceDoesNotAuthorise() public {
+        vault.setUnlocked(1_000e18);
+        vm.prank(alice);
+        uint256 id = vault.requestRedeem(200e18, alice, alice);
+        vm.prank(alice);
+        vault.approve(bob, type(uint256).max);
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(IERC7540AsyncRedeem.NotAuthorized.selector, bob));
+        vault.transferRequest(id, bob);
+    }
+
+    function test_transferRequest_unknownOrZero_reverts() public {
+        vault.setUnlocked(1_000e18);
+        vm.prank(alice);
+        uint256 id = vault.requestRedeem(200e18, alice, alice);
+
+        vm.prank(alice);
+        vm.expectRevert(IERC7540AsyncRedeem.ZeroAddress.selector);
+        vault.transferRequest(id, address(0));
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IERC7540AsyncRedeem.RedeemRequestNotFound.selector, 99, address(0)));
+        vault.transferRequest(99, bob);
+    }
+
+    function test_threeArgRedeem_withoutARequest_reverts() public {
+        vault.setUnlocked(1_000e18);
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.redeem(400e18, alice, alice);
+    }
+
+    function test_threeArgRedeem_allowanceDoesNotAuthoriseClaim() public {
+        vault.setUnlocked(1_000e18);
+        vm.prank(alice);
+        vault.approve(bob, type(uint256).max);
+        vm.prank(alice);
+        vault.requestRedeem(300e18, alice, alice);
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(IERC7540AsyncRedeem.NotAuthorized.selector, bob));
+        vault.redeem(300e18, bob, alice);
     }
 
     // --- ERC7575 / ERC165 ---
@@ -313,7 +440,15 @@ contract ERC7540AsyncRedeemTest is Test {
     }
 
     function test_supportsInterface() public view {
+        assertEq(type(IERC7540Redeem).interfaceId, bytes4(0x620ee8e4), "EIP-7540 redeem id");
+        assertEq(type(IERC7540Operator).interfaceId, bytes4(0xe3bc4e65), "EIP-7540 operator id");
+        assertEq(type(IERC7575).interfaceId, bytes4(0x2f0a18c5), "EIP-7575 vault id");
+
         assertTrue(vault.supportsInterface(type(IERC4626).interfaceId));
+        assertTrue(vault.supportsInterface(type(IERC7540Operator).interfaceId));
+        assertTrue(vault.supportsInterface(type(IERC7540Redeem).interfaceId));
+        assertTrue(vault.supportsInterface(type(IERC7540AsyncRedeem).interfaceId));
+        assertTrue(vault.supportsInterface(type(IERC7575).interfaceId));
         assertFalse(vault.supportsInterface(0xffffffff));
     }
 
@@ -343,5 +478,6 @@ contract ERC7540AsyncRedeemTest is Test {
         assertEq(bare.unlockedSupply(), 0);
         assertEq(bare.instantUnlockedSupply(), 0);
         assertEq(bare.maxRedeem(bob), 0);
+        assertEq(bare.maxInstantRedeem(bob), 0);
     }
 }

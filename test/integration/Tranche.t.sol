@@ -4,6 +4,10 @@ pragma solidity 0.8.36;
 import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
 import { IBaseMarket } from "../../contracts/interfaces/IBaseMarket.sol";
+import { IERC7540AsyncRedeem } from "../../contracts/interfaces/IERC7540AsyncRedeem.sol";
+import { IERC7540Operator } from "../../contracts/interfaces/IERC7540Operator.sol";
+import { IERC7540Redeem } from "../../contracts/interfaces/IERC7540Redeem.sol";
+import { IERC7575 } from "../../contracts/interfaces/IERC7575.sol";
 import { IOracle } from "../../contracts/interfaces/IOracle.sol";
 import { IRegistry } from "../../contracts/interfaces/IRegistry.sol";
 import { ITranche } from "../../contracts/interfaces/ITranche.sol";
@@ -65,8 +69,13 @@ contract TrancheTest is CapDeployer {
     }
 
     function test_supportsInterface() public view {
-        assertTrue(tranche0.supportsInterface(type(ITranche).interfaceId));
+        assertTrue(tranche0.supportsInterface(type(IERC7540AsyncRedeem).interfaceId));
+        assertTrue(tranche0.supportsInterface(type(IERC7540Redeem).interfaceId));
+        assertTrue(tranche0.supportsInterface(type(IERC7540Operator).interfaceId));
+        assertTrue(tranche0.supportsInterface(type(IERC7575).interfaceId));
+        assertTrue(tranche0.supportsInterface(type(IERC4626).interfaceId));
         assertFalse(tranche0.supportsInterface(0xffffffff));
+        assertFalse(tranche0.supportsInterface(0xce3bbe50), "not async deposit");
     }
 
     // ── a market's tranches need not share a collateral ───────────────────────
@@ -574,7 +583,7 @@ contract TrancheTest is CapDeployer {
         vm.stopPrank();
 
         assertEq(shares, 1e18 - DEAD_SHARES, "priced at par, so the donation did not round them away");
-        assertGt(tranche0.previewRedeem(shares), 1e18, "and it is theirs to collect");
+        assertGt(tranche0.convertToAssets(shares), 1e18, "and it is theirs to collect");
     }
 
     /// @dev The stablecoin is not seeded, because its share price cannot be donated into:
@@ -586,7 +595,7 @@ contract TrancheTest is CapDeployer {
 
         assertEq(stablecoin.balanceOf(address(stablecoin)), 0, "no seed held");
         assertEq(stablecoin.totalSupply(), 100e18, "and none in the supply");
-        assertEq(stablecoin.previewRedeem(100e18), 100e18, "so redemption is still at par");
+        assertEq(stablecoin.convertToAssets(100e18), 100e18, "so redemption is still at par");
     }
 
     /// @dev {IBaseMarket-chargePremium} skips a tranche with nothing at work and routes its share

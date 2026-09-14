@@ -9,6 +9,8 @@ import { Vm } from "forge-std/Vm.sol";
 /// @title InfraSerializer
 /// @notice Read and write `config/cap-v2.json`, keyed by chain id
 /// @dev Role membership is not stored here. AccessManager holds that, and a role can have many members.
+// Deployment scripts read and write config/cap-v2.json through the cheatcode FS.
+// forge-lint: disable-next-item(unsafe-cheatcode)
 abstract contract InfraSerializer {
     using stdJson for string;
 

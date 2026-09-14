@@ -34,7 +34,7 @@ contract WrapperTest is BaseTest {
                 address(new Stablecoin()),
                 abi.encodeCall(
                     Stablecoin.initialize,
-                    (address(accessManager), address(usdc), "Cap USD", "cUSD", "", address(irm), address(0))
+                    (address(accessManager), address(usdc), "Cap USD", "cUSD", address(irm), address(0))
                 )
             )
         );

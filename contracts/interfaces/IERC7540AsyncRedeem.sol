@@ -1,21 +1,23 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
-import { IERC7575 } from "./IERC7575.sol";
+import { IERC7540Redeem } from "./IERC7540Redeem.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 /// @title IERC7540AsyncRedeem
-/// @notice ERC-7540 async redemption on an ERC-4626 vault
-interface IERC7540AsyncRedeem is IERC4626, IERC7575 {
-    /// @dev Emitted when `sender` has locked `shares`, owned by `owner`, in the Vault to request a redemption.
-    /// `controller` controls this request.
-    event RedeemRequest(
-        address indexed controller, address indexed owner, uint256 indexed requestId, address sender, uint256 shares
-    );
+/// @notice Cap async redeem vault: ERC-7540 redeem plus instant exits and request transfer
+/// @dev {IERC7575} is the flattened ERC-165 id. Do not inherit it here: it duplicates {IERC4626}.
+interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
+    /// @notice Get the address of the share token
+    /// @return shareTokenAddress The address of the share token
+    function share() external view returns (address shareTokenAddress);
 
     /// @dev Emitted when a redeem request is cancelled
     /// `controller` controls this request.
     event CancelRedeem(address indexed controller, uint256 indexed requestId, address receiver, uint256 shares);
+
+    /// @dev Emitted when control of a request moves to another controller.
+    event TransferRequest(address indexed from, address indexed to, uint256 indexed requestId);
 
     /// @dev Revert when attempting to request a redeem with zero shares.
     error ZeroShares();
@@ -38,40 +40,20 @@ interface IERC7540AsyncRedeem is IERC4626, IERC7575 {
     /// @dev Revert when there are no claimable shares for the given redeem request.
     error NoClaimableShares(uint256 requestId, address controller);
 
-    /// @dev Assumes control of shares from sender into the Vault and submits a Request for asynchronous redeem.
-    ///
-    /// - MUST support a redeem Request flow where the control of shares is taken from sender directly
-    ///   where msg.sender has ERC-20 approval over the shares of owner.
-    /// - MUST revert if all shares cannot be requested for redeem.
-    ///
-    /// @param shares the amount of shares to be redeemed to transfer from owner
-    /// @param controller the controller of the request who will be able to operate the request
-    /// @param owner the source of the shares to be redeemed
-    /// @return requestId the id of the request
-    function requestRedeem(uint256 shares, address controller, address owner) external returns (uint256 requestId);
+    /// @dev ERC-7540 async redeem vaults must revert {previewRedeem} and {previewWithdraw}.
+    error PreviewNotSupported();
 
-    /// @dev Returns the amount of requested shares in Pending state.
-    ///
-    /// - MUST NOT include any shares in Claimable state for redeem or withdraw.
-    /// - MUST NOT show any variations depending on the caller.
-    /// - MUST NOT revert unless due to integer overflow caused by an unreasonably large input.
-    /// @param requestId the id of the request
-    /// @param controller the controller of the request
-    /// @return pendingShares the amount of pending shares
-    function pendingRedeemRequest(uint256 requestId, address controller) external view returns (uint256 pendingShares);
+    /// @notice Move a request to another controller. Place in the settlement queue is unchanged.
+    /// @dev Caller must be the current controller or its operator.
+    /// @param requestId The request to transfer
+    /// @param to The new controller
+    function transferRequest(uint256 requestId, address to) external;
 
-    /// @dev Returns the amount of requested shares in Claimable state for the controller to redeem or withdraw.
-    ///
-    /// - MUST NOT include any shares in Pending state for redeem or withdraw.
-    /// - MUST NOT show any variations depending on the caller.
-    /// - MUST NOT revert unless due to integer overflow caused by an unreasonably large input.
-    /// @param requestId the id of the request
-    /// @param controller the controller of the request
-    /// @return claimableShares the amount of claimable shares
-    function claimableRedeemRequest(uint256 requestId, address controller)
-        external
-        view
-        returns (uint256 claimableShares);
+    /// @notice Controller that currently owns a request
+    /// @dev Cap extra, not an ERC-7540 method.
+    /// @param requestId The request id
+    /// @return controller The controller, or zero if the request does not exist
+    function controllerOf(uint256 requestId) external view returns (address controller);
 
     /// @dev Redeem shares from the vault while the redemption window is open
     /// @param requestId The id of the request
@@ -112,4 +94,34 @@ interface IERC7540AsyncRedeem is IERC4626, IERC7575 {
     /// @notice Shares available for instant redeem, after the queue
     /// @return unlocked The number of instantly unlocked shares
     function instantUnlockedSupply() external view returns (uint256 unlocked);
+
+    /// @notice Shares {instantRedeem} will accept for `owner`
+    /// @param owner The share holder
+    /// @return maxShares The instant redeem limit
+    function maxInstantRedeem(address owner) external view returns (uint256 maxShares);
+
+    /// @notice Assets {instantWithdraw} will accept for `owner`
+    /// @param owner The share holder
+    /// @return maxAssets The instant withdraw limit
+    function maxInstantWithdraw(address owner) external view returns (uint256 maxAssets);
+
+    /// @notice Redeem shares against liquid reserve, without a request
+    /// @param shares The shares to burn
+    /// @param receiver The asset recipient
+    /// @param owner The share holder
+    /// @return assets The assets paid
+    function instantRedeem(uint256 shares, address receiver, address owner) external returns (uint256 assets);
+
+    /// @notice Withdraw assets against liquid reserve, without a request
+    /// @param assets The assets to pay
+    /// @param receiver The asset recipient
+    /// @param owner The share holder
+    /// @return shares The shares burned
+    function instantWithdraw(uint256 assets, address receiver, address owner) external returns (uint256 shares);
+
+    /// @notice Shares a withdrawal of `assets` would burn, including shortfall pricing
+    /// @dev {previewWithdraw} reverts. This is the quote {unlockedSupply} and instant exits use.
+    /// @param assets The asset amount
+    /// @return shares The share amount
+    function quoteWithdraw(uint256 assets) external view returns (uint256 shares);
 }

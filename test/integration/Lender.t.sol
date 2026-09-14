@@ -88,5 +88,8 @@ contract MarketTest is CapDeployer {
     function test_setMultiplier_success() public {
         market = _market();
         market.setMarketMultiplier(2e27);
+        assertEq(market.marketMultiplier(), 2e27);
+        market.setMarketMultiplier(1.5e27);
+        assertEq(market.marketMultiplier(), 1.5e27);
     }
 }

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
+/// @title IERC7540Operator
+/// @notice ERC-7540 operator methods. {IERC165-supportsInterface} id is `0xe3bc4e65`.
 interface IERC7540Operator {
     /// @dev Emitted when `controller` sets the `approved` status for an `operator`.
     event OperatorSet(address indexed controller, address indexed operator, bool approved);

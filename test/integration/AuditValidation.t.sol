@@ -3,23 +3,29 @@ pragma solidity 0.8.36;
 
 import { FixedMarket } from "../../contracts/cap/market/FixedMarket.sol";
 import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
+import { IBaseMarket } from "../../contracts/interfaces/IBaseMarket.sol";
+import { IFixedMarket } from "../../contracts/interfaces/IFixedMarket.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
 
-/// @notice Local audit characterization tests. Passing records current defective behavior;
-/// update assertions to the required invariant when implementing the corresponding fix.
+/// @notice Pins documented audit behavior. M-02 is the post-fix invariant; overdue repay
+/// leaves arrears to a keeper extend; a lowered max term refuses live extend with InvalidTerm.
 contract AuditValidationTest is CapDeployer {
     function setUp() public {
         _deployCap();
     }
 
-    function test_audit_guardianLtReductionDoesNotConstrainFloatingBorrow() public {
+    function test_guardianLtReductionConstrainsFloatingBorrow() public {
         (address m, address t,) = _createMarket("risk limits");
         FloatingMarket market = FloatingMarket(m);
         _fundTranche(t, makeAddr("supplier"), 2_000e18);
         market.setLt(0.2e27);
+        assertEq(market.variableCreditLimit(), 400e18);
         vm.prank(defaultBorrower);
+        vm.expectRevert(IBaseMarket.InsufficientLiquidity.selector);
         market.borrow(defaultBorrower, 900e18);
-        assertLt(market.healthiness(), 1e27);
+        vm.prank(defaultBorrower);
+        market.borrow(defaultBorrower, type(uint256).max);
+        assertGe(market.healthiness(), 1e27);
     }
 
     function test_audit_overdueRepaymentDoesNotSettleArrears() public {
@@ -43,9 +49,16 @@ contract AuditValidationTest is CapDeployer {
         _fundTranche(t, makeAddr("supplier"), 10_000e18);
         vm.prank(defaultBorrower);
         (uint256 id,) = market.borrow(defaultBorrower, 500e18, 30 days);
+        uint256 expiryBefore = market.expiry(id);
         market.setTermLimits(7 days, 1 days);
         vm.prank(defaultBorrower);
-        vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x11));
+        vm.expectRevert(IFixedMarket.InvalidTerm.selector);
         market.extend(id, 1 days);
+        assertEq(market.expiry(id), expiryBefore, "grandfathered expiry is unchanged");
+        vm.warp(expiryBefore - 6 days);
+        vm.prank(defaultBorrower);
+        uint256 added = market.extend(id, type(uint256).max);
+        assertEq(added, 1 days, "room opens once remaining sits under the new maximum");
+        assertEq(market.expiry(id), expiryBefore + 1 days);
     }
 }

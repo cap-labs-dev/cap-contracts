@@ -3,9 +3,8 @@ pragma solidity 0.8.36;
 
 import { IERC7540AsyncRedeem } from "../interfaces/IERC7540AsyncRedeem.sol";
 import { IERC7540Redeem } from "../interfaces/IERC7540Redeem.sol";
-import { ERC1155Queue, IERC1155Queue } from "./ERC1155Queue.sol";
+import { IERC7575 } from "../interfaces/IERC7575.sol";
 import { ERC7540Operator, IERC7540Operator } from "./ERC7540Operator.sol";
-import { ERC7575, IERC7575 } from "./ERC7575.sol";
 import {
     ERC4626Upgradeable,
     IERC4626
@@ -14,13 +13,16 @@ import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ERC165 } from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title ERC7540AsyncRedeem
 /// @author kexley
 /// @notice ERC7540 async redemptions on an ERC4626 vault
-/// @dev Override {unlockedSupply}. Instant redeem is supported when there is liquidity; integrators need ERC1155Holder for async.
-abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ERC4626Upgradeable, ERC7575, ERC165 {
+/// @dev Override {unlockedSupply}. Instant exits are {instantRedeem}/{instantWithdraw}.
+abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ERC4626Upgradeable, ERC165 {
     using SafeERC20 for IERC20;
+    using EnumerableSet for EnumerableSet.UintSet;
 
     /// @custom:storage-location cap.storage.ERC7540AsyncRedeem
     // forge-lint: disable-next-item(pascal-case-struct)
@@ -29,7 +31,9 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         uint256 redeemQueue;
         uint256 settledQueue;
         mapping(uint256 => uint256) queueIndex;
-        address queueNft;
+        mapping(uint256 => uint256) requestShares;
+        mapping(uint256 => address) requestController;
+        mapping(address => EnumerableSet.UintSet) controllerRequests;
     }
 
     // keccak256(abi.encode(uint256(keccak256("cap.storage.ERC7540AsyncRedeem")) - 1)) & ~bytes32(uint256(0xff))
@@ -50,18 +54,21 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     /// @param _asset The asset to be redeemed
     /// @param _name The name of the token
     /// @param _symbol The symbol of the token
-    /// @param _uri The URI for ERC1155 metadata
     // forge-lint: disable-next-item(mixed-case-function)
-    function __ERC7540AsyncRedeem_init(IERC20 _asset, string memory _name, string memory _symbol, string memory _uri)
+    function __ERC7540AsyncRedeem_init(IERC20 _asset, string memory _name, string memory _symbol)
         internal
         onlyInitializing
     {
         __ERC20_init(_name, _symbol);
         __ERC4626_init(_asset);
-        _getERC7540AsyncRedeemStorage().queueNft = address(new ERC1155Queue(_uri));
     }
 
     /// @inheritdoc IERC7540AsyncRedeem
+    function share() public view virtual returns (address shareTokenAddress) {
+        shareTokenAddress = address(this);
+    }
+
+    /// @inheritdoc IERC7540Redeem
     function requestRedeem(uint256 _shares, address _controller, address _owner) external returns (uint256 requestId) {
         _checkAllowance(_owner, msg.sender, _shares);
 
@@ -69,16 +76,40 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         if (_shares == 0) revert ZeroShares();
 
         ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
-        requestId = $.requestId;
-        $.requestId++;
+        // ERC-7540: if any request returns id 0, every request must. Nonzero ids start at 1.
+        requestId = ++$.requestId;
 
         $.queueIndex[requestId] = $.redeemQueue;
+        $.requestShares[requestId] = _shares;
+        $.requestController[requestId] = _controller;
+        $.controllerRequests[_controller].add(requestId);
         _transfer(_owner, address(this), _shares);
         $.redeemQueue += _shares;
 
-        IERC1155Queue($.queueNft).mint(_controller, requestId, _shares);
-
         emit RedeemRequest(_controller, _owner, requestId, msg.sender, _shares);
+    }
+
+    /// @inheritdoc IERC7540AsyncRedeem
+    function transferRequest(uint256 _requestId, address _to) external {
+        if (_to == address(0)) revert ZeroAddress();
+
+        ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
+        address from = $.requestController[_requestId];
+        if ($.requestShares[_requestId] == 0) revert RedeemRequestNotFound(_requestId, from);
+        _checkController(from, msg.sender);
+        if (_to == from) return;
+
+        $.requestController[_requestId] = _to;
+        $.controllerRequests[from].remove(_requestId);
+        $.controllerRequests[_to].add(_requestId);
+
+        emit TransferRequest(from, _to, _requestId);
+    }
+
+    /// @inheritdoc IERC7540AsyncRedeem
+    /// @dev Cap extra, not an ERC-7540 method. Needed once requests can move between controllers.
+    function controllerOf(uint256 _requestId) public view returns (address controller) {
+        controller = _getERC7540AsyncRedeemStorage().requestController[_requestId];
     }
 
     /// @inheritdoc IERC7540AsyncRedeem
@@ -87,11 +118,12 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         virtual
         returns (uint256 shares)
     {
-        shares = previewWithdraw(_assets);
+        _checkController(_controller, msg.sender);
+        shares = _quoteWithdraw(_assets);
         uint256 maxShares = claimableRedeemRequest(_requestId, _controller);
         if (shares > maxShares) revert ERC4626ExceededMaxRedeem(_controller, shares, maxShares);
 
-        _withdraw(msg.sender, _receiver, _controller, _assets, shares, _requestId);
+        _claim(_receiver, _controller, _assets, shares, _requestId);
     }
 
     /// @inheritdoc IERC7540AsyncRedeem
@@ -100,14 +132,66 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         virtual
         returns (uint256 assets)
     {
+        _checkController(_controller, msg.sender);
         uint256 maxShares = claimableRedeemRequest(_requestId, _controller);
         if (_shares > maxShares) revert ERC4626ExceededMaxRedeem(_controller, _shares, maxShares);
-        assets = previewRedeem(_shares);
+        assets = convertToAssets(_shares);
 
-        _withdraw(msg.sender, _receiver, _controller, assets, _shares, _requestId);
+        _claim(_receiver, _controller, assets, _shares, _requestId);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev Claims claimable requests for `controller`, oldest request first.
+    function redeem(uint256 _shares, address _receiver, address _controller)
+        public
+        virtual
+        override(ERC4626Upgradeable, IERC4626)
+        returns (uint256 assets)
+    {
+        uint256 maxShares = maxRedeem(_controller);
+        if (_shares > maxShares) revert ERC4626ExceededMaxRedeem(_controller, _shares, maxShares);
+        assets = _claimFifo(_shares, _receiver, _controller);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev Claims claimable requests for `controller`, oldest request first.
+    function withdraw(uint256 _assets, address _receiver, address _controller)
+        public
+        virtual
+        override(ERC4626Upgradeable, IERC4626)
+        returns (uint256 shares)
+    {
+        shares = _quoteWithdraw(_assets);
+        uint256 maxShares = maxRedeem(_controller);
+        if (shares > maxShares) {
+            revert ERC4626ExceededMaxWithdraw(_controller, _assets, convertToAssets(maxShares));
+        }
+        _claimFifo(shares, _receiver, _controller);
     }
 
     /// @inheritdoc IERC7540AsyncRedeem
+    function instantRedeem(uint256 _shares, address _receiver, address _owner) public virtual returns (uint256 assets) {
+        uint256 maxShares = maxInstantRedeem(_owner);
+        if (_shares > maxShares) revert ERC4626ExceededMaxRedeem(_owner, _shares, maxShares);
+        assets = convertToAssets(_shares);
+        _withdraw(msg.sender, _receiver, _owner, assets, _shares);
+    }
+
+    /// @inheritdoc IERC7540AsyncRedeem
+    function instantWithdraw(uint256 _assets, address _receiver, address _owner)
+        public
+        virtual
+        returns (uint256 shares)
+    {
+        shares = _quoteWithdraw(_assets);
+        uint256 maxShares = maxInstantRedeem(_owner);
+        if (shares > maxShares) {
+            revert ERC4626ExceededMaxWithdraw(_owner, _assets, maxInstantWithdraw(_owner));
+        }
+        _withdraw(msg.sender, _receiver, _owner, _assets, shares);
+    }
+
+    /// @inheritdoc IERC7540Redeem
     function claimableRedeemRequest(uint256 _requestId, address _controller)
         public
         view
@@ -116,7 +200,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
         uint256 currentIndex = $.settledQueue + unlockedSupply();
         uint256 queueIndex = $.queueIndex[_requestId];
-        uint256 balance = IERC1155Queue($.queueNft).balanceOf(_controller, _requestId);
+        uint256 balance = _requestShares(_requestId, _controller);
 
         if (currentIndex <= queueIndex) {
             claimableShares = 0;
@@ -127,7 +211,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         }
     }
 
-    /// @inheritdoc IERC7540AsyncRedeem
+    /// @inheritdoc IERC7540Redeem
     function pendingRedeemRequest(uint256 _requestId, address _controller)
         external
         view
@@ -136,7 +220,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
         uint256 currentIndex = $.settledQueue + unlockedSupply();
         uint256 queueIndex = $.queueIndex[_requestId];
-        uint256 balance = IERC1155Queue($.queueNft).balanceOf(_controller, _requestId);
+        uint256 balance = _requestShares(_requestId, _controller);
 
         if (currentIndex >= queueIndex + balance) {
             pendingShares = 0;
@@ -148,10 +232,56 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     }
 
     /// @inheritdoc IERC4626
-    function maxRedeem(address _owner) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 maxShares) {
+    /// @dev Claimable shares across the controller's requests, not the instant balance.
+    function maxRedeem(address _controller)
+        public
+        view
+        override(ERC4626Upgradeable, IERC4626)
+        returns (uint256 maxShares)
+    {
+        ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
+        EnumerableSet.UintSet storage ids = $.controllerRequests[_controller];
+        uint256 n = ids.length();
+        for (uint256 i; i < n; ++i) {
+            maxShares += claimableRedeemRequest(ids.at(i), _controller);
+        }
+    }
+
+    /// @inheritdoc IERC4626
+    function maxWithdraw(address _controller)
+        public
+        view
+        override(ERC4626Upgradeable, IERC4626)
+        returns (uint256 maxAssets)
+    {
+        maxAssets = convertToAssets(maxRedeem(_controller));
+    }
+
+    /// @inheritdoc IERC4626
+    function previewRedeem(uint256) public view virtual override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        revert PreviewNotSupported();
+    }
+
+    /// @inheritdoc IERC4626
+    function previewWithdraw(uint256) public view virtual override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+        revert PreviewNotSupported();
+    }
+
+    /// @inheritdoc IERC7540AsyncRedeem
+    function quoteWithdraw(uint256 assets) public view returns (uint256 shares) {
+        shares = _quoteWithdraw(assets);
+    }
+
+    /// @inheritdoc IERC7540AsyncRedeem
+    function maxInstantRedeem(address _owner) public view returns (uint256 maxShares) {
         uint256 instantUnlocked = instantUnlockedSupply();
         uint256 balance = balanceOf(_owner);
         maxShares = balance > instantUnlocked ? instantUnlocked : balance;
+    }
+
+    /// @inheritdoc IERC7540AsyncRedeem
+    function maxInstantWithdraw(address _owner) public view returns (uint256 maxAssets) {
+        maxAssets = convertToAssets(maxInstantRedeem(_owner));
     }
 
     /// @inheritdoc IERC7540AsyncRedeem
@@ -161,7 +291,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
 
     /// @inheritdoc IERC7540AsyncRedeem
     function activeAssets() public view returns (uint256 assets) {
-        assets = previewRedeem(activeSupply());
+        assets = convertToAssets(activeSupply());
     }
 
     /// @inheritdoc IERC7540AsyncRedeem
@@ -190,33 +320,93 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         }
     }
 
-    /// @dev Queued claim: controller or operator only. Allowance cannot stand in.
+    /// @dev Controller or operator only. Allowance cannot stand in.
     /// @param _controller The controller of the request
     /// @param _caller The caller of the claim
     function _checkController(address _controller, address _caller) internal view {
         if (_caller != _controller && !isOperator(_controller, _caller)) revert NotAuthorized(_caller);
     }
 
-    /// @dev Internal function to withdraw assets from the vault after requesting a redeem
-    /// @param _caller The caller of the withdraw
+    /// @dev Remaining shares on `requestId` if `controller` owns it.
+    /// @param _requestId The request id
+    /// @param _controller The controller to match
+    /// @return shares The remaining requested shares
+    function _requestShares(uint256 _requestId, address _controller) internal view returns (uint256 shares) {
+        ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
+        if ($.requestController[_requestId] == _controller) shares = $.requestShares[_requestId];
+    }
+
+    /// @dev Shares a withdrawal of `assets` would burn. Ceil, matching the old {previewWithdraw}.
+    /// @param assets The asset amount
+    /// @return shares The share amount
+    function _quoteWithdraw(uint256 assets) internal view returns (uint256 shares) {
+        shares = _convertToShares(assets, Math.Rounding.Ceil);
+    }
+
+    /// @dev Claim `shares` from the controller's requests, oldest id first.
+    /// @param _shares The shares to claim
+    /// @param _receiver The asset recipient
+    /// @param _controller The request controller
+    /// @return assets The assets paid
+    function _claimFifo(uint256 _shares, address _receiver, address _controller) internal returns (uint256 assets) {
+        _checkController(_controller, msg.sender);
+        if (_shares == 0) return 0;
+
+        ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
+        EnumerableSet.UintSet storage ids = $.controllerRequests[_controller];
+        uint256 n = ids.length();
+        uint256[] memory list = new uint256[](n);
+        for (uint256 i; i < n; ++i) {
+            list[i] = ids.at(i);
+        }
+        _sortIds(list);
+
+        uint256 remaining = _shares;
+        for (uint256 i; i < n && remaining > 0; ++i) {
+            uint256 claimable = claimableRedeemRequest(list[i], _controller);
+            if (claimable == 0) continue;
+            uint256 take = remaining < claimable ? remaining : claimable;
+            uint256 paid = convertToAssets(take);
+            _claim(_receiver, _controller, paid, take, list[i]);
+            assets += paid;
+            remaining -= take;
+        }
+    }
+
+    /// @dev Insertion-sort request ids so the oldest (lowest id) is claimed first.
+    /// @param ids The request ids
+    function _sortIds(uint256[] memory ids) private pure {
+        uint256 n = ids.length;
+        for (uint256 i = 1; i < n; ++i) {
+            uint256 key = ids[i];
+            uint256 j = i;
+            while (j > 0 && ids[j - 1] > key) {
+                ids[j] = ids[j - 1];
+                unchecked {
+                    --j;
+                }
+            }
+            ids[j] = key;
+        }
+    }
+
+    /// @dev Settle a queued claim. Caller authorization is the caller's responsibility.
     /// @param _receiver The receiver of the assets
     /// @param _controller The controller of the request
     /// @param _assets The number of assets to withdraw
     /// @param _shares The number of shares to withdraw
     /// @param _requestId The id of the request
-    function _withdraw(
-        address _caller,
-        address _receiver,
-        address _controller,
-        uint256 _assets,
-        uint256 _shares,
-        uint256 _requestId
-    ) internal virtual {
-        _checkController(_controller, _caller);
-
+    function _claim(address _receiver, address _controller, uint256 _assets, uint256 _shares, uint256 _requestId)
+        internal
+    {
         ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
         $.queueIndex[_requestId] += _shares;
-        IERC1155Queue($.queueNft).burn(_controller, _requestId, _shares);
+        uint256 remaining = $.requestShares[_requestId] - _shares;
+        $.requestShares[_requestId] = remaining;
+        if (remaining == 0) {
+            delete $.requestController[_requestId];
+            $.controllerRequests[_controller].remove(_requestId);
+        }
 
         _burn(address(this), _shares);
         $.settledQueue += _shares;
@@ -224,7 +414,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         _onWithdraw(_controller, _assets, _shares);
         _transferOut(_receiver, _assets);
 
-        emit Withdraw(_caller, _receiver, _controller, _assets, _shares);
+        emit Withdraw(msg.sender, _receiver, _controller, _assets, _shares);
     }
 
     /// @dev Instant withdraw. Allowance may stand in for the owner.
@@ -256,8 +446,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     /// @inheritdoc IERC165
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165) returns (bool) {
         return interfaceId == type(IERC4626).interfaceId || interfaceId == type(IERC7540Operator).interfaceId
-            || interfaceId == type(IERC7575).interfaceId || interfaceId == type(IERC7540Redeem).interfaceId
-            || interfaceId == type(IERC7540AsyncRedeem).interfaceId || interfaceId == type(IERC1155Queue).interfaceId
-            || super.supportsInterface(interfaceId);
+            || interfaceId == type(IERC7540Redeem).interfaceId || interfaceId == type(IERC7540AsyncRedeem).interfaceId
+            || interfaceId == type(IERC7575).interfaceId || super.supportsInterface(interfaceId);
     }
 }

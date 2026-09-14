@@ -63,7 +63,6 @@ interface IStablecoin {
     /// @param asset The underlying asset address
     /// @param name The token name
     /// @param symbol The token symbol
-    /// @param uri The URI for ERC1155 redemption receipt tokens
     /// @param irm The interest rate model address
     /// @param reserveVault The Aera vault that may hold idle reserve
     function initialize(
@@ -71,7 +70,6 @@ interface IStablecoin {
         address asset,
         string memory name,
         string memory symbol,
-        string memory uri,
         address irm,
         address reserveVault
     ) external;
@@ -147,8 +145,8 @@ interface IStablecoin {
     function creditBackedSupply() external view returns (uint256);
 
     /// @notice Total assets backing redemptions after bad debt is excluded
-    /// @dev Share supply minus bad debt, not the token balance.
-    /// @return assets Total redeemable assets in share units
+    /// @dev {convertToAssets} of the outstanding supply, in underlying units.
+    /// @return assets Total redeemable assets in underlying units
     function totalAssets() external view returns (uint256 assets);
 
     /// @notice Preview the shares minted for a deposit at the fixed 1:1 exchange rate

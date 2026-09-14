@@ -39,8 +39,8 @@ interface IRegistry {
     /// @param fixedMarketBeacon The fixed market beacon address
     /// @param trancheBeacon The tranche beacon address
     /// @param underwriterBeacon The underwriter beacon address
-    /// @param lt Default liquidation threshold for new markets in ray decimals
-    /// @param buffer Default liquidation buffer for new markets in ray decimals
+    /// @param lt Default liquidation threshold for new markets in ray decimals (at most one ray, above buffer)
+    /// @param buffer Default liquidation buffer for new markets in ray decimals (strictly below lt)
     /// @param targetHealth Default target health for new markets in ray decimals (min 1.25e27)
     struct InitParams {
         address stablecoin;
@@ -111,7 +111,7 @@ interface IRegistry {
     function initialize(address authority, InitParams calldata init) external;
 
     /// @notice Create child roles and seed their initial members in one transaction
-    /// @dev Restricted to whitelisted platform participants.
+    /// @dev Restricted to WHITELISTED so users can create operator groups.
     /// @param parentRoleId The role that will administer every new child role
     /// @param members The initial members for each corresponding child role
     /// @return roleIds The created child role ids
@@ -125,7 +125,7 @@ interface IRegistry {
     function isOperatorRole(uint64 roleId) external view returns (bool assigned);
 
     /// @notice Deploy a floating market with tranches at the given assets and weights
-    /// @dev Restricted to whitelisted platform participants. One tranche per entry of `assets` and `weights`.
+    /// @dev Restricted to WHITELISTED. One tranche per entry of `assets` and `weights`.
     /// @param assets The asset of each tranche, index 0 is most senior
     /// @param weights Tranche weights in ray decimals, index 0 is most senior
     /// @param name The market name
@@ -140,7 +140,7 @@ interface IRegistry {
     ) external returns (address market, address[] memory deployedTranches);
 
     /// @notice Deploy a fixed market with tranches at the given assets and weights
-    /// @dev Restricted to whitelisted platform participants. See {createFloatingMarket} for tranche inputs.
+    /// @dev Restricted to WHITELISTED. See {createFloatingMarket} for tranche inputs.
     /// @param assets The asset of each tranche, index 0 is most senior
     /// @param weights Tranche weights in ray decimals, index 0 is most senior
     /// @param name The market name
@@ -169,18 +169,18 @@ interface IRegistry {
     function createTranche(address market, address asset, uint256[] calldata weights) external returns (address tranche);
 
     /// @notice Set the depositor role on the calling market, tranche, or underwriter
-    /// @dev Restricted to WHITELISTED. Deployed markets, tranches, and underwriters hold that role
-    /// so their own owner/curator setters can forward here.
+    /// @dev Restricted to PROTOCOL. Deployed markets, tranches, and underwriters hold that
+    /// role so their own owner/curator setters can forward here.
     /// @param roleId The depositor role id
     function setDepositorRole(uint64 roleId) external;
 
     /// @notice Set the borrower role on the calling market
-    /// @dev Restricted to WHITELISTED. Deployed markets hold that role so {IBaseMarket-setBorrowerRole} can forward here.
+    /// @dev Restricted to PROTOCOL. Deployed markets hold that role so {IBaseMarket-setBorrowerRole} can forward here.
     /// @param roleId The borrower role id
     function setBorrowerRole(uint64 roleId) external;
 
     /// @notice Set the allocator role on the calling underwriter
-    /// @dev Restricted to WHITELISTED. Deployed underwriters hold that role so {IUnderwriter-setAllocatorRole} can forward here.
+    /// @dev Restricted to PROTOCOL. Deployed underwriters hold that role so {IUnderwriter-setAllocatorRole} can forward here.
     /// @param roleId The allocator role id
     function setAllocatorRole(uint64 roleId) external;
 
@@ -196,7 +196,7 @@ interface IRegistry {
     function marketOwnerRole(address market) external view returns (uint64 roleId);
 
     /// @notice Deploy an underwriter for an asset
-    /// @dev Restricted to whitelisted platform participants.
+    /// @dev Restricted to WHITELISTED.
     /// @param asset The underwriter asset
     /// @param name The underwriter name
     /// @param symbol The underwriter symbol
