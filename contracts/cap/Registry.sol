@@ -23,6 +23,7 @@ import {
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 /// @title Registry
 /// @author kexley, Cap Labs
@@ -196,7 +197,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     /// @inheritdoc IRegistry
-    function setDepositorRole(uint64 roleId) external {
+    function setDepositorRole(uint64 roleId) external restricted {
         IAccessManager manager = IAccessManager(authority());
         bytes4[] memory depositorSelectors = new bytes4[](2);
         depositorSelectors[0] = IERC4626.deposit.selector;
@@ -207,7 +208,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     /// @inheritdoc IRegistry
-    function setBorrowerRole(uint64 roleId) external {
+    function setBorrowerRole(uint64 roleId) external restricted {
         if (roleId == type(uint64).max) revert PublicRole();
         if (!isOperatorRole[roleId]) revert NotOperatorRole();
 
@@ -223,7 +224,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     /// @inheritdoc IRegistry
-    function setAllocatorRole(uint64 roleId) external {
+    function setAllocatorRole(uint64 roleId) external restricted {
         if (roleId == type(uint64).max) revert PublicRole();
         if (!isOperatorRole[roleId]) revert NotOperatorRole();
         IAccessManager manager = IAccessManager(authority());
@@ -352,11 +353,14 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         factorySelectors[0] = IBeaconFactory.create.selector;
         manager.setTargetFunctionRole(factory, factorySelectors, CapRoles.REGISTRY);
 
-        bytes4[] memory registryWhitelistedSelectors = new bytes4[](4);
+        bytes4[] memory registryWhitelistedSelectors = new bytes4[](7);
         registryWhitelistedSelectors[0] = IRegistry.createChildRoles.selector;
         registryWhitelistedSelectors[1] = IRegistry.createFloatingMarket.selector;
         registryWhitelistedSelectors[2] = IRegistry.createFixedMarket.selector;
         registryWhitelistedSelectors[3] = IRegistry.createUnderwriter.selector;
+        registryWhitelistedSelectors[4] = IRegistry.setDepositorRole.selector;
+        registryWhitelistedSelectors[5] = IRegistry.setBorrowerRole.selector;
+        registryWhitelistedSelectors[6] = IRegistry.setAllocatorRole.selector;
         manager.setTargetFunctionRole(address(this), registryWhitelistedSelectors, CapRoles.WHITELISTED);
 
         // mint, burn, credit write-off, and credit-backed premium — markets only
@@ -378,6 +382,10 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         stablecoinKeeperSelectors[1] = IStablecoin.recall.selector;
         manager.setTargetFunctionRole(stablecoin, stablecoinKeeperSelectors, CapRoles.KEEPER);
 
+        bytes4[] memory stablecoinGovernorSelectors = new bytes4[](1);
+        stablecoinGovernorSelectors[0] = IStablecoin.setReserveVault.selector;
+        manager.setTargetFunctionRole(stablecoin, stablecoinGovernorSelectors, CapRoles.GOVERNOR);
+
         bytes4[] memory irmMarketSelectors = new bytes4[](2);
         irmMarketSelectors[0] = IInterestRateModel.updateUnderwriterRate.selector;
         irmMarketSelectors[1] = IInterestRateModel.updateMarketMultiplier.selector;
@@ -394,6 +402,14 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         bytes4[] memory oracleGovernorSelectors = new bytes4[](1);
         oracleGovernorSelectors[0] = IOracle.setSource.selector;
         manager.setTargetFunctionRole(oracle, oracleGovernorSelectors, CapRoles.GOVERNOR);
+
+        // beacons are Ownable; the manager is the owner, so ADMIN upgrades via execute
+        bytes4[] memory beaconSelectors = new bytes4[](1);
+        beaconSelectors[0] = UpgradeableBeacon.upgradeTo.selector;
+        manager.setTargetFunctionRole(floatingMarketBeacon, beaconSelectors, CapRoles.ADMIN);
+        manager.setTargetFunctionRole(fixedMarketBeacon, beaconSelectors, CapRoles.ADMIN);
+        manager.setTargetFunctionRole(trancheBeacon, beaconSelectors, CapRoles.ADMIN);
+        manager.setTargetFunctionRole(underwriterBeacon, beaconSelectors, CapRoles.ADMIN);
     }
 
     /// @dev Wire market function selectors to protocol and operator roles
@@ -440,6 +456,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         manager.setTargetFunctionRole(market, liquidatorSelectors, CapRoles.LIQUIDATOR);
 
         manager.grantRole(CapRoles.MARKET, market, 0);
+        manager.grantRole(CapRoles.WHITELISTED, market, 0);
     }
 
     /// @dev Wire tranche function selectors to the market owner, market and depositor roles
@@ -466,6 +483,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
 
         // depositor role is administered by the market owner
         manager.setRoleAdmin(depositorRoleId, ownerRole);
+        manager.grantRole(CapRoles.WHITELISTED, tranche, 0);
     }
 
     /// @dev Wire underwriter function selectors to the curator and keeper roles
@@ -484,6 +502,8 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         bytes4[] memory keeperSelectors = new bytes4[](1);
         keeperSelectors[0] = IUnderwriter.report.selector;
         manager.setTargetFunctionRole(underwriter, keeperSelectors, CapRoles.KEEPER);
+
+        manager.grantRole(CapRoles.WHITELISTED, underwriter, 0);
     }
 
     /// @inheritdoc UUPSUpgradeable

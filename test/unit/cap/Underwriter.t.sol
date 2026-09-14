@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import { Underwriter } from "../../../contracts/cap/Underwriter.sol";
+import { IERC7540AsyncRedeem } from "../../../contracts/interfaces/IERC7540AsyncRedeem.sol";
 import { IUnderwriter } from "../../../contracts/interfaces/IUnderwriter.sol";
 import { DeadShares } from "../../../contracts/utils/DeadShares.sol";
 import { BaseTest } from "../../shared/BaseTest.sol";
@@ -70,6 +71,32 @@ contract UnderwriterUnitTest is BaseTest {
         selectors = new bytes4[](2);
         selectors[0] = IERC4626.deposit.selector;
         selectors[1] = IERC4626.mint.selector;
+    }
+
+    function test_emptyVaultQuotesMintAtParPlusTheSeed() public view {
+        assertEq(underwriter.previewDeposit(1e18), 1e18 - DEAD_SHARES);
+        assertEq(underwriter.previewMint(1e18 - DEAD_SHARES), 1e18);
+    }
+
+    function test_mintSeedsDeadShares() public {
+        accessManager.grantRole(DEPOSITOR_ROLE, supplier, 0);
+        _mockVault();
+        collateral.mint(supplier, 1e18);
+
+        vm.startPrank(supplier);
+        collateral.approve(address(underwriter), 1e18);
+        uint256 assets = underwriter.mint(1e18 - DEAD_SHARES, supplier);
+        vm.stopPrank();
+
+        assertEq(assets, 1e18);
+        assertEq(underwriter.balanceOf(DeadShares.HOLDER), DEAD_SHARES);
+        assertEq(underwriter.balanceOf(supplier), 1e18 - DEAD_SHARES);
+    }
+
+    function test_supportsInterface() public view {
+        assertTrue(underwriter.supportsInterface(type(IUnderwriter).interfaceId));
+        assertTrue(underwriter.supportsInterface(type(IERC7540AsyncRedeem).interfaceId));
+        assertFalse(underwriter.supportsInterface(0xffffffff));
     }
 
     function test_initializedState() public view {

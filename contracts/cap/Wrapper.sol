@@ -3,6 +3,7 @@ pragma solidity 0.8.36;
 
 import { IPremiumVesting } from "../interfaces/IPremiumVesting.sol";
 import { IWrapper } from "../interfaces/IWrapper.sol";
+import { DeadShares } from "../utils/DeadShares.sol";
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
@@ -14,6 +15,7 @@ import {
 import { ERC4626Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
+import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 /// @title Wrapper
 /// @author kexley, Cap Labs
@@ -54,6 +56,23 @@ contract Wrapper layout at erc7201("cap.storage.Wrapper")
         _decimals = ERC4626Upgradeable.decimals();
     }
 
+    /// @inheritdoc IERC4626
+    /// @dev Empty vault quotes at par via {DeadShares-seedDeposit}.
+    function previewDeposit(uint256 assets)
+        public
+        view
+        override(ERC4626Upgradeable, IERC4626)
+        returns (uint256 shares)
+    {
+        shares = totalSupply() == 0 ? DeadShares.seedDeposit(assets) : super.previewDeposit(assets);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev Inverse of {previewDeposit} while empty.
+    function previewMint(uint256 shares) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 assets) {
+        assets = totalSupply() == 0 ? DeadShares.seedMint(shares) : super.previewMint(shares);
+    }
+
     /// @dev Claim vested premium into the vault before the deposit is priced
     /// @param _caller Caller of the deposit
     /// @param _receiver Receiver of the wrapper shares
@@ -61,6 +80,7 @@ contract Wrapper layout at erc7201("cap.storage.Wrapper")
     /// @param _shares Amount of wrapper shares to mint to the receiver
     function _deposit(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal override {
         IPremiumVesting(address(asset())).claim(address(this));
+        if (totalSupply() == 0) _mint(DeadShares.HOLDER, DeadShares.SHARES);
         super._deposit(_caller, _receiver, _assets, _shares);
     }
 

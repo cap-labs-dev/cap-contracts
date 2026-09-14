@@ -3,6 +3,7 @@ pragma solidity 0.8.36;
 
 import { Stablecoin } from "../../../contracts/cap/Stablecoin.sol";
 import { Wrapper } from "../../../contracts/cap/Wrapper.sol";
+import { DeadShares } from "../../../contracts/utils/DeadShares.sol";
 import { BaseTest } from "../../shared/BaseTest.sol";
 import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
 import { MockIRM } from "../../shared/mocks/MockIRM.sol";
@@ -64,6 +65,30 @@ contract WrapperTest is BaseTest {
         assertEq(wrapper.decimals(), 18);
     }
 
+    function test_emptyVaultQuotesMintAtParPlusTheSeed() public view {
+        uint256 shares = 100e18 - DeadShares.SHARES;
+        assertEq(wrapper.previewDeposit(100e18), shares);
+        assertEq(wrapper.previewMint(shares), 100e18);
+    }
+
+    function test_mintSeedsDeadShares() public {
+        uint256 shares = 100e18 - DeadShares.SHARES;
+        vm.prank(alice);
+        uint256 assets = wrapper.mint(shares, alice);
+
+        assertEq(assets, 100e18);
+        assertEq(wrapper.balanceOf(alice), shares);
+        assertEq(wrapper.balanceOf(DeadShares.HOLDER), DeadShares.SHARES);
+    }
+
+    function test_firstDepositBelowTheSeedReverts() public {
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(DeadShares.DepositBelowSeed.selector, DeadShares.SHARES, DeadShares.SHARES)
+        );
+        wrapper.deposit(DeadShares.SHARES, alice);
+    }
+
     function test_depositAddsTheBalanceToStakedSupply() public {
         vm.prank(alice);
         wrapper.deposit(100e18, alice);
@@ -71,7 +96,8 @@ contract WrapperTest is BaseTest {
         assertEq(scoin.stakedSupply(), 100e18);
         assertEq(scoin.balanceOf(address(wrapper)), 100e18);
         assertEq(wrapper.totalAssets(), 100e18);
-        assertEq(wrapper.balanceOf(alice), 100e18);
+        assertEq(wrapper.balanceOf(alice), 100e18 - DeadShares.SHARES);
+        assertEq(wrapper.balanceOf(DeadShares.HOLDER), DeadShares.SHARES);
     }
 
     function test_totalAssetsIncludesUnclaimedVest() public {

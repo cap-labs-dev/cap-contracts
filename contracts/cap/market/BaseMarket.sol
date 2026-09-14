@@ -11,14 +11,14 @@ import { WadRayMath } from "../../utils/WadRayMath.sol";
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
-import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { ReentrancyGuardTransient } from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title BaseMarket
 /// @author kexley, Cap Labs
 /// @notice Shared base contract for fixed and floating markets
-abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, ReentrancyGuardTransient, UUPSUpgradeable {
+/// @dev Beacon instances. Upgrade via {UpgradeableBeacon-upgradeTo} on the market beacon.
+abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, ReentrancyGuardTransient {
     using WadRayMath for uint256;
 
     // keccak256(abi.encode(uint256(keccak256("cap.storage.BaseMarket")) - 1)) & ~bytes32(uint256(0xff))
@@ -447,7 +447,4 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
             emit ChargePremium($.stablecoin, remaining);
         }
     }
-
-    /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address) internal override restricted { }
 }

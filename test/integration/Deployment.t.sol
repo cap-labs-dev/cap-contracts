@@ -3,32 +3,42 @@ pragma solidity 0.8.36;
 
 import { MockAeraVault } from "../shared/mocks/MockAeraVault.sol";
 import { MockAggregator } from "../shared/mocks/MockChainlinkFeeds.sol";
+import { MockCreateX } from "../shared/mocks/MockCreateX.sol";
 import { MockERC20 } from "../shared/mocks/MockERC20.sol";
 
 import { InterestRateModel } from "../../contracts/cap/InterestRateModel.sol";
 import { Registry } from "../../contracts/cap/Registry.sol";
 import { Stablecoin } from "../../contracts/cap/Stablecoin.sol";
+import { Tranche } from "../../contracts/cap/Tranche.sol";
+import { Wrapper } from "../../contracts/cap/Wrapper.sol";
 import { ChainlinkAdapter } from "../../contracts/cap/oracle/ChainlinkAdapter.sol";
 import { Oracle } from "../../contracts/cap/oracle/Oracle.sol";
-import { ImplementationsConfig, InfraConfig, UsersConfig } from "../../contracts/deploy/interfaces/DeployConfigs.sol";
-import { ConfigureAccessControl } from "../../contracts/deploy/service/ConfigureAccessControl.sol";
-import { DeployImplems } from "../../contracts/deploy/service/DeployImplems.sol";
-import { DeployInfra } from "../../contracts/deploy/service/DeployInfra.sol";
+import { IBeaconFactory } from "../../contracts/interfaces/IBeaconFactory.sol";
+import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
 import { IOracle } from "../../contracts/interfaces/IOracle.sol";
+import { IRegistry } from "../../contracts/interfaces/IRegistry.sol";
+import { IStablecoin } from "../../contracts/interfaces/IStablecoin.sol";
+import { CapRoles } from "../../contracts/utils/CapRoles.sol";
+import { DeadShares } from "../../contracts/utils/DeadShares.sol";
+import { ImplementationsConfig, InfraConfig, UsersConfig } from "../../script/deploy/interfaces/DeployConfigs.sol";
+import { ConfigureAccessControl } from "../../script/deploy/service/ConfigureAccessControl.sol";
+import { DeployImplems } from "../../script/deploy/service/DeployImplems.sol";
+import { DeployInfra } from "../../script/deploy/service/DeployInfra.sol";
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
+import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import { Test } from "forge-std/Test.sol";
 
 /// @title DeploymentTest
 /// @notice Runs the deployment services the scripts run, and checks what came out.
 ///
-/// Nothing exercised these before. They sit under `contracts/`, so they compile, but the only
-/// callers are in `script/`, which the profile does not even build, and the test harness wires its
-/// own copy of the same graph by hand. A contract could therefore be left out of the deployment
-/// entirely, or left reachable by the wrong role, and the whole suite would still pass — which is
-/// how the oracle came to be a constructor argument nobody supplied and a set of governance
-/// setters nobody assigned. The harness's copy of the wiring is the thing under test everywhere
-/// else; this is the only place the real one is.
+/// Nothing exercised these before. They sit under `script/deploy/`, so they compile with the
+/// scripts, but the test harness wires its own copy of the same graph by hand.
+/// A contract could therefore be left out of the deployment entirely, or left reachable by the
+/// wrong role, and the whole suite would still pass — which is how the oracle came to be a
+/// constructor argument nobody supplied and a set of governance setters nobody assigned. The
+/// harness's copy of the wiring is the thing under test everywhere else; this is the only place
+/// the real one is.
 contract DeploymentTest is Test, DeployImplems, DeployInfra, ConfigureAccessControl {
     UsersConfig internal users;
     InfraConfig internal infra;
@@ -37,6 +47,8 @@ contract DeploymentTest is Test, DeployImplems, DeployInfra, ConfigureAccessCont
     address internal stranger;
 
     function setUp() public {
+        vm.etch(address(CREATEX), address(new MockCreateX()).code);
+
         governor = makeAddr("governor");
         stranger = makeAddr("stranger");
 
@@ -45,16 +57,84 @@ contract DeploymentTest is Test, DeployImplems, DeployInfra, ConfigureAccessCont
             governor: governor,
             keeper: makeAddr("keeper"),
             guardian: makeAddr("guardian"),
-            // the manager's own admin, so this contract can run the wiring step the deployer runs
             admin: address(this),
             liquidator: makeAddr("liquidator"),
             stablecoinUnderlying: address(new MockERC20("USD Coin", "USDC", 18)),
             reserveVault: address(new MockAeraVault())
         });
+        MockERC20(users.stablecoinUnderlying).mint(address(this), 2e18);
 
         ImplementationsConfig memory implems = _deployImplementations();
         infra = _deployInfra(implems, users);
         _initInfraAccessControl(infra, users);
+    }
+
+    function test_deployerRelinquishesAdminWhenADistinctAdminIsNamed() public {
+        UsersConfig memory other = users;
+        other.admin = makeAddr("protocolAdmin");
+        MockERC20(other.stablecoinUnderlying).mint(address(this), 1e18);
+
+        ImplementationsConfig memory implems = _deployImplementations();
+        InfraConfig memory deployed = _deployInfra(implems, other, keccak256("redeploy"));
+        _initInfraAccessControl(deployed, other);
+
+        (bool deployerIsAdmin,) = IAccessManager(deployed.accessManager).hasRole(CapRoles.ADMIN, other.deployer);
+        (bool namedAdminHoldsAdmin,) = IAccessManager(deployed.accessManager).hasRole(CapRoles.ADMIN, other.admin);
+        assertFalse(deployerIsAdmin, "the deployer does not keep ADMIN");
+        assertTrue(namedAdminHoldsAdmin, "the named admin holds it");
+    }
+
+    function test_adminUpgradesBeaconsThroughTheAccessManager() public {
+        address newImpl = address(new Tranche());
+        bytes memory data = abi.encodeCall(UpgradeableBeacon.upgradeTo, (newImpl));
+
+        assertEq(UpgradeableBeacon(infra.trancheBeacon).owner(), infra.accessManager);
+
+        vm.prank(stranger);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessManager.AccessManagerUnauthorizedCall.selector,
+                stranger,
+                infra.trancheBeacon,
+                UpgradeableBeacon.upgradeTo.selector
+            )
+        );
+        IAccessManager(infra.accessManager).execute(infra.trancheBeacon, data);
+
+        IAccessManager(infra.accessManager).execute(infra.trancheBeacon, data);
+        assertEq(UpgradeableBeacon(infra.trancheBeacon).implementation(), newImpl);
+    }
+
+    function test_infraIsDeployedThroughCreateX() public view {
+        address predicted = _predictCreate3(_createXSalt(users.deployer, bytes32(0), "accessManager"), users.deployer);
+        assertEq(infra.accessManager, predicted, "AccessManager sits on its CREATE3 address");
+        assertEq(
+            infra.registry,
+            _predictCreate3(_createXSalt(users.deployer, bytes32(0), "registry"), users.deployer),
+            "so does the registry"
+        );
+    }
+
+    function test_deployedInfraRoleTable() public view {
+        IAccessManager manager = IAccessManager(infra.accessManager);
+
+        _expectRole(manager, infra.stablecoin, IStablecoin.mintCreditBacked.selector, CapRoles.MARKET);
+        _expectRole(manager, infra.stablecoin, IStablecoin.invest.selector, CapRoles.KEEPER);
+        _expectRole(manager, infra.stablecoin, IStablecoin.setReserveVault.selector, CapRoles.GOVERNOR);
+        _expectRole(manager, infra.irm, IInterestRateModel.setAveragingPeriod.selector, CapRoles.GOVERNOR);
+        _expectRole(manager, infra.oracle, IOracle.setSource.selector, CapRoles.GOVERNOR);
+        _expectRole(manager, infra.registry, IRegistry.createFloatingMarket.selector, CapRoles.WHITELISTED);
+        _expectRole(manager, infra.factory, IBeaconFactory.create.selector, CapRoles.REGISTRY);
+        _expectRole(manager, infra.trancheBeacon, UpgradeableBeacon.upgradeTo.selector, CapRoles.ADMIN);
+    }
+
+    function test_theDeployedWrapperIsSeeded() public view {
+        Wrapper wrapper = Wrapper(infra.wrapper);
+        assertEq(wrapper.asset(), infra.stablecoin, "wraps the deployed stablecoin");
+        assertTrue(Stablecoin(infra.stablecoin).optedIn(infra.wrapper), "earns the vest");
+        assertEq(wrapper.balanceOf(DeadShares.HOLDER), 1e18, "the seed is unredeemable");
+        assertEq(wrapper.totalSupply(), 1e18, "first-depositor inflation cannot start from zero");
+        assertEq(Stablecoin(infra.stablecoin).stakedSupply(), 1e18, "the vault is already earning");
     }
 
     // ── the oracle is part of the deployment ──────────────────────────────────
@@ -158,5 +238,9 @@ contract DeploymentTest is Test, DeployImplems, DeployInfra, ConfigureAccessCont
         vm.stopPrank();
 
         assertEq(Stablecoin(infra.stablecoin).remaining(), 10e18, "the deposit is now vesting");
+    }
+
+    function _expectRole(IAccessManager manager, address target, bytes4 selector, uint64 expected) private view {
+        assertEq(manager.getTargetFunctionRole(target, selector), expected);
     }
 }

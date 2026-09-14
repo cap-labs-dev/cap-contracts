@@ -195,32 +195,28 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
         premium = _settle($, account, earning);
     }
 
-    /// @dev Bank what each opted-in side has earned before its balance moves
-    /// @param from The sender, skipped when zero, this contract, or not opted in
-    /// @param to The recipient, skipped when zero, this contract, or not opted in
-    /// @param amount The shares about to move
-    function _checkpointShares(address from, address to, uint256 amount) internal {
-        PremiumVestingStorage storage $ = _getPremiumVestingStorage();
-        if ($.optedIn[from]) {
-            uint256 balance = balanceOf(from);
-            _checkpoint($, from, balance, balance - amount);
-        }
-        if ($.optedIn[to]) {
-            uint256 balance = balanceOf(to);
-            _checkpoint($, to, balance, balance + amount);
-        }
-    }
-
     /// @dev Accrue, checkpoint, and keep the opted-in supply in step before the share balances move
+    /// @dev Transfers between two non-opted accounts skip the vest write when someone is already
+    /// earning; an idle pot still freezes so {remaining} does not drift.
     /// @param from The sender, or zero on mint
     /// @param to The recipient, or zero on burn
     /// @param amount The shares moving
-    function _update(address from, address to, uint256 amount) internal virtual override updatePremium {
+    function _update(address from, address to, uint256 amount) internal virtual override {
         if (from != to) {
-            _checkpointShares(from, to, amount);
             PremiumVestingStorage storage $ = _getPremiumVestingStorage();
-            if ($.optedIn[from]) $.staked -= amount;
-            if ($.optedIn[to]) $.staked += amount;
+            bool fromIn = $.optedIn[from];
+            bool toIn = $.optedIn[to];
+            if (fromIn || toIn || $.staked == 0) _accrue($, $.staked);
+            if (fromIn) {
+                uint256 balance = balanceOf(from);
+                _checkpoint($, from, balance, balance - amount);
+                $.staked -= amount;
+            }
+            if (toIn) {
+                uint256 balance = balanceOf(to);
+                _checkpoint($, to, balance, balance + amount);
+                $.staked += amount;
+            }
         }
         super._update(from, to, amount);
     }

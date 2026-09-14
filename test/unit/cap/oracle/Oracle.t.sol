@@ -5,6 +5,7 @@ import { ChainlinkAdapter } from "../../../../contracts/cap/oracle/ChainlinkAdap
 import { Oracle } from "../../../../contracts/cap/oracle/Oracle.sol";
 import { IOracle } from "../../../../contracts/interfaces/IOracle.sol";
 import { MockAdapter, MockAggregator } from "../../../shared/mocks/MockChainlinkFeeds.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { AccessManager } from "@openzeppelin/contracts/access/manager/AccessManager.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { Test } from "forge-std/Test.sol";
@@ -294,6 +295,18 @@ contract OracleTest is Test {
         assertEq(oracle.price(hops), 0);
     }
 
+    function test_price_fallsToSecondaryWhenPrimaryReturnsExtraData() public {
+        MockAdapter long = new MockAdapter(2000e18, block.timestamp);
+        IOracle.Sources[] memory hops = _chain(
+            _hop(
+                _source(address(long), abi.encodeCall(MockAdapter.longPrice, ()), 1 hours),
+                _stub(1990e18, block.timestamp, 1 hours)
+            )
+        );
+
+        assertEq(oracle.price(hops), 1990e18);
+    }
+
     // ── configuration ─────────────────────────────────────────────────────────
 
     function test_setSource_rejectsAChainThatCannotPrice() public {
@@ -352,5 +365,19 @@ contract OracleTest is Test {
         vm.prank(makeAddr("stranger"));
         vm.expectRevert();
         oracle.setSource(steth, hops);
+    }
+
+    function test_upgrade_authorized() public {
+        Oracle newImpl = new Oracle();
+        vm.prank(admin);
+        UUPSUpgradeable(address(oracle)).upgradeToAndCall(address(newImpl), "");
+        assertEq(oracle.authority(), address(accessManager));
+    }
+
+    function test_upgrade_unauthorized_reverts() public {
+        Oracle newImpl = new Oracle();
+        vm.prank(makeAddr("stranger"));
+        vm.expectRevert();
+        UUPSUpgradeable(address(oracle)).upgradeToAndCall(address(newImpl), "");
     }
 }

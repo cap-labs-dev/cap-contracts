@@ -6,6 +6,7 @@ import { IERC7540AsyncRedeem } from "./IERC7540AsyncRedeem.sol";
 /// @title ITranche
 /// @author kexley, Cap Labs
 /// @notice Interface for Tranche contract
+/// @dev Beacon instance. Upgrade via {UpgradeableBeacon-upgradeTo} on the tranche beacon.
 interface ITranche is IERC7540AsyncRedeem {
     /// @notice The oracle reported a zero price
     error InvalidPrice();

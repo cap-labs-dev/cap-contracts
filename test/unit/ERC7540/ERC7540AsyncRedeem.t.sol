@@ -307,6 +307,11 @@ contract ERC7540AsyncRedeemTest is Test {
         assertEq(vault.share(), address(vault));
     }
 
+    function test_activeAssets_isTheUnqueuedSupply() public view {
+        assertEq(vault.activeSupply(), 1_000e18);
+        assertEq(vault.activeAssets(), 1_000e18);
+    }
+
     function test_supportsInterface() public view {
         assertTrue(vault.supportsInterface(type(IERC4626).interfaceId));
         assertFalse(vault.supportsInterface(0xffffffff));

@@ -6,6 +6,7 @@ import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 /// @title IWrapper
 /// @author kexley, Cap Labs
 /// @notice ERC-4626 vault that holds a stablecoin and claims its vested premium
+/// @dev Fresh deployments seed unredeemable shares via {DeadShares}.
 interface IWrapper is IERC4626 {
     /// @notice Initialize the wrapper
     /// @param authority The access manager address

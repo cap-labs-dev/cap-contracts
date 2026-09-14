@@ -12,7 +12,6 @@ import { PremiumVesting } from "../utils/PremiumVesting.sol";
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
-import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { ERC1155Holder } from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
@@ -22,13 +21,13 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 /// @title Underwriter
 /// @author kexley, Cap Labs
 /// @notice Curator vault that allocates assets into tranches and distributes premium to depositors.
+/// @dev Beacon instance. Upgrade via {UpgradeableBeacon-upgradeTo} on the underwriter beacon.
 contract Underwriter layout at erc7201("cap.storage.Underwriter")
     is
     IUnderwriter,
     ERC1155Holder,
     AccessManagedUpgradeable,
-    PremiumVesting,
-    UUPSUpgradeable
+    PremiumVesting
 {
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -315,7 +314,4 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     {
         return interfaceId == type(IUnderwriter).interfaceId || super.supportsInterface(interfaceId);
     }
-
-    /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address) internal override restricted { }
 }

@@ -17,6 +17,7 @@ import { CapDeployer } from "../shared/CapDeployer.sol";
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 /// @notice Pins the role that every gated selector is wired to on a freshly deployed instance.
 ///
@@ -26,7 +27,7 @@ import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 /// Three selectors had reached ADMIN by omission before this test existed. Asserting the table
 /// means the next one has to be argued for in a diff rather than arrived at silently.
 ///
-/// Covers all 51 gated selectors in the protocol, across per-market instances and the shared
+/// Covers all 59 gated selectors in the protocol, across per-market instances and the shared
 /// infrastructure. The table is a snapshot and does not discover new selectors by itself. What it
 /// does do is make the intended role explicit for each one, so a selector that is later rewired,
 /// or a new instance wired differently from the last, fails here.
@@ -80,6 +81,8 @@ contract RoleTableTest is CapDeployer {
         );
         (bool isMarket,) = accessManager.hasRole(CapRoles.MARKET, market);
         assertTrue(isMarket, "market holds MARKET");
+        (bool isWhitelisted,) = accessManager.hasRole(CapRoles.WHITELISTED, market);
+        assertTrue(isWhitelisted, "market holds WHITELISTED so it can forward role setters");
 
         _assertTrancheRoleTable(tranches[0], ownerRole);
     }
@@ -172,6 +175,18 @@ contract RoleTableTest is CapDeployer {
         vm.prank(stranger);
         vm.expectRevert(unauthorized);
         registry.createUnderwriter(address(collateral), "Underwriter", "UW", ownerRole);
+
+        vm.prank(stranger);
+        vm.expectRevert(unauthorized);
+        registry.setDepositorRole(ownerRole);
+
+        vm.prank(stranger);
+        vm.expectRevert(unauthorized);
+        registry.setBorrowerRole(ownerRole);
+
+        vm.prank(stranger);
+        vm.expectRevert(unauthorized);
+        registry.setAllocatorRole(ownerRole);
     }
 
     function test_createMarket_acceptsRegisteredOperatorRoleIds() public {
@@ -242,6 +257,8 @@ contract RoleTableTest is CapDeployer {
         _expectRole(tranche, IERC4626.deposit.selector, depositorRole, "tranche deposit");
         _expectRole(tranche, IERC4626.mint.selector, depositorRole, "tranche mint");
         assertEq(accessManager.getRoleAdmin(depositorRole), ownerRole, "administered by the market owner");
+        (bool isWhitelisted,) = accessManager.hasRole(CapRoles.WHITELISTED, tranche);
+        assertTrue(isWhitelisted, "tranche holds WHITELISTED so it can forward setDepositorRole");
     }
 
     /// @dev The Registry keeps no copy of the market owner role, so handing a market to a new
@@ -347,6 +364,8 @@ contract RoleTableTest is CapDeployer {
         _expectRole(underwriter, IERC4626.deposit.selector, depositorRole, "deposit");
         _expectRole(underwriter, IERC4626.mint.selector, depositorRole, "mint");
         assertEq(accessManager.getRoleAdmin(depositorRole), curatorRole, "administered by the curator");
+        (bool isWhitelisted,) = accessManager.hasRole(CapRoles.WHITELISTED, underwriter);
+        assertTrue(isWhitelisted, "underwriter holds WHITELISTED so it can forward role setters");
     }
 
     function test_roleSetterEventsAreEmittedByRegistry() public {
@@ -401,6 +420,7 @@ contract RoleTableTest is CapDeployer {
         _expectRole(address(stablecoin), IStablecoin.fundCreditBacked.selector, CapRoles.MARKET, "fundCreditBacked");
         _expectRole(address(stablecoin), IStablecoin.invest.selector, CapRoles.KEEPER, "invest");
         _expectRole(address(stablecoin), IStablecoin.recall.selector, CapRoles.KEEPER, "recall");
+        _expectRole(address(stablecoin), IStablecoin.setReserveVault.selector, CapRoles.GOVERNOR, "setReserveVault");
 
         // the rate curve is economic policy; the per-market knobs are wired to MARKET by the
         // Registry and asserted alongside the market table
@@ -418,9 +438,18 @@ contract RoleTableTest is CapDeployer {
         );
         _expectRole(address(registry), Registry.createFixedMarket.selector, CapRoles.WHITELISTED, "createFixedMarket");
         _expectRole(address(registry), Registry.createUnderwriter.selector, CapRoles.WHITELISTED, "createUnderwriter");
+        _expectRole(address(registry), Registry.setDepositorRole.selector, CapRoles.WHITELISTED, "setDepositorRole");
+        _expectRole(address(registry), Registry.setBorrowerRole.selector, CapRoles.WHITELISTED, "setBorrowerRole");
+        _expectRole(address(registry), Registry.setAllocatorRole.selector, CapRoles.WHITELISTED, "setAllocatorRole");
 
         // only the Registry deploys through the factory
         _expectRole(address(beaconFactory), IBeaconFactory.create.selector, CapRoles.REGISTRY, "factory create");
+
+        // beacons are Ownable, owned by the AccessManager; ADMIN upgrades them via execute
+        _expectRole(floatingMarketBeacon, UpgradeableBeacon.upgradeTo.selector, CapRoles.ADMIN, "floating beacon");
+        _expectRole(fixedMarketBeacon, UpgradeableBeacon.upgradeTo.selector, CapRoles.ADMIN, "fixed beacon");
+        _expectRole(trancheBeacon, UpgradeableBeacon.upgradeTo.selector, CapRoles.ADMIN, "tranche beacon");
+        _expectRole(underwriterBeacon, UpgradeableBeacon.upgradeTo.selector, CapRoles.ADMIN, "underwriter beacon");
     }
 
     /// @dev The role admin delegation is what replaced the vault's whitelist, so pin that it works

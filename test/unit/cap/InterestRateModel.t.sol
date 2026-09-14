@@ -40,6 +40,32 @@ contract InterestRateModelTest is BaseTest {
         s = IInterestRateModel.Slopes({ base: 0, slope0: 0.1e27, slope1: 0.9e27, kink: 0.8e27 });
     }
 
+    function test_marketMultiplier_defaultsToOneRay() public view {
+        assertEq(irm.marketMultiplier(market), RAY);
+        assertEq(irm.marketMultiplier(address(uint160(0xBEEF))), RAY);
+    }
+
+    function test_averageSupplies_tracksTheSource() public {
+        stablecoin.setSupplyUtilization(0.5e27);
+        irm.updateLiquidityRate();
+        skip(365 days);
+        (uint256 credit, uint256 supply) = irm.averageSupplies();
+        assertGt(credit, 0);
+        assertGt(supply, 0);
+    }
+
+    function test_setLiquidationBonus_updatesAndBounds() public {
+        irm.setLiquidationBonus(0.05e27);
+        assertEq(irm.liquidationBonus(), 0.05e27);
+
+        vm.expectRevert(IInterestRateModel.InvalidLiquidationBonus.selector);
+        irm.setLiquidationBonus(0.1e27 + 1);
+
+        vm.prank(stranger);
+        vm.expectRevert();
+        irm.setLiquidationBonus(0.01e27);
+    }
+
     function test_initialLiquidityIndexIsRay() public view {
         (uint256 rate, uint256 index,) = irm.liquidityData();
         assertEq(rate, 0);

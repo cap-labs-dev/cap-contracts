@@ -118,6 +118,13 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     }
 
     /// @inheritdoc IStablecoin
+    function setReserveVault(address newReserveVault) external restricted {
+        address previousVault = reserveVault;
+        reserveVault = newReserveVault;
+        emit SetReserveVault(previousVault, newReserveVault);
+    }
+
+    /// @inheritdoc IStablecoin
     function utilizationRate() public view returns (uint256 rate) {
         rate = _utilizationRate(creditBackedSupply, totalSupply());
     }

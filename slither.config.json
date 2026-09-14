@@ -1,5 +1,5 @@
 {
-    "filter_paths": "lib,script,node_modules,config,test,deploy",
+    "filter_paths": "lib,script,node_modules,config,test",
     "exclude_informational": true,
     "exclude_low": true
 }

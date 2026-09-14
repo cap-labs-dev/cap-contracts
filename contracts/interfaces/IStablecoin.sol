@@ -41,6 +41,11 @@ interface IStablecoin {
     /// @param amount The underlying amount recalled
     event Recalled(uint256 amount);
 
+    /// @notice Emitted when the reserve vault is updated
+    /// @param previousVault The previous reserve vault
+    /// @param newVault The new reserve vault, or the zero address when investing is disabled
+    event SetReserveVault(address indexed previousVault, address indexed newVault);
+
     /// @notice There is no bad debt left to cover
     error NoBadDebt();
 
@@ -98,6 +103,12 @@ interface IStablecoin {
     /// @dev Keeper can recall reserve funds from the vault
     /// @param amount The underlying amount to recall
     function recall(uint256 amount) external;
+
+    /// @notice Set the reserve vault used for future investment and recall calls
+    /// @dev Governance only. The zero address is valid when no investment vault is configured.
+    /// This does not migrate or recover assets held by the previous vault.
+    /// @param newReserveVault The new reserve vault
+    function setReserveVault(address newReserveVault) external;
 
     /// @notice Recognize a loss in the reserve vault, socializing it across holders
     /// @dev Guardian only. Credit-backed supply is unchanged because no borrower debt was lost.

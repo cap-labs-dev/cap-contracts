@@ -37,4 +37,25 @@ contract MarketUnitTest is CapDeployer {
         market.setFixedCreditLimit(500e18);
         assertEq(market.fixedCreditLimit(), 500e18);
     }
+
+    function test_marketViews() public view {
+        assertEq(market.irm(), address(irm));
+        assertEq(market.registry(), address(registry));
+        assertEq(market.utilization(), 0);
+        assertEq(market.variableCreditLimit(), 0);
+    }
+
+    function test_utilizationAndPremiumIndicesAfterADraw() public {
+        IBaseMarket.Tranche[] memory tranches = market.tranches();
+        _fundTranche(tranches[0].tranche, makeAddr("senior"), 10_000e18);
+
+        vm.prank(defaultBorrower);
+        market.borrow(defaultBorrower, 100e18);
+
+        assertGt(market.utilization(), 0);
+        assertGt(market.variableCreditLimit(), 0);
+        (uint256 liquidityIndex, uint256 underwriterIndex) = market.premiumIndices();
+        assertGe(liquidityIndex, 1e27);
+        assertGe(underwriterIndex, 1e27);
+    }
 }

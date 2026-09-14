@@ -6,6 +6,8 @@ import { IChainlink } from "../../interfaces/IChainlink.sol";
 /// @title Chainlink Adapter
 /// @author kexley, Cap Labs
 /// @notice Prices one Chainlink feed
+/// @dev Does not inspect legacy `minAnswer` or `maxAnswer` clamps because supported feeds may not
+/// publish active bounds. Feed onboarding must verify clamp behavior, especially for L2 feeds.
 library ChainlinkAdapter {
     /// @dev Matches {IOracle-DECIMALS}
     uint8 private constant DECIMALS = 18;

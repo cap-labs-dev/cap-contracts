@@ -34,6 +34,28 @@ contract TrancheTest is CapDeployer {
         tranche1 = Tranche(j);
     }
 
+    function test_emptyVaultQuotesMintAtParPlusTheSeed() public view {
+        uint256 shares = 100e18 - DEAD_SHARES;
+        assertEq(tranche0.previewDeposit(100e18), shares);
+        assertEq(tranche0.previewMint(shares), 100e18);
+    }
+
+    function test_mintSeedsDeadShares() public {
+        uint256 assets = 100e18;
+        uint256 shares = assets - DEAD_SHARES;
+        _admitDepositor(address(tranche0), supplier);
+        _fundVault(supplier, assets);
+
+        vm.startPrank(supplier);
+        vault.setOperator(address(tranche0), true);
+        uint256 paid = tranche0.mint(shares, supplier);
+        vm.stopPrank();
+
+        assertEq(paid, assets);
+        assertEq(tranche0.balanceOf(DeadShares.HOLDER), DEAD_SHARES);
+        assertEq(tranche0.balanceOf(supplier), shares);
+    }
+
     function test_initializedState() public view {
         assertEq(tranche0.asset(), address(collateral));
         assertEq(tranche0.authority(), address(accessManager));

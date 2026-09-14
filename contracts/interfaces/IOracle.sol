@@ -20,7 +20,7 @@ interface IOracle {
     }
 
     /// @notice Specific data for a source
-    /// @param adapter Adapter to call
+    /// @param adapter Adapter returning exactly `(uint256 price, uint256 lastUpdated)`
     /// @param payload Encoded call to the adapter
     /// @param staleness Maximum age of the answer, in seconds
     struct Source {

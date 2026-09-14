@@ -3,41 +3,18 @@ src = "contracts"
 out = "out"
 test = "test"
 libs = ["node_modules", "lib"]
-script = "scripts"
+script = "script"
 solc_version = "0.8.36"
+evm_version = "osaka"
 ignored_warnings_from = ["node_modules", "lib"]
 remappings = [
-    "@symbioticfi/core/=node_modules/@symbioticfi/core/",
-    "@symbioticfi/burners/=node_modules/@symbioticfi/burners/",
-    "@symbioticfi/hooks/=node_modules/@symbioticfi/hooks/",
-    "@symbioticfi/rewards/=node_modules/@symbioticfi/rewards/",
-    "@layerzerolabs/oapp-alt-evm/=node_modules/@layerzerolabs/oapp-alt-evm/",
-    "@layerzerolabs/oft-alt-evm/=node_modules/@layerzerolabs/oft-alt-evm/",
-    "eigenlayer-contracts/=node_modules/eigenlayer-contracts/",
-    "eigenlayer/=node_modules/eigenlayer/",
     "forge-std/=lib/forge-std/src/",
     "@openzeppelin/=node_modules/@openzeppelin/",
     "@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
     "@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/",
-    "@predicate/=node_modules/@predicate/contracts/src/"
 ]
 fs_permissions = [
-    { access = "read", path = "./config/eigen.json" },
-    { access = "read", path = "./config/symbiotic.json" },
-    { access = "read", path = "./config/layerzero-v2-deployments.json" },
-    { access = "read", path = "./config/oft-deployments.json" },
-    { access = "read", path = "./config/lz-dvn-metadata.json" },
-    { access = "read", path = "./config/zap.json" },
-    { access = "read", path = "./config/test-harness.json" },
-    { access = "read-write", path = "./config/cap-infra.json" },
-    { access = "read-write", path = "./config/cap-symbiotic.json" },
-    { access = "read-write", path = "./config/cap-eigen.json" },
-    { access = "read-write", path = "./config/cap-vaults-1.json" },
-    { access = "read-write", path = "./config/cap-vaults-11155111.json" },
-    { access = "read-write", path = "./config/cap-vaults-17000.json" },
-    { access = "read-write", path = "./config/cap-l2tokens-421614.json" },
-    { access = "read-write", path = "./config/cap-symbiotic-vaults-11155111.json" },
-    { access = "read-write", path = "./config/cap-symbiotic-vaults-17000.json" },
+    { access = "read-write", path = "./config/cap-v2.json" },
 ]
 optimizer = true
 optimizer_runs = 200
@@ -64,21 +41,17 @@ sort_imports = true
 single_line_statement_blocks = "preserve"
 contract_new_lines = false
 
-[profile.deep]
-[profile.deep.invariant]
-runs = 5000
-depth = 200 # handler based testing doesn't need to be deep
-[profile.deep.fuzz]
-runs = 5000
-
 [profile.release]
 gas_reports = ["*"]
 gas_reports_ignore = [
-    "MockAaveDataProvider",
-    "MockChainlinkPriceFeed",
-    "MockDelegation",
+    "MockAdapter",
+    "MockAeraVault",
+    "MockAggregator",
+    "MockCreateX",
     "MockERC20",
-    "MockOFT",
+    "MockIRM",
+    "MockReentrantERC20",
+    "MockUtilizationSource",
 ]
 optimizer = true
 optimizer_runs = 200

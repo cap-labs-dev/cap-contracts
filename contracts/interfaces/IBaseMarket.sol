@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 /// @title IBaseMarket
 /// @author kexley, Cap Labs
 /// @notice Shared interface for fixed and floating market implementations
+/// @dev Beacon instances. Upgrade via {UpgradeableBeacon-upgradeTo} on the market beacon.
 interface IBaseMarket {
     /// @notice A struct representing a tranche
     /// @param tranche The tranche address

@@ -63,4 +63,76 @@ contract FixedExtendTest is CapDeployer {
         vm.expectRevert(IFixedMarket.InvalidTerm.selector);
         market.extend(id, 30 days);
     }
+
+    function test_borrowMaxTermFillsTheMaximum() public {
+        FixedMarket market = _ready();
+
+        vm.prank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, type(uint256).max);
+
+        assertEq(market.expiry(id), block.timestamp + 30 days);
+        assertEq(market.totalDebt(), market.debt(id));
+        assertGt(market.availableCredit(10 days), 0);
+        assertEq(market.availableCredit(365 days), market.availableCredit(30 days));
+    }
+
+    function test_borrowMore_onALiveLoan() public {
+        FixedMarket market = _ready();
+
+        vm.prank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 10 days);
+        uint256 debtBefore = market.debt(id);
+
+        vm.prank(defaultBorrower);
+        uint256 added = market.borrowMore(id, defaultBorrower, 100e18);
+
+        assertGt(added, 0);
+        assertGt(market.debt(id), debtBefore);
+    }
+
+    function test_borrowMore_afterExpiry_reverts() public {
+        FixedMarket market = _ready();
+
+        vm.prank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days);
+        skip(2 days);
+
+        vm.prank(defaultBorrower);
+        vm.expectRevert(IFixedMarket.LoanExpired.selector);
+        market.borrowMore(id, defaultBorrower, 1e18);
+    }
+
+    function test_borrowMore_whenRemainingTermBelowMinimum_reverts() public {
+        FixedMarket market = _ready();
+
+        vm.prank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days);
+        skip(1 hours);
+
+        vm.prank(defaultBorrower);
+        vm.expectRevert(IFixedMarket.InvalidTerm.selector);
+        market.borrowMore(id, defaultBorrower, 1e18);
+    }
+
+    function test_liquidate_unhealthyFixedLoan() public {
+        FixedMarket market = _ready();
+
+        vm.prank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 10 days);
+
+        _setPrice(address(collateral), 0.1e18);
+        assertLt(market.healthiness(), 1e27);
+
+        uint256 max = market.maxLiquidatable();
+        assertGt(max, 0);
+        _mintStable(defaultLiquidator, max);
+
+        uint256 debtBefore = market.debt(id);
+        vm.prank(defaultLiquidator);
+        (uint256 repaid, uint256 slashed) = market.liquidate(id, defaultLiquidator, max);
+
+        assertGt(repaid, 0);
+        assertGt(slashed, 0);
+        assertEq(market.debt(id), debtBefore - repaid);
+    }
 }

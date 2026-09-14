@@ -62,4 +62,8 @@ contract MockAdapter {
     function shortPrice() external view returns (uint256) {
         return answer;
     }
+
+    function longPrice() external view returns (uint256, uint256, uint256) {
+        return (answer, updatedAt, 0);
+    }
 }

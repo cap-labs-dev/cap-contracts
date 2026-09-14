@@ -84,7 +84,7 @@ contract Oracle layout at erc7201("cap.storage.Oracle") is IOracle, AccessManage
     {
         (bool success, bytes memory returnedData) = _adapter.staticcall(_payload);
 
-        if (success && returnedData.length >= 64) {
+        if (success && returnedData.length == 64) {
             uint256 lastUpdated;
             (latestAnswer, lastUpdated) = abi.decode(returnedData, (uint256, uint256));
             if (_isStale(block.timestamp, lastUpdated, _staleness)) return 0;

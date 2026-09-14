@@ -61,10 +61,6 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         _getERC7540AsyncRedeemStorage().queueNft = address(new ERC1155Queue(_uri));
     }
 
-    //////////////////////////////////////////////////////////////////////////////
-    /**************************** ERC7540 functions *****************************/
-    //////////////////////////////////////////////////////////////////////////////
-
     /// @inheritdoc IERC7540AsyncRedeem
     function requestRedeem(uint256 _shares, address _controller, address _owner) external returns (uint256 requestId) {
         _checkAllowance(_owner, msg.sender, _shares);
@@ -256,10 +252,6 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     /// @param _assets The number of assets being paid out
     /// @param _shares The number of shares burned
     function _onWithdraw(address _owner, uint256 _assets, uint256 _shares) internal virtual { }
-
-    //////////////////////////////////////////////////////////////////////////////
-    /**************************** ERC165 functions ******************************/
-    //////////////////////////////////////////////////////////////////////////////
 
     /// @inheritdoc IERC165
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165) returns (bool) {

@@ -22,6 +22,7 @@ contract StablecoinTest is BaseTest {
     address internal treasury = makeAddr("treasury");
     address internal keeper = makeAddr("keeper");
     address internal guardian = makeAddr("guardian");
+    address internal governor = makeAddr("governor");
 
     function setUp() public {
         _setUpAccessManager();
@@ -53,6 +54,10 @@ contract StablecoinTest is BaseTest {
         bytes4[] memory guardianSelectors = new bytes4[](1);
         guardianSelectors[0] = Stablecoin.recognizeBadDebtInReserve.selector;
         _grantRoleForTarget(CapRoles.GUARDIAN, guardian, address(scoin), guardianSelectors);
+
+        bytes4[] memory governorSelectors = new bytes4[](1);
+        governorSelectors[0] = Stablecoin.setReserveVault.selector;
+        _grantRoleForTarget(CapRoles.GOVERNOR, governor, address(scoin), governorSelectors);
     }
 
     /// @dev Bad debt only ever arises from a market writing off credit it minted, so the credit
@@ -79,6 +84,51 @@ contract StablecoinTest is BaseTest {
         assertEq(scoin.creditBackedSupply(), 100e18);
         assertEq(irm.updateCalls(), 1);
         assertEq(scoin.utilizationRate(), RAY);
+    }
+
+    function test_transfer_betweenNonOptedHoldersDoesNotWriteTheVest() public {
+        address earner = makeAddr("earner");
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+        scoin.mintCreditBacked(bob, 50e18);
+        scoin.mintCreditBacked(earner, 1e18);
+        vm.prank(earner);
+        scoin.optIn();
+
+        vm.warp(block.timestamp + 1 hours);
+        uint256 lastUpdate = scoin.lastPremiumUpdate();
+
+        vm.prank(alice);
+        assertTrue(scoin.transfer(bob, 10e18));
+
+        assertEq(scoin.balanceOf(alice), 90e18);
+        assertEq(scoin.balanceOf(bob), 60e18);
+        assertEq(scoin.lastPremiumUpdate(), lastUpdate, "neither earner moved, so the clock is left alone");
+    }
+
+    function test_transfer_nonOptedIsCheaperThanOptedOnceWarm() public {
+        address earner = makeAddr("earner");
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+        scoin.mintCreditBacked(bob, 50e18);
+        scoin.mintCreditBacked(earner, 20e18);
+        vm.prank(earner);
+        scoin.optIn();
+
+        vm.prank(alice);
+        scoin.transfer(bob, 1e18);
+        vm.prank(earner);
+        scoin.transfer(alice, 1e18);
+
+        vm.prank(alice);
+        scoin.transfer(bob, 1e18);
+        uint256 idle = vm.lastCallGas().gasTotalUsed;
+
+        vm.prank(earner);
+        scoin.transfer(alice, 1e18);
+        uint256 earning = vm.lastCallGas().gasTotalUsed;
+
+        assertLt(idle, earning, "skipping the vest write has to show up in gas");
     }
 
     function test_burnCreditBacked_decreases() public {
@@ -728,6 +778,27 @@ contract StablecoinTest is BaseTest {
 
     function test_initialize_setsReserveVault() public view {
         assertEq(scoin.reserveVault(), address(reserve));
+    }
+
+    function test_setReserveVault_onlyGovernor() public {
+        MockAeraVault replacement = new MockAeraVault();
+        vm.prank(keeper);
+        vm.expectRevert();
+        scoin.setReserveVault(address(replacement));
+    }
+
+    function test_setReserveVault_updatesAndAllowsZero() public {
+        MockAeraVault replacement = new MockAeraVault();
+
+        vm.expectEmit(true, true, false, true, address(scoin));
+        emit IStablecoin.SetReserveVault(address(reserve), address(replacement));
+        vm.prank(governor);
+        scoin.setReserveVault(address(replacement));
+        assertEq(scoin.reserveVault(), address(replacement));
+
+        vm.prank(governor);
+        scoin.setReserveVault(address(0));
+        assertEq(scoin.reserveVault(), address(0));
     }
 
     function test_invest_movesReserveAndLeavesSharePrice() public {

@@ -12,20 +12,14 @@ import { PremiumVesting } from "../utils/PremiumVesting.sol";
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
-import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 /// @title Tranche
 /// @author kexley, Cap Labs
 /// @notice ERC4626 tranche vault. Deposits via Vault ERC6909; earns cUSD premium from underwriting.
-contract Tranche layout at erc7201("cap.storage.Tranche")
-    is
-    ITranche,
-    AccessManagedUpgradeable,
-    PremiumVesting,
-    UUPSUpgradeable
-{
+/// @dev Beacon instance. Upgrade via {UpgradeableBeacon-upgradeTo} on the tranche beacon.
+contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessManagedUpgradeable, PremiumVesting {
     /// @inheritdoc ITranche
     address public registry;
 
@@ -216,7 +210,4 @@ contract Tranche layout at erc7201("cap.storage.Tranche")
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC7540AsyncRedeem) returns (bool) {
         return interfaceId == type(ITranche).interfaceId || super.supportsInterface(interfaceId);
     }
-
-    /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address) internal override restricted { }
 }

@@ -27,18 +27,12 @@ yarn install
 
 ### Setup environment
 
-Define `sepolia` chain in your `~/.foundry/foundry.toml`
+Define RPC endpoints in your `~/.foundry/foundry.toml` or as env vars (`ETH_RPC_URL`, and the other keys listed in this repo's `foundry.toml`).
 
 ```toml
 [rpc_endpoints]
-sepolia = "https://sepolia.gateway.tenderly.co"
-...
-
-[etherscan]
-sepolia = { key = "...", url = "https://api-sepolia.etherscan.io/api" }
+ethereum = "${ETH_RPC_URL}"
 ```
-
-## Commands
 
 ## Available Scripts
 
@@ -50,18 +44,11 @@ The following scripts are available to run with `yarn`:
 - `yarn test:build`: Build contracts, tests, and scripts with IR optimization
 
 ### Testing
-- `yarn test`: Run unit tests
-- `yarn test:unit`: Run unit tests (excluding slow tests)
-- `yarn test:invariants`: Run invariant tests only
-- `yarn test:slither`: Run Slither static analysis tool
-
-### Gas Analysis
-- `yarn gas:flamegraph`: Generate a flamegraph of gas usage
-- `yarn gas:snapshot`: Create a gas snapshot in isolation
-- `yarn gas:diff`: Compare gas usage against the last snapshot
-- `yarn gas:report`: Generate a gas usage report
+- `yarn test`: Run the Foundry suite
+- `yarn test:slither`: Run Slither static analysis
+- `yarn deploy`: Broadcast `script/Deploy.s.sol`
+- `yarn check-roles`: Check AccessManager wiring against `config/cap-v2.json`
 
 ### Coverage
-- `yarn coverage:forge`: Generate a summary coverage report
+- `yarn coverage:forge`: Generate a summary coverage report for `contracts/`
 - `yarn coverage:forge:report`: Generate a detailed LCOV coverage report with branch coverage
-

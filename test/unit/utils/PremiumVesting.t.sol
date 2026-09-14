@@ -113,6 +113,8 @@ contract PremiumVestingTest is Test {
         assertEq(v.vested(), 0, "and nothing due");
         assertEq(v.period(), 12 hours, "the constant is twelve hours");
         assertEq(v.lastUpdate(), 0, "clock starts on the first fund");
+        assertEq(IPremiumVesting(address(v)).premiumPerShare(), 0);
+        assertEq(IPremiumVesting(address(v)).pendingPremium(address(this)), 0);
     }
 
     function test_fund_addsToTheRemainderWithoutStartingAnEpoch() public {
@@ -499,6 +501,24 @@ contract PremiumVestingOptInTest is Test {
 
         vm.warp(block.timestamp + PERIOD);
         assertApproxEqRel(v.claimable(alice), pot * 632 / 1000, 0.02e18, "and only then starts to vest");
+    }
+
+    function test_transferBetweenNonOptedHoldersDoesNotMoveTheClock() public {
+        address carol = makeAddr("carol");
+        _stake(alice, 100e18);
+        v.mint(bob, 50e18);
+        v.mint(carol, 50e18);
+
+        vm.warp(block.timestamp + PERIOD);
+        uint256 last = v.lastUpdate();
+
+        vm.prank(bob);
+        assertTrue(v.transfer(carol, 10e18));
+
+        assertEq(v.lastUpdate(), last, "no earner moved, so the vest is not written");
+        assertEq(v.stakedSupply(), 100e18);
+        assertEq(v.balanceOf(bob), 40e18);
+        assertEq(v.balanceOf(carol), 60e18);
     }
 
     function test_transferToANonOptedHolderDropsStakedAndPaysThemNothing() public {

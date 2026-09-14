@@ -169,14 +169,18 @@ interface IRegistry {
     function createTranche(address market, address asset, uint256[] calldata weights) external returns (address tranche);
 
     /// @notice Set the depositor role on the calling market, tranche, or underwriter
+    /// @dev Restricted to WHITELISTED. Deployed markets, tranches, and underwriters hold that role
+    /// so their own owner/curator setters can forward here.
     /// @param roleId The depositor role id
     function setDepositorRole(uint64 roleId) external;
 
     /// @notice Set the borrower role on the calling market
+    /// @dev Restricted to WHITELISTED. Deployed markets hold that role so {IBaseMarket-setBorrowerRole} can forward here.
     /// @param roleId The borrower role id
     function setBorrowerRole(uint64 roleId) external;
 
     /// @notice Set the allocator role on the calling underwriter
+    /// @dev Restricted to WHITELISTED. Deployed underwriters hold that role so {IUnderwriter-setAllocatorRole} can forward here.
     /// @param roleId The allocator role id
     function setAllocatorRole(uint64 roleId) external;
 

@@ -7,7 +7,8 @@ import { IERC7540AsyncRedeem } from "./IERC7540AsyncRedeem.sol";
 /// @author kexley, Cap Labs
 /// @notice Interface for the curator vault that allocates vault assets into tranches and distributes premium
 /// @dev The curator role is expected to be held by a timelock or secure multisig, while the
-/// allocator role is intended for an operational wallet with narrower permissions.
+/// allocator role is intended for an operational wallet with narrower permissions. Beacon instance:
+/// upgrade via {UpgradeableBeacon-upgradeTo} on the underwriter beacon.
 interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice The tranche is not registered with the underwriter
     error NotRegisteredTranche();

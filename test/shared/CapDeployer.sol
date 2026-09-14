@@ -221,10 +221,10 @@ abstract contract CapDeployer is BaseTest {
                 address(new BeaconFactory()), abi.encodeCall(BeaconFactory.initialize, (address(accessManager)))
             )
         );
-        floatingMarketBeacon = address(new UpgradeableBeacon(address(marketImpl), address(this)));
-        fixedMarketBeacon = address(new UpgradeableBeacon(address(fixedMarketImpl), address(this)));
-        trancheBeacon = address(new UpgradeableBeacon(address(trancheImpl), address(this)));
-        underwriterBeacon = address(new UpgradeableBeacon(address(underwriterImpl), address(this)));
+        floatingMarketBeacon = address(new UpgradeableBeacon(address(marketImpl), address(accessManager)));
+        fixedMarketBeacon = address(new UpgradeableBeacon(address(fixedMarketImpl), address(accessManager)));
+        trancheBeacon = address(new UpgradeableBeacon(address(trancheImpl), address(accessManager)));
+        underwriterBeacon = address(new UpgradeableBeacon(address(underwriterImpl), address(accessManager)));
     }
 
     function _deployRegistry() internal {
