@@ -215,7 +215,39 @@ contract DebtLifecycleTest is CapDeployer {
         bundle.market.borrow(defaultBorrower, 400e18);
 
         assertEq(bundle.market.unrecoverableDebt(), 0, "collateral covers the debt");
-        vm.expectRevert(IBaseMarket.InvalidAmount.selector);
+        assertGe(bundle.market.healthiness(), 1e27, "and the market is healthy");
+        vm.expectRevert(IBaseMarket.Healthy.selector);
+        bundle.market.writeOff();
+    }
+
+    /// @dev When `lt * (1 + bonus) > 1e27`, {unrecoverableDebt} can be positive while
+    /// {healthiness} is still at or above one ray. At the deploy 2% bonus that band starts
+    /// above `lt` 0.9804; the write-off would be at most ~1.96% of collateral. Liquidation
+    /// already reverts {IBaseMarket-Healthy} there. Write-off must as well.
+    function test_writeOff_revertsHealthyInTheLtBonusBand() public {
+        MarketBundle memory bundle = _createReadyMarket("Floating");
+        _fundTranche(bundle.tranche0Addr, makeAddr("senior"), 1_000e18);
+
+        vm.prank(defaultBorrower);
+        bundle.market.borrow(defaultBorrower, 500e18);
+
+        bundle.market.setLt(1e27);
+        // capital $505, debt $500: healthy at lt = 1, but short of capital / 1.02
+        _setPrice(address(collateral), 0.505e18);
+
+        assertGe(bundle.market.healthiness(), 1e27, "still healthy");
+        assertGt(bundle.market.unrecoverableDebt(), 0, "bonus math already calls it unrecoverable");
+        assertLe(
+            bundle.market.unrecoverableDebt(),
+            bundle.market.totalCapital() * 196 / 10_000,
+            "loss is at most ~1.96% of collateral"
+        );
+
+        vm.prank(defaultLiquidator);
+        vm.expectRevert(IBaseMarket.Healthy.selector);
+        bundle.market.liquidate(defaultLiquidator, 1e18);
+
+        vm.expectRevert(IBaseMarket.Healthy.selector);
         bundle.market.writeOff();
     }
 

@@ -371,10 +371,15 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
         emit Liquidate(msg.sender, recipient, repaid, slashed);
     }
 
-    /// @dev Record the shortfall as bad debt. Bounded by {unrecoverableDebt}.
+    /// @dev Record the shortfall as bad debt. The market must already be unhealthy, the same
+    /// gate as {_liquidate}. {unrecoverableDebt} can be positive while {healthiness} is still
+    /// at or above one ray whenever `lt * (1 + bonus) > 1e27` — at the deploy bonus that band
+    /// starts above `lt` 0.9804 and the loss is at most ~1.96% of collateral. That is not a
+    /// write-off; liquidation is the remedy until health drops.
     /// @param amount The amount of debt to write off
     function _writeOff(uint256 amount) internal {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
+        if (healthiness() >= 1e27) revert Healthy();
         if (amount == 0) revert InvalidAmount();
         if (amount > unrecoverableDebt()) revert ExceedsUnrecoverableDebt();
         IStablecoin($.stablecoin).recognizeBadDebtInCredit(amount);
