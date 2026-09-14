@@ -17,7 +17,8 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
     using SafeERC20 for IERC20;
     using WadRayMath for uint256;
 
-    /// @dev Emitted when premium is added to the remainder
+    /// @notice Emitted when premium is added to the remainder
+    /// @param amount The premium added, in stablecoin units (18 decimals)
     event Fund(uint256 amount);
 
     /// @dev Per-share conversions floor. A floored debt can still let entitlements sum past the
@@ -155,7 +156,7 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
     }
 
     /// @dev Premium token this contract may pay out. Default is the raw balance; cUSD subtracts
-    ///      the redemption queue so escrowed shares are not paid as yield.
+    /// the redemption queue so escrowed shares are not paid as yield.
     /// @return available Spendable premium-token units
     function _spendablePremium() internal view virtual returns (uint256 available) {
         available = IERC20(stablecoin()).balanceOf(address(this));
@@ -299,7 +300,7 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
     /// @dev `perShare` plus the vest not yet written
     /// @param $ The PremiumVesting storage
     /// @param supply The shares that earn. Zero skips the projection, matching a freeze
-    /// @return perShare Settled per-share plus the unwritten vest, in ray
+    /// @return perShare Settled per-share plus the unwritten vest, in ray decimals
     function _projectedPerShare(PremiumVestingStorage storage $, uint256 supply)
         internal
         view
@@ -314,7 +315,7 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
 
     /// @dev Premium newly available since `lastUpdate`. A zero-supply accrue freezes, so this can read ahead.
     /// @param $ The PremiumVesting storage
-    /// @return amount Premium newly available since `lastUpdate`
+    /// @return amount Premium newly available since `lastUpdate`, in stablecoin units (18 decimals)
     function _vested(PremiumVestingStorage storage $) internal view returns (uint256 amount) {
         if (block.timestamp <= $.lastUpdate) return 0;
         uint256 weight = _weight(block.timestamp - $.lastUpdate);
@@ -325,16 +326,16 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
     /// @dev Premium attributed to `balance` at `perShare`. Floors per account. Aggregate
     /// entitlements can still exceed the pot when a prior debt also floored; {claim} caps payout
     /// at the stablecoin held.
-    /// @param perShare Cumulative premium released per staked share, in ray
+    /// @param perShare Cumulative premium released per staked share, in ray decimals
     /// @param balance The share balance being valued
-    /// @return amount The attributed premium
+    /// @return amount The attributed premium, in stablecoin units (18 decimals)
     function _owed(uint256 perShare, uint256 balance) private pure returns (uint256 amount) {
         amount = Math.mulDiv(perShare, balance, RAY, Math.Rounding.Floor);
     }
 
     /// @dev `1 - retention^elapsed`. Splits of the interval compose, subject to fixed-point rounding.
     /// @param elapsed Seconds since the last accrual
-    /// @return weight Fraction of the remainder that has vested, in ray
+    /// @return weight Fraction of the remainder that has vested, in ray decimals
     function _weight(uint256 elapsed) private pure returns (uint256 weight) {
         uint256 retention = RAY - RAY / VESTING_PERIOD;
         weight = RAY - retention.rayPow(elapsed);

@@ -5,7 +5,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title IAeraVault
 /// @author kexley, Cap Labs
-/// @notice Deposit and withdraw surface of Aera's {SingleDepositorVault}
+/// @notice Interface for the deposit and withdraw surface of Aera's {SingleDepositorVault}
 interface IAeraVault {
     /// @notice An ERC-20 amount to move
     /// @param token The token

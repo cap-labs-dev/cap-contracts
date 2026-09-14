@@ -399,7 +399,7 @@ abstract contract CapDeployer is BaseTest {
         bundle.tranche1 = Tranche(bundle.tranche1Addr);
     }
 
-    /// @dev Create market, apply slopes, and give each tranche the default max capital.
+    /// @dev Create a market, apply slopes, and give each tranche the default max capital.
     function _createReadyMarket(string memory name) internal returns (MarketBundle memory bundle) {
         bundle = _createMarketBundle(name);
         _configureMarketRates(bundle.market);
@@ -415,9 +415,8 @@ abstract contract CapDeployer is BaseTest {
         _setMaxCapital(market, capConfig.defaultMaxCapital);
     }
 
-    /// @dev Set each attached tranche's {ITranche-maxCapital} to `limit`. This is a per-tranche
-    ///      ceiling on capital, not a market-wide pot: an empty neighbour still contributes
-    ///      nothing, and a sibling cannot spend this tranche's unused room.
+    /// @dev Set every attached tranche's {ITranche-maxCapital} to `limit`. An empty neighbour
+    /// still contributes nothing; a sibling cannot spend this tranche's unused room.
     function _setMaxCapital(IBaseMarket market, uint256 limit) internal {
         IBaseMarket.Tranche[] memory ts = market.tranches();
         for (uint256 i; i < ts.length; ++i) {
@@ -425,8 +424,8 @@ abstract contract CapDeployer is BaseTest {
         }
     }
 
-    /// @dev Put `limit` on `tranche` and zero every sibling. Use when only that tranche
-    ///      should be allowed to contribute capital.
+    /// @dev Put `limit` on `tranche` and zero every sibling, so only that tranche can
+    /// contribute capital.
     function _setMaxCapitalOn(IBaseMarket market, address tranche, uint256 limit) internal {
         IBaseMarket.Tranche[] memory ts = market.tranches();
         for (uint256 i; i < ts.length; ++i) {
@@ -434,8 +433,8 @@ abstract contract CapDeployer is BaseTest {
         }
     }
 
-    /// @dev Size `tranche`'s cap so the market's LTV-scaled credit from it equals `limit`
-    ///      when the tranche has the capital. Empty siblings stay at zero.
+    /// @dev Size `tranche`'s {ITranche-maxCapital} so the market's {IBaseMarket-creditLimit}
+    /// from it equals `limit` once it has the capital. Empty siblings stay at zero.
     function _setBorrowableOn(IBaseMarket market, address tranche, uint256 limit) internal {
         uint256 ltvBound = market.ltv() < market.lt() ? market.ltv() : market.lt();
         uint256 cap = ltvBound == 0 ? 0 : (limit * 1e27 + ltvBound - 1) / ltvBound;

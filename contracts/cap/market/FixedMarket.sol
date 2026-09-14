@@ -237,7 +237,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
 
     /// @dev Rates after `mintAmount` of credit-backed supply is minted.
     /// @param term The term of the loan in seconds, already capped at the maximum
-    /// @param mintAmount The credit-backed supply still to be minted before the charge
+    /// @param mintAmount The credit-backed supply still to be minted before the charge, in stablecoin units (18 decimals)
     /// @return liquidityRate The liquidity rate per year in ray decimals
     /// @return underwriterRate The underwriter rate per year in ray decimals
     function _ratesStillToMint(uint256 term, uint256 mintAmount)
@@ -251,11 +251,11 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @dev The premium on `chargeableDebt` over `term`, priced per {_ratesStillToMint}
-    /// @param chargeableDebt The amount of debt that a premium is being charged on
+    /// @param chargeableDebt The amount of debt that a premium is being charged on, in stablecoin units (18 decimals)
     /// @param term The term of the loan in seconds
-    /// @param mintAmount The credit-backed supply still to be minted before the charge
-    /// @return liquidityPremium The liquidity premium
-    /// @return underwriterPremium The underwriter premium
+    /// @param mintAmount The credit-backed supply still to be minted before the charge, in stablecoin units (18 decimals)
+    /// @return liquidityPremium The liquidity premium, in stablecoin units (18 decimals)
+    /// @return underwriterPremium The underwriter premium, in stablecoin units (18 decimals)
     function _premiumStillToMint(uint256 chargeableDebt, uint256 term, uint256 mintAmount)
         internal
         view
@@ -267,7 +267,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
 
     /// @dev Combined liquidity and underwriter rate after `mintAmount` is minted.
     /// @param term The term of the loan in seconds, already capped at the maximum
-    /// @param mintAmount The credit-backed supply still to be minted before the charge
+    /// @param mintAmount The credit-backed supply still to be minted before the charge, in stablecoin units (18 decimals)
     /// @return rate The combined rate per year in ray decimals
     function _termRate(uint256 term, uint256 mintAmount) internal view returns (uint256 rate) {
         (uint256 liquidityRate, uint256 underwriterRate) = _ratesStillToMint(term, mintAmount);
@@ -277,9 +277,9 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     /// @dev A principal that, with its borrow premium, fits in `limit`. Invert at today's
     /// rate, then scale by `limit/cost` if the real quote is heavier. Four passes is enough
     /// because cost is nearly linear in principal. May sit below the exact maximum.
-    /// @param limit The raw {IBaseMarket-availableCredit} the draw must fit
+    /// @param limit The raw {IBaseMarket-availableCredit} the draw must fit, in USD (18 decimals)
     /// @param term The term of the loan in seconds
-    /// @return principal A principal whose {_borrowCost} is at most `limit`, or zero
+    /// @return principal A principal whose {_borrowCost} is at most `limit`, or zero, in stablecoin units (18 decimals)
     function _principalFor(uint256 limit, uint256 term) internal view returns (uint256 principal) {
         if (limit == 0) return 0;
 
@@ -298,19 +298,19 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @dev Principal plus the premium that draw would be charged.
-    /// @param principal The principal of the loan
+    /// @param principal The principal of the loan, in stablecoin units (18 decimals)
     /// @param term The term of the loan in seconds
-    /// @return cost Principal plus {premiumForBorrow} for that pair
+    /// @return cost Principal plus {premiumForBorrow} for that pair, in stablecoin units (18 decimals)
     function _borrowCost(uint256 principal, uint256 term) internal view returns (uint256 cost) {
         (uint256 liquidityPremium, uint256 underwriterPremium) = _premiumStillToMint(principal, term, principal);
         cost = principal + liquidityPremium + underwriterPremium;
     }
 
     /// @dev Invert `principal + principal * term * rate / year = limit` at a constant rate.
-    /// @param limit The credit the sized principal plus premium must not exceed
+    /// @param limit The credit the sized principal plus premium must not exceed, in USD (18 decimals)
     /// @param term The term of the loan in seconds
     /// @param rate The combined annual rate in ray decimals
-    /// @return principal The principal that saturates `limit` at `rate`
+    /// @return principal The principal that saturates `limit` at `rate`, in stablecoin units (18 decimals)
     function _principalWithin(uint256 limit, uint256 term, uint256 rate) internal pure returns (uint256 principal) {
         principal = Math.mulDiv(limit, 1e27, 1e27 + Math.mulDiv(term, rate, MathUtils.SECONDS_PER_YEAR));
     }
@@ -373,12 +373,12 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @dev Premium on `chargeableDebt` over `term`. Rates are annualized.
-    /// @param chargeableDebt The amount of debt that a premium is being charged on
+    /// @param chargeableDebt The amount of debt that a premium is being charged on, in stablecoin units (18 decimals)
     /// @param term The term of the loan in seconds
     /// @param liquidityRate The liquidity rate per year in ray decimals
     /// @param underwriterRate The underwriter rate per year in ray decimals
-    /// @return liquidityPremium The liquidity premium
-    /// @return underwriterPremium The underwriter premium
+    /// @return liquidityPremium The liquidity premium, in stablecoin units (18 decimals)
+    /// @return underwriterPremium The underwriter premium, in stablecoin units (18 decimals)
     function _premium(uint256 chargeableDebt, uint256 term, uint256 liquidityRate, uint256 underwriterRate)
         internal
         pure

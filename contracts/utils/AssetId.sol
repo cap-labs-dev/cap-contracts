@@ -2,7 +2,7 @@
 pragma solidity 0.8.36;
 
 /// @title AssetId
-/// @author kexley
+/// @author kexley, Cap Labs
 /// @notice Convert between asset addresses and ERC6909 token IDs
 library AssetId {
     /// @dev Convert an ERC20 address to an ERC6909 token id

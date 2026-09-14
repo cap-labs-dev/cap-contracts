@@ -143,11 +143,11 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
 
     /// @notice Claim previously requested redemptions for `controller`, oldest request first
     /// @dev Replaces the ERC-4626 instant-balance redeem. Caller must be `controller` or its
-    ///      operator; ERC-20 allowance is insufficient. Limited to currently claimable shares
-    ///      and {unlockedSupply}. Pays `convertToAssets(shares)` once (floored), then consumes
-    ///      receipts to match; per-request floors cannot underpay. Dust transferred onto this
-    ///      controller is cleared the same way: redeem the claimable dust and the receipts drop
-    ///      off the FIFO walk.
+    /// operator; ERC-20 allowance is insufficient. Limited to currently claimable shares
+    /// and {unlockedSupply}. Pays `convertToAssets(shares)` once (floored), then consumes
+    /// receipts to match; per-request floors cannot underpay. Dust transferred onto this
+    /// controller is cleared the same way: redeem the claimable dust and the receipts drop
+    /// off the FIFO walk.
     /// @param _shares Shares to claim
     /// @param _receiver Asset recipient
     /// @param _controller Request controller, not an instant share-balance owner
@@ -167,8 +167,8 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
 
     /// @notice Claim previously requested redemptions for `controller` by asset amount, oldest first
     /// @dev Replaces the ERC-4626 instant-balance withdraw. Caller must be `controller` or its
-    ///      operator; ERC-20 allowance is insufficient. Limited to currently claimable shares
-    ///      and {unlockedSupply}. Burns the ceil-quoted shares and pays `_assets` once.
+    /// operator; ERC-20 allowance is insufficient. Limited to currently claimable shares
+    /// and {unlockedSupply}. Burns the ceil-quoted shares and pays `_assets` once.
     /// @param _assets Assets to pay
     /// @param _receiver Asset recipient
     /// @param _controller Request controller, not an instant share-balance owner
@@ -234,7 +234,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
 
     /// @notice Claimable shares across `controller`'s requests, not an instant share balance
     /// @dev Sum of {claimableRedeemRequest} for that controller, capped by {unlockedSupply}.
-    ///      A Cap {ITranche} may revert {ITranche-InvalidPrice} when that cap needs a price.
+    /// A Cap {ITranche} may revert {ITranche-InvalidPrice} when that cap needs a price.
     /// @param _controller Request controller, not an instant share-balance owner
     /// @return maxShares Currently claimable shares
     function maxRedeem(address _controller)
@@ -257,8 +257,8 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
 
     /// @notice Asset quote of {maxRedeem} for `controller`
     /// @dev `convertToAssets` of the claimable share limit (floored). Not a withdraw from the
-    ///      owner's share balance. A Cap {ITranche} may revert {ITranche-InvalidPrice} when
-    ///      {maxRedeem} needs a price.
+    /// owner's share balance. A Cap {ITranche} may revert {ITranche-InvalidPrice} when
+    /// {maxRedeem} needs a price.
     /// @param _controller Request controller, not an instant share-balance owner
     /// @return maxAssets Currently claimable assets
     function maxWithdraw(address _controller)
@@ -400,7 +400,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     }
 
     /// @dev Consume `_shares` from the controller's requests, oldest id first,
-    ///      then pay `_assets` once. Fragment conversions are not used.
+    /// then pay `_assets` once. Fragment conversions are not used.
     /// @param _shares The shares to consume
     /// @param _receiver The asset recipient
     /// @param _controller The request controller
@@ -476,7 +476,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     }
 
     /// @dev Take `_shares` off a request and burn them. Does not pay assets.
-    ///      Emits {RedeemRequestConsumed} so individual and FIFO claims both name the receipt.
+    /// Emits {RedeemRequestConsumed} so individual and FIFO claims both name the receipt.
     /// @param _controller The request controller
     /// @param _shares The shares to consume
     /// @param _requestId The request id

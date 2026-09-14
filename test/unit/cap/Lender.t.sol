@@ -64,9 +64,9 @@ contract MarketUnitTest is CapDeployer {
         assertGe(underwriterIndex, 1e27);
     }
 
-    /// @dev An empty tranche with a cap used to raise the market-wide ceiling while a funded
-    /// tranche with a zero cap supplied the collateral. Each tranche now contributes only
-    /// `min` of its own cap and its own active capital, so that mix approves nothing.
+    /// @dev An empty tranche with a {ITranche-maxCapital} used to raise the market-wide
+    /// ceiling while a funded tranche with a zero cap supplied the collateral. Each tranche
+    /// contributes only its own {ITranche-capitalLimit}, so that mix approves nothing.
     function test_creditLimit_emptyCappedTrancheDoesNotSponsorFundedZeroCapTranche() public {
         IBaseMarket.Tranche[] memory ts = market.tranches();
         ITranche(ts[0].tranche).setMaxCapital(1_000e18);
@@ -83,7 +83,7 @@ contract MarketUnitTest is CapDeployer {
         market.borrow(defaultBorrower, 1);
     }
 
-    /// @dev Unused room on one cap cannot lift another tranche past its own cap.
+    /// @dev Unused room on one {ITranche-maxCapital} cannot lift another tranche past its own.
     function test_creditLimit_unusedCapOnOneTrancheDoesNotLiftAnother() public {
         IBaseMarket.Tranche[] memory ts = market.tranches();
         ITranche(ts[0].tranche).setMaxCapital(100e18);
@@ -97,6 +97,7 @@ contract MarketUnitTest is CapDeployer {
         assertEq(market.creditLimit(), 1_050e18);
     }
 
+    /// @dev {ITranche-capitalLimit} is the `min` of {ITranche-activeCapital} and {ITranche-maxCapital}.
     function test_trancheCapitalLimit_isMinOfActiveCapitalAndMaxCapital() public {
         IBaseMarket.Tranche[] memory ts = market.tranches();
         ITranche(ts[0].tranche).setMaxCapital(100e18);

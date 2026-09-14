@@ -5,7 +5,7 @@ import { IERC7540AsyncRedeem } from "./IERC7540AsyncRedeem.sol";
 
 /// @title ITranche
 /// @author kexley, Cap Labs
-/// @notice Interface for Tranche contract
+/// @notice Interface for the ERC-4626 tranche vault
 /// @dev Beacon instance. Upgrade via {UpgradeableBeacon-upgradeTo} on the tranche beacon.
 interface ITranche is IERC7540AsyncRedeem {
     /// @notice The oracle reported a zero price
@@ -23,8 +23,8 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @notice Emitted once when a slash retires the tranche
     event Killed();
 
-    /// @notice Emitted when this tranche's maximum capital is updated
-    /// @param maxCapital The new maximum capital
+    /// @notice Emitted when the maximum capital is updated
+    /// @param maxCapital The new maximum capital in USD (18 decimals)
     event SetMaxCapital(uint256 maxCapital);
 
     /// @notice Initialize the tranche
@@ -52,9 +52,9 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @param roleId The depositor role id
     function setDepositorRole(uint64 roleId) external;
 
-    /// @notice Set this tranche's maximum capital
-    /// @dev {capitalLimit} is `min` of this and {activeCapital}. Caps only this tranche.
-    /// @param maxCapital The new maximum capital
+    /// @notice Set the maximum capital
+    /// @dev {capitalLimit} is the `min` of this and {activeCapital}.
+    /// @param maxCapital The new maximum capital in USD (18 decimals)
     function setMaxCapital(uint256 maxCapital) external;
 
     /// @notice Slash assets worth `value`, capped by holdings
@@ -68,7 +68,7 @@ interface ITranche is IERC7540AsyncRedeem {
     function slash(uint256 value, address recipient) external returns (uint256 slashedValue);
 
     /// @notice Fold premium into the remainder
-    /// @param premium The premium being funded
+    /// @param premium The premium being funded, in stablecoin units (18 decimals)
     function fund(uint256 premium) external;
 
     /// @notice Get the market this tranche underwrites
@@ -87,55 +87,52 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @return The oracle address
     function oracle() external view returns (address);
 
-    /// @notice Whether a slash has retired the tranche
+    /// @notice Get whether a slash has retired the tranche
     /// @dev Latched below 1% of par. Closes deposits. The market also stops sending it fresh
     /// premium, so leftover dust cannot keep its weight.
     /// @return Whether the tranche has been retired
     function killed() external view returns (bool);
 
-    /// @notice Maximum capital this tranche can contribute
-    /// @dev {capitalLimit} mins this against {activeCapital}. Caps only this tranche.
-    /// @return The maximum capital
+    /// @notice Get the maximum capital of the tranche in USD (18 decimals)
+    /// @return The maximum capital in USD (18 decimals)
     function maxCapital() external view returns (uint256);
 
-    /// @notice Capital this tranche can contribute
-    /// @dev `min` of {activeCapital} and {maxCapital}. Empty capital or a zero cap
-    /// yields zero; another tranche's numbers cannot be substituted. LTV is applied
-    /// on the market, not here.
-    /// @return limit The capital limit
+    /// @notice Get the capital limit of the tranche in USD (18 decimals)
+    /// @dev `min` of {activeCapital} and {maxCapital}. Zero when empty or the cap is zero.
+    /// @return limit The capital limit in USD (18 decimals)
     function capitalLimit() external view returns (uint256 limit);
 
-    /// @notice Total assets held for this tranche in the vault
+    /// @notice Get the total assets held for this tranche in the vault
     /// @dev Vault ERC6909 balance, not tokens held here.
     /// @return assets The tranche asset balance
     function totalAssets() external view returns (uint256 assets);
 
-    /// @notice Maximum deposit for a receiver
+    /// @notice Get the maximum deposit for a receiver
     /// @dev Unlimited until killed, then zero. Admission is on {deposit}, not here.
     /// @param receiver The account that would receive shares
     /// @return maxAssets The maximum deposit amount
     function maxDeposit(address receiver) external view returns (uint256 maxAssets);
 
-    /// @notice Maximum mint for a receiver
+    /// @notice Get the maximum mint for a receiver
     /// @dev Same gate as {maxDeposit}.
     /// @param receiver The account that would receive shares
     /// @return maxShares The maximum mint amount
     function maxMint(address receiver) external view returns (uint256 maxShares);
 
-    /// @notice Shares available for redemption excluding market-locked assets
+    /// @notice Get the shares available for redemption excluding market-locked assets
     /// @dev A zero lock does not consult the oracle. A positive lock prices locked
     /// value and may revert {InvalidPrice}. {pendingRedeemRequest} and
     /// {claimableRedeemRequest} read this, which is the documented EIP-7540 deviation.
-    /// @return unlocked Shares not locked by the market
+    /// @return unlocked The shares not locked by the market
     function unlockedSupply() external view returns (uint256 unlocked);
 
     /// @notice Get the total capital value of the tranche in USD (18 decimals)
     /// @dev Zero when the tranche holds no assets, without consulting the oracle.
-    /// @return capital The total capital value in USD
+    /// @return capital The total capital value in USD (18 decimals)
     function totalCapital() external view returns (uint256 capital);
 
     /// @notice Get the active capital value of the tranche in USD (18 decimals)
     /// @dev Zero when no assets are active, without consulting the oracle.
-    /// @return capital The active capital value in USD
+    /// @return capital The active capital value in USD (18 decimals)
     function activeCapital() external view returns (uint256 capital);
 }

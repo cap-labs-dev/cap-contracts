@@ -15,7 +15,8 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 
 /// @title Vault
 /// @author kexley, Cap Labs
-/// @notice ERC6909 collateral vault
+/// @notice ERC-6909 collateral vault
+/// @dev 1:1 mint. Fee-on-transfer and rebasing tokens are unsupported.
 contract Vault is IVault, AccessManagedUpgradeable, ERC6909TokenSupplyUpgradeable, UUPSUpgradeable {
     using SafeERC20 for IERC20;
     using AssetId for address;

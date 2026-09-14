@@ -5,22 +5,22 @@ import { IBaseMarket } from "./IBaseMarket.sol";
 
 /// @title IFixedMarket
 /// @author kexley, Cap Labs
-/// @notice Interface for fixed interest rate market
+/// @notice Interface for the fixed interest rate market
 interface IFixedMarket is IBaseMarket {
-    /// @notice Invalid term entered for the loan
+    /// @notice The term entered for the loan is invalid
     error InvalidTerm();
 
-    /// @notice Invalid term limits, the minimum must not exceed a non-zero maximum
+    /// @notice The term limits are invalid, the minimum must not exceed a non-zero maximum
     error InvalidTermLimits();
 
-    /// @notice Loan has not yet passed its expiry plus grace period
+    /// @notice The loan has not yet passed its expiry plus grace period
     error StillInGracePeriod();
 
-    /// @notice Additional borrowing is unavailable at or after expiry
+    /// @notice The loan has expired and additional borrowing is unavailable
     /// @dev Used by {borrowMore}. Expired loans can still {extend} or {extendAdmin}.
     error LoanExpired();
 
-    /// @notice No loan was created at this id
+    /// @notice The loan was not created at this id
     /// @param id The id that is outside `[0, loanCount)`
     error LoanNotFound(uint256 id);
 
@@ -28,50 +28,50 @@ interface IFixedMarket is IBaseMarket {
     /// @param id The closed loan
     error LoanClosed(uint256 id);
 
-    /// @notice Term limits were updated
+    /// @notice Emitted when the term limits are updated
     /// @param maximumTermLimit The new maximum term of a loan
     /// @param minimumTermLimit The new minimum term of a loan
     event SetTermLimits(uint256 maximumTermLimit, uint256 minimumTermLimit);
 
-    /// @notice Borrowed assets from the market
+    /// @notice Emitted when assets are borrowed from the market
     /// @param id The id of the loan
     /// @param recipient The recipient of the borrowed assets
     /// @param term The term of the borrowed assets
-    /// @param principal The principal amount of the borrowed assets
-    /// @param premium The charged premium for the loan
+    /// @param principal The principal amount of the borrowed assets, in stablecoin units (18 decimals)
+    /// @param premium The charged premium for the loan, in stablecoin units (18 decimals)
     event BorrowFixed(uint256 indexed id, address indexed recipient, uint256 term, uint256 principal, uint256 premium);
 
-    /// @notice Extended the term of a loan
+    /// @notice Emitted when the term of a loan is extended
     /// @param id The id of the loan
     /// @param extension The extension of the term
-    /// @param premium The charged premium for the extended term
+    /// @param premium The charged premium for the extended term, in stablecoin units (18 decimals)
     event ExtendFixed(uint256 indexed id, uint256 extension, uint256 premium);
 
-    /// @notice Repaid assets to the loan
+    /// @notice Emitted when assets are repaid to the loan
     /// @param id The id of the loan
-    /// @param repaid The amount of assets repaid
+    /// @param repaid The amount of assets repaid, in stablecoin units (18 decimals)
     event RepayFixed(uint256 indexed id, uint256 repaid);
 
-    /// @notice Liquidated assets from the market
+    /// @notice Emitted when assets are liquidated from the market
     /// @param id The id of the loan
     /// @param sender The sender of the liquidation request
     /// @param recipient The recipient of the liquidated assets
-    /// @param amount The amount of debt repaid
-    /// @param valueSlashed USD value of collateral delivered, 18 decimals, possibly across tokens
+    /// @param amount The amount of debt repaid, in stablecoin units (18 decimals)
+    /// @param valueSlashed The USD value of collateral delivered, 18 decimals, possibly across tokens
     event LiquidateFixed(
         uint256 indexed id, address indexed sender, address indexed recipient, uint256 amount, uint256 valueSlashed
     );
 
-    /// @notice Wrote off unrecoverable debt on a loan
+    /// @notice Emitted when unrecoverable debt on a loan is written off
     /// @dev Complements the market-level {IBaseMarket-WriteOff}, which does not name the loan.
     /// @param id The id of the loan
-    /// @param amount The amount of debt written off
-    /// @param remainingDebt The loan's debt after the write off
+    /// @param amount The amount of debt written off, in stablecoin units (18 decimals)
+    /// @param remainingDebt The loan's debt after the write off, in stablecoin units (18 decimals)
     event WriteOffFixed(uint256 indexed id, uint256 amount, uint256 remainingDebt);
 
     /// @notice Initialize the market
     /// @dev Term limits must satisfy {setTermLimits}. `grace` is the delay before {extendAdmin}.
-    /// @param authority The authority of the market
+    /// @param authority The access manager address
     /// @param registry The registry providing shared market configuration
     /// @param name The name of the market
     /// @param maximumTermLimit The maximum term of a loan, must be non-zero
@@ -90,11 +90,12 @@ interface IFixedMarket is IBaseMarket {
     /// @dev Premium is {premiumForBorrow}. `type(uint256).max` fills the maximum term;
     /// a finite term outside the band reverts {InvalidTerm}.
     /// @param recipient The recipient of the borrowed assets
-    /// @param principal The principal amount of the borrowed assets, or `type(uint256).max` for
-    /// the computed available principal over `term`. That size may sit below the exact maximum.
+    /// @param principal The principal amount of the borrowed assets, in stablecoin units (18 decimals), or
+    /// `type(uint256).max` for the computed available principal over `term`. That size may sit
+    /// below the exact maximum.
     /// @param term The term of the borrowed assets
     /// @return id The id of the loan
-    /// @return actualPrincipal The actual principal amount of the borrowed assets
+    /// @return actualPrincipal The actual principal amount of the borrowed assets, in stablecoin units (18 decimals)
     function borrow(address recipient, uint256 principal, uint256 term)
         external
         returns (uint256 id, uint256 actualPrincipal);
@@ -106,18 +107,18 @@ interface IFixedMarket is IBaseMarket {
     /// remainder is below {minimumTermLimit}.
     /// @param id The id of the loan
     /// @param recipient The recipient of the borrowed assets
-    /// @param principal The principal amount of the borrowed assets, or `type(uint256).max` for
-    /// the computed available add-on over the remaining term. That size may sit below the exact
-    /// maximum.
-    /// @return actualPrincipal The actual principal amount of the borrowed assets
+    /// @param principal The principal amount of the borrowed assets, in stablecoin units (18 decimals), or
+    /// `type(uint256).max` for the computed available add-on over the remaining term. That size may
+    /// sit below the exact maximum.
+    /// @return actualPrincipal The actual principal amount of the borrowed assets, in stablecoin units (18 decimals)
     function borrowMore(uint256 id, address recipient, uint256 principal) external returns (uint256 actualPrincipal);
 
     /// @notice Repay assets to the market
     /// @dev Burns the recorded amount. Arrears accrue only when {extend} or {extendAdmin} runs
     /// after expiry; a keeper must call that after the grace period.
     /// @param id The id of the loan. Must be in `[0, loanCount)`.
-    /// @param amount The amount of assets to repay
-    /// @return repaid The actual amount of assets repaid
+    /// @param amount The amount of assets to repay, in stablecoin units (18 decimals)
+    /// @return repaid The actual amount of assets repaid, in stablecoin units (18 decimals)
     function repay(uint256 id, uint256 amount) external returns (uint256 repaid);
 
     /// @notice Liquidate assets from the market
@@ -125,9 +126,9 @@ interface IFixedMarket is IBaseMarket {
     /// liquidatable. `amount` of `type(uint256).max` clears as much as {maxLiquidatable}.
     /// @param id The id of the loan
     /// @param recipient The recipient of the liquidated assets
-    /// @param amount The amount of assets to liquidate
-    /// @return repaid The actual amount of assets repaid
-    /// @return valueSlashed USD value of collateral delivered, 18 decimals, possibly across tokens
+    /// @param amount The amount of assets to liquidate, in stablecoin units (18 decimals)
+    /// @return repaid The actual amount of assets repaid, in stablecoin units (18 decimals)
+    /// @return valueSlashed The USD value of collateral delivered, 18 decimals, possibly across tokens
     function liquidate(uint256 id, address recipient, uint256 amount)
         external
         returns (uint256 repaid, uint256 valueSlashed);
@@ -154,7 +155,7 @@ interface IFixedMarket is IBaseMarket {
     /// @dev The market must be unhealthy. Capped at the market-wide shortfall. `id` must be in
     /// `[0, loanCount)`.
     /// @param id The id of the loan
-    /// @return amount The amount of debt written off
+    /// @return amount The amount of debt written off, in stablecoin units (18 decimals)
     function writeOff(uint256 id) external returns (uint256 amount);
 
     /// @notice Set the term limits for new loans
@@ -164,41 +165,41 @@ interface IFixedMarket is IBaseMarket {
     /// @param minimumTermLimit The minimum term of a loan, must not exceed the maximum
     function setTermLimits(uint256 maximumTermLimit, uint256 minimumTermLimit) external;
 
-    /// @notice Premium an extension would be charged
+    /// @notice Get the premium an extension would be charged
     /// @dev At current rates, with no extra mint. `term` is used as given so an
     /// arrears-inclusive roll can exceed {maximumTermLimit}. Use {premiumForBorrow}
     /// for a new draw.
-    /// @param chargeableDebt The amount of debt that a premium is being charged on
+    /// @param chargeableDebt The amount of debt that a premium is being charged on, in stablecoin units (18 decimals)
     /// @param term The term of the loan
-    /// @return liquidityPremium The liquidity premium
-    /// @return underwriterPremium The underwriter premium
+    /// @return liquidityPremium The liquidity premium, in stablecoin units (18 decimals)
+    /// @return underwriterPremium The underwriter premium, in stablecoin units (18 decimals)
     function premiumForExtension(uint256 chargeableDebt, uint256 term)
         external
         view
         returns (uint256 liquidityPremium, uint256 underwriterPremium);
 
-    /// @notice Premium a new borrow would be charged
+    /// @notice Get the premium a new borrow would be charged
     /// @dev On this principal at the rate after it is minted. Earlier draws already
     /// sit in the credit-backed supply, so a later draw is dearer per token, but
     /// early slices miss the high rate the full principal would have paid. Splitting
     /// can therefore cheapen the total versus one draw. That is expected. Borrowers
     /// are permissioned; splitting to reduce premium is not acceptable use.
     /// `type(uint256).max` and anything above {maximumTermLimit} quote at the maximum.
-    /// @param principal The principal of the loan
+    /// @param principal The principal of the loan, in stablecoin units (18 decimals)
     /// @param term The term of the loan
-    /// @return liquidityPremium The liquidity premium
-    /// @return underwriterPremium The underwriter premium
+    /// @return liquidityPremium The liquidity premium, in stablecoin units (18 decimals)
+    /// @return underwriterPremium The underwriter premium, in stablecoin units (18 decimals)
     function premiumForBorrow(uint256 principal, uint256 term)
         external
         view
         returns (uint256 liquidityPremium, uint256 underwriterPremium);
 
-    /// @notice A principal borrowable over a term, leaving room for the upfront premium
+    /// @notice Get a principal borrowable over a term, leaving room for the upfront premium
     /// @dev Sized so principal plus {premiumForBorrow} fits in the raw {IBaseMarket-availableCredit}.
     /// `type(uint256).max` and anything above {maximumTermLimit} quote at the maximum.
     /// May be below the exact maximum.
     /// @param term The term of the loan
-    /// @return credit The available credit
+    /// @return credit The available credit in USD (18 decimals)
     function availableCredit(uint256 term) external view returns (uint256 credit);
 
     /// @notice Get the maximum term limit
@@ -219,7 +220,7 @@ interface IFixedMarket is IBaseMarket {
 
     /// @notice Get the debt of a loan
     /// @param id The id of the loan
-    /// @return debt The debt of the loan
+    /// @return debt The debt of the loan, in stablecoin units (18 decimals)
     function debt(uint256 id) external view returns (uint256 debt);
 
     /// @notice Get the expiry of a loan

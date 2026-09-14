@@ -13,7 +13,7 @@ library DeadShares {
     /// @dev Not `address(0)` (`_mint` rejects it) and not the vault (redemption-queue collision).
     address internal constant HOLDER = 0x000000000000000000000000000000000000dEaD;
 
-    /// @notice A first deposit too small to cover the seed
+    /// @notice The first deposit is too small to cover the seed
     error DepositBelowSeed(uint256 assets, uint256 seed);
 
     /// @dev Calculate the shares returned for a first deposit of assets, minus the seed

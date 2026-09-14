@@ -5,7 +5,7 @@ import { IERC6909TokenSupply } from "@openzeppelin/contracts/interfaces/IERC6909
 
 /// @title IVault
 /// @author kexley, Cap Labs
-/// @notice Interface for the collateral vault (ERC6909)
+/// @notice Interface for the ERC-6909 collateral vault
 /// @dev 1:1 mint. Fee-on-transfer and rebasing tokens are unsupported.
 interface IVault is IERC6909TokenSupply {
     /// @notice Initialize the vault

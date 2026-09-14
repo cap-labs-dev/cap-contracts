@@ -294,9 +294,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     function creditLimit() public view returns (uint256 limit) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         for (uint256 i; i < $.tranches.length; ++i) {
-            uint256 contribution = ITranche($.tranches[i].tranche).capitalLimit();
-            if (limit > type(uint256).max - contribution) return type(uint256).max;
-            limit += contribution;
+            limit += ITranche($.tranches[i].tranche).capitalLimit();
         }
         limit = limit.rayMul(Math.min($.ltv, $.lt));
     }
@@ -311,7 +309,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @dev Burn credit-backed stablecoin from the caller
-    /// @param amount The amount of credit-backed stablecoin to burn
+    /// @param amount The amount of credit-backed stablecoin to burn, in stablecoin units (18 decimals)
     function _repay(uint256 amount) internal {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         IStablecoin($.stablecoin).burnCreditBacked(msg.sender, amount);
@@ -327,8 +325,8 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
 
     /// @dev Repay debt and slash tranche collateral when the market is unhealthy
     /// @param recipient The account receiving slashed collateral
-    /// @param amount The debt the caller is offering to repay
-    /// @return repaid The debt actually repaid
+    /// @param amount The debt the caller is offering to repay, in stablecoin units (18 decimals)
+    /// @return repaid The debt actually repaid, in stablecoin units (18 decimals)
     /// @return slashed The collateral value slashed, in USD (18 decimals)
     function _liquidate(address recipient, uint256 amount) internal returns (uint256 repaid, uint256 slashed) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();

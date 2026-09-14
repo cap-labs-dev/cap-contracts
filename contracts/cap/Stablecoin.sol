@@ -216,7 +216,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     }
 
     /// @dev Premium is paid in this token. Queued redemptions sit in the same balance and
-    ///      must not be transferred as yield.
+    /// must not be transferred as yield.
     function _spendablePremium() internal view override returns (uint256 available) {
         uint256 held = balanceOf(address(this));
         uint256 escrow = redemptionQueue();

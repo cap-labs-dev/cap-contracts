@@ -24,7 +24,7 @@ interface IBaseMarket {
     /// @param lt The liquidation threshold in ray decimals
     /// @param tranches The tranches and their weights
     /// @param registry The registry that deployed and configures the market
-    /// @param marketMultiplier Liquidity-rate multiplier in ray decimals. Zero reads as one ray.
+    /// @param marketMultiplier The liquidity-rate multiplier in ray decimals. Zero reads as one ray.
     struct BaseMarketStorage {
         string name;
         address registry;
@@ -68,7 +68,7 @@ interface IBaseMarket {
     /// @notice The amount is invalid
     error InvalidAmount();
 
-    /// @notice Insufficient liquidity for the requested borrow
+    /// @notice The market has insufficient liquidity for the requested borrow
     error InsufficientLiquidity();
 
     /// @notice The tranche weights do not sum to one ray
@@ -82,25 +82,25 @@ interface IBaseMarket {
 
     /// @notice Emitted when assets are borrowed from the market
     /// @param recipient The address receiving the borrowed assets
-    /// @param principal The amount borrowed
+    /// @param principal The amount borrowed, in stablecoin units (18 decimals)
     event Borrow(address recipient, uint256 principal);
 
     /// @notice Emitted when debt is repaid to the market
     /// @param caller The address repaying the debt
-    /// @param amount The amount repaid
+    /// @param amount The amount repaid, in stablecoin units (18 decimals)
     event Repay(address caller, uint256 amount);
 
     /// @notice Emitted when an unhealthy position is liquidated
     /// @param caller The address initiating the liquidation
     /// @param recipient The address receiving slashed collateral
-    /// @param repaid The amount of debt repaid
-    /// @param valueSlashed USD value of collateral delivered, 18 decimals, possibly across tokens
+    /// @param repaid The amount of debt repaid, in stablecoin units (18 decimals)
+    /// @param valueSlashed The USD value of collateral delivered, 18 decimals, possibly across tokens
     event Liquidate(address caller, address recipient, uint256 repaid, uint256 valueSlashed);
 
     /// @notice Emitted when unrecoverable debt is written off the market
     /// @param caller The address initiating the write off
-    /// @param amount The amount of debt written off
-    /// @param remainingDebt The market's debt after the write off
+    /// @param amount The amount of debt written off, in stablecoin units (18 decimals)
+    /// @param remainingDebt The market's debt after the write off, in stablecoin units (18 decimals)
     event WriteOff(address indexed caller, uint256 amount, uint256 remainingDebt);
 
     /// @notice Emitted when the loan-to-value ratio is updated
@@ -135,7 +135,7 @@ interface IBaseMarket {
 
     /// @notice Emitted when premium is charged to a recipient
     /// @param recipient The recipient of the premium
-    /// @param premium The amount of premium minted
+    /// @param premium The amount of premium minted, in stablecoin units (18 decimals)
     event ChargePremium(address indexed recipient, uint256 premium);
 
     /// @notice Set the loan-to-value ratio
@@ -166,7 +166,7 @@ interface IBaseMarket {
     /// @dev Restricted to the registry; market owners may only change weights.
     /// Floating settles outstanding premium under the current list first, so an
     /// already-elapsed period is not reallocated.
-    /// @param tranches The new tranche addresses and weights
+    /// @param tranches The new tranche addresses and weights, with weights in ray decimals
     function setTranches(Tranche[] calldata tranches) external;
 
     /// @notice Set the tranche weights
@@ -202,36 +202,36 @@ interface IBaseMarket {
     function registry() external view returns (address);
 
     /// @notice Get the liquidation threshold in ray decimals
-    /// @return The liquidation threshold
+    /// @return The liquidation threshold in ray decimals
     function lt() external view returns (uint256);
 
     /// @notice Get the liquidation buffer in ray decimals
-    /// @return The liquidation buffer
+    /// @return The liquidation buffer in ray decimals
     function buffer() external view returns (uint256);
 
     /// @notice Get the target health in ray decimals
-    /// @return The target health
+    /// @return The target health in ray decimals
     function targetHealth() external view returns (uint256);
 
     /// @notice Get the loan-to-value ratio in ray decimals
-    /// @return The loan-to-value ratio
+    /// @return The loan-to-value ratio in ray decimals
     function ltv() external view returns (uint256);
 
     /// @notice Get the liquidity-rate multiplier in ray decimals
     /// @dev Unset reads as one ray.
-    /// @return The market multiplier
+    /// @return The market multiplier in ray decimals
     function marketMultiplier() external view returns (uint256);
 
     /// @notice Get the tranche addresses and weights
-    /// @return tranches The tranches and their weights
+    /// @return tranches The tranches and their weights, with weights in ray decimals
     function tranches() external view returns (Tranche[] memory tranches);
 
     /// @notice Get the total debt of the market
-    /// @return debt The total outstanding debt
+    /// @return debt The total outstanding debt, in stablecoin units (18 decimals)
     function totalDebt() external view returns (uint256 debt);
 
     /// @notice Get the debt level at which the market hits its liquidation threshold
-    /// @return threshold The liquidation threshold expressed as debt capacity
+    /// @return threshold The liquidation threshold expressed as debt capacity, in USD (18 decimals)
     function debtLiquidationThreshold() external view returns (uint256 threshold);
 
     /// @notice Get the healthiness of the market
@@ -243,20 +243,20 @@ interface IBaseMarket {
     function utilization() external view returns (uint256 utilization);
 
     /// @notice Get the maximum liquidatable debt
-    /// @return liquidatable The maximum liquidatable debt
+    /// @return liquidatable The maximum liquidatable debt, in stablecoin units (18 decimals)
     function maxLiquidatable() external view returns (uint256 liquidatable);
 
-    /// @notice Debt that fully liquidating every tranche could still repay
+    /// @notice Get the debt that fully liquidating every tranche could still repay
     /// @dev Collateral clears at `1 + liquidationBonus` per unit of debt.
-    /// @return recoverable The recoverable debt
+    /// @return recoverable The recoverable debt, in stablecoin units (18 decimals)
     function recoverableDebt() external view returns (uint256 recoverable);
 
-    /// @notice Debt no liquidation can repay
+    /// @notice Get the debt no liquidation can repay
     /// @dev `totalDebt - recoverableDebt`. Tranches need not be empty.
-    /// @return unrecoverable The unrecoverable debt
+    /// @return unrecoverable The unrecoverable debt, in stablecoin units (18 decimals)
     function unrecoverableDebt() external view returns (uint256 unrecoverable);
 
-    /// @notice Capital a tranche must keep locked to back the market's debt
+    /// @notice Get the capital a tranche must keep locked to back the market's debt
     /// @dev USD, 18 decimals, rounded up. Juniors lock first. Zero when the market
     /// has no debt, without consulting the oracle.
     /// @param tranche The tranche address
@@ -264,17 +264,16 @@ interface IBaseMarket {
     function lockedValue(address tranche) external view returns (uint256 value);
 
     /// @notice Get the total capital of the market
-    /// @return capital The total capital
+    /// @return capital The total capital in USD (18 decimals)
     function totalCapital() external view returns (uint256 capital);
 
     /// @notice Get the available credit
-    /// @return credit The available credit
+    /// @return credit The available credit in USD (18 decimals)
     function availableCredit() external view returns (uint256 credit);
 
     /// @notice Get the credit limit
     /// @dev Sum of each attached tranche's {ITranche-capitalLimit}, then `min(ltv, lt)`.
-    /// The per-tranche `min` is on the tranche and does not see LTV. Guardian tightening of
-    /// `lt` below `ltv` cuts new credit here.
-    /// @return limit The credit limit
+    /// Guardian tightening of `lt` below `ltv` cuts new credit here.
+    /// @return limit The credit limit in USD (18 decimals)
     function creditLimit() external view returns (uint256 limit);
 }

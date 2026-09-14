@@ -17,7 +17,7 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title Tranche
 /// @author kexley, Cap Labs
-/// @notice ERC4626 tranche vault. Deposits via Vault ERC6909; earns cUSD premium from underwriting.
+/// @notice ERC-4626 tranche vault. Deposits via Vault ERC-6909; earns cUSD premium from underwriting.
 /// @dev Beacon instance. Upgrade via {UpgradeableBeacon-upgradeTo} on the tranche beacon.
 contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessManagedUpgradeable, PremiumVesting {
     /// @inheritdoc ITranche

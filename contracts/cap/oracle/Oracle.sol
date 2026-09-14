@@ -10,7 +10,7 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title Oracle
 /// @author kexley, Cap Labs
-/// @notice Oracle for fetching prices from external sources
+/// @notice Fetches and composes prices from external sources
 contract Oracle layout at erc7201("cap.storage.Oracle") is IOracle, AccessManagedUpgradeable, UUPSUpgradeable {
     /// @inheritdoc IOracle
     uint8 public constant DECIMALS = 18;

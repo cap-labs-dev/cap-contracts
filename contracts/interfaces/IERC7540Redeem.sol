@@ -5,10 +5,10 @@ pragma solidity 0.8.36;
 /// @author kexley
 /// @notice ERC-7540 asynchronous redemption
 /// @dev Only the three methods the EIP uses. Cap extras live on {IERC7540AsyncRedeem}.
-///      {ITranche} claimability views consult {unlockedSupply} and may revert
-///      {ITranche-InvalidPrice} when that read needs a price and the oracle is down.
-///      That is a documented deviation from the EIP's non-revert promise. Other Cap
-///      vaults keep the EIP rule.
+/// {ITranche} claimability views consult {unlockedSupply} and may revert
+/// {ITranche-InvalidPrice} when that read needs a price and the oracle is down.
+/// That is a documented deviation from the EIP's non-revert promise. Other Cap
+/// vaults keep the EIP rule.
 interface IERC7540Redeem {
     /// @dev `sender` locked `shares` owned by `owner`. `controller` controls the request.
     event RedeemRequest(

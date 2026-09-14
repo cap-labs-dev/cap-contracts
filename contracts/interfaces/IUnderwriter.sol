@@ -13,7 +13,7 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice The tranche is not registered with the underwriter
     error NotRegisteredTranche();
 
-    /// @notice More shares were named than this vault has queued under that request id
+    /// @notice The named shares exceed this vault's queue under that request id
     error UnknownQueuedRequest();
 
     /// @notice Emitted when a tranche is registered with the underwriter
@@ -42,7 +42,7 @@ interface IUnderwriter is IERC7540AsyncRedeem {
 
     /// @notice Emitted when a tranche is reported
     /// @param tranche The tranche address
-    /// @param reward The premium claimed from the tranche
+    /// @param reward The premium claimed from the tranche, in stablecoin units (18 decimals)
     /// @param gain The increase in recorded tranche debt
     /// @param loss The decrease in recorded tranche debt
     event Reported(address indexed tranche, uint256 reward, uint256 gain, uint256 loss);
@@ -137,7 +137,7 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @return The registry address
     function registry() external view returns (address);
 
-    /// @notice When {report} last folded premium into the remainder
+    /// @notice Get when {report} last folded premium into the remainder
     /// @return The last report timestamp
     function lastReported() external view returns (uint256);
 
@@ -145,35 +145,35 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @return The default tranche address
     function defaultTranche() external view returns (address);
 
-    /// @notice Shares queued for redemption but not yet settled
+    /// @notice Get the shares queued for redemption but not yet settled
     /// @dev Still counted in {debt}.
     /// @param tranche The tranche address
     /// @return The queued share count
     function queuedShares(address tranche) external view returns (uint256);
 
-    /// @notice Shares queued under one {deallocateAsync} request
+    /// @notice Get the shares queued under one {deallocateAsync} request
     /// @param tranche The tranche address
     /// @param requestId The ERC-7540 request id
     /// @return The shares queued under that request
     function queuedRequest(address tranche, uint256 requestId) external view returns (uint256);
 
-    /// @notice Recorded value of this vault's position in a tranche.
+    /// @notice Get the recorded value of this vault's position in a tranche
     /// @param tranche The tranche address
     /// @return The recorded position value
     function debt(address tranche) external view returns (uint256);
 
-    /// @notice Sum of every {debt} entry
+    /// @notice Get the sum of every {debt} entry
     /// @return The sum of every recorded position
     function totalDebt() external view returns (uint256);
 
-    /// @notice Total assets including vault balance and recorded tranche debt
+    /// @notice Get the total assets including vault balance and recorded tranche debt
     /// @dev Vault ERC6909 balance plus {totalDebt}. A slash is folded in only when {allocate}
     /// opens or remakes the book, or when {report} / {deallocate} remake a book that already
     /// exists — Yearn-style, not a live price of positions.
     /// @return assets The total assets
     function totalAssets() external view returns (uint256 assets);
 
-    /// @notice Shares available for instant redemption based on vault liquidity
-    /// @return unlocked Shares redeemable against vault-held assets
+    /// @notice Get the shares available for instant redemption based on vault liquidity
+    /// @return unlocked The shares redeemable against vault-held assets
     function unlockedSupply() external view returns (uint256 unlocked);
 }

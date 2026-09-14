@@ -40,9 +40,9 @@ interface IRegistry {
     /// @param trancheBeacon The tranche beacon address
     /// @param underwriterBeacon The underwriter beacon address
     /// @param wrapper The staked-stablecoin wrapper address
-    /// @param lt Default liquidation threshold for new markets in ray decimals (at most one ray, above buffer)
-    /// @param buffer Default liquidation buffer for new markets in ray decimals (strictly below lt)
-    /// @param targetHealth Default target health for new markets in ray decimals (min 1.25e27)
+    /// @param lt The default liquidation threshold for new markets in ray decimals (at most one ray, above buffer)
+    /// @param buffer The default liquidation buffer for new markets in ray decimals (strictly below lt)
+    /// @param targetHealth The default target health for new markets in ray decimals (min 1.25e27)
     struct InitParams {
         address stablecoin;
         address vault;
@@ -59,13 +59,13 @@ interface IRegistry {
         uint256 targetHealth;
     }
 
-    /// @notice Child roles were created with their initial members
+    /// @notice Emitted when child roles are created with their initial members
     /// @param parentRoleId The role that administers the child roles
     /// @param members The initial members for each corresponding child role
     /// @param roleIds The created child role ids
     event CreateChildRoles(uint64 indexed parentRoleId, address[][] members, uint64[] roleIds);
 
-    /// @notice A market has been created
+    /// @notice Emitted when a market is created
     /// @param market The deployed market
     /// @param assets The asset of each tranche, in the same order as `tranches`
     /// @param name The market name
@@ -73,7 +73,7 @@ interface IRegistry {
     /// @param tranches The deployed tranche addresses in seniority order
     event CreateMarket(address market, address[] assets, string name, uint64 marketOwnerRole, address[] tranches);
 
-    /// @notice A tranche has been deployed for a market
+    /// @notice Emitted when a tranche is deployed for a market
     /// @param market The market the tranche was deployed for
     /// @param tranche The deployed tranche
     /// @param asset The tranche asset
@@ -83,7 +83,7 @@ interface IRegistry {
         address indexed market, address tranche, address asset, uint64 marketOwnerRole, uint64 depositorRole
     );
 
-    /// @notice An underwriter has been created
+    /// @notice Emitted when an underwriter is created
     /// @param underwriter The deployed underwriter
     /// @param asset The underwriter asset
     /// @param name The underwriter name
@@ -91,17 +91,17 @@ interface IRegistry {
     /// @param curatorRole The curator role id
     event CreateUnderwriter(address underwriter, address asset, string name, string symbol, uint64 curatorRole);
 
-    /// @notice The depositor role was updated
+    /// @notice Emitted when the depositor role is updated
     /// @param target The market, tranche, or underwriter whose depositor role changed
     /// @param roleId The new depositor role id
     event SetDepositorRole(address indexed target, uint64 indexed roleId);
 
-    /// @notice The borrower role was updated
+    /// @notice Emitted when the borrower role is updated
     /// @param market The market whose borrower role changed
     /// @param roleId The new borrower role id
     event SetBorrowerRole(address indexed market, uint64 indexed roleId);
 
-    /// @notice The allocator role was updated
+    /// @notice Emitted when the allocator role is updated
     /// @param underwriter The underwriter whose allocator role changed
     /// @param roleId The new allocator role id
     event SetAllocatorRole(address indexed underwriter, uint64 indexed roleId);
@@ -123,7 +123,7 @@ interface IRegistry {
         external
         returns (uint64[] memory roleIds);
 
-    /// @notice Whether a role id was created as an operator role
+    /// @notice Get whether a role id was created as an operator role
     /// @param roleId The role id to query
     /// @return assigned Whether the role is an operator role
     function isOperatorRole(uint64 roleId) external view returns (bool assigned);
@@ -133,7 +133,7 @@ interface IRegistry {
     /// Borrow, borrowMore and extend start on a closed role the owner administers, so they
     /// cannot sit at ADMIN until {setBorrowerRole}.
     /// @param assets The asset of each tranche, index 0 is most senior
-    /// @param weights Tranche weights in ray decimals, index 0 is most senior
+    /// @param weights The tranche weights in ray decimals, index 0 is most senior
     /// @param name The market name
     /// @param marketOwnerRole The market owner operator role id
     /// @return market The deployed market
@@ -148,7 +148,7 @@ interface IRegistry {
     /// @notice Deploy a fixed market with tranches at the given assets and weights
     /// @dev Restricted to WHITELISTED. See {createFloatingMarket} for tranche inputs.
     /// @param assets The asset of each tranche, index 0 is most senior
-    /// @param weights Tranche weights in ray decimals, index 0 is most senior
+    /// @param weights The tranche weights in ray decimals, index 0 is most senior
     /// @param name The market name
     /// @param marketOwnerRole The market owner operator role id
     /// @param maximumTermLimit The maximum loan term
@@ -170,7 +170,7 @@ interface IRegistry {
     /// @dev Caller must hold the market owner role. `weights` covers the whole waterfall, including the new junior.
     /// @param market The market to deploy a tranche for
     /// @param asset The asset for the new tranche
-    /// @param weights Resulting waterfall weights in ray, last entry is the new tranche
+    /// @param weights The resulting waterfall weights in ray decimals, last entry is the new tranche
     /// @return tranche The deployed tranche
     function createTranche(address market, address asset, uint256[] calldata weights) external returns (address tranche);
 
@@ -193,12 +193,12 @@ interface IRegistry {
     /// @param roleId The allocator role id
     function setAllocatorRole(uint64 roleId) external;
 
-    /// @notice Whether this registry deployed the market
+    /// @notice Get whether this registry deployed the market
     /// @param market The market to query
     /// @return deployed Whether this registry deployed the market
     function isMarket(address market) external view returns (bool deployed);
 
-    /// @notice Owner role for a market this registry deployed
+    /// @notice Get the owner role for a market this registry deployed
     /// @dev From {IBaseMarket-setTrancheWeights}. Zero if unknown.
     /// @param market The market to query
     /// @return roleId The market owner role id, or zero if the market is unknown
@@ -257,15 +257,15 @@ interface IRegistry {
     /// @return The wrapper address
     function wrapper() external view returns (address);
 
-    /// @notice Default liquidation threshold for new markets in ray decimals
-    /// @return The default liquidation threshold
+    /// @notice Get the default liquidation threshold for new markets in ray decimals
+    /// @return The default liquidation threshold in ray decimals
     function lt() external view returns (uint256);
 
-    /// @notice Default liquidation buffer for new markets in ray decimals
-    /// @return The default liquidation buffer
+    /// @notice Get the default liquidation buffer for new markets in ray decimals
+    /// @return The default liquidation buffer in ray decimals
     function buffer() external view returns (uint256);
 
-    /// @notice Default target health for new markets in ray decimals
-    /// @return The default target health
+    /// @notice Get the default target health for new markets in ray decimals
+    /// @return The default target health in ray decimals
     function targetHealth() external view returns (uint256);
 }
