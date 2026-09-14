@@ -427,9 +427,10 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @dev Charge the premium
-    /// @dev Tranches that still hold capital and have opted-in shares take their weight of the
+    /// @dev Tranches that still hold assets and have opted-in shares take their weight of the
     /// underwriter premium. Dust and ineligible-tranche weight go to the senior tranche, or vest
-    /// on the stablecoin. Already-funded premium is not touched.
+    /// on the stablecoin. Already-funded premium is not touched. Eligibility does not price
+    /// collateral, so an oracle outage cannot block a charge or a repayment.
     /// @param liquidityPremium The amount of liquidity premium to charge
     /// @param underwriterPremium The amount of underwriter premium to charge
     function _chargePremium(uint256 liquidityPremium, uint256 underwriterPremium) internal {
@@ -474,13 +475,14 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
         }
     }
 
-    /// @dev New underwriting premium is for capital that still backs the market and can be claimed.
+    /// @dev New underwriting premium is for holdings that still back the market and can be claimed.
     /// Shares survive a wipeout, so {IPremiumVesting-stakedSupply} alone would keep paying a
-    /// depleted tranche.
+    /// depleted tranche. Holdings are {ITranche-totalAssets}, not {ITranche-totalCapital}: a
+    /// missing price must not brick {FloatingMarket-repay} or {IFloatingMarket-chargePremium}.
     /// @param tranche The tranche being considered
     /// @return eligible Whether the tranche should receive a fresh allocation
     function _earnsPremium(address tranche) private view returns (bool eligible) {
         if (IPremiumVesting(tranche).stakedSupply() == 0) return false;
-        eligible = ITranche(tranche).totalCapital() > 0;
+        eligible = ITranche(tranche).totalAssets() > 0;
     }
 }

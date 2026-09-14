@@ -307,6 +307,32 @@ contract TrancheTest is CapDeployer {
         tranche0.unlockedSupply();
     }
 
+    /// @dev {_earnsPremium} used to ask {ITranche-totalCapital}, so a retired feed reverted
+    /// inside {FloatingMarket-repay} before debt could be burned. Holdings, not USD, decide
+    /// who still earns; repayment stays live through the outage.
+    function test_floatingRepayDoesNotDependOnTheOracle() public {
+        MarketBundle memory b = _createReadyMarket("repay-oracle");
+        _fundTranche(b.tranche0Addr, supplier, 10_000e18);
+
+        vm.prank(defaultBorrower);
+        b.market.borrow(defaultBorrower, 1_000e18);
+        vm.warp(block.timestamp + 30 days);
+
+        (, uint256 underwriterPremium) = b.market.premium();
+        assertGt(underwriterPremium, 0, "the charge path has to visit the tranche");
+
+        uint256 owed = b.market.totalDebt();
+        _depositStable(defaultBorrower, owed);
+
+        oracle.setSource(address(collateral), new IOracle.Sources[](0));
+        vm.expectRevert(ITranche.InvalidPrice.selector);
+        b.tranche0.totalCapital();
+
+        vm.prank(defaultBorrower);
+        assertEq(b.market.repay(type(uint256).max), owed, "full repay clears through the outage");
+        assertEq(b.market.totalDebt(), 0);
+    }
+
     function test_unlockedSupply_zeroWithoutDeposits() public view {
         assertEq(tranche0.unlockedSupply(), 0);
     }

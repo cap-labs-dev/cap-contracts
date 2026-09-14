@@ -12,10 +12,6 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     /// @return shareTokenAddress The address of the share token
     function share() external view returns (address shareTokenAddress);
 
-    /// @dev Emitted when a redeem request is cancelled
-    /// `controller` controls this request.
-    event CancelRedeem(address indexed controller, uint256 indexed requestId, address receiver, uint256 shares);
-
     /// @dev Emitted when control of a request moves to another controller.
     event TransferRequest(address indexed from, address indexed to, uint256 indexed requestId);
 
@@ -28,17 +24,8 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     /// @dev Revert when redeem request is not found for a given requestId and controller.
     error RedeemRequestNotFound(uint256 requestId, address controller);
 
-    /// @dev Revert when trying to cancel more shares than are pending in the redeem request.
-    error CancelExceedsPending(uint256 requestId, address controller, uint256 shares, uint256 pendingShares);
-
     /// @dev Revert when the caller is not authorized for the requested operation.
     error NotAuthorized(address caller);
-
-    /// @dev Revert when there are no pending shares for the given redeem request.
-    error NoPendingShares(uint256 requestId, address controller);
-
-    /// @dev Revert when there are no claimable shares for the given redeem request.
-    error NoClaimableShares(uint256 requestId, address controller);
 
     /// @dev ERC-7540 async redeem vaults must revert {previewRedeem} and {previewWithdraw}.
     error PreviewNotSupported();
