@@ -145,7 +145,9 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     /// @dev Replaces the ERC-4626 instant-balance redeem. Caller must be `controller` or its
     ///      operator; ERC-20 allowance is insufficient. Limited to currently claimable shares
     ///      and {unlockedSupply}. Pays `convertToAssets(shares)` once (floored), then consumes
-    ///      receipts to match; per-request floors cannot underpay.
+    ///      receipts to match; per-request floors cannot underpay. Dust transferred onto this
+    ///      controller is cleared the same way: redeem the claimable dust and the receipts drop
+    ///      off the FIFO walk.
     /// @param _shares Shares to claim
     /// @param _receiver Asset recipient
     /// @param _controller Request controller, not an instant share-balance owner

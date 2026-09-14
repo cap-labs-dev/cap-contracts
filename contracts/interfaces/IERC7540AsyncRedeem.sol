@@ -43,7 +43,9 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     error InexactPayout(uint256 paid, uint256 requested);
 
     /// @notice Move a request to another controller. Place in the settlement queue is unchanged.
-    /// @dev Caller must be the current controller or its operator.
+    /// @dev Caller must be the current controller or its operator. Anyone can transfer dust
+    ///      onto a controller; that controller (or its operator) clears the queue by redeeming
+    ///      the dust, by request id or via the three-arg FIFO claim.
     /// @param requestId The request to transfer
     /// @param to The new controller
     function transferRequest(uint256 requestId, address to) external;
