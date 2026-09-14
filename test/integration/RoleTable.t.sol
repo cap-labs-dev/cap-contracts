@@ -63,7 +63,6 @@ contract RoleTableTest is CapDeployer {
 
         // governance owns the parameters that bound every market
         _expectRole(market, IBaseMarket.setTargetHealth.selector, CapRoles.GOVERNOR, "setTargetHealth");
-        _expectRole(market, IBaseMarket.setFixedCreditLimit.selector, CapRoles.GOVERNOR, "setFixedCreditLimit");
 
         // the guardian tightens risk and recognises losses
         _expectRole(market, IBaseMarket.setBuffer.selector, CapRoles.GUARDIAN, "setBuffer");
@@ -272,6 +271,7 @@ contract RoleTableTest is CapDeployer {
     function _assertTrancheRoleTable(address tranche, uint64 ownerRole) internal view {
         // premium is pushed in by whichever market charged it, so this may not be open
         _expectRole(tranche, ITranche.fund.selector, CapRoles.MARKET, "fund");
+        _expectRole(tranche, ITranche.setFixedCreditLimit.selector, CapRoles.GOVERNOR, "setFixedCreditLimit");
 
         // admission is a row like any other, same as on the underwriter: the entry points are
         // gated to a role of their own, and the market owner administers that role's membership

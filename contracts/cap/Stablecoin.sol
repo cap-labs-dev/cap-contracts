@@ -57,7 +57,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         string memory _symbol,
         address _irm,
         address _reserveVault
-    ) external initializer {
+    ) external reinitializer(2) {
         __AccessManaged_init(_authority);
         __PremiumVesting_init(IERC20Metadata(_asset), _name, _symbol, address(this));
         // both previews scale between the two units, and only the direction that divides can lose
@@ -193,6 +193,14 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
 
         uint256 available = _quoteWithdraw(IERC20(asset()).balanceOf(address(this)));
         if (unlocked > available) unlocked = available;
+    }
+
+    /// @dev Premium is paid in this token. Queued redemptions sit in the same balance and
+    ///      must not be transferred as yield.
+    function _spendablePremium() internal view override returns (uint256 available) {
+        uint256 held = balanceOf(address(this));
+        uint256 escrow = redemptionQueue();
+        available = held > escrow ? held - escrow : 0;
     }
 
     /// @inheritdoc IStablecoin

@@ -23,6 +23,10 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @notice Emitted once when a slash retires the tranche
     event Killed();
 
+    /// @notice Emitted when this tranche's fixed credit limit is updated
+    /// @param fixedCreditLimit The new fixed credit limit
+    event SetFixedCreditLimit(uint256 fixedCreditLimit);
+
     /// @notice Initialize the tranche
     /// @param authority The access manager address
     /// @param registryAddress The registry that configures access roles
@@ -46,6 +50,11 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @notice Set the role permitted to deposit
     /// @param roleId The depositor role id
     function setDepositorRole(uint64 roleId) external;
+
+    /// @notice Set this tranche's contribution to the market's fixed credit limit
+    /// @dev The market's {IBaseMarket-fixedCreditLimit} is the sum across attached tranches.
+    /// @param fixedCreditLimit The new fixed credit limit
+    function setFixedCreditLimit(uint256 fixedCreditLimit) external;
 
     /// @notice Slash assets worth `value`, capped by holdings
     /// @dev Caller must be this tranche's market. Returns the floored USD value of
@@ -81,6 +90,11 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @dev Latched below 1% of par. Closes deposits.
     /// @return Whether the tranche has been retired
     function killed() external view returns (bool);
+
+    /// @notice This tranche's fixed credit limit
+    /// @dev The market sums these across its attached list.
+    /// @return The fixed credit limit
+    function fixedCreditLimit() external view returns (uint256);
 
     /// @notice Total assets held for this tranche in the vault
     /// @dev Vault ERC6909 balance, not tokens held here.

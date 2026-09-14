@@ -20,8 +20,10 @@ interface IPremiumVesting {
     event OptOut(address indexed account);
 
     /// @notice Claim vested premium for the caller
+    /// @dev Pays the calculated entitlement, clamped to spendable holdings. Unpaid remainder is
+    ///      not preserved. cUSD spendable excludes shares in the redemption queue.
     /// @param recipient The address to receive the premium
-    /// @return premium The amount paid, clamped to the stablecoin actually held
+    /// @return premium The amount paid, clamped to spendable holdings
     function claim(address recipient) external returns (uint256 premium);
 
     /// @notice Opt the caller into earning vested premium

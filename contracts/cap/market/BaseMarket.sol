@@ -96,13 +96,6 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @inheritdoc IBaseMarket
-    function setFixedCreditLimit(uint256 _fixedCreditLimit) external restricted nonReentrant {
-        BaseMarketStorage storage $ = _getBaseMarketStorage();
-        $.fixedCreditLimit = _fixedCreditLimit;
-        emit SetFixedCreditLimit(_fixedCreditLimit);
-    }
-
-    /// @inheritdoc IBaseMarket
     function setTargetHealth(uint256 _targetHealth) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         if (_targetHealth < 1.25e27) revert InvalidTargetHealth();
@@ -208,7 +201,11 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     /// @inheritdoc IBaseMarket
     function fixedCreditLimit() public view returns (uint256 fixedCreditLimitValue) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        fixedCreditLimitValue = $.fixedCreditLimit;
+        for (uint256 i; i < $.tranches.length; ++i) {
+            uint256 cap = ITranche($.tranches[i].tranche).fixedCreditLimit();
+            if (fixedCreditLimitValue > type(uint256).max - cap) return type(uint256).max;
+            fixedCreditLimitValue += cap;
+        }
     }
 
     /// @inheritdoc IBaseMarket
@@ -305,8 +302,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
 
     /// @inheritdoc IBaseMarket
     function creditLimit() public view returns (uint256 limit) {
-        BaseMarketStorage storage $ = _getBaseMarketStorage();
-        limit = Math.min($.fixedCreditLimit, variableCreditLimit());
+        limit = Math.min(fixedCreditLimit(), variableCreditLimit());
     }
 
     /// @inheritdoc IBaseMarket

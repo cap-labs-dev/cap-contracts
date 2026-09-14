@@ -27,7 +27,7 @@ contract DebtLifecycleTest is CapDeployer {
         (address marketAddr, address t0,) = _createFixedMarket("Fixed");
         market = FixedMarket(marketAddr);
         market.setUnderwriterRate(capConfig.defaultUnderwriterRate);
-        market.setFixedCreditLimit(10_000e18);
+        _setFixedCreditLimit(market, 10_000e18);
         _fundTranche(t0, makeAddr("senior"), 10_000e18);
     }
 

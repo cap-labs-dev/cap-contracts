@@ -3,6 +3,7 @@ pragma solidity 0.8.36;
 
 import { FloatingMarket } from "../../../contracts/cap/market/FloatingMarket.sol";
 import { IBaseMarket } from "../../../contracts/interfaces/IBaseMarket.sol";
+import { ITranche } from "../../../contracts/interfaces/ITranche.sol";
 import { CapDeployer } from "../../shared/CapDeployer.sol";
 
 /// @notice Unit tests for FloatingMarket via the shared deployer.
@@ -34,8 +35,17 @@ contract MarketUnitTest is CapDeployer {
     }
 
     function test_setFixedCreditLimit_effect() public {
-        market.setFixedCreditLimit(500e18);
+        IBaseMarket.Tranche[] memory ts = market.tranches();
+        ITranche(ts[0].tranche).setFixedCreditLimit(200e18);
+        ITranche(ts[1].tranche).setFixedCreditLimit(300e18);
         assertEq(market.fixedCreditLimit(), 500e18);
+    }
+
+    function test_fixedCreditLimitSaturatesAtUintMax() public {
+        IBaseMarket.Tranche[] memory ts = market.tranches();
+        ITranche(ts[0].tranche).setFixedCreditLimit(type(uint256).max);
+        ITranche(ts[1].tranche).setFixedCreditLimit(1);
+        assertEq(market.fixedCreditLimit(), type(uint256).max);
     }
 
     function test_marketViews() public view {

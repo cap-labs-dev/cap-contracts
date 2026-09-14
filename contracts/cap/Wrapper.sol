@@ -34,7 +34,7 @@ contract Wrapper layout at erc7201("cap.storage.Wrapper")
     }
 
     /// @inheritdoc IWrapper
-    function initialize(address _authority, address _asset) external initializer {
+    function initialize(address _authority, address _asset) external reinitializer(2) {
         string memory _name = string.concat("Staked ", IERC20Metadata(_asset).name());
         string memory _symbol = string.concat("st", IERC20Metadata(_asset).symbol());
 

@@ -609,7 +609,7 @@ contract AccountingIntegrityTest is CapDeployer {
             _createMarket(name, defaultMarketOwner, defaultBorrower, weights);
         market = FloatingMarket(marketAddr);
         market.setUnderwriterRate(capConfig.defaultUnderwriterRate);
-        market.setFixedCreditLimit(1_000e18);
+        _setFixedCreditLimit(market, 1_000e18);
 
         _fundTranche(tranches[0], alice, 400e18);
         _fundTranche(tranches[1], bob, 400e18);
@@ -1394,7 +1394,7 @@ contract AccountingIntegrityTest is CapDeployer {
         market = FixedMarket(marketAddr);
         market.setUnderwriterRate(capConfig.defaultUnderwriterRate);
         // let the collateral-backed limit bind rather than the flat cap
-        market.setFixedCreditLimit(type(uint256).max);
+        _setFixedCreditLimit(market, type(uint256).max);
         market.setLtv(capConfig.defaultLt - capConfig.defaultBuffer);
         _fundTranche(tranche, alice, 10_000e18);
     }
@@ -1412,7 +1412,7 @@ contract AccountingIntegrityTest is CapDeployer {
         market.setUnderwriterRate(capConfig.defaultUnderwriterRate);
         market.setMarketMultiplier(2e27);
         market.setTermLimits(365 days, 1 days);
-        market.setFixedCreditLimit(fixedLimit);
+        _setFixedCreditLimit(market, fixedLimit);
         _fundTranche(tranche, alice, 10_000e18);
     }
 
@@ -1429,7 +1429,7 @@ contract AccountingIntegrityTest is CapDeployer {
     /// its entire remaining limit.
     function _mintRecentCredit(uint256 amount) internal {
         MarketBundle memory prior = _createReadyMarket("prior-credit");
-        prior.market.setFixedCreditLimit(type(uint256).max);
+        _setFixedCreditLimit(prior.market, type(uint256).max);
         _fundTranche(prior.tranche0Addr, alice, amount * 4 + 1_000e18);
         vm.prank(defaultBorrower);
         prior.market.borrow(defaultBorrower, amount);

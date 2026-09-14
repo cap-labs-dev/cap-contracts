@@ -22,7 +22,6 @@ interface IBaseMarket {
     /// @param ltv The loan-to-value ratio in ray decimals
     /// @param buffer The liquidation buffer in ray decimals
     /// @param lt The liquidation threshold in ray decimals
-    /// @param fixedCreditLimit The fixed credit limit
     /// @param tranches The tranches and their weights
     /// @param registry The registry that deployed and configures the market
     /// @param marketMultiplier Liquidity-rate multiplier in ray decimals. Zero reads as one ray.
@@ -35,7 +34,6 @@ interface IBaseMarket {
         uint256 ltv;
         uint256 buffer;
         uint256 lt;
-        uint256 fixedCreditLimit;
         Tranche[] tranches;
         uint256 marketMultiplier;
     }
@@ -117,10 +115,6 @@ interface IBaseMarket {
     /// @param lt The new liquidation threshold in ray decimals
     event SetLt(uint256 lt);
 
-    /// @notice Emitted when the fixed credit limit is updated
-    /// @param fixedCreditLimit The new fixed credit limit
-    event SetFixedCreditLimit(uint256 fixedCreditLimit);
-
     /// @notice Emitted when the target health is updated
     /// @param targetHealth The new target health in ray decimals
     event SetTargetHealth(uint256 targetHealth);
@@ -155,10 +149,6 @@ interface IBaseMarket {
     /// @notice Set the liquidation threshold
     /// @param lt The new liquidation threshold in ray decimals
     function setLt(uint256 lt) external;
-
-    /// @notice Set the fixed credit limit
-    /// @param fixedCreditLimit The new fixed credit limit
-    function setFixedCreditLimit(uint256 fixedCreditLimit) external;
 
     /// @notice Set the target health
     /// @param targetHealth The new target health in ray decimals
@@ -232,7 +222,8 @@ interface IBaseMarket {
     /// @return The market multiplier
     function marketMultiplier() external view returns (uint256);
 
-    /// @notice Get the fixed credit limit
+    /// @notice Sum of each attached tranche's fixed credit limit
+    /// @dev Saturates at `type(uint256).max`. Set on the tranche, not here.
     /// @return The fixed credit limit
     function fixedCreditLimit() external view returns (uint256);
 
@@ -286,6 +277,7 @@ interface IBaseMarket {
     function availableCredit() external view returns (uint256 credit);
 
     /// @notice Get the credit limit
+    /// @dev `min` of the summed tranche caps and {variableCreditLimit}.
     /// @return limit The credit limit
     function creditLimit() external view returns (uint256 limit);
 

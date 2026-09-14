@@ -21,6 +21,7 @@ import { IBaseMarket } from "../../contracts/interfaces/IBaseMarket.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
 import { IOracle } from "../../contracts/interfaces/IOracle.sol";
 import { IRegistry } from "../../contracts/interfaces/IRegistry.sol";
+import { ITranche } from "../../contracts/interfaces/ITranche.sol";
 import { IUnderwriter } from "../../contracts/interfaces/IUnderwriter.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
@@ -391,11 +392,11 @@ abstract contract CapDeployer is BaseTest {
         bundle.tranche1 = Tranche(bundle.tranche1Addr);
     }
 
-    /// @dev Create market, apply slopes, and fixed credit limit from capConfig.
+    /// @dev Create market, apply slopes, and split the default fixed credit limit across tranches.
     function _createReadyMarket(string memory name) internal returns (MarketBundle memory bundle) {
         bundle = _createMarketBundle(name);
         _configureMarketRates(bundle.market);
-        bundle.market.setFixedCreditLimit(capConfig.defaultFixedCreditLimit);
+        _setFixedCreditLimit(bundle.market, capConfig.defaultFixedCreditLimit);
     }
 
     function _applyMarketDefaults(FloatingMarket market) internal {
@@ -404,7 +405,19 @@ abstract contract CapDeployer is BaseTest {
         market.setLt(capConfig.defaultLt);
         market.setMarketMultiplier(capConfig.defaultMultiplier);
         market.setTargetHealth(capConfig.defaultTargetHealth);
-        market.setFixedCreditLimit(capConfig.defaultFixedCreditLimit);
+        _setFixedCreditLimit(market, capConfig.defaultFixedCreditLimit);
+    }
+
+    /// @dev Split `limit` across the market's tranches so {IBaseMarket-fixedCreditLimit} equals `limit`.
+    function _setFixedCreditLimit(IBaseMarket market, uint256 limit) internal {
+        IBaseMarket.Tranche[] memory ts = market.tranches();
+        uint256 n = ts.length;
+        if (n == 0) return;
+        uint256 each = limit / n;
+        uint256 rem = limit - each * n;
+        for (uint256 i; i < n; ++i) {
+            ITranche(ts[i].tranche).setFixedCreditLimit(i == 0 ? each + rem : each);
+        }
     }
 
     function _configureMarketRates(FloatingMarket market) internal {

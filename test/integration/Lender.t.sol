@@ -5,6 +5,7 @@ import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
 import { IBaseMarket } from "../../contracts/interfaces/IBaseMarket.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
+import { ITranche } from "../../contracts/interfaces/ITranche.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
 
 contract MarketTest is CapDeployer {
@@ -23,14 +24,19 @@ contract MarketTest is CapDeployer {
 
     function test_setFixedCreditLimit_onlyAuthority() public {
         market = _market();
+        address tranche = market.tranches()[0].tranche;
         vm.prank(stranger);
         vm.expectRevert();
-        market.setFixedCreditLimit(1e18);
+        ITranche(tranche).setFixedCreditLimit(1e18);
     }
 
     function test_setFixedCreditLimit_effect() public {
         market = _market();
-        market.setFixedCreditLimit(123e18);
+        IBaseMarket.Tranche[] memory ts = market.tranches();
+        ITranche(ts[0].tranche).setFixedCreditLimit(100e18);
+        ITranche(ts[1].tranche).setFixedCreditLimit(23e18);
+        assertEq(ITranche(ts[0].tranche).fixedCreditLimit(), 100e18);
+        assertEq(ITranche(ts[1].tranche).fixedCreditLimit(), 23e18);
         assertEq(market.fixedCreditLimit(), 123e18);
     }
 

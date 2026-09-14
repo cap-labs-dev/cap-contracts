@@ -61,6 +61,8 @@ interface IStablecoin {
     error BadDebtExceedsSupply();
 
     /// @notice Initialize the stablecoin
+    /// @dev `reinitializer(2)` so a v1 proxy can be upgraded onto this implementation and run
+    ///      initialize again. Fresh proxies take the same path.
     /// @param authority The access manager address
     /// @param asset The underlying asset address
     /// @param name The token name

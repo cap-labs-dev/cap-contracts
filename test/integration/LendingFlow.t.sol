@@ -37,7 +37,7 @@ contract LendingFlowTest is CapDeployer {
         _fundTranche(tranche1, supplier1, TRANCHE1_DEPOSIT);
         _fundTranche(tranche0, supplier0, TRANCHE0_DEPOSIT);
 
-        market.setFixedCreditLimit(1_000e18);
+        _setFixedCreditLimit(market, 1_000e18);
     }
 
     function test_availableCredit_isLtvOfCapital() public view {

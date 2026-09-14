@@ -30,7 +30,7 @@ contract PricedCollateralTest is CapDeployer {
         (marketAddr, senior, junior) = _createMarket("Priced");
         market = FloatingMarket(marketAddr);
         _setMarketSlopes(marketAddr);
-        market.setFixedCreditLimit(100_000e18);
+        _setFixedCreditLimit(market, 100_000e18);
 
         _fundTranche(senior, makeAddr("senior"), seniorAssets);
         _fundTranche(junior, makeAddr("junior"), juniorAssets);
@@ -291,7 +291,7 @@ contract PricedCollateralTest is CapDeployer {
             _createMarket("btc", defaultMarketOwner, defaultBorrower, assets, capConfig.defaultTrancheWeights);
         market = FloatingMarket(marketAddr);
         _setMarketSlopes(marketAddr);
-        market.setFixedCreditLimit(1_000_000e18);
+        _setFixedCreditLimit(market, 1_000_000e18);
 
         senior = tranches[0];
         junior = tranches[1];

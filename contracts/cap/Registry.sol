@@ -436,10 +436,9 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         registrySelectors[0] = IBaseMarket.setTranches.selector;
         manager.setTargetFunctionRole(market, registrySelectors, CapRoles.REGISTRY);
 
-        bytes4[] memory governorSelectors = new bytes4[](3);
+        bytes4[] memory governorSelectors = new bytes4[](2);
         governorSelectors[0] = IBaseMarket.setTargetHealth.selector;
-        governorSelectors[1] = IBaseMarket.setFixedCreditLimit.selector;
-        governorSelectors[2] = IFixedMarket.setTermLimits.selector;
+        governorSelectors[1] = IFixedMarket.setTermLimits.selector;
         manager.setTargetFunctionRole(market, governorSelectors, CapRoles.GOVERNOR);
 
         bytes4[] memory guardianSelectors = new bytes4[](4);
@@ -473,6 +472,10 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         bytes4[] memory ownerSelectors = new bytes4[](1);
         ownerSelectors[0] = ITranche.setDepositorRole.selector;
         manager.setTargetFunctionRole(tranche, ownerSelectors, ownerRole);
+
+        bytes4[] memory governorSelectors = new bytes4[](1);
+        governorSelectors[0] = ITranche.setFixedCreditLimit.selector;
+        manager.setTargetFunctionRole(tranche, governorSelectors, CapRoles.GOVERNOR);
 
         // premium is pushed by the market that charged it. slash is gated on `msg.sender == market`
         bytes4[] memory marketSelectors = new bytes4[](1);

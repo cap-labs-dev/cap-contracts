@@ -9,8 +9,20 @@ import { BaseTest } from "../../shared/BaseTest.sol";
 import { MockAeraVault } from "../../shared/mocks/MockAeraVault.sol";
 import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
 import { MockIRM } from "../../shared/mocks/MockIRM.sol";
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+
+/// @dev Stands in for a live v1 proxy so the upgrade can run {Stablecoin-initialize} again.
+contract StablecoinV1Stub is AccessManagedUpgradeable, UUPSUpgradeable {
+    function initialize(address authority) external initializer {
+        __AccessManaged_init(authority);
+    }
+
+    function _authorizeUpgrade(address) internal override restricted { }
+}
 
 contract StablecoinTest is BaseTest {
     Stablecoin internal scoin;
@@ -810,6 +822,36 @@ contract StablecoinTest is BaseTest {
         assertLe(scoin.convertToAssets(unlocked), asset.balanceOf(address(scoin)), "gate stays solvent");
     }
 
+    function test_initialize_cannotReinit() public {
+        vm.expectRevert();
+        scoin.initialize(address(accessManager), address(asset), "Cap USD", "cUSD", address(irm), address(reserve));
+    }
+
+    /// @dev A v1 proxy already used `initializer`. `reinitializer(2)` is what lets the new
+    ///      implementation run initialize once more after the upgrade.
+    function test_initialize_reinitializerRunsOnAV1Proxy() public {
+        address proxy = _deployProxy(
+            address(new StablecoinV1Stub()), abi.encodeCall(StablecoinV1Stub.initialize, (address(accessManager)))
+        );
+
+        UUPSUpgradeable(proxy)
+            .upgradeToAndCall(
+                address(new Stablecoin()),
+                abi.encodeCall(
+                    Stablecoin.initialize,
+                    (address(accessManager), address(asset), "Cap USD", "cUSD", address(irm), address(reserve))
+                )
+            );
+
+        Stablecoin upgraded = Stablecoin(proxy);
+        assertEq(upgraded.name(), "Cap USD");
+        assertEq(upgraded.asset(), address(asset));
+        assertEq(upgraded.reserveVault(), address(reserve));
+
+        vm.expectRevert();
+        upgraded.initialize(address(accessManager), address(asset), "Cap USD", "cUSD", address(irm), address(reserve));
+    }
+
     function test_upgrade_authorized() public {
         Stablecoin newImpl = new Stablecoin();
         UUPSUpgradeable(address(scoin)).upgradeToAndCall(address(newImpl), "");
@@ -892,6 +934,32 @@ contract StablecoinTest is BaseTest {
         assertEq(paid, owed);
         assertEq(scoin.balanceOf(alice), 100e18 + paid);
         assertEq(scoin.claimable(alice), 0);
+    }
+
+    /// @dev Queued redemptions sit in this contract's own balance. Paying premium from the
+    ///      raw balance would spend that escrow; spendable is the remainder after the queue.
+    function test_claimDoesNotSpendRedemptionEscrow() public {
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+        vm.prank(alice);
+        scoin.optIn();
+
+        scoin.fundCreditBacked(10e18);
+        vm.warp(block.timestamp + 20 * scoin.vestingPeriod());
+
+        vm.prank(alice);
+        uint256 id = scoin.requestRedeem(50e18, alice, alice);
+        assertEq(scoin.redemptionQueue(), 50e18);
+        assertEq(scoin.balanceOf(address(scoin)), 60e18, "10 of premium plus 50 escrowed");
+
+        uint256 owed = scoin.claimable(alice);
+        vm.prank(alice);
+        uint256 paid = scoin.claim(alice);
+
+        assertEq(paid, owed <= 10e18 ? owed : 10e18, "only the unescrowed pot is paid");
+        assertEq(scoin.redemptionQueue(), 50e18, "the queued redeem is untouched");
+        assertEq(scoin.pendingRedeemRequest(id, alice) + scoin.claimableRedeemRequest(id, alice), 50e18);
+        assertEq(scoin.balanceOf(address(scoin)), 60e18 - paid);
     }
 
     function test_nonOptedHolderEarnsNothingOnTheStablecoin() public {

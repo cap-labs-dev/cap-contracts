@@ -46,7 +46,7 @@ contract LiquidationReentrancyTest is CapDeployer {
         junior = tranches[1];
 
         _setMarketSlopes(marketAddr);
-        market.setFixedCreditLimit(100_000e18);
+        _setFixedCreditLimit(market, 100_000e18);
 
         _fundTranche(senior, address(hooked), makeAddr("senior"), 500e18);
         _fundTranche(junior, address(hooked), makeAddr("junior"), 500e18);

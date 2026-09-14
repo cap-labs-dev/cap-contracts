@@ -35,6 +35,9 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     /// @inheritdoc ITranche
     bool public killed;
 
+    /// @inheritdoc ITranche
+    uint256 public fixedCreditLimit;
+
     /// @dev Shares per remaining asset at which the tranche is retired (1% of par)
     uint256 private constant KILL_RATIO = 100;
 
@@ -65,6 +68,12 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     /// @inheritdoc ITranche
     function setDepositorRole(uint64 roleId) external restricted {
         IRegistry(registry).setDepositorRole(roleId);
+    }
+
+    /// @inheritdoc ITranche
+    function setFixedCreditLimit(uint256 _fixedCreditLimit) external restricted {
+        fixedCreditLimit = _fixedCreditLimit;
+        emit SetFixedCreditLimit(_fixedCreditLimit);
     }
 
     /// @inheritdoc ITranche

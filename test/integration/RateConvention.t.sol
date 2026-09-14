@@ -22,7 +22,7 @@ contract RateConventionTest is CapDeployer {
         (address marketAddr, address t0,) = _createMarket("Floating");
         FloatingMarket market = FloatingMarket(marketAddr);
         market.setUnderwriterRate(RATE_20PCT_PER_YEAR);
-        market.setFixedCreditLimit(10_000e18);
+        _setFixedCreditLimit(market, 10_000e18);
         _fundTranche(t0, makeAddr("senior"), 10_000e18);
 
         vm.prank(defaultBorrower);
@@ -38,7 +38,7 @@ contract RateConventionTest is CapDeployer {
         (address marketAddr, address t0,) = _createFixedMarket("Fixed");
         FixedMarket market = FixedMarket(marketAddr);
         market.setUnderwriterRate(RATE_20PCT_PER_YEAR);
-        market.setFixedCreditLimit(10_000e18);
+        _setFixedCreditLimit(market, 10_000e18);
         _fundTranche(t0, makeAddr("senior"), 10_000e18);
 
         vm.prank(defaultBorrower);
@@ -55,13 +55,13 @@ contract RateConventionTest is CapDeployer {
         (address floatingAddr, address ft0,) = _createMarket("Floating");
         FloatingMarket floating = FloatingMarket(floatingAddr);
         floating.setUnderwriterRate(RATE_20PCT_PER_YEAR);
-        floating.setFixedCreditLimit(10_000e18);
+        _setFixedCreditLimit(floating, 10_000e18);
         _fundTranche(ft0, makeAddr("floatingSenior"), 10_000e18);
 
         (address fixedAddr, address xt0,) = _createFixedMarket("Fixed");
         FixedMarket fixedMarket = FixedMarket(fixedAddr);
         fixedMarket.setUnderwriterRate(RATE_20PCT_PER_YEAR);
-        fixedMarket.setFixedCreditLimit(10_000e18);
+        _setFixedCreditLimit(fixedMarket, 10_000e18);
         _fundTranche(xt0, makeAddr("fixedSenior"), 10_000e18);
 
         vm.prank(defaultBorrower);
@@ -87,7 +87,7 @@ contract RateConventionTest is CapDeployer {
         (address marketAddr, address t0,) = _createFixedMarket("Fixed");
         FixedMarket market = FixedMarket(marketAddr);
         market.setUnderwriterRate(RATE_20PCT_PER_YEAR);
-        market.setFixedCreditLimit(10_000e18);
+        _setFixedCreditLimit(market, 10_000e18);
         _fundTranche(t0, makeAddr("senior"), 10_000e18);
 
         // nothing is borrowed yet, so utilization is zero and the liquidity rate is just base
@@ -125,7 +125,7 @@ contract RateConventionTest is CapDeployer {
         (address marketAddr, address t0,) = _createFixedMarket("Fixed");
         FixedMarket market = FixedMarket(marketAddr);
         market.setUnderwriterRate(RATE_20PCT_PER_YEAR);
-        market.setFixedCreditLimit(10_000e18);
+        _setFixedCreditLimit(market, 10_000e18);
         _fundTranche(t0, makeAddr("senior"), 10_000e18);
 
         vm.prank(defaultBorrower);

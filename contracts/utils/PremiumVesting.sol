@@ -145,14 +145,20 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
         // the per-share arithmetic floors in both directions, so the ordinary case under-pays and
         // the remainder stays here. The clamp is still load-bearing: a debt rounded down can let
         // entitlements sum past the pot, and without it the last holder out hits a failed transfer.
-        // Pay what is there.
-        address token = stablecoin();
-        uint256 held = IERC20(token).balanceOf(address(this));
-        if (premium > held) premium = held;
+        // Pay what is spendable; a vault may reserve some of the raw balance (cUSD escrow).
+        uint256 available = _spendablePremium();
+        if (premium > available) premium = available;
         if (premium == 0) return 0;
 
-        IERC20(token).safeTransfer(recipient, premium);
+        IERC20(stablecoin()).safeTransfer(recipient, premium);
         emit Claimed(msg.sender, recipient, premium);
+    }
+
+    /// @dev Premium token this contract may pay out. Default is the raw balance; cUSD subtracts
+    ///      the redemption queue so escrowed shares are not paid as yield.
+    /// @return available Spendable premium-token units
+    function _spendablePremium() internal view virtual returns (uint256 available) {
+        available = IERC20(stablecoin()).balanceOf(address(this));
     }
 
     /// @dev Initialize the ERC7540 vault

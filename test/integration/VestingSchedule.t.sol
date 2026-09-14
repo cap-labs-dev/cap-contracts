@@ -21,7 +21,7 @@ contract VestingScheduleTest is CapDeployer {
         (marketAddr, senior, junior) = _createMarket("M");
         market = FloatingMarket(marketAddr);
         _setMarketSlopes(marketAddr);
-        market.setFixedCreditLimit(100_000e18);
+        _setFixedCreditLimit(market, 100_000e18);
         _fundTranche(senior, supplier, 1_000e18);
     }
 
