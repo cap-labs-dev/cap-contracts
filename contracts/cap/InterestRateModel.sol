@@ -295,6 +295,10 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     /// @return rate The liquidity rate per year in ray decimals
     function _nextLiquidityRate(uint256 utilization) internal view returns (uint256 rate) {
         Slopes memory slopes = liquiditySlopes;
+        // Averages can briefly read above one ray when credit and supply converge
+        // separately. Cap so a kink at full utilization cannot divide by zero, and
+        // so the second slope cannot run past 100%.
+        if (utilization > 1e27) utilization = 1e27;
         if (utilization <= slopes.kink) {
             uint256 ratio = slopes.kink == 0 ? 0 : utilization.rayDiv(slopes.kink);
             rate = slopes.base + slopes.slope0.rayMul(ratio);

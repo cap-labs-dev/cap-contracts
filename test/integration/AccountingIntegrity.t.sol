@@ -1248,9 +1248,69 @@ contract AccountingIntegrityTest is CapDeployer {
         assertLe(sized + sizedLiq + sizedUw, limit, "the offer must fit the raw limit");
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, type(uint256).max, term);
+        (uint256 id, uint256 drawn) = market.borrow(defaultBorrower, type(uint256).max, term);
+        assertEq(drawn, sized, "max fills the term-adjusted offer");
+        assertEq(market.debt(id) - drawn, sizedLiq + sizedUw, "the quote is what the draw pays");
         assertLe(market.debt(id), limit, "max borrow stays inside the raw limit");
         assertGe(market.healthiness(), 1e27, "and must never arrive liquidatable");
+    }
+
+    /// @dev An explicit principal pays exactly {premiumForBorrow}, not a later reading.
+    /// forge-config: default.fuzz.runs = 256
+    function testFuzz_fixedBorrowPaysTheQuotedPremium(uint96 rawPrincipal, uint32 rawTerm, uint8 rawSlope) public {
+        FixedMarket market = _fixedMarketOnSlope(bound(rawSlope, 0, 20) * 0.1e27);
+        uint256 term = bound(rawTerm, capConfig.defaultMinimumTermLimit, capConfig.defaultMaximumTermLimit);
+        uint256 sized = market.availableCredit(term);
+        if (sized == 0) return;
+
+        uint256 principal = bound(rawPrincipal, 1, sized);
+        (uint256 liquidity, uint256 underwriter) = market.premiumForBorrow(principal, term);
+        if (principal + liquidity + underwriter > market.availableCredit()) return;
+
+        vm.prank(defaultBorrower);
+        (uint256 id, uint256 drawn) = market.borrow(defaultBorrower, principal, term);
+        assertEq(drawn, principal);
+        assertEq(market.debt(id) - drawn, liquidity + underwriter, "the quote is what the draw pays");
+    }
+
+    /// @dev A later equal draw is never cheaper: the first mint is already in the rate.
+    /// forge-config: default.fuzz.runs = 256
+    function testFuzz_aLaterEqualDrawIsNeverCheaper(uint96 rawSlice, uint32 rawTerm, uint8 rawSlope) public {
+        FixedMarket market = _fixedMarketOnSlope(bound(rawSlope, 0, 20) * 0.1e27);
+        uint256 term = bound(rawTerm, capConfig.defaultMinimumTermLimit, capConfig.defaultMaximumTermLimit);
+        uint256 slice = bound(rawSlice, 1, 2_500e18);
+
+        (uint256 firstLiq, uint256 firstUw) = market.premiumForBorrow(slice, term);
+        if (slice + firstLiq + firstUw > market.availableCredit()) return;
+
+        vm.startPrank(defaultBorrower);
+        (uint256 firstId,) = market.borrow(defaultBorrower, slice, term);
+        uint256 firstPremium = market.debt(firstId) - slice;
+
+        (uint256 nextLiq, uint256 nextUw) = market.premiumForBorrow(slice, term);
+        if (slice + nextLiq + nextUw > market.availableCredit()) {
+            vm.stopPrank();
+            return;
+        }
+        (uint256 secondId,) = market.borrow(defaultBorrower, slice, term);
+        uint256 secondPremium = market.debt(secondId) - slice;
+        vm.stopPrank();
+
+        assertEq(firstPremium, firstLiq + firstUw, "the opener is the quote");
+        assertEq(secondPremium, nextLiq + nextUw, "the next draw is the quote after the first");
+        assertGe(secondPremium, firstPremium, "a later equal draw is never cheaper");
+    }
+
+    /// @dev Views treat `type(uint256).max` the way {borrow} does: the maximum term.
+    function test_premiumForBorrowTreatsMaxUintAsTheMaximumTerm() public {
+        FixedMarket market = _fixedMarketOnSlope(0.9e27);
+        uint256 principal = 1_000e18;
+        (uint256 atMaxLiq, uint256 atMaxUw) = market.premiumForBorrow(principal, market.maximumTermLimit());
+        (uint256 asFlagLiq, uint256 asFlagUw) = market.premiumForBorrow(principal, type(uint256).max);
+        (uint256 overLiq, uint256 overUw) = market.premiumForBorrow(principal, market.maximumTermLimit() + 1);
+        assertEq(asFlagLiq + asFlagUw, atMaxLiq + atMaxUw, "max uint is the maximum term");
+        assertEq(overLiq + overUw, atMaxLiq + atMaxUw, "above the maximum quotes at the maximum");
+        assertEq(market.availableCredit(type(uint256).max), market.availableCredit(market.maximumTermLimit()));
     }
 
     /// @dev A fixed market whose liquidity rate genuinely responds to utilization, on the tightest

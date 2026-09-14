@@ -165,6 +165,7 @@ interface IFixedMarket is IBaseMarket {
     /// early slices miss the high rate the full principal would have paid. Splitting
     /// can therefore cheapen the total versus one draw. That is expected. Borrowers
     /// are permissioned; splitting to reduce premium is not acceptable use.
+    /// `type(uint256).max` and anything above {maximumTermLimit} quote at the maximum.
     /// @param principal The principal of the loan
     /// @param term The term of the loan
     /// @return liquidityPremium The liquidity premium
@@ -176,6 +177,7 @@ interface IFixedMarket is IBaseMarket {
 
     /// @notice A principal borrowable over a term, leaving room for the upfront premium
     /// @dev Sized so principal plus {premiumForBorrow} fits in the raw {IBaseMarket-availableCredit}.
+    /// `type(uint256).max` and anything above {maximumTermLimit} quote at the maximum.
     /// May be below the exact maximum.
     /// @param term The term of the loan
     /// @return credit The available credit

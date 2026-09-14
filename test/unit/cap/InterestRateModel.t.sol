@@ -88,6 +88,30 @@ contract InterestRateModelTest is BaseTest {
         assertEq(irm.liquidityRate(), 0.55e27);
     }
 
+    /// @dev A kink at one ray used to divide by zero once utilization read above full.
+    /// Averages can do that when credit and supply converge separately.
+    function test_liquidityRate_kinkAtFullUtilizationDoesNotRevertAboveOneRay() public {
+        irm.setLiquiditySlopes(IInterestRateModel.Slopes({ base: 0.05e27, slope0: 0.1e27, slope1: 0.9e27, kink: 1e27 }));
+        stablecoin.setSupplyUtilization(2e27);
+        irm.updateLiquidityRate();
+        assertEq(irm.liquidityRate(), 0.15e27, "capped at full utilization: base + slope0");
+    }
+
+    /// @dev The curve is non-decreasing in the mint, so a larger draw is never cheaper per the rate.
+    function testFuzz_fixedRatesAfterMint_nonDecreasing(uint128 smaller, uint128 extra) public {
+        irm.setLiquiditySlopes(_liquiditySlopes());
+        stablecoin.setSupplyUtilization(0.5e27);
+        irm.updateLiquidityRate();
+        skip(_untilSettled());
+        irm.updateLiquidityRate();
+
+        uint256 low = smaller;
+        uint256 high = uint256(smaller) + extra;
+        (uint256 liqLow,) = irm.fixedRatesAfterMint(address(this), 1e27, low);
+        (uint256 liqHigh,) = irm.fixedRatesAfterMint(address(this), 1e27, high);
+        assertLe(liqLow, liqHigh, "a larger mint is never a cheaper liquidity rate");
+    }
+
     function test_liquidityIndex_growsOverTime() public {
         irm.setLiquiditySlopes(_liquiditySlopes());
         stablecoin.setSupplyUtilization(0.8e27);
