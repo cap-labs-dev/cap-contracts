@@ -74,6 +74,23 @@ contract UnderwriterIntegrationTest is CapDeployer {
         assertEq(vault.balanceOf(address(underwriter), address(collateral)), DEPOSIT - DEAD_SHARES);
     }
 
+    function test_deallocateAsync_clampsToHeldShares() public {
+        _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
+        underwriter.addTranche(address(tranche0));
+        underwriter.allocate(address(tranche0), DEPOSIT);
+
+        uint256 held = tranche0.balanceOf(address(underwriter));
+        uint256 requestId = underwriter.deallocateAsync(address(tranche0), held + 1e18);
+
+        assertEq(underwriter.queuedShares(address(tranche0)), held, "an oversized request is a short fill");
+        assertEq(
+            tranche0.claimableRedeemRequest(requestId, address(underwriter))
+                + tranche0.pendingRedeemRequest(requestId, address(underwriter)),
+            held
+        );
+        assertEq(tranche0.balanceOf(address(underwriter)), 0);
+    }
+
     function test_curatorControlsTheAllocatorRole() public {
         _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
         underwriter.addTranche(address(tranche0));

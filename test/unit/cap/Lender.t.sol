@@ -34,6 +34,13 @@ contract MarketUnitTest is CapDeployer {
         market.setTrancheWeights(weights);
     }
 
+    function test_setTrancheWeights_wrongLength_reverts() public {
+        uint256[] memory weights = new uint256[](1);
+        weights[0] = RAY;
+        vm.expectRevert(IBaseMarket.InvalidMarket.selector);
+        market.setTrancheWeights(weights);
+    }
+
     function test_setMaxCapital_effect() public {
         IBaseMarket.Tranche[] memory ts = market.tranches();
         ITranche(ts[0].tranche).setMaxCapital(200e18);

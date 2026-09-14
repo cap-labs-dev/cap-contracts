@@ -161,8 +161,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         uint256 maxShares = maxRedeem(_controller);
         if (_shares > maxShares) revert ERC4626ExceededMaxRedeem(_controller, _shares, maxShares);
         assets = convertToAssets(_shares);
-        uint256 consumed = _claimFifo(_shares, _receiver, _controller, assets);
-        if (consumed != _shares) revert IncompleteClaim(consumed, _shares);
+        _claimFifo(_shares, _receiver, _controller, assets);
     }
 
     /// @notice Claim previously requested redemptions for `controller` by asset amount, oldest first
@@ -184,8 +183,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         if (shares > maxShares) {
             revert ERC4626ExceededMaxWithdraw(_controller, _assets, convertToAssets(maxShares));
         }
-        uint256 consumed = _claimFifo(shares, _receiver, _controller, _assets);
-        if (consumed != shares) revert IncompleteClaim(consumed, shares);
+        _claimFifo(shares, _receiver, _controller, _assets);
     }
 
     /// @inheritdoc IERC7540AsyncRedeem
@@ -272,29 +270,13 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
 
     /// @notice Async redeem vaults do not support {previewRedeem}
     /// @dev Reverts {PreviewNotSupported}. Use {convertToAssets} or {quoteWithdraw}.
-    /// @param shares Unused
-    /// @return assets Unused
-    function previewRedeem(uint256 shares)
-        public
-        view
-        virtual
-        override(ERC4626Upgradeable, IERC4626)
-        returns (uint256 assets)
-    {
+    function previewRedeem(uint256) public view virtual override(ERC4626Upgradeable, IERC4626) returns (uint256) {
         revert PreviewNotSupported();
     }
 
     /// @notice Async redeem vaults do not support {previewWithdraw}
     /// @dev Reverts {PreviewNotSupported}. Use {quoteWithdraw}.
-    /// @param assets Unused
-    /// @return shares Unused
-    function previewWithdraw(uint256 assets)
-        public
-        view
-        virtual
-        override(ERC4626Upgradeable, IERC4626)
-        returns (uint256 shares)
-    {
+    function previewWithdraw(uint256) public view virtual override(ERC4626Upgradeable, IERC4626) returns (uint256) {
         revert PreviewNotSupported();
     }
 
@@ -405,15 +387,11 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     /// @param _receiver The asset recipient
     /// @param _controller The request controller
     /// @param _assets The assets to pay
-    /// @return consumed The shares actually taken from receipts
-    function _claimFifo(uint256 _shares, address _receiver, address _controller, uint256 _assets)
-        internal
-        returns (uint256 consumed)
-    {
+    function _claimFifo(uint256 _shares, address _receiver, address _controller, uint256 _assets) internal {
         _checkController(_controller, msg.sender);
         if (_shares == 0) {
             if (_assets != 0) revert InexactPayout(0, _assets);
-            return 0;
+            return;
         }
 
         ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
@@ -436,8 +414,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
             remaining -= take;
             remainingUnlocked -= take;
         }
-        consumed = _shares - remaining;
-        if (consumed != _shares) revert IncompleteClaim(consumed, _shares);
+        if (remaining != 0) revert IncompleteClaim(_shares - remaining, _shares);
 
         _payout(_receiver, _controller, _assets, _shares);
     }

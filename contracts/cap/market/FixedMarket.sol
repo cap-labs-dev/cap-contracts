@@ -275,8 +275,8 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @dev A principal that, with its borrow premium, fits in `limit`. Invert at today's
-    /// rate, then scale by `limit/cost` if the real quote is heavier. Four passes is enough
-    /// because cost is nearly linear in principal. May sit below the exact maximum.
+    /// rate, then scale by `limit/cost` if the real quote is heavier. Each shrink is
+    /// strictly smaller, so this ends. May sit below the exact maximum.
     /// @param limit The raw {IBaseMarket-availableCredit} the draw must fit, in USD (18 decimals)
     /// @param term The term of the loan in seconds
     /// @return principal A principal whose {_borrowCost} is at most `limit`, or zero, in stablecoin units (18 decimals)
@@ -286,15 +286,13 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         principal = _principalWithin(limit, term, _termRate(term, 0));
         if (principal > limit) principal = limit;
 
-        for (uint256 i; i < 4; ++i) {
-            uint256 cost = _borrowCost(principal, term);
-            if (cost <= limit) return principal;
-
+        uint256 cost = _borrowCost(principal, term);
+        while (cost > limit) {
             uint256 next = Math.mulDiv(principal, limit, cost);
             if (next == 0 || next >= principal) return 0;
             principal = next;
+            cost = _borrowCost(principal, term);
         }
-        return 0;
     }
 
     /// @dev Principal plus the premium that draw would be charged.

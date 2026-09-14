@@ -344,6 +344,29 @@ contract DebtLifecycleTest is CapDeployer {
         assertEq(bundle.market.tranches().length, 2, "the queue is unchanged");
     }
 
+    function test_setTranches_rejectsZeroWrongAndDuplicate() public {
+        MarketBundle memory bundle = _createReadyMarket("Spare");
+        MarketBundle memory other = _createReadyMarket("Other");
+
+        IBaseMarket.Tranche[] memory ts = new IBaseMarket.Tranche[](1);
+        ts[0] = IBaseMarket.Tranche({ tranche: address(0), weight: 1e27 });
+        vm.prank(address(registry));
+        vm.expectRevert(IBaseMarket.ZeroAddress.selector);
+        bundle.market.setTranches(ts);
+
+        ts[0] = IBaseMarket.Tranche({ tranche: other.tranche0Addr, weight: 1e27 });
+        vm.prank(address(registry));
+        vm.expectRevert(IBaseMarket.InvalidMarket.selector);
+        bundle.market.setTranches(ts);
+
+        IBaseMarket.Tranche[] memory dup = new IBaseMarket.Tranche[](2);
+        dup[0] = IBaseMarket.Tranche({ tranche: bundle.tranche0Addr, weight: 0.5e27 });
+        dup[1] = IBaseMarket.Tranche({ tranche: bundle.tranche0Addr, weight: 0.5e27 });
+        vm.prank(address(registry));
+        vm.expectRevert(IBaseMarket.TrancheAlreadySet.selector);
+        bundle.market.setTranches(dup);
+    }
+
     /// @dev The owner can still change premium weights without changing queue membership.
     function test_setTrancheWeights_preservesMembership() public {
         MarketBundle memory bundle = _createReadyMarket("Spare");

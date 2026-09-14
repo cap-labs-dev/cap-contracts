@@ -481,6 +481,22 @@ contract RoleTableTest is CapDeployer {
         IUnderwriter(underwriter).setAllocatorRole(allocatorRole);
     }
 
+    function test_setBorrowerAndAllocatorRole_rejectPublicAndNonOperatorRoles() public {
+        (address market,) =
+            _createMarket("role-gates", defaultMarketOwner, defaultBorrower, capConfig.defaultTrancheWeights);
+
+        vm.startPrank(market);
+        vm.expectRevert(IRegistry.PublicRole.selector);
+        registry.setBorrowerRole(PUBLIC_ROLE);
+        vm.expectRevert(IRegistry.NotOperatorRole.selector);
+        registry.setBorrowerRole(CapRoles.GOVERNOR);
+        vm.expectRevert(IRegistry.PublicRole.selector);
+        registry.setAllocatorRole(PUBLIC_ROLE);
+        vm.expectRevert(IRegistry.NotOperatorRole.selector);
+        registry.setAllocatorRole(CapRoles.GOVERNOR);
+        vm.stopPrank();
+    }
+
     function test_createUnderwriter_rejectsARoleThatIsNotAnOperatorRole() public {
         vm.expectRevert(IRegistry.OperatorNotAssigned.selector);
         registry.createUnderwriter(address(collateral), "Invalid", "INV", CapRoles.GOVERNOR);

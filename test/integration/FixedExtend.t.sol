@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import { FixedMarket } from "../../contracts/cap/market/FixedMarket.sol";
+import { IBaseMarket } from "../../contracts/interfaces/IBaseMarket.sol";
 import { IFixedMarket } from "../../contracts/interfaces/IFixedMarket.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
 
@@ -62,6 +63,15 @@ contract FixedExtendTest is CapDeployer {
         vm.prank(defaultBorrower);
         vm.expectRevert(IFixedMarket.InvalidTerm.selector);
         market.extend(id, 30 days);
+    }
+
+    function test_borrowMax_withNoCredit_reverts() public {
+        (address marketAddr,,) = _createFixedMarket("Empty");
+        FixedMarket market = FixedMarket(marketAddr);
+
+        vm.prank(defaultBorrower);
+        vm.expectRevert(IBaseMarket.InvalidPrincipal.selector);
+        market.borrow(defaultBorrower, type(uint256).max, 1 days);
     }
 
     function test_borrowMaxTermFillsTheMaximum() public {
@@ -184,6 +194,20 @@ contract FixedExtendTest is CapDeployer {
         vm.prank(defaultBorrower);
         vm.expectRevert(IFixedMarket.InvalidTerm.selector);
         market.borrowMore(id, defaultBorrower, 1e18);
+    }
+
+    function test_extend_whenUnhealthy_reverts() public {
+        FixedMarket market = _ready();
+
+        vm.prank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 10 days);
+
+        _setPrice(address(collateral), 0.1e18);
+        assertLt(market.healthiness(), 1e27);
+
+        vm.prank(defaultBorrower);
+        vm.expectRevert(IBaseMarket.Unhealthy.selector);
+        market.extend(id, 1 days);
     }
 
     function test_liquidate_unhealthyFixedLoan() public {

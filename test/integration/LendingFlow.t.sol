@@ -215,4 +215,19 @@ contract LendingFlowTest is CapDeployer {
         assertLe(repaid, max);
         assertGt(repaid, 0);
     }
+
+    function test_liquidate_zeroAmount_isANoOp() public {
+        vm.prank(borrower);
+        market.borrow(borrower, 500e18);
+        vm.warp(block.timestamp + 3650 days);
+        assertGt(market.maxLiquidatable(), 0);
+
+        uint256 debtBefore = market.totalDebt();
+        vm.prank(defaultLiquidator);
+        (uint256 repaid, uint256 slashed) = market.liquidate(borrower, 0);
+
+        assertEq(repaid, 0);
+        assertEq(slashed, 0);
+        assertEq(market.totalDebt(), debtBefore);
+    }
 }

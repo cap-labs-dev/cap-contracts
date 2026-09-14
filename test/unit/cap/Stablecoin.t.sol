@@ -266,6 +266,13 @@ contract StablecoinTest is BaseTest {
         assertEq(irm.updateCalls(), rateUpdates, "reserve loss does not change utilization");
     }
 
+    function test_recognizeBadDebtInCredit_revertsAboveSupply() public {
+        scoin.mintCreditBacked(bob, 50e18);
+
+        vm.expectRevert(IStablecoin.BadDebtExceedsSupply.selector);
+        scoin.recognizeBadDebtInCredit(50e18 + 1);
+    }
+
     function test_recognizeBadDebtInReserve_revertsAboveSupply() public {
         vm.prank(alice);
         scoin.deposit(100e18, alice);

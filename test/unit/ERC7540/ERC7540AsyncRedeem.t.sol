@@ -28,6 +28,11 @@ contract MockAsyncVault is ERC7540AsyncRedeem {
     function setUnlocked(uint256 u) external {
         _unlocked = u;
     }
+
+    /// @dev Exposes {_claimFifo} so a zero-share, nonzero-asset payout can be asserted.
+    function claimFifo(uint256 shares, address receiver, address controller, uint256 assets) external {
+        _claimFifo(shares, receiver, controller, assets);
+    }
 }
 
 /// @dev A vault that does NOT override unlockedSupply, exercising the base (zero) implementation.
@@ -640,5 +645,97 @@ contract ERC7540AsyncRedeemTest is Test {
         assertEq(bare.instantUnlockedSupply(), 0);
         assertEq(bare.maxRedeem(bob), 0);
         assertEq(bare.maxInstantRedeem(bob), 0);
+    }
+
+    function test_maxWithdraw_isTheAssetQuoteOfMaxRedeem() public {
+        assertEq(vault.maxWithdraw(alice), 0);
+
+        vault.setUnlocked(1_000e18);
+        vm.prank(alice);
+        vault.requestRedeem(400e18, alice, alice);
+
+        assertEq(vault.maxRedeem(alice), 400e18);
+        assertEq(vault.maxWithdraw(alice), 400e18);
+    }
+
+    function test_threeArgWithdraw_exceedingClaimable_reverts() public {
+        vault.setUnlocked(300e18);
+        vm.startPrank(alice);
+        vault.requestRedeem(1_000e18, alice, alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxWithdraw.selector, alice, 301e18, 300e18)
+        );
+        vault.withdraw(301e18, alice, alice);
+        vm.stopPrank();
+    }
+
+    function test_threeArgWithdraw_zeroAssets_isANoOp() public {
+        vm.prank(alice);
+        assertEq(vault.withdraw(0, alice, alice), 0);
+        assertEq(asset.balanceOf(alice), 0);
+    }
+
+    /// @dev Liquidity that fills the first receipt must not make the next one look claimable.
+    function test_laterRequestStaysPendingUntilTheWatermarkReachesIt() public {
+        vault.setUnlocked(100e18);
+        vm.startPrank(alice);
+        uint256 id0 = vault.requestRedeem(200e18, alice, alice);
+        uint256 id1 = vault.requestRedeem(200e18, alice, alice);
+        vm.stopPrank();
+
+        assertEq(vault.claimableRedeemRequest(id0, alice), 100e18);
+        assertEq(vault.claimableRedeemRequest(id1, alice), 0, "still behind the FIFO watermark");
+        assertEq(vault.pendingRedeemRequest(id1, alice), 200e18);
+    }
+
+    /// @dev EnumerableSet keeps insertion order. Moving an older id onto a controller that
+    /// already holds a newer one stores `[newer, older]`; FIFO must sort before it walks.
+    function test_threeArgRedeem_sortsTransferredOlderRequestFirst() public {
+        asset.mint(bob, 400e18);
+        vm.startPrank(bob);
+        asset.approve(address(vault), type(uint256).max);
+        vault.deposit(400e18, bob);
+        vm.stopPrank();
+
+        vault.setUnlocked(1_000e18);
+        vm.prank(alice);
+        uint256 older = vault.requestRedeem(100e18, alice, alice);
+        vm.prank(bob);
+        uint256 newer = vault.requestRedeem(100e18, bob, bob);
+        vm.prank(alice);
+        vault.transferRequest(older, bob);
+
+        vm.prank(bob);
+        assertEq(vault.redeem(200e18, bob, bob), 200e18);
+        assertEq(vault.claimableRedeemRequest(older, bob) + vault.pendingRedeemRequest(older, bob), 0);
+        assertEq(vault.claimableRedeemRequest(newer, bob) + vault.pendingRedeemRequest(newer, bob), 0);
+    }
+
+    function test_transferRequest_toSelf_isANoOp() public {
+        vault.setUnlocked(1_000e18);
+        vm.prank(alice);
+        uint256 id = vault.requestRedeem(100e18, alice, alice);
+
+        vm.prank(alice);
+        vault.transferRequest(id, alice);
+
+        assertEq(vault.controllerOf(id), alice);
+        assertEq(vault.maxRedeem(alice), 100e18);
+    }
+
+    function test_claimFifo_zeroSharesWithAssets_reverts() public {
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IERC7540AsyncRedeem.InexactPayout.selector, 0, 1));
+        vault.claimFifo(0, alice, alice, 1);
+    }
+
+    function test_claimFifo_moreThanClaimable_reverts() public {
+        vault.setUnlocked(100e18);
+        vm.prank(alice);
+        vault.requestRedeem(100e18, alice, alice);
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IERC7540AsyncRedeem.IncompleteClaim.selector, 100e18, 200e18));
+        vault.claimFifo(200e18, alice, alice, 200e18);
     }
 }

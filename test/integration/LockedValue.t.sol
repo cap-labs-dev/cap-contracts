@@ -167,6 +167,9 @@ contract LockedValueTest is CapDeployer {
         assertEq(market.buffer(), 0.1e27, "fixture buffer");
 
         vm.expectRevert(IBaseMarket.InvalidLt.selector);
+        market.setLt(1e27 + 1);
+
+        vm.expectRevert(IBaseMarket.InvalidLt.selector);
         market.setLt(0.1e27);
 
         vm.expectRevert(IBaseMarket.InvalidLt.selector);

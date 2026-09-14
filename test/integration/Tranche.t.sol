@@ -132,6 +132,13 @@ contract TrancheTest is CapDeployer {
         registry.createFloatingMarket(assets, capConfig.defaultTrancheWeights, "Ghostly", ownerRole);
     }
 
+    function test_createFloatingMarket_rejectsAnEmptyTrancheList() public {
+        uint64 ownerRole = _operatorRoleOf(defaultMarketOwner);
+
+        vm.expectRevert(IRegistry.InvalidTrancheCount.selector);
+        registry.createFloatingMarket(new address[](0), new uint256[](0), "Empty", ownerRole);
+    }
+
     function test_createFloatingMarket_rejectsAssetsAndWeightsOfDifferentLengths() public {
         address[] memory assets = new address[](1);
         assets[0] = address(collateral);

@@ -19,4 +19,12 @@ contract BaseMarketTest is BaseTest {
         );
         assertEq(market.totalDebt(), 0);
     }
+
+    function test_unsetMarketMultiplierReadsAsOneRay() public {
+        _setUpAccessManager();
+        BareMarket market = BareMarket(
+            _deployProxy(address(new BareMarket()), abi.encodeCall(BareMarket.initialize, (address(accessManager))))
+        );
+        assertEq(market.marketMultiplier(), 1e27);
+    }
 }
