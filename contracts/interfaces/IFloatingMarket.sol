@@ -17,6 +17,7 @@ interface IFloatingMarket is IBaseMarket {
     function initialize(address authority, address registry, string memory name) external;
 
     /// @notice Borrow assets from the market
+    /// @dev `actualPrincipal` is the rise in {totalDebt} and is at most `principal`.
     /// @param recipient The recipient of the borrowed assets
     /// @param principal The principal amount of the borrowed assets
     /// @return actualPrincipal The actual principal amount of the borrowed assets

@@ -19,6 +19,14 @@ interface IFixedMarket is IBaseMarket {
     /// @notice Loan has expired, cannot be extended
     error LoanExpired();
 
+    /// @notice No loan was created at this id
+    /// @param id The id that is outside `[0, loanCount)`
+    error LoanNotFound(uint256 id);
+
+    /// @notice The loan was fully repaid and cannot reopen
+    /// @param id The closed loan
+    error LoanClosed(uint256 id);
+
     /// @notice Term limits were updated
     /// @param maximumTermLimit The new maximum term of a loan
     /// @param minimumTermLimit The new minimum term of a loan
@@ -80,6 +88,8 @@ interface IFixedMarket is IBaseMarket {
         returns (uint256 id, uint256 actualPrincipal);
 
     /// @notice Borrow additional assets against an existing loan
+    /// @dev `id` must be in `[0, loanCount)` and still carry debt. A fully repaid
+    /// loan stays enumerable but cannot reopen; open a new loan with {borrow}.
     /// @param id The id of the loan
     /// @param recipient The recipient of the borrowed assets
     /// @param principal The principal amount of the borrowed assets
@@ -89,13 +99,13 @@ interface IFixedMarket is IBaseMarket {
     /// @notice Repay assets to the market
     /// @dev Burns the recorded amount. Arrears accrue only when {extend} or {extendAdmin} runs
     /// after expiry; a keeper must call that after the grace period.
-    /// @param id The id of the loan
+    /// @param id The id of the loan. Must be in `[0, loanCount)`.
     /// @param amount The amount of assets to repay
     /// @return repaid The actual amount of assets repaid
     function repay(uint256 id, uint256 amount) external returns (uint256 repaid);
 
     /// @notice Liquidate assets from the market
-    /// @param id The id of the loan
+    /// @param id The id of the loan. Must be in `[0, loanCount)`.
     /// @param recipient The recipient of the liquidated assets
     /// @param amount The amount of assets to liquidate
     /// @return repaid The actual amount of assets repaid
@@ -108,20 +118,22 @@ interface IFixedMarket is IBaseMarket {
     /// @dev Live loans can grow only up to the current {maximumTermLimit}. If that limit was
     /// lowered below remaining term, there is no room and the call reverts {InvalidTerm}; the
     /// existing expiry is unchanged. Expired loans roll from now and charge arrears.
+    /// `id` must be in `[0, loanCount)` and still carry debt.
     /// @param id The id of the loan
     /// @param extension The extension of the term
     /// @return actualExtension The actual extension of the term
     function extend(uint256 id, uint256 extension) external returns (uint256 actualExtension);
 
     /// @notice Roll an overdue loan forward and charge premium for the arrears
-    /// @dev Health is not checked potentially making loan liquidatable
+    /// @dev Health is not checked potentially making loan liquidatable.
+    /// `id` must be in `[0, loanCount)` and still carry debt.
     /// @param id The id of the loan
     /// @param extension The new term to roll the loan forward by
     /// @return actualExtension The arrears plus the new term
     function extendAdmin(uint256 id, uint256 extension) external returns (uint256 actualExtension);
 
     /// @notice Write off this loan's share of {unrecoverableDebt}
-    /// @dev Capped at the market-wide shortfall.
+    /// @dev Capped at the market-wide shortfall. `id` must be in `[0, loanCount)`.
     /// @param id The id of the loan
     /// @return amount The amount of debt written off
     function writeOff(uint256 id) external returns (uint256 amount);
@@ -143,8 +155,10 @@ interface IFixedMarket is IBaseMarket {
         returns (uint256 liquidityPremium, uint256 underwriterPremium);
 
     /// @notice Premium a new borrow would be charged
-    /// @dev Priced after the mint; see {IInterestRateModel-fixedRatesAfterMint}. This market
-    /// then applies {marketMultiplier} to the liquidity rate.
+    /// @dev Incremental in unsmoothed credit: the undivided premium on `prior + principal`
+    /// less the undivided premium on `prior`. Same total principal and term therefore cost
+    /// the same whether drawn once or split. See {IInterestRateModel-fixedRatesAfterMint}.
+    /// This market then applies {marketMultiplier} to the liquidity rate.
     /// @param principal The principal of the loan
     /// @param term The term of the loan
     /// @return liquidityPremium The liquidity premium
@@ -155,7 +169,7 @@ interface IFixedMarket is IBaseMarket {
         returns (uint256 liquidityPremium, uint256 underwriterPremium);
 
     /// @notice Largest principal borrowable over a term, leaving room for the upfront premium
-    /// @dev Sized at the post-mint rate for a full-limit draw.
+    /// @dev Sized at the post-mint rate for a full-limit draw, including unsmoothed credit.
     /// @param term The term of the loan
     /// @return credit The available credit
     function availableCredit(uint256 term) external view returns (uint256 credit);

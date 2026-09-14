@@ -203,6 +203,85 @@ contract AccountingIntegrityTest is CapDeployer {
     // A FLOATING REPAYMENT CLEARS EXACTLY WHAT IT BURNS
     // ─────────────────────────────────────────────────────────────────────────
 
+    /// @dev A borrow must mint exactly the debt it records. Half-up `rayDiv` of the request, then
+    /// minting that request, left the aggregate `rayMul` a wei above or below: 8 minted against 9
+    /// of debt, or 3 against 2. Settlement is the rise in {totalDebt}, same as repay uses the drop.
+    function test_borrowMintsExactlyWhatItRecords() public {
+        FloatingMarket market = _grownIndexMarketWithRoom();
+        emit log_named_uint("index", market.index());
+
+        // Consecutive amounts, because the old rounding only missed on some residues. Borrowing
+        // does not move the clock, so the index is the same on every pass and only the residue
+        // changes.
+        for (uint256 amount = 1e18; amount < 1e18 + 8; ++amount) {
+            uint256 debtBefore = market.totalDebt();
+            uint256 creditBefore = stablecoin.creditBackedSupply();
+
+            vm.prank(defaultBorrower);
+            uint256 minted = market.borrow(defaultBorrower, amount);
+
+            assertEq(market.totalDebt() - debtBefore, minted, "debt recorded matches the mint");
+            assertEq(stablecoin.creditBackedSupply() - creditBefore, minted, "credit minted matches it too");
+            assertLe(minted, amount, "never mints above the request");
+        }
+    }
+
+    /// @dev The confirmed residues: at a grown index, 8 wei used to record 9 of debt and 3 wei
+    /// used to record 2. Both now mint the floored representable rise, never above the request.
+    function test_borrowReconcilesConfirmedWeiResidues() public {
+        FloatingMarket market = _grownIndexMarketWithRoom();
+
+        uint256[2] memory residues = [uint256(8), 3];
+        for (uint256 i; i < residues.length; ++i) {
+            uint256 amount = residues[i];
+            uint256 debtBefore = market.totalDebt();
+            uint256 creditBefore = stablecoin.creditBackedSupply();
+
+            vm.prank(defaultBorrower);
+            uint256 minted = market.borrow(defaultBorrower, amount);
+
+            assertEq(market.totalDebt() - debtBefore, minted, "recorded debt equals minted credit");
+            assertEq(stablecoin.creditBackedSupply() - creditBefore, minted);
+            assertLe(minted, amount, "representable principal stays within the request");
+        }
+    }
+
+    /// @dev The invariant across an arbitrary sequence of additional borrows at an arbitrary index.
+    /// The old mismatch was a wei or two per call; what matters is that it cannot accumulate.
+    /// forge-config: default.fuzz.runs = 512
+    function testFuzz_borrowsNeverDriftFromCredit(uint96 rawAmount, uint32 elapsed, uint8 rounds) public {
+        FloatingMarket market = _grownIndexMarketWithRoom();
+        rounds = uint8(bound(rounds, 1, 8));
+
+        for (uint256 i; i < rounds; ++i) {
+            vm.warp(block.timestamp + bound(elapsed, 1, 30 days));
+            market.chargePremium();
+
+            uint256 credit = market.availableCredit();
+            if (credit == 0) break;
+            uint256 amount = bound(rawAmount, 1, credit);
+
+            uint256 debtBefore = market.totalDebt();
+            uint256 creditBefore = stablecoin.creditBackedSupply();
+            int256 gapBefore = int256(creditBefore) - int256(debtBefore);
+
+            vm.prank(defaultBorrower);
+            uint256 minted;
+            try market.borrow(defaultBorrower, amount) returns (uint256 recorded) {
+                minted = recorded;
+            } catch {
+                assertEq(market.totalDebt(), debtBefore, "a rejected borrow changes nothing");
+                assertEq(stablecoin.creditBackedSupply(), creditBefore, "and mints nothing");
+                continue;
+            }
+
+            assertEq(market.totalDebt() - debtBefore, minted, "recorded matches minted");
+            assertEq(stablecoin.creditBackedSupply() - creditBefore, minted, "credit matches minted");
+            assertLe(minted, amount, "never above the request");
+            assertEq(int256(stablecoin.creditBackedSupply()) - int256(market.totalDebt()), gapBefore, "no drift, ever");
+        }
+    }
+
     /// @dev A repayment must clear exactly the debt it burns. The scaled reduction used to be
     /// rounded half up and the burn taken at the requested amount, so at an index of 1.4907 a 1-wei
     /// payment cleared 2 wei of debt, leaving credit-backed supply with nothing behind it.
@@ -312,15 +391,78 @@ contract AccountingIntegrityTest is CapDeployer {
 
     /// @dev A market whose index has grown well above one ray, which is what exposes the rounding.
     function _grownIndexMarket() internal returns (FloatingMarket market) {
+        market = _grownIndexMarket(1_000e18, 400e18);
+    }
+
+    /// @dev Same grown index, with unused credit so later borrows can still land.
+    function _grownIndexMarketWithRoom() internal returns (FloatingMarket market) {
+        market = _grownIndexMarket(10_000e18, 400e18);
+    }
+
+    function _grownIndexMarket(uint256 capital, uint256 principal) internal returns (FloatingMarket market) {
         MarketBundle memory b = _createReadyMarket("m");
-        _fundTranche(b.tranche0Addr, alice, 1_000e18);
+        _fundTranche(b.tranche0Addr, alice, capital);
 
         vm.prank(defaultBorrower);
-        b.market.borrow(defaultBorrower, 400e18);
+        b.market.borrow(defaultBorrower, principal);
 
         vm.warp(block.timestamp + 730 days);
         b.market.chargePremium();
         market = b.market;
+    }
+
+    /// @dev A premium checkpoint must mint exactly the rise in reported {totalDebt}. The two
+    /// legs used to be rounded independently of the getter, so the sum could sit a wei away
+    /// from the debt growth they were meant to fund. Measured from the last settled reading,
+    /// because the getter already projects uncharged interest.
+    function test_premiumMintsExactlyTheReportedDebtGrowth() public {
+        FloatingMarket market = _grownIndexMarket();
+        uint256 debtBefore = market.totalDebt();
+        uint256 creditBefore = stablecoin.creditBackedSupply();
+
+        vm.warp(block.timestamp + 30 days);
+        uint256 debtAfter = market.totalDebt();
+        (uint256 liquidityPremium, uint256 underwriterPremium) = market.premium();
+
+        assertEq(debtAfter - debtBefore, liquidityPremium + underwriterPremium, "quoted premium is the reported growth");
+
+        market.chargePremium();
+
+        assertEq(market.totalDebt(), debtAfter, "the checkpoint does not move reported debt");
+        assertEq(
+            stablecoin.creditBackedSupply() - creditBefore,
+            liquidityPremium + underwriterPremium,
+            "credit minted matches it too"
+        );
+        assertEq(market.totalDebt() - debtBefore, stablecoin.creditBackedSupply() - creditBefore, "no new drift");
+    }
+
+    /// forge-config: default.fuzz.runs = 512
+    function testFuzz_premiumNeverDriftsFromCredit(uint32 elapsed, uint8 rounds) public {
+        FloatingMarket market = _grownIndexMarket();
+        rounds = uint8(bound(rounds, 1, 8));
+
+        for (uint256 i; i < rounds; ++i) {
+            uint256 debtBefore = market.totalDebt();
+            uint256 creditBefore = stablecoin.creditBackedSupply();
+
+            vm.warp(block.timestamp + bound(elapsed, 1, 30 days));
+            uint256 debtAfter = market.totalDebt();
+            (uint256 liquidityPremium, uint256 underwriterPremium) = market.premium();
+
+            assertEq(
+                debtAfter - debtBefore, liquidityPremium + underwriterPremium, "quoted premium is the reported growth"
+            );
+
+            market.chargePremium();
+
+            assertEq(market.totalDebt(), debtAfter, "the checkpoint does not move reported debt");
+            assertEq(
+                stablecoin.creditBackedSupply() - creditBefore,
+                liquidityPremium + underwriterPremium,
+                "credit minted matches it"
+            );
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -723,6 +865,47 @@ contract AccountingIntegrityTest is CapDeployer {
         b.tranche0.instantWithdraw(balance, alice, alice);
     }
 
+    /// @dev Queued claimability used `settledQueue + unlocked` as if later settlements filled the
+    /// prefix. After a later request claimed, a borrow against still-active senior capital locked
+    /// the remaining junior. The earlier request stayed fully claimable at unlocked=0, and paying
+    /// it pulled locked collateral.
+    function test_queuedWithdrawCannotReleaseLockedCollateral() public {
+        MarketBundle memory b = _createReadyMarket("m");
+        _fundTranche(b.tranche0Addr, makeAddr("senior"), 1_000e18);
+        _fundTranche(b.tranche1Addr, alice, 100e18);
+        _fundTranche(b.tranche1Addr, bob, 100e18);
+
+        uint256 aliceShares = b.tranche1.balanceOf(alice);
+        uint256 bobShares = b.tranche1.balanceOf(bob);
+        vm.prank(alice);
+        uint256 aliceId = b.tranche1.requestRedeem(aliceShares, alice, alice);
+        vm.prank(bob);
+        uint256 bobId = b.tranche1.requestRedeem(bobShares, bob, bob);
+
+        assertEq(b.tranche1.claimableRedeemRequest(aliceId, alice), aliceShares);
+        assertEq(b.tranche1.claimableRedeemRequest(bobId, bob), bobShares);
+
+        // later request settles first while the junior is still fully liquid
+        vm.prank(bob);
+        b.tranche1.redeem(bobId, bobShares, bob, bob);
+
+        // senior is still active, so the market can borrow enough to lock the rest of the junior
+        vm.prank(defaultBorrower);
+        b.market.borrow(defaultBorrower, 200e18);
+
+        uint256 healthBefore = b.market.healthiness();
+        assertGe(healthBefore, 1e27, "market is healthy after the borrow");
+        assertEq(b.tranche1.unlockedSupply(), 0, "the rest of the junior is locked");
+        assertEq(b.tranche1.claimableRedeemRequest(aliceId, alice), 0, "earlier request is not claimable");
+        assertEq(b.tranche1.maxRedeem(alice), 0);
+
+        vm.prank(alice);
+        vm.expectRevert();
+        b.tranche1.redeem(aliceId, aliceShares, alice, alice);
+
+        assertEq(b.market.healthiness(), healthBefore, "locked collateral was not released");
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // DEBT NEVER OUTRUNS THE CREDIT MINTED AGAINST IT
     // ─────────────────────────────────────────────────────────────────────────
@@ -741,7 +924,7 @@ contract AccountingIntegrityTest is CapDeployer {
 
         emit log_named_uint("totalDebt         ", b.market.totalDebt());
         emit log_named_uint("creditBackedSupply", stablecoin.creditBackedSupply());
-        assertLe(b.market.totalDebt(), stablecoin.creditBackedSupply(), "debt must stay repayable");
+        assertEq(b.market.totalDebt(), stablecoin.creditBackedSupply(), "debt matches the credit minted against it");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1091,6 +1274,70 @@ contract AccountingIntegrityTest is CapDeployer {
         emit log_named_uint("premium counting the draw", withLiquidity + withUnderwriter);
 
         assertGt(withLiquidity, withoutLiquidity, "the draw's own effect on utilization is still charged");
+    }
+
+    /// @dev Splitting a draw across calls in the same block used to omit earlier principal from
+    /// the average (it had stood for no time), so each slice was priced as a first draw. The
+    /// charge is now the increment in the undivided premium, so the same total principal and
+    /// term cost the same whether drawn once or in pieces.
+    function test_partitionedFixedBorrowPaysTheUndividedPremium() public {
+        FixedMarket market = _fixedMarketOnSlope(0.9e27);
+        _depositStable(makeAddr("saver"), 1_000e18);
+        vm.warp(block.timestamp + 2 hours);
+
+        uint256 total = QUOTED_PRINCIPAL;
+        (uint256 quotedLiquidity, uint256 quotedUnderwriter) = market.premiumForBorrow(total, 30 days);
+        uint256 quoted = quotedLiquidity + quotedUnderwriter;
+
+        uint256 snapshot = vm.snapshotState();
+
+        vm.prank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, total, 30 days);
+        assertEq(market.debt(id) - total, quoted, "the quote is what an undivided draw pays");
+
+        vm.revertToState(snapshot);
+
+        vm.startPrank(defaultBorrower);
+        (uint256 first,) = market.borrow(defaultBorrower, total / 2, 30 days);
+        uint256 firstPremium = market.debt(first) - total / 2;
+        (quotedLiquidity, quotedUnderwriter) = market.premiumForBorrow(total / 2, 30 days);
+        (uint256 second,) = market.borrow(defaultBorrower, total / 2, 30 days);
+        vm.stopPrank();
+
+        uint256 partitioned = market.debt(first) + market.debt(second) - total;
+
+        emit log_named_uint("quoted     ", quoted);
+        emit log_named_uint("partitioned", partitioned);
+
+        assertEq(
+            market.debt(second) - total / 2,
+            quotedLiquidity + quotedUnderwriter,
+            "the second draw pays the quoted increment"
+        );
+        assertGt(quotedLiquidity + quotedUnderwriter, firstPremium, "the second slice is dearer than the first");
+        assertGe(partitioned, quoted, "splitting must not discount");
+        assertApproxEqRel(partitioned, quoted, 0.02e18, "and must land on the undivided price");
+    }
+
+    /// @dev The same independence on {borrowMore}, which is the other way to partition a draw.
+    function test_borrowMorePaysTheUndividedPremium() public {
+        FixedMarket market = _fixedMarketOnSlope(0.9e27);
+        _depositStable(makeAddr("saver"), 1_000e18);
+        vm.warp(block.timestamp + 2 hours);
+
+        uint256 term = 30 days;
+        uint256 total = QUOTED_PRINCIPAL;
+        (uint256 quotedLiquidity, uint256 quotedUnderwriter) = market.premiumForBorrow(total, term);
+        uint256 quoted = quotedLiquidity + quotedUnderwriter;
+
+        vm.startPrank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, total / 2, term);
+        market.borrowMore(id, defaultBorrower, total / 2);
+        vm.stopPrank();
+
+        uint256 partitioned = market.debt(id) - total;
+        assertGe(partitioned, quoted, "adding to the same loan must not discount");
+        assertApproxEqRel(partitioned, quoted, 0.02e18, "and must land on the undivided price");
     }
 
     /// @dev A borrow of this size against the reserves used above lands above the kink, which is

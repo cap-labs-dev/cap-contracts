@@ -171,8 +171,28 @@ contract StablecoinTest is BaseTest {
         assertEq(scoin.totalAssets(), 100e18);
         scoin.recognizeBadDebtInCredit(30e18);
         assertEq(scoin.badDebt(), 30e18);
-        assertEq(scoin.totalAssets(), scoin.convertToAssets(70e18));
-        assertLt(scoin.totalAssets(), 70e18, "the curve prices the outstanding supply below par");
+        assertEq(scoin.backing(), 70e18, "recognized backing is supply net of the write-off");
+        assertEq(scoin.totalAssets(), 70e18, "and totalAssets is that figure, in underlying units");
+        assertLt(scoin.convertToAssets(70e18), 70e18, "the exit quote is the discounted one");
+    }
+
+    /// @dev Confirmed: 1,000 supply and 100 of bad debt is 900 of recognized backing. Feeding that
+    /// 900 through the exit curve produced ~801.10, which is the quote for redeeming the
+    /// outstanding supply, not the backing itself.
+    function test_totalAssets_isRecognizedBackingNotTheExitDiscount() public {
+        vm.prank(alice);
+        scoin.deposit(1_000e18, alice);
+        vm.prank(guardian);
+        scoin.recognizeBadDebtInReserve(100e18);
+
+        assertEq(scoin.totalSupply(), 1_000e18);
+        assertEq(scoin.badDebt(), 100e18);
+        assertEq(scoin.backing(), 900e18);
+        assertEq(scoin.totalAssets(), 900e18, "recognized backing, not the discounted exit");
+        assertApproxEqAbs(
+            scoin.convertToAssets(900e18), 801.098901098901098901e18, 2, "801.10 is the exit quote for those 900"
+        );
+        assertEq(scoin.convertToAssets(scoin.totalSupply()), 900e18, "redeeming everything still pays the backing");
     }
 
     function test_recognizeBadDebtInReserve_onlyGuardian() public {
@@ -193,8 +213,9 @@ contract StablecoinTest is BaseTest {
         scoin.recognizeBadDebtInReserve(30e18);
 
         assertEq(scoin.badDebt(), 30e18);
-        assertEq(scoin.totalAssets(), scoin.convertToAssets(120e18));
-        assertLt(scoin.totalAssets(), 120e18, "the curve prices the outstanding supply below par");
+        assertEq(scoin.backing(), 120e18, "recognized backing is supply net of the write-off");
+        assertEq(scoin.totalAssets(), 120e18);
+        assertLt(scoin.convertToAssets(120e18), 120e18, "the exit quote is the discounted one");
         assertEq(scoin.creditBackedSupply(), 50e18, "reserve loss does not write off borrower credit");
         assertEq(irm.updateCalls(), rateUpdates, "reserve loss does not change utilization");
     }
@@ -260,6 +281,7 @@ contract StablecoinTest is BaseTest {
         usdc.deposit(1e6, alice);
 
         assertEq(usdc.totalSupply(), 1e18);
+        assertEq(usdc.backing(), 1e18, "backing stays in share units");
         assertEq(usdc.totalAssets(), 1e6, "integrators read USDC units, not share units");
         assertEq(usdc.totalAssets(), usdc.convertToAssets(usdc.totalSupply()));
     }
@@ -343,10 +365,10 @@ contract StablecoinTest is BaseTest {
         scoin.mintCreditBacked(bob, 500e18);
         scoin.recognizeBadDebtInCredit(100e18);
 
-        assertEq(scoin.convertToAssets(scoin.totalSupply()), 1_400e18, "pays the whole reserve");
-        assertEq(
-            scoin.totalAssets(), scoin.convertToAssets(1_400e18), "totalAssets is that redeem of the outstanding supply"
-        );
+        assertEq(scoin.backing(), 1_400e18, "recognized backing is supply net of the write-off");
+        assertEq(scoin.totalAssets(), 1_400e18, "and totalAssets reports that, not the exit discount");
+        assertEq(scoin.convertToAssets(scoin.totalSupply()), 1_400e18, "redeeming everything pays the backing");
+        assertLt(scoin.convertToAssets(1_400e18), 1_400e18, "redeeming only the outstanding is discounted");
     }
 
     /// The old conversion paid early redeemers more than their share and let a single large
@@ -367,7 +389,7 @@ contract StablecoinTest is BaseTest {
         // the 500e18 left behind retains 500 * 1500 * 1400 / (1500 * 1400 + 500 * 100) of the
         // backing, so alice takes the 911.62... that leaves over and absorbs the 88.37... gap
         assertApproxEqAbs(paid, 911.627906976744186046e18, 2, "priced on the shortfall curve");
-        assertLt(scoin.totalAssets(), assetsBefore, "remaining outstanding supply is worth less");
+        assertEq(assetsBefore - scoin.totalAssets(), paid, "recognized backing falls by the payout");
         assertEq(heldBefore - asset.balanceOf(address(scoin)), paid, "the reserve falls by exactly what was paid");
         assertApproxEqAbs(scoin.badDebt(), 100e18 - (1_000e18 - paid), 2, "absorbs exactly what it left behind");
     }
@@ -444,6 +466,67 @@ contract StablecoinTest is BaseTest {
         uint256 above = scoin.quoteWithdraw(50e18);
         assertGt(below, 0);
         assertGt(above, below);
+    }
+
+    /// @dev Three-arg withdraw must pay the asset target once, even when the ceil quote is
+    /// split across receipts. The shortfall curve is nonlinear, so converting each fragment
+    /// would not sum to the single-call price — or to the requested assets.
+    function test_fifoWithdraw_paysExactAssetsOnTheShortfallCurve() public {
+        vm.prank(alice);
+        scoin.deposit(1_000e18, alice);
+        _writeOffCredit(100e18);
+
+        uint256 assets = 10e18;
+        uint256 shares = scoin.quoteWithdraw(assets);
+        assertGt(shares, assets, "the curve asks for more shares than assets");
+
+        uint256 snapshot = vm.snapshotState();
+        vm.prank(alice);
+        uint256 instantShares = scoin.instantWithdraw(assets, alice, alice);
+        uint256 instantBad = scoin.badDebt();
+        uint256 instantReserve = asset.balanceOf(address(scoin));
+        vm.revertToState(snapshot);
+
+        uint256 first = shares / 3;
+        uint256 second = shares / 3;
+        uint256 third = shares - first - second;
+        uint256 sliced = scoin.convertToAssets(first) + scoin.convertToAssets(second) + scoin.convertToAssets(third);
+
+        vm.startPrank(alice);
+        scoin.requestRedeem(first, alice, alice);
+        scoin.requestRedeem(second, alice, alice);
+        scoin.requestRedeem(third, alice, alice);
+        uint256 burned = scoin.withdraw(assets, alice, alice);
+        vm.stopPrank();
+
+        assertEq(burned, shares, "all quoted shares were consumed");
+        assertEq(burned, instantShares, "same shares as the instant path");
+        assertEq(asset.balanceOf(alice), assets, "paid the requested assets exactly");
+        assertEq(scoin.badDebt(), instantBad, "same shortfall retired");
+        assertEq(asset.balanceOf(address(scoin)), instantReserve, "same reserve left");
+        assertTrue(sliced != assets, "per-fragment conversion is not the settlement");
+    }
+
+    /// @dev One underlying atom whose ceil quote spans 1-share receipts. Each convertToAssets(1)
+    /// is zero on the curve; the settlement must still pay the atom.
+    function test_fifoWithdraw_paysOneAtomAcrossDustReceipts() public {
+        vm.prank(alice);
+        scoin.deposit(1_000e18, alice);
+        _writeOffCredit(100e18);
+
+        uint256 shares = scoin.quoteWithdraw(1);
+        assertGt(shares, 0, "the atom costs some shares");
+        assertEq(scoin.convertToAssets(1), 0, "a single share pays nothing");
+
+        vm.startPrank(alice);
+        for (uint256 i; i < shares; ++i) {
+            scoin.requestRedeem(1, alice, alice);
+        }
+        uint256 burned = scoin.withdraw(1, alice, alice);
+        vm.stopPrank();
+
+        assertEq(burned, shares, "all quoted shares were consumed");
+        assertEq(asset.balanceOf(alice), 1, "paid the atom");
     }
 
     function test_instantRedeem_absorbsBadDebt_whenSharesExceedDebt() public {
@@ -567,11 +650,13 @@ contract StablecoinTest is BaseTest {
 
         shares = bound(shares, 1, scoin.maxInstantRedeem(alice));
         uint256 heldBefore = asset.balanceOf(address(scoin));
+        uint256 assetsBefore = scoin.totalAssets();
 
         vm.prank(alice);
         uint256 paid = scoin.instantRedeem(shares, alice, alice);
 
         assertEq(heldBefore - asset.balanceOf(address(scoin)), paid, "the reserve tracks the payout exactly");
+        assertEq(assetsBefore - scoin.totalAssets(), paid, "recognized backing falls by the same amount");
         assertLe(paid, shares, "never pays out more than the shares burned");
     }
 

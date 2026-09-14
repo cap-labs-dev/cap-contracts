@@ -330,8 +330,9 @@ contract DebtLifecycleTest is CapDeployer {
     // ── a zero oracle price fails closed ─────────────────────────────────────
 
     /// @dev {Oracle-price} returns zero when both feeds fail. {Tranche-getPrice} treats that as
-    /// {InvalidPrice}, which is the comparison standing between a missing price and a division by
-    /// zero in every conversion the tranche performs.
+    /// {InvalidPrice} wherever a conversion actually needs a price. A funded tranche still has
+    /// assets to value, so {ITranche-totalCapital} fails closed. There is no debt to lock, so
+    /// {ITranche-unlockedSupply} must not consult the oracle.
     function test_zeroPrice_revertsInsteadOfDividingByZero() public {
         MarketBundle memory bundle = _createReadyMarket("Floating");
         _fundTranche(bundle.tranche0Addr, makeAddr("senior"), 10_000e18);
@@ -341,8 +342,8 @@ contract DebtLifecycleTest is CapDeployer {
         vm.expectRevert(ITranche.InvalidPrice.selector);
         bundle.tranche0.totalCapital();
 
-        vm.expectRevert(ITranche.InvalidPrice.selector);
-        bundle.tranche0.unlockedSupply();
+        assertEq(bundle.market.totalDebt(), 0, "nothing to lock");
+        assertEq(bundle.tranche0.unlockedSupply(), bundle.tranche0.totalSupply(), "debt-free exit stays open");
     }
 
     // ── term limits are validated and adjustable ─────────────────────────────

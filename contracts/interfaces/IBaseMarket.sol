@@ -267,7 +267,8 @@ interface IBaseMarket {
     function unrecoverableDebt() external view returns (uint256 unrecoverable);
 
     /// @notice Capital a tranche must keep locked to back the market's debt
-    /// @dev USD, 18 decimals. Juniors lock first.
+    /// @dev USD, 18 decimals, rounded up. Juniors lock first. Zero when the market
+    /// has no debt, without consulting the oracle.
     /// @param tranche The tranche address
     /// @return value The locked capital value in USD (18 decimals)
     function lockedValue(address tranche) external view returns (uint256 value);

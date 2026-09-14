@@ -3,13 +3,19 @@ pragma solidity 0.8.36;
 
 import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
+import { IOracle } from "../../contracts/interfaces/IOracle.sol";
+import { ITranche } from "../../contracts/interfaces/ITranche.sol";
+import { WadRayMath } from "../../contracts/utils/WadRayMath.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
+import { MockERC20 } from "../shared/mocks/MockERC20.sol";
 
 /// @title PricedCollateralTest
 /// @notice Liquidation is denominated in debt value while tranches hold token amounts, so every
 /// slash has to round-trip through the oracle price. These cases use collateral priced away from
 /// 1.0 so a missing conversion cannot pass unnoticed.
 contract PricedCollateralTest is CapDeployer {
+    using WadRayMath for uint256;
+
     uint256 internal constant LIQUIDATION_BONUS = 0.02e27;
 
     function _setUpMarketAtPrice(uint256 price, uint256 seniorAssets, uint256 juniorAssets)
@@ -194,5 +200,102 @@ contract PricedCollateralTest is CapDeployer {
         assertApproxEqRel(slashed, repaid * 102 / 100, 0.0001e18, "paid at the bonus, not below it");
         assertEq(market.totalDebt(), 900e18 - recoverable, "the shortfall survives the liquidation");
         assertEq(market.unrecoverableDebt(), 900e18 - recoverable, "and is exactly what writeOff is for");
+    }
+
+    /// @dev Eight-decimal collateral at $100,000: one token unit is $0.001. A $0.0009 request
+    /// floors to zero tokens. The non-capped branch used to return the request anyway, so the
+    /// waterfall subtracted value that never left the vault.
+    function test_slash_reportsZeroWhenTheRequestIsBelowOneToken() public {
+        (,, address junior, MockERC20 btc) = _btcJuniorMarket();
+        address recipient = makeAddr("recipient");
+
+        vm.prank(Tranche(junior).market());
+        uint256 slashed = Tranche(junior).slash(0.0009e18, recipient);
+
+        assertEq(slashed, 0, "no USD was delivered");
+        assertEq(Tranche(junior).totalAssets(), 1e8, "no tokens left the vault");
+        assertEq(btc.balanceOf(recipient), 0);
+    }
+
+    /// @dev One and a half sats of value can only move one sat. Report that sat, not the request.
+    function test_slash_reportsTheTokensThatMoved() public {
+        (,, address junior, MockERC20 btc) = _btcJuniorMarket();
+        address recipient = makeAddr("recipient");
+        uint256 satValue = 100_000e18 / 1e8;
+
+        vm.prank(Tranche(junior).market());
+        uint256 slashed = Tranche(junior).slash(satValue + satValue / 2, recipient);
+
+        assertEq(slashed, satValue, "floored to the sat that moved");
+        assertEq(btc.balanceOf(recipient), 1);
+        assertEq(Tranche(junior).totalAssets(), 1e8 - 1);
+    }
+
+    /// @dev A repayment whose bonus is worth less than one junior sat used to close the waterfall
+    /// after a zero-token slash. The remainder now lands on the senior.
+    function test_liquidation_carriesDustBelowOneTokenToTheNextTranche() public {
+        (FloatingMarket market, address senior, address junior, MockERC20 btc) = _btcJuniorMarket();
+
+        vm.prank(defaultBorrower);
+        market.borrow(defaultBorrower, 40_000e18);
+        market.setLt(0.3e27);
+        assertLt(market.healthiness(), 1e27, "unhealthy");
+
+        uint256 repay = 0.0009e18;
+        uint256 toSlash = repay.rayMul(1e27 + irm.liquidationBonus());
+        assertLt(toSlash, 100_000e18 / 1e8, "junior cannot deliver a sat");
+
+        _mintStable(defaultLiquidator, repay);
+        uint256 seniorBefore = Tranche(senior).totalAssets();
+
+        vm.prank(defaultLiquidator);
+        (uint256 repaid, uint256 slashed) = market.liquidate(defaultLiquidator, repay);
+
+        assertEq(repaid, repay);
+        assertEq(slashed, toSlash, "senior delivered the remainder");
+        assertEq(Tranche(junior).totalAssets(), 1e8, "junior lost nothing");
+        assertEq(btc.balanceOf(defaultLiquidator), 0);
+        assertEq(Tranche(senior).totalAssets(), seniorBefore - toSlash);
+        assertEq(collateral.balanceOf(defaultLiquidator), toSlash);
+    }
+
+    /// @dev An empty junior does not need a price, so retiring its feed cannot stall the waterfall.
+    function test_slash_emptyTrancheDoesNotConsultTheOracle() public {
+        _deployCap();
+        MockERC20 ghost = _newCollateral("Ghost", "GHOST", 18, 1e18);
+
+        address[] memory assets = new address[](2);
+        assets[0] = address(collateral);
+        assets[1] = address(ghost);
+        (address marketAddr, address[] memory tranches) =
+            _createMarket("ghost", defaultMarketOwner, defaultBorrower, assets, capConfig.defaultTrancheWeights);
+
+        oracle.setSource(address(ghost), new IOracle.Sources[](0));
+
+        vm.prank(marketAddr);
+        assertEq(ITranche(tranches[1]).slash(1e18, makeAddr("recipient")), 0);
+    }
+
+    function _btcJuniorMarket()
+        internal
+        returns (FloatingMarket market, address senior, address junior, MockERC20 btc)
+    {
+        _deployCap();
+        btc = _newCollateral("Wrapped Bitcoin", "WBTC", 8, 100_000e18);
+
+        address[] memory assets = new address[](2);
+        assets[0] = address(collateral);
+        assets[1] = address(btc);
+
+        (address marketAddr, address[] memory tranches) =
+            _createMarket("btc", defaultMarketOwner, defaultBorrower, assets, capConfig.defaultTrancheWeights);
+        market = FloatingMarket(marketAddr);
+        _setMarketSlopes(marketAddr);
+        market.setFixedCreditLimit(1_000_000e18);
+
+        senior = tranches[0];
+        junior = tranches[1];
+        _fundTranche(senior, address(collateral), makeAddr("senior"), 1_000e18);
+        _fundTranche(junior, address(btc), makeAddr("junior"), 1e8);
     }
 }

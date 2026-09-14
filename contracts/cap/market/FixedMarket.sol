@@ -81,6 +81,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         nonReentrant
         returns (uint256 actualPrincipal)
     {
+        _requireOpenLoan(id);
         if (block.timestamp >= expiry[id]) revert LoanExpired();
         uint256 term = expiry[id] - block.timestamp;
         if (term < minimumTermLimit) revert InvalidTerm();
@@ -89,6 +90,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
 
     /// @inheritdoc IFixedMarket
     function extend(uint256 id, uint256 extension) external restricted nonReentrant returns (uint256 actualExtension) {
+        _requireOpenLoan(id);
         uint256 previousExpiry = expiry[id];
         if (block.timestamp >= previousExpiry) {
             actualExtension = _rollFromNow(previousExpiry, extension);
@@ -114,6 +116,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         nonReentrant
         returns (uint256 actualExtension)
     {
+        _requireOpenLoan(id);
         uint256 previousExpiry = expiry[id];
         if (block.timestamp < previousExpiry + grace) revert StillInGracePeriod();
         actualExtension = _rollFromNow(previousExpiry, extension);
@@ -122,6 +125,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
 
     /// @inheritdoc IFixedMarket
     function repay(uint256 id, uint256 amount) external nonReentrant returns (uint256 repaid) {
+        _requireLoan(id);
         repaid = _debtCheck(debt[id], amount);
         debt[id] -= repaid;
         _totalDebt -= repaid;
@@ -136,6 +140,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         nonReentrant
         returns (uint256 repaid, uint256 assetsSlashed)
     {
+        _requireLoan(id);
         (repaid, assetsSlashed) = _liquidate(recipient, _debtCheck(debt[id], amount));
         debt[id] -= repaid;
         _totalDebt -= repaid;
@@ -144,6 +149,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
 
     /// @inheritdoc IFixedMarket
     function writeOff(uint256 id) external restricted nonReentrant returns (uint256 amount) {
+        _requireLoan(id);
         uint256 loanDebt = debt[id];
         uint256 unrecoverable = unrecoverableDebt();
         amount = loanDebt < unrecoverable ? loanDebt : unrecoverable;
@@ -173,7 +179,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         view
         returns (uint256 liquidityPremium, uint256 underwriterPremium)
     {
-        (liquidityPremium, underwriterPremium) = _premiumStillToMint(principal, term, principal);
+        (liquidityPremium, underwriterPremium) = _borrowPremium(principal, term);
     }
 
     /// @inheritdoc IFixedMarket
@@ -185,8 +191,34 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         // rate it will pay cannot be read off the market as it stands today. Price it against the
         // worst case instead: the rate that drawing the whole limit would produce. Nothing here can
         // return more than the limit, and a smaller mint can only mean a lower rate, so the premium
-        // finally charged is at most the one priced in here and the debt lands inside the limit
-        credit = _principalWithin(limit, term, _termRate(term, limit));
+        // finally charged is at most the one priced in here and the debt lands inside the limit.
+        // A same-window draw already minted is in the rate via {unsmoothedCredit}; the catch-up
+        // is the incremental premium on that prior notional at the higher rate.
+        uint256 rate = _termRate(term, limit);
+        uint256 prior = IInterestRateModel(irm()).unsmoothedCredit();
+        if (prior > 0) {
+            uint256 low = _termRate(term, 0);
+            if (rate > low) {
+                uint256 catchUp = (prior * term).rayMul(rate - low) / MathUtils.SECONDS_PER_YEAR;
+                if (catchUp >= limit) return 0;
+                limit -= catchUp;
+            }
+        }
+        credit = _principalWithin(limit, term, rate);
+    }
+
+    /// @dev A loan created by {borrow}, including fully repaid ones.
+    /// @param id The loan id
+    function _requireLoan(uint256 id) internal view {
+        if (id >= loanCount) revert LoanNotFound(id);
+    }
+
+    /// @dev An existing loan that still carries debt. Fully repaid loans stay in
+    /// `[0, loanCount)` for enumeration but cannot reopen.
+    /// @param id The loan id
+    function _requireOpenLoan(uint256 id) internal view {
+        _requireLoan(id);
+        if (debt[id] == 0) revert LoanClosed(id);
     }
 
     /// @dev Borrow the principal
@@ -200,13 +232,14 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         returns (uint256 actualPrincipal)
     {
         actualPrincipal = _creditCheck(availableCredit(term), principal);
+        (uint256 liquidityPremium, uint256 underwriterPremium) = _borrowPremium(actualPrincipal, term);
         debt[id] += actualPrincipal;
         _totalDebt += actualPrincipal;
         // the mint raises utilization, so the premium below is charged at a higher liquidity rate
         // than the one standing before this call. That is the intent, and availableCredit sizes
         // against it; see {IFixedMarket-availableCredit}
         _borrow(recipient, actualPrincipal);
-        uint256 chargedPremium = _chargePremiumForTerm(id, actualPrincipal, term, actualPrincipal);
+        uint256 chargedPremium = _applyPremium(id, liquidityPremium, underwriterPremium);
         // credit is min(ltv, lt) against active capital; the threshold is lt against total. A full
         // draw can land on health of one when those match. The Unhealthy assert is for the premium
         // stacked on top, and for any active < total gap. {extend} asserts the same after its charge
@@ -294,6 +327,29 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         emit ExtendFixed(id, extension, chargedPremium);
     }
 
+    /// @dev Incremental premium for a new draw: `f(prior + principal) - f(prior)`, where `f(P)`
+    /// is the undivided term premium on `P`. Same total principal and term therefore pay the same
+    /// total premium whether drawn once or split. `prior` is {IInterestRateModel-unsmoothedCredit}.
+    /// @param principal The principal of this draw
+    /// @param term The term of the loan in seconds
+    /// @return liquidityPremium The liquidity premium
+    /// @return underwriterPremium The underwriter premium
+    function _borrowPremium(uint256 principal, uint256 term)
+        internal
+        view
+        returns (uint256 liquidityPremium, uint256 underwriterPremium)
+    {
+        uint256 prior = IInterestRateModel(irm()).unsmoothedCredit();
+        (uint256 liqRate, uint256 uwRate) = _ratesStillToMint(term, principal);
+        (liquidityPremium, underwriterPremium) = _premium(prior + principal, term, liqRate, uwRate);
+        if (prior == 0) return (liquidityPremium, underwriterPremium);
+
+        (uint256 liqRate0, uint256 uwRate0) = _ratesStillToMint(term, 0);
+        (uint256 liqPrior, uint256 uwPrior) = _premium(prior, term, liqRate0, uwRate0);
+        liquidityPremium = liquidityPremium > liqPrior ? liquidityPremium - liqPrior : 0;
+        underwriterPremium = underwriterPremium > uwPrior ? underwriterPremium - uwPrior : 0;
+    }
+
     /// @dev Charge the premium
     /// @param id The id of the loan
     /// @param chargeableDebt The amount of debt that a premium is being charged on
@@ -304,13 +360,21 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         internal
         returns (uint256 chargedPremium)
     {
-        // a borrow passes its own principal here even though it has already minted it, which reads
-        // backwards until you look at what the rate is drawn from. Utilization is time-weighted, so
-        // a mint one instruction old has stood for no time and carries no weight yet; the average
-        // will not show it in this block however the charge is ordered. Handing the amount over
-        // explicitly is what keeps a borrower paying for the utilization they create, rather than
-        // the smoothing quietly refunding it. An extension mints nothing and passes zero.
+        // An extension mints nothing and passes zero. {averageUtilizationAfterMint} still folds
+        // in unsmoothed credit, so a same-window borrow is in the rate the extension pays.
         (uint256 liquidityPremium, uint256 underwriterPremium) = _premiumStillToMint(chargeableDebt, term, mintAmount);
+        chargedPremium = _applyPremium(id, liquidityPremium, underwriterPremium);
+    }
+
+    /// @dev Record a computed premium on the loan and mint it
+    /// @param id The id of the loan
+    /// @param liquidityPremium The liquidity premium
+    /// @param underwriterPremium The underwriter premium
+    /// @return chargedPremium The amount of premium that was charged
+    function _applyPremium(uint256 id, uint256 liquidityPremium, uint256 underwriterPremium)
+        internal
+        returns (uint256 chargedPremium)
+    {
         chargedPremium = liquidityPremium + underwriterPremium;
         debt[id] += chargedPremium;
         _totalDebt += chargedPremium;

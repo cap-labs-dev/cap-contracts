@@ -160,7 +160,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         badDebt += _amount;
         if (badDebt > totalSupply()) revert BadDebtExceedsSupply();
         // will never be repaid, so drop it from credit-backed supply. unlockedSupply is unchanged
-        // because badDebt rose by the same amount. Holders take the loss through totalAssets.
+        // because badDebt rose by the same amount. Holders take the loss through {backing}.
         creditBackedSupply -= _amount;
         IInterestRateModel(irm).updateLiquidityRate();
         emit BadDebtRecognizedInCredit(_amount);
@@ -192,15 +192,13 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     }
 
     /// @inheritdoc IStablecoin
-    function totalAssets() public view override(ERC4626Upgradeable, IERC4626, IStablecoin) returns (uint256 assets) {
-        assets = convertToAssets(_outstandingSupply());
+    function backing() public view returns (uint256 recognized) {
+        recognized = totalSupply() - badDebt;
     }
 
-    /// @dev Shares still recognized after write-offs. {_convertToAssets} reads this rather than
-    /// {totalAssets} so the ERC-4626 getter can quote the same figure without recursing.
-    /// @return outstanding `totalSupply - badDebt`, in share units
-    function _outstandingSupply() internal view returns (uint256 outstanding) {
-        outstanding = totalSupply() - badDebt;
+    /// @inheritdoc IStablecoin
+    function totalAssets() public view override(ERC4626Upgradeable, IERC4626, IStablecoin) returns (uint256 assets) {
+        assets = Math.mulDiv(backing(), 10 ** underlyingDecimals, 10 ** decimals());
     }
 
     /// @inheritdoc IStablecoin
@@ -231,7 +229,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     }
 
     /// @dev During a shortfall, redemptions price below the backing ratio so exit repairs the peg.
-    /// Redemptions are priced at roughly (totalAssets / totalSupply) ^2
+    /// Priced at roughly ({backing} / totalSupply) ^ 2. That is an exit quote, not {totalAssets}.
     /// @param _shares The number of shares to convert to assets
     /// @param _rounding The rounding direction
     /// @return assets The number of assets
@@ -247,16 +245,16 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
             value = _shares;
         } else {
             uint256 supply = totalSupply();
-            uint256 backing = _outstandingSupply();
+            uint256 recognized = backing();
             if (_shares >= supply) {
-                value = backing;
+                value = recognized;
             } else {
                 uint256 remaining = supply - _shares;
-                uint256 anchor = supply * backing;
+                uint256 anchor = supply * recognized;
                 // the payout is backing less what is retained, so the retained side is rounded the
                 // opposite way to keep the payout itself on the requested side
                 uint256 retained = Math.mulDiv(remaining, anchor, anchor + remaining * shortfall, _opposite(_rounding));
-                value = backing > retained ? backing - retained : 0;
+                value = recognized > retained ? recognized - retained : 0;
             }
         }
         assets = Math.mulDiv(value, 10 ** underlyingDecimals, 10 ** decimals(), _rounding);
@@ -278,12 +276,12 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         if (shortfall == 0) return value;
 
         uint256 supply = totalSupply();
-        uint256 backing = _outstandingSupply();
+        uint256 recognized = backing();
         // more than the whole reserve can ever pay out, so the entire supply would not cover it
-        if (value >= backing) return supply;
+        if (value >= recognized) return supply;
 
-        uint256 retained = backing - value;
-        uint256 anchor = supply * backing;
+        uint256 retained = recognized - value;
+        uint256 anchor = supply * recognized;
         uint256 remaining = Math.mulDiv(retained, anchor, anchor - retained * shortfall, _opposite(_rounding));
         shares = supply > remaining ? supply - remaining : 0;
     }

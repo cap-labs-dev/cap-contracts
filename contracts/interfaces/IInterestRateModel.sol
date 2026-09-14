@@ -191,12 +191,19 @@ interface IInterestRateModel {
     function averageSupplies() external view returns (uint256 credit, uint256 supply);
 
     /// @notice The time-weighted utilization rate
-    /// @dev {averageUtilizationAfterMint} with nothing about to be minted
+    /// @dev The carried averages only. Unabsorbed credit-backed mints are added by
+    /// {averageUtilizationAfterMint}, not here.
     /// @return rate The time-weighted utilization rate in ray decimals
     function averageUtilization() external view returns (uint256 rate);
 
+    /// @notice Credit-backed supply the time-weighted average has not yet absorbed
+    /// @dev `max(0, live credit - average credit)`. A reserve-only move does not appear.
+    /// @return amount The unsmoothed credit-backed supply
+    function unsmoothedCredit() external view returns (uint256 amount);
+
     /// @notice Utilization after a credit-backed mint, against the time-weighted supplies
-    /// @dev Mint is added in full; a same-tx supply move carries no weight.
+    /// @dev `mintAmount` and any already-unabsorbed credit are added in full. A same-tx reserve
+    /// move still carries no weight.
     /// @param mintAmount The credit-backed supply about to be minted
     /// @return rate The projected utilization rate in ray decimals
     function averageUtilizationAfterMint(uint256 mintAmount) external view returns (uint256 rate);
@@ -238,9 +245,9 @@ interface IInterestRateModel {
     function liquidityIndex() external view returns (uint256 index);
 
     /// @notice Fixed rates after a credit-backed mint
-    /// @dev Non-decreasing in `mintAmount`. See {averageUtilizationAfterMint}. The liquidity
-    /// rate is the protocol curve times the term multiplier; the caller applies its market
-    /// multiplier.
+    /// @dev Non-decreasing in `mintAmount`. See {averageUtilizationAfterMint}, which also folds
+    /// in unabsorbed credit. The liquidity rate is the protocol curve times the term multiplier;
+    /// the caller applies its market multiplier.
     /// @param market The market the underwriter rate is for
     /// @param termUtilization The term as a fraction of the market's maximum term in ray decimals
     /// @param mintAmount The credit-backed supply about to be minted

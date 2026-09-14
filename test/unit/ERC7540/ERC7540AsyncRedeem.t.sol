@@ -7,6 +7,7 @@ import { IERC7540Operator } from "../../../contracts/interfaces/IERC7540Operator
 import { IERC7540Redeem } from "../../../contracts/interfaces/IERC7540Redeem.sol";
 import { IERC7575 } from "../../../contracts/interfaces/IERC7575.sol";
 import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
+import { ERC4626Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { Test } from "forge-std/Test.sol";
@@ -76,6 +77,26 @@ contract ERC7540AsyncRedeemTest is Test {
         vault.requestRedeem(0, alice, alice);
     }
 
+    /// @dev A zero controller cannot later transfer or claim. Reject before the escrow so shares
+    /// stay with the owner. Abandoned requests under a real controller are a separate policy.
+    function test_requestRedeem_zeroController_reverts() public {
+        uint256 ownerShares = vault.balanceOf(alice);
+        uint256 escrowed = vault.balanceOf(address(vault));
+        uint256 queued = vault.redemptionQueue();
+
+        vm.prank(alice);
+        vm.expectRevert(IERC7540AsyncRedeem.ZeroAddress.selector);
+        vault.requestRedeem(400e18, address(0), alice);
+
+        assertEq(vault.balanceOf(alice), ownerShares);
+        assertEq(vault.balanceOf(address(vault)), escrowed);
+        assertEq(vault.redemptionQueue(), queued);
+
+        vm.prank(alice);
+        uint256 id = vault.requestRedeem(400e18, alice, alice);
+        assertEq(id, 1, "failed zero-controller request must not consume a request id");
+    }
+
     function test_requestRedeem_insufficientBalance_reverts() public {
         vm.prank(alice);
         vm.expectRevert();
@@ -124,6 +145,89 @@ contract ERC7540AsyncRedeemTest is Test {
         // 500 of liquidity: first request (400) fully claimable, second gets the remaining 100
         assertEq(vault.claimableRedeemRequest(id0, alice), 400e18);
         assertEq(vault.claimableRedeemRequest(id1, alice), 100e18);
+    }
+
+    /// @dev A later 4-arg claim advances `settledQueue` without filling the prefix. The earlier
+    /// request must recap to current unlocked, not stay claimable against a stale watermark.
+    function test_laterClaimDoesNotKeepEarlierRequestClaimableAfterLiquidityFalls() public {
+        vault.setUnlocked(200e18);
+        vm.startPrank(alice);
+        uint256 id0 = vault.requestRedeem(100e18, alice, alice);
+        uint256 id1 = vault.requestRedeem(100e18, alice, alice);
+        vault.redeem(id1, 100e18, alice, alice);
+        vm.stopPrank();
+
+        vault.setUnlocked(0);
+        assertEq(vault.unlockedSupply(), 0);
+        assertEq(vault.claimableRedeemRequest(id0, alice), 0, "earlier request is not claimable without liquidity");
+        assertEq(vault.pendingRedeemRequest(id0, alice), 100e18, "the shares stay pending");
+        assertEq(vault.maxRedeem(alice), 0);
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxRedeem.selector, alice, 100e18, 0));
+        vault.redeem(id0, 100e18, alice, alice);
+    }
+
+    function test_laterClaimRecapsEarlierRequestToRemainingUnlocked() public {
+        vault.setUnlocked(200e18);
+        vm.startPrank(alice);
+        uint256 id0 = vault.requestRedeem(100e18, alice, alice);
+        uint256 id1 = vault.requestRedeem(100e18, alice, alice);
+        vault.redeem(id1, 100e18, alice, alice);
+        vm.stopPrank();
+
+        vault.setUnlocked(40e18);
+        assertEq(vault.claimableRedeemRequest(id0, alice), 40e18);
+        assertEq(vault.pendingRedeemRequest(id0, alice), 60e18);
+        assertEq(vault.maxRedeem(alice), 40e18);
+
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.redeem(id0, 41e18, alice, alice);
+
+        vm.prank(alice);
+        assertEq(vault.redeem(id0, 40e18, alice, alice), 40e18);
+    }
+
+    function test_outOfOrderClaimStillAllowedWhileLiquid() public {
+        vault.setUnlocked(200e18);
+        vm.startPrank(alice);
+        uint256 id0 = vault.requestRedeem(100e18, alice, alice);
+        uint256 id1 = vault.requestRedeem(100e18, alice, alice);
+        assertEq(vault.redeem(id1, 100e18, alice, alice), 100e18, "later request may settle first");
+        assertEq(vault.redeem(id0, 100e18, alice, alice), 100e18, "earlier request still settles after");
+        vm.stopPrank();
+    }
+
+    /// @dev After a later request settles, two earlier leftovers can each look claimable up to
+    /// unlocked. Aggregate maxRedeem and FIFO must share that budget.
+    function test_fifoAndMaxRedeemShareTheUnlockedBudget() public {
+        vault.setUnlocked(200e18);
+        vm.startPrank(alice);
+        vault.requestRedeem(50e18, alice, alice);
+        vault.requestRedeem(50e18, alice, alice);
+        vault.requestRedeem(50e18, alice, alice);
+        vault.redeem(3, 50e18, alice, alice);
+        vm.stopPrank();
+
+        vault.setUnlocked(80e18);
+        assertEq(vault.claimableRedeemRequest(1, alice), 50e18);
+        assertEq(vault.claimableRedeemRequest(2, alice), 50e18);
+        assertEq(vault.maxRedeem(alice), 80e18, "sum is capped at unlocked");
+
+        vm.prank(alice);
+        vault.redeem(80e18, alice, alice);
+        assertEq(vault.claimableRedeemRequest(1, alice), 0, "first leftover is exhausted");
+        assertEq(
+            vault.claimableRedeemRequest(2, alice) + vault.pendingRedeemRequest(2, alice),
+            20e18,
+            "FIFO stopped at the unlocked budget"
+        );
+
+        // the mock's unlocked is sticky; once it falls, the leftover is pending, not still claimable
+        vault.setUnlocked(0);
+        assertEq(vault.claimableRedeemRequest(2, alice), 0);
+        assertEq(vault.pendingRedeemRequest(2, alice), 20e18);
     }
 
     // --- redeem / withdraw execution ---
@@ -325,6 +429,57 @@ contract ERC7540AsyncRedeemTest is Test {
         assertEq(asset.balanceOf(alice), 400e18);
         assertEq(vault.maxRedeem(alice), 0);
         assertEq(vault.balanceOf(address(vault)), 0);
+    }
+
+    function test_threeArgWithdraw_claimsFifoAcrossRequests() public {
+        vault.setUnlocked(500e18);
+        vm.startPrank(alice);
+        vault.requestRedeem(400e18, alice, alice);
+        vault.requestRedeem(400e18, alice, alice);
+        uint256 shares = vault.withdraw(500e18, alice, alice);
+        vm.stopPrank();
+
+        assertEq(shares, 500e18);
+        assertEq(asset.balanceOf(alice), 500e18, "paid the requested assets");
+        assertEq(vault.claimableRedeemRequest(1, alice), 0, "the older request is fully claimed");
+        assertEq(
+            vault.claimableRedeemRequest(2, alice) + vault.pendingRedeemRequest(2, alice),
+            300e18,
+            "the newer request still holds the rest"
+        );
+    }
+
+    /// @dev Confirmed: one underlying atom across 1-share receipts burned the ceil quote and paid
+    /// nothing, because each fragment's convertToAssets floored to zero and withdraw ignored the
+    /// summed payout. The vault is below par so that floor is real.
+    function test_threeArgWithdraw_paysTheAtomAcrossDustReceipts() public {
+        vault.setUnlocked(1_000e18);
+        deal(address(asset), address(vault), 400e18);
+        assertEq(vault.convertToAssets(1), 0, "a single share pays nothing");
+
+        vm.startPrank(alice);
+        vault.requestRedeem(1, alice, alice);
+        vault.requestRedeem(1, alice, alice);
+        vault.requestRedeem(1, alice, alice);
+        vault.requestRedeem(10e18, alice, alice);
+
+        uint256 shares = vault.quoteWithdraw(1);
+        assertEq(shares, 3, "the ceil quote spans the three dust receipts");
+        assertEq(
+            vault.convertToAssets(1) + vault.convertToAssets(1) + vault.convertToAssets(1),
+            0,
+            "fragment floors would have paid zero"
+        );
+
+        uint256 burned = vault.withdraw(1, alice, alice);
+        vm.stopPrank();
+
+        assertEq(burned, shares, "all quoted shares were consumed");
+        assertEq(asset.balanceOf(alice), 1, "paid the atom");
+        assertEq(vault.claimableRedeemRequest(1, alice) + vault.pendingRedeemRequest(1, alice), 0);
+        assertEq(vault.claimableRedeemRequest(2, alice) + vault.pendingRedeemRequest(2, alice), 0);
+        assertEq(vault.claimableRedeemRequest(3, alice) + vault.pendingRedeemRequest(3, alice), 0);
+        assertEq(vault.claimableRedeemRequest(4, alice) + vault.pendingRedeemRequest(4, alice), 10e18);
     }
 
     function test_threeArgRedeem_claimsFifoAcrossRequests() public {

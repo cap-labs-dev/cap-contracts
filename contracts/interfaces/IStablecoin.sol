@@ -114,7 +114,8 @@ interface IStablecoin {
     function recognizeBadDebtInReserve(uint256 amount) external;
 
     /// @notice Recognize unrecoverable borrower debt, socializing the loss across holders
-    /// @dev Market only. Also drops credit-backed supply. Redeemers take the haircut via {totalAssets}.
+    /// @dev Market only. Also drops credit-backed supply. Recognized backing falls through
+    /// {backing} / {totalAssets}; redeemers take a further exit haircut via {convertToAssets}.
     /// @param amount The amount of bad debt to recognize
     function recognizeBadDebtInCredit(uint256 amount) external;
 
@@ -144,9 +145,16 @@ interface IStablecoin {
     /// @return The credit-backed supply
     function creditBackedSupply() external view returns (uint256);
 
-    /// @notice Total assets backing redemptions after bad debt is excluded
-    /// @dev {convertToAssets} of the outstanding supply, in underlying units.
-    /// @return assets Total redeemable assets in underlying units
+    /// @notice Recognized backing in share units
+    /// @dev `totalSupply - badDebt`. {convertToAssets} applies a further shortfall
+    /// discount when quoting an exit; this figure is not that quote.
+    /// @return recognized The outstanding supply still recognized as backed
+    function backing() external view returns (uint256 recognized);
+
+    /// @notice Recognized backing in underlying units
+    /// @dev Scaled {backing}. Integrators read this as managed assets, not as the
+    /// discounted value of redeeming the outstanding supply.
+    /// @return assets Total recognized assets in underlying units
     function totalAssets() external view returns (uint256 assets);
 
     /// @notice Preview the shares minted for a deposit at the fixed 1:1 exchange rate

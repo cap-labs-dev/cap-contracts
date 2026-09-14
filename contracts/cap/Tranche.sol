@@ -13,6 +13,7 @@ import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title Tranche
 /// @author kexley, Cap Labs
@@ -69,16 +70,19 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     /// @inheritdoc ITranche
     function slash(uint256 value, address recipient) external returns (uint256 slashedValue) {
         if (msg.sender != market) revert InvalidMarket();
+        uint256 total = totalAssets();
+        // nothing to deliver, and a price would only add a failure mode
+        if (total == 0) return 0;
+
         uint256 price = getPrice();
         uint256 unit = 10 ** decimals();
-        uint256 assets = value * unit / price;
-        uint256 total = totalAssets();
-        if (assets > total) {
-            assets = total;
-            slashedValue = total * price / unit;
-        } else {
-            slashedValue = value;
-        }
+        uint256 assets = Math.mulDiv(value, unit, price);
+        if (assets > total) assets = total;
+        // report what the tokens are worth, never the request. A floor-to-zero
+        // conversion transfers nothing so the waterfall can try the next tranche.
+        slashedValue = Math.mulDiv(assets, price, unit);
+        if (slashedValue == 0) return 0;
+
         // Kill below 1% of par so a fresh deposit cannot mint against a near-zero asset base.
         // Empty stays at par. Latch before the withdrawal so a transfer hook cannot deposit first.
         if (!killed && totalSupply() > (total - assets) * KILL_RATIO) {
@@ -157,21 +161,30 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
 
     /// @inheritdoc ITranche
     function unlockedSupply() public view override(ERC7540AsyncRedeem, ITranche) returns (uint256 unlocked) {
-        // market accounts in USD; convert locked value back to collateral
-        uint256 lockedAssets = IBaseMarket(market).lockedValue(address(this)) * 10 ** decimals() / getPrice();
+        uint256 locked = IBaseMarket(market).lockedValue(address(this));
+        uint256 supply = totalSupply();
+        if (locked == 0) return supply;
+
+        // market accounts in USD; convert locked value back to collateral, rounding up
+        // at both stages so a discarded fraction cannot be withdrawn. A zero lock never
+        // consults the oracle, so a debt-free tranche can still exit after its feed dies.
+        uint256 lockedAssets = Math.mulDiv(locked, 10 ** decimals(), getPrice(), Math.Rounding.Ceil);
         uint256 lockedShares = _quoteWithdraw(lockedAssets);
-        uint256 totalSupply = totalSupply();
-        if (totalSupply > lockedShares) unlocked = totalSupply - lockedShares;
+        if (supply > lockedShares) unlocked = supply - lockedShares;
     }
 
     /// @inheritdoc ITranche
     function totalCapital() public view returns (uint256 capital) {
-        capital = totalAssets() * getPrice() / 10 ** decimals();
+        uint256 assets = totalAssets();
+        if (assets == 0) return 0;
+        capital = assets * getPrice() / 10 ** decimals();
     }
 
     /// @inheritdoc ITranche
     function activeCapital() public view returns (uint256 capital) {
-        capital = activeAssets() * getPrice() / 10 ** decimals();
+        uint256 assets = activeAssets();
+        if (assets == 0) return 0;
+        capital = assets * getPrice() / 10 ** decimals();
     }
 
     /// @dev Mint the seed on the first deposit. Already deducted from the quote.

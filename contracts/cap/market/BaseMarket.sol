@@ -268,8 +268,13 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
 
     /// @inheritdoc IBaseMarket
     function lockedValue(address tranche) public view returns (uint256 value) {
+        uint256 debt = totalDebt();
+        // nothing to lock, and walking the stack would price every junior for no reason
+        if (debt == 0) return 0;
+
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        value = totalDebt().rayDiv($.lt - $.buffer);
+        // ceil so a later token conversion cannot start from an understated USD requirement
+        value = Math.mulDiv(debt, WadRayMath.RAY, $.lt - $.buffer, Math.Rounding.Ceil);
 
         for (uint256 i = $.tranches.length; i > 0;) {
             i--;
@@ -356,6 +361,9 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
 
         uint256 toSlash = repaid.rayMul(_slashPerDebt());
 
+        // Each slash reports only the value it delivered. Remainder — empty junior,
+        // or a request below that tranche's token unit — is offered to the next.
+        // Dust left after the senior is uncollected; repayment already settled.
         for (uint256 i = $.tranches.length; i > 0;) {
             i--;
             uint256 slashedAmount = ITranche($.tranches[i].tranche).slash(toSlash, recipient);
@@ -419,9 +427,9 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @dev Charge the premium
-    /// @dev Active tranches take their weight of the underwriter premium. Dust and empty-tranche
-    /// weight go to the senior tranche, or vest on the stablecoin. Shares are clamped so rounding
-    /// cannot overflow.
+    /// @dev Tranches that still hold capital and have opted-in shares take their weight of the
+    /// underwriter premium. Dust and ineligible-tranche weight go to the senior tranche, or vest
+    /// on the stablecoin. Already-funded premium is not touched.
     /// @param liquidityPremium The amount of liquidity premium to charge
     /// @param underwriterPremium The amount of underwriter premium to charge
     function _chargePremium(uint256 liquidityPremium, uint256 underwriterPremium) internal {
@@ -439,9 +447,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
         uint256 length = $.tranches.length;
         for (uint256 i; i < length; ++i) {
             address tranche = $.tranches[i].tranche;
-            // stakedSupply rather than activeSupply: nobody opted in, so premium sent there
-            // would sit unclaimable
-            if (IPremiumVesting(tranche).stakedSupply() == 0) continue;
+            if (!_earnsPremium(tranche)) continue;
             if (i == 0) {
                 seniorActive = true;
                 continue;
@@ -466,5 +472,15 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
             IStablecoin($.stablecoin).fundCreditBacked(remaining);
             emit ChargePremium($.stablecoin, remaining);
         }
+    }
+
+    /// @dev New underwriting premium is for capital that still backs the market and can be claimed.
+    /// Shares survive a wipeout, so {IPremiumVesting-stakedSupply} alone would keep paying a
+    /// depleted tranche.
+    /// @param tranche The tranche being considered
+    /// @return eligible Whether the tranche should receive a fresh allocation
+    function _earnsPremium(address tranche) private view returns (bool eligible) {
+        if (IPremiumVesting(tranche).stakedSupply() == 0) return false;
+        eligible = ITranche(tranche).totalCapital() > 0;
     }
 }

@@ -43,6 +43,12 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     /// @dev ERC-7540 async redeem vaults must revert {previewRedeem} and {previewWithdraw}.
     error PreviewNotSupported();
 
+    /// @dev FIFO consume did not burn every share the quote required.
+    error IncompleteClaim(uint256 consumed, uint256 requested);
+
+    /// @dev The settlement paid a different asset amount than the caller requested.
+    error InexactPayout(uint256 paid, uint256 requested);
+
     /// @notice Move a request to another controller. Place in the settlement queue is unchanged.
     /// @dev Caller must be the current controller or its operator.
     /// @param requestId The request to transfer

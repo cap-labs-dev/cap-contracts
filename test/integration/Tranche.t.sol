@@ -253,6 +253,60 @@ contract TrancheTest is CapDeployer {
         tranche0.totalCapital();
     }
 
+    /// @dev Empty capital is already zero. Asking the oracle would only add a failure mode to
+    /// views that have nothing to value.
+    function test_emptyTrancheValuationDoesNotConsultTheOracle() public {
+        oracle.setSource(address(collateral), new IOracle.Sources[](0));
+
+        assertEq(tranche0.totalAssets(), 0);
+        assertEq(tranche0.totalCapital(), 0);
+        assertEq(tranche0.activeCapital(), 0);
+        assertEq(tranche0.unlockedSupply(), 0);
+    }
+
+    /// @dev Confirmed: a funded, debt-free withdrawal used to revert {InvalidPrice} once the feed
+    /// was retired, because {unlockedSupply} always priced the lock. With nothing to lock, the
+    /// ordinary exit must still settle. {totalCapital} keeps failing closed — that call is a
+    /// valuation of assets the tranche still holds.
+    function test_debtFreeWithdrawalDoesNotDependOnTheOracle() public {
+        _fundTranche(address(tranche0), supplier, 100e18);
+        uint256 held = 100e18 - DEAD_SHARES;
+
+        oracle.setSource(address(collateral), new IOracle.Sources[](0));
+
+        vm.expectRevert(ITranche.InvalidPrice.selector);
+        tranche0.totalCapital();
+
+        assertEq(market.totalDebt(), 0, "nothing to lock");
+        assertEq(market.lockedValue(address(tranche0)), 0);
+        assertEq(tranche0.unlockedSupply(), tranche0.totalSupply());
+
+        vm.prank(supplier);
+        uint256 assets = tranche0.instantRedeem(held, supplier, supplier);
+        assertEq(assets, held, "debt-free exit pays the holder");
+        assertEq(tranche0.balanceOf(supplier), 0);
+    }
+
+    /// @dev Outstanding debt still has to be valued. Retiring the feed must keep {unlockedSupply}
+    /// closed so a holder cannot walk out of collateral that is backing a live loan.
+    function test_outstandingDebtStillRequiresAPrice() public {
+        _fundTranche(address(tranche0), supplier, 100e18);
+        _fundTranche(address(tranche1), stranger, 100e18);
+
+        vm.prank(defaultBorrower);
+        market.borrow(defaultBorrower, 50e18);
+        assertGt(market.totalDebt(), 0, "debt is live");
+
+        oracle.setSource(address(collateral), new IOracle.Sources[](0));
+
+        vm.expectRevert(ITranche.InvalidPrice.selector);
+        tranche1.totalCapital();
+        vm.expectRevert(ITranche.InvalidPrice.selector);
+        tranche1.unlockedSupply();
+        vm.expectRevert(ITranche.InvalidPrice.selector);
+        tranche0.unlockedSupply();
+    }
+
     function test_unlockedSupply_zeroWithoutDeposits() public view {
         assertEq(tranche0.unlockedSupply(), 0);
     }
@@ -618,6 +672,71 @@ contract TrancheTest is CapDeployer {
 
         assertEq(stablecoin.balanceOf(b.tranche0Addr), 0, "no premium sent to the emptied tranche");
         assertGt(stablecoin.balanceOf(b.tranche1Addr), 0, "it went to the tranche that is working");
+    }
+
+    /// @dev Shares survive a wipeout, so {stakedSupply} stays positive after every asset is
+    /// slashed. Fresh underwriting premium is for capital that still backs the market; already
+    /// funded rewards stay on the tranche.
+    function test_depletedTrancheDoesNotReceiveFreshPremium() public {
+        MarketBundle memory b = _createReadyMarket("depleted");
+        _fundTranche(b.tranche0Addr, supplier, 100e18);
+        _fundTranche(b.tranche1Addr, stranger, 100e18);
+
+        vm.prank(defaultBorrower);
+        b.market.borrow(defaultBorrower, 50e18);
+        vm.warp(block.timestamp + 30 days);
+        b.market.chargePremium();
+
+        uint256 juniorHeld = stablecoin.balanceOf(b.tranche1Addr);
+        uint256 seniorHeld = stablecoin.balanceOf(b.tranche0Addr);
+        assertGt(juniorHeld, 0, "junior earned while it had capital");
+
+        _marketSlash(b.tranche1, 1_000_000e18);
+        assertEq(b.tranche1.totalAssets(), 0, "liquidation took every asset");
+        assertTrue(b.tranche1.killed(), "and retired the tranche");
+        assertGt(b.tranche1.stakedSupply(), 0, "but the shares are still opted in");
+        assertEq(stablecoin.balanceOf(b.tranche1Addr), juniorHeld, "funded premium is left alone");
+
+        vm.warp(block.timestamp + 30 days);
+        b.market.chargePremium();
+
+        assertEq(stablecoin.balanceOf(b.tranche1Addr), juniorHeld, "no fresh premium to a depleted tranche");
+        assertGt(stablecoin.balanceOf(b.tranche0Addr), seniorHeld, "its weight went to the senior");
+    }
+
+    /// @dev The same capital check applies to the senior fallback. A wiped senior must not absorb
+    /// leftover junior weight; that remainder vests on the stablecoin.
+    function test_depletedSeniorFallbackVestsOnStablecoin() public {
+        MarketBundle memory b = _createReadyMarket("depleted-senior");
+        _fundTranche(b.tranche0Addr, supplier, 100e18);
+        _fundTranche(b.tranche1Addr, stranger, 100e18);
+
+        vm.prank(defaultBorrower);
+        b.market.borrow(defaultBorrower, 50e18);
+        vm.warp(block.timestamp + 30 days);
+        b.market.chargePremium();
+
+        uint256 seniorHeld = stablecoin.balanceOf(b.tranche0Addr);
+        _marketSlash(b.tranche0, 1_000_000e18);
+        assertEq(b.tranche0.totalAssets(), 0, "senior is empty");
+        assertGt(b.tranche0.stakedSupply(), 0, "and still has opted-in shares");
+
+        vm.warp(block.timestamp + 30 days);
+        (uint256 liquidityPremium, uint256 underwriterPremium) = b.market.premium();
+        uint256 juniorShare = underwriterPremium * b.market.tranches()[1].weight / 1e27;
+        uint256 leftover = underwriterPremium - juniorShare;
+        uint256 vestedBefore = stablecoin.balanceOf(address(stablecoin));
+        uint256 juniorBefore = stablecoin.balanceOf(b.tranche1Addr);
+
+        b.market.chargePremium();
+
+        assertEq(stablecoin.balanceOf(b.tranche0Addr), seniorHeld, "depleted senior takes nothing more");
+        assertEq(stablecoin.balanceOf(b.tranche1Addr) - juniorBefore, juniorShare, "live junior keeps its weight");
+        assertEq(
+            stablecoin.balanceOf(address(stablecoin)) - vestedBefore,
+            liquidityPremium + leftover,
+            "leftover vests on cUSD"
+        );
     }
 
     /// @dev The seed never opts in, so it is excluded from {IPremiumVesting-stakedSupply}, which

@@ -4,7 +4,10 @@ pragma solidity 0.8.36;
 import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
 import { IBaseMarket } from "../../contracts/interfaces/IBaseMarket.sol";
+import { IOracle } from "../../contracts/interfaces/IOracle.sol";
+import { ITranche } from "../../contracts/interfaces/ITranche.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
+import { MockERC20 } from "../shared/mocks/MockERC20.sol";
 
 /// @title LockedValueTest
 /// @notice The market computes locked capital in USD while tranches hold collateral tokens, so a
@@ -78,6 +81,46 @@ contract LockedValueTest is CapDeployer {
         assertApproxEqAbs(Tranche(junior).unlockedSupply(), expectedUnlocked, 1e6, "junior unlocked in tokens");
     }
 
+    /// @dev Six-decimal collateral plus a zero buffer used to floor the USD-to-token conversion
+    /// and leave health below one after a full instant exit. Both conversions now ceil.
+    function test_sixDecimalZeroBufferWithdrawCannotBreakHealth() public {
+        _deployCap();
+        MockERC20 usdc = _newCollateral("USD Coin", "USDC", 6, 1e18);
+        address[] memory assets = new address[](2);
+        assets[0] = address(usdc);
+        assets[1] = address(usdc);
+
+        (address marketAddr, address[] memory tranches) =
+            _createMarket("usdc6", defaultMarketOwner, defaultBorrower, assets, capConfig.defaultTrancheWeights);
+        FloatingMarket market = FloatingMarket(marketAddr);
+        market.setBuffer(0);
+        market.setLtv(market.lt());
+        market.setFixedCreditLimit(type(uint256).max);
+
+        address seniorLp = makeAddr("senior-lp");
+        address juniorLp = makeAddr("junior-lp");
+        _fundTranche(tranches[0], address(usdc), seniorLp, 1_000e6);
+        _fundTranche(tranches[1], address(usdc), juniorLp, 4_001e6);
+
+        vm.prank(defaultBorrower);
+        market.borrow(defaultBorrower, 3_200e18 + 1);
+
+        _exitUnlocked(tranches[0], seniorLp);
+        _exitUnlocked(tranches[1], juniorLp);
+
+        emit log_named_uint("health", market.healthiness());
+        emit log_named_uint("debt  ", market.totalDebt());
+        emit log_named_uint("capital", market.totalCapital());
+        assertGe(market.healthiness(), 1e27, "a full instant exit must not make the market unhealthy");
+    }
+
+    function _exitUnlocked(address tranche, address lp) internal {
+        uint256 redeemable = Tranche(tranche).maxInstantRedeem(lp);
+        if (redeemable == 0) return;
+        vm.prank(lp);
+        Tranche(tranche).instantRedeem(redeemable, lp, lp);
+    }
+
     /// No debt means nothing is locked, at any price.
     function test_noDebtLeavesEverythingUnlocked() public {
         (FloatingMarket market, address senior, address junior) = _marketAtPrice(0.5e18);
@@ -85,6 +128,24 @@ contract LockedValueTest is CapDeployer {
         assertEq(market.lockedValue(senior), 0, "senior free");
         assertEq(market.lockedValue(junior), 0, "junior free");
         assertEq(Tranche(junior).unlockedSupply(), Tranche(junior).totalSupply(), "all unlocked");
+    }
+
+    /// @dev Zero-debt locking used to walk the stack and price every junior. After the feed dies
+    /// that walk reverted, so a senior could not exit even though nothing was locked.
+    function test_noDebtUnlocksAfterTheFeedDies() public {
+        (FloatingMarket market, address senior, address junior) = _marketAtPrice(0.5e18);
+        oracle.setSource(Tranche(junior).asset(), new IOracle.Sources[](0));
+
+        vm.expectRevert(ITranche.InvalidPrice.selector);
+        Tranche(junior).totalCapital();
+
+        assertEq(market.lockedValue(senior), 0, "senior free without a price");
+        assertEq(market.lockedValue(junior), 0, "junior free without a price");
+        assertEq(Tranche(senior).unlockedSupply(), Tranche(senior).totalSupply());
+        assertEq(Tranche(junior).unlockedSupply(), Tranche(junior).totalSupply());
+
+        _exitUnlocked(junior, makeAddr("junior"));
+        assertEq(Tranche(junior).balanceOf(makeAddr("junior")), 0, "debt-free junior still exits");
     }
 
     /// lockedValue divides by lt - buffer, so the setters must keep the buffer below lt.

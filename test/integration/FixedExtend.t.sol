@@ -102,6 +102,78 @@ contract FixedExtendTest is CapDeployer {
         market.borrowMore(id, defaultBorrower, 1e18);
     }
 
+    /// @dev Confirmed: `extend` on an unused id populated expiry from timestamp-0 arrears, then
+    /// `borrowMore` minted debt while `loanCount` stayed zero. Keepers walking `[0, loanCount)`
+    /// would never see it.
+    function test_lifecycle_rejectsAnIdOutsideLoanCount() public {
+        FixedMarket market = _ready();
+        assertEq(market.loanCount(), 0);
+
+        vm.prank(defaultBorrower);
+        vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanNotFound.selector, 0));
+        market.extend(0, 7 days);
+
+        vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanNotFound.selector, 0));
+        market.extendAdmin(0, 7 days);
+
+        vm.prank(defaultBorrower);
+        vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanNotFound.selector, 0));
+        market.borrowMore(0, defaultBorrower, 1e18);
+
+        vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanNotFound.selector, 0));
+        market.repay(0, 1e18);
+
+        assertEq(market.loanCount(), 0, "no loan was created");
+        assertEq(market.totalDebt(), 0, "and no debt escaped the range");
+        assertEq(market.expiry(0), 0, "expiry stayed unset");
+    }
+
+    function test_lifecycle_rejectsAnIdPastTheLastLoan() public {
+        FixedMarket market = _ready();
+
+        vm.prank(defaultBorrower);
+        market.borrow(defaultBorrower, PRINCIPAL, 10 days);
+        assertEq(market.loanCount(), 1);
+
+        vm.prank(defaultBorrower);
+        vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanNotFound.selector, 1));
+        market.borrowMore(1, defaultBorrower, 1e18);
+    }
+
+    /// @dev Fully repaid loans stay in `loanCount` so keepers can walk them, but they cannot
+    /// reopen. A new draw goes through {borrow}.
+    function test_fullyRepaidLoanCannotReopen() public {
+        FixedMarket market = _ready();
+
+        vm.prank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 10 days);
+        uint256 owed = market.debt(id);
+        _depositStable(defaultBorrower, owed);
+
+        vm.prank(defaultBorrower);
+        market.repay(id, type(uint256).max);
+
+        assertEq(market.debt(id), 0);
+        assertEq(market.loanCount(), 1, "the closed loan stays enumerable");
+        assertEq(market.totalDebt(), 0);
+
+        vm.prank(defaultBorrower);
+        vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanClosed.selector, id));
+        market.borrowMore(id, defaultBorrower, 1e18);
+
+        vm.prank(defaultBorrower);
+        vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanClosed.selector, id));
+        market.extend(id, 1 days);
+
+        vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanClosed.selector, id));
+        market.extendAdmin(id, 7 days);
+
+        vm.prank(defaultBorrower);
+        (uint256 next,) = market.borrow(defaultBorrower, PRINCIPAL, 10 days);
+        assertEq(next, 1, "a new loan takes the next id");
+        assertEq(market.loanCount(), 2);
+    }
+
     function test_borrowMore_whenRemainingTermBelowMinimum_reverts() public {
         FixedMarket market = _ready();
 

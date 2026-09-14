@@ -48,7 +48,10 @@ interface ITranche is IERC7540AsyncRedeem {
     function setDepositorRole(uint64 roleId) external;
 
     /// @notice Slash assets worth `value`, capped by holdings
-    /// @dev Caller must be this tranche's market
+    /// @dev Caller must be this tranche's market. Returns the floored USD value of
+    /// tokens actually transferred. Empty holdings, or a request that cannot
+    /// produce a positive USD output, return 0 so the market can offer the
+    /// remainder to the next tranche.
     /// @param value The value to slash in USD (18 decimals)
     /// @param recipient The recipient of the slashed assets
     /// @return slashedValue The value slashed in USD (18 decimals)
@@ -97,14 +100,17 @@ interface ITranche is IERC7540AsyncRedeem {
     function maxMint(address receiver) external view returns (uint256 maxShares);
 
     /// @notice Shares available for redemption excluding market-locked assets
+    /// @dev A zero lock does not consult the oracle.
     /// @return unlocked Shares not locked by the market
     function unlockedSupply() external view returns (uint256 unlocked);
 
     /// @notice Get the total capital value of the tranche in USD (18 decimals)
+    /// @dev Zero when the tranche holds no assets, without consulting the oracle.
     /// @return capital The total capital value in USD
     function totalCapital() external view returns (uint256 capital);
 
     /// @notice Get the active capital value of the tranche in USD (18 decimals)
+    /// @dev Zero when no assets are active, without consulting the oracle.
     /// @return capital The active capital value in USD
     function activeCapital() external view returns (uint256 capital);
 }

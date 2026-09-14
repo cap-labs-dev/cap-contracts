@@ -222,6 +222,57 @@ contract InterestRateModelTest is BaseTest {
         );
     }
 
+    /// @dev A credit-backed mint that has stood for no time is absent from the average, but a
+    /// later `afterMint` still has to count it. Otherwise a second draw in the same block is
+    /// priced as if the first never happened.
+    function test_averageAfterMint_countsUnabsorbedCredit() public {
+        stablecoin.setSupplyUtilization(0.5e27);
+        irm.updateLiquidityRate();
+        skip(_untilSettled());
+        irm.updateLiquidityRate();
+
+        stablecoin.setSupplyUtilization(0.7e27);
+        irm.updateLiquidityRate();
+
+        (uint256 credit, uint256 supply) = irm.averageSupplies();
+        uint256 extra = irm.unsmoothedCredit();
+        assertEq(extra, 0.7e27 - credit, "the jump has stood for no time");
+        assertGt(extra, 0, "so there is unabsorbed credit");
+        assertApproxEqRel(irm.averageUtilization(), 0.5e27, 1e12, "and the average has not moved");
+        assertApproxEqRel(
+            irm.averageUtilizationAfterMint(0.1e27),
+            (credit + extra + 0.1e27) * 1e27 / (supply + extra + 0.1e27),
+            1e12,
+            "unabsorbed credit is in the projected utilization"
+        );
+        assertGt(
+            irm.averageUtilizationAfterMint(0.1e27),
+            (credit + 0.1e27) * 1e27 / (supply + 0.1e27),
+            "without it the second mint would be priced off the stale average"
+        );
+    }
+
+    /// @dev A same-block drop in live credit is not subtracted. The average still holds the
+    /// higher reading, and pricing stays on that side.
+    function test_unsmoothedCredit_doesNotFollowALiveDrop() public {
+        stablecoin.setSupplyUtilization(0.5e27);
+        irm.updateLiquidityRate();
+        skip(_untilSettled());
+        irm.updateLiquidityRate();
+
+        stablecoin.setSupplyUtilization(0.3e27);
+        irm.updateLiquidityRate();
+
+        (uint256 credit, uint256 supply) = irm.averageSupplies();
+        assertEq(irm.unsmoothedCredit(), 0, "a drop is not unsmoothed borrowing");
+        assertApproxEqRel(
+            irm.averageUtilizationAfterMint(0.1e27),
+            (credit + 0.1e27) * 1e27 / (supply + 0.1e27),
+            1e12,
+            "the mint is still added to the average"
+        );
+    }
+
     /// @dev Compared against the figure standing immediately before the change rather than a
     /// constant, which is the actual claim: the interval that has run is settled under the window
     /// it ran under, so widening cannot reach back and reweight it.

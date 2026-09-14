@@ -65,10 +65,8 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
     {
         _chargePremium();
 
-        actualPrincipal = _creditCheck(availableCredit(), principal);
-        uint256 scaledPrincipal = actualPrincipal.rayDiv(index());
-        if (scaledPrincipal == 0) revert InvalidScaledAmount();
-        scaledDebt += scaledPrincipal;
+        uint256 requested = _creditCheck(availableCredit(), principal);
+        (scaledDebt, actualPrincipal) = _borrowWithin(requested);
 
         _borrow(recipient, actualPrincipal);
     }
@@ -77,9 +75,7 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
     function repay(uint256 amount) external nonReentrant returns (uint256 repaid) {
         _chargePremium();
         uint256 debt = totalDebt();
-        (uint256 remainingScaled, uint256 cleared) = _floorReduction(debt, _debtCheck(debt, amount));
-        scaledDebt = remainingScaled;
-        repaid = cleared;
+        (scaledDebt, repaid) = _repayWithin(debt, _debtCheck(debt, amount));
         _repay(repaid);
     }
 
@@ -92,10 +88,9 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
     {
         _chargePremium();
         uint256 debt = totalDebt();
-        // floored up front but stored last, because the health gate and the cap inside
-        // {_liquidate} are both measured off totalDebt and have to see the debt as it stands.
-        // Clamping here too makes that cap a no-op, so `cleared` is what comes back as `repaid`
-        (uint256 remainingScaled, uint256 cleared) = _floorReduction(debt, Math.min(amount, maxLiquidatable()));
+        // Entitlement is taken first: {_liquidate} reads health and maxLiquidatable off
+        // {totalDebt}, so scaledDebt has to stay put until those checks have run.
+        (uint256 remainingScaled, uint256 cleared) = _repayWithin(debt, Math.min(amount, maxLiquidatable()));
         (repaid, assetsSlashed) = _liquidate(recipient, cleared);
         scaledDebt = remainingScaled;
     }
@@ -109,7 +104,7 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
     function writeOff() external restricted nonReentrant returns (uint256 amount) {
         _chargePremium();
         uint256 debt = totalDebt();
-        (uint256 remainingScaled, uint256 cleared) = _floorReduction(debt, unrecoverableDebt());
+        (uint256 remainingScaled, uint256 cleared) = _repayWithin(debt, unrecoverableDebt());
         amount = cleared;
         // record against the pre-write-off debt, since {_writeOff} bounds itself by
         // {unrecoverableDebt} and that would read as nothing once scaledDebt has moved
@@ -147,27 +142,28 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
         combinedIndex = liquidityIndex.rayMul(underwriterIndex);
     }
 
-    /// @dev Scaled reduction that clears at most `target`. Settlement is the drop in {totalDebt}.
-    /// @param debt The debt before the reduction, as read by {totalDebt}
-    /// @param target The debt to clear
-    /// @return remainingScaled The scaled debt to store
-    /// @return cleared The debt actually cleared, which is what must be settled against
-    function _floorReduction(uint256 debt, uint256 target)
-        internal
-        view
-        returns (uint256 remainingScaled, uint256 cleared)
-    {
-        if (target == 0) return (scaledDebt, 0);
-        if (target >= debt) return (0, debt);
+    /// @dev A representable rise in {totalDebt} that does not exceed `requested`.
+    /// Inverse-floor of the cap is conservative under half-up `rayMul` and is not always the
+    /// largest representable fill.
+    function _borrowWithin(uint256 requested) private view returns (uint256 newScaled, uint256 minted) {
+        uint256 idx = index();
+        uint256 current = scaledDebt.rayMul(idx);
+        newScaled = Math.mulDiv(current + requested, WadRayMath.RAY, idx, Math.Rounding.Floor);
+        minted = newScaled.rayMul(idx) - current;
+        if (minted == 0) revert InvalidScaledAmount();
+    }
 
-        uint256 currentIndex = index();
-        // not rayDiv: every WadRayMath operation rounds half up, and half up here is the bug
-        uint256 scaled = Math.mulDiv(target, WadRayMath.RAY, currentIndex);
-        if (scaled == 0) revert InvalidScaledAmount();
+    /// @dev A representable drop in {totalDebt} that does not exceed `requested`.
+    /// Inverse-ceil of the floor is conservative under half-up `rayMul` and is not always the
+    /// largest representable fill.
+    function _repayWithin(uint256 debt, uint256 requested) private view returns (uint256 newScaled, uint256 burned) {
+        if (requested == 0) return (scaledDebt, 0);
+        if (requested >= debt) return (0, debt);
 
-        remainingScaled = scaledDebt - scaled;
-        // rayMul, because this has to be the same expression {totalDebt} will report
-        cleared = debt - remainingScaled.rayMul(currentIndex);
+        uint256 idx = index();
+        newScaled = Math.mulDiv(debt - requested, WadRayMath.RAY, idx, Math.Rounding.Ceil);
+        burned = debt - newScaled.rayMul(idx);
+        if (burned == 0) revert InvalidScaledAmount();
     }
 
     /// @dev Accrue premiums for a market
@@ -205,7 +201,10 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
         localNow = lastLocal.rayMul((globalNow.rayDiv(lastGlobal)).rayPowRay(multiplier));
     }
 
-    /// @dev Calculate the liquidity and underwriter premiums
+    /// @dev Premium as the rise in {totalDebt} between two checkpoints, split liquidity-then
+    /// underwriter. Each valuation uses the same half-up product as the getter, so the two
+    /// components sum to the reported growth and there is no independently rounded remainder.
+    /// Indices are assumed nondecreasing, as the previous delta form required.
     /// @param scaledDebtAmount The scaled debt
     /// @param previousLiquidityIndex The last liquidity index
     /// @param previousUnderwriterIndex The last underwriter index
@@ -220,10 +219,10 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
         uint256 currentLiquidityIndex,
         uint256 currentUnderwriterIndex
     ) internal pure returns (uint256 liquidityPremium, uint256 underwriterPremium) {
-        liquidityPremium = scaledDebtAmount.rayMul(
-            previousUnderwriterIndex.rayMul(currentLiquidityIndex - previousLiquidityIndex)
-        );
-        underwriterPremium =
-            scaledDebtAmount.rayMul(currentLiquidityIndex.rayMul(currentUnderwriterIndex - previousUnderwriterIndex));
+        uint256 previousDebt = scaledDebtAmount.rayMul(previousLiquidityIndex.rayMul(previousUnderwriterIndex));
+        uint256 debtAfterLiquidity = scaledDebtAmount.rayMul(currentLiquidityIndex.rayMul(previousUnderwriterIndex));
+        uint256 currentDebt = scaledDebtAmount.rayMul(currentLiquidityIndex.rayMul(currentUnderwriterIndex));
+        liquidityPremium = debtAfterLiquidity - previousDebt;
+        underwriterPremium = currentDebt - debtAfterLiquidity;
     }
 }
