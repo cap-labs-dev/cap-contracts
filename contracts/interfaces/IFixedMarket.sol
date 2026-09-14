@@ -155,10 +155,9 @@ interface IFixedMarket is IBaseMarket {
         returns (uint256 liquidityPremium, uint256 underwriterPremium);
 
     /// @notice Premium a new borrow would be charged
-    /// @dev Incremental in unsmoothed credit: the undivided premium on `prior + principal`
-    /// less the undivided premium on `prior`. Same total principal and term therefore cost
-    /// the same whether drawn once or split. See {IInterestRateModel-fixedRatesAfterMint}.
-    /// This market then applies {marketMultiplier} to the liquidity rate.
+    /// @dev On this principal at the rate after it is minted. Earlier draws are already
+    /// in the credit-backed supply, so a second draw this block is dearer. Splitting a
+    /// principal is not the same price as taking it in one draw.
     /// @param principal The principal of the loan
     /// @param term The term of the loan
     /// @return liquidityPremium The liquidity premium

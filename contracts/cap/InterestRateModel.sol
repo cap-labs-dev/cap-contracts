@@ -158,8 +158,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         view
         returns (uint256 liquidity, uint256 underwriter)
     {
-        uint256 projected = _nextLiquidityRate(averageUtilizationAfterMint(mintAmount));
-        liquidity = projected.rayMul(termMultiplier(termUtilization));
+        liquidity = _nextLiquidityRate(averageUtilizationAfterMint(mintAmount)).rayMul(termMultiplier(termUtilization));
         underwriter = underwriterRate(market);
     }
 

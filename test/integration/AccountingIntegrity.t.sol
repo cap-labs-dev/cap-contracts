@@ -1435,68 +1435,53 @@ contract AccountingIntegrityTest is CapDeployer {
         assertGt(withLiquidity, withoutLiquidity, "the draw's own effect on utilization is still charged");
     }
 
-    /// @dev Splitting a draw across calls in the same block used to omit earlier principal from
-    /// the average (it had stood for no time), so each slice was priced as a first draw. The
-    /// charge is now the increment in the undivided premium, so the same total principal and
-    /// term cost the same whether drawn once or in pieces.
-    function test_partitionedFixedBorrowPaysTheUndividedPremium() public {
+    /// @dev Each draw is priced at the rate after it is minted. A second same-size
+    /// draw this block is dearer because the first already raised credit-backed supply.
+    /// Two halves are not the one-shot price of the whole.
+    function test_aSecondDrawThisBlockPaysMore() public {
         FixedMarket market = _fixedMarketOnSlope(0.9e27);
         _depositStable(makeAddr("saver"), 1_000e18);
         vm.warp(block.timestamp + 2 hours);
 
-        uint256 total = QUOTED_PRINCIPAL;
-        (uint256 quotedLiquidity, uint256 quotedUnderwriter) = market.premiumForBorrow(total, 30 days);
-        uint256 quoted = quotedLiquidity + quotedUnderwriter;
-
-        uint256 snapshot = vm.snapshotState();
-
-        vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, total, 30 days);
-        assertEq(market.debt(id) - total, quoted, "the quote is what an undivided draw pays");
-
-        vm.revertToState(snapshot);
+        uint256 half = 2_500e18;
+        uint256 term = 30 days;
+        (uint256 oneLiq, uint256 oneUw) = market.premiumForBorrow(half * 2, term);
+        uint256 oneShot = oneLiq + oneUw;
 
         vm.startPrank(defaultBorrower);
-        (uint256 first,) = market.borrow(defaultBorrower, total / 2, 30 days);
-        uint256 firstPremium = market.debt(first) - total / 2;
-        (quotedLiquidity, quotedUnderwriter) = market.premiumForBorrow(total / 2, 30 days);
-        (uint256 second,) = market.borrow(defaultBorrower, total / 2, 30 days);
+        (uint256 firstId,) = market.borrow(defaultBorrower, half, term);
+        uint256 firstPremium = market.debt(firstId) - half;
+        (uint256 nextLiq, uint256 nextUw) = market.premiumForBorrow(half, term);
+        (uint256 secondId,) = market.borrow(defaultBorrower, half, term);
+        uint256 secondPremium = market.debt(secondId) - half;
         vm.stopPrank();
 
-        uint256 partitioned = market.debt(first) + market.debt(second) - total;
-
-        emit log_named_uint("quoted     ", quoted);
-        emit log_named_uint("partitioned", partitioned);
-
-        assertEq(
-            market.debt(second) - total / 2,
-            quotedLiquidity + quotedUnderwriter,
-            "the second draw pays the quoted increment"
-        );
-        assertGt(quotedLiquidity + quotedUnderwriter, firstPremium, "the second slice is dearer than the first");
-        assertGe(partitioned, quoted, "splitting must not discount");
-        assertApproxEqRel(partitioned, quoted, 0.02e18, "and must land on the undivided price");
+        assertEq(secondPremium, nextLiq + nextUw, "the next draw is the quote after the first");
+        assertGt(secondPremium, firstPremium, "the second draw is dearer than the first");
+        assertTrue(firstPremium + secondPremium != oneShot, "halves are not the one-shot price");
     }
 
-    /// @dev The same independence on {borrowMore}, which is the other way to partition a draw.
-    function test_borrowMorePaysTheUndividedPremium() public {
+    /// @dev {borrowMore} is the same marginal price: the add-on pays more than the opener.
+    function test_borrowMorePaysTheMarginalPremium() public {
         FixedMarket market = _fixedMarketOnSlope(0.9e27);
         _depositStable(makeAddr("saver"), 1_000e18);
         vm.warp(block.timestamp + 2 hours);
 
+        uint256 half = 2_500e18;
         uint256 term = 30 days;
-        uint256 total = QUOTED_PRINCIPAL;
-        (uint256 quotedLiquidity, uint256 quotedUnderwriter) = market.premiumForBorrow(total, term);
-        uint256 quoted = quotedLiquidity + quotedUnderwriter;
+        (uint256 oneLiq, uint256 oneUw) = market.premiumForBorrow(half * 2, term);
+        uint256 oneShot = oneLiq + oneUw;
 
         vm.startPrank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, total / 2, term);
-        market.borrowMore(id, defaultBorrower, total / 2);
+        (uint256 id,) = market.borrow(defaultBorrower, half, term);
+        uint256 firstPremium = market.debt(id) - half;
+        market.borrowMore(id, defaultBorrower, half);
         vm.stopPrank();
 
-        uint256 partitioned = market.debt(id) - total;
-        assertGe(partitioned, quoted, "adding to the same loan must not discount");
-        assertApproxEqRel(partitioned, quoted, 0.02e18, "and must land on the undivided price");
+        uint256 split = market.debt(id) - half * 2;
+        uint256 secondPremium = split - firstPremium;
+        assertGt(secondPremium, firstPremium, "the add-on is dearer than the opener");
+        assertTrue(split != oneShot, "halves are not the one-shot price");
     }
 
     /// @dev A borrow of this size against the reserves used above lands above the kink, which is

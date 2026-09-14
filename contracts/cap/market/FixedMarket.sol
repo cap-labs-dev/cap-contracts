@@ -179,7 +179,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         view
         returns (uint256 liquidityPremium, uint256 underwriterPremium)
     {
-        (liquidityPremium, underwriterPremium) = _borrowPremium(principal, term);
+        (liquidityPremium, underwriterPremium) = _premiumStillToMint(principal, term, principal);
     }
 
     /// @inheritdoc IFixedMarket
@@ -217,7 +217,8 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         actualPrincipal = principal == type(uint256).max ? _principalFor(limit, term) : principal;
         if (actualPrincipal == 0) revert InvalidPrincipal();
 
-        (uint256 liquidityPremium, uint256 underwriterPremium) = _borrowPremium(actualPrincipal, term);
+        (uint256 liquidityPremium, uint256 underwriterPremium) =
+            _premiumStillToMint(actualPrincipal, term, actualPrincipal);
         if (actualPrincipal + liquidityPremium + underwriterPremium > limit) revert InsufficientLiquidity();
 
         debt[id] += actualPrincipal;
@@ -267,7 +268,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         rate = liquidityRate + underwriterRate;
     }
 
-    /// @dev A principal that, with its {_borrowPremium}, fits in `limit`. Invert at today's
+    /// @dev A principal that, with its borrow premium, fits in `limit`. Invert at today's
     /// rate, then scale by `limit/cost` if the real quote is heavier. Four passes is enough
     /// because cost is nearly linear in principal. May sit below the exact maximum.
     function _principalFor(uint256 limit, uint256 term) internal view returns (uint256 principal) {
@@ -289,7 +290,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
 
     /// @dev Principal plus the premium that draw would be charged.
     function _borrowCost(uint256 principal, uint256 term) internal view returns (uint256 cost) {
-        (uint256 liquidityPremium, uint256 underwriterPremium) = _borrowPremium(principal, term);
+        (uint256 liquidityPremium, uint256 underwriterPremium) = _premiumStillToMint(principal, term, principal);
         cost = principal + liquidityPremium + underwriterPremium;
     }
 
@@ -328,29 +329,6 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         expiry[id] += extension;
         uint256 chargedPremium = _chargePremiumForTerm(id, debt[id], extension, 0);
         emit ExtendFixed(id, extension, chargedPremium);
-    }
-
-    /// @dev Incremental premium for a new draw: `f(prior + principal) - f(prior)`, where `f(P)`
-    /// is the undivided term premium on `P`. Same total principal and term therefore pay the same
-    /// total premium whether drawn once or split. `prior` is {IInterestRateModel-unsmoothedCredit}.
-    /// @param principal The principal of this draw
-    /// @param term The term of the loan in seconds
-    /// @return liquidityPremium The liquidity premium
-    /// @return underwriterPremium The underwriter premium
-    function _borrowPremium(uint256 principal, uint256 term)
-        internal
-        view
-        returns (uint256 liquidityPremium, uint256 underwriterPremium)
-    {
-        uint256 prior = IInterestRateModel(irm()).unsmoothedCredit();
-        (uint256 liqRate, uint256 uwRate) = _ratesStillToMint(term, principal);
-        (liquidityPremium, underwriterPremium) = _premium(prior + principal, term, liqRate, uwRate);
-        if (prior == 0) return (liquidityPremium, underwriterPremium);
-
-        (uint256 liqRate0, uint256 uwRate0) = _ratesStillToMint(term, 0);
-        (uint256 liqPrior, uint256 uwPrior) = _premium(prior, term, liqRate0, uwRate0);
-        liquidityPremium = liquidityPremium > liqPrior ? liquidityPremium - liqPrior : 0;
-        underwriterPremium = underwriterPremium > uwPrior ? underwriterPremium - uwPrior : 0;
     }
 
     /// @dev Charge the premium
