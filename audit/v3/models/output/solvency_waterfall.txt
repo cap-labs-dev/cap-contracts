@@ -1,0 +1,122 @@
+solvency_waterfall.py  HEAD a843c1d  K0=$100M, P0=$2000, lt 0.8 / buffer 0.1 / TH 1.25 / bonus 2% (deploy); ltv 0.5, 95/5 (harness)
+
+== 1. Loss allocation, tranches 95/5, full draw (x = 1), ltv 0.5, lt 0.8, bonus 2%, TH 1.25 ==
+  d      f    | health | maxLiq   | recover. | unrec(view) | junior slashed | senior slashed | cUSD loss | junior wiped/killed
+  0.000  0.25 |  1.600 |    $0.0M |   $98.0M |       $0.0M |         $5.00M |         $7.75M |    $0.00M | True/True
+  0.000  0.50 |  1.600 |    $0.0M |   $98.0M |       $0.0M |         $5.00M |        $20.50M |    $0.00M | True/True
+  0.000  1.00 |  1.600 |    $0.0M |   $98.0M |       $0.0M |         $5.00M |        $46.00M |    $0.00M | True/True
+  0.200  0.25 |  1.280 |    $0.0M |   $78.4M |       $0.0M |         $4.00M |         $8.75M |    $0.00M | True/True
+  0.200  0.50 |  1.280 |    $0.0M |   $78.4M |       $0.0M |         $4.00M |        $21.50M |    $0.00M | True/True
+  0.200  1.00 |  1.280 |    $0.0M |   $78.4M |       $0.0M |         $4.00M |        $47.00M |    $0.00M | True/True
+  0.300  0.25 |  1.120 |    $0.0M |   $68.6M |       $0.0M |         $3.50M |         $9.25M |    $0.00M | True/True
+  0.300  0.50 |  1.120 |    $0.0M |   $68.6M |       $0.0M |         $3.50M |        $22.00M |    $0.00M | True/True
+  0.300  1.00 |  1.120 |    $0.0M |   $68.6M |       $0.0M |         $3.50M |        $47.50M |    $0.00M | True/True
+  0.375  0.25 |  1.000 |   $28.8M |   $61.3M |       $0.0M |         $3.12M |         $9.62M |    $0.00M | True/True
+  0.375  0.50 |  1.000 |   $28.8M |   $61.3M |       $0.0M |         $3.12M |        $22.38M |    $0.00M | True/True
+  0.375  1.00 |  1.000 |   $28.8M |   $61.3M |       $0.0M |         $3.12M |        $47.88M |    $0.00M | True/True
+  0.450  0.25 |  0.880 |   $42.6M |   $53.9M |       $0.0M |         $2.75M |        $10.00M |    $0.00M | True/True
+  0.450  0.50 |  0.880 |   $42.6M |   $53.9M |       $0.0M |         $2.75M |        $22.75M |    $0.00M | True/True
+  0.450  1.00 |  0.880 |   $42.6M |   $53.9M |       $0.0M |         $2.75M |        $48.25M |    $0.00M | True/True
+  0.490  0.25 |  0.816 |   $50.0M |   $50.0M |       $0.0M |         $2.55M |        $10.20M |    $0.00M | True/True
+  0.490  0.50 |  0.816 |   $50.0M |   $50.0M |       $0.0M |         $2.55M |        $22.95M |    $0.00M | True/True
+  0.490  1.00 |  0.816 |   $50.0M |   $50.0M |       $0.0M |         $2.55M |        $48.45M |    $0.00M | True/True
+  0.550  0.25 |  0.720 |   $44.1M |   $44.1M |       $5.9M |         $2.25M |        $10.50M |    $0.00M | True/True
+  0.550  0.50 |  0.720 |   $44.1M |   $44.1M |       $5.9M |         $2.25M |        $23.25M |    $0.00M | True/True
+  0.550  1.00 |  0.720 |   $44.1M |   $44.1M |       $5.9M |         $2.25M |        $42.75M |    $5.88M | True/True
+  0.700  0.25 |  0.480 |   $29.4M |   $29.4M |      $20.6M |         $1.50M |        $11.25M |    $0.00M | True/True
+  0.700  0.50 |  0.480 |   $29.4M |   $29.4M |      $20.6M |         $1.50M |        $24.00M |    $0.00M | True/True
+  0.700  1.00 |  0.480 |   $29.4M |   $29.4M |      $20.6M |         $1.50M |        $28.50M |   $20.59M | True/True
+
+== 1. Loss allocation, tranches 70/30, full draw (x = 1), ltv 0.5, lt 0.8, bonus 2%, TH 1.25 ==
+  d      f    | health | maxLiq   | recover. | unrec(view) | junior slashed | senior slashed | cUSD loss | junior wiped/killed
+  0.000  0.25 |  1.600 |    $0.0M |   $98.0M |       $0.0M |        $12.75M |         $0.00M |    $0.00M | False/False
+  0.000  0.50 |  1.600 |    $0.0M |   $98.0M |       $0.0M |        $25.50M |         $0.00M |    $0.00M | False/False
+  0.000  1.00 |  1.600 |    $0.0M |   $98.0M |       $0.0M |        $30.00M |        $21.00M |    $0.00M | True/True
+  0.200  0.25 |  1.280 |    $0.0M |   $78.4M |       $0.0M |        $12.75M |         $0.00M |    $0.00M | False/False
+  0.200  0.50 |  1.280 |    $0.0M |   $78.4M |       $0.0M |        $24.00M |         $1.50M |    $0.00M | True/True
+  0.200  1.00 |  1.280 |    $0.0M |   $78.4M |       $0.0M |        $24.00M |        $27.00M |    $0.00M | True/True
+  0.300  0.25 |  1.120 |    $0.0M |   $68.6M |       $0.0M |        $12.75M |         $0.00M |    $0.00M | False/False
+  0.300  0.50 |  1.120 |    $0.0M |   $68.6M |       $0.0M |        $21.00M |         $4.50M |    $0.00M | True/True
+  0.300  1.00 |  1.120 |    $0.0M |   $68.6M |       $0.0M |        $21.00M |        $30.00M |    $0.00M | True/True
+  0.375  0.25 |  1.000 |   $28.8M |   $61.3M |       $0.0M |        $12.75M |         $0.00M |    $0.00M | False/False
+  0.375  0.50 |  1.000 |   $28.8M |   $61.3M |       $0.0M |        $18.75M |         $6.75M |    $0.00M | True/True
+  0.375  1.00 |  1.000 |   $28.8M |   $61.3M |       $0.0M |        $18.75M |        $32.25M |    $0.00M | True/True
+  0.450  0.25 |  0.880 |   $42.6M |   $53.9M |       $0.0M |        $12.75M |         $0.00M |    $0.00M | False/False
+  0.450  0.50 |  0.880 |   $42.6M |   $53.9M |       $0.0M |        $16.50M |         $9.00M |    $0.00M | True/True
+  0.450  1.00 |  0.880 |   $42.6M |   $53.9M |       $0.0M |        $16.50M |        $34.50M |    $0.00M | True/True
+  0.490  0.25 |  0.816 |   $50.0M |   $50.0M |       $0.0M |        $12.75M |         $0.00M |    $0.00M | False/False
+  0.490  0.50 |  0.816 |   $50.0M |   $50.0M |       $0.0M |        $15.30M |        $10.20M |    $0.00M | True/True
+  0.490  1.00 |  0.816 |   $50.0M |   $50.0M |       $0.0M |        $15.30M |        $35.70M |    $0.00M | True/True
+  0.550  0.25 |  0.720 |   $44.1M |   $44.1M |       $5.9M |        $12.75M |         $0.00M |    $0.00M | False/False
+  0.550  0.50 |  0.720 |   $44.1M |   $44.1M |       $5.9M |        $13.50M |        $12.00M |    $0.00M | True/True
+  0.550  1.00 |  0.720 |   $44.1M |   $44.1M |       $5.9M |        $13.50M |        $31.50M |    $5.88M | True/True
+  0.700  0.25 |  0.480 |   $29.4M |   $29.4M |      $20.6M |         $9.00M |         $3.75M |    $0.00M | True/True
+  0.700  0.50 |  0.480 |   $29.4M |   $29.4M |      $20.6M |         $9.00M |        $16.50M |    $0.00M | True/True
+  0.700  1.00 |  0.480 |   $29.4M |   $29.4M |      $20.6M |         $9.00M |        $21.00M |   $20.59M | True/True
+
+== 2. Smallest drawdown d at which cUSD holders first lose (eventual f D > K/(1+b)), by f, ltv, lt ==
+  analytic: d* = 1 - f x ltv (1+b); h<1 at d_h = 1 - x ltv / lt; 'cushion' = d* - d_h (negative: loss before liquidation is even possible)
+  ltv  lt  |  f=0.25   f=0.50   f=0.75   f=1.00  | d(h<1)  cushion@f=1 | junior wiped at (f=1) | senior touched at (f=1)
+  0.5  0.8 |  87.25%   74.50%   61.75%   49.00%  |  37.5%   +11.5%       |   0.0% |   0.0%
+  0.7  0.8 |  82.15%   64.30%   46.45%   28.60%  |  12.5%   +16.1%       |   0.0% |   0.0%
+  0.5  0.9 |  87.25%   74.50%   61.75%   49.00%  |  44.4%    +4.6%       |   0.0% |   0.0%
+  0.7  0.9 |  82.15%   64.30%   46.45%   28.60%  |  22.2%    +6.4%       |   0.0% |   0.0%
+  A 5% junior is wiped by ANY full default (f=1) at d=0: slash = 1.02 x $50M = $51M > $5M. It is KILLED (KILL_RATIO 100) in the same call.
+  ltv 0.7 + lt 0.9: cUSD loses at d = 28.6% while h<1 only at 22.2%: 6.4 points of price between 'liquidatable' and 'insolvent'.
+  70/30 at f=0.25 (slash $12.75M): junior wiped at d >= 57.5%; at f=0.5 ($25.5M): d >= 15.0%
+
+== 3. Floor-to-zero dust rule (Tranche.slash L79-84): value lost per tranche per liquidation ==
+  A request below one token unit converts to 0 assets and is passed on; after the senior it is uncollected.
+  ETH 18-dec $2000  : max uncollected per tranche = 2000 wei USD = $2.00e-15   (price/10^decimals)
+  WBTC 8-dec $60k   : max uncollected per tranche = 600000000000000 wei USD = $6.00e-04   (price/10^decimals)
+  2-dec token $1    : max uncollected per tranche = 10000000000000000 wei USD = $1.00e-02   (price/10^decimals)
+  => slashed < repaid*(1+bonus) by at most (n_tranches x price/unit): negligible unless the token has <= 2 decimals (P10).
+
+== 4. Correlated markets: N markets, same draw (x=1, ltv 0.5), shared cUSD; per-market protection NOT pooled ==
+  ltv 0.5: per-market loss needs d > 49.0%; 30d @ 100% vol: per-market P(d > d*) = 0.0140
+  rho   N | P(system loss>0) | E[loss] % of total debt | E[loss | loss] % | pooled-capital loss % | silo/pooled
+  0.0   1 |      0.0131      |         0.125%          |      9.61%     |        0.125%         |  1.0x
+  0.0   5 |      0.0683      |         0.128%          |      1.88%     |        0.000%         |  inf
+  0.0  20 |      0.2426      |         0.125%          |      0.52%     |        0.000%         |  inf
+  0.0  50 |      0.5015      |         0.127%          |      0.25%     |        0.000%         |  inf
+  0.5   1 |      0.0129      |         0.112%          |      8.70%     |        0.112%         |  1.0x
+  0.5   5 |      0.0620      |         0.123%          |      1.98%     |        0.000%         |  3751.7x
+  0.5  20 |      0.1869      |         0.128%          |      0.68%     |        0.000%         |  inf
+  0.5  50 |      0.3352      |         0.129%          |      0.39%     |        0.000%         |  inf
+  0.9   1 |      0.0140      |         0.121%          |      8.66%     |        0.121%         |  1.0x
+  0.9   5 |      0.0389      |         0.135%          |      3.48%     |        0.067%         |  2.0x
+  0.9  20 |      0.0667      |         0.131%          |      1.97%     |        0.058%         |  2.2x
+  0.9  50 |      0.0925      |         0.137%          |      1.49%     |        0.062%         |  2.2x
+  1.0   1 |      0.0134      |         0.121%          |      9.00%     |        0.121%         |  1.0x
+  1.0   5 |      0.0135      |         0.124%          |      9.22%     |        0.124%         |  1.0x
+  1.0  20 |      0.0127      |         0.117%          |      9.17%     |        0.117%         |  1.0x
+  1.0  50 |      0.0135      |         0.129%          |      9.53%     |        0.129%         |  1.0x
+  ltv 0.7: per-market loss needs d > 28.6%; 30d @ 100% vol: per-market P(d > d*) = 0.1518
+  rho   N | P(system loss>0) | E[loss] % of total debt | E[loss | loss] % | pooled-capital loss % | silo/pooled
+  0.0   1 |      0.1523      |         2.086%          |     13.70%     |        2.086%         |  1.0x
+  0.0   5 |      0.5607      |         1.995%          |      3.56%     |        0.027%         |  73.0x
+  0.0  20 |      0.9614      |         2.005%          |      2.09%     |        0.000%         |  inf
+  0.0  50 |      0.9998      |         1.991%          |      1.99%     |        0.000%         |  inf
+  0.5   1 |      0.1530      |         2.026%          |     13.25%     |        2.026%         |  1.0x
+  0.5   5 |      0.4789      |         1.986%          |      4.15%     |        0.265%         |  7.5x
+  0.5  20 |      0.8008      |         1.963%          |      2.45%     |        0.090%         |  21.9x
+  0.5  50 |      0.9264      |         1.981%          |      2.14%     |        0.068%         |  29.0x
+  0.9   1 |      0.1483      |         1.964%          |     13.24%     |        1.964%         |  1.0x
+  0.9   5 |      0.2903      |         2.082%          |      7.17%     |        1.577%         |  1.3x
+  0.9  20 |      0.4092      |         2.010%          |      4.91%     |        1.405%         |  1.4x
+  0.9  50 |      0.4759      |         1.936%          |      4.07%     |        1.333%         |  1.5x
+  1.0   1 |      0.1558      |         2.074%          |     13.31%     |        2.074%         |  1.0x
+  1.0   5 |      0.1531      |         2.033%          |     13.28%     |        2.033%         |  1.0x
+  1.0  20 |      0.1545      |         2.040%          |     13.20%     |        2.040%         |  1.0x
+  1.0  50 |      0.1537      |         1.990%          |     12.95%     |        1.990%         |  1.0x
+  Closed form at rho = 0 with per-market loss probability p: P(system loss) = 1 - (1-p)^N.
+    p = 1%/period per market: system loss more likely than not from N >= 69 markets
+    p = 2%/period per market: system loss more likely than not from N >= 35 markets
+    p = 5%/period per market: system loss more likely than not from N >= 14 markets
+  Correlation shifts the tail, not the mean: rho 1.0 -> loss in one 'event' but N times larger; rho 0 -> a loss every period at large N.
+
+=== HEADLINE ===
+Full draw at ltv 0.5: junior (5%) is wiped+killed by the first full-default liquidation at ANY drawdown; senior is touched at d=0;
+cUSD holders lose at d >= 49.0% (f=1) or 74.5% (f=0.5). At ltv 0.7 the cUSD threshold is 28.6% and at lt 0.9 the
+liquidatable point is d=22.2%: only 6.4 points of price separate 'can liquidate' from 'cUSD already lost'. The dust rule costs <= price/10^dec per tranche.
+Silo'd protection: at rho=0 the system loses on 1-(1-p)^N of periods; at p=2% that is >50% from N=35 markets; silo loss exceeds the pooled loss (table 4).

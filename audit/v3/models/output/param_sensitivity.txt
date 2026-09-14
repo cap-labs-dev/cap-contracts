@@ -1,0 +1,77 @@
+param_sensitivity.py  HEAD a843c1d - permitted vs unsafe ranges (numbers from exact arithmetic)
+
+parameter                                | permitted                                                  | OVERLAP
+------------------------------------------------------------------------------------------------------------------------
+lt                                       | buffer < lt <= 1e27                                        | YES
+   unsafe: lt > 1/(1+bonus): unrecoverableDebt>0 while healthiness>=1 (I38/P13) - 0.9804 at bonus 2%, 0.9091 at bonus 10%; lt <= ltv+buffer: every borrow reverts Unhealthy
+   setter: BaseMarket.setLt L89-96 (GUARDIAN); Registry.initialize L106
+buffer                                   | buffer < lt (may exceed lt - ltv; documented as tightening | YES
+   unsafe: buffer >= lt - D/K locks 100% of every tranche's shares: 0.30 at a full draw (D=0.5K); at 0.799 lockedValue = $50B on $50M debt. A GUARDIAN can freeze all underwriter exits with one call.
+   setter: BaseMarket.setBuffer L79-86 (GUARDIAN)
+ltv                                      | ltv + buffer <= lt                                         | no
+   unsafe: none (0 disables borrowing)
+   setter: BaseMarket.setLtv L71-76 (market OWNER)
+targetHealth                             | >= 1.25e27, NO upper bound                                 | YES (economic)
+   unsafe: perCleared = TH-(1+b)lt >= 0.15 always (safe); first liquidation at h=1 clears 58% of debt at TH 1.25, 84% at 2, >= 90% from TH 2.66 (a full junior+senior wipe on a 1-wei breach)
+   setter: BaseMarket.setTargetHealth L106-111 (GOVERNOR); Registry.initialize L107
+liquidationBonus                         | 0 <= bonus <= 0.1e27                                       | YES
+   unsafe: bonus 0: no liquidation is ever profitable (liquidation_cascade s2); bonus with lt > 1/(1+b): P13 band
+   setter: IRM.setLiquidationBonus L174-184 (GOVERNOR); initialize
+averagingPeriod                          | [5 min, 1 day]                                             | YES (economic)
+   unsafe: whole band: a par deposit held one period depresses the fixed rate (ema_manipulation: break-even capital < 1x supply at every period)
+   setter: IRM.setAveragingPeriod L187-203 (GOVERNOR)
+base / slope0 / slope1                   | UNBOUNDED (only kink <= 1e27)                              | YES
+   unsafe: rate >= 17207%/yr makes a fully-drawn market (h 1.6) liquidatable within 1 day, 412989%/yr within 1 h, 126199032%/yr in one 12 s block; calculateCompoundedInterest REVERTS above 3.40e+11 ray for a 1 h gap / 3.40e+11 (1 d) / 3.40e+11 (1 y): every _index() read on the IRM and every floating borrow/repay/liquidate bricks until slopes are lowered; below that the 3-term binomial UNDER-accrues by up to 99.0% (rate 1000%/yr, gap 365 d) - a borrower undercharge, not an error
+   setter: IRM.setLiquiditySlopes L105-115 (GOVERNOR)
+kink                                     | kink <= 1e27 (0 handled)                                   | no
+   unsafe: none
+   setter: IRM.setLiquiditySlopes L111
+marketMultiplier                         | [1e27, 2e27] at deploy; band has NO setter                 | no
+   unsafe: none inside the band. rayExp `exp <<= k` is an UNCHECKED shift: silent wrap needs frac*ln(G) >= 115 ray, i.e. a per-charge growth factor G >= e^115 - unreachable while the binomial reverts first
+   setter: BaseMarket.setMarketMultiplier L137-152 (OWNER); band init-only IRM L84-87
+termMultiplierSlope                      | UNBOUNDED                                                  | YES (short-term DoS only)
+   unsafe: multiplier = 1 + slope(1 - term/max) >= 1 always (never negative, never below the plain rate); slope >= 2516 ray makes a 1-day loan's premium >= its principal at 15% (availableCredit(term) -> 0, borrow reverts InvalidPrincipal); rayMul overflow above 7.7e+23 ray
+   setter: IRM.setTermMultiplierSlope L149-152 (GOVERNOR)
+underwriterRate                          | 0 <= rate <= maximumUnderwriterRate (1e27 at deploy)       | YES
+   unsafe: 0: underwriting negative-EV at any default risk (rate_sweep). 100%: a fully-drawn market goes unhealthy from accrual in 172 days and the owner-as-underwriter has received more cUSD than its collateral is worth after a further ln(1/lt)/rate = 81 days (P14 economics); at 20% those are 858 and 407 days
+   setter: BaseMarket.setUnderwriterRate L130-134 (market OWNER = third party) -> IRM L124-131
+maximumUnderwriterRate                   | any uint256 at init (1e27 in deploy)                       | YES (init only)
+   unsafe: above 1e27 the self-dealing window shrinks as 1/rate; a bad init is permanent (no setter)
+   setter: IRM.initialize L88 (NO setter)
+maximumTermLimit / minimumTermLimit      | max != 0, min <= max, otherwise UNBOUNDED                  | YES (economic)
+   unsafe: term > 2.86 years: whole-term premium >= principal at 35% carry (borrow of the limit yields ~0 principal); a long max term also locks a manipulated EMA rate for the whole term (ema_manipulation)
+   setter: FixedMarket.setTermLimits L59-61 (GOVERNOR)
+grace                                    | any uint256                                                | YES
+   unsafe: 0: KEEPER extendAdmin rolls a loan the second it expires with NO health check (bypasses the Unhealthy guard on extend, L109); large: expired loans are never rolled and pay nothing - $8219/day of free credit per $10M at 30% carry (liquidation_cascade s3)
+   setter: FixedMarket.initialize L55 (NO setter; Registry.createFixedMarket passes it)
+fixedCreditLimit                         | UNBOUNDED (0 disables)                                     | no
+   unsafe: none: creditLimit = min(fixed, variable)
+   setter: BaseMarket.setFixedCreditLimit L99-103 (GOVERNOR)
+tranche weights                          | sum == 1e27; a weight may be 0; reverts if h < 1           | no (economic)
+   unsafe: weight 0 = full junior-first slash exposure with no premium; the JUNIOR is 100% locked (Tranche.unlockedSupply) from a 7% draw (lockedValue = D/(lt-buffer) lands on it first)
+   setter: BaseMarket.setTrancheWeights L119-127 (OWNER); _setTranches L390-406
+Registry lt / buffer / targetHealth      | lt <= 1e27, lt > buffer, TH >= 1.25e27 (NEW at HEAD)       | YES (same as lt)
+   unsafe: round-1 overlap (unvalidated) CLOSED; same lt > 1/(1+b) band as setLt remains
+   setter: Registry.initialize L106-107
+VESTING_PERIOD / KILL_RATIO / MIN,MAX_AVERAGING | n/a                                                        | no
+   unsafe: not settable
+   setter: constants (12 h / 100 / 5 min, 1 d)
+------------------------------------------------------------------------------------------------------------------------
+overlaps: 12 of 18 parameters
+
+== numeric details ==
+compoundedInterest revert: rate > 3.403e+11 ray (1 s gap), 3.403e+11 (1 h), 3.403e+11 (1 d), 3.403e+11 (1 y)
+rate to push h 1.6 -> 1.0: 1 day 17207%/yr, 1 hour 412989%/yr, 1 block 126199032%/yr
+binomial vs exact e^(rt): r=100% gap 1d: -0.00%; r=100% gap 30d: -0.00%; r=100% gap 365d: -1.90%; r=300% gap 1d: -0.00%; r=300% gap 30d: -0.01%; r=300% gap 365d: -35.28%; r=1000% gap 1d: -0.00%; r=1000% gap 30d: -0.99%; r=1000% gap 365d: -98.97%
+healthiness lag threshold: lt > 0.9804 (bonus 2%), > 0.9091 (bonus 10%)
+maxLiquidatable perCleared at permitted extremes TH 1.25 / lt 1.0 / bonus 10%: 0.15 ray (> 0, as the planning note says)
+  first liquidation at h=1: TH 1.25 lt 0.8 bonus 2%: 58% of debt
+  first liquidation at h=1: TH 1.50 lt 0.8 bonus 2%: 73% of debt
+  first liquidation at h=1: TH 2.00 lt 0.8 bonus 2%: 84% of debt
+  first liquidation at h=1: TH 3.00 lt 0.8 bonus 2%: 92% of debt
+rayPowRay sanity: (1.1)^2 = 1.2099999999999997, (1.1)^1.5 = 1.1536897329871665 (float 1.1^1.5 = 1.153689732987)
+
+=== HEADLINE ===
+12 of 18 parameters have a permitted range overlapping an unsafe one. Accounting-breaking: lt in (0.9804, 1] at bonus 2% (I38 fails: write-off
+possible while liquidate reverts Healthy); unbounded slopes (>= 17207%/yr liquidates a full market within a day; > 3.40e+11 ray reverts the index
+and bricks every floating market); buffer >= 0.30 freezes every tranche exit (GUARDIAN, one call); grace is init-only. Registry.initialize is now validated.
