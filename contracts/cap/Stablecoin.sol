@@ -11,6 +11,10 @@ import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {
+    ERC20PermitUpgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -19,12 +23,13 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title Stablecoin
 /// @author kexley, Cap Labs
-/// @notice Credit-backed ERC-7540 stablecoin
+/// @notice Credit-backed ERC-7540 stablecoin with ERC-2612 permit
 contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     is
     IStablecoin,
     AccessManagedUpgradeable,
     PausableUpgradeable,
+    ERC20PermitUpgradeable,
     PremiumVesting,
     UUPSUpgradeable
 {
@@ -63,6 +68,8 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         __AccessManaged_init(_authority);
         __Pausable_init();
         __PremiumVesting_init(IERC20Metadata(_asset), _name, _symbol, address(this));
+        // same name the ERC-20 uses, so a v1 proxy that already had permit keeps its domain
+        __ERC20Permit_init(_name);
         // both previews scale between the two units, and only the direction that divides can lose
         // anything. Below 18 that is the mint side, which rounds up so the vault keeps the dust;
         // above 18 it would be the deposit side, where rounding up is not available because the
@@ -249,7 +256,12 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     }
 
     /// @inheritdoc IStablecoin
-    function decimals() public pure override(ERC4626Upgradeable, IERC20Metadata, IStablecoin) returns (uint8) {
+    function decimals()
+        public
+        pure
+        override(ERC20Upgradeable, ERC4626Upgradeable, IERC20Metadata, IStablecoin)
+        returns (uint8)
+    {
         return 18;
     }
 
@@ -322,7 +334,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     /// @param from The sender, or zero on mint
     /// @param to The recipient, or zero on burn
     /// @param amount The shares moving
-    function _update(address from, address to, uint256 amount) internal override {
+    function _update(address from, address to, uint256 amount) internal override(ERC20Upgradeable, PremiumVesting) {
         if (from == address(0) || to == address(0)) _requireNotPaused();
         super._update(from, to, amount);
     }

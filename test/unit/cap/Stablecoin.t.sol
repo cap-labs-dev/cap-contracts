@@ -75,6 +75,49 @@ contract StablecoinTest is BaseTest {
         assertEq(scoin.decimals(), 18);
     }
 
+    /// @dev Live cUSD is ERC-2612. The 4626/7540 rewrite dropped permit, nonces, and
+    /// DOMAIN_SEPARATOR; wallets and routers that approve by signature would have nowhere to go.
+    function test_permitSetsAllowanceAndConsumesNonce() public {
+        uint256 ownerKey = 0xA11CE;
+        address owner = vm.addr(ownerKey);
+        address spender = makeAddr("permitSpender");
+
+        vm.prank(alice);
+        scoin.deposit(100e18, owner);
+
+        assertEq(scoin.nonces(owner), 0);
+        assertTrue(scoin.DOMAIN_SEPARATOR() != bytes32(0));
+
+        uint256 value = 40e18;
+        uint256 deadline = block.timestamp + 1 days;
+        bytes32 digest = keccak256(
+            abi.encodePacked(
+                "\x19\x01",
+                scoin.DOMAIN_SEPARATOR(),
+                keccak256(
+                    abi.encode(
+                        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"),
+                        owner,
+                        spender,
+                        value,
+                        scoin.nonces(owner),
+                        deadline
+                    )
+                )
+            )
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerKey, digest);
+
+        scoin.permit(owner, spender, value, deadline, v, r, s);
+
+        assertEq(scoin.allowance(owner, spender), value);
+        assertEq(scoin.nonces(owner), 1);
+
+        vm.prank(spender);
+        scoin.transferFrom(owner, spender, value);
+        assertEq(scoin.balanceOf(spender), value);
+    }
+
     function test_mintCreditBacked_onlyAuthority() public {
         vm.prank(alice);
         vm.expectRevert();

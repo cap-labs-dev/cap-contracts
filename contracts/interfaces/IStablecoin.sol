@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 /// @title IStablecoin
 /// @author kexley, Cap Labs
 /// @notice Interface for Stablecoin vault accounting
+/// @dev The implementation is ERC-20 with ERC-2612
 interface IStablecoin {
     /// @notice Emitted when credit-backed tokens are minted
     /// @param to The recipient
