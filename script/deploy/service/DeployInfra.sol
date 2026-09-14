@@ -46,38 +46,9 @@ contract DeployInfra is CreateXUtils {
         internal
         returns (InfraConfig memory infra)
     {
-        _requireTransientStorage();
-        require(users.stablecoinUnderlying != address(0), "stablecoinUnderlying required");
-        require(users.deployer != address(0), "deployer required");
+        infra = _deploySharedHead(implementations, users, saltNamespace);
 
         address deployer = users.deployer;
-
-        // Temporary admin so this account can grant the Registry ADMIN before initialize.
-        // {_initInfraAccessControl} moves ADMIN to `users.admin` and drops the deployer.
-        infra.accessManager = _create3(
-            _salt(deployer, saltNamespace, "accessManager"),
-            abi.encodePacked(type(AccessManager).creationCode, abi.encode(deployer))
-        );
-
-        infra.vault = _create3Proxy(
-            _salt(deployer, saltNamespace, "vault"),
-            implementations.vault,
-            abi.encodeCall(Vault.initialize, (infra.accessManager))
-        );
-
-        // Deployed here rather than passed in. Handing the registry a foreign address meant the
-        // real oracle was never built or read by anything that runs, so its answer scale went
-        // unchecked against the consumers that carry it into collateral value. The adapter is
-        // stateless and holds no per-asset configuration, so one instance serves every feed; the
-        // governor still has to point each asset at it with {Oracle-setSource} before that asset
-        // can back a market, which {Registry} enforces by pricing it at launch
-        infra.oracle = _create3Proxy(
-            _salt(deployer, saltNamespace, "oracle"),
-            implementations.oracle,
-            abi.encodeCall(Oracle.initialize, (infra.accessManager))
-        );
-        infra.chainlinkAdapter =
-            _create3(_salt(deployer, saltNamespace, "chainlinkAdapter"), type(ChainlinkAdapter).creationCode);
 
         // CREATE3 addresses do not depend on initcode, so the circular IRM / stablecoin pair
         // can be predicted before either proxy exists
@@ -110,6 +81,97 @@ contract DeployInfra is CreateXUtils {
             abi.encodeCall(Wrapper.initialize, (infra.accessManager, infra.stablecoin))
         );
         _seedWrapper(infra.wrapper, infra.stablecoin, users.stablecoinUnderlying);
+
+        infra = _deployFactoryBeaconsAndRegistry(implementations, users, saltNamespace, infra);
+    }
+
+    /// @dev Deploy the v2 stack around live cUSD and stcUSD proxies. Those proxies are upgraded
+    ///      separately; this step does not seed the wrapper, which already has holders.
+    /// @param implementations The implementation addresses
+    /// @param users The admin and token configuration
+    /// @param saltNamespace Distinguishes otherwise identical deploys
+    /// @param existingStablecoin The live cUSD proxy
+    /// @param existingWrapper The live stcUSD proxy
+    /// @return infra The deployed infrastructure, with `stablecoin` and `wrapper` unchanged
+    function _deployInfraAroundExisting(
+        ImplementationsConfig memory implementations,
+        UsersConfig memory users,
+        bytes32 saltNamespace,
+        address existingStablecoin,
+        address existingWrapper
+    ) internal returns (InfraConfig memory infra) {
+        require(existingStablecoin != address(0), "stablecoin required");
+        require(existingWrapper != address(0), "wrapper required");
+
+        infra = _deploySharedHead(implementations, users, saltNamespace);
+
+        address deployer = users.deployer;
+        address irmAddr = _predictCreate3(_salt(deployer, saltNamespace, "irm"), deployer);
+
+        infra.irm = _create3Proxy(
+            _salt(deployer, saltNamespace, "irm"),
+            implementations.irm,
+            abi.encodeCall(
+                InterestRateModel.initialize,
+                (infra.accessManager, existingStablecoin, 1e27, 2e27, 1e27, 0.02e27, 1 hours)
+            )
+        );
+        require(infra.irm == irmAddr, "irm addr");
+
+        infra.stablecoin = existingStablecoin;
+        infra.wrapper = existingWrapper;
+
+        infra = _deployFactoryBeaconsAndRegistry(implementations, users, saltNamespace, infra);
+    }
+
+    /// @dev AccessManager, vault, oracle, and the chainlink adapter
+    function _deploySharedHead(
+        ImplementationsConfig memory implementations,
+        UsersConfig memory users,
+        bytes32 saltNamespace
+    ) private returns (InfraConfig memory infra) {
+        _requireTransientStorage();
+        require(users.stablecoinUnderlying != address(0), "stablecoinUnderlying required");
+        require(users.deployer != address(0), "deployer required");
+
+        address deployer = users.deployer;
+
+        // Temporary admin so this account can grant the Registry ADMIN before initialize.
+        // {_initInfraAccessControl} moves ADMIN to `users.admin` and drops the deployer.
+        infra.accessManager = _create3(
+            _salt(deployer, saltNamespace, "accessManager"),
+            abi.encodePacked(type(AccessManager).creationCode, abi.encode(deployer))
+        );
+
+        infra.vault = _create3Proxy(
+            _salt(deployer, saltNamespace, "vault"),
+            implementations.vault,
+            abi.encodeCall(Vault.initialize, (infra.accessManager))
+        );
+
+        // Deployed here rather than passed in. Handing the registry a foreign address meant the
+        // real oracle was never built or read by anything that runs, so its answer scale went
+        // unchecked against the consumers that carry it into collateral value. The adapter is
+        // stateless and holds no per-asset configuration, so one instance serves every feed; the
+        // governor still has to point each asset at it with {Oracle-setSource} before that asset
+        // can back a market, which {Registry} enforces by pricing it at launch
+        infra.oracle = _create3Proxy(
+            _salt(deployer, saltNamespace, "oracle"),
+            implementations.oracle,
+            abi.encodeCall(Oracle.initialize, (infra.accessManager))
+        );
+        infra.chainlinkAdapter =
+            _create3(_salt(deployer, saltNamespace, "chainlinkAdapter"), type(ChainlinkAdapter).creationCode);
+    }
+
+    /// @dev Factory, beacons, and the registry that points at the tokens already on `infra`
+    function _deployFactoryBeaconsAndRegistry(
+        ImplementationsConfig memory implementations,
+        UsersConfig memory users,
+        bytes32 saltNamespace,
+        InfraConfig memory infra
+    ) private returns (InfraConfig memory) {
+        address deployer = users.deployer;
 
         infra.factory = _create3Proxy(
             _salt(deployer, saltNamespace, "factory"),
@@ -175,6 +237,7 @@ contract DeployInfra is CreateXUtils {
         );
 
         require(infra.registry == registryAddr, "registry addr");
+        return infra;
     }
 
     /// @dev Permissioned CreateX salt for `key` under `namespace`
