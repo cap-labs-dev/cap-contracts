@@ -266,7 +266,8 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         if (supply != average.observedSupply) utilizationAverage.observedSupply = supply;
     }
 
-    /// @dev Share of the distance to the observation earned over `elapsed`. Compounds.
+    /// @dev Share of the distance to the observation earned over `elapsed`. Compounds,
+    /// subject to fixed-point rounding in {WadRayMath-rayPow}.
     /// @param elapsed Seconds since the last fold
     /// @return weight Share in ray decimals
     function _averagingWeight(uint256 elapsed) internal view returns (uint256 weight) {

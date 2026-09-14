@@ -54,32 +54,41 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     /// @return controller The controller, or zero if the request does not exist
     function controllerOf(uint256 requestId) external view returns (address controller);
 
-    /// @dev Redeem shares from the vault while the redemption window is open
-    /// @param requestId The id of the request
-    /// @param shares The number of shares to redeem
-    /// @param receiver The receiver of the assets
-    /// @param controller The controller of the request
-    /// @return assets The number of assets redeemed
+    /// @notice Claim previously requested shares on a single request
+    /// @dev Caller must be `controller` or its operator. ERC-20 allowance is insufficient.
+    ///      Limited to currently claimable shares on this request and {unlockedSupply}.
+    ///      Pays `convertToAssets(shares)` (floored). There is no redemption window.
+    /// @param requestId The request to settle
+    /// @param shares Shares to claim
+    /// @param receiver Asset recipient
+    /// @param controller Request controller, not an instant share-balance owner
+    /// @return assets Assets paid
     function redeem(uint256 requestId, uint256 shares, address receiver, address controller)
         external
         returns (uint256 assets);
 
-    /// @dev Withdraw assets from the vault after requesting a redeem.
-    /// @param requestId The id of the request
-    /// @param assets The number of assets to withdraw
-    /// @param receiver The receiver of the assets
-    /// @param controller The controller of the request
-    /// @return shares The number of shares withdrawn
+    /// @notice Claim a previously requested redemption by asset amount on a single request
+    /// @dev Caller must be `controller` or its operator. ERC-20 allowance is insufficient.
+    ///      Limited to currently claimable shares on this request and {unlockedSupply}.
+    ///      Burns the ceil-quoted shares for `assets`.
+    /// @param requestId The request to settle
+    /// @param assets Assets to pay
+    /// @param receiver Asset recipient
+    /// @param controller Request controller, not an instant share-balance owner
+    /// @return shares Shares burned
     function withdraw(uint256 requestId, uint256 assets, address receiver, address controller)
         external
         returns (uint256 shares);
 
-    /// @notice Get the number of shares not in the redemption queue
-    /// @return supply The number of shares not in the redemption queue
+    /// @notice Shares not sitting in the redemption queue
+    /// @return supply `totalSupply - redemptionQueue`
     function activeSupply() external view returns (uint256 supply);
 
-    /// @notice Get the number of assets not in the redemption queue
-    /// @return assets The number of assets not in the redemption queue
+    /// @notice Asset quote for {activeSupply}
+    /// @dev `convertToAssets(activeSupply())`. Not a separable physical reserve balance; a
+    ///      nonlinear conversion (for example {IStablecoin} under a shortfall) can make this
+    ///      differ from `totalAssets - convertToAssets(redemptionQueue)`.
+    /// @return assets The exit quote of the unqueued shares
     function activeAssets() external view returns (uint256 assets);
 
     /// @notice Get the number of shares in the redemption queue

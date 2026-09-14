@@ -16,21 +16,21 @@ interface IStablecoin {
     event BurnCreditBacked(address indexed from, uint256 amount);
 
     /// @notice Emitted when a reserve loss is recognized
-    /// @param amount The amount of bad debt recognized
+    /// @param amount Bad debt recognized, in cUSD share units (18 decimals)
     event BadDebtRecognizedInReserve(uint256 amount);
 
     /// @notice Emitted when a credit loss is recognized
-    /// @param amount The amount of bad debt recognized
+    /// @param amount Bad debt recognized, in cUSD share units (18 decimals)
     event BadDebtRecognizedInCredit(uint256 amount);
 
     /// @notice Emitted when bad debt is reduced
     /// @param owner The account whose redemption reduced bad debt
-    /// @param amount The amount of bad debt reduced
+    /// @param amount Bad debt reduced, in cUSD share units (18 decimals)
     event BadDebtReduced(address indexed owner, uint256 amount);
 
     /// @notice Emitted when bad debt is covered outright
     /// @param payer The account that burned cUSD to retire the shortfall
-    /// @param amount The amount of bad debt covered
+    /// @param amount Bad debt covered, in cUSD share units (18 decimals)
     event BadDebtCovered(address indexed payer, uint256 amount);
 
     /// @notice Emitted when reserve is sent to reserve vault
@@ -110,23 +110,25 @@ interface IStablecoin {
 
     /// @notice Recognize a loss in the reserve vault, socializing it across holders
     /// @dev Guardian only. Credit-backed supply is unchanged because no borrower debt was lost.
-    /// @param amount The amount of bad debt to recognize
+    /// `amount` is cUSD share units (18 decimals), not underlying reserve-token units.
+    /// @param amount Bad debt to recognize, in cUSD share units (18 decimals)
     function recognizeBadDebtInReserve(uint256 amount) external;
 
     /// @notice Recognize unrecoverable borrower debt, socializing the loss across holders
     /// @dev Market only. Also drops credit-backed supply. Recognized backing falls through
     /// {backing} / {totalAssets}; redeemers take a further exit haircut via {convertToAssets}.
-    /// @param amount The amount of bad debt to recognize
+    /// `amount` is cUSD share units (18 decimals), not underlying reserve-token units.
+    /// @param amount Bad debt to recognize, in cUSD share units (18 decimals)
     function recognizeBadDebtInCredit(uint256 amount) external;
 
     /// @notice Burn cUSD to retire bad debt and restore the peg
-    /// @dev Permissionless
-    /// @param amount The amount of bad debt to cover, capped at the outstanding shortfall
-    /// @return covered The amount of bad debt actually covered
+    /// @dev Permissionless. `amount` is cUSD share units (18 decimals).
+    /// @param amount Bad debt to cover, in cUSD share units (18 decimals), capped at the shortfall
+    /// @return covered Bad debt actually covered, in cUSD share units (18 decimals)
     function coverBadDebt(uint256 amount) external returns (uint256 covered);
 
     /// @notice Get the current bad debt
-    /// @return debt The outstanding bad debt
+    /// @return debt Outstanding bad debt, in cUSD share units (18 decimals)
     function badDebt() external view returns (uint256 debt);
 
     /// @notice Get the underlying asset decimals
@@ -145,7 +147,7 @@ interface IStablecoin {
     /// @return The credit-backed supply
     function creditBackedSupply() external view returns (uint256);
 
-    /// @notice Recognized backing in share units
+    /// @notice Recognized backing in cUSD share units (18 decimals)
     /// @dev `totalSupply - badDebt`. {convertToAssets} applies a further shortfall
     /// discount when quoting an exit; this figure is not that quote.
     /// @return recognized The outstanding supply still recognized as backed

@@ -90,14 +90,14 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
         external
         restricted
         nonReentrant
-        returns (uint256 repaid, uint256 assetsSlashed)
+        returns (uint256 repaid, uint256 valueSlashed)
     {
         _chargePremium();
         uint256 debt = totalDebt();
         // Entitlement is taken first: {_liquidate} reads health and maxLiquidatable off
         // {totalDebt}, so scaledDebt has to stay put until those checks have run.
         (uint256 remainingScaled, uint256 cleared) = _repayWithin(debt, Math.min(amount, maxLiquidatable()));
-        (repaid, assetsSlashed) = _liquidate(recipient, cleared);
+        (repaid, valueSlashed) = _liquidate(recipient, cleared);
         scaledDebt = remainingScaled;
     }
 
@@ -191,8 +191,8 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
     }
 
     /// @dev Grow the market-local index by the global growth factor raised to `multiplier`.
-    /// `2e27` squares the factor, so a year of 10% is 21%, and splitting that year into any
-    /// number of realisations does not change the result.
+    /// `2e27` squares the factor, so a year of 10% is 21%. Splitting that year into any
+    /// number of realisations is mathematically identical, subject to fixed-point rounding.
     /// @param lastLocal The market-local index at the last checkpoint
     /// @param lastGlobal The unmultiplied global liquidity index at the last checkpoint
     /// @param globalNow The current unmultiplied global liquidity index

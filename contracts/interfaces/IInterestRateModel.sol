@@ -161,7 +161,8 @@ interface IInterestRateModel {
     function averagingPeriod() external view returns (uint256);
 
     /// @notice Share of the average that survives one second
-    /// @dev Derived from {averagingPeriod}. Splitting an interval cannot change the result.
+    /// @dev Derived from {averagingPeriod}. Splitting an interval is mathematically identical,
+    /// subject to fixed-point rounding in {WadRayMath-rayPow}.
     /// @return The per-second retention factor
     function retentionPerSecond() external view returns (uint256);
 

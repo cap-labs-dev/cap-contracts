@@ -94,10 +94,10 @@ interface IBaseMarket {
 
     /// @notice Emitted when an unhealthy position is liquidated
     /// @param caller The address initiating the liquidation
-    /// @param recipient The address receiving slashed assets
+    /// @param recipient The address receiving slashed collateral
     /// @param repaid The amount of debt repaid
-    /// @param assetsSlashed The amount of tranche assets slashed
-    event Liquidate(address caller, address recipient, uint256 repaid, uint256 assetsSlashed);
+    /// @param valueSlashed USD value of collateral delivered, 18 decimals, possibly across tokens
+    event Liquidate(address caller, address recipient, uint256 repaid, uint256 valueSlashed);
 
     /// @notice Emitted when unrecoverable debt is written off the market
     /// @param caller The address initiating the write off

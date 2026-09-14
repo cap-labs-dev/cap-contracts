@@ -71,9 +71,10 @@ interface IPremiumVesting {
     /// @return premium Premium banked at the last checkpoint and not yet collected
     function pendingPremium(address user) external view returns (uint256 premium);
 
-    /// @notice Get claimable premium for an account
+    /// @notice Calculated premium entitlement for an account
+    /// @dev Not the amount {claim} will pay. Payment is capped by the stablecoin this contract holds.
     /// @param user The account to query
-    /// @return premium The claimable premium
+    /// @return premium The calculated entitlement, uncapped by holdings
     function claimable(address user) external view returns (uint256 premium);
 
     /// @notice Sum of opted-in balances

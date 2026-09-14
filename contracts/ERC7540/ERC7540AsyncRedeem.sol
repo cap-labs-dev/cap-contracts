@@ -141,10 +141,15 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         _claim(_receiver, _controller, assets, _shares, _requestId);
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Claims claimable requests for `controller`, oldest request first.
-    ///      Assets are converted once from the full share amount, then receipts
-    ///      are consumed to match. Per-request floors cannot underpay.
+    /// @notice Claim previously requested redemptions for `controller`, oldest request first
+    /// @dev Replaces the ERC-4626 instant-balance redeem. Caller must be `controller` or its
+    ///      operator; ERC-20 allowance is insufficient. Limited to currently claimable shares
+    ///      and {unlockedSupply}. Pays `convertToAssets(shares)` once (floored), then consumes
+    ///      receipts to match; per-request floors cannot underpay.
+    /// @param _shares Shares to claim
+    /// @param _receiver Asset recipient
+    /// @param _controller Request controller, not an instant share-balance owner
+    /// @return assets Assets paid
     function redeem(uint256 _shares, address _receiver, address _controller)
         public
         virtual
@@ -158,10 +163,14 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         if (consumed != _shares) revert IncompleteClaim(consumed, _shares);
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Claims claimable requests for `controller`, oldest request first.
-    ///      Burns the ceil-quoted shares and pays `_assets` once, so a request
-    ///      split across dust receipts still settles the atom it asked for.
+    /// @notice Claim previously requested redemptions for `controller` by asset amount, oldest first
+    /// @dev Replaces the ERC-4626 instant-balance withdraw. Caller must be `controller` or its
+    ///      operator; ERC-20 allowance is insufficient. Limited to currently claimable shares
+    ///      and {unlockedSupply}. Burns the ceil-quoted shares and pays `_assets` once.
+    /// @param _assets Assets to pay
+    /// @param _receiver Asset recipient
+    /// @param _controller Request controller, not an instant share-balance owner
+    /// @return shares Shares burned
     function withdraw(uint256 _assets, address _receiver, address _controller)
         public
         virtual
@@ -221,8 +230,11 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         pendingShares = _requestShares(_requestId, _controller) - _claimableShares(_requestId, _controller);
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Claimable shares across the controller's requests, not the instant balance.
+    /// @notice Claimable shares across `controller`'s requests, not an instant share balance
+    /// @dev Sum of {claimableRedeemRequest} for that controller, capped by {unlockedSupply}.
+    ///      A Cap {ITranche} may revert {ITranche-InvalidPrice} when that cap needs a price.
+    /// @param _controller Request controller, not an instant share-balance owner
+    /// @return maxShares Currently claimable shares
     function maxRedeem(address _controller)
         public
         view
@@ -241,7 +253,12 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         }
     }
 
-    /// @inheritdoc IERC4626
+    /// @notice Asset quote of {maxRedeem} for `controller`
+    /// @dev `convertToAssets` of the claimable share limit (floored). Not a withdraw from the
+    ///      owner's share balance. A Cap {ITranche} may revert {ITranche-InvalidPrice} when
+    ///      {maxRedeem} needs a price.
+    /// @param _controller Request controller, not an instant share-balance owner
+    /// @return maxAssets Currently claimable assets
     function maxWithdraw(address _controller)
         public
         view
@@ -251,13 +268,31 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         maxAssets = convertToAssets(maxRedeem(_controller));
     }
 
-    /// @inheritdoc IERC4626
-    function previewRedeem(uint256) public view virtual override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+    /// @notice Async redeem vaults do not support {previewRedeem}
+    /// @dev Reverts {PreviewNotSupported}. Use {convertToAssets} or {quoteWithdraw}.
+    /// @param shares Unused
+    /// @return assets Unused
+    function previewRedeem(uint256 shares)
+        public
+        view
+        virtual
+        override(ERC4626Upgradeable, IERC4626)
+        returns (uint256 assets)
+    {
         revert PreviewNotSupported();
     }
 
-    /// @inheritdoc IERC4626
-    function previewWithdraw(uint256) public view virtual override(ERC4626Upgradeable, IERC4626) returns (uint256) {
+    /// @notice Async redeem vaults do not support {previewWithdraw}
+    /// @dev Reverts {PreviewNotSupported}. Use {quoteWithdraw}.
+    /// @param assets Unused
+    /// @return shares Unused
+    function previewWithdraw(uint256 assets)
+        public
+        view
+        virtual
+        override(ERC4626Upgradeable, IERC4626)
+        returns (uint256 shares)
+    {
         revert PreviewNotSupported();
     }
 

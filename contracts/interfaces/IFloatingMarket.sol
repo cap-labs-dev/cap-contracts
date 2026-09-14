@@ -33,8 +33,8 @@ interface IFloatingMarket is IBaseMarket {
     /// @param recipient The recipient of the liquidated assets
     /// @param amount The amount of assets to liquidate
     /// @return repaid The actual amount of assets repaid
-    /// @return assetsSlashed The amount of assets slashed
-    function liquidate(address recipient, uint256 amount) external returns (uint256 repaid, uint256 assetsSlashed);
+    /// @return valueSlashed USD value of collateral delivered, 18 decimals, possibly across tokens
+    function liquidate(address recipient, uint256 amount) external returns (uint256 repaid, uint256 valueSlashed);
 
     /// @notice Charge the accrued premium
     function chargePremium() external;
@@ -50,7 +50,8 @@ interface IFloatingMarket is IBaseMarket {
     function premium() external view returns (uint256 liquidityPremium, uint256 underwriterPremium);
 
     /// @notice Get the liquidity and underwriter premium indexes
-    /// @dev Liquidity is this market's local index: the global increment times {marketMultiplier}.
+    /// @dev Liquidity grows as `oldLocal × (newGlobal / oldGlobal)^multiplier`, subject to
+    /// fixed-point rounding. Same-block reads return the last checkpoint.
     /// @return liquidityIndex The market-local liquidity index
     /// @return underwriterIndex The underwriter index
     function premiumIndices() external view returns (uint256 liquidityIndex, uint256 underwriterIndex);

@@ -5,6 +5,10 @@ pragma solidity 0.8.36;
 /// @author kexley
 /// @notice ERC-7540 asynchronous redemption
 /// @dev Only the three methods the EIP uses. Cap extras live on {IERC7540AsyncRedeem}.
+///      {ITranche} claimability views consult {unlockedSupply} and may revert
+///      {ITranche-InvalidPrice} when that read needs a price and the oracle is down.
+///      That is a documented deviation from the EIP's non-revert promise. Other Cap
+///      vaults keep the EIP rule.
 interface IERC7540Redeem {
     /// @dev `sender` locked `shares` owned by `owner`. `controller` controls the request.
     event RedeemRequest(
@@ -22,14 +26,16 @@ interface IERC7540Redeem {
     ///
     /// - MUST NOT include any shares in Claimable state.
     /// - MUST NOT show any variations depending on the caller.
-    /// - MUST NOT revert unless due to integer overflow caused by an unreasonably large input.
+    /// - MUST NOT revert unless due to integer overflow caused by an unreasonably large input,
+    ///   except a Cap {ITranche} may revert {ITranche-InvalidPrice} as noted above.
     function pendingRedeemRequest(uint256 requestId, address controller) external view returns (uint256 pendingShares);
 
     /// @dev Requested `shares` in Claimable state for (`requestId`, `controller`).
     ///
     /// - MUST NOT include any shares in Pending state.
     /// - MUST NOT show any variations depending on the caller.
-    /// - MUST NOT revert unless due to integer overflow caused by an unreasonably large input.
+    /// - MUST NOT revert unless due to integer overflow caused by an unreasonably large input,
+    ///   except a Cap {ITranche} may revert {ITranche-InvalidPrice} as noted above.
     function claimableRedeemRequest(uint256 requestId, address controller)
         external
         view

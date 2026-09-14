@@ -139,13 +139,13 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         external
         restricted
         nonReentrant
-        returns (uint256 repaid, uint256 assetsSlashed)
+        returns (uint256 repaid, uint256 valueSlashed)
     {
         _requireLoan(id);
-        (repaid, assetsSlashed) = _liquidate(recipient, _debtCheck(debt[id], amount));
+        (repaid, valueSlashed) = _liquidate(recipient, _debtCheck(debt[id], amount));
         debt[id] -= repaid;
         _totalDebt -= repaid;
-        emit LiquidateFixed(id, msg.sender, recipient, repaid, assetsSlashed);
+        emit LiquidateFixed(id, msg.sender, recipient, repaid, valueSlashed);
     }
 
     /// @inheritdoc IFixedMarket

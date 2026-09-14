@@ -100,7 +100,9 @@ interface ITranche is IERC7540AsyncRedeem {
     function maxMint(address receiver) external view returns (uint256 maxShares);
 
     /// @notice Shares available for redemption excluding market-locked assets
-    /// @dev A zero lock does not consult the oracle.
+    /// @dev A zero lock does not consult the oracle. A positive lock prices locked
+    /// value and may revert {InvalidPrice}. {pendingRedeemRequest} and
+    /// {claimableRedeemRequest} read this, which is the documented EIP-7540 deviation.
     /// @return unlocked Shares not locked by the market
     function unlockedSupply() external view returns (uint256 unlocked);
 

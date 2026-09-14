@@ -20,7 +20,8 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
     /// @dev Emitted when premium is added to the remainder
     event Fund(uint256 amount);
 
-    /// @dev Both conversions floor, so they can only under-attribute.
+    /// @dev Per-share conversions floor. A floored debt can still let entitlements sum past the
+    /// pot; {claim} pays at most the stablecoin this contract holds.
     uint256 private constant RAY = WadRayMath.RAY;
 
     /// @notice Twelve-hour time constant. After a day most of a pot has vested
@@ -315,7 +316,9 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
         amount = Math.mulDiv($.remainder, weight, RAY, Math.Rounding.Floor);
     }
 
-    /// @dev Premium attributed to `balance` at `perShare`. Floors, so it can only under-attribute
+    /// @dev Premium attributed to `balance` at `perShare`. Floors per account. Aggregate
+    /// entitlements can still exceed the pot when a prior debt also floored; {claim} caps payout
+    /// at the stablecoin held.
     /// @param perShare Cumulative premium released per staked share, in ray
     /// @param balance The share balance being valued
     /// @return amount The attributed premium
@@ -323,7 +326,7 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
         amount = Math.mulDiv(perShare, balance, RAY, Math.Rounding.Floor);
     }
 
-    /// @dev `1 - retention^elapsed`, so splits of the interval compose
+    /// @dev `1 - retention^elapsed`. Splits of the interval compose, subject to fixed-point rounding.
     /// @param elapsed Seconds since the last accrual
     /// @return weight Fraction of the remainder that has vested, in ray
     function _weight(uint256 elapsed) private pure returns (uint256 weight) {

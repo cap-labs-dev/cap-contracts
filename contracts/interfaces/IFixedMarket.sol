@@ -16,7 +16,8 @@ interface IFixedMarket is IBaseMarket {
     /// @notice Loan has not yet passed its expiry plus grace period
     error StillInGracePeriod();
 
-    /// @notice Loan has expired, cannot be extended
+    /// @notice Additional borrowing is unavailable at or after expiry
+    /// @dev Used by {borrowMore}. Expired loans can still {extend} or {extendAdmin}.
     error LoanExpired();
 
     /// @notice No loan was created at this id
@@ -55,10 +56,10 @@ interface IFixedMarket is IBaseMarket {
     /// @param id The id of the loan
     /// @param sender The sender of the liquidation request
     /// @param recipient The recipient of the liquidated assets
-    /// @param amount The amount of assets liquidated
-    /// @param assetsSlashed The amount of assets slashed
+    /// @param amount The amount of debt repaid
+    /// @param valueSlashed USD value of collateral delivered, 18 decimals, possibly across tokens
     event LiquidateFixed(
-        uint256 indexed id, address indexed sender, address indexed recipient, uint256 amount, uint256 assetsSlashed
+        uint256 indexed id, address indexed sender, address indexed recipient, uint256 amount, uint256 valueSlashed
     );
 
     /// @notice Wrote off unrecoverable debt on a loan
@@ -90,7 +91,7 @@ interface IFixedMarket is IBaseMarket {
     /// a finite term outside the band reverts {InvalidTerm}.
     /// @param recipient The recipient of the borrowed assets
     /// @param principal The principal amount of the borrowed assets, or `type(uint256).max` for
-    /// the largest principal that still fits {availableCredit} over `term`
+    /// the computed available principal over `term`. That size may sit below the exact maximum.
     /// @param term The term of the borrowed assets
     /// @return id The id of the loan
     /// @return actualPrincipal The actual principal amount of the borrowed assets
@@ -106,7 +107,8 @@ interface IFixedMarket is IBaseMarket {
     /// @param id The id of the loan
     /// @param recipient The recipient of the borrowed assets
     /// @param principal The principal amount of the borrowed assets, or `type(uint256).max` for
-    /// the largest add-on that still fits {availableCredit} over the remaining term
+    /// the computed available add-on over the remaining term. That size may sit below the exact
+    /// maximum.
     /// @return actualPrincipal The actual principal amount of the borrowed assets
     function borrowMore(uint256 id, address recipient, uint256 principal) external returns (uint256 actualPrincipal);
 
@@ -125,10 +127,10 @@ interface IFixedMarket is IBaseMarket {
     /// @param recipient The recipient of the liquidated assets
     /// @param amount The amount of assets to liquidate
     /// @return repaid The actual amount of assets repaid
-    /// @return assetsSlashed The amount of assets slashed
+    /// @return valueSlashed USD value of collateral delivered, 18 decimals, possibly across tokens
     function liquidate(uint256 id, address recipient, uint256 amount)
         external
-        returns (uint256 repaid, uint256 assetsSlashed);
+        returns (uint256 repaid, uint256 valueSlashed);
 
     /// @notice Extend the term of a loan
     /// @dev Live loans can grow only up to the current {maximumTermLimit}. If that limit was

@@ -4,6 +4,9 @@ pragma solidity 0.8.36;
 /// @title IERC7575
 /// @notice ERC-4626 vault methods plus {share}. Flattened so {IERC165-supportsInterface} id is `0x2f0a18c5`.
 /// @dev Do not inherit this next to {IERC4626}: same selectors, different types, override diamond.
+///      Cap async vaults specialize {maxRedeem}, {maxWithdraw}, {redeem}, and {withdraw} on
+///      {ERC7540AsyncRedeem}: those claim requested redemptions for a controller, not an
+///      instant share balance. Use that NatSpec, not the generic wording below.
 interface IERC7575 {
     /// @notice Underlying asset the vault accounts, deposits, and withdraws
     /// @return assetTokenAddress The ERC-20 asset
