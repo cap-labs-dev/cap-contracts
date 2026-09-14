@@ -121,8 +121,14 @@ interface IInterestRateModel {
     function setAveragingPeriod(uint256 averagingPeriod) external;
 
     /// @notice Update the underwriter rate for the calling market ({CapRoles-MARKET})
+    /// @dev Checkpoints the index first so the new rate applies only going forward.
     /// @param rate The new underwriter rate per year in ray decimals
     function updateUnderwriterRate(uint256 rate) external;
+
+    /// @notice Fold a market's underwriter index up to now
+    /// @dev Permissionless. Does not change the rate. Anyone can keep a long-idle market current.
+    /// @param market The market whose index to checkpoint
+    function updateUnderwriterIndex(address market) external;
 
     /// @notice The address of the Stablecoin token
     /// @return The stablecoin address
@@ -230,6 +236,8 @@ interface IInterestRateModel {
     function liquidityRate() external view returns (uint256 rate);
 
     /// @notice The current underwriter index for a market
+    /// @dev Compounds in year-sized windows, so a long gap since the last write does not
+    /// collapse onto a single cubic.
     /// @param market The market to query
     /// @return index The underwriter index
     function underwriterIndex(address market) external view returns (uint256 index);

@@ -4,11 +4,14 @@ pragma solidity 0.8.36;
 import { InterestRateModel } from "../../../contracts/cap/InterestRateModel.sol";
 import { IInterestRateModel } from "../../../contracts/interfaces/IInterestRateModel.sol";
 import { CapRoles } from "../../../contracts/utils/CapRoles.sol";
+import { WadRayMath } from "../../../contracts/utils/WadRayMath.sol";
 import { BaseTest } from "../../shared/BaseTest.sol";
 import { MockUtilizationSource } from "../../shared/mocks/MockUtilizationSource.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 contract InterestRateModelTest is BaseTest {
+    using WadRayMath for uint256;
+
     InterestRateModel internal irm;
     MockUtilizationSource internal stablecoin;
     address internal market = makeAddr("market");
@@ -134,6 +137,41 @@ contract InterestRateModelTest is BaseTest {
         uint256 before = irm.underwriterIndex(market);
         vm.warp(block.timestamp + 365 days);
         assertGt(irm.underwriterIndex(market), before);
+    }
+
+    /// @dev Only the market owner can change the rate, and they have no reason to poke it. Five
+    /// years without a write must still equal five annual folds, not a single cubic.
+    function test_underwriterIndex_fiveIdleYearsMatchesAnnualFolds() public {
+        vm.prank(market);
+        irm.updateUnderwriterRate(1e27);
+
+        uint256 start = irm.underwriterIndex(market);
+        vm.warp(block.timestamp + 365 days);
+        uint256 oneYear = irm.underwriterIndex(market);
+
+        uint256 folded = start;
+        for (uint256 i; i < 5; ++i) {
+            folded = folded.rayMul(oneYear.rayDiv(start));
+        }
+
+        vm.warp(block.timestamp + 4 * 365 days);
+        assertEq(irm.underwriterIndex(market), folded);
+    }
+
+    function test_updateUnderwriterIndex_isPermissionlessAndWritesTheView() public {
+        vm.prank(market);
+        irm.updateUnderwriterRate(0.2e27);
+        vm.warp(block.timestamp + 365 days);
+        uint256 live = irm.underwriterIndex(market);
+
+        vm.prank(stranger);
+        irm.updateUnderwriterIndex(market);
+
+        (uint256 rate, uint256 stored, uint256 lastUpdate) = irm.underwriterData(market);
+        assertEq(rate, 0.2e27, "the rate is untouched");
+        assertEq(stored, live, "storage caught the view");
+        assertEq(lastUpdate, block.timestamp);
+        assertEq(irm.underwriterIndex(market), live);
     }
 
     function test_termMultiplierSlope_effect() public {

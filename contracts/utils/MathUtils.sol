@@ -30,12 +30,12 @@ library MathUtils {
         interestRate = WadRayMath.RAY + result;
     }
 
-    /// @dev Function to calculate the interest using a compounded interest rate formula
-    /// To avoid expensive exponentiation, the calculation is performed using a binomial approximation:
-    /// (1+x)^n = 1+n*x+[n/2*(n-1)]*x^2+[n/6*(n-1)*(n-2)*x^3...
-    /// The approximation slightly underpays liquidity providers and undercharges borrowers, with the advantage of great
-    /// gas cost reductions. The whitepaper contains reference to the approximation and a table showing the margin of
-    /// error per different time periods
+    /// @dev Compound `rate` from `lastUpdateTimestamp` to `currentTimestamp`.
+    /// Each window of at most one year uses Aave's cubic binomial. A single cubic over many
+    /// years under-accrues without bound (about 1.9% after 1 y at 100%, 73% after 5 y). Folding
+    /// year-sized windows keeps the error at the one-year bound, and matches checkpointing once
+    /// a year. The underwriter index is only written on a rate change, so the view has to do
+    /// this itself.
     /// @param rate The interest rate, in ray
     /// @param lastUpdateTimestamp The timestamp of the last update of the interest
     /// @param currentTimestamp The timestamp to accumulate interest up to
@@ -47,20 +47,31 @@ library MathUtils {
     {
         //solium-disable-next-line
         uint256 exp = currentTimestamp - lastUpdateTimestamp;
+        if (exp == 0) return WadRayMath.RAY;
 
-        if (exp == 0) {
-            return WadRayMath.RAY;
+        interestRate = WadRayMath.RAY;
+        while (exp > 0) {
+            uint256 step = exp > SECONDS_PER_YEAR ? SECONDS_PER_YEAR : exp;
+            interestRate = interestRate.rayMul(_compoundedInterest(rate, step));
+            unchecked {
+                exp -= step;
+            }
         }
+    }
 
+    /// @dev Cubic binomial for a single window. `exp` must be positive and is intended to be at
+    /// most {SECONDS_PER_YEAR}.
+    /// @param rate The interest rate, in ray
+    /// @param exp Elapsed seconds in this window
+    /// @return interestRate The growth factor for this window, in ray
+    function _compoundedInterest(uint256 rate, uint256 exp) private pure returns (uint256 interestRate) {
         uint256 expMinusOne;
         uint256 expMinusTwo;
         uint256 basePowerTwo;
         uint256 basePowerThree;
         unchecked {
             expMinusOne = exp - 1;
-
             expMinusTwo = exp > 2 ? exp - 2 : 0;
-
             basePowerTwo = rate.rayMul(rate) / (SECONDS_PER_YEAR * SECONDS_PER_YEAR);
             basePowerThree = basePowerTwo.rayMul(rate) / SECONDS_PER_YEAR;
         }

@@ -125,10 +125,14 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     function updateUnderwriterRate(uint256 rate) external restricted {
         if (rate > maximumUnderwriterRate) revert InvalidRate();
         address market = msg.sender;
-        underwriterData[market].index = underwriterIndex(market);
-        underwriterData[market].lastUpdate = block.timestamp;
+        _checkpointUnderwriter(market);
         underwriterData[market].ratePerYear = rate;
         emit UpdateUnderwriterRate(market, rate);
+    }
+
+    /// @inheritdoc IInterestRateModel
+    function updateUnderwriterIndex(address market) external {
+        _checkpointUnderwriter(market);
     }
 
     /// @inheritdoc IInterestRateModel
@@ -310,6 +314,13 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
             rate = slopes.base + slopes.slope0
                 + slopes.slope1.rayMul((utilization - slopes.kink).rayDiv(1e27 - slopes.kink));
         }
+    }
+
+    /// @dev Write the live underwriter index and clock. Rate is unchanged.
+    /// @param market The market whose index to checkpoint
+    function _checkpointUnderwriter(address market) internal {
+        underwriterData[market].index = underwriterIndex(market);
+        underwriterData[market].lastUpdate = block.timestamp;
     }
 
     /// @dev Calculate the cumulative index for a given index data
