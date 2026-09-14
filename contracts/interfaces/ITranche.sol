@@ -87,7 +87,8 @@ interface ITranche is IERC7540AsyncRedeem {
     function oracle() external view returns (address);
 
     /// @notice Whether a slash has retired the tranche
-    /// @dev Latched below 1% of par. Closes deposits.
+    /// @dev Latched below 1% of par. Closes deposits. The market also stops sending it fresh
+    /// premium, so leftover dust cannot keep its weight.
     /// @return Whether the tranche has been retired
     function killed() external view returns (bool);
 

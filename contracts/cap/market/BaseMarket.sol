@@ -429,10 +429,11 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @dev Charge the premium
-    /// @dev Tranches that still hold assets and have opted-in shares take their weight of the
-    /// underwriter premium. Dust and ineligible-tranche weight go to the senior tranche, or vest
-    /// on the stablecoin. Already-funded premium is not touched. Eligibility does not price
-    /// collateral, so an oracle outage cannot block a charge or a repayment.
+    /// @dev Alive tranches that still hold assets and have opted-in shares take their weight of
+    /// the underwriter premium. Killed or empty tranches do not: a dust remainder after a slash
+    /// must not keep a senior's weight. Ineligible weight goes to the senior if it still earns,
+    /// or vests on the stablecoin. Already-funded premium is not touched. Eligibility does not
+    /// price collateral, so an oracle outage cannot block a charge or a repayment.
     /// @param liquidityPremium The amount of liquidity premium to charge
     /// @param underwriterPremium The amount of underwriter premium to charge
     function _chargePremium(uint256 liquidityPremium, uint256 underwriterPremium) internal {
@@ -478,12 +479,15 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @dev New underwriting premium is for holdings that still back the market and can be claimed.
-    /// Shares survive a wipeout, so {IPremiumVesting-stakedSupply} alone would keep paying a
-    /// depleted tranche. Holdings are {ITranche-totalAssets}, not {ITranche-totalCapital}: a
-    /// missing price must not brick {FloatingMarket-repay} or {IFloatingMarket-chargePremium}.
+    /// A killed tranche is retired even if a dust of assets remains; paying it its full weight
+    /// would let a 0.5-token dead senior out-earn a live junior. Shares survive a wipeout, so
+    /// {IPremiumVesting-stakedSupply} alone would keep paying it too. Holdings are
+    /// {ITranche-totalAssets}, not {ITranche-totalCapital}: a missing price must not brick
+    /// {FloatingMarket-repay} or {IFloatingMarket-chargePremium}.
     /// @param tranche The tranche being considered
     /// @return eligible Whether the tranche should receive a fresh allocation
     function _earnsPremium(address tranche) private view returns (bool eligible) {
+        if (ITranche(tranche).killed()) return false;
         if (IPremiumVesting(tranche).stakedSupply() == 0) return false;
         eligible = ITranche(tranche).totalAssets() > 0;
     }

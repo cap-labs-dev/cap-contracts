@@ -765,6 +765,44 @@ contract TrancheTest is CapDeployer {
         );
     }
 
+    /// @dev Kill is latched below 1% of par, so a senior can sit on half a token of dust and
+    /// still have {totalAssets} > 0. That used to keep its full weight — about 95% of the pot —
+    /// while a 1,000-token live junior took 5%.
+    function test_killedDustSeniorDoesNotOutEarnALiveJunior() public {
+        MarketBundle memory b = _createReadyMarket("killed-dust");
+        _fundTranche(b.tranche0Addr, supplier, 100e18);
+        _fundTranche(b.tranche1Addr, stranger, 1_000e18);
+
+        vm.prank(defaultBorrower);
+        b.market.borrow(defaultBorrower, 50e18);
+        vm.warp(block.timestamp + 30 days);
+        b.market.chargePremium();
+
+        uint256 seniorHeld = stablecoin.balanceOf(b.tranche0Addr);
+        _marketSlash(b.tranche0, 100e18 - 0.5e18);
+        assertEq(b.tranche0.totalAssets(), 0.5e18, "half a token of dust remains");
+        assertTrue(b.tranche0.killed(), "and that is enough to retire it");
+        assertGt(b.tranche0.stakedSupply(), 0, "shares are still opted in");
+
+        vm.warp(block.timestamp + 30 days);
+        (uint256 liquidityPremium, uint256 underwriterPremium) = b.market.premium();
+        uint256 juniorShare = underwriterPremium * b.market.tranches()[1].weight / 1e27;
+        uint256 leftover = underwriterPremium - juniorShare;
+        uint256 vestedBefore = stablecoin.balanceOf(address(stablecoin));
+        uint256 juniorBefore = stablecoin.balanceOf(b.tranche1Addr);
+
+        b.market.chargePremium();
+
+        assertEq(stablecoin.balanceOf(b.tranche0Addr), seniorHeld, "dust senior takes no fresh premium");
+        assertEq(stablecoin.balanceOf(b.tranche1Addr) - juniorBefore, juniorShare, "live junior keeps its weight");
+        assertGt(juniorShare, 0, "the junior actually earned");
+        assertEq(
+            stablecoin.balanceOf(address(stablecoin)) - vestedBefore,
+            liquidityPremium + leftover,
+            "the senior's weight vests on cUSD, not on the dust"
+        );
+    }
+
     /// @dev The seed never opts in, so it is excluded from {IPremiumVesting-stakedSupply}, which
     /// is the divisor premium is spread over. The real holders are the only claim on it.
     ///
