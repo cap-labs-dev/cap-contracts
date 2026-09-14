@@ -391,9 +391,7 @@ contract UnderwriterUnitTest is BaseTest {
     function test_removeTranche_reportsBeforeDeregistering() public {
         underwriter.addTranche(tranche);
         underwriter.setDefaultTranche(tranche);
-        vm.mockCall(tranche, abi.encodeWithSelector(IERC20.balanceOf.selector, address(underwriter)), abi.encode(1e18));
-        vm.mockCall(tranche, abi.encodeWithSignature("convertToAssets(uint256)"), abi.encode(1e18));
-        underwriter.report(tranche);
+        _openBook(1e18);
 
         vm.mockCall(tranche, abi.encodeWithSignature("claim(address)", address(underwriter)), abi.encode(uint256(2e18)));
 
@@ -402,5 +400,46 @@ contract UnderwriterUnitTest is BaseTest {
 
         assertEq(underwriter.remaining(), 2e18);
         assertEq(underwriter.defaultTranche(), address(0));
+    }
+
+    /// @dev deallocate remakes a book that allocate already opened. An airdropped vault with a
+    /// huge convertToAssets must not be able to enter totalDebt through a refresh.
+    function test_deallocate_doesNotOpenABookFromAnAirdrop() public {
+        address dumped = makeAddr("airdroppedVault");
+        vm.mockCall(dumped, abi.encodeWithSelector(IERC20.balanceOf.selector, address(underwriter)), abi.encode(1e18));
+        vm.mockCall(dumped, abi.encodeWithSignature("instantUnlockedSupply()"), abi.encode(1e18));
+        vm.mockCall(dumped, abi.encodeWithSignature("convertToAssets(uint256)"), abi.encode(1e30));
+
+        uint256 book = underwriter.totalDebt();
+        underwriter.deallocate(dumped, 0);
+
+        assertEq(underwriter.totalDebt(), book);
+        assertEq(underwriter.debt(dumped), 0);
+    }
+
+    /// @dev report is the same gate: claiming premium on a registered tranche does not book an
+    /// airdrop that allocate never opened.
+    function test_report_doesNotOpenABookFromAnAirdrop() public {
+        underwriter.addTranche(tranche);
+        vm.mockCall(tranche, abi.encodeWithSelector(IERC20.balanceOf.selector, address(underwriter)), abi.encode(1e18));
+        vm.mockCall(tranche, abi.encodeWithSignature("convertToAssets(uint256)"), abi.encode(1e30));
+
+        underwriter.report(tranche);
+
+        assertEq(underwriter.debt(tranche), 0);
+        assertEq(underwriter.totalDebt(), 0);
+    }
+
+    function _openBook(uint256 assets) internal {
+        vm.mockCall(
+            tranche,
+            abi.encodeWithSignature("deposit(uint256,address)", assets, address(underwriter)),
+            abi.encode(assets)
+        );
+        vm.mockCall(
+            tranche, abi.encodeWithSelector(IERC20.balanceOf.selector, address(underwriter)), abi.encode(assets)
+        );
+        vm.mockCall(tranche, abi.encodeWithSignature("convertToAssets(uint256)"), abi.encode(assets));
+        underwriter.allocate(tranche, assets);
     }
 }

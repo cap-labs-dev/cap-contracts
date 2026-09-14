@@ -96,6 +96,7 @@ interface IUnderwriter is IERC7540AsyncRedeem {
 
     /// @notice Instantly redeem unlocked tranche shares back to the vault
     /// @dev Allocator only. Tranches can be removed from registration and still deallocated.
+    /// Remakes the mark only if {debt} is already nonzero — an airdrop cannot open a book.
     /// @param tranche The tranche address
     /// @param shares The shares to redeem
     /// @return deallocated The amount of shares redeemed
@@ -121,8 +122,8 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     function setDefaultTranche(address tranche) external;
 
     /// @notice Re-value a tranche position and claim its premium
-    /// @dev Same revaluation as {allocate} and {deallocate}. Share price stays on the last mark
-    /// until this runs; that lag is intentional, not a live NAV walk.
+    /// @dev Remakes the mark only if {allocate} already opened one. Share price stays on that
+    /// book until this runs; that lag is intentional, not a live NAV walk.
     /// @param tranche The tranche address
     function report(address tranche) external;
 
@@ -164,8 +165,9 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     function totalDebt() external view returns (uint256);
 
     /// @notice Total assets including vault balance and recorded tranche debt
-    /// @dev Vault ERC6909 balance plus {totalDebt}. A slash is folded in only when {report},
-    /// {allocate}, or {deallocate} remakes the mark — Yearn-style, not a live price of positions.
+    /// @dev Vault ERC6909 balance plus {totalDebt}. A slash is folded in only when {allocate}
+    /// opens or remakes the book, or when {report} / {deallocate} remake a book that already
+    /// exists — Yearn-style, not a live price of positions.
     /// @return assets The total assets
     function totalAssets() external view returns (uint256 assets);
 

@@ -126,7 +126,8 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     function _allocate(address tranche, uint256 assets) internal {
         if (!_registeredTranches.contains(tranche)) revert NotRegisteredTranche();
         ITranche(tranche).deposit(assets, address(this));
-        _mark(tranche);
+        // allocate is the only path that may open a book
+        _syncMark(tranche);
     }
 
     /// @inheritdoc IUnderwriter
@@ -138,8 +139,7 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
             Math.min(ITranche(tranche).balanceOf(address(this)), ITranche(tranche).instantUnlockedSupply());
         deallocated = Math.min(shares, available);
         if (deallocated > 0) ITranche(tranche).instantRedeem(deallocated, address(this), address(this));
-        // outside the branch, so the postcondition is simply that this tranche's mark is fresh when
-        // the call returns, whether or not there was anything to pull out
+        // remakes an existing book only. An airdropped vault cannot enter {totalDebt} here.
         _mark(tranche);
     }
 
@@ -179,12 +179,22 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         _mark(tranche);
     }
 
-    /// @dev Re-value from remaining plus queued shares. A slash between reports is a loss that
-    /// waits here on purpose: share price is this cached book, not a live walk of every position.
+    /// @dev Re-value a book that {allocate} already opened. A never-seen token is a no-op, so an
+    /// airdropped vault cannot enter {totalDebt} through deallocate, finalize, or report.
     /// @param tranche The tranche to re-value
     /// @return gain The increase in the recorded position, if any
     /// @return loss The decrease in the recorded position, if any
     function _mark(address tranche) internal returns (uint256 gain, uint256 loss) {
+        if (debt[tranche] == 0) return (0, 0);
+        return _syncMark(tranche);
+    }
+
+    /// @dev Write {debt} from remaining plus queued shares. A slash between reports is a loss that
+    /// waits here on purpose: share price is this cached book, not a live walk of every position.
+    /// @param tranche The tranche to re-value
+    /// @return gain The increase in the recorded position, if any
+    /// @return loss The decrease in the recorded position, if any
+    function _syncMark(address tranche) internal returns (uint256 gain, uint256 loss) {
         uint256 recorded = debt[tranche];
         uint256 position = ITranche(tranche).balanceOf(address(this)) + queuedShares[tranche];
         uint256 assets = ITranche(tranche).convertToAssets(position);
