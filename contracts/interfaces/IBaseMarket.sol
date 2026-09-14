@@ -173,10 +173,13 @@ interface IBaseMarket {
 
     /// @notice Set the tranches and their weights
     /// @dev Restricted to the registry; market owners may only change weights.
+    /// Floating settles outstanding premium under the current list first, so an
+    /// already-elapsed period is not reallocated.
     /// @param tranches The new tranche addresses and weights
     function setTranches(Tranche[] calldata tranches) external;
 
     /// @notice Set the tranche weights
+    /// @dev Floating settles outstanding premium under the current weights first.
     /// @param weights The new tranche weights in ray decimals
     function setTrancheWeights(uint256[] calldata weights) external;
 

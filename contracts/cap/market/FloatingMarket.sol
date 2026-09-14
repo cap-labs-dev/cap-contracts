@@ -44,6 +44,12 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
         lastPremiumUpdate = block.timestamp;
     }
 
+    /// @dev Allocate elapsed premium to the current tranches before membership or
+    /// weights change, so an already-accrued period is not paid under the new split.
+    function _beforeTrancheChange() internal override {
+        _chargePremium();
+    }
+
     /// @inheritdoc IBaseMarket
     /// @dev Accrue at the old multiplier first so the new factor applies only going forward.
     function setMarketMultiplier(uint256 multiplier)

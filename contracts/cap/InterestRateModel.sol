@@ -64,6 +64,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     uint256 public constant MAXIMUM_AVERAGING_PERIOD = 1 days;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
+    /// @dev Implementation only. The live model is the UUPS proxy.
     constructor() {
         _disableInitializers();
     }
@@ -237,7 +238,8 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         rate = _ratio(credit + mintAmount, supply + mintAmount);
     }
 
-    /// @dev Accrue the averages, then set the liquidity rate from live utilization.
+    /// @dev Fold elapsed time into the averages, then set the liquidity rate from
+    /// live utilization. Permissionless via {updateLiquidityRate}.
     function _updateLiquidityRate() internal {
         _accrueAverage();
         liquidityData.index = _index(liquidityData);
@@ -246,7 +248,8 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         liquidityData.ratePerYear = _nextLiquidityRate(utilization);
     }
 
-    /// @dev Fold the prior observation into the averages, then store the live reading.
+    /// @dev Fold the prior observation into the averages when time has passed, then
+    /// store the live supplies as the new observation.
     function _accrueAverage() internal {
         UtilizationAverage memory average = utilizationAverage;
 
@@ -320,5 +323,6 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     }
 
     /// @inheritdoc UUPSUpgradeable
+    /// @dev Same {restricted} gate as the other setters.
     function _authorizeUpgrade(address) internal override restricted { }
 }

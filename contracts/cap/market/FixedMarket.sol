@@ -37,6 +37,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     uint256 private _totalDebt;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
+    /// @dev Implementation only. Instances are initialized behind the market beacon.
     constructor() {
         _disableInitializers();
     }
@@ -201,11 +202,13 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         if (debt[id] == 0) revert LoanClosed(id);
     }
 
-    /// @dev Borrow the principal
+    /// @dev Draw `principal` and charge {premiumForBorrow}. `type(uint256).max` fills
+    /// {_principalFor}. Reverts {Unhealthy} if the premium (or an active-to-total gap)
+    /// takes health below one ray.
     /// @param id The id of the loan
     /// @param recipient The address to borrow to
-    /// @param principal The principal of the loan
-    /// @param term The term of the loan
+    /// @param principal The principal of the loan, or `type(uint256).max` for the sized max
+    /// @param term The term of the loan in seconds, already inside the band
     /// @return actualPrincipal The principal actually drawn
     function _borrow(uint256 id, address recipient, uint256 principal, uint256 term)
         internal
@@ -261,6 +264,9 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @dev Combined liquidity and underwriter rate after `mintAmount` is minted.
+    /// @param term The term of the loan in seconds, already capped at the maximum
+    /// @param mintAmount The credit-backed supply still to be minted before the charge
+    /// @return rate The combined rate per year in ray decimals
     function _termRate(uint256 term, uint256 mintAmount) internal view returns (uint256 rate) {
         (uint256 liquidityRate, uint256 underwriterRate) = _ratesStillToMint(term, mintAmount);
         rate = liquidityRate + underwriterRate;
@@ -269,6 +275,9 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     /// @dev A principal that, with its borrow premium, fits in `limit`. Invert at today's
     /// rate, then scale by `limit/cost` if the real quote is heavier. Four passes is enough
     /// because cost is nearly linear in principal. May sit below the exact maximum.
+    /// @param limit The raw {IBaseMarket-availableCredit} the draw must fit
+    /// @param term The term of the loan in seconds
+    /// @return principal A principal whose {_borrowCost} is at most `limit`, or zero
     function _principalFor(uint256 limit, uint256 term) internal view returns (uint256 principal) {
         if (limit == 0) return 0;
 
@@ -287,28 +296,36 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @dev Principal plus the premium that draw would be charged.
+    /// @param principal The principal of the loan
+    /// @param term The term of the loan in seconds
+    /// @return cost Principal plus {premiumForBorrow} for that pair
     function _borrowCost(uint256 principal, uint256 term) internal view returns (uint256 cost) {
         (uint256 liquidityPremium, uint256 underwriterPremium) = _premiumStillToMint(principal, term, principal);
         cost = principal + liquidityPremium + underwriterPremium;
     }
 
     /// @dev Invert `principal + principal * term * rate / year = limit` at a constant rate.
+    /// @param limit The credit the sized principal plus premium must not exceed
+    /// @param term The term of the loan in seconds
+    /// @param rate The combined annual rate in ray decimals
+    /// @return principal The principal that saturates `limit` at `rate`
     function _principalWithin(uint256 limit, uint256 term, uint256 rate) internal pure returns (uint256 principal) {
         principal = Math.mulDiv(limit, 1e27, 1e27 + Math.mulDiv(term, rate, MathUtils.SECONDS_PER_YEAR));
     }
 
-    /// @dev `type(uint256).max` and anything above the maximum quote at the maximum.
+    /// @dev Terms above {maximumTermLimit}, including `type(uint256).max`, quote at the maximum.
     /// {borrow} still rejects a finite term outside the band.
+    /// @param term The requested term in seconds
+    /// @return quoted The term used for a view quote
     function _quoteTerm(uint256 term) internal view returns (uint256 quoted) {
-        quoted = term == type(uint256).max || term > maximumTermLimit ? maximumTermLimit : term;
+        quoted = term > maximumTermLimit ? maximumTermLimit : term;
     }
 
-    /// @dev Validate the term limits and store them
+    /// @dev Store term limits. The maximum must be non-zero because rates divide by it;
+    /// the minimum must not exceed it or every term is invalid.
     /// @param _maximumTermLimit The maximum term of a loan
     /// @param _minimumTermLimit The minimum term of a loan
     function _setTermLimits(uint256 _maximumTermLimit, uint256 _minimumTermLimit) internal {
-        // rates divide the term by the maximum, and a minimum above the maximum makes every
-        // term invalid
         if (_maximumTermLimit == 0 || _minimumTermLimit > _maximumTermLimit) revert InvalidTermLimits();
         maximumTermLimit = _maximumTermLimit;
         minimumTermLimit = _minimumTermLimit;
@@ -326,23 +343,16 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         actualExtension += block.timestamp - previousExpiry;
     }
 
-    /// @dev Extend the loan
+    /// @dev Grow expiry by `extension` and charge premium on outstanding debt over that term.
+    /// Mints nothing; {averageUtilizationAfterMint} still folds in unsmoothed credit, so a
+    /// same-block borrow is in the rate the extension pays.
     /// @param id The id of the loan
-    /// @param extension The extension of the loan
+    /// @param extension The seconds added to expiry, including any arrears
     function _extend(uint256 id, uint256 extension) internal {
         expiry[id] += extension;
-        uint256 chargedPremium = _chargePremiumForTerm(id, debt[id], extension);
+        (uint256 liquidityPremium, uint256 underwriterPremium) = _premiumStillToMint(debt[id], extension, 0);
+        uint256 chargedPremium = _applyPremium(id, liquidityPremium, underwriterPremium);
         emit ExtendFixed(id, extension, chargedPremium);
-    }
-
-    /// @dev Charge an extension. Mints nothing; {averageUtilizationAfterMint} still folds
-    /// in unsmoothed credit, so a same-block borrow is in the rate the extension pays.
-    function _chargePremiumForTerm(uint256 id, uint256 chargeableDebt, uint256 term)
-        internal
-        returns (uint256 chargedPremium)
-    {
-        (uint256 liquidityPremium, uint256 underwriterPremium) = _premiumStillToMint(chargeableDebt, term, 0);
-        chargedPremium = _applyPremium(id, liquidityPremium, underwriterPremium);
     }
 
     /// @dev Record a computed premium on the loan and mint it

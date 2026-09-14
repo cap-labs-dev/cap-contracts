@@ -62,11 +62,12 @@ interface IFixedMarket is IBaseMarket {
     );
 
     /// @notice Initialize the market
+    /// @dev Term limits must satisfy {setTermLimits}. `grace` is the delay before {extendAdmin}.
     /// @param authority The authority of the market
     /// @param registry The registry providing shared market configuration
     /// @param name The name of the market
-    /// @param maximumTermLimit The maximum term of a loan
-    /// @param minimumTermLimit The minimum term of a loan
+    /// @param maximumTermLimit The maximum term of a loan, must be non-zero
+    /// @param minimumTermLimit The minimum term of a loan, must not exceed the maximum
     /// @param grace The grace period after expiry for admin extensions
     function initialize(
         address authority,
@@ -78,10 +79,11 @@ interface IFixedMarket is IBaseMarket {
     ) external;
 
     /// @notice Borrow assets from the market
-    /// @dev Premium is {premiumForBorrow}. Splitting a draw can cheapen the total;
-    /// borrowers are permissioned and that is not acceptable use.
+    /// @dev Premium is {premiumForBorrow}. `type(uint256).max` fills the maximum term;
+    /// a finite term outside the band reverts {InvalidTerm}.
     /// @param recipient The recipient of the borrowed assets
-    /// @param principal The principal amount of the borrowed assets
+    /// @param principal The principal amount of the borrowed assets, or `type(uint256).max` for
+    /// the largest principal that still fits {availableCredit} over `term`
     /// @param term The term of the borrowed assets
     /// @return id The id of the loan
     /// @return actualPrincipal The actual principal amount of the borrowed assets
@@ -90,14 +92,14 @@ interface IFixedMarket is IBaseMarket {
         returns (uint256 id, uint256 actualPrincipal);
 
     /// @notice Borrow additional assets against an existing loan
-    /// @dev `id` must be in `[0, loanCount)` and still carry debt. A fully repaid
-    /// loan stays enumerable but cannot reopen; open a new loan with {borrow}.
-    /// Priced as a new {premiumForBorrow} on this add-on, so it can be cheaper
-    /// than drawing the same total in one go. Borrowers are permissioned; splitting
-    /// to cheapen the premium is not acceptable use.
+    /// @dev `id` must still carry debt. A fully repaid loan stays enumerable but cannot
+    /// reopen; open a new loan with {borrow}. Premium is {premiumForBorrow} on the
+    /// remaining term. Reverts {LoanExpired} at or after expiry, {InvalidTerm} if the
+    /// remainder is below {minimumTermLimit}.
     /// @param id The id of the loan
     /// @param recipient The recipient of the borrowed assets
-    /// @param principal The principal amount of the borrowed assets
+    /// @param principal The principal amount of the borrowed assets, or `type(uint256).max` for
+    /// the largest add-on that still fits {availableCredit} over the remaining term
     /// @return actualPrincipal The actual principal amount of the borrowed assets
     function borrowMore(uint256 id, address recipient, uint256 principal) external returns (uint256 actualPrincipal);
 
@@ -110,7 +112,9 @@ interface IFixedMarket is IBaseMarket {
     function repay(uint256 id, uint256 amount) external returns (uint256 repaid);
 
     /// @notice Liquidate assets from the market
-    /// @param id The id of the loan. Must be in `[0, loanCount)`.
+    /// @dev `id` must be in `[0, loanCount)`. Reverts {Healthy} when the market is not
+    /// liquidatable. `amount` of `type(uint256).max` clears as much as {maxLiquidatable}.
+    /// @param id The id of the loan
     /// @param recipient The recipient of the liquidated assets
     /// @param amount The amount of assets to liquidate
     /// @return repaid The actual amount of assets repaid
@@ -130,7 +134,7 @@ interface IFixedMarket is IBaseMarket {
     function extend(uint256 id, uint256 extension) external returns (uint256 actualExtension);
 
     /// @notice Roll an overdue loan forward and charge premium for the arrears
-    /// @dev Health is not checked potentially making loan liquidatable.
+    /// @dev Health is not checked, so the loan may become liquidatable.
     /// `id` must be in `[0, loanCount)` and still carry debt.
     /// @param id The id of the loan
     /// @param extension The new term to roll the loan forward by
@@ -144,12 +148,16 @@ interface IFixedMarket is IBaseMarket {
     function writeOff(uint256 id) external returns (uint256 amount);
 
     /// @notice Set the term limits for new loans
+    /// @dev Existing loans keep their expiry. A lowered maximum that sits below a live
+    /// remaining term leaves that loan with no room to {extend}.
     /// @param maximumTermLimit The maximum term of a loan, must be non-zero
     /// @param minimumTermLimit The minimum term of a loan, must not exceed the maximum
     function setTermLimits(uint256 maximumTermLimit, uint256 minimumTermLimit) external;
 
     /// @notice Premium an extension would be charged
-    /// @dev At current rates. Use {premiumForBorrow} for a new draw.
+    /// @dev At current rates, with no extra mint. `term` is used as given so an
+    /// arrears-inclusive roll can exceed {maximumTermLimit}. Use {premiumForBorrow}
+    /// for a new draw.
     /// @param chargeableDebt The amount of debt that a premium is being charged on
     /// @param term The term of the loan
     /// @return liquidityPremium The liquidity premium

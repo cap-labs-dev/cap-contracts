@@ -385,9 +385,14 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
         emit WriteOff(msg.sender, amount);
     }
 
+    /// @dev Floating realises outstanding premium under the current list first.
+    /// Fixed has nothing outstanding: term premium is charged when it is minted.
+    function _beforeTrancheChange() internal virtual { }
+
     /// @dev Set the tranches and weights
     /// @param _tranches The tranches and their weights, index 0 is most senior
     function _setTranches(Tranche[] memory _tranches) internal {
+        _beforeTrancheChange();
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         delete $.tranches;
         uint256 totalWeight;

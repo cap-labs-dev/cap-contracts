@@ -533,6 +533,74 @@ contract AccountingIntegrityTest is CapDeployer {
         assertEq(market.totalDebt(), stablecoin.creditBackedSupply(), "debt stays repayable");
     }
 
+    /// @dev Changing weights used to pay the already-elapsed period under the new split.
+    /// Settlement runs first, so the junior keeps the 10% it earned, not the 90% it was
+    /// just given. Total debt is unchanged; only the recipient mix is at stake.
+    function test_trancheWeightChangeSettlesUnderTheOldWeights() public {
+        MarketBundle memory b = _createReadyMarket("old-weights");
+        _fundTranche(b.tranche0Addr, alice, 5_000e18);
+        _fundTranche(b.tranche1Addr, bob, 5_000e18);
+
+        uint256[] memory oldWeights = new uint256[](2);
+        oldWeights[0] = 0.9e27;
+        oldWeights[1] = 0.1e27;
+        b.market.setTrancheWeights(oldWeights);
+
+        vm.prank(defaultBorrower);
+        b.market.borrow(defaultBorrower, 400e18);
+
+        vm.warp(block.timestamp + 30 days);
+        (, uint256 underwriterPremium) = b.market.premium();
+        uint256 expectedJunior = WadRayMath.rayMul(underwriterPremium, 0.1e27);
+        uint256 debtBefore = b.market.totalDebt();
+        uint256 juniorBefore = stablecoin.balanceOf(b.tranche1Addr);
+
+        uint256[] memory newWeights = new uint256[](2);
+        newWeights[0] = 0.1e27;
+        newWeights[1] = 0.9e27;
+        b.market.setTrancheWeights(newWeights);
+
+        assertEq(
+            stablecoin.balanceOf(b.tranche1Addr) - juniorBefore, expectedJunior, "the elapsed period pays the old 10%"
+        );
+        assertEq(b.market.totalDebt(), debtBefore, "debt does not jump");
+        (uint256 leftoverLiquidity, uint256 leftoverUnderwriter) = b.market.premium();
+        assertEq(leftoverLiquidity + leftoverUnderwriter, 0, "the period was settled by the weight change");
+    }
+
+    /// @dev Adding a tranche also rewrites existing weights. The elapsed period still
+    /// pays the list that stood while it accrued; the new layer takes nothing of it.
+    function test_addingATrancheSettlesUnderTheOldWeights() public {
+        MarketBundle memory b = _createReadyMarket("add-tranche");
+        _fundTranche(b.tranche0Addr, alice, 5_000e18);
+        _fundTranche(b.tranche1Addr, bob, 5_000e18);
+
+        uint256[] memory oldWeights = new uint256[](2);
+        oldWeights[0] = 0.9e27;
+        oldWeights[1] = 0.1e27;
+        b.market.setTrancheWeights(oldWeights);
+
+        vm.prank(defaultBorrower);
+        b.market.borrow(defaultBorrower, 400e18);
+
+        vm.warp(block.timestamp + 30 days);
+        (, uint256 underwriterPremium) = b.market.premium();
+        uint256 expectedJunior = WadRayMath.rayMul(underwriterPremium, 0.1e27);
+        uint256 juniorBefore = stablecoin.balanceOf(b.tranche1Addr);
+
+        uint256[] memory next = new uint256[](3);
+        next[0] = 0.5e27;
+        next[1] = 0.3e27;
+        next[2] = 0.2e27;
+        vm.prank(defaultMarketOwner);
+        address added = registry.createTranche(b.marketAddr, address(collateral), next);
+
+        assertEq(
+            stablecoin.balanceOf(b.tranche1Addr) - juniorBefore, expectedJunior, "the elapsed period pays the old 10%"
+        );
+        assertEq(stablecoin.balanceOf(added), 0, "the new layer takes none of it");
+    }
+
     function _readyMarketWithWeights(string memory name, uint256[] memory weights)
         internal
         returns (FloatingMarket market)
