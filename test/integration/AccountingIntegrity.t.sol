@@ -1437,7 +1437,8 @@ contract AccountingIntegrityTest is CapDeployer {
 
     /// @dev Each draw is priced at the rate after it is minted. A second same-size
     /// draw this block is dearer because the first already raised credit-backed supply.
-    /// Two halves are not the one-shot price of the whole.
+    /// Two halves are not the one-shot price of the whole; the split can be cheaper.
+    /// That is expected. Borrowers are permissioned and must not split to reduce premium.
     function test_aSecondDrawThisBlockPaysMore() public {
         FixedMarket market = _fixedMarketOnSlope(0.9e27);
         _depositStable(makeAddr("saver"), 1_000e18);
@@ -1461,7 +1462,8 @@ contract AccountingIntegrityTest is CapDeployer {
         assertTrue(firstPremium + secondPremium != oneShot, "halves are not the one-shot price");
     }
 
-    /// @dev {borrowMore} is the same marginal price: the add-on pays more than the opener.
+    /// @dev {borrowMore} is the same marginal price: the add-on pays more than the opener,
+    /// and the split can be cheaper than one draw. Expected; not acceptable use.
     function test_borrowMorePaysTheMarginalPremium() public {
         FixedMarket market = _fixedMarketOnSlope(0.9e27);
         _depositStable(makeAddr("saver"), 1_000e18);

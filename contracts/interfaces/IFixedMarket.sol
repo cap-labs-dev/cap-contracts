@@ -78,6 +78,8 @@ interface IFixedMarket is IBaseMarket {
     ) external;
 
     /// @notice Borrow assets from the market
+    /// @dev Premium is {premiumForBorrow}. Splitting a draw can cheapen the total;
+    /// borrowers are permissioned and that is not acceptable use.
     /// @param recipient The recipient of the borrowed assets
     /// @param principal The principal amount of the borrowed assets
     /// @param term The term of the borrowed assets
@@ -90,6 +92,9 @@ interface IFixedMarket is IBaseMarket {
     /// @notice Borrow additional assets against an existing loan
     /// @dev `id` must be in `[0, loanCount)` and still carry debt. A fully repaid
     /// loan stays enumerable but cannot reopen; open a new loan with {borrow}.
+    /// Priced as a new {premiumForBorrow} on this add-on, so it can be cheaper
+    /// than drawing the same total in one go. Borrowers are permissioned; splitting
+    /// to cheapen the premium is not acceptable use.
     /// @param id The id of the loan
     /// @param recipient The recipient of the borrowed assets
     /// @param principal The principal amount of the borrowed assets
@@ -155,9 +160,11 @@ interface IFixedMarket is IBaseMarket {
         returns (uint256 liquidityPremium, uint256 underwriterPremium);
 
     /// @notice Premium a new borrow would be charged
-    /// @dev On this principal at the rate after it is minted. Earlier draws are already
-    /// in the credit-backed supply, so a second draw this block is dearer. Splitting a
-    /// principal is not the same price as taking it in one draw.
+    /// @dev On this principal at the rate after it is minted. Earlier draws already
+    /// sit in the credit-backed supply, so a later draw is dearer per token, but
+    /// early slices miss the high rate the full principal would have paid. Splitting
+    /// can therefore cheapen the total versus one draw. That is expected. Borrowers
+    /// are permissioned; splitting to reduce premium is not acceptable use.
     /// @param principal The principal of the loan
     /// @param term The term of the loan
     /// @return liquidityPremium The liquidity premium
