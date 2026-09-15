@@ -1,0 +1,129 @@
+rate_sweep.py  HEAD a843c1d  harness curve 5/5/10/kink 80 (no deploy slopes exist); alt curve 2/8/50/kink 90; bonus 2%; ltv 0.5
+
+== 1. Liquidity rate and floating borrower cost across cUSD utilization u (hourly re-indexing) ==
+  u    | r(u) harness | r(u) alt curve | float m=1 | float m=1.5 | float m=2 (G^m-1) | linear m*r @2 | gap @2 | fixed leg m=2 (linear)
+  0.00 |     5.00%    |      2.00%     |    5.13%  |     7.79%   |      10.52%       |     10.00%    | +0.52% |    10.00%
+  0.20 |     6.25%    |      3.78%     |    6.45%  |     9.83%   |      13.31%       |     12.50%    | +0.81% |    12.50%
+  0.40 |     7.50%    |      5.56%     |    7.79%  |    11.91%   |      16.18%       |     15.00%    | +1.18% |    15.00%
+  0.60 |     8.75%    |      7.33%     |    9.14%  |    14.03%   |      19.12%       |     17.50%    | +1.62% |    17.50%
+  0.80 |    10.00%    |      9.11%     |   10.52%  |    16.18%   |      22.14%       |     20.00%    | +2.14% |    20.00%
+  0.85 |    12.50%    |      9.56%     |   13.31%  |    20.62%   |      28.40%       |     25.00%    | +3.40% |    25.00%
+  0.90 |    15.00%    |     10.00%     |   16.18%  |    25.23%   |      34.99%       |     30.00%    | +4.99% |    30.00%
+  0.95 |    17.50%    |     35.00%     |   19.12%  |    30.02%   |      41.91%       |     35.00%    | +6.91% |    35.00%
+  1.00 |    20.00%    |     60.00%     |   22.14%  |    34.99%   |      49.18%       |     40.00%    | +9.18% |    40.00%
+  Exponent semantics: m=2 squares the growth factor, so a floating borrower pays (1+r)^2-1 = 2r + r^2 (+compounding), the
+  fixed market charges 2r linearly (FixedMarket L262). The gap grows with r: it is the region where floating > fixed at equal m.
+
+== 2. Lender (stcUSD) yield = liquidity premium / opted-in supply; opt-in fraction phi of TOTAL supply ==
+  Only opted-in balances earn (PremiumVesting L15). Premium = r(u) * C per year (m=1); yield per staked cUSD = r(u)*u/phi.
+  u    | r(u)   | phi=1.0 | phi=0.5 | phi=0.25 | phi=0.1 | underwriter rate (owner-set, flat, 0..100%) | protocol take
+  0.20 |  6.25% |   1.25% |   2.50% |    5.00% |  12.50% |        not a function of u                  |    0
+  0.50 |  8.12% |   4.06% |   8.12% |   16.25% |  40.62% |        not a function of u                  |    0
+  0.80 | 10.00% |   8.00% |  16.00% |   32.00% |  80.00% |        not a function of u                  |    0
+  0.90 | 15.00% |  13.50% |  27.00% |   54.00% | 135.00% |        not a function of u                  |    0
+  0.95 | 17.50% |  16.62% |  33.25% |   66.50% | 166.25% |        not a function of u                  |    0
+
+== 3. Fixed term multiplier 1 + slope*(1 - term/maxTerm) (max term 30 d; slope UNBOUNDED, setTermMultiplierSlope) ==
+  slope | 1d     | 7d     | 15d    | 30d   (multiplier on the liquidity leg; never below 1, never negative)
+    0.0 |   1.00 |   1.00 |   1.00 |   1.00
+    0.5 |   1.48 |   1.38 |   1.25 |   1.00
+    1.0 |   1.97 |   1.77 |   1.50 |   1.00
+    5.0 |   5.83 |   4.83 |   3.50 |   1.00
+   50.0 |  49.33 |  39.33 |  26.00 |   1.00
+
+== 4. Underwriter EV per $1 of tranche capital at leverage L = D/K = ltv = 0.5; where the rational move harms the system ==
+  net = uw*L - p_def*(1+b)*L - p_vol*0.58*(1+b)*L   (0.58 = first-liquidation share of debt at TH 1.25, lt 0.8)
+  break-even uw rate (independent of L): p_def 1%: 1.02%  2%: 2.04%  5%: 5.10%  (+0.58(1+b)p_vol)
+  The underwriter rate is set by the MARKET OWNER (borrowing side), floor 0, and does not move with u, vol or health.
+  Exit window (Tranche.unlockedSupply, lockedValue = D/(lt-buffer) = D/0.7 on the SENIOR after the junior):
+    drawdown   0.0%: health 1.600, senior capital free to exit  30.1%
+    drawdown  10.0%: health 1.440, senior capital free to exit  21.7%
+    drawdown  20.0%: health 1.280, senior capital free to exit  11.3%
+    drawdown  25.0%: health 1.200, senior capital free to exit   5.0%
+    drawdown  28.6%: health 1.142, senior capital free to exit   0.0%
+    drawdown  30.0%: health 1.120, senior capital free to exit   0.0%
+  => a senior underwriter can pull ~30% of capital until the price has fallen 28.6% (health 1.14), i.e. BEFORE liquidation
+     is possible (37.5%) and while its EV is most negative. The junior is 100% locked from a 7% draw onwards.
+
+  Floating vs fixed at equal m and u (annual cost; fixed rolled every 30 d; uw 20%):
+  u    | m   | floating (1+r)^m*(1+uw)-1 | fixed rolled monthly | migrate to fixed?
+  0.80 | 1.0 |           34.99%           |        34.50%        | yes (+0.49%)
+  0.80 | 1.5 |           41.91%           |        41.21%        | yes (+0.70%)
+  0.80 | 2.0 |           49.18%           |        48.23%        | yes (+0.96%)
+  0.90 | 1.0 |           41.91%           |        41.21%        | yes (+0.70%)
+  0.90 | 1.5 |           52.96%           |        51.85%        | yes (+1.11%)
+  0.90 | 2.0 |           64.87%           |        63.23%        | yes (+1.64%)
+  1.00 | 1.0 |           49.18%           |        48.23%        | yes (+0.96%)
+  1.00 | 1.5 |           64.87%           |        63.23%        | yes (+1.64%)
+  1.00 | 2.0 |           82.21%           |        79.62%        | yes (+2.59%)
+
+== 5. P8: borrower opts in on cUSD (PremiumVesting.optIn is public, L114) and captures D/(staked+D) of every liquidity premium ==
+  S=$100M, credit C=uS, non-borrower holders opt in a fraction phi of (S-C); new borrower D parks the loan opted-in.
+  earn = D/(phi(S-C)+D) * r' (C+D); cost = (r' + uw) D  [r' at u after mint]. Liquidity leg free when C >= phi (S-C), i.e. u >= phi/(1+phi).
+  u    | phi  | D      | D/staked | net liquidity cost | net cost incl. uw 20% | share of pool captured
+  0.50 | 1.00 | $  5M |    0.10  |     -0.00% of D      |       +20.00% of D      |     9.1%
+  0.50 | 1.00 | $ 20M |    0.40  |     +0.00% of D      |       +20.00% of D      |    28.6%
+  0.50 | 0.50 | $  5M |    0.20  |     -6.89% of D      |       +13.11% of D      |    16.7%
+  0.50 | 0.50 | $ 20M |    0.80  |     -4.80% of D      |       +15.20% of D      |    44.4%
+  0.80 | 1.00 | $  5M |    0.25  |    -25.14% of D      |        -5.14% of D      |    20.0%
+  0.80 | 1.00 | $ 20M |    1.00  |    -17.50% of D      |        +2.50% of D      |    50.0%
+  0.80 | 0.50 | $  5M |    0.50  |    -48.89% of D      |       -28.89% of D      |    33.3%
+  0.80 | 0.50 | $ 20M |    2.00  |    -27.22% of D      |        -7.22% of D      |    66.7%
+  0.90 | 1.00 | $  5M |    0.50  |    -81.27% of D      |       -61.27% of D      |    33.3%
+  0.90 | 1.00 | $ 20M |    2.00  |    -42.22% of D      |       -22.22% of D      |    66.7%
+  0.90 | 0.50 | $  5M |    1.00  |   -129.52% of D      |      -109.52% of D      |    50.0%
+  0.90 | 0.50 | $ 20M |    4.00  |    -53.83% of D      |       -33.83% of D      |    80.0%
+  Threshold: liquidity leg free at u >= 50% (phi=1) / 33% (phi=0.5); ALL-IN free (incl. uw) when (C+D)/(staked+D) >= 1 + uw/r'.
+  General form: yield to stakers r*u/phi_T (phi_T = staked/TOTAL supply) vs borrower all-in cost r+uw: borrow-to-stake is a
+  money pump while phi_T < u/(1+uw/r); it self-limits at phi* where lender yield == borrower cost.
+  u    | r(u)   | uw  | phi* = u/(1+uw/r) | staker yield at phi* | borrower cost | loop profitable while staked/S <
+  0.50 |  8.12% |   0% |       0.500        |         8.12%        |      8.12%    |    50.0%
+  0.50 |  8.12% |   5% |       0.310        |        13.12%        |     13.12%    |    31.0%
+  0.50 |  8.12% |  20% |       0.144        |        28.13%        |     28.12%    |    14.4%
+  0.80 | 10.00% |   0% |       0.800        |        10.00%        |     10.00%    |    80.0%
+  0.80 | 10.00% |   5% |       0.533        |        15.00%        |     15.00%    |    53.3%
+  0.80 | 10.00% |  20% |       0.267        |        30.00%        |     30.00%    |    26.7%
+  0.90 | 15.00% |   0% |       0.900        |        15.00%        |     15.00%    |    90.0%
+  0.90 | 15.00% |   5% |       0.675        |        20.00%        |     20.00%    |    67.5%
+  0.90 | 15.00% |  20% |       0.386        |        35.00%        |     35.00%    |    38.6%
+  0.95 | 17.50% |   0% |       0.950        |        17.50%        |     17.50%    |    95.0%
+  0.95 | 17.50% |   5% |       0.739        |        22.50%        |     22.50%    |    73.9%
+  0.95 | 17.50% |  20% |       0.443        |        37.50%        |     37.50%    |    44.3%
+
+== 6. P6: fixed _borrowPremium is incremental in GLOBAL unsmoothedCredit: a same-window floating borrow C makes a fixed draw P pay C*term*(r_P - r_0) ==
+  S=$100M, harness curve, averaging 1 h, EMA quiet before; floating C at t=0, fixed P=$10M at t; uw leg unaffected (flat).
+  u0   | C/P | t     | r_0     | r_P     | fixed's own premium (30d) | overcharge (30d) | % of own | overcharge 7d | 1d
+  0.80 | 0.5 |    0m | 10.476% | 11.304% |        $    92912         |    $    3403     |   3.66%  |   $    794    | $  113
+  0.80 | 0.5 |   15m | 10.476% | 11.304% |        $    92912         |    $    2650     |   2.85%  |   $    618    | $   88
+  0.80 | 0.5 |    1h | 10.476% | 11.304% |        $    92912         |    $    1252     |   1.35%  |   $    292    | $   42
+  0.80 | 1.0 |    0m | 10.909% | 11.667% |        $    95890         |    $    6227     |   6.49%  |   $   1453    | $  208
+  0.80 | 1.0 |   15m | 10.909% | 11.667% |        $    95890         |    $    4849     |   5.06%  |   $   1131    | $  162
+  0.80 | 1.0 |    1h | 10.909% | 11.667% |        $    95890         |    $    2290     |   2.39%  |   $    534    | $   76
+  0.80 | 2.0 |    0m | 11.667% | 12.308% |        $   101159         |    $   10537     |  10.42%  |   $   2459    | $  351
+  0.80 | 2.0 |   15m | 11.667% | 12.308% |        $   101159         |    $    8206     |   8.11%  |   $   1915    | $  274
+  0.80 | 2.0 |    1h | 11.667% | 12.308% |        $   101159         |    $    3876     |   3.83%  |   $    904    | $  129
+  0.80 | 5.0 |    0m | 13.333% | 13.750% |        $   113014         |    $   17123     |  15.15%  |   $   3995    | $  571
+  0.80 | 5.0 |   15m | 13.333% | 13.750% |        $   113014         |    $   13335     |  11.80%  |   $   3112    | $  445
+  0.80 | 5.0 |    1h | 13.333% | 13.750% |        $   113014         |    $    6298     |   5.57%  |   $   1470    | $  210
+  0.90 | 0.5 |    0m | 15.238% | 15.652% |        $   128648         |    $    1702     |   1.32%  |   $    397    | $   57
+  0.90 | 0.5 |   15m | 15.238% | 15.652% |        $   128648         |    $    1325     |   1.03%  |   $    309    | $   44
+  0.90 | 0.5 |    1h | 15.238% | 15.652% |        $   128648         |    $     626     |   0.49%  |   $    146    | $   21
+  0.90 | 1.0 |    0m | 15.455% | 15.833% |        $   130137         |    $    3113     |   2.39%  |   $    726    | $  104
+  0.90 | 1.0 |   15m | 15.455% | 15.833% |        $   130137         |    $    2425     |   1.86%  |   $    566    | $   81
+  0.90 | 1.0 |    1h | 15.455% | 15.833% |        $   130137         |    $    1145     |   0.88%  |   $    267    | $   38
+  0.90 | 2.0 |    0m | 15.833% | 16.154% |        $   132771         |    $    5269     |   3.97%  |   $   1229    | $  176
+  0.90 | 2.0 |   15m | 15.833% | 16.154% |        $   132771         |    $    4103     |   3.09%  |   $    957    | $  137
+  0.90 | 2.0 |    1h | 15.833% | 16.154% |        $   132771         |    $    1938     |   1.46%  |   $    452    | $   65
+  0.90 | 5.0 |    0m | 16.667% | 16.875% |        $   138699         |    $    8562     |   6.17%  |   $   1998    | $  285
+  0.90 | 5.0 |   15m | 16.667% | 16.875% |        $   138699         |    $    6668     |   4.81%  |   $   1556    | $  222
+  0.90 | 5.0 |    1h | 16.667% | 16.875% |        $   138699         |    $    3149     |   2.27%  |   $    735    | $  105
+  The floating borrower C pays nothing extra (its rate is the live one); the overcharge is pure, decays as e^(-t/period), and is
+  paid to opted-in cUSD holders. Same-block floating borrow+repay (C in, C out) leaves prior = 0: no overcharge, but also no charge.
+
+=== HEADLINE ===
+Multiplier is an exponent on floating (G^m) and linear on fixed (m*r): at u=1, m=2 floating pays 49.18%/yr vs 40% fixed (+9.18 pts);
+floating > fixed rolled monthly at every (u, m) tested (+0.5 to +2.6 pts), so borrowers migrate to fixed (EMA-priced, M-2). Protocol take: 0.
+P8: borrow-to-stake is a money pump while staked/S < u/(1+uw/r) = 26.7% at u=0.8 (harness r=10%, uw 20%), 53.3% at uw=5%; with full
+opt-in the liquidity leg alone is free from u >= 50%. P6: a $10M 30d fixed draw after a same-block $50M floating borrow is overcharged $17123 (15.2% of its own premium) at u=0.8.
+Underwriting is negative-EV below uw = (1+b)(p_def + 0.58 p_vol) = 2.04% at 2%/yr default risk; the senior can exit 30% of capital
+until the price has fallen 28.6%, before liquidation is possible at 37.5%: the rational exit precedes the loss it was meant to cover.

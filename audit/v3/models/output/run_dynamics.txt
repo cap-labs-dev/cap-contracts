@@ -1,0 +1,95 @@
+run_dynamics.py  HEAD a843c1d  S=$100M cUSD, USDC 6-dec
+
+== A. Instant redemption capacity w* = unlockedSupply/S = (1-u)(1-phi); beyond it the queue stalls until KEEPER recall ==
+  u \ phi |  0.00  |  0.25  |  0.50  |  0.75  |  0.90     (share of total supply redeemable now)
+  0.50    |  50.0% |  37.5% |  25.0% |  12.5% |   5.0%
+  0.70    |  30.0% |  22.5% |  15.0% |   7.5% |   3.0%
+  0.80    |  20.0% |  15.0% |  10.0% |   5.0% |   2.0%
+  0.90    |  10.0% |   7.5% |   5.0% |   2.5% |   1.0%
+  0.95    |   5.0% |   3.8% |   2.5% |   1.2% |   0.5%
+  With u=0.8 and 75% of the reserve invested, a 5%-of-supply redemption day empties the on-hand balance; every later
+  request waits for recall. Queue wait = keeper latency, not a function of anything on-chain.
+  Daily-demand w vs (1-u)(1-phi): days of demand the on-hand balance covers = (1-u)(1-phi)/w:
+    w =  1%/day: u 0.8 phi 0.5 -> 10.0 d; u 0.8 phi 0.75 ->  5.0 d; u 0.9 phi 0.75 ->  2.5 d
+    w =  2%/day: u 0.8 phi 0.5 ->  5.0 d; u 0.8 phi 0.75 ->  2.5 d; u 0.9 phi 0.75 ->  1.2 d
+    w =  5%/day: u 0.8 phi 0.5 ->  2.0 d; u 0.8 phi 0.75 ->  1.0 d; u 0.9 phi 0.75 ->  0.5 d
+
+== B. Unrecognised Aera loss l (P12): exits at par before recognition shift the loss to stayers ==
+  true backing = 1 - l/S; f of supply exits at par -> survivors' backing = (1 - l/S - f)/(1 - f); haircut on stayers = (l/S)/(1-f).
+  Exits are capped by unlockedSupply = (1-u)(1-phi) S (u 0.8: phi 0 -> 20%, phi 0.75 -> 5%).
+  l/S    | f=1%   | f=5%   | f=10%  | f=20%  | loss shifted at f=5% | at f=20%
+    0.5% |  0.51% |  0.53% |  0.56% |  0.62% |      $0.03M          | $0.10M
+    1.0% |  1.01% |  1.05% |  1.11% |  1.25% |      $0.05M          | $0.20M
+    2.0% |  2.02% |  2.11% |  2.22% |  2.50% |      $0.10M          | $0.40M
+    5.0% |  5.05% |  5.26% |  5.56% |  6.25% |      $0.25M          | $1.00M
+   10.0% | 10.10% | 10.53% | 11.11% | 12.50% |      $0.50M          | $2.00M
+  Is a run rational? exit now (par, gas $5) vs wait one day: E[loss of waiting] = P(recognised within the day) * (l/S)/(1-f) - y/365.
+  Threshold l*/S above which exiting now is strictly better, by P(recognition in 1 day):
+    P =    5%: l*/S = 0.4384%  ($438k on $100M)   [gas adds $5 / holding]
+    P =   10%: l*/S = 0.2192%  ($219k on $100M)   [gas adds $5 / holding]
+    P =   25%: l*/S = 0.0877%  ($88k on $100M)   [gas adds $5 / holding]
+    P =   50%: l*/S = 0.0438%  ($44k on $100M)   [gas adds $5 / holding]
+    P =  100%: l*/S = 0.0219%  ($22k on $100M)   [gas adds $5 / holding]
+  => with any credible chance of recognition inside a day, a loss above a few hundredths of a percent of supply makes
+     immediate par exit dominant: the run is rational for every holder who can still reach the on-hand reserve.
+  After recognizeBadDebtInReserve(l): unlockedSupply drops by l (creditBackedSupply unchanged), so the LAST l of
+  would-be par exits become queue-stuck; the quadratic haircut then applies to what is left.
+
+== C. After recognition: the quadratic haircut (backing/supply)^2-shaped exit. Does exiting early still beat staying? ==
+  u 0.0, phi 0.0, badDebt 10% of S: unlocked 90.0% of S, backing 0.900
+    exit # | shares (%S) | payout/share | backing after | badDebt after | whole-supply payout/share if staying
+       1   |    9.00%    |   0.81736    |    0.90817    |    $ 8.36M    |   0.90817
+       2   |    9.00%    |   0.83234    |    0.91650    |    $ 6.85M    |   0.91650
+       3   |    9.00%    |   0.84774    |    0.92497    |    $ 5.48M    |   0.92497
+       4   |    9.00%    |   0.86357    |    0.93361    |    $ 4.25M    |   0.93361
+       5   |    9.00%    |   0.87984    |    0.94241    |    $ 3.17M    |   0.94241
+       6   |    9.00%    |   0.89658    |    0.95137    |    $ 2.24M    |   0.95137
+       7   |    9.00%    |   0.91381    |    0.96051    |    $ 1.46M    |   0.96051
+       8   |    9.00%    |   0.93153    |    0.96983    |    $ 0.84M    |   0.96983
+       9   |    9.00%    |   0.94978    |    0.97933    |    $ 0.39M    |   0.97933
+      10   |    9.00%    |   0.96856    |    0.98901    |    $ 0.11M    |   0.98901
+    payout/share rises along the sequence (monotone) and backing rises after every exit: 'exit repairs the peg' HOLDS.
+  u 0.5, phi 0.0, badDebt 10% of S: unlocked 40.0% of S, backing 0.900
+    exit # | shares (%S) | payout/share | backing after | badDebt after | whole-supply payout/share if staying
+       1   |    4.00%    |   0.81325    |    0.90361    |    $ 9.25M    |   0.90361
+       2   |    4.00%    |   0.81981    |    0.90726    |    $ 8.53M    |   0.90726
+       3   |    4.00%    |   0.82645    |    0.91093    |    $ 7.84M    |   0.91093
+       4   |    4.00%    |   0.83317    |    0.91463    |    $ 7.17M    |   0.91463
+       5   |    4.00%    |   0.83997    |    0.91837    |    $ 6.53M    |   0.91837
+       6   |    4.00%    |   0.84686    |    0.92213    |    $ 5.92M    |   0.92213
+       7   |    4.00%    |   0.85383    |    0.92593    |    $ 5.33M    |   0.92593
+       8   |    4.00%    |   0.86088    |    0.92975    |    $ 4.78M    |   0.92975
+       9   |    4.00%    |   0.86803    |    0.93361    |    $ 4.25M    |   0.93361
+      10   |    4.00%    |   0.87526    |    0.93750    |    $ 3.75M    |   0.93750
+    payout/share rises along the sequence (monotone) and backing rises after every exit: 'exit repairs the peg' HOLDS.
+  u 0.8, phi 0.0, badDebt 5% of S: unlocked 15.0% of S, backing 0.950
+    exit # | shares (%S) | payout/share | backing after | badDebt after | whole-supply payout/share if staying
+       1   |    1.50%    |   0.90318    |    0.95071    |    $ 4.85M    |   0.95071
+       2   |    1.50%    |   0.90453    |    0.95143    |    $ 4.71M    |   0.95143
+       3   |    1.50%    |   0.90589    |    0.95214    |    $ 4.57M    |   0.95214
+       4   |    1.50%    |   0.90726    |    0.95286    |    $ 4.43M    |   0.95286
+       5   |    1.50%    |   0.90862    |    0.95358    |    $ 4.29M    |   0.95358
+       6   |    1.50%    |   0.90999    |    0.95429    |    $ 4.16M    |   0.95429
+       7   |    1.50%    |   0.91136    |    0.95501    |    $ 4.03M    |   0.95501
+       8   |    1.50%    |   0.91274    |    0.95573    |    $ 3.90M    |   0.95573
+       9   |    1.50%    |   0.91412    |    0.95646    |    $ 3.77M    |   0.95646
+      10   |    1.50%    |   0.91550    |    0.95718    |    $ 3.64M    |   0.95718
+    payout/share rises along the sequence (monotone) and backing rises after every exit: 'exit repairs the peg' HOLDS.
+
+  Marginal payout d(assets)/d(shares) along a single large exit (u 0, badDebt 10%): average vs marginal per 1% slice
+    f=   1%: average 0.81081  marginal 0.81081   (backing 0.900; ^2 = 0.810)
+    f=   5%: average 0.81407  marginal 0.81734   (backing 0.900; ^2 = 0.810)
+    f=  10%: average 0.81818  marginal 0.82561   (backing 0.900; ^2 = 0.810)
+    f=  25%: average 0.83077  marginal 0.85120   (backing 0.900; ^2 = 0.810)
+    f=  50%: average 0.85263  marginal 0.89656   (backing 0.900; ^2 = 0.810)
+    f=  75%: average 0.87568  marginal 0.94565   (backing 0.900; ^2 = 0.810)
+    f=  90%: average 0.89011  marginal 0.97707   (backing 0.900; ^2 = 0.810)
+  Marginal payout is below average and rises with f: the first dollar out is paid ~backing^2, the last ~backing.
+  Post-recognition a run is IRRATIONAL (waiting pays more per share); pre-recognition (part B) it is rational.
+  The curve cannot see an unrecognised loss: the first-mover advantage lives entirely in the GUARDIAN's recognition latency.
+
+=== HEADLINE ===
+Instant capacity is (1-u)(1-phi) of supply: 5% at u=0.8 with 75% of the reserve in Aera; past it the queue waits on KEEPER recall.
+An unrecognised Aera loss makes par exit dominant above l*/S = (y/365)/P(recognition) = 0.044% of supply at P=50%/day: the
+run is rational until GUARDIAN recognition, and each $1 out shifts l/S of loss to stayers (haircut l/(S(1-f))). After recognition
+the quadratic curve pays the first exiter backing^2 and later exiters more, so waiting dominates: 'exit repairs the peg' holds.

@@ -1,0 +1,8 @@
+### [MEDIUM] A market owner can set a funded, locked junior tranche's premium weight to zero while it remains first-loss (routed from WS-R incidental #2)
+**Location:** contracts/cap/market/BaseMarket.sol:L119-L127 (`setTrancheWeights`), L390-L406 (`_setTranches` — only checks Σ weights == 1e27, no per-tranche floor), L435-L475 (`_chargePremium` pays `underwriterPremium.rayMul(weight)`), L367-L373 (`_liquidate` slashes juniors first regardless of weight)
+**Impact:** Third-party depositors in a junior tranche (e.g. an Underwriter vault allocated there) keep carrying first-loss exposure and stay locked by `lockedValue`, but receive no underwriter premium; the owner redirects their share to the senior (which the owner may own) or, if the senior is not opted in, to cUSD stakers. Weight is the only compensation lever and it is unilateral.
+**Likelihood:** Owner role only; one call; no capital. Depositors cannot exit while locked.
+**Exploit path:** (1) owner creates market [senior: own capital, junior: third-party underwriter]; junior locked by outstanding debt. (2) owner `setTrancheWeights([1e27, 0])`. (3) `chargePremium` → 100% to senior; junior earns 0; a liquidation still slashes the junior first.
+**Proof:** to be produced by the verifier (see verify/LEAD-3.md); REGRESSION.md incidental #2 describes the observation.
+**Recommendation:** Require a minimum weight for any tranche with `totalCapital > 0` while the market has debt, or make weight changes on indebted markets a GOVERNOR co-signed action; emit the change with old/new weights.
+**Invariant broken:** proposed I43: "no tranche with locked capital has weight 0".

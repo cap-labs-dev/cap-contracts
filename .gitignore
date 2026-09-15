@@ -39,3 +39,6 @@ bin
 .gambit
 .sumo*
 sumo
+# Foundry libs (forge-std is a real submodule; everything else under lib/ is local-only)
+lib/*
+!lib/forge-std

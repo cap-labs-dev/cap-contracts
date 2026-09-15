@@ -1,0 +1,33 @@
+premium_accrual_insolvent.py  HEAD a843c1d  D=$50M, K=$30.6M -> recoverable $30.0M, unrecoverable $20.0M at t=0; S=$100M
+
+== 1. Unbacked premium minted per day of GUARDIAN delay (junior wiped, senior still earning) ==
+  delay | debt      | extra bad debt | per day  | liquidity leg -> stcUSD | uw leg -> senior | -> junior | total bad debt at writeOff | +% | badDebt/S
+     1d | $ 50.04M  |   $ 0.039M     | $ 38543  |        $ 0.011M         |     $ 0.027M     |  $0.000M  |          $ 20.04M           |  0.2% | 20.03%
+     7d | $ 50.27M  |   $ 0.270M     | $ 38637  |        $ 0.078M         |     $ 0.192M     |  $0.000M  |          $ 20.27M           |  1.4% | 20.22%
+    30d | $ 51.17M  |   $ 1.170M     | $ 39001  |        $ 0.339M         |     $ 0.831M     |  $0.000M  |          $ 21.17M           |  5.9% | 20.93%
+    90d | $ 53.60M  |   $ 3.598M     | $ 39974  |        $ 1.044M         |     $ 2.553M     |  $0.000M  |          $ 23.60M           | 18.0% | 22.78%
+   180d | $ 57.47M  |   $ 7.470M     | $ 41498  |        $ 2.179M         |     $ 5.291M     |  $0.000M  |          $ 27.47M           | 37.3% | 25.56%
+   365d | $ 66.39M  |   $16.385M     | $ 44891  |        $ 4.828M         |     $11.557M     |  $0.000M  |          $ 36.39M           | 81.9% | 31.26%
+  The senior tranche, which is about to be slashed to zero, is paid 20%/yr on the whole $50M out of cUSD that will be written off.
+
+== 2. Both tranches empty (K=0 after a full slash, debt residual unrecoverable): _earnsPremium false for all ==
+    30d: liquidity $0.339M + underwriter $0.831M = $1.170M ALL vested on the stablecoin: opted-in cUSD holders receive their own future loss
+   365d: liquidity $4.828M + underwriter $11.557M = $16.385M ALL vested on the stablecoin: opted-in cUSD holders receive their own future loss
+
+== 3. Sensitivity: underwriter rate x delay -> extra bad debt as % of the initial $20M ==
+  uw rate | 7d     | 30d    | 90d    | 365d
+      0%   |   0.4% |   1.7% |   5.1% |  21.3%
+      5%   |   0.6% |   2.7% |   8.2% |  35.4%
+     20%   |   1.4% |   5.9% |  18.0% |  81.9%
+     50%   |   2.8% |  12.2% |  38.6% | 199.1%
+    100%   |   5.2% |  23.3% |  76.5% | 493.1%
+
+== 4. Fixed market equivalent: each KEEPER extendAdmin roll after insolvency adds a whole term of premium at once ==
+  roll of  1 d on $50M: +$0.039M of bad debt per roll (0.19% of the initial unrecoverable)
+  roll of  7 d on $50M: +$0.270M of bad debt per roll (1.35% of the initial unrecoverable)
+  roll of 30 d on $50M: +$1.156M of bad debt per roll (5.78% of the initial unrecoverable)
+
+=== HEADLINE ===
+With $20M unrecoverable on a $50M floating debt, every day without writeOff mints ~$39001 of unbacked cUSD (28%/yr carry): $1.17M after
+30 days (+5.9% bad debt), $16.39M after a year (+82%), 29% of it to stcUSD holders and 71% to the senior tranche that is about to be
+slashed. Nothing on-chain stops it: chargePremium is permissionless and has no health or recoverability check.
