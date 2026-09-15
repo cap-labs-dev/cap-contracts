@@ -1,0 +1,40 @@
+== Curve shape (supply $50M, 18dp): payout per share for redeeming fraction f of supply ==
+  shortfall | f=0.1%% | f=10%% | f=50%% | f=100%% | backing ratio | ratio^2 
+    1.00%  | 0.980110 | 0.981081 | 0.985025 | 0.990000 | 0.990000 | 0.980100
+   10.00%  | 0.810081 | 0.818182 | 0.852632 | 0.900000 | 0.900000 | 0.810000
+   50.00%  | 0.250125 | 0.263158 | 0.333333 | 0.500000 | 0.500000 | 0.250000
+   90.00%  | 0.010009 | 0.010989 | 0.018182 | 0.100000 | 0.100000 | 0.010000
+   99.99%  | 0.000000 | 0.000000 | 0.000000 | 0.000100 | 0.000100 | 0.000000
+== Sequential redeemers (10 x 5% of supply, shortfall 20%, no credit): per-share payout ==
+  0.64646 0.65966 0.67326 0.68729 0.70175 0.71669 0.73210 0.74801 0.76445 0.78144
+  monotone increasing: True  (design intent: later redeemer gets MORE per share)
+== T1 split-equivalence: n calls vs 1 call (positive deviation = split pays MORE) ==
+  cases: 7020
+  max POSITIVE deviation (split pays more): 0 wei  inputs=None
+  max NEGATIVE deviation (split pays less): -987 wei  inputs=(50000000000000000000000000, 9990, 6, 24975000000000000000000, 1000, False)
+== T1b adversarial: 1000 redemptions of tiny size, decimals 6, deep shortfall ==
+  max positive deviation: 0 wei  inputs=None
+== T2 round-trip deposit -> redeem (I11): payout - deposit, positive = vault loses ==
+  max (payout - deposit): 0 wei  inputs=None
+== T3 previewRedeem monotonic in shares ==
+  violation: None
+== T4 _onWithdraw keeps unlockedSupply <= real balance (I1) and badDebt consistent ==
+  max (unlockedSupply - balance) in 18dp wei: 0  inputs=(1000000000000000000000000, 0, 6, 500000000000000000000000)  (>0 would break I1)
+  max dust retained by vault (balance - unlocked): 3000000000000 wei-18dp
+  badDebt clamp (reduced > badDebt) hit: 0 times
+== T5 withdraw/redeem inverse consistency ==
+  max a - previewRedeem(previewWithdraw(a)) [assets wei]: 0  inputs=None
+     (withdraw pays `a` for previewWithdraw(a) shares; a value > 1 asset-wei means the withdrawer
+      is paid more than those shares are worth under redeem -> compare to 1 unit of underlying)
+  max previewWithdraw(previewRedeem(s)) - s [shares]: 0  inputs=None
+== T6 deposit-at-par-then-redeem vs plain redeem (positive = attacker gains) ==
+  max attacker gain: -18736455 asset-wei  inputs=(1000000000000000000000000, 100, 6, 693000000000000000000000, 10000000000)
+
+=== HEADLINE ===
+split-equivalence max over-payment: 0 wei (I10 HOLDS)
+dust split max over-payment:        0 wei
+round-trip max over-payment:        0 wei (I11 HOLDS)
+monotonicity violation:             False
+I1 (unlocked <= balance) max gap:   0 wei (HOLDS)
+withdraw-vs-redeem slack (assets):  0 wei
+deposit-to-improve-exit max gain:   -18736455 asset-wei (claim HOLDS)

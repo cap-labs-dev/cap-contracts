@@ -1,0 +1,52 @@
+## Verdict: CONFIRMED
+
+## Why (one paragraph, the decisive reason)
+The scale mismatch is real, unmitigated, and reachable on the only wiring the repo can produce: `contracts/cap/oracle/Oracle.sol` is the sole `IOracle` implementation in scope (`DECIMALS = 8`, `ChainlinkAdapter` normalises to 8), `Tranche.getPrice()` passes the answer straight into `totalCapital`/`activeCapital`/`unlockedSupply`/`slash` with no rescale, and nothing downstream in `BaseMarket` rescales either, so every USD figure is compared against 18-decimal cUSD debt 1e10x too small. Angle (a) fails: there is no intended external 18-decimal oracle — `script/` is not even in the compile path (`foundry.toml` sets `script = "scripts"`), `WalletUsersConfig._getUsersConfig()` never sets `users.oracle` so `DeployInfra` would revert with "oracle required", the `script/manage/*` files import `contracts/oracle/PriceOracle.sol` which no longer exists, and the mainnet oracle in `config/cap-infra.json` (0xcD7f…) is the v1 oracle whose `ChainlinkAdapter` also fixes to 8 decimals and exposes `getPrice`, not `price`, so `Registry._deployTranche`'s liveness call would revert against it. Fund loss is demonstrated, not merely asserted: the E PoC and my own no-price-move test both show the LIQUIDATOR receiving exactly 1e10x the collateral the debt entitles them to (7.87 WETH for 1.5e-6 cUSD with no price change at all, after ordinary premium accrual). The LIQUIDATOR role does not lower severity because the payout is wrong on an *honest* liquidation — the role is trusted to liquidate, not to be handed the tranche — and the recipient is caller-supplied, so underwriter funds leave the protocol on the first liquidation of any market. Certain on deployment, total loss to underwriters, no attacker capital: Critical stands.
+
+## What I tried (numbered; include commands run and real output snippets)
+1. **Is `Oracle.sol` the production oracle? (angle a)** Searched for any other oracle: `ls contracts/cap/oracle/` → only `ChainlinkAdapter.sol`, `Oracle.sol`. `contracts/deploy/service/DeployInfra.sol:37,81` takes `users.oracle` from `UsersConfig`, but `script/config/WalletUsersConfig.sol` builds `UsersConfig` without an `oracle` field (defaults to `address(0)`), so `_deployInfra` reverts `"oracle required"`. `foundry.toml`: `script = "scripts"` — the `script/` directory is not compiled at all. `script/manage/CapAddPriceOracle.s.sol:10-13` imports `contracts/oracle/Oracle.sol` and `contracts/oracle/libraries/ChainlinkAdapter.sol`, which were deleted in commit `9266cdb` ("Add cap-network"). Conclusion: no production script defines an oracle; the scripts are stale v1 scaffolding.
+2. **Could the v1 mainnet oracle in `config/cap-infra.json` be the intended one?** `git show 9266cdb^:contracts/oracle/libraries/ChainlinkAdapter.sol`:
+   ```
+   10:    /// @notice Fetch price for an asset from Chainlink fixed to 8 decimals
+   19:        if (decimals < 8) latestAnswer *= 10 ** (8 - decimals);
+   ```
+   and v1 consumers call `IOracle($.oracle).getPrice(asset)` (selector differs from `price(address)`). So even that oracle is 8-decimal, and `Registry._deployTranche`'s `IOracle(oracle).price(_asset)` would revert against it. No 18-decimal oracle exists anywhere in the repo, its history, or its configs.
+3. **Any rescale between `IOracle.price` and consumers? (angle b)** `grep -n "price\|decimals\|10 \*\*" contracts/cap/Tranche.sol` → `getPrice()` (L328-330) returns the raw oracle answer; L85 `assets = value * unit / price`, L274 `lockedValue * 10**decimals() / getPrice()`, L282/287 `assets * getPrice() / 10**decimals()`. `BaseMarket.sol` L213, 259, 277, 290, 311 consume `totalCapital()/activeCapital()` directly against `totalDebt()` (18-dec cUSD; `Stablecoin.decimals()` fixed at 18, `IStablecoin.sol:118`). `git log -S"18 -" -- contracts/cap/Tranche.sol contracts/cap/oracle` → empty: a rescale never existed. `DECIMALS()` is never read by any consumer (`grep -rn "DECIMALS()" contracts` → only the interface).
+4. **Ran the LEAD PoC:** `FOUNDRY_TEST=audit/tests/scratch/LEAD forge test --match-path 'audit/tests/scratch/LEAD/OracleDecimals.t.sol' -vv`
+   ```
+   [FAIL: totalCapital should be $2,000,000 in 18 decimals: 200000000000000 != 2000000000000000000000000]
+     totalCapital reported: 200000000000000
+   ```
+   Read line by line: it grants itself REGISTRY (role 5) only to deploy a tranche the way `Registry._deployTranche` does, wires the real `Oracle` proxy + `ChainlinkAdapter` + an 8-decimal `MockAggregator`; no mocked check, no non-production value. Sound.
+5. **Ran the E PoC:** `FOUNDRY_TEST=audit/tests/scratch/E forge test --match-path 'audit/tests/scratch/E/E1_OracleDecimals.t.sol' -vv` → 4 fail / 1 pass exactly as quoted in E.md:
+   ```
+   cUSD burned by liquidator (wei): 588235294118
+   WETH seized (wei): 10000000000000000000
+   real USD value seized (18-dec): 6000000000000000000000
+   USD the liquidator was owed (18-dec): 600000000000
+   ```
+   `RealOracleDeployer.sol` mirrors `CapDeployer._deployCapWithConfig` and only swaps the Registry's oracle for the real one; roles come from `_configureAccess()` (production `ConfigureAccessControl` shape); the liquidator holds LIQUIDATOR as in production (`ConfigureAccessControl.sol:23`), borrower holds the operator role assigned by `Registry`. No prank of an unassigned role, no mock hiding a check.
+6. **Removed the price-crash precondition (own test):** `audit/tests/scratch/verify/CRIT-ORACLE-DECIMALS/NoPriceMove.t.sol`, run with `FOUNDRY_TEST=audit/tests/scratch/verify/CRIT-ORACLE-DECIMALS forge test --match-path '.../NoPriceMove.t.sol' -vv`. Same price (2000e8) throughout, only time passes with the feed kept fresh:
+   ```
+   borrowed (cUSD wei): 1000000000000
+   years of accrual until liquidatable: 3
+   healthiness (ray): 881062497046783583485255015
+   cUSD burned by liquidator (wei): 1543747763971
+   WETH seized (wei): 7873113596250000000
+   WETH a correct slash would hand over (wei): 787311359
+   ```
+   Seized/intended = 1e10 exactly. So the drain needs no price move and no malicious actor — an honest, target-health-sized liquidation does it. With a price drop, `maxLiquidatable` grows and the cap at `totalAssets` takes the whole tranche (E's case).
+7. **Role/privilege analysis (angle c):** `Registry.sol:361-364` gates both `liquidate` selectors behind `CapRoles.LIQUIDATOR`; `ConfigureAccessControl.sol:23` grants it to `users.liquidator`. `Tranche.slash` is `restricted` + `msg.sender == market`; `BaseMarket._liquidate` is the only `.slash(` caller (`grep -rn "\.slash(" contracts`). So the *only* path to the mis-scaled payout is a liquidation, and every liquidation pays it. The role is a bounded operational role (intended to be entitled to `1 + bonus` per unit of debt, `BaseMarket.sol:336-338`), not governance; the defect converts it into "take the tranche for dust", and the funds go to a caller-supplied `recipient`. Immunefi scoring: direct loss of user (underwriter) funds, no preconditions beyond normal operation → Critical. A privileged-role discount would apply only if the role were trusted with the assets it takes; it is not.
+8. **Is the fail-closed part alone High?** Yes — if `slash` were correct, (a)/(c) would be "protocol non-functional", High. But (b) is real extractable loss and is on the *default* operating path, so the composite is Critical.
+9. **Registry liveness check (angle d):** `Registry.sol:288-289` calls only `IOracle(oracle).price(_asset)`. It binds the registry to the `price(address) returns (uint256,uint256)` selector, not to `DECIMALS()`; an 18-dec oracle with the same selector would pass without implementing `DECIMALS()`. This does not help the finding's opponent: no such oracle exists, and it means there is no runtime guard on scale at all (supports E's recommendation (c)).
+10. **Design intent / docs:** `IOracle.sol:25-28` says every adapter answers in `{DECIMALS}` (8); `ITranche.sol:22,59,61,153,157` and `IBaseMarket.sol:254,258` say "USD (18 decimals)". The two interfaces contradict each other; the code follows the oracle. `test/shared/mocks/MockOracle.sol:17` declares `DECIMALS = 8` while `CapDeployer.sol:91` feeds `1e18` — confirms the suite tests an 18-dec scale the real oracle never produces. `test/unit/cap/oracle/ChainlinkAdapter.t.sol:44-61` asserts `2000e8` and never touches a tranche.
+
+## Corrections to the finding text (bullet list, or "none")
+- LEAD.md "Likelihood ... premium accrual alone will do it in time": true but slow at default rates — ~3 years for a 50% LTV / 80% LT market (health starts at 1.6). A ~38% price drop is the realistic trigger; either way the payout is 1e10x whenever a liquidation happens. Suggest "premium accrual alone will do it (≈3 years at default rates); any ≥38% drawdown does it immediately".
+- E.md "Underwriters lose 100% of their deposit on the first unhealthy block": only when `maxLiquidatable` reaches the tranche cap (the PoC's 70% crash). A target-health-sized liquidation with no price move takes ~79% (7.87/10 WETH in my test) and leaves the tranche alive. Phrase as "up to 100%; ≥79% even with no price move".
+- E.md "or anyone if the role is ever opened" (LEAD) — fine as a note, but the severity case should rest on the honest-liquidation path, which needs no role misuse. Recommend stating explicitly that the LIQUIDATOR role does not mitigate because the mis-payment occurs on the intended use of the role.
+- E.md "Note for WS-F: DeployInfra ... passes an externally supplied users.oracle": add that `WalletUsersConfig._getUsersConfig()` never sets `oracle` (deploy would revert "oracle required") and that `script/` is outside `foundry.toml`'s compile path (`script = "scripts"`) — i.e. there is no production wiring at all yet, which strengthens "no 18-dec oracle is intended".
+- E.md Location: `Oracle.sol:16-19` is accurate; `Tranche.sol` lines 83-89, 274, 282, 287 verified against current file.
+
+## Residual doubt (what would settle it if still uncertain)
+None material. The only thing that would demote this is an authoritative statement from the team that a different, 18-decimal `IOracle` implementation (same `price(address)` selector) is what will be plugged into `Registry.initialize`. Nothing in `contracts/`, `config/`, `script/`, git history, or NatSpec suggests that; `IOracle.sol` itself fixes the scale at 8 and `Oracle.DECIMALS` is a `constant`, so even that answer would leave the in-repo oracle unusable and `Registry` unguarded against the mismatch.

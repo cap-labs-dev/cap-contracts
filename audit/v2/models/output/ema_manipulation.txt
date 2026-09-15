@@ -1,0 +1,146 @@
+ema_manipulation.py  S=$100M, r_alt 5%, term = max = 30d, gas $20  [3dad5ef: exponential fold]
+
+== v2 DELTA: weight is now 1-(1-1/P)^t (exponential). weight(P)=0.6322, weight(2P)=0.8647, weight(3P)=0.9502, weight(5P)=0.9933 (P=1h) ==
+   Round 1 (linear) had weight(P) = 1: the deposit fully replaced the average after one period.
+   Break-even D (smallest grid D with profit > 0) and best D for each (L, period, hold time t), u=90%:
+
+  loan $1M:
+  period | t      | v2 break-even D | v2 best D  | v2 profit | v2 saved  | u_manip | v1 saved @same D,t | v1 break-even D
+      5m | 0.5P   | $0.1M           | $153M      | $5305     | $5361     |  56.42% | $5626              | $0.1M
+      5m | 1.0P   | $0.1M           | $153M      | $5804     | $5897     |  46.00% | $6419              | $0.1M
+      5m | 2.0P   | $0.1M           | $153M      | $6091     | $6257     |  38.99% | $6419              | $0.1M
+      5m | 3.0P   | $0.1M           | $153M      | $6125     | $6363     |  36.93% | $6419              | $0.1M
+      5m | 5.0P   | $0.1M           | $153M      | $6028     | $6412     |  35.97% | $6419              | $0.1M
+      1h | 0.5P   | $0.1M           | $153M      | $4903     | $5360     |  56.45% | $5626              | $0.1M
+      1h | 1.0P   | $0.1M           | $153M      | $5002     | $5896     |  46.02% | $6419              | $0.1M
+      1h | 2.0P   | $0.1M           | $106M      | $4603     | $5834     |  47.23% | $6002              | $0.1M
+      1h | 3.0P   | $0.1M           | $65M       | $4255     | $5388     |  55.90% | $5444              | $0.1M
+      1h | 5.0P   | $0.1M           | $28M       | $3812     | $4621     |  70.84% | $4626              | $0.1M
+     24h | 0.5P   | $0.3M           | $31M       | $1858     | $4017     |  80.32% | $4251              | $0.2M
+     24h | 1.0P   | $0.2M           | $19M       | $1320     | $3965     |  80.45% | $4369              | $0.1M
+     24h | 2.0P   | $0.5M           | $9M        | $163      | $2704     |  83.52% | $3092              | $0.2M
+     24h | 3.0P   | none            | -          | $0        | $0        |   0.00% | $0                 | none
+     24h | 5.0P   | none            | -          | $0        | $0        |   0.00% | $0                 | none
+
+  loan $10M:
+  period | t      | v2 break-even D | v2 best D  | v2 profit | v2 saved  | u_manip | v1 saved @same D,t | v1 break-even D
+      5m | 0.5P   | $0.1M           | $153M      | $55704    | $55760    |  58.73% | $58384             | $0.1M
+      5m | 1.0P   | $0.1M           | $153M      | $60996    | $61089    |  48.35% | $66396             | $0.1M
+      5m | 2.0P   | $0.1M           | $153M      | $64567    | $64733    |  41.26% | $66396             | $0.1M
+      5m | 3.0P   | $0.1M           | $153M      | $65578    | $65816    |  39.15% | $66396             | $0.1M
+      5m | 5.0P   | $0.1M           | $153M      | $65936    | $66320    |  38.17% | $66396             | $0.1M
+      1h | 0.5P   | $0.1M           | $153M      | $55291    | $55747    |  58.75% | $58384             | $0.1M
+      1h | 1.0P   | $0.1M           | $153M      | $60185    | $61078    |  48.37% | $66396             | $0.1M
+      1h | 2.0P   | $0.1M           | $153M      | $62961    | $64727    |  41.27% | $66396             | $0.1M
+      1h | 3.0P   | $0.1M           | $153M      | $63174    | $65814    |  39.16% | $66396             | $0.1M
+      1h | 5.0P   | $0.1M           | $153M      | $61932    | $66319    |  38.17% | $66396             | $0.1M
+     24h | 0.5P   | $0.1M           | $153M      | $45246    | $55746    |  58.75% | $58384             | $0.1M
+     24h | 1.0P   | $0.1M           | $73M       | $43007    | $53094    |  63.92% | $57932             | $0.1M
+     24h | 2.0P   | $0.1M           | $19M       | $40071    | $45340    |  79.01% | $46155             | $0.1M
+     24h | 3.0P   | $0.1M           | $17M       | $38206    | $45194    |  79.30% | $45465             | $0.1M
+     24h | 5.0P   | $0.1M           | $15M       | $34280    | $44577    |  80.06% | $44833             | $0.1M
+
+  loan $50M:
+  period | t      | v2 break-even D | v2 best D  | v2 profit | v2 saved  | u_manip | v1 saved @same D,t | v1 break-even D
+      5m | 0.5P   | $0.1M           | $153M      | $308391   | $308448   |  66.58% | $320695            | $0.1M
+      5m | 1.0P   | $0.1M           | $153M      | $333666   | $333758   |  56.72% | $360778            | $0.1M
+      5m | 2.0P   | $0.1M           | $153M      | $351939   | $352104   |  49.58% | $360778            | $0.1M
+      5m | 3.0P   | $0.1M           | $153M      | $357495   | $357733   |  47.39% | $360778            | $0.1M
+      5m | 5.0P   | $0.1M           | $153M      | $359992   | $360376   |  46.36% | $360778            | $0.1M
+      1h | 0.5P   | $0.1M           | $153M      | $307933   | $308390   |  66.60% | $320695            | $0.1M
+      1h | 1.0P   | $0.1M           | $153M      | $332814   | $333708   |  56.74% | $360778            | $0.1M
+      1h | 2.0P   | $0.1M           | $153M      | $350309   | $352076   |  49.59% | $360778            | $0.1M
+      1h | 3.0P   | $0.1M           | $153M      | $355079   | $357719   |  47.39% | $360778            | $0.1M
+      1h | 5.0P   | $0.1M           | $153M      | $355986   | $360373   |  46.36% | $360778            | $0.1M
+     24h | 0.5P   | $0.1M           | $153M      | $297885   | $308385   |  66.60% | $320695            | $0.1M
+     24h | 1.0P   | $0.1M           | $153M      | $312723   | $333703   |  56.74% | $360778            | $0.1M
+     24h | 2.0P   | $0.1M           | $153M      | $310134   | $352073   |  49.59% | $360778            | $0.1M
+     24h | 3.0P   | $0.1M           | $153M      | $294819   | $357717   |  47.40% | $360778            | $0.1M
+     24h | 5.0P   | $0.1M           | $83M       | $267880   | $324781   |  60.22% | $325152            | $0.1M
+
+  Reading: at t = P the exponential fold moves the average only 63.2% of the way (95% at 3P, 99.3% at 5P),
+  but the saving is CONCAVE in D: at D = 1.5x supply the $ saved falls only 8% (1-day period, t=P: $53.1k vs $57.9k)
+  and the break-even D is unchanged at the grid minimum ($0.1M) in every cell. Cost is linear in t, so at the
+  1-day period the optimum moves to t ~ 0.5P; at 5 min / 1 h the attacker simply holds 3-5P for a few dollars.
+  Dilution by D is untouched; the band still bounds the duration of the depression, not whether it pays.
+
+  Optimal hold time for D = 1x supply, L = $10M, u = 90% (profit = saved - cost):
+   period   5m: best t = 5.00P, profit $61130 (saved $61388, cost $258); round-1 at t=P: saved $61466 cost $68 profit $61398
+   period   1h: best t = 3.00P, profit $59140 (saved $60872, cost $1732); round-1 at t=P: saved $61466 cost $591 profit $60875
+   period  24h: best t = 0.50P, profit $44662 (saved $51531, cost $6869); round-1 at t=P: saved $61466 cost $13719 profit $47747
+
+== live utilization 80% (rate 10.00%) ==
+  loan $1M: honest 30d premium $8301 (rate at u_after_mint 10.10%)
+  period   | t=period: break-even D | best D      | profit    | saved     | u_manip | t=period/2 profit@bestD
+       5m  | $0.1M                  | $153M       | $1995     | $2087     |  40.95% | $1555
+      15m  | $0.1M                  | $153M       | $1848     | $2087     |  40.96% | $1481
+       1h  | $0.1M                  | $153M       | $1193     | $2087     |  40.97% | $1153
+       4h  | $0.1M                  | $10M        | $66       | $323      |  75.30% | $93
+      12h  | $0.2M                  | $0M         | $33       | $82       |  79.98% | $21
+      24h  | $0.3M                  | $0M         | $6        | $79       |  80.01% | $3
+  loan $10M: honest 30d premium $89664 (rate at u_after_mint 10.91%)
+  period   | t=period: break-even D | best D      | profit    | saved     | u_manip | t=period/2 profit@bestD
+       5m  | $0.1M                  | $153M       | $26120    | $26213    |  43.52% | $21360
+      15m  | $0.1M                  | $153M       | $25968    | $26206    |  43.53% | $21279
+       1h  | $0.1M                  | $153M       | $25310    | $26204    |  43.54% | $20949
+       4h  | $0.1M                  | $153M       | $22690    | $26203    |  43.54% | $19638
+      12h  | $0.1M                  | $153M       | $15703    | $26203    |  43.54% | $16145
+      24h  | $0.1M                  | $58M        | $9080     | $16984    |  61.48% | $9751
+  loan $50M: honest 30d premium $547945 (rate at u_after_mint 13.33%)
+  period   | t=period: break-even D | best D      | profit    | saved     | u_manip | t=period/2 profit@bestD
+       5m  | $0.1M                  | $153M       | $207086   | $207179   |  52.67% | $183619
+      15m  | $0.1M                  | $153M       | $206906   | $207144   |  52.69% | $183508
+       1h  | $0.1M                  | $153M       | $206238   | $207132   |  52.69% | $183165
+       4h  | $0.1M                  | $153M       | $203615   | $207128   |  52.69% | $181852
+      12h  | $0.1M                  | $153M       | $196628   | $207128   |  52.69% | $178358
+      24h  | $0.1M                  | $153M       | $186148   | $207127   |  52.69% | $173118
+
+== live utilization 90% (rate 15.00%) ==
+  loan $1M: honest 30d premium $12369 (rate at u_after_mint 15.05%)
+  period   | t=period: break-even D | best D      | profit    | saved     | u_manip | t=period/2 profit@bestD
+       5m  | $0.1M                  | $153M       | $5804     | $5897     |  46.00% | $5305
+      15m  | $0.1M                  | $153M       | $5658     | $5896     |  46.02% | $5231
+       1h  | $0.1M                  | $153M       | $5002     | $5896     |  46.02% | $4903
+       4h  | $0.1M                  | $22M        | $3670     | $4184     |  79.35% | $2613
+      12h  | $0.1M                  | $22M        | $2681     | $4184     |  79.35% | $2119
+      24h  | $0.2M                  | $19M        | $1320     | $3965     |  80.45% | $1239
+  loan $10M: honest 30d premium $127024 (rate at u_after_mint 15.45%)
+  period   | t=period: break-even D | best D      | profit    | saved     | u_manip | t=period/2 profit@bestD
+       5m  | $0.1M                  | $153M       | $60996    | $61089    |  48.35% | $55704
+      15m  | $0.1M                  | $153M       | $60843    | $61081    |  48.37% | $55622
+       1h  | $0.1M                  | $153M       | $60185    | $61078    |  48.37% | $55291
+       4h  | $0.1M                  | $153M       | $57564    | $61078    |  48.37% | $53980
+      12h  | $0.1M                  | $153M       | $50578    | $61078    |  48.37% | $50486
+      24h  | $0.1M                  | $73M        | $43007    | $53094    |  63.92% | $43895
+  loan $50M: honest 30d premium $684932 (rate at u_after_mint 16.67%)
+  period   | t=period: break-even D | best D      | profit    | saved     | u_manip | t=period/2 profit@bestD
+       5m  | $0.1M                  | $153M       | $333666   | $333758   |  56.72% | $308391
+      15m  | $0.1M                  | $153M       | $333483   | $333721   |  56.74% | $308276
+       1h  | $0.1M                  | $153M       | $332814   | $333708   |  56.74% | $307933
+       4h  | $0.1M                  | $153M       | $330191   | $333704   |  56.74% | $306619
+      12h  | $0.1M                  | $153M       | $323204   | $333703   |  56.74% | $303125
+      24h  | $0.1M                  | $153M       | $312723   | $333703   |  56.74% | $297885
+
+== termMultiplier: shorter terms pay MORE (slope 0.5e27), so the max term is both the cheapest and the
+   one that locks the manipulated rate longest; the multiplier does not touch the attack at max term ==
+  term  1d slope 0.0: multiplier 1.000 honest $4234    manipulated(D=1x S, t=1d) $2358    saved $1876
+  term  1d slope 0.5: multiplier 1.483 honest $6281    manipulated(D=1x S, t=1d) $3498    saved $2782
+  term  7d slope 0.0: multiplier 1.000 honest $29639   manipulated(D=1x S, t=1d) $16509   saved $13130
+  term  7d slope 0.5: multiplier 1.383 honest $41000   manipulated(D=1x S, t=1d) $22838   saved $18163
+  term 15d slope 0.0: multiplier 1.000 honest $63512   manipulated(D=1x S, t=1d) $35377   saved $28135
+  term 15d slope 0.5: multiplier 1.250 honest $79390   manipulated(D=1x S, t=1d) $44221   saved $35169
+  term 30d slope 0.0: multiplier 1.000 honest $127024  manipulated(D=1x S, t=1d) $70753   saved $56271
+  term 30d slope 0.5: multiplier 1.000 honest $127024  manipulated(D=1x S, t=1d) $70753   saved $56271
+
+== Why the band does not help: benefit saturates (63% at t=P, 95% at 3P), cost is linear in t ==
+  period    300s: t=0.50P: saved $51543 cost $44 | t=1.00P: saved $56281 cost $68 | t=2.00P: saved $59787 cost $115 | t=3.00P: saved $60875 cost $163
+  period   3600s: t=0.50P: saved $51532 cost $305 | t=1.00P: saved $56271 cost $591 | t=2.00P: saved $59781 cost $1162 | t=3.00P: saved $60872 cost $1732
+  period  86400s: t=0.50P: saved $51531 cost $6869 | t=1.00P: saved $56271 cost $13719 | t=2.00P: saved $59781 cost $27417 | t=3.00P: saved $60872 cost $41116
+
+== Attacker needs BORROWER role; but the same lever prices EVERY fixed borrow in the window: ==
+   a $100M deposit held 1 day depresses the average for all borrowers for the next period.
+
+=== HEADLINE ===
+At the MAXIMUM averaging period (1 day), u=90%, a $100M par deposit held 24h cuts a $10M 30-day fixed premium from $127024 to $70753 (saves $56271) at a cost of $13719: 4x return. At the minimum (5 min) the cost is $68.
+Round 1 (linear fold, same D, t=P) saved $61466. Exponential fold: 92% of that at t=P, $59781 at t=2P (cost $27417).
+The band [5 min, 1 day] still bounds the attack's DURATION, not its profitability; break-even D is < 1x supply at every period.

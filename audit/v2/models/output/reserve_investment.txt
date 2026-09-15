@@ -1,0 +1,66 @@
+reserve_investment.py  S=$100M u0=80% R=unlockedSupply=$20M  [3dad5ef Stablecoin.invest/recall]
+== (a) Liquidity DoS: phi* above which a day of redemptions reverts before the keeper's recall lands ==
+phi* = 1 - d S tau / R   (R = $20M = 20% of S; '-' = negative: even phi = 0 cannot cover tau of demand)
+d/day  | tau=1h   | tau=6h   | tau=12h  | tau=1d   | tau=3d   | tau=7d   | hours of demand the liquid slice covers at phi = 0.25/0.50/0.75/0.90
+0.01   |    0.998 |    0.988 |    0.975 |    0.950 |    0.850 |    0.650 | 360.0h / 240.0h / 120.0h / 48.0h
+0.02   |    0.996 |    0.975 |    0.950 |    0.900 |    0.700 |    0.300 | 180.0h / 120.0h / 60.0h / 24.0h
+0.05   |    0.990 |    0.938 |    0.875 |    0.750 |    0.250 |        - | 72.0h / 48.0h / 24.0h / 9.6h
+At u0 = 90% (R = $10M) every phi* halves its distance to 1: with d = 5%/day and a 1-day latency, phi* < 0 - no
+investment at all survives a day of the round-1 demand assumption.
+  R=$10M: tau=1h phi*=0.979, tau=6h phi*=0.875, tau=12h phi*=0.750, tau=1d phi*=0.500, tau=3d phi*=-, tau=7d phi*=-
+Note: unlockedSupply/maxRedeem/claimable do NOT fall when invest() runs; the revert is a bare ERC20 transfer
+failure in the redemption path, indistinguishable to the user from a broken token.
+
+== (b) Aera loss ell on the invested slice: who is paid, in queue order (unlockedSupply still = R) ==
+Reserve after loss R' = (1 - ell phi) R. FIFO par payout until R' is exhausted; the rest of the 'unlocked' supply reverts.
+phi    ell   | reserve after | paid at par  | stranded (revert) | first zero-payout redeemer at | recognised-as-badDebt alternative:
+             |               | (of $20M)    |                   | cumulative redemption of      |   payout/share first / last redeemer of R
+0.25   0.05  | $19.75M       | $19.75M ( 98.8%) | $ 0.25M ( 1.2%)    | $19.75M                       | 0.9950 / 0.9960
+0.25   0.10  | $19.50M       | $19.50M ( 97.5%) | $ 0.50M ( 2.5%)    | $19.50M                       | 0.9901 / 0.9920
+0.25   0.20  | $19.00M       | $19.00M ( 95.0%) | $ 1.00M ( 5.0%)    | $19.00M                       | 0.9802 / 0.9839
+0.25   0.30  | $18.50M       | $18.50M ( 92.5%) | $ 1.50M ( 7.5%)    | $18.50M                       | 0.9704 / 0.9756
+0.50   0.05  | $19.50M       | $19.50M ( 97.5%) | $ 0.50M ( 2.5%)    | $19.50M                       | 0.9901 / 0.9920
+0.50   0.10  | $19.00M       | $19.00M ( 95.0%) | $ 1.00M ( 5.0%)    | $19.00M                       | 0.9802 / 0.9839
+0.50   0.20  | $18.00M       | $18.00M ( 90.0%) | $ 2.00M (10.0%)    | $18.00M                       | 0.9606 / 0.9675
+0.50   0.30  | $17.00M       | $17.00M ( 85.0%) | $ 3.00M (15.0%)    | $17.00M                       | 0.9412 / 0.9509
+0.75   0.05  | $19.25M       | $19.25M ( 96.2%) | $ 0.75M ( 3.8%)    | $19.25M                       | 0.9851 / 0.9879
+0.75   0.10  | $18.50M       | $18.50M ( 92.5%) | $ 1.50M ( 7.5%)    | $18.50M                       | 0.9704 / 0.9756
+0.75   0.20  | $17.00M       | $17.00M ( 85.0%) | $ 3.00M (15.0%)    | $17.00M                       | 0.9412 / 0.9509
+0.75   0.30  | $15.50M       | $15.50M ( 77.5%) | $ 4.50M (22.5%)    | $15.50M                       | 0.9124 / 0.9257
+1.00   0.05  | $19.00M       | $19.00M ( 95.0%) | $ 1.00M ( 5.0%)    | $19.00M                       | 0.9802 / 0.9839
+1.00   0.10  | $18.00M       | $18.00M ( 90.0%) | $ 2.00M (10.0%)    | $18.00M                       | 0.9606 / 0.9675
+1.00   0.20  | $16.00M       | $16.00M ( 80.0%) | $ 4.00M (20.0%)    | $16.00M                       | 0.9220 / 0.9346
+1.00   0.30  | $14.00M       | $14.00M ( 70.0%) | $ 6.00M (30.0%)    | $14.00M                       | 0.8841 / 0.9003
+Reading: unrecognised, the loss is borne 100% by the LAST ell*phi*R of redeemers (they get nothing, not a haircut),
+and every earlier redeemer is paid par - the exact first-mover advantage the convex curve was built to remove.
+Recognised as badDebt it is a 0.5-11.6% haircut spread monotonically along the queue.
+Nothing in Stablecoin can recognise an Aera loss: coverBadDebt only lowers badDebt, writeOff is a market
+action on a borrower's debt. The only exits are a donation via fund() or a permanent revert wall.
+
+== (c) Cap on phi with P(revert within 7 d) < 1%: round-1 run dynamics, lognormal daily demand (sigma 100%), ==
+   fresh repayment 1%/day, keeper recalls everything tau after balance < 1.5x mean demand. 8000 paths per cell.
+   phi = 0 never reverts (excess demand queues); the cap is the largest phi keeping P(revert) < 1%,
+   shown as a fraction of (unlockedSupply - redemptionQueue); queue0 = 0 and $5M (5% of S).
+w0/day | queue0 | tau=0 (same block) | tau=1d    | tau=3d    | tau=7d (never in window)
+0.005  | $0M    | 1.000     | 0.760     | 0.751     | 0.747    
+0.005  | $5M    | 1.000     | 0.680     | 0.668     | 0.663    
+0.010  | $0M    | 1.000     | 0.331     | 0.311     | 0.289    
+0.010  | $5M    | 1.000     | 0.108     | 0.079     | 0.052    
+0.020  | $0M    | 1.000     | 0.000     | 0.000     | 0.000    
+0.020  | $5M    | 1.000     | 0.000     | 0.000     | 0.000    
+0.050  | $0M    | 1.000     | 0.000     | 0.000     | 0.000    
+0.050  | $5M    | 1.000     | 0.000     | 0.000     | 0.000    
+Reading: a same-block keeper (tau = 0) makes any phi safe by construction; with a 1-day recall latency the
+1%-revert cap is 0.76 of the free reserve at 0.5%/day demand, 0.33 at 1%/day, 0.00 at 2%/day and 0.00 at the
+round-1 5%/day run assumption (queue 0); a standing $5M queue lowers each by a further 8-22% of R.
+There is no on-chain cap at all: invest(amount) accepts any amount up to balanceOf(stablecoin), including
+the redemptionQueue's backing, and unlockedSupply does not move.
+
+=== HEADLINE ===
+invest() is invisible to unlockedSupply/maxRedeem/claimable: at the round-1 5%/day demand assumption a
+one-day keeper latency means phi > 0.75 reverts the first day of redemptions (phi > 0.50 at u0 = 90%);
+an Aera loss ell on phi R is paid 100% by the last ell*phi*R of redeemers as a hard zero (revert), everyone
+before them at par - the first-mover advantage the haircut curve exists to remove. Keeping P(revert in 7 d)
+< 1% needs phi <= 0.33 of (unlockedSupply - queue) at 1%/day demand with a 1-day recall, 0.00 at 5%/day.
+Recommendation: subtract `invested` from unlockedSupply (or add a liquid-floor check in invest), and give
+the loss a recognition path (invested-vs-recalled ghost -> badDebt).

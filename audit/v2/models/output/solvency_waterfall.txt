@@ -1,0 +1,70 @@
+== 1. Shock thresholds, 2 tranches, capital split 95/5, lt 0.80 ltv 0.50 bonus 2% targetHealth 1.25 ==
+credit-util | debt/K0 | health<1 at | junior wiped | senior touched | cUSD LOSS (unrec>0, jump, no liq) | unrec>0 AFTER one liquidation
+     25%    |  0.125  |    84.38%   |    84.38%    |     84.38%     |             87.25%              |       87.25%      | junior KILLED at 84.38%
+     50%    |  0.250  |    68.75%   |    68.75%    |     68.75%     |             74.50%              |       74.50%      | junior KILLED at 68.75%
+     75%    |  0.375  |    53.13%   |    53.13%    |     53.13%     |             61.75%              |       61.75%      | junior KILLED at 53.13%
+    100%    |  0.500  |    37.50%   |    37.50%    |     37.50%     |             49.00%              |       49.00%      | junior KILLED at 37.50%
+    160%    |  0.800  |     0.00%   |     0.00%    |      0.00%     |             18.40%              |       18.40%      | junior KILLED at 0.00%
+  analytic: health<1 at s = 1 - debt/(K0*lt); unrec>0 at s = 1 - debt*(1+bonus)/K0
+
+== 2. Junior capital share needed so the junior absorbs a full liquidation (credit-util 100%) ==
+junior share | shock at junior wiped | shock at senior touched | shock unrec>0
+      5%      |        37.50%         |         37.50%          |    49.00%
+     10%      |        37.50%         |         37.50%          |    49.00%
+     20%      |        37.50%         |         37.50%          |    49.00%
+     30%      |        37.50%         |         37.50%          |    49.00%
+     40%      |        37.50%         |         37.50%          |    49.00%
+     50%      |        38.29%         |         38.29%          |    49.00%
+  at shock 37.51% (health just < 1): maxLiquidatable = $28.8M of $50M debt, slash = $29.4M; junior 5% holds $3.1M
+
+== 3. 3-5 tranches (capital by weight), credit-util 100%: which tranches a single liquidation reaches ==
+  n=3 shock 40%: liq $33.4M slashed(senior..junior)=['$22.1M', '$9.0M', '$3.0M'] killed=[1, 2] h_post=1.250 unrec_post=$0.00M
+  n=3 shock 45%: liq $42.6M slashed(senior..junior)=['$32.5M', '$8.2M', '$2.8M'] killed=[1, 2] h_post=1.250 unrec_post=$0.00M
+  n=3 shock 48%: liq $48.2M slashed(senior..junior)=['$38.7M', '$7.8M', '$2.6M'] killed=[1, 2] h_post=1.250 unrec_post=$0.00M
+  n=3 shock 49%: liq $50.0M slashed(senior..junior)=['$40.8M', '$7.7M', '$2.6M'] killed=[0, 1, 2] h_post=1.250 unrec_post=$0.00M
+  n=3 shock 50%: liq $49.0M slashed(senior..junior)=['$40.0M', '$7.5M', '$2.5M'] killed=[0, 1, 2] h_post=0.000 unrec_post=$0.98M
+  n=4 shock 40%: liq $33.4M slashed(senior..junior)=['$16.1M', '$9.0M', '$6.0M', '$3.0M'] killed=[1, 2, 3] h_post=1.250 unrec_post=$0.00M
+  n=4 shock 45%: liq $42.6M slashed(senior..junior)=['$27.0M', '$8.2M', '$5.5M', '$2.8M'] killed=[1, 2, 3] h_post=1.250 unrec_post=$0.00M
+  n=4 shock 48%: liq $48.2M slashed(senior..junior)=['$33.5M', '$7.8M', '$5.2M', '$2.6M'] killed=[1, 2, 3] h_post=1.250 unrec_post=$0.00M
+  n=4 shock 49%: liq $50.0M slashed(senior..junior)=['$35.7M', '$7.7M', '$5.1M', '$2.6M'] killed=[0, 1, 2, 3] h_post=1.250 unrec_post=$0.00M
+  n=4 shock 50%: liq $49.0M slashed(senior..junior)=['$35.0M', '$7.5M', '$5.0M', '$2.5M'] killed=[0, 1, 2, 3] h_post=0.000 unrec_post=$0.98M
+  n=5 shock 40%: liq $33.4M slashed(senior..junior)=['$10.1M', '$9.0M', '$6.0M', '$6.0M', '$3.0M'] killed=[1, 2, 3, 4] h_post=1.250 unrec_post=$0.00M
+  n=5 shock 45%: liq $42.6M slashed(senior..junior)=['$21.5M', '$8.2M', '$5.5M', '$5.5M', '$2.8M'] killed=[1, 2, 3, 4] h_post=1.250 unrec_post=$0.00M
+  n=5 shock 48%: liq $48.2M slashed(senior..junior)=['$28.3M', '$7.8M', '$5.2M', '$5.2M', '$2.6M'] killed=[1, 2, 3, 4] h_post=1.250 unrec_post=$0.00M
+  n=5 shock 49%: liq $50.0M slashed(senior..junior)=['$30.6M', '$7.7M', '$5.1M', '$5.1M', '$2.6M'] killed=[0, 1, 2, 3, 4] h_post=1.250 unrec_post=$0.00M
+  n=5 shock 50%: liq $49.0M slashed(senior..junior)=['$30.0M', '$7.5M', '$5.0M', '$5.0M', '$2.5M'] killed=[0, 1, 2, 3, 4] h_post=0.000 unrec_post=$0.98M
+
+== 4. Is healthiness() leading or lagging real protection? ==
+real protection = recoverableDebt / totalDebt = K / ((1+bonus) * debt); healthiness = K*lt/debt
+healthiness == 1  <=>  K = debt/lt ;  protection == 1  <=>  K = debt*(1+bonus)
+  lt 0.7000 bonus 2%: protection at health=1 is 1.4006; LEADS by 28.60% of price
+  lt 0.8000 bonus 2%: protection at health=1 is 1.2255; LEADS by 18.40% of price
+  lt 0.9000 bonus 2%: protection at health=1 is 1.0893; LEADS by 8.20% of price
+  lt 0.9500 bonus 2%: protection at health=1 is 1.0320; LEADS by 3.10% of price
+  lt 0.9800 bonus 2%: protection at health=1 is 1.0004; LEADS by 0.04% of price
+  lt 0.9804 bonus 2%: protection at health=1 is 1.0000; LAGS: unrec>0 while healthiness>=1
+  lt 0.9900 bonus 2%: protection at health=1 is 0.9903; LAGS: unrec>0 while healthiness>=1
+  lt 1.0000 bonus 2%: protection at health=1 is 0.9804; LAGS: unrec>0 while healthiness>=1
+  threshold: healthiness lags real protection when lt > 1/(1+bonus) = 0.9804 (setLt permits up to 1.0)
+  In the TIME dimension healthiness lags: premium accrues into debt every block with no price move,
+  and a fixed borrow adds its whole-term premium instantly, so health moves before price does.
+
+  Shock path (2 tranches 95/5, credit-util 100%), liquidator acts each step:
+  step shock | health | protection | unrec | liq this step | cumulative slash | junior | senior
+   10.0%     | 1.440  |   1.000    | $0.0M | $0.0M | $0.0M | $4.5M | $85.5M
+   20.0%     | 1.280  |   1.000    | $0.0M | $0.0M | $0.0M | $4.0M | $76.0M
+   30.0%     | 1.120  |   1.000    | $0.0M | $0.0M | $0.0M | $3.5M | $66.5M
+   35.0%     | 1.040  |   1.000    | $0.0M | $0.0M | $0.0M | $3.2M | $61.8M
+   37.5%     | 1.000  |   1.000    | $0.0M | $28.8M | $29.4M | $0.0M | $33.1M
+   40.0%     | 1.200  |   1.000    | $0.0M | $0.0M | $29.4M | $0.0M | $31.8M
+   45.0%     | 1.100  |   1.000    | $0.0M | $0.0M | $29.4M | $0.0M | $29.1M
+   50.0%     | 1.000  |   1.000    | $0.0M | $0.0M | $29.4M | $0.0M | $26.5M
+   55.0%     | 0.900  |   1.000    | $0.0M | $17.1M | $46.8M | $0.0M | $6.4M
+  With prompt liquidation at every step the path never reaches unrec>0: each liquidation resets health to
+  targetHealth. The loss to cUSD holders needs a single JUMP (or liquidator absence) of size >= the cushion.
+
+=== HEADLINE ===
+Defaults (lt 0.8, ltv 0.5, bonus 2%, 95/5): at full credit-line draw, health<1 at a 37.5% correlated price drop; cUSD holders take a loss (unrecoverableDebt>0) at 49.0% if no liquidation lands in between.
+The 5% junior is wiped (and permanently KILLED) by the FIRST liquidation at any credit-util; the senior is touched in the same call:
+restoring health from 1.0 to targetHealth 1.25 liquidates 58% of the debt in one call (perCleared = 1.25 - 1.02*0.8 = 0.434).
+healthiness() LEADS unrecoverable debt by (1 - (1+bonus)*lt) = 18.4% of price at defaults, but LAGS whenever lt > 0.9804, which setLt permits (up to 1.0).

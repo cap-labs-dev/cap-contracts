@@ -1,0 +1,59 @@
+rate_sweep.py  curve base 5%/slope0 5%/slope1 10%/kink 80%; bonus 2%; ltv 0.5; protocol take = 0 (none exists)
+
+== 1. Rates across stablecoin utilization u ==
+  u    | liqRate(u) | lender yield/cUSD (x1) | (x2 mult) | underwriter rate (flat, owner-set, floor 0) | protocol
+ 0.00  |    5.00%   |         0.00%          |   0.00%   |         0% .. 100%, NOT a function of u          |   0%
+ 0.20  |    6.25%   |         1.25%          |   2.50%   |         0% .. 100%, NOT a function of u          |   0%
+ 0.40  |    7.50%   |         3.00%          |   6.00%   |         0% .. 100%, NOT a function of u          |   0%
+ 0.60  |    8.75%   |         5.25%          |  10.50%   |         0% .. 100%, NOT a function of u          |   0%
+ 0.80  |   10.00%   |         8.00%          |  16.00%   |         0% .. 100%, NOT a function of u          |   0%
+ 0.85  |   12.50%   |        10.62%          |  21.25%   |         0% .. 100%, NOT a function of u          |   0%
+ 0.90  |   15.00%   |        13.50%          |  27.00%   |         0% .. 100%, NOT a function of u          |   0%
+ 0.95  |   17.50%   |        16.62%          |  33.25%   |         0% .. 100%, NOT a function of u          |   0%
+ 1.00  |   20.00%   |        20.00%          |  40.00%   |         0% .. 100%, NOT a function of u          |   0%
+  The liquidity rate rises with u (lenders are paid for scarcity); the underwriter rate does NOT move with
+  anything - not utilization, not collateral vol, not health. Underwriter compensation is decoupled from risk.
+
+== 2. Underwriter expected return per $1 of tranche capital, leverage L = debt/K = ltv = 0.50 ==
+  gross = uwRate*L ; loss = p_def*L*(1+b) + p_vol*0.58*(1+b)*L
+  uwRate | pDef  1% pVol  0% | pDef  1% pVol  5% | pDef  1% pVol 15% | pDef  2% pVol  0% | pDef  2% pVol  5% | pDef  2% pVol 15% | pDef  5% pVol  0% | pDef  5% pVol  5% | pDef  5% pVol 15% | pDef 10% pVol  0% | pDef 10% pVol  5% | pDef 10% pVol 15%
+    0.0% |           -0.51% |           -1.99% |           -4.95% |           -1.02% |           -2.50% |           -5.46% |           -2.55% |           -4.03% |           -6.99% |           -5.10% |           -6.58% |           -9.54%
+    1.0% |           -0.01% |           -1.49% |           -4.45% |           -0.52% |           -2.00% |           -4.96% |           -2.05% |           -3.53% |           -6.49% |           -4.60% |           -6.08% |           -9.04%
+    2.0% |           +0.49% |           -0.99% |           -3.95% |           -0.02% |           -1.50% |           -4.46% |           -1.55% |           -3.03% |           -5.99% |           -4.10% |           -5.58% |           -8.54%
+    3.0% |           +0.99% |           -0.49% |           -3.45% |           +0.48% |           -1.00% |           -3.96% |           -1.05% |           -2.53% |           -5.49% |           -3.60% |           -5.08% |           -8.04%
+    5.0% |           +1.99% |           +0.51% |           -2.45% |           +1.48% |           +0.00% |           -2.96% |           -0.05% |           -1.53% |           -4.49% |           -2.60% |           -4.08% |           -7.04%
+    8.0% |           +3.49% |           +2.01% |           -0.95% |           +2.98% |           +1.50% |           -1.46% |           +1.45% |           -0.03% |           -2.99% |           -1.10% |           -2.58% |           -5.54%
+   10.0% |           +4.49% |           +3.01% |           +0.05% |           +3.98% |           +2.50% |           -0.46% |           +2.45% |           +0.97% |           -1.99% |           -0.10% |           -1.58% |           -4.54%
+   20.0% |           +9.49% |           +8.01% |           +5.05% |           +8.98% |           +7.50% |           +4.54% |           +7.45% |           +5.97% |           +3.01% |           +4.90% |           +3.42% |           +0.46%
+   50.0% |          +24.49% |          +23.01% |          +20.05% |          +23.98% |          +22.50% |          +19.54% |          +22.45% |          +20.97% |          +18.01% |          +19.90% |          +18.42% |          +15.46%
+
+== 3. Break-even underwriter rate (below which underwriting is negative EV), by p_def x p_vol ==
+  Independent of L (both sides scale with leverage) => the threshold is a pure rate:
+   p_def   1%: pVol  0% -> uwRate* >=  1.02%  pVol  5% -> uwRate* >=  3.98%  pVol 15% -> uwRate* >=  9.89%
+   p_def   2%: pVol  0% -> uwRate* >=  2.04%  pVol  5% -> uwRate* >=  5.00%  pVol 15% -> uwRate* >= 10.91%
+   p_def   5%: pVol  0% -> uwRate* >=  5.10%  pVol  5% -> uwRate* >=  8.06%  pVol 15% -> uwRate* >= 13.97%
+   p_def  10%: pVol  0% -> uwRate* >= 10.20%  pVol  5% -> uwRate* >= 13.16%  pVol 15% -> uwRate* >= 19.07%
+  CapDeployer default 20% clears every cell; production default is whatever the market owner sets,
+  and the code permits 0%, at which underwriting is negative EV at ANY nonzero default probability.
+
+== 4. When the system needs underwriters most: utilization high, collateral falling ==
+  At u -> 1 the lender rate doubles (10% -> 20%, or 40% at x2) while the underwriter rate stays flat.
+  Underwriter net EV is invariant to u, but the tranche's REDEEMABILITY is not: lockedValue = debt/(lt-buffer)
+  = debt/0.7 = 1.43x debt is locked in the tranches, so at credit-util 100% (debt = 0.5 K) 71% of K cannot
+  leave. The rational underwriter therefore queues to exit whenever expected return turns negative, and
+  the queue only settles as debt is repaid - i.e. exactly when repayment is least likely.
+   credit-util  25%: locked share of tranche capital = 18%, free to exit = 82%
+   credit-util  50%: locked share of tranche capital = 36%, free to exit = 64%
+   credit-util  75%: locked share of tranche capital = 54%, free to exit = 46%
+   credit-util 100%: locked share of tranche capital = 71%, free to exit = 29%
+
+== 5. Fee-to-risk mismatch summary ==
+  uwRate  0.0%: tolerates borrower default probability up to  0.00%/yr (p_vol=0) before EV < 0
+  uwRate  2.0%: tolerates borrower default probability up to  1.96%/yr (p_vol=0) before EV < 0
+  uwRate  5.0%: tolerates borrower default probability up to  4.90%/yr (p_vol=0) before EV < 0
+  uwRate 20.0%: tolerates borrower default probability up to 19.61%/yr (p_vol=0) before EV < 0
+
+=== HEADLINE ===
+Underwriting is negative-EV whenever underwriterRate < (1+bonus)*(p_default + 0.58*p_volLiq): at 2%/yr
+default risk that is 2.04%; at 5% it is 5.10%. The rate is set by the MARKET OWNER (the borrowing side),
+has floor 0, and does not respond to utilization, health, or vol. Protocol take: none.
