@@ -1066,7 +1066,9 @@ contract StablecoinTest is BaseTest {
     function test_idleStablecoinFreezesUntilSomeoneOptsIn() public {
         scoin.fundCreditBacked(10e18);
         vm.warp(block.timestamp + scoin.vestingPeriod());
-        uint256 pot = scoin.remaining() + scoin.vested();
+        assertEq(scoin.vested(), 0, "nobody is earning, so nothing has vested");
+        uint256 pot = scoin.remaining();
+        assertEq(pot, 10e18, "the funded shares are still locked");
 
         vm.prank(alice);
         scoin.deposit(100e18, alice);
@@ -1075,6 +1077,7 @@ contract StablecoinTest is BaseTest {
 
         assertEq(scoin.claimable(alice), 0, "the idle window is not hers");
         assertEq(scoin.remaining(), pot, "and the remainder is still held");
+        assertEq(scoin.vested(), 0);
     }
 
     // ── idle reserve can sit in Aera without changing the share price ─────────

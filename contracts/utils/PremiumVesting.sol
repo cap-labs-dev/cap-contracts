@@ -66,13 +66,14 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
 
     /// @inheritdoc IPremiumVesting
     function vested() public view returns (uint256 amount) {
-        amount = _vested(_getPremiumVestingStorage());
+        PremiumVestingStorage storage $ = _getPremiumVestingStorage();
+        amount = _vested($, $.staked);
     }
 
     /// @inheritdoc IPremiumVesting
     function remaining() public view returns (uint256 amount) {
         PremiumVestingStorage storage $ = _getPremiumVestingStorage();
-        amount = $.remainder - _vested($);
+        amount = $.remainder - _vested($, $.staked);
     }
 
     /// @inheritdoc IPremiumVesting
@@ -245,7 +246,7 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
             return;
         }
 
-        uint256 amount = _vested($);
+        uint256 amount = _vested($, supply);
         if (amount > 0) {
             $.perShare += Math.mulDiv(amount, RAY, supply, Math.Rounding.Floor);
             $.remainder -= amount;
@@ -308,15 +309,18 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
     {
         perShare = $.perShare;
         if (supply > 0) {
-            uint256 amount = _vested($);
+            uint256 amount = _vested($, supply);
             if (amount > 0) perShare += Math.mulDiv(amount, RAY, supply, Math.Rounding.Floor);
         }
     }
 
-    /// @dev Premium newly available since `lastUpdate`. A zero-supply accrue freezes, so this can read ahead.
+    /// @dev Premium newly available since `lastUpdate` against `supply`. Zero supply
+    /// matches an {_accrue} freeze: nothing is released and the pot does not age.
     /// @param $ The PremiumVesting storage
+    /// @param supply The shares that earn
     /// @return amount Premium newly available since `lastUpdate`, in stablecoin units (18 decimals)
-    function _vested(PremiumVestingStorage storage $) internal view returns (uint256 amount) {
+    function _vested(PremiumVestingStorage storage $, uint256 supply) internal view returns (uint256 amount) {
+        if (supply == 0) return 0;
         if (block.timestamp <= $.lastUpdate) return 0;
         uint256 weight = _weight(block.timestamp - $.lastUpdate);
         if (weight == 0) return 0;

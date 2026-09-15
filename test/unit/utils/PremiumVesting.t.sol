@@ -107,6 +107,12 @@ contract PremiumVestingTest is Test {
         quiet = 20 * PERIOD;
     }
 
+    function _earn(address who, uint256 shares) internal {
+        v.mint(who, shares);
+        vm.prank(who);
+        v.optIn();
+    }
+
     function test_startsEmpty() public view {
         assertEq(v.remainder(), 0, "nothing held");
         assertEq(v.remaining(), 0, "nothing projected");
@@ -126,6 +132,7 @@ contract PremiumVestingTest is Test {
     }
 
     function test_releaseIsExponentialInTheTimeConstant() public {
+        _earn(alice, 1_000e18);
         v.fund(PREMIUM);
 
         vm.warp(block.timestamp + PERIOD / 2);
@@ -139,6 +146,7 @@ contract PremiumVestingTest is Test {
     }
 
     function test_releaseNeverQuiteFinishes() public {
+        _earn(alice, 1_000e18);
         v.fund(PREMIUM);
         vm.warp(block.timestamp + PERIOD);
 
@@ -152,6 +160,7 @@ contract PremiumVestingTest is Test {
     }
 
     function test_accrueDividesByTheSupplyPresentAtTheTime() public {
+        _earn(alice, 1_000e18);
         v.fund(PREMIUM);
         vm.warp(block.timestamp + PERIOD / 2);
 
@@ -196,6 +205,7 @@ contract PremiumVestingTest is Test {
     /// @dev A half-pot top-up at the midpoint jumps the remainder and the rate, and does not
     /// re-age the leftover
     function test_aTopUpContributesWithoutResettingAge() public {
+        _earn(alice, 1_000e18);
         v.fund(PREMIUM);
         vm.warp(block.timestamp + PERIOD / 2);
         v.accrue(1_000e18);
@@ -323,12 +333,31 @@ contract PremiumVestingTest is Test {
     }
 
     function test_rateTracksTheRemainder() public {
+        _earn(alice, 1_000e18);
         v.fund(PREMIUM);
         assertEq(v.rate(), PREMIUM / PERIOD, "starts at remainder / period");
 
         vm.warp(block.timestamp + PERIOD);
         assertLt(v.rate(), PREMIUM / PERIOD, "and falls as the remainder falls");
         assertGt(v.rate(), 0, "without hitting zero");
+    }
+
+    /// @dev Views used to project a vest while {_accrue} froze. With nobody earning they
+    /// must report the stored pot, and settlement must not release it.
+    function test_viewsFreezeWhileNobodyIsEarning() public {
+        v.fund(100e18);
+        vm.warp(block.timestamp + PERIOD);
+
+        assertEq(v.stakedSupply(), 0);
+        assertEq(v.vested(), 0, "nothing is available to write");
+        assertEq(v.remaining(), 100e18, "the whole pot is still locked");
+        assertEq(v.remainder(), 100e18);
+
+        v.accrue(0);
+        assertEq(v.remainder(), 100e18, "settlement left the pot untouched");
+        assertEq(v.perShare(), 0);
+        assertEq(v.vested(), 0);
+        assertEq(v.remaining(), 100e18);
     }
 }
 
@@ -493,14 +522,25 @@ contract PremiumVestingOptInTest is Test {
     function test_laterOptInDoesNotSweepAnIdleFreeze() public {
         _fund(PREMIUM);
         vm.warp(block.timestamp + PERIOD);
-        uint256 pot = v.remaining() + v.vested();
+        assertEq(v.vested(), 0, "the idle window does not project a vest");
+        uint256 pot = v.remaining();
+        assertEq(pot, PREMIUM, "so remaining is the stored pot");
 
         _stake(alice, 100e18);
         assertEq(v.claimable(alice), 0, "she missed the idle window");
         assertEq(v.remaining(), pot, "the buffer is still held");
+        assertEq(v.vested(), 0);
 
         vm.warp(block.timestamp + PERIOD);
         assertApproxEqRel(v.claimable(alice), pot * 632 / 1000, 0.02e18, "and only then starts to vest");
+        assertApproxEqAbs(v.claimable(alice), v.vested(), 1, "the sole earner is owed the unwritten vest");
+        assertEq(v.remaining() + v.vested(), pot);
+
+        uint256 projected = v.claimable(alice);
+        vm.prank(alice);
+        assertEq(v.claim(alice), projected, "settlement matches the view");
+        assertEq(v.vested(), 0, "the write consumed the projection");
+        assertEq(v.remaining(), v.remainder());
     }
 
     function test_transferBetweenNonOptedHoldersDoesNotMoveTheClock() public {

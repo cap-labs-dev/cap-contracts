@@ -48,10 +48,12 @@ interface IPremiumVesting {
     function vestingPeriod() external view returns (uint256 period);
 
     /// @notice Get the premium that has become available to claim since the last accrual
+    /// @dev Zero when nobody is earning, matching a freeze.
     /// @return amount The vested premium not yet written to `perShare`, in stablecoin units (18 decimals)
     function vested() external view returns (uint256 amount);
 
     /// @notice Get the premium still locked, not yet vested
+    /// @dev Equals the stored remainder while nobody is earning.
     /// @return amount The remainder after the unwritten vest, in stablecoin units (18 decimals)
     function remaining() external view returns (uint256 amount);
 
