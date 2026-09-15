@@ -1,0 +1,56 @@
+name: Foundry fuzz and invariant tests
+
+on:
+  pull_request:
+  schedule:
+    - cron: '17 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Campaign budget
+        type: choice
+        default: deep
+        options: [pr, deep]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-and-invariant-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  accounting:
+    name: Fuzz and invariant tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CAMPAIGN_PROFILE: ${{ github.event_name == 'pull_request' && 'pr' || inputs.profile || 'deep' }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.12.0'
+      - name: Install pinned JavaScript dependencies
+        run: |
+          npm install --global yarn@1.22.22
+          yarn install --frozen-lockfile --ignore-scripts
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+      - name: Run regression, fuzz and invariant tests
+        run: bash script/run-fuzz-tests.sh "$CAMPAIGN_PROFILE"
+      - name: Preserve seed, logs and minimized counterexamples
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-and-invariant-tests-${{ env.CAMPAIGN_PROFILE }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/fuzz-and-invariant-tests/
+            cache/invariant/
+            cache/fuzz/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 30

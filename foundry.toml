@@ -15,6 +15,7 @@ remappings = [
 ]
 fs_permissions = [
     { access = "read-write", path = "./config/cap-v2.json" },
+    { access = "read-write", path = "./artifacts/fuzz-and-invariant-tests" },
 ]
 optimizer = true
 optimizer_runs = 200
@@ -71,3 +72,34 @@ yul = true                                    # default true
 
 [profile.slither]
 via_ir = true
+
+# Fuzz and invariant test profiles; compiler settings are inherited unchanged.
+[profile.local.fuzz]
+runs = 256
+failure_persist_dir = "cache/fuzz"
+[profile.local.invariant]
+runs = 32
+depth = 64
+fail_on_revert = true
+show_metrics = true
+failure_persist_dir = "cache/invariant"
+
+[profile.pr.fuzz]
+runs = 1000
+failure_persist_dir = "cache/fuzz"
+[profile.pr.invariant]
+runs = 256
+depth = 128
+fail_on_revert = true
+show_metrics = true
+failure_persist_dir = "cache/invariant"
+
+[profile.deep.fuzz]
+runs = 10000
+failure_persist_dir = "cache/fuzz"
+[profile.deep.invariant]
+runs = 2048
+depth = 256
+fail_on_revert = true
+show_metrics = true
+failure_persist_dir = "cache/invariant"
