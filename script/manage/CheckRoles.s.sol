@@ -243,7 +243,6 @@ contract CheckRoles is Script, InfraSerializer {
             _wired(manager, "Market.setTrancheWeights", market, IBaseMarket.setTrancheWeights.selector, ownerRole);
             _wired(manager, "Market.setMarketMultiplier", market, IBaseMarket.setMarketMultiplier.selector, ownerRole);
             _wired(manager, "Market.setUnderwriterRate", market, IBaseMarket.setUnderwriterRate.selector, ownerRole);
-            _wired(manager, "Market.setDepositorRole", market, IBaseMarket.setDepositorRole.selector, ownerRole);
             _wired(manager, "Market.setTranches", market, IBaseMarket.setTranches.selector, CapRoles.REGISTRY);
             _wired(manager, "Market.setTargetHealth", market, IBaseMarket.setTargetHealth.selector, CapRoles.GOVERNOR);
             _wired(manager, "Market.setBuffer", market, IBaseMarket.setBuffer.selector, CapRoles.GUARDIAN);

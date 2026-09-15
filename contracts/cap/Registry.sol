@@ -514,13 +514,12 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     function _marketOwnerSelectors() private pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](6);
+        selectors = new bytes4[](5);
         selectors[0] = IBaseMarket.setTrancheWeights.selector;
         selectors[1] = IBaseMarket.setLtv.selector;
         selectors[2] = IBaseMarket.setMarketMultiplier.selector;
         selectors[3] = IBaseMarket.setUnderwriterRate.selector;
         selectors[4] = IBaseMarket.setBorrowerRole.selector;
-        selectors[5] = IBaseMarket.setDepositorRole.selector;
     }
 
     function _marketRegistrySelectors() private pure returns (bytes4[] memory selectors) {
