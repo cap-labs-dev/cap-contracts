@@ -174,8 +174,8 @@ interface IRegistry {
     /// @return tranche The deployed tranche
     function createTranche(address market, address asset, uint256[] calldata weights) external returns (address tranche);
 
-    /// @notice Set the depositor role on the calling market, tranche, or underwriter
-    /// @dev Restricted to PROTOCOL. Deployed markets, tranches, and underwriters hold that
+    /// @notice Set the depositor role on the calling tranche or underwriter
+    /// @dev Restricted to PROTOCOL. Deployed tranches and underwriters hold that
     /// role so their own owner/curator setters can forward here.
     /// @param roleId The depositor role id
     function setDepositorRole(uint64 roleId) external;

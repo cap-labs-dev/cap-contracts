@@ -154,10 +154,6 @@ interface IBaseMarket {
     /// @param targetHealth The new target health in ray decimals
     function setTargetHealth(uint256 targetHealth) external;
 
-    /// @notice Set the role permitted to deposit into the market
-    /// @param roleId The depositor role id
-    function setDepositorRole(uint64 roleId) external;
-
     /// @notice Set the role permitted to borrow from the market
     /// @param roleId The borrower role id
     function setBorrowerRole(uint64 roleId) external;

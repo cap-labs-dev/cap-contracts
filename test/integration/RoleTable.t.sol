@@ -74,7 +74,6 @@ contract RoleTableTest is CapDeployer {
         _expectRole(market, IBaseMarket.setTrancheWeights.selector, ownerRole, "setTrancheWeights");
         _expectRole(market, IBaseMarket.setMarketMultiplier.selector, ownerRole, "setMarketMultiplier");
         _expectRole(market, IBaseMarket.setUnderwriterRate.selector, ownerRole, "setUnderwriterRate");
-        _expectRole(market, IBaseMarket.setDepositorRole.selector, ownerRole, "setDepositorRole");
         _expectRole(market, IBaseMarket.setTranches.selector, CapRoles.REGISTRY, "setTranches");
 
         // only the designated borrower can draw credit
@@ -459,15 +458,15 @@ contract RoleTableTest is CapDeployer {
     }
 
     function test_roleSetterEventsAreEmittedByRegistry() public {
-        (address market,) =
+        (address market, address[] memory tranches) =
             _createMarket("role-events", defaultMarketOwner, defaultBorrower, capConfig.defaultTrancheWeights);
         uint64 depositorRole = _assignOperator(makeAddr("eventDepositor"));
         uint64 borrowerRole = _assignOperator(makeAddr("eventBorrower"));
 
         vm.expectEmit(true, true, false, true, address(registry));
-        emit IRegistry.SetDepositorRole(market, depositorRole);
+        emit IRegistry.SetDepositorRole(tranches[0], depositorRole);
         vm.prank(defaultMarketOwner);
-        IBaseMarket(market).setDepositorRole(depositorRole);
+        ITranche(tranches[0]).setDepositorRole(depositorRole);
 
         vm.expectEmit(true, true, false, true, address(registry));
         emit IRegistry.SetBorrowerRole(market, borrowerRole);

@@ -58,11 +58,6 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @inheritdoc IBaseMarket
-    function setDepositorRole(uint64 roleId) external restricted nonReentrant {
-        IRegistry(_getBaseMarketStorage().registry).setDepositorRole(roleId);
-    }
-
-    /// @inheritdoc IBaseMarket
     function setBorrowerRole(uint64 roleId) external restricted nonReentrant {
         IRegistry(_getBaseMarketStorage().registry).setBorrowerRole(roleId);
     }
