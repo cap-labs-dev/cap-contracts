@@ -13,6 +13,9 @@ import {
     ERC20PermitUpgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {
+    ReentrancyGuardTransientUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @title Vault for storing the backing for cTokens
@@ -24,6 +27,7 @@ abstract contract Vault is
     IVault,
     ERC20PermitUpgradeable,
     PausableUpgradeable,
+    ReentrancyGuardTransientUpgradeable,
     Access,
     Minter,
     FractionalReserve,
@@ -35,6 +39,7 @@ abstract contract Vault is
     function mint(address _asset, uint256 _amountIn, uint256 _minAmountOut, address _receiver, uint256 _deadline)
         external
         whenNotPaused
+        nonReentrant
         returns (uint256 amountOut)
     {
         uint256 fee;
@@ -61,6 +66,7 @@ abstract contract Vault is
     function burn(address _asset, uint256 _amountIn, uint256 _minAmountOut, address _receiver, uint256 _deadline)
         external
         whenNotPaused
+        nonReentrant
         returns (uint256 amountOut)
     {
         uint256 fee;
@@ -88,6 +94,7 @@ abstract contract Vault is
     function redeem(uint256 _amountIn, uint256[] calldata _minAmountsOut, address _receiver, uint256 _deadline)
         external
         whenNotPaused
+        nonReentrant
         returns (uint256[] memory amountsOut)
     {
         uint256[] memory fees;
@@ -118,6 +125,7 @@ abstract contract Vault is
     function borrow(address _asset, uint256 _amount, address _receiver)
         external
         whenNotPaused
+        nonReentrant
         checkAccess(this.borrow.selector)
     {
         divest(_asset, _amount);
@@ -125,7 +133,12 @@ abstract contract Vault is
     }
 
     /// @inheritdoc IVault
-    function repay(address _asset, uint256 _amount) external whenNotPaused checkAccess(this.repay.selector) {
+    function repay(address _asset, uint256 _amount)
+        external
+        whenNotPaused
+        nonReentrant
+        checkAccess(this.repay.selector)
+    {
         VaultLogic.repay(getVaultStorage(), RepayParams({ asset: _asset, amount: _amount }));
     }
 

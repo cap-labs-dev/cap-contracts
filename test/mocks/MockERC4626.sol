@@ -37,12 +37,12 @@ contract MockERC4626 is ERC4626, StdCheats {
         return super.mint(shares, receiver);
     }
 
-    function withdraw(uint256 assets, address receiver, address owner) public override returns (uint256) {
+    function withdraw(uint256 assets, address receiver, address owner) public virtual override returns (uint256) {
         __mockYield();
         return super.withdraw(assets, receiver, owner);
     }
 
-    function redeem(uint256 shares, address receiver, address owner) public override returns (uint256) {
+    function redeem(uint256 shares, address receiver, address owner) public virtual override returns (uint256) {
         __mockYield();
         return super.redeem(shares, receiver, owner);
     }
