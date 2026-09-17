@@ -20,6 +20,15 @@ interface IInterestRateModel {
     /// @notice The averaging period must sit inside the bounded window
     error InvalidAveragingPeriod();
 
+    /// @notice The default liquidation threshold is invalid
+    error InvalidLiquidationThreshold();
+
+    /// @notice The default liquidation buffer is invalid
+    error InvalidBuffer();
+
+    /// @notice The default target health is below the minimum
+    error InvalidTargetHealth();
+
     /// @notice The data for an index
     /// @param ratePerYear The interest rate per year in ray decimals
     /// @param index The cumulative index in ray decimals
@@ -79,6 +88,18 @@ interface IInterestRateModel {
     /// @param averagingPeriod The new averaging period in seconds
     event SetAveragingPeriod(uint256 averagingPeriod);
 
+    /// @notice Emitted when the default liquidation threshold is set
+    /// @param liquidationThreshold The new default liquidation threshold in ray decimals
+    event SetLiquidationThreshold(uint256 liquidationThreshold);
+
+    /// @notice Emitted when the default liquidation buffer is set
+    /// @param buffer The new default liquidation buffer in ray decimals
+    event SetBuffer(uint256 buffer);
+
+    /// @notice Emitted when the default target health is set
+    /// @param targetHealth The new default target health in ray decimals
+    event SetTargetHealth(uint256 targetHealth);
+
     /// @notice Initialize the interest rate model
     /// @dev Same bounds as the setters.
     /// @param authority The access manager address
@@ -89,6 +110,9 @@ interface IInterestRateModel {
     /// @param maximumUnderwriterRate The maximum underwriter rate per year in ray decimals
     /// @param liquidationBonus The liquidation bonus in ray decimals
     /// @param averagingPeriod The averaging period in seconds, inside the bounded window
+    /// @param liquidationThreshold The default liquidation threshold for new markets in ray decimals
+    /// @param buffer The default liquidation buffer for new markets in ray decimals
+    /// @param targetHealth The default target health for new markets in ray decimals
     function initialize(
         address authority,
         address stablecoin,
@@ -96,7 +120,10 @@ interface IInterestRateModel {
         uint256 maximumMarketMultiplier,
         uint256 maximumUnderwriterRate,
         uint256 liquidationBonus,
-        uint256 averagingPeriod
+        uint256 averagingPeriod,
+        uint256 liquidationThreshold,
+        uint256 buffer,
+        uint256 targetHealth
     ) external;
 
     /// @notice Accrue the liquidity rate and fold the elapsed interval into the averages
@@ -119,6 +146,18 @@ interface IInterestRateModel {
     /// @dev Bounded at both ends. Settles the running interval under the old window first.
     /// @param averagingPeriod The averaging period in seconds, inside the bounded window
     function setAveragingPeriod(uint256 averagingPeriod) external;
+
+    /// @notice Set the default liquidation threshold copied onto new markets
+    /// @param liquidationThreshold The default liquidation threshold in ray decimals
+    function setLiquidationThreshold(uint256 liquidationThreshold) external;
+
+    /// @notice Set the default liquidation buffer copied onto new markets
+    /// @param buffer The default liquidation buffer in ray decimals
+    function setBuffer(uint256 buffer) external;
+
+    /// @notice Set the default target health copied onto new markets
+    /// @param targetHealth The default target health in ray decimals
+    function setTargetHealth(uint256 targetHealth) external;
 
     /// @notice Update the underwriter rate for the calling market ({CapRoles-MARKET})
     /// @dev Checkpoints the index first so the new rate applies only going forward.
@@ -160,6 +199,18 @@ interface IInterestRateModel {
     /// @notice Get the fixed liquidation bonus in ray decimals
     /// @return The liquidation bonus in ray decimals
     function liquidationBonus() external view returns (uint256);
+
+    /// @notice Get the default liquidation threshold for new markets in ray decimals
+    /// @return The default liquidation threshold in ray decimals
+    function liquidationThreshold() external view returns (uint256);
+
+    /// @notice Get the default liquidation buffer for new markets in ray decimals
+    /// @return The default liquidation buffer in ray decimals
+    function buffer() external view returns (uint256);
+
+    /// @notice Get the default target health for new markets in ray decimals
+    /// @return The default target health in ray decimals
+    function targetHealth() external view returns (uint256);
 
     /// @notice Get the averaging period in seconds
     /// @dev Time constant. One period moves the average ~63% toward the observation.

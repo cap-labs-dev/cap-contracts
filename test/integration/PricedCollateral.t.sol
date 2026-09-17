@@ -82,7 +82,7 @@ contract PricedCollateralTest is CapDeployer {
         vm.prank(defaultBorrower);
         market.borrow(defaultBorrower, 900e18);
 
-        market.setLt(0.4e27);
+        market.setLiquidationThreshold(0.4e27);
         assertGt(market.maxLiquidatable(), 100e18, "market should be liquidatable");
 
         _mintStable(defaultLiquidator, 100e18);
@@ -104,7 +104,7 @@ contract PricedCollateralTest is CapDeployer {
         vm.prank(defaultBorrower);
         market.borrow(defaultBorrower, 240e18);
 
-        market.setLt(0.2e27);
+        market.setLiquidationThreshold(0.2e27);
         assertGt(market.maxLiquidatable(), 100e18, "market should be liquidatable");
 
         _mintStable(defaultLiquidator, 100e18);
@@ -122,7 +122,7 @@ contract PricedCollateralTest is CapDeployer {
         vm.prank(defaultBorrower);
         market.borrow(defaultBorrower, 500e18);
 
-        market.setLt(0.4e27);
+        market.setLiquidationThreshold(0.4e27);
         assertGt(market.maxLiquidatable(), 100e18, "market should be liquidatable");
 
         _mintStable(defaultLiquidator, 100e18);
@@ -238,7 +238,7 @@ contract PricedCollateralTest is CapDeployer {
 
         vm.prank(defaultBorrower);
         market.borrow(defaultBorrower, 40_000e18);
-        market.setLt(0.3e27);
+        market.setLiquidationThreshold(0.3e27);
         assertLt(market.healthiness(), 1e27, "unhealthy");
 
         uint256 repay = 0.0009e18;

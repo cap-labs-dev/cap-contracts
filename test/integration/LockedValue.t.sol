@@ -94,7 +94,7 @@ contract LockedValueTest is CapDeployer {
             _createMarket("usdc6", defaultMarketOwner, defaultBorrower, assets, capConfig.defaultTrancheWeights);
         FloatingMarket market = FloatingMarket(marketAddr);
         market.setBuffer(0);
-        market.setLtv(market.lt());
+        market.setLoanToValue(market.liquidationThreshold());
         _setMaxCapital(market, type(uint256).max);
 
         address seniorLp = makeAddr("senior-lp");
@@ -148,10 +148,11 @@ contract LockedValueTest is CapDeployer {
         assertEq(Tranche(junior).balanceOf(makeAddr("junior")), 0, "debt-free junior still exits");
     }
 
-    /// lockedValue divides by lt - buffer, so the setters must keep the buffer below lt.
-    function test_buffer_cannotBeRaisedToOrAboveLt() public {
+    /// lockedValue divides by liquidationThreshold - buffer, so the setters must keep the buffer
+    /// below the threshold.
+    function test_buffer_cannotBeRaisedToOrAboveLiquidationThreshold() public {
         (FloatingMarket market,,) = _marketAtPrice(1e18);
-        assertEq(market.lt(), 0.8e27, "fixture lt");
+        assertEq(market.liquidationThreshold(), 0.8e27, "fixture liquidationThreshold");
 
         vm.expectRevert(IBaseMarket.InvalidBuffer.selector);
         market.setBuffer(0.8e27);
@@ -162,27 +163,31 @@ contract LockedValueTest is CapDeployer {
         market.setBuffer(0.79e27); // still valid
     }
 
-    function test_lt_cannotBeDroppedToOrBelowBuffer() public {
+    function test_liquidationThreshold_cannotBeDroppedToOrBelowBuffer() public {
         (FloatingMarket market,,) = _marketAtPrice(1e18);
         assertEq(market.buffer(), 0.1e27, "fixture buffer");
 
-        vm.expectRevert(IBaseMarket.InvalidLt.selector);
-        market.setLt(1e27 + 1);
+        vm.expectRevert(IBaseMarket.InvalidLiquidationThreshold.selector);
+        market.setLiquidationThreshold(1e27 + 1);
 
-        vm.expectRevert(IBaseMarket.InvalidLt.selector);
-        market.setLt(0.1e27);
+        vm.expectRevert(IBaseMarket.InvalidLiquidationThreshold.selector);
+        market.setLiquidationThreshold(0.1e27);
 
-        vm.expectRevert(IBaseMarket.InvalidLt.selector);
-        market.setLt(0.05e27);
+        vm.expectRevert(IBaseMarket.InvalidLiquidationThreshold.selector);
+        market.setLiquidationThreshold(0.05e27);
 
-        // dropping lt below ltv is still allowed; that just makes the market unhealthy
-        market.setLt(0.2e27);
-        assertLt(market.lt(), market.ltv(), "lt below ltv is a permitted guardian action");
+        // dropping the threshold below loanToValue is still allowed; that just makes the market unhealthy
+        market.setLiquidationThreshold(0.2e27);
+        assertLt(
+            market.liquidationThreshold(),
+            market.loanToValue(),
+            "liquidationThreshold below loanToValue is a permitted guardian action"
+        );
     }
 
-    function test_targetHealth_atLeast1_25AndAboveLt() public {
+    function test_targetHealth_atLeast1_25AndAboveLiquidationThreshold() public {
         (FloatingMarket market,,) = _marketAtPrice(1e18);
-        assertEq(market.lt(), 0.8e27, "fixture lt");
+        assertEq(market.liquidationThreshold(), 0.8e27, "fixture liquidationThreshold");
         assertEq(market.targetHealth(), 1.25e27, "fixture targetHealth");
 
         vm.expectRevert(IBaseMarket.InvalidTargetHealth.selector);
@@ -195,7 +200,11 @@ contract LockedValueTest is CapDeployer {
         market.setTargetHealth(1.5e27);
         assertEq(market.targetHealth(), 1.5e27);
 
-        market.setLt(1e27);
-        assertLt(market.lt(), market.targetHealth(), "lt stays strictly below targetHealth");
+        market.setLiquidationThreshold(1e27);
+        assertLt(
+            market.liquidationThreshold(),
+            market.targetHealth(),
+            "liquidationThreshold stays strictly below targetHealth"
+        );
     }
 }

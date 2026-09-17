@@ -70,7 +70,7 @@ contract RoleTableTest is CapDeployer {
         assertTrue(ownerRole != 0 && borrowerRole != 0, "operator roles must not collide with ADMIN");
 
         // the market owner tunes its own market's risk, pricing and tranche weights
-        _expectRole(market, IBaseMarket.setLtv.selector, ownerRole, "setLtv");
+        _expectRole(market, IBaseMarket.setLoanToValue.selector, ownerRole, "setLoanToValue");
         _expectRole(market, IBaseMarket.setTrancheWeights.selector, ownerRole, "setTrancheWeights");
         _expectRole(market, IBaseMarket.setMarketMultiplier.selector, ownerRole, "setMarketMultiplier");
         _expectRole(market, IBaseMarket.setUnderwriterRate.selector, ownerRole, "setUnderwriterRate");
@@ -84,7 +84,7 @@ contract RoleTableTest is CapDeployer {
 
         // the guardian tightens risk and recognises losses
         _expectRole(market, IBaseMarket.setBuffer.selector, CapRoles.GUARDIAN, "setBuffer");
-        _expectRole(market, IBaseMarket.setLt.selector, CapRoles.GUARDIAN, "setLt");
+        _expectRole(market, IBaseMarket.setLiquidationThreshold.selector, CapRoles.GUARDIAN, "setLiquidationThreshold");
         _expectRole(market, IFloatingMarket.writeOff.selector, CapRoles.GUARDIAN, "writeOff");
 
         _expectRole(market, IFloatingMarket.liquidate.selector, CapRoles.LIQUIDATOR, "liquidate");
@@ -255,7 +255,7 @@ contract RoleTableTest is CapDeployer {
             registry.createFloatingMarket(_uniformAssets(2), capConfig.defaultTrancheWeights, "role-owned", ownerRole);
 
         vm.prank(coOwner);
-        IBaseMarket(market).setLtv(capConfig.defaultLtv);
+        IBaseMarket(market).setLoanToValue(capConfig.defaultLoanToValue);
     }
 
     function test_whitelistedCreatorDoesNotNeedTheMarketOwnerRole() public {
@@ -279,10 +279,10 @@ contract RoleTableTest is CapDeployer {
 
         vm.prank(creator);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, creator));
-        IBaseMarket(market).setLtv(capConfig.defaultLtv);
+        IBaseMarket(market).setLoanToValue(capConfig.defaultLoanToValue);
 
         vm.prank(owner);
-        IBaseMarket(market).setLtv(capConfig.defaultLtv);
+        IBaseMarket(market).setLoanToValue(capConfig.defaultLoanToValue);
     }
 
     function test_instanceCannotLaunch() public {
@@ -336,7 +336,7 @@ contract RoleTableTest is CapDeployer {
         uint64 newRole = _assignOperator(newOwner);
 
         bytes4[] memory ownerSelectors = new bytes4[](1);
-        ownerSelectors[0] = IBaseMarket.setLtv.selector;
+        ownerSelectors[0] = IBaseMarket.setLoanToValue.selector;
         accessManager.setTargetFunctionRole(marketAddr, ownerSelectors, newRole);
 
         assertEq(registry.marketOwnerRole(marketAddr), newRole, "and the new one once it is rehomed");
@@ -535,6 +535,16 @@ contract RoleTableTest is CapDeployer {
         _expectRole(address(irm), IInterestRateModel.setTermMultiplierSlope.selector, CapRoles.GOVERNOR, "term slope");
         _expectRole(
             address(irm), IInterestRateModel.setLiquidationBonus.selector, CapRoles.GOVERNOR, "liquidation bonus"
+        );
+        _expectRole(
+            address(irm),
+            IInterestRateModel.setLiquidationThreshold.selector,
+            CapRoles.GOVERNOR,
+            "default liquidation threshold"
+        );
+        _expectRole(address(irm), IInterestRateModel.setBuffer.selector, CapRoles.GOVERNOR, "default buffer");
+        _expectRole(
+            address(irm), IInterestRateModel.setTargetHealth.selector, CapRoles.GOVERNOR, "default target health"
         );
         _expectRole(address(oracle), IOracle.setSource.selector, CapRoles.GOVERNOR, "setSource");
 

@@ -19,7 +19,7 @@ contract AuditValidationTest is CapDeployer {
         FloatingMarket market = FloatingMarket(m);
         _setMaxCapitalOn(market, t, type(uint256).max);
         _fundTranche(t, makeAddr("supplier"), 2_000e18);
-        market.setLt(0.2e27);
+        market.setLiquidationThreshold(0.2e27);
         assertEq(market.creditLimit(), 400e18);
         vm.prank(defaultBorrower);
         vm.expectRevert(IBaseMarket.InsufficientLiquidity.selector);

@@ -81,9 +81,9 @@ abstract contract CapDeployer is BaseTest {
 
     struct CapConfig {
         uint256 collateralPrice;
-        uint256 defaultLtv;
+        uint256 defaultLoanToValue;
         uint256 defaultBuffer;
-        uint256 defaultLt;
+        uint256 defaultLiquidationThreshold;
         uint256 defaultMultiplier;
         uint256 defaultTargetHealth;
         uint256 defaultLiquidationBonus;
@@ -113,9 +113,9 @@ abstract contract CapDeployer is BaseTest {
 
     function _defaultCapConfig() internal pure returns (CapConfig memory cfg) {
         cfg.collateralPrice = 1e18;
-        cfg.defaultLtv = 0.5e27;
+        cfg.defaultLoanToValue = 0.5e27;
         cfg.defaultBuffer = 0.1e27;
-        cfg.defaultLt = 0.8e27;
+        cfg.defaultLiquidationThreshold = 0.8e27;
         cfg.defaultMultiplier = 1e27;
         cfg.defaultTargetHealth = 1.25e27;
         cfg.defaultLiquidationBonus = 0.02e27;
@@ -196,7 +196,10 @@ abstract contract CapDeployer is BaseTest {
                         capConfig.defaultMaximumMarketMultiplier,
                         capConfig.defaultMaximumUnderwriterRate,
                         capConfig.defaultLiquidationBonus,
-                        capConfig.defaultAveragingPeriod
+                        capConfig.defaultAveragingPeriod,
+                        capConfig.defaultLiquidationThreshold,
+                        capConfig.defaultBuffer,
+                        capConfig.defaultTargetHealth
                     )
                 )
             )
@@ -256,10 +259,7 @@ abstract contract CapDeployer is BaseTest {
                             fixedMarketBeacon: fixedMarketBeacon,
                             trancheBeacon: trancheBeacon,
                             underwriterBeacon: underwriterBeacon,
-                            wrapper: address(wrapper),
-                            lt: capConfig.defaultLt,
-                            buffer: capConfig.defaultBuffer,
-                            targetHealth: capConfig.defaultTargetHealth
+                            wrapper: address(wrapper)
                         })
                     )
                 )
@@ -407,9 +407,9 @@ abstract contract CapDeployer is BaseTest {
     }
 
     function _applyMarketDefaults(FloatingMarket market) internal {
-        market.setLtv(capConfig.defaultLtv);
+        market.setLoanToValue(capConfig.defaultLoanToValue);
         market.setBuffer(capConfig.defaultBuffer);
-        market.setLt(capConfig.defaultLt);
+        market.setLiquidationThreshold(capConfig.defaultLiquidationThreshold);
         market.setMarketMultiplier(capConfig.defaultMultiplier);
         market.setTargetHealth(capConfig.defaultTargetHealth);
         _setMaxCapital(market, capConfig.defaultMaxCapital);
@@ -436,7 +436,8 @@ abstract contract CapDeployer is BaseTest {
     /// @dev Size `tranche`'s {ITranche-maxCapital} so the market's {IBaseMarket-creditLimit}
     /// from it equals `limit` once it has the capital. Empty siblings stay at zero.
     function _setBorrowableOn(IBaseMarket market, address tranche, uint256 limit) internal {
-        uint256 ltvBound = market.ltv() < market.lt() ? market.ltv() : market.lt();
+        uint256 ltvBound =
+            market.loanToValue() < market.liquidationThreshold() ? market.loanToValue() : market.liquidationThreshold();
         uint256 cap = ltvBound == 0 ? 0 : (limit * 1e27 + ltvBound - 1) / ltvBound;
         _setMaxCapitalOn(market, tranche, cap);
     }

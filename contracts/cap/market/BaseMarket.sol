@@ -52,9 +52,10 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
 
         $.irm = IRegistry(_registry).irm();
         $.stablecoin = IRegistry(_registry).stablecoin();
-        $.lt = IRegistry(_registry).lt();
-        $.buffer = IRegistry(_registry).buffer();
-        $.targetHealth = IRegistry(_registry).targetHealth();
+        IInterestRateModel irm_ = IInterestRateModel($.irm);
+        $.liquidationThreshold = irm_.liquidationThreshold();
+        $.buffer = irm_.buffer();
+        $.targetHealth = irm_.targetHealth();
     }
 
     /// @inheritdoc IBaseMarket
@@ -63,31 +64,32 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @inheritdoc IBaseMarket
-    function setLtv(uint256 _ltv) external restricted nonReentrant {
+    function setLoanToValue(uint256 _loanToValue) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        if (_ltv + $.buffer > $.lt) revert InvalidLtv();
-        $.ltv = _ltv;
-        emit SetLtv(_ltv);
+        if (_loanToValue + $.buffer > $.liquidationThreshold) revert InvalidLoanToValue();
+        $.loanToValue = _loanToValue;
+        emit SetLoanToValue(_loanToValue);
     }
 
     /// @inheritdoc IBaseMarket
     function setBuffer(uint256 _buffer) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        // must stay below lt (lockedValue divides by lt - buffer). Raising the buffer only
-        // tightens, so ltv is not re-checked.
-        if (_buffer >= $.lt) revert InvalidBuffer();
+        // must stay below the liquidation threshold (lockedValue divides by
+        // liquidationThreshold - buffer). Raising the buffer only tightens, so
+        // loanToValue is not re-checked.
+        if (_buffer >= $.liquidationThreshold) revert InvalidBuffer();
         $.buffer = _buffer;
         emit SetBuffer(_buffer);
     }
 
     /// @inheritdoc IBaseMarket
-    function setLt(uint256 _lt) external restricted nonReentrant {
+    function setLiquidationThreshold(uint256 _liquidationThreshold) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        if (_lt > 1e27) revert InvalidLt();
-        // must stay above the buffer. Dropping below ltv is allowed (forces unhealthy).
-        if (_lt <= $.buffer) revert InvalidLt();
-        $.lt = _lt;
-        emit SetLt(_lt);
+        if (_liquidationThreshold > 1e27) revert InvalidLiquidationThreshold();
+        // must stay above the buffer. Dropping below loanToValue is allowed (forces unhealthy).
+        if (_liquidationThreshold <= $.buffer) revert InvalidLiquidationThreshold();
+        $.liquidationThreshold = _liquidationThreshold;
+        emit SetLiquidationThreshold(_liquidationThreshold);
     }
 
     /// @inheritdoc IBaseMarket
@@ -164,9 +166,9 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @inheritdoc IBaseMarket
-    function lt() public view returns (uint256 ltValue) {
+    function liquidationThreshold() public view returns (uint256 threshold) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        ltValue = $.lt;
+        threshold = $.liquidationThreshold;
     }
 
     /// @inheritdoc IBaseMarket
@@ -182,9 +184,9 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @inheritdoc IBaseMarket
-    function ltv() public view returns (uint256 ltvValue) {
+    function loanToValue() public view returns (uint256 loanToValueRatio) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        ltvValue = $.ltv;
+        loanToValueRatio = $.loanToValue;
     }
 
     /// @inheritdoc IBaseMarket
@@ -205,7 +207,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     /// @inheritdoc IBaseMarket
     function debtLiquidationThreshold() public view returns (uint256) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        return totalCapital().rayMul($.lt);
+        return totalCapital().rayMul($.liquidationThreshold);
     }
 
     /// @inheritdoc IBaseMarket
@@ -226,11 +228,11 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     /// @dev Repayment that lands health on {targetHealth}, capped at {recoverableDebt}.
     function maxLiquidatable() public view returns (uint256 liquidatable) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        uint256 liquidationThreshold = debtLiquidationThreshold();
+        uint256 debtThreshold = debtLiquidationThreshold();
         uint256 debt = totalDebt();
-        if (debt > liquidationThreshold) {
-            uint256 perCleared = $.targetHealth - _slashPerDebt().rayMul($.lt);
-            liquidatable = ($.targetHealth.rayMul(debt) - liquidationThreshold).rayDiv(perCleared);
+        if (debt > debtThreshold) {
+            uint256 perCleared = $.targetHealth - _slashPerDebt().rayMul($.liquidationThreshold);
+            liquidatable = ($.targetHealth.rayMul(debt) - debtThreshold).rayDiv(perCleared);
             uint256 cap = Math.min(debt, recoverableDebt());
             if (liquidatable > cap) liquidatable = cap;
         }
@@ -256,7 +258,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
 
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         // ceil so a later token conversion cannot start from an understated USD requirement
-        value = Math.mulDiv(debt, WadRayMath.RAY, $.lt - $.buffer, Math.Rounding.Ceil);
+        value = Math.mulDiv(debt, WadRayMath.RAY, $.liquidationThreshold - $.buffer, Math.Rounding.Ceil);
 
         for (uint256 i = $.tranches.length; i > 0;) {
             i--;
@@ -291,7 +293,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
         for (uint256 i; i < $.tranches.length; ++i) {
             limit += ITranche($.tranches[i].tranche).capitalLimit();
         }
-        limit = limit.rayMul(Math.min($.ltv, $.lt));
+        limit = limit.rayMul(Math.min($.loanToValue, $.liquidationThreshold));
     }
 
     /// @dev Mint credit-backed stablecoin to the recipient
@@ -350,9 +352,9 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
 
     /// @dev Record the shortfall as bad debt. The market must already be unhealthy, the same
     /// gate as {_liquidate}. {unrecoverableDebt} can be positive while {healthiness} is still
-    /// at or above one ray whenever `lt * (1 + bonus) > 1e27` — at the deploy bonus that band
-    /// starts above `lt` 0.9804 and the loss is at most ~1.96% of collateral. That is not a
-    /// write-off; liquidation is the remedy until health drops.
+    /// at or above one ray whenever `liquidationThreshold * (1 + bonus) > 1e27` — at the deploy
+    /// bonus that band starts above `liquidationThreshold` 0.9804 and the loss is at most ~1.96%
+    /// of collateral. That is not a write-off; liquidation is the remedy until health drops.
     /// @param amount The amount of debt to write off
     function _writeOff(uint256 amount) internal {
         BaseMarketStorage storage $ = _getBaseMarketStorage();

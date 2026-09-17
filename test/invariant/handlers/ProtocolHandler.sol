@@ -368,7 +368,7 @@ contract ProtocolHandler is CapDeployer {
 
     function risk(uint256 raw, bool fixed_) external counted {
         IBaseMarket market = fixed_ ? IBaseMarket(address(fixedMarket)) : IBaseMarket(address(floating));
-        market.setLt(bound(raw, 20, 95) * 1e25);
+        market.setLiquidationThreshold(bound(raw, 20, 95) * 1e25);
         _success();
     }
 
@@ -768,7 +768,7 @@ contract ProtocolHandler is CapDeployer {
             uint256 value = activeAssets * oracle.price(t.asset()) / (10 ** t.decimals());
             capital += _min(value, t.maxCapital());
         }
-        return (capital * _min(market.ltv(), market.lt()) + RAY / 2) / RAY;
+        return (capital * _min(market.loanToValue(), market.liquidationThreshold()) + RAY / 2) / RAY;
     }
 
     function _checkCeil(uint256 assets, uint256 shares, uint256 numerator, uint256 denominator) internal pure {
