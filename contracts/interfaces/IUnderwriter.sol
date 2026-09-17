@@ -197,6 +197,10 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @return The default tranche address
     function defaultTranche() external view returns (address);
 
+    /// @notice Get the tranches registered for allocation
+    /// @return The registered tranche addresses
+    function registeredTranches() external view returns (address[] memory);
+
     /// @notice Get the shares queued for redemption but not yet settled
     /// @dev Still counted in {debt}.
     /// @param tranche The tranche address

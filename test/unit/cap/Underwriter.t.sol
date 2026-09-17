@@ -571,6 +571,18 @@ contract UnderwriterUnitTest is BaseTest {
         underwriter.addTranche(tranche);
     }
 
+    function test_registeredTranches_listsAddAndRemove() public {
+        assertEq(underwriter.registeredTranches().length, 0);
+
+        underwriter.addTranche(tranche);
+        address[] memory added = underwriter.registeredTranches();
+        assertEq(added.length, 1);
+        assertEq(added[0], tranche);
+
+        underwriter.removeTranche(tranche);
+        assertEq(underwriter.registeredTranches().length, 0);
+    }
+
     function test_report_foldsClaimedPremiumIntoTheRemainder() public {
         underwriter.addTranche(tranche);
         vm.mockCall(tranche, abi.encodeWithSignature("claim(address)", address(underwriter)), abi.encode(uint256(5e18)));

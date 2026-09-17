@@ -53,6 +53,11 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     /// @dev Shares per remaining asset at which the pool is retired (1% of par).
     uint256 private constant KILL_RATIO = 100;
 
+    /// @inheritdoc IUnderwriter
+    function registeredTranches() external view returns (address[] memory) {
+        return _registeredTranches.values();
+    }
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
