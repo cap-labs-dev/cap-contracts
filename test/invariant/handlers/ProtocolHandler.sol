@@ -765,7 +765,7 @@ contract ProtocolHandler is CapDeployer {
             if (sig == keccak256("Killed()")) {
                 assertFalse(ghostKilled[l.emitter], "retirement event only occurs once");
                 ghostKilled[l.emitter] = true;
-            } else if (sig == keccak256("Fund(uint256)")) {
+            } else if (sig == keccak256("Fund(address,uint256)")) {
                 ghostFunded[l.emitter] += abi.decode(l.data, (uint256));
             } else if (sig == keccak256("Claimed(address,address,uint256)")) {
                 ghostPaid[l.emitter] += abi.decode(l.data, (uint256));

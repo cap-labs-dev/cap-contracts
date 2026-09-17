@@ -20,10 +20,6 @@ abstract contract PremiumVesting is IPremiumVesting, AccessManagedUpgradeable, E
     using SafeERC20 for IERC20;
     using WadRayMath for uint256;
 
-    /// @notice Emitted when premium is added to the remainder
-    /// @param amount The premium added, in stablecoin units (18 decimals)
-    event Fund(uint256 amount);
-
     /// @dev Per-share conversions floor. A floored debt can still let entitlements sum past the
     /// pot; {claim} pays at most the stablecoin this contract holds.
     uint256 private constant RAY = WadRayMath.RAY;
@@ -210,7 +206,7 @@ abstract contract PremiumVesting is IPremiumVesting, AccessManagedUpgradeable, E
     /// @param premium The premium being folded in
     function _fund(uint256 premium) internal updatePremium {
         _getPremiumVestingStorage().remainder += premium;
-        emit Fund(premium);
+        emit Fund(msg.sender, premium);
     }
 
     /// @dev Record the claimable premium for an account. Caller must {_updatePremium} first.

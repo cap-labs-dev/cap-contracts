@@ -12,6 +12,11 @@ interface IPremiumVesting {
     /// @param period The new vesting time constant in seconds
     event SetVestingPeriod(uint256 period);
 
+    /// @notice Emitted when premium is added to the remainder
+    /// @param source The caller that funded
+    /// @param amount The premium added, in stablecoin units (18 decimals)
+    event Fund(address indexed source, uint256 amount);
+
     /// @notice Emitted when vested premium is claimed
     /// @param user The account whose entitlement was settled
     /// @param recipient The address that received the premium

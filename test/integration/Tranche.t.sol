@@ -9,6 +9,7 @@ import { IERC7540Operator } from "../../contracts/interfaces/IERC7540Operator.so
 import { IERC7540Redeem } from "../../contracts/interfaces/IERC7540Redeem.sol";
 import { IERC7575 } from "../../contracts/interfaces/IERC7575.sol";
 import { IOracle } from "../../contracts/interfaces/IOracle.sol";
+import { IPremiumVesting } from "../../contracts/interfaces/IPremiumVesting.sol";
 import { IRegistry } from "../../contracts/interfaces/IRegistry.sol";
 import { ITranche } from "../../contracts/interfaces/ITranche.sol";
 import { DeadShares } from "../../contracts/utils/DeadShares.sol";
@@ -688,6 +689,17 @@ contract TrancheTest is CapDeployer {
         assertEq(stablecoin.balanceOf(address(stablecoin)), 0, "no seed held");
         assertEq(stablecoin.totalSupply(), 100e18, "and none in the supply");
         assertEq(stablecoin.convertToAssets(100e18), 100e18, "so redemption is still at par");
+    }
+
+    /// @dev {fund} is Market-only, so the source on {Fund} is the market that paid.
+    function test_fund_emitsSource() public {
+        MarketBundle memory b = _createReadyMarket("fund-src");
+
+        vm.expectEmit(address(b.tranche0));
+        emit IPremiumVesting.Fund(address(b.market), 3e18);
+        vm.prank(address(b.market));
+        b.tranche0.fund(3e18);
+        assertEq(b.tranche0.remaining(), 3e18);
     }
 
     /// @dev {IBaseMarket-chargePremium} skips a tranche with nothing at work and routes its share

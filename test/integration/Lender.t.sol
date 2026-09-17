@@ -90,7 +90,7 @@ contract MarketTest is CapDeployer {
         next[1] = 0.3e27;
         next[2] = 0.2e27;
         vm.recordLogs();
-        address added = registry.createTranche(marketAddr, address(collateral), next);
+        address added = registry.createTranche(marketAddr, address(collateral), next, registry.DEFAULT_VESTING_PERIOD());
         _assertDeployed(vm.getRecordedLogs(), registry.trancheBeacon(), added);
 
         vm.recordLogs();
