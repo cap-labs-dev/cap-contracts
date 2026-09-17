@@ -449,7 +449,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
 
         if (liquidityPremium > 0) {
             IStablecoin($.stablecoin).fundCreditBacked(liquidityPremium);
-            emit ChargePremium($.stablecoin, liquidityPremium);
+            emit ChargeLiquidityPremium(liquidityPremium);
         }
 
         if (underwriterPremium == 0) return;
@@ -470,7 +470,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
             remaining -= premium;
             IStablecoin($.stablecoin).mintCreditBacked(tranche, premium);
             ITranche(tranche).fund(premium);
-            emit ChargePremium(tranche, premium);
+            emit ChargeUnderwriterPremium(tranche, premium);
         }
 
         if (remaining == 0) return;
@@ -479,10 +479,10 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
             address senior = $.tranches[0].tranche;
             IStablecoin($.stablecoin).mintCreditBacked(senior, remaining);
             ITranche(senior).fund(remaining);
-            emit ChargePremium(senior, remaining);
+            emit ChargeUnderwriterPremium(senior, remaining);
         } else {
             IStablecoin($.stablecoin).fundCreditBacked(remaining);
-            emit ChargePremium($.stablecoin, remaining);
+            emit ChargeLiquidityPremium(remaining);
         }
     }
 

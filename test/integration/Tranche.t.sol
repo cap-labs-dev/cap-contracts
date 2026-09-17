@@ -766,6 +766,18 @@ contract TrancheTest is CapDeployer {
         uint256 vestedBefore = stablecoin.balanceOf(address(stablecoin));
         uint256 juniorBefore = stablecoin.balanceOf(b.tranche1Addr);
 
+        if (liquidityPremium > 0) {
+            vm.expectEmit(address(b.market));
+            emit IBaseMarket.ChargeLiquidityPremium(liquidityPremium);
+        }
+        if (juniorShare > 0) {
+            vm.expectEmit(address(b.market));
+            emit IBaseMarket.ChargeUnderwriterPremium(b.tranche1Addr, juniorShare);
+        }
+        if (leftover > 0) {
+            vm.expectEmit(address(b.market));
+            emit IBaseMarket.ChargeLiquidityPremium(leftover);
+        }
         b.market.chargePremium();
 
         assertEq(stablecoin.balanceOf(b.tranche0Addr), seniorHeld, "depleted senior takes nothing more");
