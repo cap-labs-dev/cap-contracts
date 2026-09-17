@@ -32,6 +32,7 @@ import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 /// @dev This contract must hold ADMIN: `setTargetFunctionRole` cannot be delegated.
 contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, AccessManagedUpgradeable, UUPSUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableSet for EnumerableSet.UintSet;
 
     /// @notice Deployment default for floating tranches, cUSD, and underwriters, in seconds.
     uint256 public constant DEFAULT_VESTING_PERIOD = 12 hours;
@@ -66,17 +67,23 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     /// @inheritdoc IRegistry
     address public wrapper;
 
-    /// @inheritdoc IRegistry
-    mapping(address market => bool deployed) public isMarket;
-
-    /// @inheritdoc IRegistry
-    mapping(uint64 roleId => bool assigned) public isOperatorRole;
-
     /// @dev Next operator role id to assign
     uint64 private _nextOperatorRoleId;
 
     /// @dev Deployments per market, used to name tranche suffixes. Only ever increases.
     mapping(address market => uint256 count) private _trancheCount;
+
+    /// @dev Markets this registry deployed, in create order
+    EnumerableSet.AddressSet private _markets;
+
+    /// @dev Tranches this registry deployed, in create order
+    EnumerableSet.AddressSet private _tranches;
+
+    /// @dev Underwriters this registry deployed, in create order
+    EnumerableSet.AddressSet private _underwriters;
+
+    /// @dev Operator role ids this registry minted
+    EnumerableSet.UintSet private _operatorRoles;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -122,7 +129,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
                 manager.grantRole(roleIds[i], members[i][j], 0);
             }
             manager.setRoleAdmin(roleIds[i], parentRoleId);
-            isOperatorRole[roleIds[i]] = true;
+            _operatorRoles.add(roleIds[i]);
         }
         emit CreateChildRoles(parentRoleId, members, roleIds);
     }
@@ -174,7 +181,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         external
         returns (address tranche)
     {
-        if (!isMarket[_market]) revert UnknownMarket();
+        if (!isMarket(_market)) revert UnknownMarket();
         uint64 ownerRole = marketOwnerRole(_market);
         (bool isOwner,) = IAccessManager(authority()).hasRole(ownerRole, msg.sender);
         if (!isOwner) revert NotMarketOwner();
@@ -207,7 +214,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     /// @inheritdoc IRegistry
     function setBorrowerRole(uint64 roleId) external restricted {
         if (roleId == type(uint64).max) revert PublicRole();
-        if (!isOperatorRole[roleId]) revert NotOperatorRole();
+        if (!isOperatorRole(roleId)) revert NotOperatorRole();
 
         IAccessManager manager = IAccessManager(authority());
         manager.setTargetFunctionRole(msg.sender, _borrowerSelectors(), roleId);
@@ -217,7 +224,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     /// @inheritdoc IRegistry
     function setAllocatorRole(uint64 roleId) external restricted {
         if (roleId == type(uint64).max) revert PublicRole();
-        if (!isOperatorRole[roleId]) revert NotOperatorRole();
+        if (!isOperatorRole(roleId)) revert NotOperatorRole();
         IAccessManager manager = IAccessManager(authority());
         manager.setTargetFunctionRole(msg.sender, _allocatorSelectors(), roleId);
         emit SetAllocatorRole(msg.sender, roleId);
@@ -229,7 +236,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         restricted
         returns (address underwriter)
     {
-        if (!isOperatorRole[_curatorRole]) {
+        if (!isOperatorRole(_curatorRole)) {
             revert OperatorNotAssigned();
         }
 
@@ -240,6 +247,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
                 (authority(), address(this), _name, _symbol, _asset, vault, stablecoin, DEFAULT_VESTING_PERIOD)
             )
         );
+        _underwriters.add(underwriter);
 
         _configureUnderwriterRoles(underwriter, _curatorRole);
 
@@ -247,10 +255,78 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     /// @inheritdoc IRegistry
+    function isMarket(address market) public view returns (bool deployed) {
+        deployed = _markets.contains(market);
+    }
+
+    /// @inheritdoc IRegistry
+    function isOperatorRole(uint64 roleId) public view returns (bool assigned) {
+        assigned = _operatorRoles.contains(roleId);
+    }
+
+    /// @inheritdoc IRegistry
+    function isTranche(address tranche) public view returns (bool deployed) {
+        deployed = _tranches.contains(tranche);
+    }
+
+    /// @inheritdoc IRegistry
+    function isUnderwriter(address underwriter) public view returns (bool deployed) {
+        deployed = _underwriters.contains(underwriter);
+    }
+
+    /// @inheritdoc IRegistry
     function marketOwnerRole(address _market) public view returns (uint64 roleId) {
         // Live from the AccessManager, so rehoming owner selectors moves this too.
-        if (!isMarket[_market]) return 0;
+        if (!isMarket(_market)) return 0;
         roleId = IAccessManager(authority()).getTargetFunctionRole(_market, IBaseMarket.setLoanToValue.selector);
+    }
+
+    /// @inheritdoc IRegistry
+    function marketsLength() external view returns (uint256 count) {
+        count = _markets.length();
+    }
+
+    /// @inheritdoc IRegistry
+    function markets(uint256 start, uint256 end) external view returns (address[] memory listed) {
+        listed = _slice(_markets, start, end);
+    }
+
+    /// @inheritdoc IRegistry
+    function tranchesLength() external view returns (uint256 count) {
+        count = _tranches.length();
+    }
+
+    /// @inheritdoc IRegistry
+    function tranches(uint256 start, uint256 end) external view returns (address[] memory listed) {
+        listed = _slice(_tranches, start, end);
+    }
+
+    /// @inheritdoc IRegistry
+    function underwritersLength() external view returns (uint256 count) {
+        count = _underwriters.length();
+    }
+
+    /// @inheritdoc IRegistry
+    function underwriters(uint256 start, uint256 end) external view returns (address[] memory listed) {
+        listed = _slice(_underwriters, start, end);
+    }
+
+    /// @dev Return `[start, end)` of a set. `end` is exclusive so `length` is a valid max.
+    /// @param set The address set
+    /// @param start The first index, inclusive
+    /// @param end The last index, exclusive
+    /// @return listed The addresses in that range
+    function _slice(EnumerableSet.AddressSet storage set, uint256 start, uint256 end)
+        private
+        view
+        returns (address[] memory listed)
+    {
+        uint256 length = set.length();
+        if (start > end || end > length) revert InvalidRange();
+        listed = new address[](end - start);
+        for (uint256 i = start; i < end; ++i) {
+            listed[i - start] = set.at(i);
+        }
     }
 
     /// @dev Deploy a market with tranches and wire AccessManager roles
@@ -275,10 +351,10 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         if (_assets.length == 0) revert InvalidTrancheCount();
         if (_assets.length > MarketLimits.MAX_TRANCHES) revert IBaseMarket.TooManyTranches();
         if (_assets.length != _weights.length) revert TrancheAssetsMismatch();
-        if (!isOperatorRole[_marketOwnerRole]) revert OperatorNotAssigned();
+        if (!isOperatorRole(_marketOwnerRole)) revert OperatorNotAssigned();
 
         market = _deploy(beacon, marketInitData);
-        isMarket[market] = true;
+        _markets.add(market);
         _trancheCount[market] = _assets.length;
 
         deployedTranches = new address[](_assets.length);
@@ -323,6 +399,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
                 (authority(), address(this), _asset, trancheName, trancheSymbol, market, vault, oracle, _vestingPeriod)
             )
         );
+        _tranches.add(tranche);
 
         uint64 depositorRoleId = _newClosedRole(IAccessManager(authority()), ownerRole);
         _configureTrancheRoles(tranche, ownerRole, depositorRoleId);
@@ -429,7 +506,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     function _newClosedRole(IAccessManager manager, uint64 adminRole) internal returns (uint64 roleId) {
         roleId = _nextOperatorRoleId++;
         manager.setRoleAdmin(roleId, adminRole);
-        isOperatorRole[roleId] = true;
+        _operatorRoles.add(roleId);
     }
 
     function _upgradeSelectors() private pure returns (bytes4[] memory selectors) {

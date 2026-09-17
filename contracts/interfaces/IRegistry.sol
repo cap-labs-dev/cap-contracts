@@ -29,6 +29,10 @@ interface IRegistry {
     /// @notice The caller does not hold the market's owner role
     error NotMarketOwner();
 
+    /// @notice The requested slice is empty-inverted or past the set
+    /// @dev Valid calls use `start <= end <= length`. `end` is exclusive, so `length` is the max.
+    error InvalidRange();
+
     /// @notice Shared initialization parameters for the registry
     /// @param stablecoin The stablecoin address
     /// @param vault The vault address
@@ -201,6 +205,49 @@ interface IRegistry {
     /// @param market The market to query
     /// @return deployed Whether this registry deployed the market
     function isMarket(address market) external view returns (bool deployed);
+
+    /// @notice Get whether this registry deployed the tranche
+    /// @param tranche The tranche to query
+    /// @return deployed Whether this registry deployed the tranche
+    function isTranche(address tranche) external view returns (bool deployed);
+
+    /// @notice Get whether this registry deployed the underwriter
+    /// @param underwriter The underwriter to query
+    /// @return deployed Whether this registry deployed the underwriter
+    function isUnderwriter(address underwriter) external view returns (bool deployed);
+
+    /// @notice Get the number of markets this registry deployed
+    /// @return count The market count
+    function marketsLength() external view returns (uint256 count);
+
+    /// @notice Get a slice of deployed markets
+    /// @dev `end` is exclusive. `markets(0, marketsLength())` is the full list.
+    /// @param start The first index, inclusive
+    /// @param end The last index, exclusive, at most {marketsLength}
+    /// @return listed The markets in that range
+    function markets(uint256 start, uint256 end) external view returns (address[] memory listed);
+
+    /// @notice Get the number of tranches this registry deployed
+    /// @return count The tranche count
+    function tranchesLength() external view returns (uint256 count);
+
+    /// @notice Get a slice of deployed tranches
+    /// @dev `end` is exclusive. `tranches(0, tranchesLength())` is the full list.
+    /// @param start The first index, inclusive
+    /// @param end The last index, exclusive, at most {tranchesLength}
+    /// @return listed The tranches in that range
+    function tranches(uint256 start, uint256 end) external view returns (address[] memory listed);
+
+    /// @notice Get the number of underwriters this registry deployed
+    /// @return count The underwriter count
+    function underwritersLength() external view returns (uint256 count);
+
+    /// @notice Get a slice of deployed underwriters
+    /// @dev `end` is exclusive. `underwriters(0, underwritersLength())` is the full list.
+    /// @param start The first index, inclusive
+    /// @param end The last index, exclusive, at most {underwritersLength}
+    /// @return listed The underwriters in that range
+    function underwriters(uint256 start, uint256 end) external view returns (address[] memory listed);
 
     /// @notice Get the owner role for a market this registry deployed
     /// @dev From {IBaseMarket-setTrancheWeights}. Zero if unknown.

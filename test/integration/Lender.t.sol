@@ -6,6 +6,7 @@ import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
 import { IBaseMarket } from "../../contracts/interfaces/IBaseMarket.sol";
 import { IBeaconFactory } from "../../contracts/interfaces/IBeaconFactory.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
+import { IRegistry } from "../../contracts/interfaces/IRegistry.sol";
 import { ITranche } from "../../contracts/interfaces/ITranche.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
 import { Vm } from "forge-std/Vm.sol";
@@ -74,6 +75,57 @@ contract MarketTest is CapDeployer {
         assertEq(Tranche(tranche1).asset(), address(collateral));
         assertEq(FloatingMarket(marketAddr).tranches()[0].tranche, tranche0);
         assertEq(FloatingMarket(marketAddr).tranches()[1].tranche, tranche1);
+    }
+
+    function test_registry_listsMarketsTranchesAndUnderwriters() public {
+        assertEq(registry.marketsLength(), 0);
+        assertEq(registry.tranchesLength(), 0);
+        assertEq(registry.underwritersLength(), 0);
+        assertEq(registry.markets(0, 0).length, 0);
+
+        (address marketA, address trancheA0, address trancheA1) = _createMarket("A");
+        (address marketB, address trancheB0, address trancheB1) = _createMarket("B");
+        address underwriter = address(_deployUnderwriter());
+
+        assertTrue(registry.isMarket(marketA));
+        assertTrue(registry.isMarket(marketB));
+        assertTrue(registry.isTranche(trancheA0));
+        assertTrue(registry.isTranche(trancheA1));
+        assertTrue(registry.isTranche(trancheB0));
+        assertTrue(registry.isTranche(trancheB1));
+        assertFalse(registry.isTranche(marketA));
+        assertTrue(registry.isUnderwriter(underwriter));
+        assertFalse(registry.isUnderwriter(marketA));
+
+        assertEq(registry.marketsLength(), 2);
+        address[] memory markets = registry.markets(0, registry.marketsLength());
+        assertEq(markets.length, 2);
+        assertEq(markets[0], marketA);
+        assertEq(markets[1], marketB);
+        assertEq(registry.markets(0, 1)[0], marketA);
+        assertEq(registry.markets(1, 2)[0], marketB);
+
+        assertEq(registry.tranchesLength(), 4);
+        address[] memory listedTranches = registry.tranches(0, 2);
+        assertEq(listedTranches[0], trancheA0);
+        assertEq(listedTranches[1], trancheA1);
+
+        assertEq(registry.underwritersLength(), 1);
+        assertEq(registry.underwriters(0, 1)[0], underwriter);
+
+        uint256[] memory next = new uint256[](3);
+        next[0] = 0.5e27;
+        next[1] = 0.3e27;
+        next[2] = 0.2e27;
+        address added = registry.createTranche(marketB, address(collateral), next, registry.DEFAULT_VESTING_PERIOD());
+        assertTrue(registry.isTranche(added));
+        assertEq(registry.tranchesLength(), 5);
+        assertEq(registry.tranches(4, 5)[0], added);
+
+        vm.expectRevert(IRegistry.InvalidRange.selector);
+        registry.markets(1, 0);
+        vm.expectRevert(IRegistry.InvalidRange.selector);
+        registry.markets(0, 3);
     }
 
     /// @dev Factory logs name the beacon, so a market, tranche, and underwriter are distinguishable.
