@@ -32,15 +32,26 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @param tranche The tranche address
     event RemoveTranche(address indexed tranche);
 
-    /// @notice Emitted when recorded tranche debt increases
+    /// @notice Emitted when vault assets are deployed into a tranche
     /// @param tranche The tranche address
-    /// @param amount The amount of debt added
-    event DebtIncreased(address indexed tranche, uint256 amount);
+    /// @param assets The increase in recorded debt from the deposit
+    event Allocated(address indexed tranche, uint256 assets);
 
-    /// @notice Emitted when recorded tranche debt decreases
+    /// @notice Emitted when tranche assets return to the vault
+    /// @dev Instant {deallocate} and {finalizeDeallocateAsync} only. A request stays in {debt}.
     /// @param tranche The tranche address
-    /// @param amount The amount of debt removed
-    event DebtDecreased(address indexed tranche, uint256 amount);
+    /// @param assets The decrease in recorded debt from the redemption
+    event Deallocated(address indexed tranche, uint256 assets);
+
+    /// @notice Emitted when a remake finds the position worth more than the cached book
+    /// @param tranche The tranche address
+    /// @param amount The unmarked gain
+    event Gain(address indexed tranche, uint256 amount);
+
+    /// @notice Emitted when a remake finds the position worth less than the cached book
+    /// @param tranche The tranche address
+    /// @param amount The unmarked loss
+    event Loss(address indexed tranche, uint256 amount);
 
     /// @notice Emitted when an async tranche redemption is requested
     /// @param tranche The tranche address
@@ -100,7 +111,8 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     function removeTranche(address tranche) external;
 
     /// @notice Allocate vault assets into a registered tranche
-    /// @dev Allocator only.
+    /// @dev Allocator only. Remakes an existing book first, then records the deposit. The only
+    /// path that may open a book.
     /// @param tranche The tranche address
     /// @param assets The amount of assets to allocate
     function allocate(address tranche, uint256 assets) external;

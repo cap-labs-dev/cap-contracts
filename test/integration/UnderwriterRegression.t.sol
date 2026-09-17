@@ -197,6 +197,30 @@ contract UnderwriterRegressionTest is CapDeployer {
         _assertDepositsClosed();
     }
 
+    function test_reportingAnUnchangedOpenBookStillLatchesRetirementAfterAnExit() public {
+        _fundUnderwriter(address(pool), incumbent, 1_000_000);
+        pool.allocate(address(tranche), 1_000_000);
+        _slash(tranche.totalAssets() - 10_010);
+        pool.report(address(tranche));
+        pool.deallocate(address(tranche), tranche.balanceOf(address(pool)) - 100);
+        assertEq(pool.totalAssets(), 10_000);
+        uint256 marked = pool.debt(address(tranche));
+        assertGt(marked, 0);
+        assertFalse(pool.killed());
+
+        vm.prank(incumbent);
+        assertEq(pool.instantRedeem(20_099, incumbent, incumbent), 201);
+        assertFalse(pool.killed());
+        assertEq(pool.maxDeposit(entrant), 0);
+        assertEq(tranche.convertToAssets(tranche.balanceOf(address(pool))), marked);
+
+        vm.expectEmit(address(pool));
+        emit IUnderwriter.Killed();
+        pool.report(address(tranche));
+        assertEq(pool.debt(address(tranche)), marked, "the unchanged mark must still check retirement");
+        assertTrue(pool.killed());
+    }
+
     function test_killedDefaultClosesLimitsWithoutRetiringHealthyPool() public {
         _fundUnderwriter(address(pool), incumbent, 1_000e18);
         pool.allocate(address(tranche), 10e18);
