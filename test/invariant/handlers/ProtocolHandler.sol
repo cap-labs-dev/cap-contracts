@@ -715,7 +715,7 @@ contract ProtocolHandler is CapDeployer {
             Vm.Log memory l = logs[i];
             if (l.topics.length == 0) continue;
             bytes32 sig = l.topics[0];
-            if (sig == keccak256("Fund(uint256)")) {
+            if (sig == keccak256("Fund(address,uint256)")) {
                 ghostFunded[l.emitter] += abi.decode(l.data, (uint256));
             } else if (sig == keccak256("Claimed(address,address,uint256)")) {
                 ghostPaid[l.emitter] += abi.decode(l.data, (uint256));

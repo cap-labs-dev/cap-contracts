@@ -3,6 +3,7 @@ pragma solidity 0.8.36;
 
 import { Stablecoin } from "../../../contracts/cap/Stablecoin.sol";
 import { IERC7540AsyncRedeem } from "../../../contracts/interfaces/IERC7540AsyncRedeem.sol";
+import { IPremiumVesting } from "../../../contracts/interfaces/IPremiumVesting.sol";
 import { IStablecoin } from "../../../contracts/interfaces/IStablecoin.sol";
 import { CapRoles } from "../../../contracts/utils/CapRoles.sol";
 import { BaseTest } from "../../shared/BaseTest.sol";
@@ -1001,6 +1002,8 @@ contract StablecoinTest is BaseTest {
     }
 
     function test_fundCreditBacked_mintsToItselfAndOpensTheRemainder() public {
+        vm.expectEmit(address(scoin));
+        emit IPremiumVesting.Fund(address(this), 10e18);
         scoin.fundCreditBacked(10e18);
         assertEq(scoin.balanceOf(address(scoin)), 10e18);
         assertEq(scoin.creditBackedSupply(), 10e18);

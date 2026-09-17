@@ -124,6 +124,8 @@ contract PremiumVestingTest is Test {
     }
 
     function test_fund_addsToTheRemainderWithoutStartingAnEpoch() public {
+        vm.expectEmit(address(v));
+        emit IPremiumVesting.Fund(address(this), PREMIUM);
         v.fund(PREMIUM);
 
         assertEq(v.remainder(), PREMIUM, "the whole amount is the remainder");

@@ -5,6 +5,11 @@ pragma solidity 0.8.36;
 /// @author kexley, Cap Labs
 /// @notice Interface for the shared premium vesting surface used by {Tranche}, {Underwriter} and {Stablecoin}
 interface IPremiumVesting {
+    /// @notice Emitted when premium is added to the remainder
+    /// @param source The caller that funded
+    /// @param amount The premium added, in stablecoin units (18 decimals)
+    event Fund(address indexed source, uint256 amount);
+
     /// @notice Emitted when vested premium is claimed
     /// @param user The account whose entitlement was settled
     /// @param recipient The address that received the premium
