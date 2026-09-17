@@ -55,6 +55,11 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     /// @inheritdoc IUnderwriter
     uint256 public lastReported;
 
+    /// @inheritdoc IUnderwriter
+    function registeredTranches() external view returns (address[] memory) {
+        return _registeredTranches.values();
+    }
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
