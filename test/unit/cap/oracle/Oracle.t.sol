@@ -320,10 +320,22 @@ contract OracleTest is Test {
         assertEq(oracle.price(steth), 2000e18, "the working chain was left alone");
     }
 
+    function test_setSource_emitsIndexedAsset() public {
+        IOracle.Sources[] memory hops = _chain(_hop(_stub(2000e18, block.timestamp, 1 hours)));
+
+        vm.expectEmit(address(oracle));
+        emit IOracle.SetSource(steth, hops);
+        vm.prank(admin);
+        oracle.setSource(steth, hops);
+    }
+
     function test_setSource_canClearAChain() public {
         _set(steth, _chain(_hop(_stub(2000e18, block.timestamp, 1 hours))));
 
-        _set(steth, new IOracle.Sources[](0));
+        IOracle.Sources[] memory empty = new IOracle.Sources[](0);
+        vm.expectEmit(address(oracle));
+        emit IOracle.SetSource(steth, empty);
+        _set(steth, empty);
 
         assertEq(oracle.sources(steth).length, 0, "cleared");
         assertEq(oracle.price(steth), 0, "and no longer prices");
