@@ -6,8 +6,9 @@ pragma solidity 0.8.36;
 /// @notice Interface for deploying and initializing beacon proxies
 interface IBeaconFactory {
     /// @notice Emitted when a beacon proxy is deployed
+    /// @param beacon The upgradeable beacon the proxy follows
     /// @param proxy The address of the deployed beacon proxy
-    event Deployed(address proxy);
+    event Deployed(address indexed beacon, address indexed proxy);
 
     /// @notice Initialize the factory
     /// @param authority The access manager address

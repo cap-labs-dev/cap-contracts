@@ -30,7 +30,7 @@ contract BeaconFactory layout at erc7201("cap.storage.BeaconFactory")
     /// @inheritdoc IBeaconFactory
     function create(address beacon, bytes memory data) external restricted returns (address proxy) {
         proxy = address(new BeaconProxy(beacon, data));
-        emit Deployed(proxy);
+        emit Deployed(beacon, proxy);
     }
 
     /// @inheritdoc UUPSUpgradeable

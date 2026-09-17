@@ -3,9 +3,13 @@ pragma solidity 0.8.36;
 
 import { BeaconFactory } from "../../../contracts/cap/BeaconFactory.sol";
 import { Registry } from "../../../contracts/cap/Registry.sol";
+import { IBeaconFactory } from "../../../contracts/interfaces/IBeaconFactory.sol";
 import { IRegistry } from "../../../contracts/interfaces/IRegistry.sol";
 import { BaseTest } from "../../shared/BaseTest.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+
+contract DummyBeaconImpl { }
 
 contract RegistryTest is BaseTest {
     function _validInit() internal view returns (IRegistry.InitParams memory init) {
@@ -120,5 +124,20 @@ contract RegistryTest is BaseTest {
         vm.prank(makeAddr("stranger"));
         vm.expectRevert();
         UUPSUpgradeable(address(factory)).upgradeToAndCall(address(newImpl), "");
+    }
+
+    /// @dev The beacon is the type key.
+    function test_beaconFactoryCreate_emitsBeaconAndProxy() public {
+        BeaconFactory factory = BeaconFactory(
+            _deployProxy(
+                address(new BeaconFactory()), abi.encodeCall(BeaconFactory.initialize, (address(accessManager)))
+            )
+        );
+        address beacon = address(new UpgradeableBeacon(address(new DummyBeaconImpl()), address(this)));
+        address predicted = vm.computeCreateAddress(address(factory), vm.getNonce(address(factory)));
+
+        vm.expectEmit(address(factory));
+        emit IBeaconFactory.Deployed(beacon, predicted);
+        assertEq(factory.create(beacon, ""), predicted);
     }
 }
