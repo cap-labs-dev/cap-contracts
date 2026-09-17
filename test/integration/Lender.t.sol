@@ -4,9 +4,11 @@ pragma solidity 0.8.36;
 import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
 import { IBaseMarket } from "../../contracts/interfaces/IBaseMarket.sol";
+import { IBeaconFactory } from "../../contracts/interfaces/IBeaconFactory.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
 import { ITranche } from "../../contracts/interfaces/ITranche.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
+import { Vm } from "forge-std/Vm.sol";
 
 contract MarketTest is CapDeployer {
     address internal stranger = makeAddr("stranger");
@@ -72,6 +74,39 @@ contract MarketTest is CapDeployer {
         assertEq(Tranche(tranche1).asset(), address(collateral));
         assertEq(FloatingMarket(marketAddr).tranches()[0].tranche, tranche0);
         assertEq(FloatingMarket(marketAddr).tranches()[1].tranche, tranche1);
+    }
+
+    /// @dev Factory logs name the beacon, so a market, tranche, and underwriter are distinguishable.
+    function test_factoryDeployed_tagsBeacon() public {
+        vm.recordLogs();
+        (address marketAddr, address tranche0, address tranche1) = _createMarket("Tagged");
+        Vm.Log[] memory created = vm.getRecordedLogs();
+        _assertDeployed(created, registry.floatingMarketBeacon(), marketAddr);
+        _assertDeployed(created, registry.trancheBeacon(), tranche0);
+        _assertDeployed(created, registry.trancheBeacon(), tranche1);
+
+        uint256[] memory next = new uint256[](3);
+        next[0] = 0.5e27;
+        next[1] = 0.3e27;
+        next[2] = 0.2e27;
+        vm.recordLogs();
+        address added = registry.createTranche(marketAddr, address(collateral), next);
+        _assertDeployed(vm.getRecordedLogs(), registry.trancheBeacon(), added);
+
+        vm.recordLogs();
+        address underwriter = address(_deployUnderwriter());
+        _assertDeployed(vm.getRecordedLogs(), registry.underwriterBeacon(), underwriter);
+    }
+
+    function _assertDeployed(Vm.Log[] memory logs, address beacon, address proxy) internal view {
+        bytes32 sig = keccak256("Deployed(address,address)");
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter != address(beaconFactory) || logs[i].topics[0] != sig) continue;
+            if (address(uint160(uint256(logs[i].topics[2]))) != proxy) continue;
+            assertEq(address(uint160(uint256(logs[i].topics[1]))), beacon);
+            return;
+        }
+        revert("missing Deployed");
     }
 
     function test_setLoanToValue_onlyAuthority() public {
