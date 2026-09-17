@@ -36,5 +36,5 @@ jobs:
 
       - name: Run Forge tests
         run: |
-          forge test -vvv
+          yarn test -vvv
         id: test

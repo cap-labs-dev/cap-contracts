@@ -55,7 +55,8 @@ forge --version
 ```sh
 yarn compile                        # Build with the default Foundry configuration
 yarn build                          # Build with the package's --skip Test filter
-yarn test                           # Run the default test suite
+yarn test                           # Unit, integration, and fuzz — skips test/invariant
+yarn test:invariants                # Invariant campaigns only
 forge test --match-contract DebtLifecycleTest -vvv
 forge fmt --check                   # Check Solidity formatting
 
