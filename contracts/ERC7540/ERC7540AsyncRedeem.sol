@@ -114,6 +114,11 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     }
 
     /// @inheritdoc IERC7540AsyncRedeem
+    function requestsOf(address controller) external view returns (uint256[] memory requestIds) {
+        requestIds = _getERC7540AsyncRedeemStorage().controllerRequests[controller].values();
+    }
+
+    /// @inheritdoc IERC7540AsyncRedeem
     function withdraw(uint256 _requestId, uint256 _assets, address _receiver, address _controller)
         public
         virtual
