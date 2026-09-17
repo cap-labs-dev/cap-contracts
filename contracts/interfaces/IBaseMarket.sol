@@ -133,10 +133,15 @@ interface IBaseMarket {
     /// @param multiplier The new market multiplier in ray decimals
     event SetMarketMultiplier(uint256 multiplier);
 
-    /// @notice Emitted when premium is charged to a recipient
-    /// @param recipient The recipient of the premium
-    /// @param premium The amount of premium minted, in stablecoin units (18 decimals)
-    event ChargePremium(address indexed recipient, uint256 premium);
+    /// @notice Emitted when premium is funded onto the stablecoin
+    /// @dev The IRM liquidity slice, and leftover underwriter premium that no tranche earned.
+    /// @param premium The amount funded, in stablecoin units (18 decimals)
+    event ChargeLiquidityPremium(uint256 premium);
+
+    /// @notice Emitted when underwriter premium is paid to a tranche
+    /// @param recipient The tranche that received the premium
+    /// @param premium The amount minted, in stablecoin units (18 decimals)
+    event ChargeUnderwriterPremium(address indexed recipient, uint256 premium);
 
     /// @notice Set the loan-to-value ratio
     /// @param loanToValue The new loan-to-value ratio in ray decimals

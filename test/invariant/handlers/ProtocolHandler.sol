@@ -725,7 +725,9 @@ contract ProtocolHandler is CapDeployer {
             } else if (sig == keccak256("Repay(address,uint256)")) {
                 (, uint256 n) = abi.decode(l.data, (address, uint256));
                 ghostRepaid[l.emitter] += n;
-            } else if (sig == keccak256("ChargePremium(address,uint256)")) {
+            } else if (sig == keccak256("ChargeLiquidityPremium(uint256)")) {
+                ghostPremium[l.emitter] += abi.decode(l.data, (uint256));
+            } else if (sig == keccak256("ChargeUnderwriterPremium(address,uint256)")) {
                 ghostPremium[l.emitter] += abi.decode(l.data, (uint256));
             } else if (sig == keccak256("WriteOff(address,uint256,uint256)")) {
                 (uint256 n,) = abi.decode(l.data, (uint256, uint256));
