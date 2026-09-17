@@ -41,6 +41,16 @@ interface IFixedMarket is IBaseMarket {
     /// @param premium The charged premium for the loan, in stablecoin units (18 decimals)
     event BorrowFixed(uint256 indexed id, address indexed recipient, uint256 term, uint256 principal, uint256 premium);
 
+    /// @notice Emitted when additional principal is drawn on an existing loan
+    /// @param id The id of the loan
+    /// @param recipient The recipient of the borrowed assets
+    /// @param term The remaining term at the time of the draw, in seconds
+    /// @param principal The principal added, in stablecoin units (18 decimals)
+    /// @param premium The charged premium for the add-on, in stablecoin units (18 decimals)
+    event BorrowMoreFixed(
+        uint256 indexed id, address indexed recipient, uint256 term, uint256 principal, uint256 premium
+    );
+
     /// @notice Emitted when the term of a loan is extended
     /// @param id The id of the loan
     /// @param extension The extension of the term

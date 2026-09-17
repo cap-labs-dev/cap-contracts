@@ -89,12 +89,21 @@ contract FixedExtendTest is CapDeployer {
     function test_borrowMore_onALiveLoan() public {
         FixedMarket market = _ready();
 
+        uint256 term = 10 days;
+        (uint256 openLiq, uint256 openUw) = market.premiumForBorrow(PRINCIPAL, term);
+        vm.expectEmit(address(market));
+        emit IFixedMarket.BorrowFixed(0, defaultBorrower, term, PRINCIPAL, openLiq + openUw);
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 10 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, term);
         uint256 debtBefore = market.debt(id);
 
+        uint256 remaining = market.expiry(id) - block.timestamp;
+        uint256 addOn = 100e18;
+        (uint256 moreLiq, uint256 moreUw) = market.premiumForBorrow(addOn, remaining);
+        vm.expectEmit(address(market));
+        emit IFixedMarket.BorrowMoreFixed(id, defaultBorrower, remaining, addOn, moreLiq + moreUw);
         vm.prank(defaultBorrower);
-        uint256 added = market.borrowMore(id, defaultBorrower, 100e18);
+        uint256 added = market.borrowMore(id, defaultBorrower, addOn);
 
         assertGt(added, 0);
         assertGt(market.debt(id), debtBefore);

@@ -72,7 +72,9 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         else if (term > maximumTermLimit || term < minimumTermLimit) revert InvalidTerm();
         id = loanCount++;
         expiry[id] = block.timestamp + term;
-        actualPrincipal = _borrow(id, recipient, principal, term);
+        uint256 premium;
+        (actualPrincipal, premium) = _borrow(id, recipient, principal, term);
+        emit BorrowFixed(id, recipient, term, actualPrincipal, premium);
     }
 
     /// @inheritdoc IFixedMarket
@@ -86,7 +88,9 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         if (block.timestamp >= expiry[id]) revert LoanExpired();
         uint256 term = expiry[id] - block.timestamp;
         if (term < minimumTermLimit) revert InvalidTerm();
-        actualPrincipal = _borrow(id, recipient, principal, term);
+        uint256 premium;
+        (actualPrincipal, premium) = _borrow(id, recipient, principal, term);
+        emit BorrowMoreFixed(id, recipient, term, actualPrincipal, premium);
     }
 
     /// @inheritdoc IFixedMarket
@@ -212,9 +216,10 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     /// @param principal The principal of the loan, or `type(uint256).max` for the sized max
     /// @param term The term of the loan in seconds, already inside the band
     /// @return actualPrincipal The principal actually drawn
+    /// @return chargedPremium The premium minted onto the loan
     function _borrow(uint256 id, address recipient, uint256 principal, uint256 term)
         internal
-        returns (uint256 actualPrincipal)
+        returns (uint256 actualPrincipal, uint256 chargedPremium)
     {
         uint256 limit = availableCredit();
         actualPrincipal = principal == type(uint256).max ? _principalFor(limit, term) : principal;
@@ -227,12 +232,11 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         debt[id] += actualPrincipal;
         _totalDebt += actualPrincipal;
         _borrow(recipient, actualPrincipal);
-        uint256 chargedPremium = _applyPremium(id, liquidityPremium, underwriterPremium);
+        chargedPremium = _applyPremium(id, liquidityPremium, underwriterPremium);
         // credit is min(ltv, lt) against active capital; the threshold is lt against total. A full
         // draw can land on health of one when those match. The Unhealthy assert is for the premium
         // stacked on top, and for any active < total gap. {extend} asserts the same after its charge
         if (healthiness() < 1e27) revert Unhealthy();
-        emit BorrowFixed(id, recipient, term, actualPrincipal, chargedPremium);
     }
 
     /// @dev Rates after `mintAmount` of credit-backed supply is minted.
