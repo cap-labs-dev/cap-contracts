@@ -59,7 +59,8 @@ contract DeployInfra is CreateXUtils {
             _salt(deployer, saltNamespace, "irm"),
             implementations.irm,
             abi.encodeCall(
-                InterestRateModel.initialize, (infra.accessManager, stablecoinAddr, 1e27, 2e27, 1e27, 0.02e27, 1 hours)
+                InterestRateModel.initialize,
+                (infra.accessManager, stablecoinAddr, 1e27, 2e27, 1e27, 0.02e27, 1 hours, 0.8e27, 0.1e27, 1.25e27)
             )
         );
 
@@ -121,7 +122,7 @@ contract DeployInfra is CreateXUtils {
             implementations.irm,
             abi.encodeCall(
                 InterestRateModel.initialize,
-                (infra.accessManager, existingStablecoin, 1e27, 2e27, 1e27, 0.02e27, 1 hours)
+                (infra.accessManager, existingStablecoin, 1e27, 2e27, 1e27, 0.02e27, 1 hours, 0.8e27, 0.1e27, 1.25e27)
             )
         );
         require(infra.irm == irmAddr, "irm addr");
@@ -235,10 +236,7 @@ contract DeployInfra is CreateXUtils {
                         fixedMarketBeacon: infra.fixedMarketBeacon,
                         trancheBeacon: infra.trancheBeacon,
                         underwriterBeacon: infra.underwriterBeacon,
-                        wrapper: infra.wrapper,
-                        lt: 0.8e27,
-                        buffer: 0.1e27,
-                        targetHealth: 1.25e27
+                        wrapper: infra.wrapper
                     })
                 )
             )

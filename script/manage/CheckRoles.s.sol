@@ -149,6 +149,17 @@ contract CheckRoles is Script, InfraSerializer {
             IInterestRateModel.setAveragingPeriod.selector,
             CapRoles.GOVERNOR
         );
+        _wired(
+            manager,
+            "IRM.setLiquidationThreshold",
+            infra.irm,
+            IInterestRateModel.setLiquidationThreshold.selector,
+            CapRoles.GOVERNOR
+        );
+        _wired(manager, "IRM.setBuffer", infra.irm, IInterestRateModel.setBuffer.selector, CapRoles.GOVERNOR);
+        _wired(
+            manager, "IRM.setTargetHealth", infra.irm, IInterestRateModel.setTargetHealth.selector, CapRoles.GOVERNOR
+        );
 
         _wired(manager, "Oracle.setSource", infra.oracle, IOracle.setSource.selector, CapRoles.GOVERNOR);
 
@@ -239,14 +250,20 @@ contract CheckRoles is Script, InfraSerializer {
             (, InfraConfig memory infra) = _readInfra();
             console.log("== market", market, "==");
             uint64 ownerRole = Registry(infra.registry).marketOwnerRole(market);
-            _wired(manager, "Market.setLtv", market, IBaseMarket.setLtv.selector, ownerRole);
+            _wired(manager, "Market.setLoanToValue", market, IBaseMarket.setLoanToValue.selector, ownerRole);
             _wired(manager, "Market.setTrancheWeights", market, IBaseMarket.setTrancheWeights.selector, ownerRole);
             _wired(manager, "Market.setMarketMultiplier", market, IBaseMarket.setMarketMultiplier.selector, ownerRole);
             _wired(manager, "Market.setUnderwriterRate", market, IBaseMarket.setUnderwriterRate.selector, ownerRole);
             _wired(manager, "Market.setTranches", market, IBaseMarket.setTranches.selector, CapRoles.REGISTRY);
             _wired(manager, "Market.setTargetHealth", market, IBaseMarket.setTargetHealth.selector, CapRoles.GOVERNOR);
             _wired(manager, "Market.setBuffer", market, IBaseMarket.setBuffer.selector, CapRoles.GUARDIAN);
-            _wired(manager, "Market.setLt", market, IBaseMarket.setLt.selector, CapRoles.GUARDIAN);
+            _wired(
+                manager,
+                "Market.setLiquidationThreshold",
+                market,
+                IBaseMarket.setLiquidationThreshold.selector,
+                CapRoles.GUARDIAN
+            );
             _wired(manager, "Market.liquidate", market, IFloatingMarket.liquidate.selector, CapRoles.LIQUIDATOR);
             _wired(manager, "Market.writeOff", market, IFloatingMarket.writeOff.selector, CapRoles.GUARDIAN);
             _notAdmin(manager, "Market.borrow", market, IFloatingMarket.borrow.selector);

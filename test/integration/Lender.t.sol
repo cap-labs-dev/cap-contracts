@@ -22,6 +22,17 @@ contract MarketTest is CapDeployer {
         m = FloatingMarket(marketAddr);
     }
 
+    function test_newMarketCopiesIrmRiskDefaults() public {
+        (address marketAddr,) = registry.createFloatingMarket(
+            _uniformAssets(2), capConfig.defaultTrancheWeights, "defaults", _operatorRoleOf(defaultMarketOwner)
+        );
+        FloatingMarket created = FloatingMarket(marketAddr);
+        assertEq(created.liquidationThreshold(), irm.liquidationThreshold());
+        assertEq(created.buffer(), irm.buffer());
+        assertEq(created.targetHealth(), irm.targetHealth());
+        assertEq(created.loanToValue(), 0);
+    }
+
     function test_setMaxCapital_onlyAuthority() public {
         market = _market();
         address tranche = market.tranches()[0].tranche;
@@ -63,25 +74,25 @@ contract MarketTest is CapDeployer {
         assertEq(FloatingMarket(marketAddr).tranches()[1].tranche, tranche1);
     }
 
-    function test_setLtv_onlyAuthority() public {
+    function test_setLoanToValue_onlyAuthority() public {
         market = _market();
         vm.prank(stranger);
         vm.expectRevert();
-        market.setLtv(0.4e27);
+        market.setLoanToValue(0.4e27);
 
-        market.setLtv(0.4e27);
+        market.setLoanToValue(0.4e27);
     }
 
-    function test_setLtv_invalid_reverts() public {
+    function test_setLoanToValue_invalid_reverts() public {
         market = _market();
-        vm.expectRevert(IBaseMarket.InvalidLtv.selector);
-        market.setLtv(0.75e27);
+        vm.expectRevert(IBaseMarket.InvalidLoanToValue.selector);
+        market.setLoanToValue(0.75e27);
     }
 
-    function test_setBuffer_and_setLt_success() public {
+    function test_setBuffer_and_setLiquidationThreshold_success() public {
         market = _market();
         market.setBuffer(0.2e27);
-        market.setLt(0.85e27);
+        market.setLiquidationThreshold(0.85e27);
     }
 
     function test_setMultiplier_invalid_reverts() public {

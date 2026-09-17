@@ -3,6 +3,7 @@ pragma solidity 0.8.36;
 
 import { BaseMarket } from "../../../../contracts/cap/market/BaseMarket.sol";
 import { IBaseMarket } from "../../../../contracts/interfaces/IBaseMarket.sol";
+import { IInterestRateModel } from "../../../../contracts/interfaces/IInterestRateModel.sol";
 import { ITranche } from "../../../../contracts/interfaces/ITranche.sol";
 import { BaseTest } from "../../../shared/BaseTest.sol";
 
@@ -43,9 +44,9 @@ contract MarketHealthTest is BaseTest {
         address irm = makeAddr("irm");
         vm.mockCall(registry, abi.encodeWithSignature("irm()"), abi.encode(irm));
         vm.mockCall(registry, abi.encodeWithSignature("stablecoin()"), abi.encode(makeAddr("stablecoin")));
-        vm.mockCall(registry, abi.encodeWithSignature("lt()"), abi.encode(0.8e27));
-        vm.mockCall(registry, abi.encodeWithSignature("buffer()"), abi.encode(0.1e27));
-        vm.mockCall(registry, abi.encodeWithSignature("targetHealth()"), abi.encode(1.25e27));
+        vm.mockCall(irm, abi.encodeCall(IInterestRateModel.liquidationThreshold, ()), abi.encode(0.8e27));
+        vm.mockCall(irm, abi.encodeCall(IInterestRateModel.buffer, ()), abi.encode(0.1e27));
+        vm.mockCall(irm, abi.encodeCall(IInterestRateModel.targetHealth, ()), abi.encode(1.25e27));
         vm.mockCall(irm, abi.encodeWithSignature("liquidationBonus()"), abi.encode(0.1e27));
         market = MarketHealthHarness(
             _deployProxy(

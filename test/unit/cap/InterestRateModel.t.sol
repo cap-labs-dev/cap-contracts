@@ -28,7 +28,18 @@ contract InterestRateModelTest is BaseTest {
                 address(impl),
                 abi.encodeCall(
                     InterestRateModel.initialize,
-                    (address(accessManager), address(stablecoin), 0.5e27, 2e27, 1e27, 0.02e27, 1 hours)
+                    (
+                        address(accessManager),
+                        address(stablecoin),
+                        0.5e27,
+                        2e27,
+                        1e27,
+                        0.02e27,
+                        1 hours,
+                        0.8e27,
+                        0.1e27,
+                        1.25e27
+                    )
                 )
             )
         );
@@ -50,6 +61,55 @@ contract InterestRateModelTest is BaseTest {
         (uint256 credit, uint256 supply) = irm.averageSupplies();
         assertGt(credit, 0);
         assertGt(supply, 0);
+    }
+
+    function test_setRiskDefaults_updatesAndBounds() public {
+        assertEq(irm.liquidationThreshold(), 0.8e27);
+        assertEq(irm.buffer(), 0.1e27);
+        assertEq(irm.targetHealth(), 1.25e27);
+
+        irm.setLiquidationThreshold(0.9e27);
+        irm.setBuffer(0.2e27);
+        irm.setTargetHealth(1.5e27);
+        assertEq(irm.liquidationThreshold(), 0.9e27);
+        assertEq(irm.buffer(), 0.2e27);
+        assertEq(irm.targetHealth(), 1.5e27);
+
+        vm.expectRevert(IInterestRateModel.InvalidLiquidationThreshold.selector);
+        irm.setLiquidationThreshold(1e27 + 1);
+        vm.expectRevert(IInterestRateModel.InvalidLiquidationThreshold.selector);
+        irm.setLiquidationThreshold(0.2e27);
+        vm.expectRevert(IInterestRateModel.InvalidBuffer.selector);
+        irm.setBuffer(0.9e27);
+        vm.expectRevert(IInterestRateModel.InvalidBuffer.selector);
+        irm.setBuffer(0.1e27 - 1);
+        irm.setBuffer(0.1e27);
+        assertEq(irm.buffer(), 0.1e27);
+        vm.expectRevert(IInterestRateModel.InvalidTargetHealth.selector);
+        irm.setTargetHealth(1.24e27);
+    }
+
+    function test_initialize_rejectsBufferBelowTenPercent() public {
+        InterestRateModel impl = new InterestRateModel();
+        vm.expectRevert(IInterestRateModel.InvalidBuffer.selector);
+        _deployProxy(
+            address(impl),
+            abi.encodeCall(
+                InterestRateModel.initialize,
+                (
+                    address(accessManager),
+                    address(stablecoin),
+                    0.5e27,
+                    2e27,
+                    1e27,
+                    0.02e27,
+                    1 hours,
+                    0.8e27,
+                    0.1e27 - 1,
+                    1.25e27
+                )
+            )
+        );
     }
 
     function test_setLiquidationBonus_updatesAndBounds() public {

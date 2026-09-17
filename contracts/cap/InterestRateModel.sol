@@ -50,6 +50,15 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     uint256 public liquidationBonus;
 
     /// @inheritdoc IInterestRateModel
+    uint256 public liquidationThreshold;
+
+    /// @inheritdoc IInterestRateModel
+    uint256 public buffer;
+
+    /// @inheritdoc IInterestRateModel
+    uint256 public targetHealth;
+
+    /// @inheritdoc IInterestRateModel
     UtilizationAverage public utilizationAverage;
 
     /// @inheritdoc IInterestRateModel
@@ -78,7 +87,10 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         uint256 _maximumMarketMultiplier,
         uint256 _maximumUnderwriterRate,
         uint256 _liquidationBonus,
-        uint256 _averagingPeriod
+        uint256 _averagingPeriod,
+        uint256 _liquidationThreshold,
+        uint256 _buffer,
+        uint256 _targetHealth
     ) external initializer {
         __AccessManaged_init(_authority);
         // the multiplier band has no setter, so an inverted one would leave every
@@ -96,6 +108,9 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         utilizationAverage.lastUpdate = block.timestamp;
         _setLiquidationBonus(_liquidationBonus);
         _setAveragingPeriod(_averagingPeriod);
+        _setLiquidationThreshold(_liquidationThreshold);
+        _setBuffer(_buffer);
+        _setTargetHealth(_targetHealth);
     }
 
     /// @inheritdoc IInterestRateModel
@@ -186,6 +201,47 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         if (_liquidationBonus > MarketLimits.MAX_LIQUIDATION_BONUS) revert InvalidLiquidationBonus();
         liquidationBonus = _liquidationBonus;
         emit SetLiquidationBonus(_liquidationBonus);
+    }
+
+    /// @inheritdoc IInterestRateModel
+    function setLiquidationThreshold(uint256 _liquidationThreshold) external restricted {
+        _setLiquidationThreshold(_liquidationThreshold);
+    }
+
+    /// @inheritdoc IInterestRateModel
+    function setBuffer(uint256 _buffer) external restricted {
+        _setBuffer(_buffer);
+    }
+
+    /// @inheritdoc IInterestRateModel
+    function setTargetHealth(uint256 _targetHealth) external restricted {
+        _setTargetHealth(_targetHealth);
+    }
+
+    /// @dev Shared with {initialize}. Same bounds as the setter.
+    /// @param _liquidationThreshold The default liquidation threshold in ray decimals
+    function _setLiquidationThreshold(uint256 _liquidationThreshold) internal {
+        if (_liquidationThreshold > MarketLimits.MAX_LT || _liquidationThreshold <= buffer) {
+            revert InvalidLiquidationThreshold();
+        }
+        liquidationThreshold = _liquidationThreshold;
+        emit SetLiquidationThreshold(_liquidationThreshold);
+    }
+
+    /// @dev Shared with {initialize}. Must be at least 10% and strictly below the liquidation threshold.
+    /// @param _buffer The default liquidation buffer in ray decimals
+    function _setBuffer(uint256 _buffer) internal {
+        if (_buffer < MarketLimits.MIN_BUFFER || _buffer >= liquidationThreshold) revert InvalidBuffer();
+        buffer = _buffer;
+        emit SetBuffer(_buffer);
+    }
+
+    /// @dev Shared with {initialize}. Floor matches {IBaseMarket-setTargetHealth}.
+    /// @param _targetHealth The default target health in ray decimals
+    function _setTargetHealth(uint256 _targetHealth) internal {
+        if (_targetHealth < MarketLimits.MIN_TARGET_HEALTH) revert InvalidTargetHealth();
+        targetHealth = _targetHealth;
+        emit SetTargetHealth(_targetHealth);
     }
 
     /// @inheritdoc IInterestRateModel

@@ -55,7 +55,7 @@ contract LiquidationReentrancyTest is CapDeployer {
         market.borrow(defaultBorrower, 900e18);
 
         // $2000 of collateral against $900 of debt, then the threshold moves under it
-        market.setLt(0.4e27);
+        market.setLiquidationThreshold(0.4e27);
         assertLt(market.healthiness(), 1e27, "the market has to be liquidatable for any of this");
     }
 

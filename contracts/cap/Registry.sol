@@ -67,15 +67,6 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     address public wrapper;
 
     /// @inheritdoc IRegistry
-    uint256 public lt;
-
-    /// @inheritdoc IRegistry
-    uint256 public buffer;
-
-    /// @inheritdoc IRegistry
-    uint256 public targetHealth;
-
-    /// @inheritdoc IRegistry
     mapping(address market => bool deployed) public isMarket;
 
     /// @inheritdoc IRegistry
@@ -111,12 +102,6 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         trancheBeacon = init.trancheBeacon;
         underwriterBeacon = init.underwriterBeacon;
         wrapper = init.wrapper;
-        if (init.buffer < MarketLimits.MIN_BUFFER) revert IBaseMarket.InvalidBuffer();
-        if (init.lt > MarketLimits.MAX_LT || init.lt <= init.buffer) revert IBaseMarket.InvalidLt();
-        if (init.targetHealth < MarketLimits.MIN_TARGET_HEALTH) revert IBaseMarket.InvalidTargetHealth();
-        lt = init.lt;
-        buffer = init.buffer;
-        targetHealth = init.targetHealth;
         _nextOperatorRoleId = CapRoles.FIRST_OPERATOR_ROLE;
         _configureInfraRoles();
     }
@@ -265,7 +250,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     function marketOwnerRole(address _market) public view returns (uint64 roleId) {
         // Live from the AccessManager, so rehoming owner selectors moves this too.
         if (!isMarket[_market]) return 0;
-        roleId = IAccessManager(authority()).getTargetFunctionRole(_market, IBaseMarket.setLtv.selector);
+        roleId = IAccessManager(authority()).getTargetFunctionRole(_market, IBaseMarket.setLoanToValue.selector);
     }
 
     /// @dev Deploy a market with tranches and wire AccessManager roles
@@ -502,11 +487,14 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     function _irmGovernorSelectors() private pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](4);
+        selectors = new bytes4[](7);
         selectors[0] = IInterestRateModel.setLiquiditySlopes.selector;
         selectors[1] = IInterestRateModel.setTermMultiplierSlope.selector;
         selectors[2] = IInterestRateModel.setLiquidationBonus.selector;
         selectors[3] = IInterestRateModel.setAveragingPeriod.selector;
+        selectors[4] = IInterestRateModel.setLiquidationThreshold.selector;
+        selectors[5] = IInterestRateModel.setBuffer.selector;
+        selectors[6] = IInterestRateModel.setTargetHealth.selector;
     }
 
     function _oracleGovernorSelectors() private pure returns (bytes4[] memory selectors) {
@@ -516,7 +504,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     function _marketOwnerSelectors() private pure returns (bytes4[] memory selectors) {
         selectors = new bytes4[](5);
         selectors[0] = IBaseMarket.setTrancheWeights.selector;
-        selectors[1] = IBaseMarket.setLtv.selector;
+        selectors[1] = IBaseMarket.setLoanToValue.selector;
         selectors[2] = IBaseMarket.setMarketMultiplier.selector;
         selectors[3] = IBaseMarket.setUnderwriterRate.selector;
         selectors[4] = IBaseMarket.setBorrowerRole.selector;
@@ -535,7 +523,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     function _marketGuardianSelectors() private pure returns (bytes4[] memory selectors) {
         selectors = new bytes4[](4);
         selectors[0] = IBaseMarket.setBuffer.selector;
-        selectors[1] = IBaseMarket.setLt.selector;
+        selectors[1] = IBaseMarket.setLiquidationThreshold.selector;
         selectors[2] = IFloatingMarket.writeOff.selector;
         selectors[3] = IFixedMarket.writeOff.selector;
     }

@@ -19,9 +19,9 @@ interface IBaseMarket {
     /// @param stablecoin The stablecoin address
     /// @param irm The interest rate model address
     /// @param targetHealth The target health in ray decimals
-    /// @param ltv The loan-to-value ratio in ray decimals
+    /// @param loanToValue The loan-to-value ratio in ray decimals
     /// @param buffer The liquidation buffer in ray decimals
-    /// @param lt The liquidation threshold in ray decimals
+    /// @param liquidationThreshold The liquidation threshold in ray decimals
     /// @param tranches The tranches and their weights
     /// @param registry The registry that deployed and configures the market
     /// @param marketMultiplier The liquidity-rate multiplier in ray decimals. Zero reads as one ray.
@@ -31,21 +31,21 @@ interface IBaseMarket {
         address stablecoin;
         address irm;
         uint256 targetHealth;
-        uint256 ltv;
+        uint256 loanToValue;
         uint256 buffer;
-        uint256 lt;
+        uint256 liquidationThreshold;
         Tranche[] tranches;
         uint256 marketMultiplier;
     }
 
     /// @notice The loan-to-value ratio exceeds the liquidation threshold minus buffer
-    error InvalidLtv();
+    error InvalidLoanToValue();
 
     /// @notice The buffer is below 10% or is not strictly below the liquidation threshold
     error InvalidBuffer();
 
     /// @notice The liquidation threshold exceeds the maximum allowed value
-    error InvalidLt();
+    error InvalidLiquidationThreshold();
 
     /// @notice The target health is below the minimum allowed value
     error InvalidTargetHealth();
@@ -107,16 +107,16 @@ interface IBaseMarket {
     event WriteOff(address indexed caller, uint256 amount, uint256 remainingDebt);
 
     /// @notice Emitted when the loan-to-value ratio is updated
-    /// @param ltv The new loan-to-value ratio in ray decimals
-    event SetLtv(uint256 ltv);
+    /// @param loanToValue The new loan-to-value ratio in ray decimals
+    event SetLoanToValue(uint256 loanToValue);
 
     /// @notice Emitted when the liquidation buffer is updated
     /// @param buffer The new buffer in ray decimals
     event SetBuffer(uint256 buffer);
 
     /// @notice Emitted when the liquidation threshold is updated
-    /// @param lt The new liquidation threshold in ray decimals
-    event SetLt(uint256 lt);
+    /// @param liquidationThreshold The new liquidation threshold in ray decimals
+    event SetLiquidationThreshold(uint256 liquidationThreshold);
 
     /// @notice Emitted when the target health is updated
     /// @param targetHealth The new target health in ray decimals
@@ -142,18 +142,18 @@ interface IBaseMarket {
     event ChargePremium(address indexed recipient, uint256 premium);
 
     /// @notice Set the loan-to-value ratio
-    /// @param ltv The new loan-to-value ratio in ray decimals
-    function setLtv(uint256 ltv) external;
+    /// @param loanToValue The new loan-to-value ratio in ray decimals
+    function setLoanToValue(uint256 loanToValue) external;
 
     /// @notice Set the liquidation buffer
-    /// @dev Must be at least 0.1e27 and strictly below {lt}. Credit capacity uses
-    /// `min(ltv, lt - buffer)`, so raising the buffer can tighten an existing LTV setting.
+    /// @dev Must be at least 0.1e27 and strictly below {liquidationThreshold}. Credit capacity uses
+    /// `min(loanToValue, liquidationThreshold - buffer)`, so raising the buffer can tighten an existing LTV setting.
     /// @param buffer The new buffer in ray decimals
     function setBuffer(uint256 buffer) external;
 
     /// @notice Set the liquidation threshold
-    /// @param lt The new liquidation threshold in ray decimals
-    function setLt(uint256 lt) external;
+    /// @param liquidationThreshold The new liquidation threshold in ray decimals
+    function setLiquidationThreshold(uint256 liquidationThreshold) external;
 
     /// @notice Set the target health
     /// @param targetHealth The new target health in ray decimals
@@ -206,7 +206,7 @@ interface IBaseMarket {
 
     /// @notice Get the liquidation threshold in ray decimals
     /// @return The liquidation threshold in ray decimals
-    function lt() external view returns (uint256);
+    function liquidationThreshold() external view returns (uint256);
 
     /// @notice Get the liquidation buffer in ray decimals
     /// @return The liquidation buffer in ray decimals
@@ -218,7 +218,7 @@ interface IBaseMarket {
 
     /// @notice Get the loan-to-value ratio in ray decimals
     /// @return The loan-to-value ratio in ray decimals
-    function ltv() external view returns (uint256);
+    function loanToValue() external view returns (uint256);
 
     /// @notice Get the liquidity-rate multiplier in ray decimals
     /// @dev Unset reads as one ray.
@@ -278,8 +278,8 @@ interface IBaseMarket {
     function availableCredit() external view returns (uint256 credit);
 
     /// @notice Get the credit limit
-    /// @dev Sum of each attached tranche's {ITranche-capitalLimit}, then `min(ltv, lt - buffer)`.
-    /// Lowering `lt` or raising `buffer` caps new credit even when the stored `ltv` is higher.
+    /// @dev Sum of each attached tranche's {ITranche-capitalLimit}, then `min(loanToValue, liquidationThreshold - buffer)`.
+    /// Lowering `liquidationThreshold` or raising `buffer` caps new credit even when the stored `loanToValue` is higher.
     /// @return limit The credit limit in USD (18 decimals)
     function creditLimit() external view returns (uint256 limit);
 }

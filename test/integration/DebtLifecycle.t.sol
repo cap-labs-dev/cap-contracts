@@ -231,7 +231,7 @@ contract DebtLifecycleTest is CapDeployer {
         vm.prank(defaultBorrower);
         bundle.market.borrow(defaultBorrower, 500e18);
 
-        bundle.market.setLt(1e27);
+        bundle.market.setLiquidationThreshold(1e27);
         // capital $505, debt $500: healthy at lt = 1, but short of capital / 1.02
         _setPrice(address(collateral), 0.505e18);
 

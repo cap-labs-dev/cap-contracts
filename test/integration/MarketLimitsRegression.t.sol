@@ -34,15 +34,15 @@ contract MarketLimitsRegressionTest is CapDeployer {
         market.setBuffer(0.8e27);
         market.setBuffer(0.4e27);
         assertEq(market.creditLimit(), 400e18);
-        assertEq(market.ltv(), 0.5e27, "risk tightening need not change the owner's stored LTV");
-        market.setLt(0.6e27);
+        assertEq(market.loanToValue(), 0.5e27, "risk tightening need not change the owner's stored LTV");
+        market.setLiquidationThreshold(0.6e27);
         assertEq(market.creditLimit(), 200e18);
-        vm.expectRevert(IBaseMarket.InvalidLt.selector);
-        market.setLt(0.4e27);
+        vm.expectRevert(IBaseMarket.InvalidLiquidationThreshold.selector);
+        market.setLiquidationThreshold(0.4e27);
     }
 
     function test_marketInitializationAlsoRejectsSubMinimumBuffer() public {
-        vm.mockCall(address(registry), abi.encodeWithSignature("buffer()"), abi.encode(0.1e27 - 1));
+        vm.mockCall(address(irm), abi.encodeCall(IInterestRateModel.buffer, ()), abi.encode(0.1e27 - 1));
         FloatingMarket implementation = new FloatingMarket();
         vm.expectRevert(IBaseMarket.InvalidBuffer.selector);
         _deployProxy(
@@ -116,7 +116,7 @@ contract MarketLimitsRegressionTest is CapDeployer {
         uint256 lt = bound(rawLt, MarketLimits.MIN_BUFFER + 1, MarketLimits.MAX_LT);
         uint256 buffer = bound(rawBuffer, MarketLimits.MIN_BUFFER, lt - 1);
         uint256 bonus = bound(rawBonus, 0, MarketLimits.MAX_LIQUIDATION_BONUS);
-        market.setLt(lt);
+        market.setLiquidationThreshold(lt);
         market.setBuffer(buffer);
         irm.setLiquidationBonus(bonus);
         assertLt((lt - buffer) * (RAY + bonus), RAY * RAY, "credit ratio stays below recoverable collateral");
@@ -131,7 +131,7 @@ contract MarketLimitsRegressionTest is CapDeployer {
         _fundTranche(address(senior), makeAddr("supplier"), 1_000e18);
         vm.prank(defaultBorrower);
         market.borrow(defaultBorrower, 400e18);
-        market.setLt(RAY);
+        market.setLiquidationThreshold(RAY);
         irm.setLiquidationBonus(0.1e27);
         _setPrice(address(collateral), 0.1e18);
         assertGt(market.writeOff(), 0);
@@ -146,7 +146,7 @@ contract MarketLimitsRegressionTest is CapDeployer {
         _fundTranche(t, makeAddr("supplier"), 1_000e18);
         vm.prank(defaultBorrower);
         (uint256 id,) = fixedMarket.borrow(defaultBorrower, 400e18, 30 days);
-        fixedMarket.setLt(RAY);
+        fixedMarket.setLiquidationThreshold(RAY);
         irm.setLiquidationBonus(0.1e27);
         _setPrice(address(collateral), 0.1e18);
         assertGt(fixedMarket.writeOff(id), 0);

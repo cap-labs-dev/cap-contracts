@@ -1400,7 +1400,7 @@ contract AccountingIntegrityTest is CapDeployer {
         market.setUnderwriterRate(capConfig.defaultUnderwriterRate);
         // let the collateral-backed limit bind rather than the flat cap
         _setMaxCapitalOn(market, tranche, type(uint256).max);
-        market.setLtv(capConfig.defaultLt - capConfig.defaultBuffer);
+        market.setLoanToValue(capConfig.defaultLiquidationThreshold - capConfig.defaultBuffer);
         _fundTranche(tranche, alice, 10_000e18);
     }
 
@@ -1680,7 +1680,18 @@ contract AccountingIntegrityTest is CapDeployer {
             address(impl),
             abi.encodeCall(
                 InterestRateModel.initialize,
-                (address(accessManager), address(stablecoin), 1e27, 2e27, 1e27, 0.2e27, 1 hours)
+                (
+                    address(accessManager),
+                    address(stablecoin),
+                    1e27,
+                    2e27,
+                    1e27,
+                    0.2e27,
+                    1 hours,
+                    0.8e27,
+                    0.1e27,
+                    1.25e27
+                )
             )
         );
 
@@ -1689,7 +1700,18 @@ contract AccountingIntegrityTest is CapDeployer {
             address(impl),
             abi.encodeCall(
                 InterestRateModel.initialize,
-                (address(accessManager), address(stablecoin), 2e27, 1e27, 1e27, 0.05e27, 1 hours)
+                (
+                    address(accessManager),
+                    address(stablecoin),
+                    2e27,
+                    1e27,
+                    1e27,
+                    0.05e27,
+                    1 hours,
+                    0.8e27,
+                    0.1e27,
+                    1.25e27
+                )
             )
         );
 
@@ -1700,7 +1722,7 @@ contract AccountingIntegrityTest is CapDeployer {
             address(impl),
             abi.encodeCall(
                 InterestRateModel.initialize,
-                (address(accessManager), address(stablecoin), 1e27, 2e27, 1e27, 0.05e27, 0)
+                (address(accessManager), address(stablecoin), 1e27, 2e27, 1e27, 0.05e27, 0, 0.8e27, 0.1e27, 1.25e27)
             )
         );
 
@@ -1709,7 +1731,78 @@ contract AccountingIntegrityTest is CapDeployer {
             address(impl),
             abi.encodeCall(
                 InterestRateModel.initialize,
-                (address(accessManager), address(stablecoin), 1e27, 2e27, 1e27, 0.05e27, 8 days)
+                (
+                    address(accessManager),
+                    address(stablecoin),
+                    1e27,
+                    2e27,
+                    1e27,
+                    0.05e27,
+                    8 days,
+                    0.8e27,
+                    0.1e27,
+                    1.25e27
+                )
+            )
+        );
+
+        vm.expectRevert(IInterestRateModel.InvalidLiquidationThreshold.selector);
+        _deployProxy(
+            address(impl),
+            abi.encodeCall(
+                InterestRateModel.initialize,
+                (
+                    address(accessManager),
+                    address(stablecoin),
+                    1e27,
+                    2e27,
+                    1e27,
+                    0.05e27,
+                    1 hours,
+                    1e27 + 1,
+                    0.1e27,
+                    1.25e27
+                )
+            )
+        );
+
+        vm.expectRevert(IInterestRateModel.InvalidBuffer.selector);
+        _deployProxy(
+            address(impl),
+            abi.encodeCall(
+                InterestRateModel.initialize,
+                (
+                    address(accessManager),
+                    address(stablecoin),
+                    1e27,
+                    2e27,
+                    1e27,
+                    0.05e27,
+                    1 hours,
+                    0.1e27,
+                    0.1e27,
+                    1.25e27
+                )
+            )
+        );
+
+        vm.expectRevert(IInterestRateModel.InvalidTargetHealth.selector);
+        _deployProxy(
+            address(impl),
+            abi.encodeCall(
+                InterestRateModel.initialize,
+                (
+                    address(accessManager),
+                    address(stablecoin),
+                    1e27,
+                    2e27,
+                    1e27,
+                    0.05e27,
+                    1 hours,
+                    0.8e27,
+                    0.1e27,
+                    1.24e27
+                )
             )
         );
     }
@@ -1729,12 +1822,13 @@ contract AccountingIntegrityTest is CapDeployer {
         );
     }
 
-    /// @dev `setLtv` rejects `ltv + buffer > lt` while `setBuffer` only checks `buffer < lt`, so
-    /// the buffer can be raised into a pair `setLtv` would have refused. That asymmetry is
-    /// deliberate and this pins the reason: every direction it opens up locks more capital per unit
-    /// of debt, so a guardian reaching for it cannot loosen anything, and the one bound that does
-    /// matter — the divisor in `lockedValue` — still bites.
-    function test_raisingBufferPastLtvIsAPermittedTightening() public {
+    /// @dev `setLoanToValue` rejects `loanToValue + buffer > liquidationThreshold` while
+    /// `setBuffer` only checks `buffer < liquidationThreshold`, so the buffer can be raised
+    /// into a pair `setLoanToValue` would have refused. That asymmetry is deliberate and this
+    /// pins the reason: every direction it opens up locks more capital per unit of debt, so a
+    /// guardian reaching for it cannot loosen anything, and the one bound that does matter —
+    /// the divisor in `lockedValue` — still bites.
+    function test_raisingBufferPastLoanToValueIsAPermittedTightening() public {
         MarketBundle memory b = _createReadyMarket("m");
         _fundTranche(b.tranche0Addr, alice, 1_000e18);
 
@@ -1742,14 +1836,14 @@ contract AccountingIntegrityTest is CapDeployer {
         b.market.borrow(defaultBorrower, 200e18);
 
         uint256 lockedBefore = b.market.lockedValue(b.tranche0Addr);
-        uint256 lt = b.market.lt();
+        uint256 threshold = b.market.liquidationThreshold();
 
-        b.market.setBuffer(lt - b.market.ltv() + 0.01e27);
-        assertGt(b.market.ltv() + b.market.buffer(), lt, "the pair setLtv would reject");
+        b.market.setBuffer(threshold - b.market.loanToValue() + 0.01e27);
+        assertGt(b.market.loanToValue() + b.market.buffer(), threshold, "the pair setLoanToValue would reject");
         assertGt(b.market.lockedValue(b.tranche0Addr), lockedBefore, "and it locks more, never less");
 
         vm.expectRevert(IBaseMarket.InvalidBuffer.selector);
-        b.market.setBuffer(lt);
+        b.market.setBuffer(threshold);
     }
 
     /// @dev {Tranche-claim} emits and returns; the underwriter's equivalent moved cUSD and said

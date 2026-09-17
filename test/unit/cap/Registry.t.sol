@@ -3,7 +3,6 @@ pragma solidity 0.8.36;
 
 import { BeaconFactory } from "../../../contracts/cap/BeaconFactory.sol";
 import { Registry } from "../../../contracts/cap/Registry.sol";
-import { IBaseMarket } from "../../../contracts/interfaces/IBaseMarket.sol";
 import { IRegistry } from "../../../contracts/interfaces/IRegistry.sol";
 import { BaseTest } from "../../shared/BaseTest.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -20,10 +19,7 @@ contract RegistryTest is BaseTest {
             fixedMarketBeacon: address(7),
             trancheBeacon: address(8),
             underwriterBeacon: address(9),
-            wrapper: address(10),
-            lt: 0.8e27,
-            buffer: 0.1e27,
-            targetHealth: 1.25e27
+            wrapper: address(10)
         });
     }
 
@@ -79,34 +75,6 @@ contract RegistryTest is BaseTest {
         init = _validInit();
         init.wrapper = address(0);
         _initRevertsOnZero(init);
-    }
-
-    function test_initialize_rejectsInvalidRiskParams() public {
-        Registry impl = new Registry();
-
-        IRegistry.InitParams memory init = _validInit();
-        init.lt = 1e27 + 1;
-        vm.expectRevert(IBaseMarket.InvalidLt.selector);
-        _deployProxy(address(impl), abi.encodeCall(Registry.initialize, (address(accessManager), init)));
-
-        init = _validInit();
-        init.lt = 0.1e27;
-        init.buffer = 0.1e27;
-        vm.expectRevert(IBaseMarket.InvalidLt.selector);
-        _deployProxy(address(impl), abi.encodeCall(Registry.initialize, (address(accessManager), init)));
-
-        init = _validInit();
-        init.targetHealth = 1.24e27;
-        vm.expectRevert(IBaseMarket.InvalidTargetHealth.selector);
-        _deployProxy(address(impl), abi.encodeCall(Registry.initialize, (address(accessManager), init)));
-    }
-
-    function test_initialize_rejectsBufferBelowTenPercent() public {
-        IRegistry.InitParams memory init = _validInit();
-        init.buffer = 0.1e27 - 1;
-        Registry impl = new Registry();
-        vm.expectRevert(IBaseMarket.InvalidBuffer.selector);
-        _deployProxy(address(impl), abi.encodeCall(Registry.initialize, (address(accessManager), init)));
     }
 
     function _deployRegistry(IRegistry.InitParams memory init) internal returns (Registry registry) {
