@@ -115,7 +115,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         IAeraVault.TokenAmount[] memory amounts = new IAeraVault.TokenAmount[](1);
         amounts[0] = IAeraVault.TokenAmount({ token: token, amount: amount });
         IAeraVault(reserveVault).deposit(amounts);
-        emit Invested(amount);
+        emit Invested(reserveVault, amount);
     }
 
     /// @inheritdoc IStablecoin
@@ -123,7 +123,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         IAeraVault.TokenAmount[] memory amounts = new IAeraVault.TokenAmount[](1);
         amounts[0] = IAeraVault.TokenAmount({ token: IERC20(asset()), amount: amount });
         IAeraVault(reserveVault).withdraw(amounts);
-        emit Recalled(amount);
+        emit Recalled(reserveVault, amount);
     }
 
     /// @inheritdoc IStablecoin
