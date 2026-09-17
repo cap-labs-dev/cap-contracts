@@ -65,6 +65,11 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     /// @return controller The controller, or zero if the request does not exist
     function controllerOf(uint256 requestId) external view returns (address controller);
 
+    /// @notice Get the request ids currently held by a controller
+    /// @param controller The request controller
+    /// @return requestIds The ids still queued for that controller
+    function requestsOf(address controller) external view returns (uint256[] memory requestIds);
+
     /// @notice Claim previously requested shares on a single request
     /// @dev Caller must be `controller` or its operator. ERC-20 allowance is insufficient.
     /// Limited to currently claimable shares on this request and {unlockedSupply}.

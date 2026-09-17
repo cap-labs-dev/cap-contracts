@@ -76,6 +76,33 @@ contract ERC7540AsyncRedeemTest is Test {
         assertEq(vault.activeSupply(), 600e18);
     }
 
+    function test_requestsOf_listsThenDropsConsumedAndTransferredIds() public {
+        vault.setUnlocked(1_000e18);
+        assertEq(vault.requestsOf(alice).length, 0);
+
+        vm.startPrank(alice);
+        uint256 id0 = vault.requestRedeem(200e18, alice, alice);
+        uint256 id1 = vault.requestRedeem(200e18, alice, alice);
+        vm.stopPrank();
+
+        uint256[] memory listed = vault.requestsOf(alice);
+        assertEq(listed.length, 2);
+        assertEq(listed[0], id0);
+        assertEq(listed[1], id1);
+
+        vm.prank(alice);
+        vault.transferRequest(id1, bob);
+        assertEq(vault.requestsOf(alice).length, 1);
+        assertEq(vault.requestsOf(alice)[0], id0);
+        assertEq(vault.requestsOf(bob).length, 1);
+        assertEq(vault.requestsOf(bob)[0], id1);
+
+        vm.prank(alice);
+        vault.redeem(id0, 200e18, alice, alice);
+        assertEq(vault.requestsOf(alice).length, 0);
+        assertEq(vault.requestsOf(bob).length, 1);
+    }
+
     function test_requestRedeem_zeroShares_reverts() public {
         vm.prank(alice);
         vm.expectRevert(IERC7540AsyncRedeem.ZeroShares.selector);
