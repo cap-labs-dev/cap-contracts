@@ -125,13 +125,17 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     /// @param assets The amount of assets to allocate
     function _allocate(address tranche, uint256 assets) internal {
         if (!_registeredTranches.contains(tranche)) revert NotRegisteredTranche();
+        // remake first so an unmarked slash is Loss, not netted into Allocated
+        _mark(tranche);
         ITranche(tranche).deposit(assets, address(this));
         // allocate is the only path that may open a book
-        _syncMark(tranche);
+        _applyAllocated(tranche);
     }
 
     /// @inheritdoc IUnderwriter
     function deallocate(address tranche, uint256 shares) external restricted returns (uint256 deallocated) {
+        // remake first so an unmarked slash is Loss, not netted into Deallocated
+        _mark(tranche);
         // clamped by this contract's own holding as well as the tranche's unlocked supply, so an
         // oversized request comes back as a short fill the way {deallocateAsync} does rather than
         // reverting inside the tranche's burn
@@ -140,13 +144,16 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         deallocated = Math.min(shares, available);
         if (deallocated > 0) ITranche(tranche).instantRedeem(deallocated, address(this), address(this));
         // remakes an existing book only. An airdropped vault cannot enter {totalDebt} here.
-        _mark(tranche);
+        _applyDeallocated(tranche);
     }
 
     /// @inheritdoc IUnderwriter
     function deallocateAsync(address tranche, uint256 shares) external restricted returns (uint256 requestId) {
         uint256 balance = ITranche(tranche).balanceOf(address(this));
         if (shares > balance) shares = balance;
+
+        // the request stays in {debt}, so this remake is gain/loss only
+        _mark(tranche);
 
         requestId = ITranche(tranche).requestRedeem(shares, address(this), address(this));
 
@@ -155,8 +162,6 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         // this is what keeps {_mark} able to see them while they sit there
         queuedShares[tranche] += shares;
         queuedRequest[tranche][requestId] = shares;
-
-        _mark(tranche);
 
         emit RequestedRedeem(tranche, shares, requestId);
     }
@@ -171,12 +176,22 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         uint256 recorded = queuedRequest[tranche][requestId];
         if (shares > recorded) revert UnknownQueuedRequest();
 
+        _mark(tranche);
+
         ITranche(tranche).redeem(requestId, shares, address(this), address(this));
 
         queuedRequest[tranche][requestId] = recorded - shares;
         queuedShares[tranche] -= shares;
 
-        _mark(tranche);
+        _applyDeallocated(tranche);
+    }
+
+    /// @dev Remaining plus queued shares, in asset units
+    /// @param tranche The tranche to price
+    /// @return The live convert-to-assets of this vault's position
+    function _positionAssets(address tranche) internal view returns (uint256) {
+        uint256 position = ITranche(tranche).balanceOf(address(this)) + queuedShares[tranche];
+        return ITranche(tranche).convertToAssets(position);
     }
 
     /// @dev Re-value a book that {allocate} already opened. A never-seen token is a no-op, so an
@@ -196,20 +211,44 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     /// @return loss The decrease in the recorded position, if any
     function _syncMark(address tranche) internal returns (uint256 gain, uint256 loss) {
         uint256 recorded = debt[tranche];
-        uint256 position = ITranche(tranche).balanceOf(address(this)) + queuedShares[tranche];
-        uint256 assets = ITranche(tranche).convertToAssets(position);
+        uint256 assets = _positionAssets(tranche);
         if (assets == recorded) return (0, 0);
 
         if (assets < recorded) {
             loss = recorded - assets;
             totalDebt -= loss;
-            emit DebtDecreased(tranche, loss);
+            emit Loss(tranche, loss);
         } else {
             gain = assets - recorded;
             totalDebt += gain;
-            emit DebtIncreased(tranche, gain);
+            emit Gain(tranche, gain);
         }
         debt[tranche] = assets;
+    }
+
+    /// @dev Fold a deposit into {debt}. First allocation opens the book.
+    /// @param tranche The tranche that received the deposit
+    function _applyAllocated(address tranche) internal {
+        uint256 marked = debt[tranche];
+        uint256 assets = _positionAssets(tranche);
+        if (assets <= marked) return;
+        uint256 added = assets - marked;
+        debt[tranche] = assets;
+        totalDebt += added;
+        emit Allocated(tranche, added);
+    }
+
+    /// @dev Fold a redemption into {debt}. A never-seen token is a no-op.
+    /// @param tranche The tranche that was redeemed
+    function _applyDeallocated(address tranche) internal {
+        uint256 marked = debt[tranche];
+        if (marked == 0) return;
+        uint256 assets = _positionAssets(tranche);
+        if (assets >= marked) return;
+        uint256 removed = marked - assets;
+        debt[tranche] = assets;
+        totalDebt -= removed;
+        emit Deallocated(tranche, removed);
     }
 
     /// @inheritdoc IUnderwriter

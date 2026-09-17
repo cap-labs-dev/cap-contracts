@@ -316,6 +316,185 @@ contract UnderwriterUnitTest is BaseTest {
         underwriter.allocate(tranche, 1e18);
     }
 
+    /// @dev First deposit opens the book as Allocated, not as a remake gain.
+    function test_allocate_emitsAllocated() public {
+        MockMarkTranche t = _markTranche();
+
+        vm.expectEmit(address(underwriter));
+        emit IUnderwriter.Allocated(address(t), 1e18);
+        underwriter.allocate(address(t), 1e18);
+
+        assertEq(underwriter.debt(address(t)), 1e18);
+        assertEq(underwriter.totalDebt(), 1e18);
+    }
+
+    /// @dev Remake first: an unmarked slash is Loss, then the deposit is Allocated.
+    function test_allocate_afterLoss_emitsLossThenAllocated() public {
+        MockMarkTranche t = _markTranche();
+        underwriter.allocate(address(t), 1e18);
+        t.setPrice(0.6e18);
+
+        vm.expectEmit(address(underwriter));
+        emit IUnderwriter.Loss(address(t), 0.4e18);
+        vm.expectEmit(address(underwriter));
+        emit IUnderwriter.Allocated(address(t), 0.6e18);
+        underwriter.allocate(address(t), 1e18);
+
+        assertEq(underwriter.debt(address(t)), 1.2e18);
+        assertEq(underwriter.totalDebt(), 1.2e18);
+    }
+
+    /// @dev Instant redeem is Deallocated. A zero redeem after a slash is only the remake.
+    function test_deallocate_emitsDeallocatedAndRemakesLossSeparately() public {
+        MockMarkTranche t = _markTranche();
+        underwriter.allocate(address(t), 1e18);
+
+        vm.expectEmit(address(underwriter));
+        emit IUnderwriter.Deallocated(address(t), 0.4e18);
+        underwriter.deallocate(address(t), 0.4e18);
+        assertEq(underwriter.debt(address(t)), 0.6e18);
+
+        t.setPrice(0.5e18);
+        vm.expectEmit(address(underwriter));
+        emit IUnderwriter.Loss(address(t), 0.3e18);
+        underwriter.deallocate(address(t), 0);
+        assertEq(underwriter.debt(address(t)), 0.3e18);
+        assertEq(underwriter.totalDebt(), 0.3e18);
+    }
+
+    /// @dev Queued shares stay in the book, so a request remakes loss and does not emit Deallocated.
+    function test_deallocateAsync_remakesLossWithoutDeallocated() public {
+        MockMarkTranche t = _markTranche();
+        underwriter.allocate(address(t), 1e18);
+        t.setPrice(0.7e18);
+
+        vm.expectEmit(address(underwriter));
+        emit IUnderwriter.Loss(address(t), 0.3e18);
+        uint256 requestId = underwriter.deallocateAsync(address(t), 1e18);
+
+        assertEq(underwriter.debt(address(t)), 0.7e18);
+        assertEq(underwriter.queuedShares(address(t)), 1e18);
+        assertEq(t.balanceOf(address(underwriter)), 0);
+
+        vm.expectEmit(address(underwriter));
+        emit IUnderwriter.Deallocated(address(t), 0.7e18);
+        underwriter.finalizeDeallocateAsync(address(t), requestId, 1e18);
+        assertEq(underwriter.debt(address(t)), 0);
+        assertEq(underwriter.totalDebt(), 0);
+    }
+
+    /// @dev report is a remake only: gain and loss stay on Gain / Loss.
+    function test_report_emitsGainAndLoss() public {
+        MockMarkTranche t = _markTranche();
+        underwriter.allocate(address(t), 1e18);
+
+        t.setPrice(1.25e18);
+        vm.expectEmit(address(underwriter));
+        emit IUnderwriter.Gain(address(t), 0.25e18);
+        underwriter.report(address(t));
+        assertEq(underwriter.debt(address(t)), 1.25e18);
+
+        t.setPrice(1e18);
+        vm.expectEmit(address(underwriter));
+        emit IUnderwriter.Loss(address(t), 0.25e18);
+        underwriter.report(address(t));
+        assertEq(underwriter.debt(address(t)), 1e18);
+    }
+
+    /// @dev A zero deposit does not raise convertToAssets, so {_applyAllocated} is a no-op.
+    function test_allocate_zeroDoesNotEmitAllocated() public {
+        MockMarkTranche t = _markTranche();
+        underwriter.allocate(address(t), 1e18);
+
+        vm.recordLogs();
+        underwriter.allocate(address(t), 0);
+        assertEq(vm.getRecordedLogs().length, 0);
+        assertEq(underwriter.debt(address(t)), 1e18);
+        assertEq(underwriter.totalDebt(), 1e18);
+    }
+
+    /// @dev Remake first: unmarked yield is Gain, then the deposit is Allocated.
+    function test_allocate_afterGain_emitsGainThenAllocated() public {
+        MockMarkTranche t = _markTranche();
+        underwriter.allocate(address(t), 1e18);
+        t.setPrice(1.5e18);
+
+        vm.expectEmit(address(underwriter));
+        emit IUnderwriter.Gain(address(t), 0.5e18);
+        vm.expectEmit(address(underwriter));
+        emit IUnderwriter.Allocated(address(t), 1.5e18);
+        underwriter.allocate(address(t), 1e18);
+
+        assertEq(underwriter.debt(address(t)), 3e18);
+        assertEq(underwriter.totalDebt(), 3e18);
+    }
+
+    /// @dev Remake first: unmarked yield is Gain, then the redeem is Deallocated.
+    function test_deallocate_afterGain_emitsGainThenDeallocated() public {
+        MockMarkTranche t = _markTranche();
+        underwriter.allocate(address(t), 1e18);
+        t.setPrice(1.5e18);
+
+        vm.expectEmit(address(underwriter));
+        emit IUnderwriter.Gain(address(t), 0.5e18);
+        vm.expectEmit(address(underwriter));
+        emit IUnderwriter.Deallocated(address(t), 0.75e18);
+        underwriter.deallocate(address(t), 0.5e18);
+
+        assertEq(underwriter.debt(address(t)), 0.75e18);
+        assertEq(underwriter.totalDebt(), 0.75e18);
+    }
+
+    /// @dev An oversized request is a short fill against this vault's holding.
+    function test_deallocateAsync_clampsToHeldShares() public {
+        MockMarkTranche t = _markTranche();
+        underwriter.allocate(address(t), 1e18);
+
+        uint256 requestId = underwriter.deallocateAsync(address(t), 2e18);
+
+        assertEq(requestId, 1);
+        assertEq(underwriter.queuedShares(address(t)), 1e18);
+        assertEq(underwriter.queuedRequest(address(t), requestId), 1e18);
+        assertEq(t.balanceOf(address(underwriter)), 0);
+        assertEq(underwriter.debt(address(t)), 1e18);
+    }
+
+    /// @dev A request id this vault never queued, or more shares than it queued, is refused.
+    function test_finalizeDeallocateAsync_unknownRequestReverts() public {
+        MockMarkTranche t = _markTranche();
+        underwriter.allocate(address(t), 1e18);
+        uint256 requestId = underwriter.deallocateAsync(address(t), 1e18);
+
+        vm.expectRevert(IUnderwriter.UnknownQueuedRequest.selector);
+        underwriter.finalizeDeallocateAsync(address(t), 99, 1);
+
+        vm.expectRevert(IUnderwriter.UnknownQueuedRequest.selector);
+        underwriter.finalizeDeallocateAsync(address(t), requestId, 1e18 + 1);
+    }
+
+    /// @dev Loss while shares sit in the queue is remade on finalize, then Deallocated.
+    function test_finalize_afterQueuedLoss_emitsLossThenDeallocated() public {
+        MockMarkTranche t = _markTranche();
+        underwriter.allocate(address(t), 1e18);
+        uint256 requestId = underwriter.deallocateAsync(address(t), 1e18);
+        t.setPrice(0.4e18);
+
+        vm.expectEmit(address(underwriter));
+        emit IUnderwriter.Loss(address(t), 0.6e18);
+        vm.expectEmit(address(underwriter));
+        emit IUnderwriter.Deallocated(address(t), 0.4e18);
+        underwriter.finalizeDeallocateAsync(address(t), requestId, 1e18);
+
+        assertEq(underwriter.debt(address(t)), 0);
+        assertEq(underwriter.queuedShares(address(t)), 0);
+        assertEq(underwriter.totalDebt(), 0);
+    }
+
+    function _markTranche() internal returns (MockMarkTranche t) {
+        t = new MockMarkTranche();
+        underwriter.addTranche(address(t));
+    }
+
     /// @dev {report} is not gated on registration. {removeTranche} only closes allocations; leftover
     /// shares keep earning, and a re-add must not be the only way to collect that later premium.
     function test_report_doesNotRequireRegistration() public {
@@ -451,5 +630,53 @@ contract UnderwriterUnitTest is BaseTest {
         );
         vm.mockCall(tranche, abi.encodeWithSignature("convertToAssets(uint256)"), abi.encode(assets));
         underwriter.allocate(tranche, assets);
+    }
+}
+
+/// @dev Live convertToAssets so a remake and a later deposit see different books.
+contract MockMarkTranche {
+    uint256 public shares;
+    uint256 public price = 1e18;
+    uint256 public nextRequestId = 1;
+
+    function optIn() external { }
+
+    function claim(address) external pure returns (uint256) {
+        return 0;
+    }
+
+    function setPrice(uint256 newPrice) external {
+        price = newPrice;
+    }
+
+    function deposit(uint256 assets, address) external returns (uint256) {
+        shares += assets;
+        return assets;
+    }
+
+    function balanceOf(address) external view returns (uint256) {
+        return shares;
+    }
+
+    function convertToAssets(uint256 amount) external view returns (uint256) {
+        return amount * price / 1e18;
+    }
+
+    function instantUnlockedSupply() external view returns (uint256) {
+        return shares;
+    }
+
+    function instantRedeem(uint256 amount, address, address) external returns (uint256) {
+        shares -= amount;
+        return amount;
+    }
+
+    function requestRedeem(uint256 amount, address, address) external returns (uint256 requestId) {
+        shares -= amount;
+        requestId = nextRequestId++;
+    }
+
+    function redeem(uint256, uint256, address, address) external pure returns (uint256) {
+        return 0;
     }
 }
