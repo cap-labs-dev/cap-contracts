@@ -17,12 +17,15 @@ interface IStablecoin {
     event BurnCreditBacked(address indexed from, uint256 amount);
 
     /// @notice Emitted when a reserve loss is recognized
+    /// @dev Guardian action; no market. Lifetime total is the sum of these logs.
     /// @param amount The bad debt recognized, in cUSD share units (18 decimals)
     event BadDebtRecognizedInReserve(uint256 amount);
 
     /// @notice Emitted when a credit loss is recognized
+    /// @dev `market` is the caller. Lifetime total is the sum of credit and reserve logs.
+    /// @param market The market that recognized the loss
     /// @param amount The bad debt recognized, in cUSD share units (18 decimals)
-    event BadDebtRecognizedInCredit(uint256 amount);
+    event BadDebtRecognizedInCredit(address indexed market, uint256 amount);
 
     /// @notice Emitted when bad debt is reduced
     /// @param owner The account whose redemption reduced bad debt

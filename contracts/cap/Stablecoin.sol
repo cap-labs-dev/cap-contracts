@@ -187,7 +187,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         // because badDebt rose by the same amount. Holders take the loss through {backing}.
         creditBackedSupply -= _amount;
         IInterestRateModel(irm).updateLiquidityRate();
-        emit BadDebtRecognizedInCredit(_amount);
+        emit BadDebtRecognizedInCredit(msg.sender, _amount);
     }
 
     /// @inheritdoc IStablecoin

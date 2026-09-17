@@ -253,7 +253,7 @@ contract StablecoinTest is BaseTest {
         scoin.mintCreditBacked(bob, 50e18);
         uint256 rateUpdates = irm.updateCalls();
 
-        vm.expectEmit(false, false, false, true);
+        vm.expectEmit(address(scoin));
         emit IStablecoin.BadDebtRecognizedInReserve(30e18);
         vm.prank(guardian);
         scoin.recognizeBadDebtInReserve(30e18);
@@ -264,6 +264,15 @@ contract StablecoinTest is BaseTest {
         assertLt(scoin.convertToAssets(120e18), 120e18, "the exit quote is the discounted one");
         assertEq(scoin.creditBackedSupply(), 50e18, "reserve loss does not write off borrower credit");
         assertEq(irm.updateCalls(), rateUpdates, "reserve loss does not change utilization");
+    }
+
+    function test_recognizeBadDebtInCredit_namesTheMarket() public {
+        scoin.mintCreditBacked(bob, 50e18);
+
+        vm.expectEmit(address(scoin));
+        emit IStablecoin.BadDebtRecognizedInCredit(address(this), 20e18);
+        scoin.recognizeBadDebtInCredit(20e18);
+        assertEq(scoin.badDebt(), 20e18);
     }
 
     function test_recognizeBadDebtInCredit_revertsAboveSupply() public {
