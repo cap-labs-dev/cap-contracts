@@ -37,13 +37,15 @@ interface IStablecoin {
     /// @param amount The bad debt covered, in cUSD share units (18 decimals)
     event BadDebtCovered(address indexed payer, uint256 amount);
 
-    /// @notice Emitted when reserve is sent to reserve vault
-    /// @param amount The underlying amount sent
-    event Invested(uint256 amount);
+    /// @notice Emitted when reserve is sent to the reserve vault
+    /// @param reserveVault The vault that received the reserve
+    /// @param assets The underlying reserve-token units sent
+    event Invested(address indexed reserveVault, uint256 assets);
 
-    /// @notice Emitted when reserve is recalled from reserve vault
-    /// @param amount The underlying amount recalled
-    event Recalled(uint256 amount);
+    /// @notice Emitted when reserve is recalled from the reserve vault
+    /// @param reserveVault The vault that returned the reserve
+    /// @param assets The underlying reserve-token units recalled
+    event Recalled(address indexed reserveVault, uint256 assets);
 
     /// @notice Emitted when the reserve vault is updated
     /// @param previousVault The previous reserve vault

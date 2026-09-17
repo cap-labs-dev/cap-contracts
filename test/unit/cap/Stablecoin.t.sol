@@ -1134,6 +1134,8 @@ contract StablecoinTest is BaseTest {
         scoin.deposit(1_000e18, alice);
         assertEq(scoin.totalAssets(), 1_000e18);
 
+        vm.expectEmit(address(scoin));
+        emit IStablecoin.Invested(address(reserve), 400e18);
         vm.prank(keeper);
         scoin.invest(400e18);
 
@@ -1149,6 +1151,8 @@ contract StablecoinTest is BaseTest {
 
         vm.prank(keeper);
         scoin.invest(400e18);
+        vm.expectEmit(address(scoin));
+        emit IStablecoin.Recalled(address(reserve), 400e18);
         vm.prank(keeper);
         scoin.recall(400e18);
 
