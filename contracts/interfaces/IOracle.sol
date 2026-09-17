@@ -32,7 +32,7 @@ interface IOracle {
     /// @notice Emitted when the source chain for an asset is updated
     /// @param asset The asset the chain prices
     /// @param sources The hops to multiply
-    event SetSource(address asset, Sources[] sources);
+    event SetSource(address indexed asset, Sources[] sources);
 
     /// @notice The asset has no usable price
     /// @param asset The asset that could not be priced
