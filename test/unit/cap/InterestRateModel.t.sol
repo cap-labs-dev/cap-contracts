@@ -191,6 +191,26 @@ contract InterestRateModelTest is BaseTest {
         assertEq(irm.underwriterIndex(market), folded);
     }
 
+    function test_updateLiquidityRate_emitsRateAndIndex() public {
+        irm.setLiquiditySlopes(_liquiditySlopes());
+        stablecoin.setSupplyUtilization(0.8e27);
+
+        vm.expectEmit(address(irm));
+        emit IInterestRateModel.LiquidityRateUpdated(0.1e27, irm.liquidityIndex());
+        irm.updateLiquidityRate();
+    }
+
+    function test_updateUnderwriterIndex_emitsIndex() public {
+        vm.prank(market);
+        irm.updateUnderwriterRate(0.2e27);
+        vm.warp(block.timestamp + 365 days);
+        uint256 live = irm.underwriterIndex(market);
+
+        vm.expectEmit(address(irm));
+        emit IInterestRateModel.UnderwriterIndexUpdated(market, live);
+        irm.updateUnderwriterIndex(market);
+    }
+
     function test_updateUnderwriterIndex_isPermissionlessAndWritesTheView() public {
         vm.prank(market);
         irm.updateUnderwriterRate(0.2e27);
