@@ -76,6 +76,16 @@ interface IInterestRateModel {
     /// @param slopes The new liquidity slopes, in ray decimals
     event SetLiquiditySlopes(Slopes slopes);
 
+    /// @notice Emitted when the live liquidity rate and index are checkpointed
+    /// @param ratePerYear The liquidity rate per year in ray decimals
+    /// @param index The checkpointed liquidity index in ray decimals
+    event LiquidityRateUpdated(uint256 ratePerYear, uint256 index);
+
+    /// @notice Emitted when a market's underwriter index is checkpointed
+    /// @param market The market whose index was written
+    /// @param index The checkpointed underwriter index in ray decimals
+    event UnderwriterIndexUpdated(address indexed market, uint256 index);
+
     /// @notice Emitted when the term multiplier slope is set
     /// @param slope The new term multiplier slope in ray decimals
     event SetTermMultiplierSlope(uint256 slope);

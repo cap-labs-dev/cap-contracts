@@ -307,6 +307,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         liquidityData.lastUpdate = block.timestamp;
         uint256 utilization = IStablecoin(stablecoin).utilizationRate();
         liquidityData.ratePerYear = _nextLiquidityRate(utilization);
+        emit LiquidityRateUpdated(liquidityData.ratePerYear, liquidityData.index);
     }
 
     /// @dev Fold the prior observation into the averages when time has passed, then
@@ -378,6 +379,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     function _checkpointUnderwriter(address market) internal {
         underwriterData[market].index = underwriterIndex(market);
         underwriterData[market].lastUpdate = block.timestamp;
+        emit UnderwriterIndexUpdated(market, underwriterData[market].index);
     }
 
     /// @dev Calculate the cumulative index for a given index data
