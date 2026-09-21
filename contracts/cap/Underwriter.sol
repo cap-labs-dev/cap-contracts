@@ -190,7 +190,7 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     }
 
     /// @dev Write {debt} from remaining plus queued shares. The book stays cached between marks;
-    /// issuance quotes separately value the already-recorded default position via {_issuanceAssets}.
+    /// issuance quotes separately value the default position via {_issuanceAssets}.
     /// @param tranche The tranche to re-value
     /// @return gain The increase in the recorded position, if any
     /// @return loss The decrease in the recorded position, if any
@@ -249,14 +249,14 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     /// @inheritdoc IUnderwriter
     /// @dev Idle vault balance plus the last marked tranche positions. A slash hits the tranche
     /// immediately, but this vault only folds it in when {_mark} runs (allocate, deallocate, or
-    /// report). Issuance quotes separately adjust for the already-recorded default position.
+    /// report). Issuance quotes separately adjust for the default position, even when its book is zero.
     function totalAssets() public view override(ERC4626Upgradeable, IERC4626, IUnderwriter) returns (uint256) {
         return IVault(vault).balanceOf(address(this), asset()) + totalDebt;
     }
 
     /// @dev Replace the default position's cached value with its current value for issuance only.
-    /// Includes queued shares, as {_syncMark} does. A zero book stays excluded, as in {_mark};
-    /// allocation persists the updated book after the incoming assets have been transferred.
+    /// Includes queued shares and zero-book positions, as the allocation's {_syncMark} does.
+    /// Allocation persists the updated book after the incoming assets have been transferred.
     /// @return assets The assets used to price deposits and mints
     function _issuanceAssets() internal view returns (uint256 assets) {
         assets = totalAssets();
@@ -264,8 +264,6 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         if (tranche == address(0)) return assets;
 
         uint256 recorded = debt[tranche];
-        if (recorded == 0) return assets;
-
         uint256 position = ITranche(tranche).balanceOf(address(this)) + queuedShares[tranche];
         assets = assets - recorded + ITranche(tranche).convertToAssets(position);
     }

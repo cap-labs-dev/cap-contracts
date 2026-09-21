@@ -169,8 +169,9 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice Get the total assets including vault balance and recorded tranche debt
     /// @dev Vault ERC6909 balance plus {totalDebt}. A slash is folded in only when {allocate}
     /// opens or remakes the book, or when {report} / {deallocate} remake a book that already
-    /// exists. Deposit and mint quotes separately adjust for the already-recorded default
-    /// position, including queued shares, without writing the book.
+    /// exists. Deposit and mint quotes separately adjust for the default position, including
+    /// queued shares and positions whose recorded debt is zero, without writing the book.
+    /// Non-default positions remain cached, so unreported gains and losses also affect issuance pricing.
     /// @return assets The total assets
     function totalAssets() external view returns (uint256 assets);
 
