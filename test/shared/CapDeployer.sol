@@ -436,7 +436,8 @@ abstract contract CapDeployer is BaseTest {
     /// @dev Size `tranche`'s {ITranche-maxCapital} so the market's {IBaseMarket-creditLimit}
     /// from it equals `limit` once it has the capital. Empty siblings stay at zero.
     function _setBorrowableOn(IBaseMarket market, address tranche, uint256 limit) internal {
-        uint256 ltvBound = market.ltv() < market.lt() ? market.ltv() : market.lt();
+        uint256 bufferedLt = market.lt() - market.buffer();
+        uint256 ltvBound = market.ltv() < bufferedLt ? market.ltv() : bufferedLt;
         uint256 cap = ltvBound == 0 ? 0 : (limit * 1e27 + ltvBound - 1) / ltvBound;
         _setMaxCapitalOn(market, tranche, cap);
     }

@@ -20,7 +20,7 @@ contract AuditValidationTest is CapDeployer {
         _setMaxCapitalOn(market, t, type(uint256).max);
         _fundTranche(t, makeAddr("supplier"), 2_000e18);
         market.setLt(0.2e27);
-        assertEq(market.creditLimit(), 400e18);
+        assertEq(market.creditLimit(), 200e18, "2000 capital at LT 20% minus buffer 10%");
         vm.prank(defaultBorrower);
         vm.expectRevert(IBaseMarket.InsufficientLiquidity.selector);
         market.borrow(defaultBorrower, 900e18);

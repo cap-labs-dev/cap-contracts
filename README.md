@@ -26,6 +26,8 @@ The buffer must be at least 10% (`0.1e27`) and strictly below LT, both at initia
 
 Write-offs do not permanently pause borrowing; later repayments or collateral changes may create available credit. A healthy state after a write-off does not mean the recognized loss has been covered or new reserves have arrived. Upgrades do not rewrite previously stored buffers, so existing deployments with buffers below 10% require a configuration update before relying on this bound.
 
+Guardian procedure: when `LT × (1 + liquidationBonus) >= 1` (using fractional ratios), prioritize liquidation while the market is unhealthy, before writing off the remaining unrecoverable debt. Writing off first can make the residual healthy and block collateral recovery through liquidation. If liquidation is unavailable and the guardian proceeds with a write-off, it accepts that residual and the possibility of further write-offs as premiums accrue. The minimum buffer prevents immediate new borrowing against unchanged collateral; it does not enforce liquidation ordering or guarantee recovery of the remaining collateral.
+
 ## Development setup
 
 Required: Git, Node.js **24.12.x**, Yarn **1.22.22**, and Foundry **v1.5.1**. Install Foundry with [foundryup](https://getfoundry.sh/). The checked-in configuration uses Solidity **0.8.36** and the **Osaka** EVM target.
