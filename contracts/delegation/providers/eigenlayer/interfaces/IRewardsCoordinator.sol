@@ -1,4 +1,4 @@
-    // SPDX-License-Identifier: BUSL-1.1
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
 interface IRewardsCoordinator {
@@ -118,6 +118,8 @@ interface IRewardsCoordinator {
     ) external;
 
     function MAX_REWARDS_DURATION() external pure returns (uint32);
+
+    function MAX_RETROACTIVE_LENGTH() external pure returns (uint32);
 
     function activationDelay() external pure returns (uint256);
 }
