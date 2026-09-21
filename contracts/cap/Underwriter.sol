@@ -55,6 +55,12 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     /// @inheritdoc IUnderwriter
     uint256 public lastReported;
 
+    /// @inheritdoc IUnderwriter
+    bool public killed;
+
+    /// @dev Shares per remaining asset at which the pool is retired (1% of par).
+    uint256 private constant KILL_RATIO = 100;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -185,7 +191,10 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     /// @return gain The increase in the recorded position, if any
     /// @return loss The decrease in the recorded position, if any
     function _mark(address tranche) internal returns (uint256 gain, uint256 loss) {
-        if (debt[tranche] == 0) return (0, 0);
+        if (debt[tranche] == 0) {
+            _checkKilled();
+            return (0, 0);
+        }
         return _syncMark(tranche);
     }
 
@@ -198,18 +207,34 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         uint256 recorded = debt[tranche];
         uint256 position = ITranche(tranche).balanceOf(address(this)) + queuedShares[tranche];
         uint256 assets = ITranche(tranche).convertToAssets(position);
-        if (assets == recorded) return (0, 0);
 
         if (assets < recorded) {
             loss = recorded - assets;
             totalDebt -= loss;
             emit DebtDecreased(tranche, loss);
-        } else {
+        } else if (assets > recorded) {
             gain = assets - recorded;
             totalDebt += gain;
             emit DebtIncreased(tranche, gain);
         }
         debt[tranche] = assets;
+        _checkKilled();
+    }
+
+    /// @dev Latch retirement after updating a position, including an unchanged or closed book.
+    /// Exits, reports, and premium claims remain available after retirement.
+    function _checkKilled() private {
+        if (!killed && _belowKillThreshold()) {
+            killed = true;
+            emit Killed();
+        }
+    }
+
+    /// @dev Use the same recorded assets as share pricing. Division avoids overflowing assets * 100.
+    /// A never-funded pool is not a loss; equality at 1% of par remains open.
+    function _belowKillThreshold() private view returns (bool) {
+        uint256 supply = totalSupply();
+        return supply > 0 && totalAssets() < Math.ceilDiv(supply, KILL_RATIO);
     }
 
     /// @inheritdoc IUnderwriter
@@ -244,6 +269,30 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         returns (uint256 assets)
     {
         assets = super.mint(_shares, _receiver);
+    }
+
+    /// @inheritdoc IUnderwriter
+    function maxDeposit(address)
+        public
+        view
+        override(ERC4626Upgradeable, IERC4626, IUnderwriter)
+        returns (uint256 maxAssets)
+    {
+        if (!killed && !_belowKillThreshold()) {
+            maxAssets = type(uint256).max;
+        }
+    }
+
+    /// @inheritdoc IUnderwriter
+    function maxMint(address)
+        public
+        view
+        override(ERC4626Upgradeable, IERC4626, IUnderwriter)
+        returns (uint256 maxShares)
+    {
+        if (!killed && !_belowKillThreshold()) {
+            maxShares = type(uint256).max;
+        }
     }
 
     /// @inheritdoc IUnderwriter
@@ -284,6 +333,8 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
         if (totalSupply() == 0) _mint(DeadShares.HOLDER, DeadShares.SHARES);
         super._deposit(caller, receiver, assets, shares);
+        // Default allocation can recognize a loss after the entry-point limit check.
+        if (killed) revert UnderwriterKilled();
     }
 
     /// @dev Transfer in assets to the vault from the sender

@@ -16,6 +16,12 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice The named shares exceed this vault's queue under that request id
     error UnknownQueuedRequest();
 
+    /// @notice The deposit's default allocation retired the underwriter
+    error UnderwriterKilled();
+
+    /// @notice Emitted once when a position update retires the underwriter
+    event Killed();
+
     /// @notice Emitted when a tranche is registered with the underwriter
     /// @param tranche The tranche address
     event AddTranche(address indexed tranche);
@@ -140,6 +146,26 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice Get when {report} last folded premium into the remainder
     /// @return The last report timestamp
     function lastReported() external view returns (uint256);
+
+    /// @notice Get whether a position update has retired the underwriter
+    /// @dev Latched below 1% of par using idle assets plus recorded tranche values. Deposits and
+    /// mints close permanently; deallocations, redemptions, reports, and premium claims stay open.
+    /// @return Whether the underwriter has been retired
+    function killed() external view returns (bool);
+
+    /// @notice Get the maximum deposit for a receiver
+    /// @dev Zero if killed or recorded assets are below 1% of par, otherwise unlimited. The
+    /// additional value check also protects already-impaired pools before their next position update.
+    /// Admission remains on the caller of {deposit}, not on the receiver.
+    /// @param receiver The account that would receive shares
+    /// @return maxAssets The maximum deposit amount
+    function maxDeposit(address receiver) external view returns (uint256 maxAssets);
+
+    /// @notice Get the maximum mint for a receiver
+    /// @dev Same gate as {maxDeposit}.
+    /// @param receiver The account that would receive shares
+    /// @return maxShares The maximum mint amount
+    function maxMint(address receiver) external view returns (uint256 maxShares);
 
     /// @notice Get the default allocation tranche
     /// @return The default tranche address
