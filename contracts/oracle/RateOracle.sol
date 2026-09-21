@@ -36,6 +36,7 @@ abstract contract RateOracle is IRateOracle, Access, RateOracleStorageUtils {
 
     /// @inheritdoc IRateOracle
     function setRestakerRate(address _agent, uint256 _rate) external checkAccess(this.setRestakerRate.selector) {
+        if (_rate > 1e27) revert RateTooHigh(_agent, _rate);
         getRateOracleStorage().restakerRate[_agent] = _rate;
         emit SetRestakerRate(_agent, _rate);
     }
