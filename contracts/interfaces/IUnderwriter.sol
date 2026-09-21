@@ -124,8 +124,8 @@ interface IUnderwriter is IERC7540AsyncRedeem {
 
     /// @notice Re-value a tranche position and claim its premium
     /// @dev Registration is not checked; see {deallocate}. Remakes the mark only if {allocate}
-    /// already opened one. Share price stays on that book until this runs; that lag is
-    /// intentional, not a live NAV walk.
+    /// already opened one. Valuations stay cached between marks. Deposit and mint quotes
+    /// separately value the already-recorded default position at its current value.
     /// @param tranche The tranche address
     function report(address tranche) external;
 
@@ -169,7 +169,8 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice Get the total assets including vault balance and recorded tranche debt
     /// @dev Vault ERC6909 balance plus {totalDebt}. A slash is folded in only when {allocate}
     /// opens or remakes the book, or when {report} / {deallocate} remake a book that already
-    /// exists — Yearn-style, not a live price of positions.
+    /// exists. Deposit and mint quotes separately adjust for the already-recorded default
+    /// position, including queued shares, without writing the book.
     /// @return assets The total assets
     function totalAssets() external view returns (uint256 assets);
 

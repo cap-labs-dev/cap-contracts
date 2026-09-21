@@ -189,8 +189,8 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         return _syncMark(tranche);
     }
 
-    /// @dev Write {debt} from remaining plus queued shares. A slash between reports is a loss that
-    /// waits here on purpose: share price is this cached book, not a live walk of every position.
+    /// @dev Write {debt} from remaining plus queued shares. The book stays cached between marks;
+    /// issuance quotes separately value the already-recorded default position via {_issuanceAssets}.
     /// @param tranche The tranche to re-value
     /// @return gain The increase in the recorded position, if any
     /// @return loss The decrease in the recorded position, if any
@@ -249,26 +249,50 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     /// @inheritdoc IUnderwriter
     /// @dev Idle vault balance plus the last marked tranche positions. A slash hits the tranche
     /// immediately, but this vault only folds it in when {_mark} runs (allocate, deallocate, or
-    /// report). Positions are not priced live.
+    /// report). Issuance quotes separately adjust for the already-recorded default position.
     function totalAssets() public view override(ERC4626Upgradeable, IERC4626, IUnderwriter) returns (uint256) {
         return IVault(vault).balanceOf(address(this), asset()) + totalDebt;
     }
 
+    /// @dev Replace the default position's cached value with its current value for issuance only.
+    /// Includes queued shares, as {_syncMark} does. A zero book stays excluded, as in {_mark};
+    /// allocation persists the updated book after the incoming assets have been transferred.
+    /// @return assets The assets used to price deposits and mints
+    function _issuanceAssets() internal view returns (uint256 assets) {
+        assets = totalAssets();
+        address tranche = defaultTranche;
+        if (tranche == address(0)) return assets;
+
+        uint256 recorded = debt[tranche];
+        if (recorded == 0) return assets;
+
+        uint256 position = ITranche(tranche).balanceOf(address(this)) + queuedShares[tranche];
+        assets = assets - recorded + ITranche(tranche).convertToAssets(position);
+    }
+
     /// @inheritdoc IERC4626
-    /// @dev Empty vault quotes at par via {DeadShares-seedDeposit} minus the seeded shares.
+    /// @dev Prices the existing default position via {_issuanceAssets} before allocation can mark it.
+    /// Empty vault quotes at par via {DeadShares-seedDeposit} minus the seeded shares.
     function previewDeposit(uint256 assets)
         public
         view
         override(ERC4626Upgradeable, IERC4626)
         returns (uint256 shares)
     {
-        shares = totalSupply() == 0 ? DeadShares.seedDeposit(assets) : super.previewDeposit(assets);
+        uint256 supply = totalSupply();
+        shares = supply == 0
+            ? DeadShares.seedDeposit(assets)
+            : Math.mulDiv(assets, supply + 10 ** _decimalsOffset(), _issuanceAssets() + 1, Math.Rounding.Floor);
     }
 
     /// @inheritdoc IERC4626
-    /// @dev Inverse of {previewDeposit} while empty.
+    /// @dev Uses the same issuance valuation as {previewDeposit}, rounding assets up.
+    /// Inverse of {previewDeposit} while empty.
     function previewMint(uint256 shares) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 assets) {
-        assets = totalSupply() == 0 ? DeadShares.seedMint(shares) : super.previewMint(shares);
+        uint256 supply = totalSupply();
+        assets = supply == 0
+            ? DeadShares.seedMint(shares)
+            : Math.mulDiv(shares, _issuanceAssets() + 1, supply + 10 ** _decimalsOffset(), Math.Rounding.Ceil);
     }
 
     /// @inheritdoc IUnderwriter
