@@ -83,7 +83,7 @@ contract StablecoinWrapperMigrationTest is BaseTest {
                 address(new Stablecoin()),
                 abi.encodeCall(
                     Stablecoin.initialize,
-                    (address(accessManager), address(usdc), "Cap USD", "cUSD", address(irm), address(reserve))
+                    (address(accessManager), address(usdc), "Cap USD", "cUSD", address(irm), address(reserve), 12 hours)
                 )
             )
         );
@@ -129,7 +129,7 @@ contract StablecoinWrapperMigrationTest is BaseTest {
                 address(new Stablecoin()),
                 abi.encodeCall(
                     Stablecoin.initialize,
-                    (address(accessManager), address(usdc), "Cap USD", "cUSD", address(irm), address(reserve))
+                    (address(accessManager), address(usdc), "Cap USD", "cUSD", address(irm), address(reserve), 12 hours)
                 )
             );
         UUPSUpgradeable(address(wrapper))
@@ -163,7 +163,9 @@ contract StablecoinWrapperMigrationTest is BaseTest {
         assertEq(minted, 5e18);
 
         vm.expectRevert();
-        scoin.initialize(address(accessManager), address(usdc), "Cap USD", "cUSD", address(irm), address(reserve));
+        scoin.initialize(
+            address(accessManager), address(usdc), "Cap USD", "cUSD", address(irm), address(reserve), 12 hours
+        );
         vm.expectRevert();
         wrapper.initialize(address(accessManager), address(scoin));
     }

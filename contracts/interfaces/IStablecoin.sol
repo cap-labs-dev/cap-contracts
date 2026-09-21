@@ -70,13 +70,15 @@ interface IStablecoin {
     /// @param symbol The token symbol
     /// @param irm The interest rate model address
     /// @param reserveVault The Aera vault that may hold idle reserve
+    /// @param vestingPeriod The initial premium vesting time constant in seconds
     function initialize(
         address authority,
         address asset,
         string memory name,
         string memory symbol,
         address irm,
-        address reserveVault
+        address reserveVault,
+        uint256 vestingPeriod
     ) external;
 
     /// @notice Mint credit-backed tokens for a borrow or reward

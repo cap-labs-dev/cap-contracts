@@ -59,6 +59,7 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @param asset The vault asset deposited by curators
     /// @param vaultAddress The vault holding curator assets
     /// @param stablecoinAddress The stablecoin used for premium payments
+    /// @param vestingPeriod The initial premium vesting time constant in seconds
     function initialize(
         address authority,
         address registryAddress,
@@ -66,7 +67,8 @@ interface IUnderwriter is IERC7540AsyncRedeem {
         string memory symbol,
         address asset,
         address vaultAddress,
-        address stablecoinAddress
+        address stablecoinAddress,
+        uint256 vestingPeriod
     ) external;
 
     /// @notice Set the role permitted to deposit

@@ -32,7 +32,15 @@ contract NumericalBoundariesTest is CapDeployer {
                 address(new Stablecoin()),
                 abi.encodeCall(
                     Stablecoin.initialize,
-                    (address(accessManager), address(token), "Boundary cUSD", "bcUSD", address(irm), address(0))
+                    (
+                        address(accessManager),
+                        address(token),
+                        "Boundary cUSD",
+                        "bcUSD",
+                        address(irm),
+                        address(0),
+                        12 hours
+                    )
                 )
             )
         );

@@ -9,9 +9,6 @@ import { IUnderwriter } from "../interfaces/IUnderwriter.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import { DeadShares } from "../utils/DeadShares.sol";
 import { PremiumVesting } from "../utils/PremiumVesting.sol";
-import {
-    AccessManagedUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -20,12 +17,7 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 /// @author kexley, Cap Labs
 /// @notice Curator vault that allocates assets into tranches and distributes premium to depositors.
 /// @dev Beacon instance. Upgrade via {UpgradeableBeacon-upgradeTo} on the underwriter beacon.
-contract Underwriter layout at erc7201("cap.storage.Underwriter")
-    is
-    IUnderwriter,
-    AccessManagedUpgradeable,
-    PremiumVesting
-{
+contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwriter, PremiumVesting {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @inheritdoc IUnderwriter
@@ -68,10 +60,10 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         string memory _symbol,
         address _asset,
         address _vaultAddress,
-        address _stablecoinAddress
+        address _stablecoinAddress,
+        uint256 _vestingPeriod
     ) external override initializer {
-        __AccessManaged_init(_authority);
-        __PremiumVesting_init(IERC20(_asset), _name, _symbol, _stablecoinAddress);
+        __PremiumVesting_init(_authority, IERC20(_asset), _name, _symbol, _stablecoinAddress, _vestingPeriod);
         registry = _registry;
         vault = _vaultAddress;
     }
