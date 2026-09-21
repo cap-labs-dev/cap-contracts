@@ -41,7 +41,7 @@ interface IRegistry {
     /// @param underwriterBeacon The underwriter beacon address
     /// @param wrapper The staked-stablecoin wrapper address
     /// @param lt The default liquidation threshold for new markets in ray decimals (at most one ray, above buffer)
-    /// @param buffer The default liquidation buffer for new markets in ray decimals (strictly below lt)
+    /// @param buffer The default liquidation buffer in ray decimals (at least 0.1e27, strictly below lt)
     /// @param targetHealth The default target health for new markets in ray decimals (min 1.25e27)
     struct InitParams {
         address stablecoin;

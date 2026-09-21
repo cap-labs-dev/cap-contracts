@@ -16,6 +16,16 @@ This repository contains the Solidity contracts, deployment tooling, and Foundry
 
 Core implementations are in [contracts/cap](contracts/cap), public interfaces in [contracts/interfaces](contracts/interfaces), and premium accounting in [PremiumVesting.sol](contracts/utils/PremiumVesting.sol).
 
+### Write-offs and market health
+
+A guardian can write off derived unrecoverable debt while a market is unhealthy. A write-off reduces market debt and credit-backed cUSD supply and increases recognized cUSD bad debt, without slashing collateral or adding reserves. The remaining debt may be healthy: the health requirement applies before the write-off, and continued liquidatability is not guaranteed. Liquidation is blocked while the remaining market debt is healthy.
+
+Ignoring integer rounding, a full floating-market write-off with nonzero remaining debt leaves debt at `capital / (1 + liquidationBonus)` and health at `LT × (1 + liquidationBonus)`, with ratios expressed as fractions. With a 2% liquidation bonus, the remaining debt can be healthy at an LT of approximately 98.0392% or higher. The buffer affects collateral locking and LTV validation, but does not enter the health or recoverable-debt calculation.
+
+The buffer must be at least 10% (`0.1e27`) and strictly below LT, both at initialization and when changed. Credit capacity uses `min(LTV, LT - buffer)`, so increasing the buffer or lowering LT tightens the effective borrowing limit even if the stored LTV is higher. With LT capped at 100%, credit capacity is at most 90% of eligible collateral. Even at the maximum 10% liquidation bonus, a full write-off leaves approximately 90.91% of total collateral value as debt, preventing the write-off from immediately reopening borrowing capacity against the same collateral.
+
+Write-offs do not permanently pause borrowing; later repayments or collateral changes may create available credit. A healthy state after a write-off does not mean the recognized loss has been covered or new reserves have arrived. Upgrades do not rewrite previously stored buffers, so existing deployments with buffers below 10% require a configuration update before relying on this bound.
+
 ## Development setup
 
 Required: Git, Node.js **24.12.x**, Yarn **1.22.22**, and Foundry **v1.5.1**. Install Foundry with [foundryup](https://getfoundry.sh/). The checked-in configuration uses Solidity **0.8.36** and the **Osaka** EVM target.
