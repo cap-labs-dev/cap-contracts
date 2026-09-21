@@ -207,10 +207,12 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
         localNow = lastLocal.rayMul((globalNow.rayDiv(lastGlobal)).rayPowRay(multiplier));
     }
 
-    /// @dev Premium as the rise in {totalDebt} between two checkpoints, split liquidity-then
-    /// underwriter. Each valuation uses the same half-up product as the getter, so the two
-    /// components sum to the reported growth and there is no independently rounded remainder.
-    /// Indices are assumed nondecreasing, as the previous delta form required.
+    /// @dev Premium as the rise in {totalDebt}, split underwriting-then-liquidity. Underwriting
+    /// accrues against the previous liquidity index; liquidity receives the remaining growth.
+    /// More frequent realization can increase underwriting's share for the same index and debt
+    /// path, incentivizing eligible underwriters to fund both pools sooner. Each valuation uses
+    /// the getter's half-up product, so the components sum exactly to reported debt growth.
+    /// Indices are assumed nondecreasing.
     /// @param scaledDebtAmount The scaled debt
     /// @param previousLiquidityIndex The last liquidity index
     /// @param previousUnderwriterIndex The last underwriter index
@@ -226,9 +228,9 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
         uint256 currentUnderwriterIndex
     ) internal pure returns (uint256 liquidityPremium, uint256 underwriterPremium) {
         uint256 previousDebt = scaledDebtAmount.rayMul(previousLiquidityIndex.rayMul(previousUnderwriterIndex));
-        uint256 debtAfterLiquidity = scaledDebtAmount.rayMul(currentLiquidityIndex.rayMul(previousUnderwriterIndex));
+        uint256 debtAfterUnderwriting = scaledDebtAmount.rayMul(previousLiquidityIndex.rayMul(currentUnderwriterIndex));
         uint256 currentDebt = scaledDebtAmount.rayMul(currentLiquidityIndex.rayMul(currentUnderwriterIndex));
-        liquidityPremium = debtAfterLiquidity - previousDebt;
-        underwriterPremium = currentDebt - debtAfterLiquidity;
+        underwriterPremium = debtAfterUnderwriting - previousDebt;
+        liquidityPremium = currentDebt - debtAfterUnderwriting;
     }
 }

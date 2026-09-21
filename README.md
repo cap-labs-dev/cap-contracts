@@ -14,6 +14,8 @@ This repository contains the Solidity contracts, deployment tooling, and Foundry
 - **Exits:** cUSD, tranches, and underwriter pools support queued redemptions and instant exits when liquidity and credit constraints permit. Recognized losses can affect exit value. Redeeming stcUSD returns cUSD; redeeming cUSD returns the reserve token.
 - **Configuration and access:** `Registry` creates markets and underwriter pools and wires their roles through OpenZeppelin `AccessManager`. `Oracle` prices collateral, and `InterestRateModel` supplies rate calculations. Markets, tranches, and underwriter pools use beacon proxies; core infrastructure contracts use UUPS proxies.
 
+Floating markets allocate underwriting premium using the liquidity index at the previous realization, then allocate the remaining debt growth to liquidity. For the same index and debt path, more frequent realization can increase underwriting's share, up to rounding. This intentionally incentivizes eligible underwriters to realize premiums and fund both pools for vesting sooner; the benefit is shared through the existing tranche allocation, with no separate caller reward. Total minted premium always equals reported debt growth, and realization does not change borrower debt.
+
 Core implementations are in [contracts/cap](contracts/cap), public interfaces in [contracts/interfaces](contracts/interfaces), and premium accounting in [PremiumVesting.sol](contracts/utils/PremiumVesting.sol).
 
 ## Development setup
