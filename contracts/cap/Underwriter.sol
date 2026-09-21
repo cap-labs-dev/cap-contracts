@@ -305,6 +305,8 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         (uint256 gain, uint256 loss) = _mark(_tranche);
 
         uint256 premium = IPremiumVesting(_tranche).claim(address(this));
+        // Harvested premium vests again at the pool's configured rate. Holders earn as it
+        // vests here, including those who joined after the tranche generated the premium.
         _fund(premium);
         lastReported = block.timestamp;
 
