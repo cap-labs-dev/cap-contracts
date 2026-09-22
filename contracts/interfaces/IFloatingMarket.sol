@@ -37,6 +37,8 @@ interface IFloatingMarket is IBaseMarket {
     function liquidate(address recipient, uint256 amount) external returns (uint256 repaid, uint256 valueSlashed);
 
     /// @notice Charge the accrued premium
+    /// @dev With no scaled debt, reset the local liquidity index to one ray and refresh both
+    /// IRM baselines without minting premiums, including after a full repayment in the same block.
     function chargePremium() external;
 
     /// @notice Write off {unrecoverableDebt} as bad debt
@@ -52,12 +54,15 @@ interface IFloatingMarket is IBaseMarket {
 
     /// @notice Get the liquidity and underwriter premium indexes
     /// @dev Liquidity grows as `oldLocal × (newGlobal / oldGlobal)^multiplier`, subject to
-    /// fixed-point rounding. Same-block reads return the last checkpoint.
+    /// fixed-point rounding. With no scaled debt, returns one ray and the current IRM underwriter
+    /// index without growing liquidity. Otherwise, same-block reads return the last checkpoint.
     /// @return liquidityIndex The market-local liquidity index in ray decimals
     /// @return underwriterIndex The underwriter index in ray decimals
     function premiumIndices() external view returns (uint256 liquidityIndex, uint256 underwriterIndex);
 
     /// @notice Get the combined debt index
+    /// @dev With no scaled debt, equals the current IRM underwriter index. The local liquidity
+    /// index resets between debt lifecycles, so this index is not globally monotonic.
     /// @return combinedIndex The combined debt index in ray decimals
     function index() external view returns (uint256 combinedIndex);
 }

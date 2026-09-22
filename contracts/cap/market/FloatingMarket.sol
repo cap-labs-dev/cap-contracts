@@ -120,6 +120,7 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
 
     /// @inheritdoc IBaseMarket
     function totalDebt() public view override(BaseMarket, IBaseMarket) returns (uint256 marketDebt) {
+        if (scaledDebt == 0) return 0;
         marketDebt = scaledDebt.rayMul(index());
     }
 
@@ -134,6 +135,9 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
 
     /// @inheritdoc IFloatingMarket
     function premiumIndices() public view returns (uint256 liquidityIndex, uint256 underwriterIndex) {
+        if (scaledDebt == 0) {
+            return (WadRayMath.RAY, IInterestRateModel(irm()).underwriterIndex(address(this)));
+        }
         if (lastPremiumUpdate == block.timestamp) return (lastLiquidityIndex, lastUnderwriterIndex);
         liquidityIndex = _growIndex(
             lastLiquidityIndex, lastGlobalIndex, IInterestRateModel(irm()).liquidityIndex(), marketMultiplier()
@@ -143,8 +147,8 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
 
     /// @inheritdoc IFloatingMarket
     function index() public view returns (uint256 combinedIndex) {
-        if (lastPremiumUpdate == block.timestamp) return lastLiquidityIndex.rayMul(lastUnderwriterIndex);
         (uint256 liquidityIndex, uint256 underwriterIndex) = premiumIndices();
+        if (scaledDebt == 0) return underwriterIndex;
         combinedIndex = liquidityIndex.rayMul(underwriterIndex);
     }
 
@@ -174,15 +178,22 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
 
     /// @dev Accrue premiums for a market
     function _chargePremium() internal {
+        // Re-anchor an empty market before growing its local index. This also applies
+        // to a full repayment followed by a new borrow in the same block.
+        if (scaledDebt == 0) {
+            lastLiquidityIndex = WadRayMath.RAY;
+            lastGlobalIndex = IInterestRateModel(irm()).liquidityIndex();
+            lastUnderwriterIndex = IInterestRateModel(irm()).underwriterIndex(address(this));
+            lastPremiumUpdate = block.timestamp;
+            return;
+        }
         if (lastPremiumUpdate == block.timestamp) return;
 
         (uint256 liquidityIndex, uint256 underwriterIndex) = premiumIndices();
 
-        if (scaledDebt > 0) {
-            (uint256 liquidityPremium, uint256 underwriterPremium) =
-                _premium(scaledDebt, lastLiquidityIndex, lastUnderwriterIndex, liquidityIndex, underwriterIndex);
-            _chargePremium(liquidityPremium, underwriterPremium);
-        }
+        (uint256 liquidityPremium, uint256 underwriterPremium) =
+            _premium(scaledDebt, lastLiquidityIndex, lastUnderwriterIndex, liquidityIndex, underwriterIndex);
+        _chargePremium(liquidityPremium, underwriterPremium);
 
         lastLiquidityIndex = liquidityIndex;
         lastGlobalIndex = IInterestRateModel(irm()).liquidityIndex();
