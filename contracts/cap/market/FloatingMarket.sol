@@ -159,15 +159,16 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
         if (minted == 0) revert InvalidScaledAmount();
     }
 
-    /// @dev A representable drop in {totalDebt} that does not exceed `requested`.
-    /// Inverse-ceil of the floor is conservative under half-up `rayMul` and is not always the
-    /// largest representable fill.
+    /// @dev The largest representable drop in {totalDebt} that does not exceed `requested`.
     function _repayWithin(uint256 debt, uint256 requested) private view returns (uint256 newScaled, uint256 burned) {
         if (requested == 0) return (scaledDebt, 0);
         if (requested >= debt) return (0, debt);
 
         uint256 idx = index();
-        newScaled = Math.mulDiv(debt - requested, WadRayMath.RAY, idx, Math.Rounding.Ceil);
+        uint256 targetDebt = debt - requested;
+        newScaled = Math.mulDiv(targetDebt, WadRayMath.RAY, idx, Math.Rounding.Ceil);
+        // Half-up rounding may admit one less scaled unit. Since idx >= RAY, one check suffices.
+        if (newScaled > 0 && (newScaled - 1).rayMul(idx) >= targetDebt) --newScaled;
         burned = debt - newScaled.rayMul(idx);
         if (burned == 0) revert InvalidScaledAmount();
     }
