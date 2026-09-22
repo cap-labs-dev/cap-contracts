@@ -243,6 +243,7 @@ interface IBaseMarket {
     function utilization() external view returns (uint256 utilization);
 
     /// @notice Get the maximum liquidatable debt
+    /// @dev Uses one capital valuation to target {targetHealth}, capped at {recoverableDebt}.
     /// @return liquidatable The maximum liquidatable debt, in stablecoin units (18 decimals)
     function maxLiquidatable() external view returns (uint256 liquidatable);
 

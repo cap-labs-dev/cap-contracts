@@ -228,15 +228,23 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @inheritdoc IBaseMarket
-    /// @dev Repayment that lands health on {targetHealth}, capped at {recoverableDebt}.
     function maxLiquidatable() public view returns (uint256 liquidatable) {
+        uint256 capital = totalCapital();
+        liquidatable = _maxLiquidatable(capital, totalDebt());
+    }
+
+    /// @dev Calculate the liquidation cap from an existing capital valuation and debt balance.
+    /// @param capital The total collateral value in USD (18 decimals)
+    /// @param debt The outstanding debt in stablecoin units (18 decimals)
+    /// @return liquidatable The maximum debt that may be repaid
+    function _maxLiquidatable(uint256 capital, uint256 debt) private view returns (uint256 liquidatable) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        uint256 liquidationThreshold = debtLiquidationThreshold();
-        uint256 debt = totalDebt();
+        uint256 liquidationThreshold = capital.rayMul($.lt);
         if (debt > liquidationThreshold) {
-            uint256 perCleared = $.targetHealth - _slashPerDebt().rayMul($.lt);
+            uint256 slashPerDebt = _slashPerDebt();
+            uint256 perCleared = $.targetHealth - slashPerDebt.rayMul($.lt);
             liquidatable = ($.targetHealth.rayMul(debt) - liquidationThreshold).rayDiv(perCleared);
-            uint256 cap = Math.min(debt, recoverableDebt());
+            uint256 cap = Math.min(debt, capital.rayDiv(slashPerDebt));
             if (liquidatable > cap) liquidatable = cap;
         }
     }
@@ -323,16 +331,30 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
         perDebt = 1e27 + IInterestRateModel($.irm).liquidationBonus();
     }
 
-    /// @dev Repay debt and slash tranche collateral when the market is unhealthy
+    /// @dev Check health and size liquidation using the same capital valuation and debt balance.
+    /// @param capital The total collateral value in USD (18 decimals)
+    /// @param debt The outstanding debt before liquidation in stablecoin units (18 decimals)
+    /// @return liquidatable The maximum debt that may be repaid
+    function _checkLiquidation(uint256 capital, uint256 debt) internal view returns (uint256 liquidatable) {
+        BaseMarketStorage storage $ = _getBaseMarketStorage();
+        if (debt == 0) revert Healthy();
+        if (capital.rayMul($.lt).rayDiv(debt) >= 1e27) revert Healthy();
+        liquidatable = _maxLiquidatable(capital, debt);
+    }
+
+    /// @dev Repay debt and slash tranche collateral within the cap returned by {_checkLiquidation}.
+    /// The caller must check health and calculate the cap before changing the debt balance.
     /// @param recipient The account receiving slashed collateral
     /// @param amount The debt the caller is offering to repay, in stablecoin units (18 decimals)
+    /// @param liquidatable The maximum repayment returned by {_checkLiquidation}
     /// @return repaid The debt actually repaid, in stablecoin units (18 decimals)
     /// @return slashed The collateral value slashed, in USD (18 decimals)
-    function _liquidate(address recipient, uint256 amount) internal returns (uint256 repaid, uint256 slashed) {
+    function _liquidate(address recipient, uint256 amount, uint256 liquidatable)
+        internal
+        returns (uint256 repaid, uint256 slashed)
+    {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        if (healthiness() >= 1e27) revert Healthy();
-
-        repaid = Math.min(amount, maxLiquidatable());
+        repaid = Math.min(amount, liquidatable);
         if (repaid == 0) return (0, 0);
 
         _repay(repaid);
@@ -354,7 +376,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @dev Record the shortfall as bad debt. The market must already be unhealthy, the same
-    /// gate as {_liquidate}. {unrecoverableDebt} can be positive while {healthiness} is still
+    /// gate as {_checkLiquidation}. {unrecoverableDebt} can be positive while {healthiness} is still
     /// at or above one ray whenever `lt * (1 + bonus) > 1e27` — at the deploy bonus that band
     /// starts above `lt` 0.9804 and the loss is at most ~1.96% of collateral. That is not a
     /// write-off; liquidation is the remedy until health drops.
