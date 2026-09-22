@@ -278,7 +278,7 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         override(ERC4626Upgradeable, IERC4626, IUnderwriter)
         returns (uint256 maxAssets)
     {
-        if (!killed && !_belowKillThreshold()) {
+        if (_depositsOpen()) {
             maxAssets = type(uint256).max;
         }
     }
@@ -290,9 +290,23 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         override(ERC4626Upgradeable, IERC4626, IUnderwriter)
         returns (uint256 maxShares)
     {
-        if (!killed && !_belowKillThreshold()) {
+        if (_depositsOpen()) {
             maxShares = type(uint256).max;
         }
+    }
+
+    /// @dev A killed default blocks new capital without retiring an otherwise healthy pool.
+    /// @return open Whether the pool and its default tranche permit new capital
+    function _depositsOpen() private view returns (bool) {
+        if (killed || _belowKillThreshold()) {
+            return false;
+        }
+        address tranche = defaultTranche;
+        if (tranche != address(0)) {
+            if (ITranche(tranche).killed()) return false;
+        }
+
+        return true;
     }
 
     /// @inheritdoc IUnderwriter
