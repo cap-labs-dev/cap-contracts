@@ -130,6 +130,7 @@ interface IRegistry {
 
     /// @notice Deploy a floating market with tranches at the given assets and weights
     /// @dev Restricted to WHITELISTED. One tranche per entry of `assets` and `weights`.
+    /// Between one and ten tranches may be created; the limit is checked before deployment.
     /// Borrow, borrowMore and extend start on a closed role the owner administers, so they
     /// cannot sit at ADMIN until {setBorrowerRole}.
     /// @param assets The asset of each tranche, index 0 is most senior
@@ -168,6 +169,7 @@ interface IRegistry {
 
     /// @notice Add a junior tranche to a market and reweight the waterfall
     /// @dev Caller must hold the market owner role. `weights` covers the whole waterfall, including the new junior.
+    /// Reverts before deployment if the market already has ten configured tranches.
     /// @param market The market to deploy a tranche for
     /// @param asset The asset for the new tranche
     /// @param weights The resulting waterfall weights in ray decimals, last entry is the new tranche

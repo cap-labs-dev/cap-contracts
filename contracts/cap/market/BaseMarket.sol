@@ -378,6 +378,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     /// @dev Set the tranches and weights
     /// @param _tranches The tranches and their weights, index 0 is most senior
     function _setTranches(Tranche[] memory _tranches) internal {
+        if (_tranches.length > MarketLimits.MAX_TRANCHES) revert TooManyTranches();
         _beforeTrancheChange();
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         delete $.tranches;

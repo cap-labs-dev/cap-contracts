@@ -77,6 +77,9 @@ interface IBaseMarket {
     /// @notice The tranche is already set
     error TrancheAlreadySet();
 
+    /// @notice The market would exceed the fixed limit of ten configured tranches
+    error TooManyTranches();
+
     /// @notice The write off exceeds the debt that liquidation could never recover
     error ExceedsUnrecoverableDebt();
 
@@ -166,6 +169,8 @@ interface IBaseMarket {
 
     /// @notice Set the tranches and their weights
     /// @dev Restricted to the registry; market owners may only change weights.
+    /// At most ten tranches may be configured, including empty, killed and zero-weight tranches.
+    /// The count is checked before settling premium.
     /// Floating settles outstanding premium under the current list first, so an
     /// already-elapsed period is not reallocated.
     /// @param tranches The new tranche addresses and weights, with weights in ray decimals

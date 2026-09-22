@@ -189,6 +189,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         if (!isOwner) revert NotMarketOwner();
 
         IBaseMarket.Tranche[] memory existing = IBaseMarket(_market).tranches();
+        if (existing.length >= MarketLimits.MAX_TRANCHES) revert IBaseMarket.TooManyTranches();
         if (_weights.length != existing.length + 1) revert InvalidTrancheCount();
 
         tranche = _deployTranche(_asset, IBaseMarket(_market).name(), _market, ownerRole, _trancheCount[_market]++);
@@ -276,6 +277,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         uint64 _marketOwnerRole
     ) internal returns (address market, address[] memory deployedTranches) {
         if (_assets.length == 0) revert InvalidTrancheCount();
+        if (_assets.length > MarketLimits.MAX_TRANCHES) revert IBaseMarket.TooManyTranches();
         if (_assets.length != _weights.length) revert TrancheAssetsMismatch();
         if (!isOperatorRole[_marketOwnerRole]) revert OperatorNotAssigned();
 

@@ -2,7 +2,7 @@
 pragma solidity 0.8.36;
 
 /// @title MarketLimits
-/// @notice Shared bounds for market risk parameters
+/// @notice Fixed limits shared by markets and the registry
 /// @dev Review these bounds together: credit at MAX_LT - MIN_BUFFER must remain below
 /// collateral recovery at MAX_LIQUIDATION_BONUS, and MIN_TARGET_HEALTH must exceed
 /// MAX_LT * (1 + MAX_LIQUIDATION_BONUS), with ratios expressed as fractions.
@@ -18,4 +18,7 @@ library MarketLimits {
 
     /// @dev Maximum collateral bonus per unit of debt liquidated: 10%, in ray decimals.
     uint256 internal constant MAX_LIQUIDATION_BONUS = 0.1e27;
+
+    /// @dev Maximum configured tranches per market, including empty, killed and zero-weight tranches.
+    uint256 internal constant MAX_TRANCHES = 10;
 }
