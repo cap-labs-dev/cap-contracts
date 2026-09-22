@@ -20,7 +20,7 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @param value The value of the slashed assets in USD (18 decimals)
     event Slashed(address indexed recipient, uint256 assets, uint256 value);
 
-    /// @notice Emitted once when a slash retires the tranche
+    /// @notice Emitted once when the tranche is retired
     event Killed();
 
     /// @notice Emitted when the maximum capital is updated
@@ -87,9 +87,9 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @return The oracle address
     function oracle() external view returns (address);
 
-    /// @notice Get whether a slash has retired the tranche
-    /// @dev Latched below 1% of par. Closes deposits. The market also stops sending it fresh
-    /// premium, so leftover dust cannot keep its weight.
+    /// @notice Get whether the tranche has been retired
+    /// @dev Latched below 1% of par after a slash or withdrawal. Closes deposits. The market
+    /// also stops sending it fresh premium, so leftover dust cannot keep its weight.
     /// @return Whether the tranche has been retired
     function killed() external view returns (bool);
 

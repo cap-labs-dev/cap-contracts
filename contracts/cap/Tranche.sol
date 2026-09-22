@@ -92,12 +92,7 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
         slashedValue = Math.mulDiv(assets, price, unit);
         if (slashedValue == 0) return 0;
 
-        // Kill below 1% of par so a fresh deposit cannot mint against a near-zero asset base.
-        // Empty stays at par. Latch before the withdrawal so a transfer hook cannot deposit first.
-        if (!killed && totalSupply() > (total - assets) * KILL_RATIO) {
-            killed = true;
-            emit Killed();
-        }
+        _checkKilled(total - assets);
 
         IVault(vault).withdraw(asset(), assets, recipient);
         emit Slashed(recipient, assets, slashedValue);
@@ -209,6 +204,22 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
         if (totalSupply() == 0) _mint(DeadShares.HOLDER, DeadShares.SHARES);
         super._deposit(caller, receiver, assets, shares);
+    }
+
+    /// @inheritdoc ERC7540AsyncRedeem
+    /// @dev Shares are already burned; check the asset balance that will remain after payout.
+    function _onWithdraw(address, uint256 assets, uint256) internal override {
+        _checkKilled(totalAssets() - assets);
+    }
+
+    /// @dev Retire below 1% of par before assets leave. Equality and zero share supply stay alive.
+    /// Division avoids overflowing assets * KILL_RATIO. Retirement never blocks an exit.
+    /// @param assets The asset balance after the slash or withdrawal
+    function _checkKilled(uint256 assets) private {
+        if (!killed && assets < Math.ceilDiv(totalSupply(), KILL_RATIO)) {
+            killed = true;
+            emit Killed();
+        }
     }
 
     /// @dev Transfer assets into the vault on deposit
