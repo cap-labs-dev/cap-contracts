@@ -72,9 +72,8 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         __ERC20Permit_init(_name);
         // both previews scale between the two units, and only the direction that divides can lose
         // anything. Below 18 that is the mint side, which rounds up so the vault keeps the dust;
-        // above 18 it would be the deposit side, where rounding up is not available because the
-        // assets have already been pulled, and a deposit too small to mint a single share would
-        // simply be donated. Refuse the configuration rather than carry a preview that cannot
+        // above 18 it would be the deposit side, where a small deposit could quote zero shares
+        // and be rejected. Refuse the configuration rather than carry a preview that cannot
         // round in the vault's favour
         uint8 assetDecimals = IERC20Metadata(_asset).decimals();
         if (assetDecimals > decimals()) revert UnsupportedDecimals();

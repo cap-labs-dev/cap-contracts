@@ -79,6 +79,7 @@ contract Wrapper layout at erc7201("cap.storage.Wrapper")
     /// @param _assets Amount of the asset to pull from the caller
     /// @param _shares Amount of wrapper shares to mint to the receiver
     function _deposit(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal override {
+        if (_shares == 0) revert ZeroShares();
         IPremiumVesting(address(asset())).claim(address(this));
         if (totalSupply() == 0) _mint(DeadShares.HOLDER, DeadShares.SHARES);
         super._deposit(_caller, _receiver, _assets, _shares);

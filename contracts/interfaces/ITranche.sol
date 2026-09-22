@@ -7,6 +7,8 @@ import { IERC7540AsyncRedeem } from "./IERC7540AsyncRedeem.sol";
 /// @author kexley, Cap Labs
 /// @notice Interface for the ERC-4626 tranche vault
 /// @dev Beacon instance. Upgrade via {UpgradeableBeacon-upgradeTo} on the tranche beacon.
+/// Deposits and mints must issue at least one share or revert with {ZeroShares}.
+/// A deposit preview can still return zero when the asset amount rounds below one share.
 interface ITranche is IERC7540AsyncRedeem {
     /// @notice The oracle reported a zero price
     error InvalidPrice();

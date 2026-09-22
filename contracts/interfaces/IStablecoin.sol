@@ -90,7 +90,7 @@ interface IStablecoin {
     function burnCreditBacked(address from, uint256 amount) external;
 
     /// @notice Deposit underlying and vest the minted cUSD as yield
-    /// @dev Permissionless
+    /// @dev Permissionless. A zero premium reverts through the shared zero-share deposit guard.
     /// @param premium The underlying amount to deposit
     function fund(uint256 premium) external;
 

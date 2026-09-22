@@ -8,6 +8,7 @@ import { FloatingMarket } from "../../../contracts/cap/market/FloatingMarket.sol
 import { IBaseMarket } from "../../../contracts/interfaces/IBaseMarket.sol";
 import { IERC7540AsyncRedeem } from "../../../contracts/interfaces/IERC7540AsyncRedeem.sol";
 import { IPremiumVesting } from "../../../contracts/interfaces/IPremiumVesting.sol";
+import { IWrapper } from "../../../contracts/interfaces/IWrapper.sol";
 import { CapDeployer } from "../../shared/CapDeployer.sol";
 import { MockAeraVault } from "../../shared/mocks/MockAeraVault.sol";
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
@@ -198,6 +199,15 @@ contract ProtocolHandler is CapDeployer {
         uint256 amount = _amount(raw, available);
         if (amount == 0 || (!unwrap_ && wrapper.totalSupply() == 0 && amount <= DEAD_SHARES)) {
             _skip();
+            return;
+        }
+        // Accrued yield can make a positive dust deposit round below one share.
+        if (!unwrap_ && wrapper.previewDeposit(amount) == 0) {
+            vm.expectRevert(IWrapper.ZeroShares.selector);
+            vm.prank(actor);
+            wrapper.deposit(amount, actor);
+            assertEq(stablecoin.balanceOf(actor), available, "zero-share deposit preserves assets");
+            calls[msg.sig].expectedReverts++;
             return;
         }
         vm.prank(actor);
