@@ -217,7 +217,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     function healthiness() public view returns (uint256) {
         uint256 debt = totalDebt();
         if (debt == 0) return 1e27;
-        return debtLiquidationThreshold().rayDiv(debt);
+        return Math.mulDiv(debtLiquidationThreshold(), WadRayMath.RAY, debt, Math.Rounding.Floor);
     }
 
     /// @inheritdoc IBaseMarket
@@ -338,7 +338,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     function _checkLiquidation(uint256 capital, uint256 debt) internal view returns (uint256 liquidatable) {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         if (debt == 0) revert Healthy();
-        if (capital.rayMul($.lt).rayDiv(debt) >= 1e27) revert Healthy();
+        if (capital.rayMul($.lt) >= debt) revert Healthy();
         liquidatable = _maxLiquidatable(capital, debt);
     }
 
