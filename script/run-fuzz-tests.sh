@@ -8,10 +8,16 @@ main() {
   profile="${1:-local}"
   if [ "$#" -gt 0 ]; then shift; fi
   case "$profile" in local|pr|deep) ;; *) echo "Usage: $0 {local|pr|deep} [forge test arguments]" >&2; exit 2;; esac
-  if [[ "$(forge --version)" != $'forge Version: 1.5.1-stable\n'* ]]; then
-    echo 'This campaign is pinned to Foundry v1.5.1. Install with: foundryup --install v1.5.1' >&2
-    exit 2
-  fi
+  local forge_version
+  forge_version="$(forge --version)"
+  # Local stable builds and tagged releases use different banners for the same version.
+  case "${forge_version%%$'\n'*}" in
+    'forge Version: 1.5.1-stable'|'forge Version: 1.5.1-v1.5.1') ;;
+    *)
+      echo 'This campaign is pinned to Foundry v1.5.1. Install with: foundryup --install v1.5.1' >&2
+      exit 2
+      ;;
+  esac
 
   artifact_dir="artifacts/fuzz-and-invariant-tests/$profile"
   mkdir -p "$artifact_dir"
