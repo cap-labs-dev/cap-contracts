@@ -4,6 +4,8 @@ CAP is a stablecoin and credit protocol. It issues **cUSD** against reserve-toke
 
 This repository contains the Solidity contracts, deployment tooling, and Foundry unit, integration, fuzz, and invariant tests.
 
+See [Known issues and accepted behavior](KNOWN_ISSUES.md) for accepted risks, mitigation boundaries, and the current vesting defaults.
+
 ## How the protocol works
 
 - **Stablecoin liquidity:** users deposit the configured reserve token to mint cUSD at par, adjusted for token decimals. Markets can also mint credit-backed cUSD when an authorized borrower draws credit. Repayments burn cUSD and reduce outstanding credit.
@@ -118,6 +120,7 @@ A few protocol-specific notes:
 
 - Tranche and underwriter deposits pull **Vault balances**. Approve the ERC20 to the Vault, call `Vault.deposit`, then `setOperator` before depositing. Withdrawals return Vault balances.
 - Market repayment burns the caller's cUSD and does not need an ERC20 approval. Pass `cast max-uint` to clear remaining premium debt.
+- Fixed-market `borrow` and `borrowMore` take a `maxPremium` argument in 18-decimal cUSD units, covering the combined liquidity and underwriting premium for that draw. Execution reverts above the cap; `type(uint256).max` disables it. Extensions use their existing pricing without this cap. These borrowing signatures change the function selectors: upgrades of existing fixed markets must also update the Registry implementation and reapply each market's borrower role through `setBorrowerRole` to configure the new selectors.
 - Queue an exit with `requestRedeem`, then `redeem` the claimable amount. Instant exits stay within `maxInstantRedeem`. Async `previewRedeem` and `previewWithdraw` are unsupported.
 - Call `optIn` and `claim` on cUSD, tranche, or underwriter shares. The wrapper opts in for stcUSD holders.
 
