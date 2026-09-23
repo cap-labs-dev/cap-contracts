@@ -371,6 +371,40 @@ contract StablecoinTest is BaseTest {
         assertEq(usdc.previewDeposit(1e6), 1e18, "and a dollar buys a dollar");
     }
 
+    /// @dev Compare decimal scaling with the full-precision ratios over every supported decimal
+    /// width and the uint256 range, including inputs whose intermediate products overflow uint256.
+    function testFuzz_decimalConversionsMatchFullPrecision(uint8 assetDecimals, uint256 assets, uint256 shares) public {
+        assetDecimals = uint8(bound(assetDecimals, 0, 18));
+        Stablecoin scaled = _stablecoinOn(assetDecimals);
+        uint256 unit = 10 ** assetDecimals;
+        assets = bound(assets, 0, type(uint256).max / (1e18 / unit));
+
+        uint256 expectedShares = Math.mulDiv(assets, 1e18, unit);
+        assertEq(scaled.previewDeposit(assets), expectedShares);
+        assertEq(scaled.convertToShares(assets), expectedShares);
+        assertEq(scaled.quoteWithdraw(assets), expectedShares);
+        assertEq(scaled.previewMint(shares), Math.mulDiv(shares, unit, 1e18, Math.Rounding.Ceil));
+        assertEq(scaled.convertToAssets(shares), Math.mulDiv(shares, unit, 1e18));
+
+        scaled.mintCreditBacked(alice, shares);
+        assertEq(scaled.totalAssets(), Math.mulDiv(shares, unit, 1e18));
+        scaled.recognizeBadDebtInCredit(shares / 3);
+        assertEq(scaled.totalAssets(), Math.mulDiv(shares - shares / 3, unit, 1e18));
+    }
+
+    function testFuzz_decimalScalingRejectsUnrepresentableShares(uint8 assetDecimals) public {
+        assetDecimals = uint8(bound(assetDecimals, 0, 17));
+        Stablecoin scaled = _stablecoinOn(assetDecimals);
+        uint256 assets = type(uint256).max / (10 ** (18 - assetDecimals)) + 1;
+
+        vm.expectRevert();
+        scaled.previewDeposit(assets);
+        vm.expectRevert();
+        scaled.convertToShares(assets);
+        vm.expectRevert();
+        scaled.quoteWithdraw(assets);
+    }
+
     function test_totalAssets_isUnderlyingUnits() public {
         Stablecoin usdc = _stablecoinOn(6);
         MockERC20 underlying = MockERC20(usdc.asset());

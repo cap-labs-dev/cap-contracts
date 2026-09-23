@@ -40,6 +40,12 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: v1.5.1
+      - name: Check default contract sizes
+        run: forge build --sizes --skip test --skip script
+      - name: Check release contract sizes
+        env:
+          FOUNDRY_PROFILE: release
+        run: forge build --sizes --skip test --skip script --out out-release --cache-path cache-release
       - name: Run regression, fuzz and invariant tests
         run: bash script/run-fuzz-tests.sh "$CAMPAIGN_PROFILE"
       - name: Preserve seed, logs and minimized counterexamples

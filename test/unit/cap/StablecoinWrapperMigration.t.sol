@@ -43,7 +43,6 @@ contract StablecoinWrapperMigrationTest is BaseTest {
         address scoinReserve;
         address scoinStablecoin;
         uint8 scoinDecimals;
-        uint8 underlyingDecimals;
         string scoinName;
         string scoinSymbol;
         uint256 scoinSupply;
@@ -181,7 +180,6 @@ contract StablecoinWrapperMigrationTest is BaseTest {
         s.scoinReserve = scoin.reserveVault();
         s.scoinStablecoin = scoin.stablecoin();
         s.scoinDecimals = scoin.decimals();
-        s.underlyingDecimals = scoin.underlyingDecimals();
         s.scoinName = scoin.name();
         s.scoinSymbol = scoin.symbol();
         s.scoinSupply = scoin.totalSupply();
@@ -216,7 +214,6 @@ contract StablecoinWrapperMigrationTest is BaseTest {
         assertEq(a.scoinReserve, b.scoinReserve);
         assertEq(a.scoinStablecoin, b.scoinStablecoin);
         assertEq(a.scoinDecimals, b.scoinDecimals);
-        assertEq(a.underlyingDecimals, b.underlyingDecimals);
         assertEq(a.scoinName, b.scoinName);
         assertEq(a.scoinSymbol, b.scoinSymbol);
         assertEq(a.scoinSupply, b.scoinSupply);

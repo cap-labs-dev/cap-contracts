@@ -153,10 +153,6 @@ interface IStablecoin {
     /// @return debt The outstanding bad debt, in cUSD share units (18 decimals)
     function badDebt() external view returns (uint256 debt);
 
-    /// @notice Get the underlying asset decimals
-    /// @return The underlying asset decimals
-    function underlyingDecimals() external view returns (uint8);
-
     /// @notice Get the interest rate model address
     /// @return The interest rate model address
     function irm() external view returns (address);

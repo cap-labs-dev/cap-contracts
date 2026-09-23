@@ -62,6 +62,30 @@ contract ERC7540AsyncRedeemTest is Test {
         vm.stopPrank();
     }
 
+    function testFuzz_exitEmitsCallerReceiverAndOwner(uint8 route) public {
+        route = uint8(bound(route, 0, 5));
+        vault.setUnlocked(1_000e18);
+        vm.prank(alice);
+        vault.setOperator(bob, true);
+
+        uint256 id;
+        if (route >= 2) {
+            vm.prank(alice);
+            id = vault.requestRedeem(200e18, alice, alice);
+        }
+
+        vm.expectEmit(true, true, true, true, address(vault));
+        emit IERC4626.Withdraw(bob, carol, alice, 50e18, 50e18);
+        vm.prank(bob);
+        if (route == 0) vault.instantRedeem(50e18, carol, alice);
+        else if (route == 1) vault.instantWithdraw(50e18, carol, alice);
+        else if (route == 2) vault.redeem(id, 50e18, carol, alice);
+        else if (route == 3) vault.withdraw(id, 50e18, carol, alice);
+        else if (route == 4) vault.redeem(50e18, carol, alice);
+        else vault.withdraw(50e18, carol, alice);
+        assertEq(asset.balanceOf(carol), 50e18);
+    }
+
     // --- request mechanics ---
 
     function test_requestRedeem_escrowsShares() public {

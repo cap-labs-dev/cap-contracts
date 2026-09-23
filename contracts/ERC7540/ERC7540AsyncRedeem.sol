@@ -402,10 +402,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
         EnumerableSet.UintSet storage ids = $.controllerRequests[_controller];
         uint256 n = ids.length();
-        uint256[] memory list = new uint256[](n);
-        for (uint256 i; i < n; ++i) {
-            list[i] = ids.at(i);
-        }
+        uint256[] memory list = ids.values();
         _sortIds(list);
 
         uint256 remaining = _shares;
@@ -421,7 +418,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         }
         if (remaining != 0) revert IncompleteClaim(_shares - remaining, _shares);
 
-        _payout(_receiver, _controller, _assets, _shares);
+        _payout(msg.sender, _receiver, _controller, _assets, _shares);
     }
 
     /// @dev Insertion-sort request ids so the oldest (lowest id) is claimed first.
@@ -454,7 +451,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         if (_shares > unlocked) revert ERC4626ExceededMaxRedeem(_controller, _shares, unlocked);
 
         _consumeRequest(_controller, _shares, _requestId);
-        _payout(_receiver, _controller, _assets, _shares);
+        _payout(msg.sender, _receiver, _controller, _assets, _shares);
     }
 
     /// @dev Take `_shares` off a request and burn them. Does not pay assets.
@@ -477,15 +474,18 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         emit RedeemRequestConsumed(_requestId, _controller, _shares, remaining);
     }
 
-    /// @dev Pay `_assets` once for a completed consume of `_shares`.
+    /// @dev Pay `_assets` once after `_shares` have been burned for an instant or queued exit.
+    /// @param _caller The caller of the withdrawal or claim
     /// @param _receiver The asset recipient
-    /// @param _controller The request controller
+    /// @param _controller The request controller or instant share owner
     /// @param _assets The assets to pay
     /// @param _shares The shares that were burned
-    function _payout(address _receiver, address _controller, uint256 _assets, uint256 _shares) internal {
+    function _payout(address _caller, address _receiver, address _controller, uint256 _assets, uint256 _shares)
+        internal
+    {
         _onWithdraw(_controller, _assets, _shares);
         _transferOut(_receiver, _assets);
-        emit Withdraw(msg.sender, _receiver, _controller, _assets, _shares);
+        emit Withdraw(_caller, _receiver, _controller, _assets, _shares);
     }
 
     /// @dev Deposit/mint hook. Reject zero shares before transferring assets.
@@ -512,10 +512,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         _checkAllowance(_owner, _caller, _shares);
 
         _burn(_owner, _shares);
-        _onWithdraw(_owner, _assets, _shares);
-        _transferOut(_receiver, _assets);
-
-        emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
+        _payout(_caller, _receiver, _owner, _assets, _shares);
     }
 
     /// @dev Shared hook after the burn, before {_transferOut}. Instant and queued both land here.

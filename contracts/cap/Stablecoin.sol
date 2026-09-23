@@ -33,9 +33,6 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     using WadRayMath for uint256;
 
     /// @inheritdoc IStablecoin
-    uint8 public underlyingDecimals;
-
-    /// @inheritdoc IStablecoin
     address public irm;
 
     /// @inheritdoc IStablecoin
@@ -46,6 +43,9 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
 
     /// @inheritdoc IStablecoin
     address public reserveVault;
+
+    /// @dev Share units per underlying unit, cached during initialization.
+    uint256 private _scalingFactor;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -73,7 +73,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         // round in the vault's favour
         uint8 assetDecimals = IERC20Metadata(_asset).decimals();
         if (assetDecimals > decimals()) revert UnsupportedDecimals();
-        underlyingDecimals = assetDecimals;
+        _scalingFactor = 10 ** (decimals() - assetDecimals);
         irm = _irm;
         reserveVault = _reserveVault;
     }
@@ -99,7 +99,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     function burnCreditBacked(address _from, uint256 _amount) external restricted {
         _burn(_from, _amount);
         creditBackedSupply -= _amount;
-        IInterestRateModel(irm).updateLiquidityRate();
+        _updateLiquidityRate();
         emit BurnCreditBacked(_from, _amount);
     }
 
@@ -181,7 +181,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         // will never be repaid, so drop it from credit-backed supply. unlockedSupply is unchanged
         // because badDebt rose by the same amount. Holders take the loss through {backing}.
         creditBackedSupply -= _amount;
-        IInterestRateModel(irm).updateLiquidityRate();
+        _updateLiquidityRate();
         emit BadDebtRecognizedInCredit(msg.sender, _amount);
     }
 
@@ -195,7 +195,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         badDebt = shortfall - covered;
         _burn(msg.sender, covered);
 
-        IInterestRateModel(irm).updateLiquidityRate();
+        _updateLiquidityRate();
         emit BadDebtCovered(msg.sender, covered);
     }
 
@@ -226,7 +226,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
 
     /// @inheritdoc IStablecoin
     function totalAssets() public view override(ERC4626Upgradeable, IERC4626, IStablecoin) returns (uint256 assets) {
-        assets = Math.mulDiv(backing(), 10 ** underlyingDecimals, 10 ** decimals());
+        assets = backing() / _scalingFactor;
     }
 
     /// @inheritdoc IStablecoin
@@ -237,7 +237,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         override(ERC4626Upgradeable, IERC4626, IStablecoin)
         returns (uint256 shares)
     {
-        shares = Math.mulDiv(_assets, 10 ** decimals(), 10 ** underlyingDecimals, Math.Rounding.Floor);
+        shares = _assets * _scalingFactor;
     }
 
     /// @inheritdoc IStablecoin
@@ -248,7 +248,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         override(ERC4626Upgradeable, IERC4626, IStablecoin)
         returns (uint256 assets)
     {
-        assets = Math.mulDiv(_shares, 10 ** underlyingDecimals, 10 ** decimals(), Math.Rounding.Ceil);
+        assets = Math.ceilDiv(_shares, _scalingFactor);
     }
 
     /// @inheritdoc IStablecoin
@@ -292,7 +292,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
                 value = recognized > retained ? recognized - retained : 0;
             }
         }
-        assets = Math.mulDiv(value, 10 ** underlyingDecimals, 10 ** decimals(), _rounding);
+        assets = _rounding == Math.Rounding.Ceil ? Math.ceilDiv(value, _scalingFactor) : value / _scalingFactor;
     }
 
     /// @dev Inverse of {_convertToAssets}.
@@ -306,7 +306,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         returns (uint256 shares)
     {
         if (_assets == 0) return 0;
-        uint256 value = Math.mulDiv(_assets, 10 ** decimals(), 10 ** underlyingDecimals, _rounding);
+        uint256 value = _assets * _scalingFactor;
         uint256 shortfall = badDebt;
         if (shortfall == 0) return value;
 
@@ -344,7 +344,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     /// @param _shares The amount of shares minted
     function _deposit(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal override {
         super._deposit(_caller, _receiver, _assets, _shares);
-        IInterestRateModel(irm).updateLiquidityRate();
+        _updateLiquidityRate();
     }
 
     /// @dev Mint credit-backed stablecoin and update the liquidity rate
@@ -353,7 +353,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     function _mintCreditBacked(address _to, uint256 _amount) internal {
         _mint(_to, _amount);
         creditBackedSupply += _amount;
-        IInterestRateModel(irm).updateLiquidityRate();
+        _updateLiquidityRate();
         emit MintCreditBacked(_to, _amount);
     }
 
@@ -363,13 +363,18 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     /// @param _shares The amount of shares burned
     function _onWithdraw(address _owner, uint256 _assets, uint256 _shares) internal override {
         if (badDebt > 0) {
-            uint256 paidInShares = Math.mulDiv(_assets, 10 ** decimals(), 10 ** underlyingDecimals);
+            uint256 paidInShares = _assets * _scalingFactor;
             uint256 reduced = _shares > paidInShares ? _shares - paidInShares : 0;
             if (reduced > badDebt) reduced = badDebt;
             badDebt -= reduced;
             emit BadDebtReduced(_owner, reduced);
         }
 
+        _updateLiquidityRate();
+    }
+
+    /// @dev Checkpoint utilization after a change to the stablecoin supply.
+    function _updateLiquidityRate() private {
         IInterestRateModel(irm).updateLiquidityRate();
     }
 
