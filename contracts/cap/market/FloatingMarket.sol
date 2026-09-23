@@ -94,10 +94,10 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
     {
         _chargePremium();
         uint256 debt = totalDebt();
-        // Entitlement is taken first: {_liquidate} reads health and maxLiquidatable off
-        // {totalDebt}, so scaledDebt has to stay put until those checks have run.
-        (uint256 remainingScaled, uint256 cleared) = _repayWithin(debt, Math.min(amount, maxLiquidatable()));
-        (repaid, valueSlashed) = _liquidate(recipient, cleared);
+        uint256 capital = totalCapital();
+        uint256 liquidatable = _checkLiquidation(capital, debt);
+        (uint256 remainingScaled, uint256 cleared) = _repayWithin(debt, Math.min(amount, liquidatable));
+        (repaid, valueSlashed) = _liquidate(recipient, cleared, liquidatable);
         scaledDebt = remainingScaled;
     }
 

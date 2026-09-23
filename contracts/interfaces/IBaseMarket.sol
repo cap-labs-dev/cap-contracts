@@ -242,6 +242,8 @@ interface IBaseMarket {
     function debtLiquidationThreshold() external view returns (uint256 threshold);
 
     /// @notice Get the healthiness of the market
+    /// @dev Rounded down so debt above {debtLiquidationThreshold} is always unhealthy. Returns
+    /// one ray when no debt is outstanding.
     /// @return health The healthiness in ray decimals
     function healthiness() external view returns (uint256 health);
 
@@ -250,6 +252,7 @@ interface IBaseMarket {
     function utilization() external view returns (uint256 utilization);
 
     /// @notice Get the maximum liquidatable debt
+    /// @dev Uses one capital valuation to target {targetHealth}, capped at {recoverableDebt}.
     /// @return liquidatable The maximum liquidatable debt, in stablecoin units (18 decimals)
     function maxLiquidatable() external view returns (uint256 liquidatable);
 
