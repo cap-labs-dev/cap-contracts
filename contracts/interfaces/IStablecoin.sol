@@ -161,12 +161,14 @@ interface IStablecoin {
     function reserveVault() external view returns (address vault);
 
     /// @notice Get the credit-backed token supply
+    /// @dev Aggregate performing credit, not a separate class of tokens. Redemption does not
+    /// reduce this counter or repay a loan; only repayment/liquidation burns and write-offs do.
     /// @return The credit-backed supply, in cUSD share units (18 decimals)
     function creditBackedSupply() external view returns (uint256);
 
     /// @notice Get the recognized backing in cUSD share units (18 decimals)
-    /// @dev `totalSupply - badDebt`. {convertToAssets} applies a further shortfall
-    /// discount when quoting an exit; this figure is not that quote.
+    /// @dev `totalSupply - badDebt`, including performing credit. Shortfall exit pricing instead
+    /// uses `totalSupply - creditBackedSupply` and deducts bad debt from that basis.
     /// @return recognized The outstanding supply still recognized as backed, in cUSD share units (18 decimals)
     function backing() external view returns (uint256 recognized);
 
@@ -191,7 +193,9 @@ interface IStablecoin {
     /// @return The share token decimals
     function decimals() external view returns (uint8);
 
-    /// @notice Get the shares available for redemption, excluding credit-backed and written-off supply
+    /// @notice Get the aggregate shares available for redemption, excluding credit and bad debt
+    /// @dev Any holder, including a borrower, may use this capacity. Limited by liquid reserve;
+    /// repeated exits can exhaust it and leave remaining holders backed entirely by credit.
     /// @return unlocked The shares not reserved for outstanding borrows or written off, in cUSD share units (18 decimals)
     function unlockedSupply() external view returns (uint256 unlocked);
 

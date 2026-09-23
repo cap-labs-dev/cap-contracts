@@ -202,7 +202,8 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
 
     /// @inheritdoc IStablecoin
     function unlockedSupply() public view override(ERC7540AsyncRedeem, IStablecoin) returns (uint256 unlocked) {
-        // neither credit-backed nor written-off supply may redeem against the reserve
+        // aggregate reserve capacity, not a restriction on which holders may redeem:
+        // credit-minted tokens are fungible with deposited tokens
         uint256 locked = creditBackedSupply + badDebt;
         uint256 supply = totalSupply();
         if (supply > locked) unlocked = supply - locked;
@@ -261,8 +262,10 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         return 18;
     }
 
-    /// @dev During a shortfall, redemptions price below the backing ratio so exit repairs the peg.
-    /// Priced at roughly ({backing} / totalSupply) ^ 2. That is an exit quote, not {totalAssets}.
+    /// @dev During a shortfall, price against supply excluding performing credit. Credit issuance
+    /// and repayment change total supply and credit equally, leaving this basis unchanged.
+    /// With B = totalSupply - creditBackedSupply and R = B - badDebt, the marginal price is
+    /// (R / B) ^ 2. The curve integrates that price over the exit; {totalAssets} still includes credit.
     /// @param _shares The number of shares to convert to assets
     /// @param _rounding The rounding direction
     /// @return assets The number of assets
@@ -277,8 +280,8 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         if (shortfall == 0) {
             value = _shares;
         } else {
-            uint256 supply = totalSupply();
-            uint256 recognized = backing();
+            uint256 supply = totalSupply() - creditBackedSupply;
+            uint256 recognized = supply - shortfall;
             if (_shares >= supply) {
                 value = recognized;
             } else {
@@ -308,9 +311,9 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         uint256 shortfall = badDebt;
         if (shortfall == 0) return value;
 
-        uint256 supply = totalSupply();
-        uint256 recognized = backing();
-        // more than the whole reserve can ever pay out, so the entire supply would not cover it
+        uint256 supply = totalSupply() - creditBackedSupply;
+        uint256 recognized = supply - shortfall;
+        // saturate at the pricing basis; while shortfall > 0, this exceeds unlockedSupply
         if (value >= recognized) return supply;
 
         uint256 retained = recognized - value;

@@ -236,7 +236,9 @@ contract NumericalBoundariesTest is CapDeployer {
         market.borrow(defaultBorrower, 1, 30 days + 1);
     }
 
-    function testFuzz_shortfallExactWithdrawUsesMinimalShares(uint96 rawAssets, uint96 rawLoss) public {
+    function testFuzz_shortfallExactWithdrawUsesMinimalShares(uint96 rawAssets, uint96 rawLoss, uint96 rawCredit)
+        public
+    {
         // Small integer domain makes an independent exhaustive quote possible.
         (Stablecoin s, MockERC20 token) = _stable(18);
         vm.prank(alice);
@@ -246,6 +248,7 @@ contract NumericalBoundariesTest is CapDeployer {
         vm.prank(address(s));
         token.transfer(address(0x1055), loss);
         s.recognizeBadDebtInReserve(loss);
+        s.mintCreditBacked(defaultBorrower, bound(rawCredit, 1, 10_000));
         uint256 requested = bound(rawAssets, 1, 1000 - loss);
         uint256 expected;
         // Economic exit relation: retainedBacking/remainingSupply =
@@ -266,7 +269,7 @@ contract NumericalBoundariesTest is CapDeployer {
             vm.prank(alice);
             assertEq(s.instantWithdraw(requested, alice, alice), expected);
             assertEq(token.balanceOf(alice) - before, requested);
-            assertEq(s.backing(), token.balanceOf(address(s)));
+            assertEq(s.backing() - s.creditBackedSupply(), token.balanceOf(address(s)));
         }
     }
 
