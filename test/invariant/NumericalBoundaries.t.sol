@@ -54,8 +54,15 @@ contract NumericalBoundariesTest is CapDeployer {
         (Stablecoin s, MockERC20 token) = _stable(d);
         uint256 assets = bound(raw, 0, 1e24);
         uint256 scale = 10 ** (18 - d);
-        vm.prank(alice);
-        uint256 shares = s.deposit(assets, alice);
+        uint256 shares;
+        if (assets == 0) {
+            vm.expectRevert(IERC7540AsyncRedeem.ZeroShares.selector);
+            vm.prank(alice);
+            s.deposit(assets, alice);
+        } else {
+            vm.prank(alice);
+            shares = s.deposit(assets, alice);
+        }
         assertEq(shares, assets * scale);
         assertEq(token.balanceOf(address(s)), assets);
         uint256 requestedShares = uint256(raw) % 1e24 + 1;

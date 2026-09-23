@@ -483,6 +483,16 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         emit Withdraw(msg.sender, _receiver, _controller, _assets, _shares);
     }
 
+    /// @dev Deposit/mint hook. Reject zero shares before transferring assets.
+    /// @param _caller The account funding the deposit
+    /// @param _receiver The account receiving the shares
+    /// @param _assets The number of assets deposited
+    /// @param _shares The number of shares to mint
+    function _deposit(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal virtual override {
+        if (_shares == 0) revert ZeroShares();
+        super._deposit(_caller, _receiver, _assets, _shares);
+    }
+
     /// @dev Instant withdraw. Allowance may stand in for the owner.
     /// @param _caller The caller of the withdraw
     /// @param _receiver The receiver of the assets

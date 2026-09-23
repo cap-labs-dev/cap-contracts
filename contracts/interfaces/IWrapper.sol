@@ -7,7 +7,12 @@ import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 /// @author kexley, Cap Labs
 /// @notice Interface for the ERC-4626 vault that holds a stablecoin and claims its vested premium
 /// @dev Fresh deployments seed unredeemable shares via {DeadShares}.
+/// Deposits and mints must issue at least one share or revert with {ZeroShares}.
+/// A deposit preview can still return zero when the asset amount rounds below one share.
 interface IWrapper is IERC4626 {
+    /// @notice The deposit or mint produces zero shares
+    error ZeroShares();
+
     /// @notice Initialize the wrapper
     /// @dev `reinitializer(2)` so a v1 proxy can be upgraded onto this implementation and run
     /// initialize again. Fresh proxies take the same path.

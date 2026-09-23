@@ -9,6 +9,8 @@ import { IERC7540AsyncRedeem } from "./IERC7540AsyncRedeem.sol";
 /// @dev The curator role is expected to be held by a timelock or secure multisig, while the
 /// allocator role is intended for an operational wallet with narrower permissions. Beacon instance:
 /// upgrade via {UpgradeableBeacon-upgradeTo} on the underwriter beacon.
+/// Deposits and mints must issue at least one share or revert with {ZeroShares}.
+/// A default-tranche allocation that would issue zero tranche shares also reverts the entire deposit.
 interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice The tranche is not registered with the underwriter
     error NotRegisteredTranche();

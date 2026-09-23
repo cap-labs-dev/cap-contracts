@@ -8,6 +8,7 @@ import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 /// @author kexley, Cap Labs
 /// @notice Interface for the Cap async redeem vault: ERC-7540 redeem plus instant exits and request transfer
 /// @dev {IERC7575} is the flattened ERC-165 id. Do not inherit it here: it duplicates {IERC4626}.
+/// Deposit/mint execution rejects zero-share output with {ZeroShares}; previews may still return zero.
 interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     /// @notice Get the address of the share token
     /// @return shareTokenAddress The address of the share token
@@ -30,7 +31,7 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
         uint256 indexed requestId, address indexed controller, uint256 shares, uint256 remainingShares
     );
 
-    /// @notice The redeem request has zero shares
+    /// @notice The operation specifies or produces zero shares
     error ZeroShares();
 
     /// @notice The redeem request is for the zero address
