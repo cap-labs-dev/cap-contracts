@@ -309,11 +309,12 @@ contract AccountingIntegrityTest is CapDeployer {
         }
     }
 
-    /// @dev A payment too small to move a whole scaled unit clears nothing, so it must not be
-    /// accepted. Flooring is what stops the leak, and the honest consequence of flooring is that
-    /// sub-unit dust is rejected rather than taken for a no-op. chargePremium is the poke.
+    /// @dev A payment below the smallest representable debt reduction must still be rejected.
     function test_subUnitRepayIsRejected() public {
         FloatingMarket market = _grownIndexMarket();
+        vm.warp(block.timestamp + 730 days);
+        market.chargePremium();
+        assertGe(market.index(), 2e27, "each scaled unit now represents at least two wei");
 
         _mintStable(defaultBorrower, 10);
         vm.prank(defaultBorrower);
