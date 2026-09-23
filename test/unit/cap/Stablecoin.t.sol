@@ -38,7 +38,15 @@ contract StablecoinTest is BaseTest {
                 address(impl),
                 abi.encodeCall(
                     Stablecoin.initialize,
-                    (address(accessManager), address(asset), "Cap USD", "cUSD", address(irm), address(reserve))
+                    (
+                        address(accessManager),
+                        address(asset),
+                        "Cap USD",
+                        "cUSD",
+                        address(irm),
+                        address(reserve),
+                        12 hours
+                    )
                 )
             )
         );
@@ -324,7 +332,7 @@ contract StablecoinTest is BaseTest {
                 address(new Stablecoin()),
                 abi.encodeCall(
                     Stablecoin.initialize,
-                    (address(accessManager), address(underlying), "Cap USD", "cUSD", address(irm), address(0))
+                    (address(accessManager), address(underlying), "Cap USD", "cUSD", address(irm), address(0), 12 hours)
                 )
             )
         );
@@ -380,7 +388,7 @@ contract StablecoinTest is BaseTest {
             impl,
             abi.encodeCall(
                 Stablecoin.initialize,
-                (address(accessManager), address(wide), "Cap USD", "cUSD", address(irm), address(0))
+                (address(accessManager), address(wide), "Cap USD", "cUSD", address(irm), address(0), 12 hours)
             )
         );
     }
@@ -941,7 +949,9 @@ contract StablecoinTest is BaseTest {
 
     function test_initialize_cannotReinit() public {
         vm.expectRevert();
-        scoin.initialize(address(accessManager), address(asset), "Cap USD", "cUSD", address(irm), address(reserve));
+        scoin.initialize(
+            address(accessManager), address(asset), "Cap USD", "cUSD", address(irm), address(reserve), 12 hours
+        );
     }
 
     function test_upgrade_authorized() public {

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
+import { Registry } from "../../../contracts/cap/Registry.sol";
 import { Stablecoin } from "../../../contracts/cap/Stablecoin.sol";
 import { Wrapper } from "../../../contracts/cap/Wrapper.sol";
 import { ImplementationsConfig, InfraConfig, UsersConfig } from "../interfaces/DeployConfigs.sol";
@@ -30,7 +31,15 @@ contract MigrateInfra {
                 implementations.stablecoin,
                 abi.encodeCall(
                     Stablecoin.initialize,
-                    (infra.accessManager, users.stablecoinUnderlying, name, symbol, infra.irm, users.reserveVault)
+                    (
+                        infra.accessManager,
+                        users.stablecoinUnderlying,
+                        name,
+                        symbol,
+                        infra.irm,
+                        users.reserveVault,
+                        Registry(implementations.registry).DEFAULT_VESTING_PERIOD()
+                    )
                 )
             );
         UUPSUpgradeable(infra.wrapper)

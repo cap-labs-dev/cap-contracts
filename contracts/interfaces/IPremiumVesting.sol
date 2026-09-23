@@ -5,6 +5,13 @@ pragma solidity 0.8.36;
 /// @author kexley, Cap Labs
 /// @notice Interface for the shared premium vesting surface used by {Tranche}, {Underwriter} and {Stablecoin}
 interface IPremiumVesting {
+    /// @notice The period is zero or exceeds the precision supported by the decay calculation
+    error InvalidVestingPeriod();
+
+    /// @notice Emitted after accrued premium is checkpointed and the period is changed
+    /// @param period The new vesting time constant in seconds
+    event SetVestingPeriod(uint256 period);
+
     /// @notice Emitted when vested premium is claimed
     /// @param user The account whose entitlement was settled
     /// @param recipient The address that received the premium
@@ -44,8 +51,15 @@ interface IPremiumVesting {
     function stablecoin() external view returns (address token);
 
     /// @notice Get the vesting time constant
-    /// @return period The vesting time constant
+    /// @dev Approximately 63% vests in one period while holders are earning.
+    /// @return period The vesting time constant in seconds
     function vestingPeriod() external view returns (uint256 period);
+
+    /// @notice Change the premium vesting time constant
+    /// @dev Access controlled. Checkpoints accrued premium using the old period before applying
+    /// the new period to the unvested remainder and future funding. Already-earned premium is preserved.
+    /// @param period The new time constant in seconds
+    function setVestingPeriod(uint256 period) external;
 
     /// @notice Get the premium that has become available to claim since the last accrual
     /// @dev Zero when nobody is earning, matching a freeze.

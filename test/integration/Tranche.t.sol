@@ -115,7 +115,7 @@ contract TrancheTest is CapDeployer {
         MockERC20 unpriced = new MockERC20("Ghost", "GHOST", 18);
 
         vm.expectRevert(abi.encodeWithSelector(IOracle.PriceError.selector, address(unpriced)));
-        registry.createTranche(address(market), address(unpriced), _weights3(0.5e27, 0.3e27, 0.2e27));
+        registry.createTranche(address(market), address(unpriced), _weights3(0.5e27, 0.3e27, 0.2e27), 12 hours);
 
         assertGt(tranche0.unlockedSupply(), 0, "existing depositors can still get out");
     }
@@ -432,8 +432,9 @@ contract TrancheTest is CapDeployer {
         uint256 juniorWeight = market.tranches()[1].weight;
         _slashTo(100e18, 0.5e18);
 
-        address fresh =
-            registry.createTranche(address(market), address(collateral), _weights3(0, juniorWeight, seniorWeight));
+        address fresh = registry.createTranche(
+            address(market), address(collateral), _weights3(0, juniorWeight, seniorWeight), 12 hours
+        );
 
         assertEq(ITranche(fresh).market(), address(market), "wired to the same market");
         assertEq(ITranche(fresh).asset(), tranche0.asset(), "and the same collateral");
@@ -456,7 +457,8 @@ contract TrancheTest is CapDeployer {
     function test_createTranche_addsAJuniorLayerWithItsOwnAsset() public {
         MockERC20 secondAsset = _newCollateral("Staked Ether", "stETH", 18, 2e18);
 
-        address added = registry.createTranche(address(market), address(secondAsset), _weights3(0.5e27, 0.3e27, 0.2e27));
+        address added =
+            registry.createTranche(address(market), address(secondAsset), _weights3(0.5e27, 0.3e27, 0.2e27), 12 hours);
 
         assertEq(market.tranches().length, 3, "the waterfall got a layer deeper");
         assertEq(market.tranches()[2].tranche, added, "the new tranche is the most junior");
@@ -474,23 +476,24 @@ contract TrancheTest is CapDeployer {
     function test_createTranche_rejectsWeightsThatDoNotCoverTheNewTranche() public {
         uint256[] memory tooShort = capConfig.defaultTrancheWeights;
         vm.expectRevert(IRegistry.InvalidTrancheCount.selector);
-        registry.createTranche(address(market), address(collateral), tooShort);
+        registry.createTranche(address(market), address(collateral), tooShort, 12 hours);
     }
 
     function test_createTranche_rejectsWeightsThatDoNotTotalOneRay() public {
         vm.expectRevert(IBaseMarket.InvalidTrancheWeightsTotal.selector);
-        registry.createTranche(address(market), address(collateral), _weights3(0.5e27, 0.3e27, 0.1e27));
+        registry.createTranche(address(market), address(collateral), _weights3(0.5e27, 0.3e27, 0.1e27), 12 hours);
     }
 
     /// @dev The owner role comes off the market rather than off an argument, so there is no call
     /// shape that wires a tranche to somebody else's operator role.
     function test_createTranche_rejectsAMarketItDidNotDeploy() public {
         vm.expectRevert(IRegistry.UnknownMarket.selector);
-        registry.createTranche(makeAddr("notAMarket"), address(collateral), _weights3(0.5e27, 0.3e27, 0.2e27));
+        registry.createTranche(makeAddr("notAMarket"), address(collateral), _weights3(0.5e27, 0.3e27, 0.2e27), 12 hours);
     }
 
     function test_createTranche_namesDoNotCollideWithTheTrancheTheyReplace() public {
-        address fresh = registry.createTranche(address(market), address(collateral), _weights3(0.5e27, 0.3e27, 0.2e27));
+        address fresh =
+            registry.createTranche(address(market), address(collateral), _weights3(0.5e27, 0.3e27, 0.2e27), 12 hours);
 
         assertTrue(
             keccak256(bytes(Tranche(fresh).name())) != keccak256(bytes(tranche0.name())), "distinct from tranche 0"
@@ -508,22 +511,22 @@ contract TrancheTest is CapDeployer {
 
         vm.prank(stranger);
         vm.expectRevert(IRegistry.NotMarketOwner.selector);
-        registry.createTranche(address(market), address(collateral), weights);
+        registry.createTranche(address(market), address(collateral), weights, 12 hours);
 
         accessManager.grantRole(CapRoles.ADMIN, stranger, 0);
         vm.prank(stranger);
         vm.expectRevert(IRegistry.NotMarketOwner.selector);
-        registry.createTranche(address(market), address(collateral), weights);
+        registry.createTranche(address(market), address(collateral), weights, 12 hours);
 
         address otherOwner = makeAddr("otherOwner");
         uint64 otherOwnerRole = _assignOperator(otherOwner);
         registry.createFloatingMarket(_uniformAssets(2), capConfig.defaultTrancheWeights, "other", otherOwnerRole);
         vm.prank(otherOwner);
         vm.expectRevert(IRegistry.NotMarketOwner.selector);
-        registry.createTranche(address(market), address(collateral), weights);
+        registry.createTranche(address(market), address(collateral), weights, 12 hours);
 
         vm.prank(defaultMarketOwner);
-        registry.createTranche(address(market), address(collateral), weights);
+        registry.createTranche(address(market), address(collateral), weights, 12 hours);
         assertEq(market.tranches().length, 3);
     }
 

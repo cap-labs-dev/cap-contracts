@@ -25,7 +25,15 @@ contract StablecoinShortfallTest is BaseTest {
                 address(new Stablecoin()),
                 abi.encodeCall(
                     Stablecoin.initialize,
-                    (address(accessManager), address(usdc), "Cap USD", "cUSD", address(new MockIRM()), address(reserve))
+                    (
+                        address(accessManager),
+                        address(usdc),
+                        "Cap USD",
+                        "cUSD",
+                        address(new MockIRM()),
+                        address(reserve),
+                        12 hours
+                    )
                 )
             )
         );

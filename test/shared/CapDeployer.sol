@@ -205,7 +205,8 @@ abstract contract CapDeployer is BaseTest {
             _deployProxy(
                 address(stablecoinImpl),
                 abi.encodeCall(
-                    Stablecoin.initialize, (authority, address(cusdUnderlying), "Cap USD", "cUSD", irmAddr, address(0))
+                    Stablecoin.initialize,
+                    (authority, address(cusdUnderlying), "Cap USD", "cUSD", irmAddr, address(0), 12 hours)
                 )
             )
         );
