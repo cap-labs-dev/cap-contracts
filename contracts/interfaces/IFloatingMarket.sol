@@ -37,6 +37,9 @@ interface IFloatingMarket is IBaseMarket {
     function liquidate(address recipient, uint256 amount) external returns (uint256 repaid, uint256 valueSlashed);
 
     /// @notice Charge the accrued premium
+    /// @dev Permissionless realization funds both premium pools. More frequent realization can
+    /// increase eligible underwriters' allocation for the same index and debt path, up to rounding.
+    /// The caller receives no separate reward. Total premium equals reported debt growth.
     function chargePremium() external;
 
     /// @notice Write off {unrecoverableDebt} as bad debt
@@ -47,6 +50,8 @@ interface IFloatingMarket is IBaseMarket {
     function writeOff() external returns (uint256 amount);
 
     /// @notice Get the liquidity and underwriter premiums
+    /// @dev Underwriting accrues against the last realized liquidity index. Liquidity receives
+    /// the remaining debt growth. Allocation intentionally depends on realization frequency.
     /// @return liquidityPremium The liquidity premium, in stablecoin units (18 decimals)
     /// @return underwriterPremium The underwriter premium, in stablecoin units (18 decimals)
     function premium() external view returns (uint256 liquidityPremium, uint256 underwriterPremium);
