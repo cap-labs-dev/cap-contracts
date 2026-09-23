@@ -9,9 +9,6 @@ import { IUnderwriter } from "../interfaces/IUnderwriter.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import { DeadShares } from "../utils/DeadShares.sol";
 import { PremiumVesting } from "../utils/PremiumVesting.sol";
-import {
-    AccessManagedUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -20,12 +17,7 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 /// @author kexley, Cap Labs
 /// @notice Curator vault that allocates assets into tranches and distributes premium to depositors.
 /// @dev Beacon instance. Upgrade via {UpgradeableBeacon-upgradeTo} on the underwriter beacon.
-contract Underwriter layout at erc7201("cap.storage.Underwriter")
-    is
-    IUnderwriter,
-    AccessManagedUpgradeable,
-    PremiumVesting
-{
+contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwriter, PremiumVesting {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @inheritdoc IUnderwriter
@@ -74,10 +66,10 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         string memory _symbol,
         address _asset,
         address _vaultAddress,
-        address _stablecoinAddress
+        address _stablecoinAddress,
+        uint256 _vestingPeriod
     ) external override initializer {
-        __AccessManaged_init(_authority);
-        __PremiumVesting_init(IERC20(_asset), _name, _symbol, _stablecoinAddress);
+        __PremiumVesting_init(_authority, IERC20(_asset), _name, _symbol, _stablecoinAddress, _vestingPeriod);
         registry = _registry;
         vault = _vaultAddress;
     }
@@ -198,8 +190,8 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         return _syncMark(tranche);
     }
 
-    /// @dev Write {debt} from remaining plus queued shares. A slash between reports is a loss that
-    /// waits here on purpose: share price is this cached book, not a live walk of every position.
+    /// @dev Write {debt} from remaining plus queued shares. The book stays cached between marks;
+    /// issuance quotes separately value the default position via {_issuanceAssets}.
     /// @param tranche The tranche to re-value
     /// @return gain The increase in the recorded position, if any
     /// @return loss The decrease in the recorded position, if any
@@ -312,26 +304,48 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     /// @inheritdoc IUnderwriter
     /// @dev Idle vault balance plus the last marked tranche positions. A slash hits the tranche
     /// immediately, but this vault only folds it in when {_mark} runs (allocate, deallocate, or
-    /// report). Positions are not priced live.
+    /// report). Issuance quotes separately adjust for the default position, even when its book is zero.
     function totalAssets() public view override(ERC4626Upgradeable, IERC4626, IUnderwriter) returns (uint256) {
         return IVault(vault).balanceOf(address(this), asset()) + totalDebt;
     }
 
+    /// @dev Replace the default position's cached value with its current value for issuance only.
+    /// Includes queued shares and zero-book positions, as the allocation's {_syncMark} does.
+    /// Allocation persists the updated book after the incoming assets have been transferred.
+    /// @return assets The assets used to price deposits and mints
+    function _issuanceAssets() internal view returns (uint256 assets) {
+        assets = totalAssets();
+        address tranche = defaultTranche;
+        if (tranche == address(0)) return assets;
+
+        uint256 recorded = debt[tranche];
+        uint256 position = ITranche(tranche).balanceOf(address(this)) + queuedShares[tranche];
+        assets = assets - recorded + ITranche(tranche).convertToAssets(position);
+    }
+
     /// @inheritdoc IERC4626
-    /// @dev Empty vault quotes at par via {DeadShares-seedDeposit} minus the seeded shares.
+    /// @dev Prices the existing default position via {_issuanceAssets} before allocation can mark it.
+    /// Empty vault quotes at par via {DeadShares-seedDeposit} minus the seeded shares.
     function previewDeposit(uint256 assets)
         public
         view
         override(ERC4626Upgradeable, IERC4626)
         returns (uint256 shares)
     {
-        shares = totalSupply() == 0 ? DeadShares.seedDeposit(assets) : super.previewDeposit(assets);
+        uint256 supply = totalSupply();
+        shares = supply == 0
+            ? DeadShares.seedDeposit(assets)
+            : Math.mulDiv(assets, supply + 10 ** _decimalsOffset(), _issuanceAssets() + 1, Math.Rounding.Floor);
     }
 
     /// @inheritdoc IERC4626
-    /// @dev Inverse of {previewDeposit} while empty.
+    /// @dev Uses the same issuance valuation as {previewDeposit}, rounding assets up.
+    /// Inverse of {previewDeposit} while empty.
     function previewMint(uint256 shares) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 assets) {
-        assets = totalSupply() == 0 ? DeadShares.seedMint(shares) : super.previewMint(shares);
+        uint256 supply = totalSupply();
+        assets = supply == 0
+            ? DeadShares.seedMint(shares)
+            : Math.mulDiv(shares, _issuanceAssets() + 1, supply + 10 ** _decimalsOffset(), Math.Rounding.Ceil);
     }
 
     /// @inheritdoc IUnderwriter
@@ -378,6 +392,8 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         (uint256 gain, uint256 loss) = _mark(_tranche);
 
         uint256 premium = IPremiumVesting(_tranche).claim(address(this));
+        // Harvested premium vests again at the pool's configured rate. Holders earn as it
+        // vests here, including those who joined after the tranche generated the premium.
         _fund(premium);
         lastReported = block.timestamp;
 

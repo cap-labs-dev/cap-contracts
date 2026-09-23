@@ -43,7 +43,7 @@ contract AccountingIntegrityTest is CapDeployer {
                 address(impl),
                 abi.encodeCall(
                     Stablecoin.initialize,
-                    (address(accessManager), address(usdc), "Cap USD", "cUSD", address(mockIrm), address(0))
+                    (address(accessManager), address(usdc), "Cap USD", "cUSD", address(mockIrm), address(0), 12 hours)
                 )
             )
         );
@@ -309,11 +309,12 @@ contract AccountingIntegrityTest is CapDeployer {
         }
     }
 
-    /// @dev A payment too small to move a whole scaled unit clears nothing, so it must not be
-    /// accepted. Flooring is what stops the leak, and the honest consequence of flooring is that
-    /// sub-unit dust is rejected rather than taken for a no-op. chargePremium is the poke.
+    /// @dev A payment below the smallest representable debt reduction must still be rejected.
     function test_subUnitRepayIsRejected() public {
         FloatingMarket market = _grownIndexMarket();
+        vm.warp(block.timestamp + 730 days);
+        market.chargePremium();
+        assertGe(market.index(), 2e27, "each scaled unit now represents at least two wei");
 
         _mintStable(defaultBorrower, 10);
         vm.prank(defaultBorrower);
@@ -595,7 +596,7 @@ contract AccountingIntegrityTest is CapDeployer {
         next[1] = 0.3e27;
         next[2] = 0.2e27;
         vm.prank(defaultMarketOwner);
-        address added = registry.createTranche(b.marketAddr, address(collateral), next);
+        address added = registry.createTranche(b.marketAddr, address(collateral), next, 12 hours);
 
         assertEq(
             stablecoin.balanceOf(b.tranche1Addr) - juniorBefore, expectedJunior, "the elapsed period pays the old 10%"

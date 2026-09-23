@@ -3,6 +3,7 @@ pragma solidity 0.8.36;
 
 import { IInterestRateModel } from "../interfaces/IInterestRateModel.sol";
 import { IStablecoin } from "../interfaces/IStablecoin.sol";
+import { MarketLimits } from "../utils/MarketLimits.sol";
 import { MathUtils } from "../utils/MathUtils.sol";
 import { WadRayMath } from "../utils/WadRayMath.sol";
 import {
@@ -182,7 +183,7 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     /// @dev Shared with {initialize}. Same bounds as the setter.
     /// @param _liquidationBonus The liquidation bonus in ray decimals
     function _setLiquidationBonus(uint256 _liquidationBonus) internal {
-        if (_liquidationBonus > 0.1e27) revert InvalidLiquidationBonus();
+        if (_liquidationBonus > MarketLimits.MAX_LIQUIDATION_BONUS) revert InvalidLiquidationBonus();
         liquidationBonus = _liquidationBonus;
         emit SetLiquidationBonus(_liquidationBonus);
     }

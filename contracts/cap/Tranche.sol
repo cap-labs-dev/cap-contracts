@@ -9,9 +9,6 @@ import { ITranche } from "../interfaces/ITranche.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import { DeadShares } from "../utils/DeadShares.sol";
 import { PremiumVesting } from "../utils/PremiumVesting.sol";
-import {
-    AccessManagedUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -19,7 +16,7 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 /// @author kexley, Cap Labs
 /// @notice ERC-4626 tranche vault. Deposits via Vault ERC-6909; earns cUSD premium from underwriting.
 /// @dev Beacon instance. Upgrade via {UpgradeableBeacon-upgradeTo} on the tranche beacon.
-contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessManagedUpgradeable, PremiumVesting {
+contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVesting {
     /// @inheritdoc ITranche
     address public registry;
 
@@ -55,10 +52,12 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, AccessMan
         string memory _symbol,
         address _market,
         address _vault,
-        address _oracle
+        address _oracle,
+        uint256 _vestingPeriod
     ) external initializer {
-        __AccessManaged_init(_authority);
-        __PremiumVesting_init(IERC20(_asset), _name, _symbol, IBaseMarket(_market).stablecoin());
+        __PremiumVesting_init(
+            _authority, IERC20(_asset), _name, _symbol, IBaseMarket(_market).stablecoin(), _vestingPeriod
+        );
         registry = _registry;
         market = _market;
         vault = _vault;

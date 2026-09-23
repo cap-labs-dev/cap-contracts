@@ -94,10 +94,10 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
     {
         _chargePremium();
         uint256 debt = totalDebt();
-        // Entitlement is taken first: {_liquidate} reads health and maxLiquidatable off
-        // {totalDebt}, so scaledDebt has to stay put until those checks have run.
-        (uint256 remainingScaled, uint256 cleared) = _repayWithin(debt, Math.min(amount, maxLiquidatable()));
-        (repaid, valueSlashed) = _liquidate(recipient, cleared);
+        uint256 capital = totalCapital();
+        uint256 liquidatable = _checkLiquidation(capital, debt);
+        (uint256 remainingScaled, uint256 cleared) = _repayWithin(debt, Math.min(amount, liquidatable));
+        (repaid, valueSlashed) = _liquidate(recipient, cleared, liquidatable);
         scaledDebt = remainingScaled;
     }
 
@@ -120,6 +120,7 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
 
     /// @inheritdoc IBaseMarket
     function totalDebt() public view override(BaseMarket, IBaseMarket) returns (uint256 marketDebt) {
+        if (scaledDebt == 0) return 0;
         marketDebt = scaledDebt.rayMul(index());
     }
 
@@ -134,6 +135,9 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
 
     /// @inheritdoc IFloatingMarket
     function premiumIndices() public view returns (uint256 liquidityIndex, uint256 underwriterIndex) {
+        if (scaledDebt == 0) {
+            return (WadRayMath.RAY, IInterestRateModel(irm()).underwriterIndex(address(this)));
+        }
         if (lastPremiumUpdate == block.timestamp) return (lastLiquidityIndex, lastUnderwriterIndex);
         liquidityIndex = _growIndex(
             lastLiquidityIndex, lastGlobalIndex, IInterestRateModel(irm()).liquidityIndex(), marketMultiplier()
@@ -143,8 +147,8 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
 
     /// @inheritdoc IFloatingMarket
     function index() public view returns (uint256 combinedIndex) {
-        if (lastPremiumUpdate == block.timestamp) return lastLiquidityIndex.rayMul(lastUnderwriterIndex);
         (uint256 liquidityIndex, uint256 underwriterIndex) = premiumIndices();
+        if (scaledDebt == 0) return underwriterIndex;
         combinedIndex = liquidityIndex.rayMul(underwriterIndex);
     }
 
@@ -159,30 +163,38 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
         if (minted == 0) revert InvalidScaledAmount();
     }
 
-    /// @dev A representable drop in {totalDebt} that does not exceed `requested`.
-    /// Inverse-ceil of the floor is conservative under half-up `rayMul` and is not always the
-    /// largest representable fill.
+    /// @dev The largest representable drop in {totalDebt} that does not exceed `requested`.
     function _repayWithin(uint256 debt, uint256 requested) private view returns (uint256 newScaled, uint256 burned) {
         if (requested == 0) return (scaledDebt, 0);
         if (requested >= debt) return (0, debt);
 
         uint256 idx = index();
-        newScaled = Math.mulDiv(debt - requested, WadRayMath.RAY, idx, Math.Rounding.Ceil);
+        uint256 targetDebt = debt - requested;
+        newScaled = Math.mulDiv(targetDebt, WadRayMath.RAY, idx, Math.Rounding.Ceil);
+        // Half-up rounding may admit one less scaled unit. Since idx >= RAY, one check suffices.
+        if (newScaled > 0 && (newScaled - 1).rayMul(idx) >= targetDebt) --newScaled;
         burned = debt - newScaled.rayMul(idx);
         if (burned == 0) revert InvalidScaledAmount();
     }
 
     /// @dev Accrue premiums for a market
     function _chargePremium() internal {
+        // Re-anchor an empty market before growing its local index. This also applies
+        // to a full repayment followed by a new borrow in the same block.
+        if (scaledDebt == 0) {
+            lastLiquidityIndex = WadRayMath.RAY;
+            lastGlobalIndex = IInterestRateModel(irm()).liquidityIndex();
+            lastUnderwriterIndex = IInterestRateModel(irm()).underwriterIndex(address(this));
+            lastPremiumUpdate = block.timestamp;
+            return;
+        }
         if (lastPremiumUpdate == block.timestamp) return;
 
         (uint256 liquidityIndex, uint256 underwriterIndex) = premiumIndices();
 
-        if (scaledDebt > 0) {
-            (uint256 liquidityPremium, uint256 underwriterPremium) =
-                _premium(scaledDebt, lastLiquidityIndex, lastUnderwriterIndex, liquidityIndex, underwriterIndex);
-            _chargePremium(liquidityPremium, underwriterPremium);
-        }
+        (uint256 liquidityPremium, uint256 underwriterPremium) =
+            _premium(scaledDebt, lastLiquidityIndex, lastUnderwriterIndex, liquidityIndex, underwriterIndex);
+        _chargePremium(liquidityPremium, underwriterPremium);
 
         lastLiquidityIndex = liquidityIndex;
         lastGlobalIndex = IInterestRateModel(irm()).liquidityIndex();
@@ -207,10 +219,12 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
         localNow = lastLocal.rayMul((globalNow.rayDiv(lastGlobal)).rayPowRay(multiplier));
     }
 
-    /// @dev Premium as the rise in {totalDebt} between two checkpoints, split liquidity-then
-    /// underwriter. Each valuation uses the same half-up product as the getter, so the two
-    /// components sum to the reported growth and there is no independently rounded remainder.
-    /// Indices are assumed nondecreasing, as the previous delta form required.
+    /// @dev Premium as the rise in {totalDebt}, split underwriting-then-liquidity. Underwriting
+    /// accrues against the previous liquidity index; liquidity receives the remaining growth.
+    /// More frequent realization can increase underwriting's share for the same index and debt
+    /// path, incentivizing eligible underwriters to fund both pools sooner. Each valuation uses
+    /// the getter's half-up product, so the components sum exactly to reported debt growth.
+    /// Indices are assumed nondecreasing.
     /// @param scaledDebtAmount The scaled debt
     /// @param previousLiquidityIndex The last liquidity index
     /// @param previousUnderwriterIndex The last underwriter index
@@ -226,9 +240,9 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
         uint256 currentUnderwriterIndex
     ) internal pure returns (uint256 liquidityPremium, uint256 underwriterPremium) {
         uint256 previousDebt = scaledDebtAmount.rayMul(previousLiquidityIndex.rayMul(previousUnderwriterIndex));
-        uint256 debtAfterLiquidity = scaledDebtAmount.rayMul(currentLiquidityIndex.rayMul(previousUnderwriterIndex));
+        uint256 debtAfterUnderwriting = scaledDebtAmount.rayMul(previousLiquidityIndex.rayMul(currentUnderwriterIndex));
         uint256 currentDebt = scaledDebtAmount.rayMul(currentLiquidityIndex.rayMul(currentUnderwriterIndex));
-        liquidityPremium = debtAfterLiquidity - previousDebt;
-        underwriterPremium = currentDebt - debtAfterLiquidity;
+        underwriterPremium = debtAfterUnderwriting - previousDebt;
+        liquidityPremium = currentDebt - debtAfterUnderwriting;
     }
 }
