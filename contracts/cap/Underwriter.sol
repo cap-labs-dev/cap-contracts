@@ -349,8 +349,9 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     }
 
     /// @inheritdoc IUnderwriter
-    function unlockedSupply() public view override(ERC7540AsyncRedeem, IUnderwriter) returns (uint256) {
-        return _quoteWithdraw(IVault(vault).balanceOf(address(this), asset()));
+    function unlockedSupply() public view override(ERC7540AsyncRedeem, IUnderwriter) returns (uint256 unlocked) {
+        uint256 idleAssets = IVault(vault).balanceOf(address(this), asset());
+        unlocked = _convertToShares(idleAssets, Math.Rounding.Floor);
     }
 
     /// @dev Mint the seed on the first deposit. Already deducted from the quote.

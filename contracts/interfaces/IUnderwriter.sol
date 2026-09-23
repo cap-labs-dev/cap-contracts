@@ -209,6 +209,7 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     function totalAssets() external view returns (uint256 assets);
 
     /// @notice Get the shares available for instant redemption based on vault liquidity
+    /// @dev Rounds down so redeeming the unlocked shares cannot exceed idle assets.
     /// @return unlocked The shares redeemable against vault-held assets
     function unlockedSupply() external view returns (uint256 unlocked);
 }
