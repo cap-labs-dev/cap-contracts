@@ -126,7 +126,12 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     function finalizeDeallocateAsync(address tranche, uint256 requestId, uint256 shares) external;
 
     /// @notice Set the registered tranche that receives deposits by default
-    /// @dev Allocator only.
+    /// @dev Allocator only. This authorizes automatic allocation of all incoming deposits.
+    /// Accepted liquidity risk: a deposit followed by an instant redemption can consume
+    /// pre-existing idle liquidity not reserved for queued redemptions, leaving remaining
+    /// holders with default-tranche exposure instead. Queued redemptions retain priority.
+    /// Restoring idle liquidity requires allocator deallocation and sufficient unlocked
+    /// tranche capital; existing market debt can prevent immediate recovery.
     /// @param tranche The default tranche address
     function setDefaultTranche(address tranche) external;
 
