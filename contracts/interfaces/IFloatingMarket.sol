@@ -37,27 +37,38 @@ interface IFloatingMarket is IBaseMarket {
     function liquidate(address recipient, uint256 amount) external returns (uint256 repaid, uint256 valueSlashed);
 
     /// @notice Charge the accrued premium
+    /// @dev Permissionless realization funds both premium pools. More frequent realization can
+    /// increase eligible underwriters' allocation for the same index and debt path, up to rounding.
+    /// The caller receives no separate reward. Total premium equals reported debt growth.
+    /// With no scaled debt, reset the local liquidity index to one ray and refresh both
+    /// IRM baselines without minting premiums, including after a full repayment in the same block.
     function chargePremium() external;
 
     /// @notice Write off {unrecoverableDebt} as bad debt
-    /// @dev The market must be unhealthy. Unrecoverable debt is derived. Remaining debt stays
-    /// liquidatable.
+    /// @dev The market must be unhealthy before the write-off. Clears the representable shortfall
+    /// without slashing collateral. Remaining debt may be healthy, so continued liquidatability
+    /// is not guaranteed. Borrowing remains subject to {creditLimit}; the market is not paused.
     /// @return amount The amount of debt written off, in stablecoin units (18 decimals)
     function writeOff() external returns (uint256 amount);
 
     /// @notice Get the liquidity and underwriter premiums
+    /// @dev Underwriting accrues against the last realized liquidity index. Liquidity receives
+    /// the remaining debt growth. Allocation intentionally depends on realization frequency.
     /// @return liquidityPremium The liquidity premium, in stablecoin units (18 decimals)
     /// @return underwriterPremium The underwriter premium, in stablecoin units (18 decimals)
     function premium() external view returns (uint256 liquidityPremium, uint256 underwriterPremium);
 
     /// @notice Get the liquidity and underwriter premium indexes
     /// @dev Liquidity grows as `oldLocal × (newGlobal / oldGlobal)^multiplier`, subject to
-    /// fixed-point rounding. Same-block reads return the last checkpoint.
+    /// fixed-point rounding. With no scaled debt, returns one ray and the current IRM underwriter
+    /// index without growing liquidity. Otherwise, same-block reads return the last checkpoint.
     /// @return liquidityIndex The market-local liquidity index in ray decimals
     /// @return underwriterIndex The underwriter index in ray decimals
     function premiumIndices() external view returns (uint256 liquidityIndex, uint256 underwriterIndex);
 
     /// @notice Get the combined debt index
+    /// @dev With no scaled debt, equals the current IRM underwriter index. The local liquidity
+    /// index resets between debt lifecycles, so this index is not globally monotonic.
     /// @return combinedIndex The combined debt index in ray decimals
     function index() external view returns (uint256 combinedIndex);
 }

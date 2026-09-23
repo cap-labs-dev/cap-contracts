@@ -59,6 +59,7 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @param asset The vault asset deposited by curators
     /// @param vaultAddress The vault holding curator assets
     /// @param stablecoinAddress The stablecoin used for premium payments
+    /// @param vestingPeriod The initial premium vesting time constant in seconds
     function initialize(
         address authority,
         address registryAddress,
@@ -66,7 +67,8 @@ interface IUnderwriter is IERC7540AsyncRedeem {
         string memory symbol,
         address asset,
         address vaultAddress,
-        address stablecoinAddress
+        address stablecoinAddress,
+        uint256 vestingPeriod
     ) external;
 
     /// @notice Set the role permitted to deposit
@@ -125,7 +127,10 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice Re-value a tranche position and claim its premium
     /// @dev Registration is not checked; see {deallocate}. Remakes the mark only if {allocate}
     /// already opened one. Valuations stay cached between marks. Deposit and mint quotes
-    /// separately value the already-recorded default position at its current value.
+    /// separately value the default position at its current value.
+    /// Harvested premium enters the pool's own vesting pot, whose period the curator controls.
+    /// It rewards opted-in balances as it vests, including holders who joined after the tranche
+    /// generated it. Previously credited pool rewards remain with their original holders.
     /// @param tranche The tranche address
     function report(address tranche) external;
 

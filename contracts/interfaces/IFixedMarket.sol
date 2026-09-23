@@ -152,8 +152,10 @@ interface IFixedMarket is IBaseMarket {
     function extendAdmin(uint256 id, uint256 extension) external returns (uint256 actualExtension);
 
     /// @notice Write off this loan's share of {unrecoverableDebt}
-    /// @dev The market must be unhealthy. Capped at the market-wide shortfall. `id` must be in
-    /// `[0, loanCount)`.
+    /// @dev The market must be unhealthy before the write-off. Capped at the market-wide shortfall;
+    /// collateral is not slashed. Remaining market debt may be healthy, so continued liquidatability
+    /// is not guaranteed. Borrowing remains subject to {creditLimit}; the market is not paused.
+    /// `id` must be in `[0, loanCount)`.
     /// @param id The id of the loan
     /// @return amount The amount of debt written off, in stablecoin units (18 decimals)
     function writeOff(uint256 id) external returns (uint256 amount);

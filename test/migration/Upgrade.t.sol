@@ -53,7 +53,7 @@ contract UpgradeTest is MigrationBase {
 
     function test_reinitializeIsClosed() public {
         vm.expectRevert();
-        scoin.initialize(infra.accessManager, address(usdc), liveName, liveSymbol, infra.irm, address(0));
+        scoin.initialize(infra.accessManager, address(usdc), liveName, liveSymbol, infra.irm, address(0), 12 hours);
         vm.expectRevert();
         wrapper.initialize(infra.accessManager, address(scoin));
     }
