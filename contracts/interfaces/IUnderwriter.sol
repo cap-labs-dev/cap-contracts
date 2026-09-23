@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import { IERC7540AsyncRedeem } from "./IERC7540AsyncRedeem.sol";
+import { IPremiumVesting } from "./IPremiumVesting.sol";
 
 /// @title IUnderwriter
 /// @author kexley, Cap Labs
@@ -11,7 +12,7 @@ import { IERC7540AsyncRedeem } from "./IERC7540AsyncRedeem.sol";
 /// upgrade via {UpgradeableBeacon-upgradeTo} on the underwriter beacon.
 /// Deposits and mints must issue at least one share or revert with {ZeroShares}.
 /// A default-tranche allocation that would issue zero tranche shares also reverts the entire deposit.
-interface IUnderwriter is IERC7540AsyncRedeem {
+interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @notice The tranche is not registered with the underwriter
     error NotRegisteredTranche();
 

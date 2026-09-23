@@ -64,6 +64,11 @@ interface IFloatingMarket is IBaseMarket {
     /// @return underwriterPremium The underwriter premium, in stablecoin units (18 decimals)
     function premium() external view returns (uint256 liquidityPremium, uint256 underwriterPremium);
 
+    /// @notice Get the timestamp of the last premium checkpoint
+    /// @dev Set at initialization and updated by premium charges, including empty-market resets.
+    /// @return timestamp The last checkpoint time in seconds
+    function lastPremiumUpdate() external view returns (uint256 timestamp);
+
     /// @notice Get the liquidity and underwriter premium indexes
     /// @dev Liquidity grows as `oldLocal × (newGlobal / oldGlobal)^multiplier`, subject to
     /// fixed-point rounding. With no scaled debt, returns one ray and the current IRM underwriter

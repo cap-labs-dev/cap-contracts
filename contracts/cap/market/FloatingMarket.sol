@@ -23,8 +23,8 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
     /// @dev Last cached underwriter index at premium charge
     uint256 private lastUnderwriterIndex;
 
-    /// @dev Timestamp of the last premium charge
-    uint256 private lastPremiumUpdate;
+    /// @inheritdoc IFloatingMarket
+    uint256 public lastPremiumUpdate;
 
     /// @dev Scaled outstanding debt
     uint256 private scaledDebt;

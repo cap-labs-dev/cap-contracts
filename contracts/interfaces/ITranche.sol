@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import { IERC7540AsyncRedeem } from "./IERC7540AsyncRedeem.sol";
+import { IPremiumVesting } from "./IPremiumVesting.sol";
 
 /// @title ITranche
 /// @author kexley, Cap Labs
@@ -9,7 +10,7 @@ import { IERC7540AsyncRedeem } from "./IERC7540AsyncRedeem.sol";
 /// @dev Beacon instance. Upgrade via {UpgradeableBeacon-upgradeTo} on the tranche beacon.
 /// Deposits and mints must issue at least one share or revert with {ZeroShares}.
 /// A deposit preview can still return zero when the asset amount rounds below one share.
-interface ITranche is IERC7540AsyncRedeem {
+interface ITranche is IPremiumVesting, IERC7540AsyncRedeem {
     /// @notice The oracle reported a zero price
     error InvalidPrice();
 
