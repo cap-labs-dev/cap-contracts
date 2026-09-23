@@ -8,6 +8,7 @@ import { IFixedMarket } from "../../contracts/interfaces/IFixedMarket.sol";
 import { IFloatingMarket } from "../../contracts/interfaces/IFloatingMarket.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
 import { IOracle } from "../../contracts/interfaces/IOracle.sol";
+import { IPremiumVesting } from "../../contracts/interfaces/IPremiumVesting.sol";
 import { IRegistry } from "../../contracts/interfaces/IRegistry.sol";
 import { IStablecoin } from "../../contracts/interfaces/IStablecoin.sol";
 import { ITranche } from "../../contracts/interfaces/ITranche.sol";
@@ -103,6 +104,13 @@ contract CheckRoles is Script, InfraSerializer {
             "Stablecoin.setReserveVault",
             infra.stablecoin,
             IStablecoin.setReserveVault.selector,
+            CapRoles.GOVERNOR
+        );
+        _wired(
+            manager,
+            "Stablecoin.setVestingPeriod",
+            infra.stablecoin,
+            IPremiumVesting.setVestingPeriod.selector,
             CapRoles.GOVERNOR
         );
 
@@ -257,6 +265,13 @@ contract CheckRoles is Script, InfraSerializer {
             uint64 owner = manager.getRoleAdmin(depositor);
             _wired(manager, "Tranche.fund", tranche, ITranche.fund.selector, CapRoles.MARKET);
             _wired(manager, "Tranche.setMaxCapital", tranche, ITranche.setMaxCapital.selector, CapRoles.GOVERNOR);
+            _wired(
+                manager,
+                "Tranche.setVestingPeriod",
+                tranche,
+                IPremiumVesting.setVestingPeriod.selector,
+                CapRoles.GOVERNOR
+            );
             _wired(manager, "Tranche.deposit", tranche, IERC4626.deposit.selector, depositor);
             _wired(manager, "Tranche.mint", tranche, IERC4626.mint.selector, depositor);
             console.log("  depositor role", depositor, "admin", owner);
@@ -267,6 +282,9 @@ contract CheckRoles is Script, InfraSerializer {
             console.log("== underwriter", underwriter, "==");
             uint64 curator = manager.getTargetFunctionRole(underwriter, IUnderwriter.addTranche.selector);
             _wired(manager, "Underwriter.addTranche", underwriter, IUnderwriter.addTranche.selector, curator);
+            _wired(
+                manager, "Underwriter.setVestingPeriod", underwriter, IPremiumVesting.setVestingPeriod.selector, curator
+            );
             _wired(
                 manager, "Underwriter.setAllocatorRole", underwriter, IUnderwriter.setAllocatorRole.selector, curator
             );

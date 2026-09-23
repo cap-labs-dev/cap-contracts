@@ -81,9 +81,9 @@ contract LockedValueTest is CapDeployer {
         assertApproxEqAbs(Tranche(junior).unlockedSupply(), expectedUnlocked, 1e6, "junior unlocked in tokens");
     }
 
-    /// @dev Six-decimal collateral plus a zero buffer used to floor the USD-to-token conversion
-    /// and leave health below one after a full instant exit. Both conversions now ceil.
-    function test_sixDecimalZeroBufferWithdrawCannotBreakHealth() public {
+    /// @dev Keep the six-decimal exit-rounding regression at the minimum permitted buffer.
+    /// Both conversions must ceil so the remaining collateral also covers the buffered credit bound.
+    function test_sixDecimalMinimumBufferWithdrawCannotBreakHealth() public {
         _deployCap();
         MockERC20 usdc = _newCollateral("USD Coin", "USDC", 6, 1e18);
         address[] memory assets = new address[](2);
@@ -93,8 +93,8 @@ contract LockedValueTest is CapDeployer {
         (address marketAddr, address[] memory tranches) =
             _createMarket("usdc6", defaultMarketOwner, defaultBorrower, assets, capConfig.defaultTrancheWeights);
         FloatingMarket market = FloatingMarket(marketAddr);
-        market.setBuffer(0);
-        market.setLtv(market.lt());
+        market.setBuffer(0.1e27);
+        market.setLtv(market.lt() - market.buffer());
         _setMaxCapital(market, type(uint256).max);
 
         address seniorLp = makeAddr("senior-lp");
@@ -112,6 +112,7 @@ contract LockedValueTest is CapDeployer {
         emit log_named_uint("debt  ", market.totalDebt());
         emit log_named_uint("capital", market.totalCapital());
         assertGe(market.healthiness(), 1e27, "a full instant exit must not make the market unhealthy");
+        assertGe(market.creditLimit(), market.totalDebt(), "ceil exits preserve the buffered credit bound");
     }
 
     function _exitUnlocked(address tranche, address lp) internal {

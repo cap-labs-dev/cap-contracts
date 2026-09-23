@@ -43,7 +43,7 @@ contract AccountingIntegrityTest is CapDeployer {
                 address(impl),
                 abi.encodeCall(
                     Stablecoin.initialize,
-                    (address(accessManager), address(usdc), "Cap USD", "cUSD", address(mockIrm), address(0))
+                    (address(accessManager), address(usdc), "Cap USD", "cUSD", address(mockIrm), address(0), 12 hours)
                 )
             )
         );
@@ -595,7 +595,7 @@ contract AccountingIntegrityTest is CapDeployer {
         next[1] = 0.3e27;
         next[2] = 0.2e27;
         vm.prank(defaultMarketOwner);
-        address added = registry.createTranche(b.marketAddr, address(collateral), next);
+        address added = registry.createTranche(b.marketAddr, address(collateral), next, 12 hours);
 
         assertEq(
             stablecoin.balanceOf(b.tranche1Addr) - juniorBefore, expectedJunior, "the elapsed period pays the old 10%"

@@ -41,7 +41,7 @@ interface IBaseMarket {
     /// @notice The loan-to-value ratio exceeds the liquidation threshold minus buffer
     error InvalidLtv();
 
-    /// @notice The buffer exceeds the maximum allowed value
+    /// @notice The buffer is below 10% or is not strictly below the liquidation threshold
     error InvalidBuffer();
 
     /// @notice The liquidation threshold exceeds the maximum allowed value
@@ -76,6 +76,9 @@ interface IBaseMarket {
 
     /// @notice The tranche is already set
     error TrancheAlreadySet();
+
+    /// @notice The market would exceed the fixed limit of ten configured tranches
+    error TooManyTranches();
 
     /// @notice The write off exceeds the debt that liquidation could never recover
     error ExceedsUnrecoverableDebt();
@@ -143,6 +146,8 @@ interface IBaseMarket {
     function setLtv(uint256 ltv) external;
 
     /// @notice Set the liquidation buffer
+    /// @dev Must be at least 0.1e27 and strictly below {lt}. Credit capacity uses
+    /// `min(ltv, lt - buffer)`, so raising the buffer can tighten an existing LTV setting.
     /// @param buffer The new buffer in ray decimals
     function setBuffer(uint256 buffer) external;
 
@@ -164,6 +169,8 @@ interface IBaseMarket {
 
     /// @notice Set the tranches and their weights
     /// @dev Restricted to the registry; market owners may only change weights.
+    /// At most ten tranches may be configured, including empty, killed and zero-weight tranches.
+    /// The count is checked before settling premium.
     /// Floating settles outstanding premium under the current list first, so an
     /// already-elapsed period is not reallocated.
     /// @param tranches The new tranche addresses and weights, with weights in ray decimals
@@ -275,8 +282,8 @@ interface IBaseMarket {
     function availableCredit() external view returns (uint256 credit);
 
     /// @notice Get the credit limit
-    /// @dev Sum of each attached tranche's {ITranche-capitalLimit}, then `min(ltv, lt)`.
-    /// Guardian tightening of `lt` below `ltv` cuts new credit here.
+    /// @dev Sum of each attached tranche's {ITranche-capitalLimit}, then `min(ltv, lt - buffer)`.
+    /// Lowering `lt` or raising `buffer` caps new credit even when the stored `ltv` is higher.
     /// @return limit The credit limit in USD (18 decimals)
     function creditLimit() external view returns (uint256 limit);
 }

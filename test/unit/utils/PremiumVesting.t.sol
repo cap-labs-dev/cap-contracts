@@ -7,6 +7,7 @@ import { PremiumVesting } from "../../../contracts/utils/PremiumVesting.sol";
 import { WadRayMath } from "../../../contracts/utils/WadRayMath.sol";
 import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
 import { ERC4626Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import { AccessManager } from "@openzeppelin/contracts/access/manager/AccessManager.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -23,7 +24,7 @@ contract PremiumVestingHarness is PremiumVesting {
     }
 
     function initialize(IERC20 asset, address premium) external initializer {
-        __PremiumVesting_init(asset, "Vault", "VLT", premium);
+        __PremiumVesting_init(address(new AccessManager(msg.sender)), asset, "Vault", "VLT", premium, 12 hours);
     }
 
     function mint(address to, uint256 amount) external {
@@ -94,7 +95,13 @@ contract PremiumVestingTest is Test {
 
     function setUp() public {
         vm.warp(1_000_000);
-        v = new PremiumVestingHarness();
+        v = _newVesting();
+    }
+
+    function _newVesting() internal returns (PremiumVestingHarness instance) {
+        instance = new PremiumVestingHarness();
+        MockERC20 token = new MockERC20("Token", "TOK", 18);
+        instance.initialize(IERC20(address(token)), address(token));
     }
 
     function _vested(uint256 pot, uint256 elapsed) internal pure returns (uint256 amount) {
@@ -237,8 +244,8 @@ contract PremiumVestingTest is Test {
         uint256 split = v.perShare();
         uint256 splitLeft = v.remainder();
 
-        PremiumVestingHarness single = new PremiumVestingHarness();
         vm.warp(startedAt);
+        PremiumVestingHarness single = _newVesting();
         single.fund(PREMIUM);
         vm.warp(startedAt + PERIOD);
         single.accrue(supply);

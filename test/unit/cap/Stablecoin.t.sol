@@ -38,7 +38,15 @@ contract StablecoinTest is BaseTest {
                 address(impl),
                 abi.encodeCall(
                     Stablecoin.initialize,
-                    (address(accessManager), address(asset), "Cap USD", "cUSD", address(irm), address(reserve))
+                    (
+                        address(accessManager),
+                        address(asset),
+                        "Cap USD",
+                        "cUSD",
+                        address(irm),
+                        address(reserve),
+                        12 hours
+                    )
                 )
             )
         );
@@ -324,7 +332,7 @@ contract StablecoinTest is BaseTest {
                 address(new Stablecoin()),
                 abi.encodeCall(
                     Stablecoin.initialize,
-                    (address(accessManager), address(underlying), "Cap USD", "cUSD", address(irm), address(0))
+                    (address(accessManager), address(underlying), "Cap USD", "cUSD", address(irm), address(0), 12 hours)
                 )
             )
         );
@@ -380,7 +388,7 @@ contract StablecoinTest is BaseTest {
             impl,
             abi.encodeCall(
                 Stablecoin.initialize,
-                (address(accessManager), address(wide), "Cap USD", "cUSD", address(irm), address(0))
+                (address(accessManager), address(wide), "Cap USD", "cUSD", address(irm), address(0), 12 hours)
             )
         );
     }
@@ -439,9 +447,9 @@ contract StablecoinTest is BaseTest {
         assertApproxEqAbs(scoin.convertToAssets(40e18), 17.241379310344827586e18, 2, "paid something, not zero");
     }
 
-    /// Redeeming the entire supply pays out exactly the reserve and no more, so the curve can
-    /// never promise assets that are not there.
-    function test_previewRedeem_wholeSupplyPaysExactlyTheBacking() public {
+    /// The quote saturates at recognized reserve backing. Performing credit remains in managed
+    /// assets, but cannot inflate the exit quote. Execution is separately gated by unlockedSupply.
+    function test_previewRedeem_saturatesAtBackingExcludingPerformingCredit() public {
         vm.prank(alice);
         scoin.deposit(1_000e18, alice);
         scoin.mintCreditBacked(bob, 500e18);
@@ -449,8 +457,9 @@ contract StablecoinTest is BaseTest {
 
         assertEq(scoin.backing(), 1_400e18, "recognized backing is supply net of the write-off");
         assertEq(scoin.totalAssets(), 1_400e18, "and totalAssets reports that, not the exit discount");
-        assertEq(scoin.convertToAssets(scoin.totalSupply()), 1_400e18, "redeeming everything pays the backing");
-        assertLt(scoin.convertToAssets(1_400e18), 1_400e18, "redeeming only the outstanding is discounted");
+        assertEq(scoin.convertToAssets(1_100e18), 1_000e18, "the pricing basis quotes the reserve backing");
+        assertEq(scoin.convertToAssets(scoin.totalSupply()), 1_000e18, "larger quotes also saturate there");
+        assertLt(scoin.convertToAssets(1_000e18), 1_000e18, "executable exits still take a haircut");
     }
 
     /// The old conversion paid early redeemers more than their share and let a single large
@@ -468,18 +477,19 @@ contract StablecoinTest is BaseTest {
         vm.prank(alice);
         uint256 paid = scoin.instantRedeem(1_000e18, alice, alice);
 
-        // the 500e18 left behind retains 500 * 1500 * 1400 / (1500 * 1400 + 500 * 100) of the
-        // backing, so alice takes the 911.62... that leaves over and absorbs the 88.37... gap
-        assertApproxEqAbs(paid, 911.627906976744186046e18, 2, "priced on the shortfall curve");
+        // B = 1100, R = 1000 and x = 1000, excluding 400 of performing credit.
+        // The payout is x * R^2 / (B^2 - x * D) = 100000 / 111.
+        assertApproxEqAbs(paid, 900.9009009009009009e18, 2, "priced on the shortfall curve");
         assertEq(assetsBefore - scoin.totalAssets(), paid, "recognized backing falls by the payout");
         assertEq(heldBefore - asset.balanceOf(address(scoin)), paid, "the reserve falls by exactly what was paid");
         assertApproxEqAbs(scoin.badDebt(), 100e18 - (1_000e18 - paid), 2, "absorbs exactly what it left behind");
     }
 
     /// @dev The property the shortfall curve rests on, and the reason chopping a redemption up
-    /// cannot beat taking it in one call: `badDebt / (totalSupply * outstandingSupply)` is conserved by
-    /// a redemption. Since what a redemption retains is `remaining / (1 + k * remaining)` for that
-    /// same `k`, the payout depends only on where the supply ends up and not on the route taken.
+    /// cannot beat taking it in one call: `badDebt / (B * R)` is conserved by a redemption, where
+    /// B excludes performing credit and R = B - badDebt. The retained backing is
+    /// `remaining / (1 + k * remaining)` for that same `k`, so the payout depends only on where
+    /// the supply ends up and not on the route taken.
     ///
     /// What would break it is charging the marginal price — the backing ratio squared — on a whole
     /// redemption, since each slice lifts the ratio for the next and a sliced exit would harvest
@@ -510,10 +520,11 @@ contract StablecoinTest is BaseTest {
         assertApproxEqRel(taken, whole, 1e6, "and slicing pays no more than the single call");
     }
 
-    /// @dev `badDebt * 1e36 / (totalSupply * outstandingSupply)`, scaled so the ratio is comparable
+    /// @dev `badDebt * 1e36 / (B * R)`, scaled so the ratio is comparable
     /// across states without losing it to integer division
     function _shortfallInvariant() internal view returns (uint256 k) {
-        k = Math.mulDiv(scoin.badDebt(), 1e36, scoin.totalSupply() * (scoin.totalSupply() - scoin.badDebt()));
+        uint256 basis = scoin.totalSupply() - scoin.creditBackedSupply();
+        k = Math.mulDiv(scoin.badDebt(), 1e36, basis * (basis - scoin.badDebt()));
     }
 
     /// quoteWithdraw must be the inverse of convertToAssets above the shortfall.
@@ -938,7 +949,9 @@ contract StablecoinTest is BaseTest {
 
     function test_initialize_cannotReinit() public {
         vm.expectRevert();
-        scoin.initialize(address(accessManager), address(asset), "Cap USD", "cUSD", address(irm), address(reserve));
+        scoin.initialize(
+            address(accessManager), address(asset), "Cap USD", "cUSD", address(irm), address(reserve), 12 hours
+        );
     }
 
     function test_upgrade_authorized() public {

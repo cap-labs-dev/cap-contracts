@@ -5,15 +5,18 @@ import { ERC7540AsyncRedeem } from "../ERC7540/ERC7540AsyncRedeem.sol";
 import { IPremiumVesting } from "../interfaces/IPremiumVesting.sol";
 import { DeadShares } from "./DeadShares.sol";
 import { WadRayMath } from "./WadRayMath.sol";
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title PremiumVesting
 /// @author kexley, Cap Labs
-/// @notice Exponential premium vesting over a 12-hour time constant
+/// @notice Exponential premium vesting over a configurable time constant
 /// @dev Only opted-in balances earn. Zero staked supply freezes the remainder.
-abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
+abstract contract PremiumVesting is IPremiumVesting, AccessManagedUpgradeable, ERC7540AsyncRedeem {
     using SafeERC20 for IERC20;
     using WadRayMath for uint256;
 
@@ -25,10 +28,8 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
     /// pot; {claim} pays at most the stablecoin this contract holds.
     uint256 private constant RAY = WadRayMath.RAY;
 
-    /// @notice Twelve-hour time constant. After a day most of a pot has vested
-    uint256 public constant VESTING_PERIOD = 12 hours;
-
     /// @custom:storage-location cap.storage.PremiumVesting
+    /// @param vestingPeriod Configured time constant in seconds
     /// @param remainder Premium still held
     /// @param lastUpdate The point accrual has been settled up to
     /// @param perShare Cumulative premium released per staked share, in ray decimals
@@ -38,6 +39,7 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
     /// @param optedIn Whether an account earns
     /// @param staked Sum of opted-in balances
     struct PremiumVestingStorage {
+        uint256 vestingPeriod;
         uint256 remainder;
         uint256 lastUpdate;
         uint256 perShare;
@@ -60,8 +62,13 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
     }
 
     /// @inheritdoc IPremiumVesting
-    function vestingPeriod() public pure returns (uint256 period) {
-        period = VESTING_PERIOD;
+    function vestingPeriod() public view returns (uint256 period) {
+        period = _getPremiumVestingStorage().vestingPeriod;
+    }
+
+    /// @inheritdoc IPremiumVesting
+    function setVestingPeriod(uint256 period) external restricted updatePremium {
+        _setVestingPeriod(period);
     }
 
     /// @inheritdoc IPremiumVesting
@@ -78,7 +85,7 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
 
     /// @inheritdoc IPremiumVesting
     function premiumPerSecond() public view returns (uint256 perSecond) {
-        perSecond = remaining() / VESTING_PERIOD;
+        perSecond = remaining() / vestingPeriod();
     }
 
     /// @inheritdoc IPremiumVesting
@@ -163,18 +170,35 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
         available = IERC20(stablecoin()).balanceOf(address(this));
     }
 
-    /// @dev Initialize the ERC7540 vault
+    /// @dev Initialize access control, the ERC7540 vault, and premium vesting
+    /// @param authority The access manager address
     /// @param asset The vault asset
     /// @param name The token name
     /// @param symbol The token symbol
     /// @param token The stablecoin premium is paid in
+    /// @param period The premium vesting time constant in seconds
     // forge-lint: disable-next-item(mixed-case-function)
-    function __PremiumVesting_init(IERC20 asset, string memory name, string memory symbol, address token)
-        internal
-        onlyInitializing
-    {
+    function __PremiumVesting_init(
+        address authority,
+        IERC20 asset,
+        string memory name,
+        string memory symbol,
+        address token,
+        uint256 period
+    ) internal onlyInitializing {
+        __AccessManaged_init(authority);
         __ERC7540AsyncRedeem_init(asset, name, symbol);
         _getPremiumVestingStorage().stablecoin = token;
+        _setVestingPeriod(period);
+    }
+
+    /// @dev Set the time constant during initialization or after checkpointing accrued premium.
+    /// @param period The vesting time constant in seconds
+    function _setVestingPeriod(uint256 period) internal {
+        // Above RAY, the per-second decay rounds to zero and vesting would stop entirely.
+        if (period == 0 || period > RAY) revert InvalidVestingPeriod();
+        _getPremiumVestingStorage().vestingPeriod = period;
+        emit SetVestingPeriod(period);
     }
 
     /// @dev Credit whatever has vested since the last accrual to the current supply
@@ -340,8 +364,8 @@ abstract contract PremiumVesting is IPremiumVesting, ERC7540AsyncRedeem {
     /// @dev `1 - retention^elapsed`. Splits of the interval compose, subject to fixed-point rounding.
     /// @param elapsed Seconds since the last accrual
     /// @return weight Fraction of the remainder that has vested, in ray decimals
-    function _weight(uint256 elapsed) private pure returns (uint256 weight) {
-        uint256 retention = RAY - RAY / VESTING_PERIOD;
+    function _weight(uint256 elapsed) private view returns (uint256 weight) {
+        uint256 retention = RAY - RAY / vestingPeriod();
         weight = RAY - retention.rayPow(elapsed);
     }
 }
