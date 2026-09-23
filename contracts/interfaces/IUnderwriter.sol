@@ -198,6 +198,7 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     function defaultTranche() external view returns (address);
 
     /// @notice Get the tranches registered for allocation
+    /// @dev Returns the full list. Curators are expected to keep it small; no on-chain count limit is enforced.
     /// @return The registered tranche addresses
     function registeredTranches() external view returns (address[] memory);
 

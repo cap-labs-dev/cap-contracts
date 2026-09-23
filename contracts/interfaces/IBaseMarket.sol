@@ -231,6 +231,7 @@ interface IBaseMarket {
     function marketMultiplier() external view returns (uint256);
 
     /// @notice Get the tranche addresses and weights
+    /// @dev Returns the full list, bounded to ten tranches by {MarketLimits-MAX_TRANCHES}.
     /// @return tranches The tranches and their weights, with weights in ray decimals
     function tranches() external view returns (Tranche[] memory tranches);
 

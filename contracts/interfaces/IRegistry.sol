@@ -29,8 +29,8 @@ interface IRegistry {
     /// @notice The caller does not hold the market's owner role
     error NotMarketOwner();
 
-    /// @notice The requested slice is empty-inverted or past the set
-    /// @dev Valid calls use `start <= end <= length`. `end` is exclusive, so `length` is the max.
+    /// @notice The requested slice starts after its end
+    /// @dev `start` must not exceed `end`. Bounds past the collection are clamped to its length.
     error InvalidRange();
 
     /// @notice Shared initialization parameters for the registry
@@ -221,9 +221,10 @@ interface IRegistry {
     function marketsLength() external view returns (uint256 count);
 
     /// @notice Get a slice of deployed markets
-    /// @dev `end` is exclusive. `markets(0, marketsLength())` is the full list.
+    /// @dev `end` is exclusive and clamped to the length. A start at or beyond the length returns an empty list.
+    /// Inverted ranges revert. `markets(0, type(uint256).max)` returns the full list.
     /// @param start The first index, inclusive
-    /// @param end The last index, exclusive, at most {marketsLength}
+    /// @param end The last index, exclusive
     /// @return listed The markets in that range
     function markets(uint256 start, uint256 end) external view returns (address[] memory listed);
 
@@ -232,9 +233,10 @@ interface IRegistry {
     function tranchesLength() external view returns (uint256 count);
 
     /// @notice Get a slice of deployed tranches
-    /// @dev `end` is exclusive. `tranches(0, tranchesLength())` is the full list.
+    /// @dev `end` is exclusive and clamped to the length. A start at or beyond the length returns an empty list.
+    /// Inverted ranges revert. `tranches(0, type(uint256).max)` returns the full list.
     /// @param start The first index, inclusive
-    /// @param end The last index, exclusive, at most {tranchesLength}
+    /// @param end The last index, exclusive
     /// @return listed The tranches in that range
     function tranches(uint256 start, uint256 end) external view returns (address[] memory listed);
 
@@ -243,9 +245,10 @@ interface IRegistry {
     function underwritersLength() external view returns (uint256 count);
 
     /// @notice Get a slice of deployed underwriters
-    /// @dev `end` is exclusive. `underwriters(0, underwritersLength())` is the full list.
+    /// @dev `end` is exclusive and clamped to the length. A start at or beyond the length returns an empty list.
+    /// Inverted ranges revert. `underwriters(0, type(uint256).max)` returns the full list.
     /// @param start The first index, inclusive
-    /// @param end The last index, exclusive, at most {underwritersLength}
+    /// @param end The last index, exclusive
     /// @return listed The underwriters in that range
     function underwriters(uint256 start, uint256 end) external view returns (address[] memory listed);
 

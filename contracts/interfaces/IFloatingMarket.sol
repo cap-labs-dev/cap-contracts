@@ -10,6 +10,12 @@ interface IFloatingMarket is IBaseMarket {
     /// @notice The scaled amount is zero
     error InvalidScaledAmount();
 
+    /// @notice Emitted when the market initializes or checkpoints its premium indices
+    /// @dev Also emitted when an empty market resets its liquidity index to one ray.
+    /// @param liquidityIndex The market-local liquidity index, in ray decimals
+    /// @param underwriterIndex The underwriter index, in ray decimals
+    event PremiumIndexUpdated(uint256 liquidityIndex, uint256 underwriterIndex);
+
     /// @notice Initialize the market
     /// @param authority The access manager address
     /// @param registry The registry providing shared market configuration

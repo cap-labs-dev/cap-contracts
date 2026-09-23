@@ -121,6 +121,22 @@ A few protocol-specific notes:
 - Queue an exit with `requestRedeem`, then `redeem` the claimable amount. Instant exits stay within `maxInstantRedeem`. Async `previewRedeem` and `previewWithdraw` are unsupported.
 - Call `optIn` and `claim` on cUSD, tranche, or underwriter shares. The wrapper opts in for stcUSD holders.
 
+### Views and event checkpoints
+
+Registry `markets(start, end)`, `tranches(start, end)` and `underwriters(start, end)` use an exclusive end and clamp both bounds to the collection length. An oversized final page returns the remaining entries; a start at or beyond the length returns an empty array. Inverted requested ranges still revert. `(0, type(uint256).max)` returns the full collection. Market `tranches()` returns its full list, bounded to ten entries. Underwriter `registeredTranches()` also returns the full list; curators should keep it small because no count limit is enforced.
+
+`PremiumAccrued(perShare, remainder, staked)` records the vesting state whenever its checkpoint timestamp advances, including idle and rounded-to-zero accruals. Use the event's block timestamp as the new vesting baseline. The event precedes the calling operation's funding or balance changes: replay subsequent `Fund`, `Transfer`, `OptIn`, `OptOut`, `Claimed` and `SetVestingPeriod` events in order. Project accrual between checkpoints using the configured period and contract rounding. Tranche and underwriter NAV exclude separately claimable cUSD premiums; the wrapper includes its claimable cUSD premium in `totalAssets()`.
+
+`PremiumIndexUpdated(liquidityIndex, underwriterIndex)` records floating-market index baselines at initialization and premium checkpoints, including empty-market resets. Funded same-timestamp calls that keep the cached indices emit no additional checkpoint. The liquidity index is market-local, not the global IRM index. Debt reconstruction must also replay debt movements, IRM updates and market multiplier changes with the contract's rounding; the checkpoint alone is not a debt balance.
+
+### Zap authorization for queued redemptions
+
+Queued claims follow [ERC-7540](https://eips.ethereum.org/EIPS/eip-7540): the caller must be the request controller or its approved operator. ERC20 share allowance can authorize `requestRedeem`, but does not authorize claiming an existing request.
+
+For a user-controlled request, approve a trusted zap with `setOperator(zap, true)` on the cUSD, tranche or underwriter contract. The zap can then call `requestRedeem(shares, user, user)` and, once claimable, `redeem(requestId, shares, receiver, user)` or the corresponding `withdraw`. Revoke approval with `setOperator(zap, false)`. This approval is separate from the Vault's ERC6909 operator approval used for collateral deposits.
+
+Operator approval gives the zap authority to direct payouts and transfer requests. The zap must authenticate the user for every operation: direct calls should derive the owner/controller from the caller, and relayed calls must verify a user-signed instruction binding the vault, request, amount, recipient and any swap parameters, with a nonce and deadline. Apply these checks throughout any batching or callback paths. A public bundler that forwards arbitrary calls using its own operator approval is unsafe: another caller could use that approval to redirect a user's redemption. Signing an operator approval alone does not authenticate the subsequent zap operation. No zap implementation or signed operator extension is included here.
+
 ## Deploy infrastructure
 
 [Deploy.s.sol](script/Deploy.s.sol) deploys fresh shared infrastructure through CreateX, initializes access control, seeds the wrapper, and writes the result to `config/cap-v2.json`. It does not create or configure individual credit markets. The target chain needs the canonical CreateX factory and support for the configured EVM bytecode.

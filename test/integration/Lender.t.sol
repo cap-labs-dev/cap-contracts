@@ -124,8 +124,36 @@ contract MarketTest is CapDeployer {
 
         vm.expectRevert(IRegistry.InvalidRange.selector);
         registry.markets(1, 0);
+        assertEq(registry.markets(0, 3), markets);
+        _assertRegistryPageBounds(registry.markets, 2);
+        _assertRegistryPageBounds(registry.tranches, 5);
+        _assertRegistryPageBounds(registry.underwriters, 1);
+    }
+
+    function test_registry_emptyCollectionsClampPages() public {
+        _assertRegistryPageBounds(registry.markets, 0);
+        _assertRegistryPageBounds(registry.tranches, 0);
+        _assertRegistryPageBounds(registry.underwriters, 0);
+    }
+
+    function _assertRegistryPageBounds(
+        function(uint256, uint256) external view returns (address[] memory) list,
+        uint256 length
+    ) internal {
+        address[] memory all = list(0, length);
+        assertEq(all.length, length);
+        assertEq(list(0, type(uint256).max), all, "an oversized end returns the full collection");
+        assertEq(list(length, length).length, 0);
+        assertEq(list(length, type(uint256).max).length, 0, "start at the end returns an empty page");
+        assertEq(list(length + 1, type(uint256).max).length, 0, "start past the end returns an empty page");
+        assertEq(list(type(uint256).max, type(uint256).max).length, 0);
+        if (length > 0) {
+            address[] memory tail = list(length - 1, type(uint256).max);
+            assertEq(tail.length, 1, "the last oversized page contains only the remaining entry");
+            assertEq(tail[0], all[length - 1]);
+        }
         vm.expectRevert(IRegistry.InvalidRange.selector);
-        registry.markets(0, 3);
+        list(length + 2, length + 1);
     }
 
     /// @dev Factory logs name the beacon, so a market, tranche, and underwriter are distinguishable.

@@ -27,6 +27,20 @@ contract FloatingMarketRegressionTest is CapDeployer {
         );
     }
 
+    function test_initializationEmitsTheMarketLocalIndexBaseline() public {
+        _indices(1.5e27, RAY);
+        vm.expectEmit();
+        emit IFloatingMarket.PremiumIndexUpdated(RAY, RAY);
+        vm.prank(address(registry));
+        address created = beaconFactory.create(
+            floatingMarketBeacon,
+            abi.encodeCall(IFloatingMarket.initialize, (address(accessManager), address(registry), "Index baseline"))
+        );
+        (uint256 liquidity, uint256 underwriting) = FloatingMarket(created).premiumIndices();
+        assertEq(liquidity, RAY, "a new market starts a local epoch regardless of the global index");
+        assertEq(underwriting, RAY);
+    }
+
     function test_dormantEmptyMarketSkipsUnrepresentableLocalGrowthAndCanBorrowAgain() public {
         vm.mockCall(address(irm), abi.encodeCall(IInterestRateModel.maximumMarketMultiplier, ()), abi.encode(4e27));
         market.setMarketMultiplier(4e27);
@@ -39,6 +53,8 @@ contract FloatingMarketRegressionTest is CapDeployer {
         assertEq(underwriting, 2e27);
         assertEq(market.index(), 2e27);
         uint256 credit = stablecoin.creditBackedSupply();
+        vm.expectEmit(address(market));
+        emit IFloatingMarket.PremiumIndexUpdated(RAY, 2e27);
         vm.prank(makeAddr("permissionless caller"));
         market.chargePremium();
         assertEq(stablecoin.creditBackedSupply(), credit);
@@ -62,6 +78,8 @@ contract FloatingMarketRegressionTest is CapDeployer {
         market.borrow(defaultBorrower, 100e18);
         vm.warp(block.timestamp + 1);
         _indices(1.2e27, 1.1e27);
+        vm.expectEmit(address(market));
+        emit IFloatingMarket.PremiumIndexUpdated(1.2e27, 1.1e27);
         market.chargePremium();
         assertEq(market.totalDebt(), 132e18);
         _mintStable(defaultBorrower, 32e18);
@@ -72,6 +90,8 @@ contract FloatingMarketRegressionTest is CapDeployer {
         assertEq(l, RAY);
         assertEq(u, 1.1e27);
         assertEq(market.index(), u);
+        vm.expectEmit(address(market));
+        emit IFloatingMarket.PremiumIndexUpdated(RAY, 1.1e27);
         uint256 minted = market.borrow(defaultBorrower, 55e18);
         vm.stopPrank();
         assertEq(minted, 55e18);
@@ -88,13 +108,17 @@ contract FloatingMarketRegressionTest is CapDeployer {
         market.borrow(defaultBorrower, 100e18);
         _indices(1.2e27, 1.1e27);
         assertEq(market.index(), RAY);
+        vm.recordLogs();
         market.chargePremium();
+        assertEq(vm.getRecordedLogs().length, 0, "cached indices do not emit another checkpoint");
         assertEq(market.totalDebt(), 100e18);
         vm.warp(block.timestamp + 1);
         assertEq(market.totalDebt(), 132e18);
         market.chargePremium();
         uint256 credit = stablecoin.creditBackedSupply();
+        vm.recordLogs();
         market.chargePremium();
+        assertEq(vm.getRecordedLogs().length, 0, "a repeated charge does not advance the clock");
         assertEq(stablecoin.creditBackedSupply(), credit, "no duplicate premium");
     }
 

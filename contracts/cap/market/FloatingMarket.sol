@@ -42,6 +42,7 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
         lastGlobalIndex = IInterestRateModel(irm()).liquidityIndex();
         lastUnderwriterIndex = IInterestRateModel(irm()).underwriterIndex(address(this));
         lastPremiumUpdate = block.timestamp;
+        emit PremiumIndexUpdated(lastLiquidityIndex, lastUnderwriterIndex);
     }
 
     /// @dev Allocate elapsed premium to the current tranches before membership or
@@ -186,6 +187,7 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
             lastGlobalIndex = IInterestRateModel(irm()).liquidityIndex();
             lastUnderwriterIndex = IInterestRateModel(irm()).underwriterIndex(address(this));
             lastPremiumUpdate = block.timestamp;
+            emit PremiumIndexUpdated(lastLiquidityIndex, lastUnderwriterIndex);
             return;
         }
         if (lastPremiumUpdate == block.timestamp) return;
@@ -200,6 +202,7 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
         lastGlobalIndex = IInterestRateModel(irm()).liquidityIndex();
         lastUnderwriterIndex = underwriterIndex;
         lastPremiumUpdate = block.timestamp;
+        emit PremiumIndexUpdated(liquidityIndex, underwriterIndex);
     }
 
     /// @dev Grow the market-local index by the global growth factor raised to `multiplier`.

@@ -311,7 +311,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         listed = _slice(_underwriters, start, end);
     }
 
-    /// @dev Return `[start, end)` of a set. `end` is exclusive so `length` is a valid max.
+    /// @dev Return `[start, end)` of a set, clamping both bounds to its length after rejecting inverted ranges.
     /// @param set The address set
     /// @param start The first index, inclusive
     /// @param end The last index, exclusive
@@ -322,7 +322,9 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         returns (address[] memory listed)
     {
         uint256 length = set.length();
-        if (start > end || end > length) revert InvalidRange();
+        if (start > end) revert InvalidRange();
+        if (end > length) end = length;
+        if (start > end) start = end;
         listed = new address[](end - start);
         for (uint256 i = start; i < end; ++i) {
             listed[i - start] = set.at(i);

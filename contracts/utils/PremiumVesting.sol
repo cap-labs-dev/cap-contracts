@@ -261,17 +261,13 @@ abstract contract PremiumVesting is IPremiumVesting, AccessManagedUpgradeable, E
     function _accrue(PremiumVestingStorage storage $, uint256 supply) internal {
         if (block.timestamp <= $.lastUpdate) return;
 
-        if (supply == 0) {
-            $.lastUpdate = block.timestamp;
-            return;
-        }
-
         uint256 amount = _vested($, supply);
         if (amount > 0) {
             $.perShare += Math.mulDiv(amount, RAY, supply, Math.Rounding.Floor);
             $.remainder -= amount;
         }
         $.lastUpdate = block.timestamp;
+        emit PremiumAccrued($.perShare, $.remainder, supply);
     }
 
     /// @dev Bank what an account has earned before its balance moves

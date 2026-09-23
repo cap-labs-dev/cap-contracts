@@ -17,6 +17,14 @@ interface IPremiumVesting {
     /// @param amount The premium added, in stablecoin units (18 decimals)
     event Fund(address indexed source, uint256 amount);
 
+    /// @notice Emitted when premium accrual advances its checkpoint
+    /// @dev Includes idle and rounded-to-zero accruals so the event timestamp tracks the vesting clock.
+    /// Values describe the checkpoint before the calling operation changes balances or funds more premium.
+    /// @param perShare Cumulative premium released per staked share, in ray decimals
+    /// @param remainder Premium still unvested, in stablecoin units (18 decimals)
+    /// @param staked Opted-in share supply used for this accrual
+    event PremiumAccrued(uint256 perShare, uint256 remainder, uint256 staked);
+
     /// @notice Emitted when vested premium is claimed
     /// @param user The account whose entitlement was settled
     /// @param recipient The address that received the premium
@@ -82,7 +90,7 @@ interface IPremiumVesting {
     function premiumPerSecond() external view returns (uint256 perSecond);
 
     /// @notice Get the timestamp of the last premium accrual update
-    /// @return timestamp The last time vested premium was written to `perShare`
+    /// @return timestamp The last checkpoint time, including idle and rounded-to-zero accruals
     function lastPremiumUpdate() external view returns (uint256 timestamp);
 
     /// @notice Get the accumulated premium per share in ray decimals

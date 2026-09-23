@@ -144,6 +144,10 @@ contract PremiumVestingTest is Test {
         uint256 vestedBefore = v.vested();
         uint256 owedBefore = v.claimable(alice);
 
+        vm.expectEmit(address(v));
+        emit IPremiumVesting.PremiumAccrued(vestedBefore * 1e9, PREMIUM - vestedBefore, 1e18);
+        vm.expectEmit(address(v));
+        emit IPremiumVesting.SetVestingPeriod(newPeriod);
         v.setVestingPeriod(newPeriod);
 
         assertEq(v.remainder(), PREMIUM - vestedBefore);
@@ -254,6 +258,8 @@ contract PremiumVestingTest is Test {
         vm.warp(block.timestamp + PERIOD / 2);
 
         uint256 due = v.vested();
+        vm.expectEmit(address(v));
+        emit IPremiumVesting.PremiumAccrued(Math.mulDiv(due, RAY, 1_000e18), PREMIUM - due, 1_000e18);
         v.accrue(1_000e18);
         assertEq(v.perShare(), due.rayDiv(1_000e18), "what vested, over the supply");
         assertEq(v.remainder(), PREMIUM - due, "and is taken off the remainder");
@@ -270,12 +276,63 @@ contract PremiumVestingTest is Test {
         uint256 lastBefore = v.lastUpdate();
 
         vm.warp(block.timestamp + PERIOD * 3);
+        vm.expectEmit(address(v));
+        emit IPremiumVesting.PremiumAccrued(v.perShare(), heldBefore, 0);
         v.accrue(0);
 
         assertEq(v.remainder(), heldBefore, "nothing vested to nobody");
         assertEq(v.lastUpdate(), lastBefore + PERIOD * 3, "the clock still moved");
         assertEq(v.vested(), 0, "so there is no cliff waiting for the next depositor");
         assertEq(v.remaining(), heldBefore, "and the same amount is still held");
+    }
+
+    function test_checkpointPrecedesFundingAndStakeChanges() public {
+        _earn(alice, 1_000e18);
+        v.fund(PREMIUM);
+        vm.warp(block.timestamp + PERIOD);
+        uint256 due = v.vested();
+        uint256 perShare = Math.mulDiv(due, RAY, 1_000e18);
+        uint256 remainder = PREMIUM - due;
+
+        vm.expectEmit(address(v));
+        emit IPremiumVesting.PremiumAccrued(perShare, remainder, 1_000e18);
+        vm.expectEmit(address(v));
+        emit IPremiumVesting.Fund(address(this), PREMIUM);
+        v.fund(PREMIUM);
+        assertEq(v.remainder(), remainder + PREMIUM, "the funding event adds to the checkpoint remainder");
+
+        vm.warp(block.timestamp + PERIOD);
+        due = v.vested();
+        perShare += Math.mulDiv(due, RAY, 1_000e18);
+        remainder = remainder + PREMIUM - due;
+        vm.expectEmit(address(v));
+        emit IPremiumVesting.PremiumAccrued(perShare, remainder, 1_000e18);
+        vm.expectEmit(address(v));
+        emit IPremiumVesting.OptOut(alice);
+        vm.prank(alice);
+        v.optOut();
+        assertEq(v.stakedSupply(), 0, "the checkpoint records the supply before opting out");
+        assertEq(v.remainder(), remainder);
+    }
+
+    function test_roundedZeroAccrualEmitsOnceWhenTheClockAdvances() public {
+        _earn(alice, 1e18);
+        v.fund(1);
+        vm.warp(block.timestamp + 1);
+        assertEq(v.vested(), 0, "elapsed premium rounds down to zero");
+
+        vm.expectEmit(address(v));
+        emit IPremiumVesting.PremiumAccrued(0, 1, 1e18);
+        vm.prank(bob);
+        v.optIn();
+        assertEq(v.lastUpdate(), block.timestamp);
+        assertEq(v.perShare(), 0);
+        assertEq(v.remainder(), 1);
+
+        vm.recordLogs();
+        vm.prank(bob);
+        v.optIn();
+        assertEq(vm.getRecordedLogs().length, 0, "a same-timestamp no-op emits no checkpoint");
     }
 
     function test_fundAddsWithoutRestarting() public {
