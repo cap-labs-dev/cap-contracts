@@ -71,6 +71,53 @@ contract InterestRateModelTest is BaseTest {
         assertEq(irm.underwriterIndex(market), RAY);
     }
 
+    /// @dev Cumulative-index multiplication must remain valid after many checkpoints.
+    function test_largeCumulativeIndexesRemainCheckpointableWithoutStorageOverrides() public {
+        irm.setLiquiditySlopes(IInterestRateModel.Slopes({ base: RAY, slope0: 0, slope1: 0, kink: RAY }));
+        vm.prank(market);
+        irm.updateUnderwriterRate(RAY);
+        uint256 previous = RAY;
+        for (uint256 year; year < 70; ++year) {
+            skip(365 days);
+            uint256 current = irm.liquidityIndex();
+            assertGt(current, previous);
+            assertEq(irm.underwriterIndex(market), current);
+            irm.updateLiquidityRate();
+            irm.updateUnderwriterIndex(market);
+            assertEq(irm.liquidityIndex(), current);
+            previous = current;
+        }
+        assertGt(previous, type(uint256).max / RAY, "even multiplication by one ray needs 512 bits");
+        irm.setLiquiditySlopes(IInterestRateModel.Slopes({ base: 0, slope0: 0, slope1: 0, kink: RAY }));
+        vm.prank(market);
+        irm.updateUnderwriterRate(0);
+        skip(365 days);
+        assertEq(irm.liquidityIndex(), previous);
+        assertEq(irm.underwriterIndex(market), previous);
+        irm.updateLiquidityRate();
+        irm.updateUnderwriterIndex(market);
+    }
+
+    function test_largeSupplyAveragesMoveInBothDirectionsWithoutIntermediateOverflow() public {
+        vm.mockCall(address(stablecoin), abi.encodeWithSignature("supplies()"), abi.encode(uint256(0), uint256(1e60)));
+        irm.updateLiquidityRate();
+        skip(1 hours);
+        (uint256 credit, uint256 supply) = irm.averageSupplies();
+        assertEq(credit, 0);
+        assertGt(supply, 0.63e60);
+        assertLt(supply, 0.64e60);
+        irm.updateLiquidityRate();
+        vm.mockCall(address(stablecoin), abi.encodeWithSignature("supplies()"), abi.encode(uint256(0), uint256(0)));
+        irm.updateLiquidityRate();
+        skip(1 hours);
+        (, uint256 decayed) = irm.averageSupplies();
+        assertGt(decayed, supply * 36 / 100);
+        assertLt(decayed, supply * 37 / 100);
+        irm.updateLiquidityRate();
+        (, uint256 stored) = irm.averageSupplies();
+        assertEq(stored, decayed);
+    }
+
     function test_setLiquiditySlopes_onlyAuthority() public {
         vm.prank(stranger);
         vm.expectRevert();

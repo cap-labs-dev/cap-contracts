@@ -101,6 +101,14 @@ contract RegistryTest is BaseTest {
         _deployProxy(address(impl), abi.encodeCall(Registry.initialize, (address(accessManager), init)));
     }
 
+    function test_initialize_rejectsBufferBelowTenPercent() public {
+        IRegistry.InitParams memory init = _validInit();
+        init.buffer = 0.1e27 - 1;
+        Registry impl = new Registry();
+        vm.expectRevert(IBaseMarket.InvalidBuffer.selector);
+        _deployProxy(address(impl), abi.encodeCall(Registry.initialize, (address(accessManager), init)));
+    }
+
     function _deployRegistry(IRegistry.InitParams memory init) internal returns (Registry registry) {
         Registry impl = new Registry();
         address predicted = vm.computeCreateAddress(address(this), vm.getNonce(address(this)));

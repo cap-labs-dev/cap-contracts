@@ -33,6 +33,7 @@ contract ProtocolInvariantTest is StdInvariant, Test {
         selectors.push(handler.writeOff.selector);
         selectors.push(handler.cover.selector);
         selectors.push(handler.premium.selector);
+        selectors.push(handler.changeVestingPeriod.selector);
         selectors.push(handler.request.selector);
         selectors.push(handler.transferRequest.selector);
         selectors.push(handler.settle.selector);

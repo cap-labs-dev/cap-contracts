@@ -27,6 +27,10 @@ contract PremiumVestingHarness is PremiumVesting {
         __PremiumVesting_init(address(new AccessManager(msg.sender)), asset, "Vault", "VLT", premium, 12 hours);
     }
 
+    function initializeWithPeriod(IERC20 asset, uint256 period_) external initializer {
+        __PremiumVesting_init(address(new AccessManager(msg.sender)), asset, "Vault", "VLT", address(asset), period_);
+    }
+
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
     }
@@ -124,10 +128,86 @@ contract PremiumVestingTest is Test {
         assertEq(v.remainder(), 0, "nothing held");
         assertEq(v.remaining(), 0, "nothing projected");
         assertEq(v.vested(), 0, "and nothing due");
-        assertEq(v.period(), 12 hours, "the constant is twelve hours");
+        assertEq(v.period(), 12 hours, "the initial period is twelve hours");
         assertEq(v.lastUpdate(), 0, "clock starts on the first fund");
         assertEq(IPremiumVesting(address(v)).premiumPerShare(), 0);
         assertEq(IPremiumVesting(address(v)).pendingPremium(address(this)), 0);
+    }
+
+    /// @dev Compare changing the period with explicitly settling the old schedule first.
+    function testFuzz_setVestingPeriod_checkpointsTheOldSchedule(uint32 rawElapsed, uint32 rawPeriod) public {
+        uint256 elapsed = bound(rawElapsed, 1, 3 * PERIOD);
+        uint256 newPeriod = bound(rawPeriod, 1, 365 days);
+        _earn(alice, 1e18);
+        v.fund(PREMIUM);
+        vm.warp(block.timestamp + elapsed);
+        uint256 vestedBefore = v.vested();
+        uint256 owedBefore = v.claimable(alice);
+
+        v.setVestingPeriod(newPeriod);
+
+        assertEq(v.remainder(), PREMIUM - vestedBefore);
+        assertEq(v.lastUpdate(), block.timestamp);
+        assertEq(v.claimable(alice), owedBefore, "past earnings are preserved");
+        assertEq(v.vested(), 0, "the new rate starts now");
+        assertEq(v.period(), newPeriod);
+        vm.warp(block.timestamp + newPeriod);
+        uint256 weight = RAY - (RAY - RAY / newPeriod).rayPow(newPeriod);
+        assertEq(v.vested(), Math.mulDiv(PREMIUM - vestedBefore, weight, RAY));
+    }
+
+    function test_setVestingPeriod_idlePotDoesNotReleaseRetroactively() public {
+        v.fund(PREMIUM);
+        vm.warp(block.timestamp + 30 days);
+        v.setVestingPeriod(1 days);
+        assertEq(v.remaining(), PREMIUM);
+        assertEq(v.vested(), 0);
+        _earn(alice, 1e18);
+        assertEq(v.claimable(alice), 0);
+        vm.warp(block.timestamp + 1 days);
+        assertApproxEqRel(v.claimable(alice), PREMIUM * 632 / 1000, 0.001e18);
+    }
+
+    function test_setVestingPeriod_rejectsInvalidBoundsWithoutCheckpointing() public {
+        _earn(alice, 1e18);
+        v.fund(PREMIUM);
+        vm.warp(block.timestamp + PERIOD);
+        uint256 last = v.lastUpdate();
+        vm.expectRevert(IPremiumVesting.InvalidVestingPeriod.selector);
+        v.setVestingPeriod(0);
+        vm.expectRevert(IPremiumVesting.InvalidVestingPeriod.selector);
+        v.setVestingPeriod(RAY + 1);
+        assertEq(v.lastUpdate(), last);
+        assertEq(v.remainder(), PREMIUM);
+        assertEq(v.period(), PERIOD);
+    }
+
+    function test_setVestingPeriod_acceptsBothEndpoints() public {
+        v.setVestingPeriod(RAY);
+        assertEq(v.period(), RAY);
+        v.setVestingPeriod(1);
+        _earn(alice, 1e18);
+        v.fund(PREMIUM);
+        vm.warp(block.timestamp + 1);
+        assertEq(v.vested(), PREMIUM, "one-second period releases the whole pot next second");
+    }
+
+    function test_initializeWithPeriod_rejectsInvalidBounds() public {
+        PremiumVestingHarness invalid = new PremiumVestingHarness();
+        MockERC20 token = new MockERC20("Token", "TOK", 18);
+        vm.expectRevert(IPremiumVesting.InvalidVestingPeriod.selector);
+        invalid.initializeWithPeriod(IERC20(address(token)), 0);
+        vm.expectRevert(IPremiumVesting.InvalidVestingPeriod.selector);
+        invalid.initializeWithPeriod(IERC20(address(token)), RAY + 1);
+        invalid.initializeWithPeriod(IERC20(address(token)), 7 days);
+        assertEq(invalid.vestingPeriod(), 7 days);
+    }
+
+    function test_setVestingPeriod_requiresAuthority() public {
+        vm.prank(bob);
+        vm.expectRevert();
+        v.setVestingPeriod(1 days);
+        assertEq(v.period(), PERIOD);
     }
 
     function test_fund_addsToTheRemainderWithoutStartingAnEpoch() public {

@@ -47,6 +47,7 @@ contract ProtocolHandler is CapDeployer {
     mapping(address => uint256) public ghostPremium;
     mapping(address => uint256) public ghostRepaid;
     mapping(address => uint256) public ghostWrittenOff;
+    mapping(address => bool) public ghostKilled;
     uint256[2] public ghostMarks;
     uint256 public partialSettlements;
     uint256 public lossActions;
@@ -161,7 +162,7 @@ contract ProtocolHandler is CapDeployer {
     function deposit(uint256 which, uint256 who, uint256 raw) external counted {
         uint256 k = which % 5;
         address actor = actors[who % 3];
-        if (k < 4 && ts[k].killed()) {
+        if (exits[k].maxDeposit(actor) == 0) {
             _skip();
             return;
         }
@@ -449,6 +450,7 @@ contract ProtocolHandler is CapDeployer {
             amount = floating.writeOff();
         }
         assertGt(amount, 0);
+        assertEq(market.availableCredit(), 0, "write-off cannot reopen borrowing");
         lossActions++;
         _success();
     }
@@ -490,6 +492,24 @@ contract ProtocolHandler is CapDeployer {
                 if (paid > 0) positiveClaims++;
             }
             vm.stopPrank();
+        }
+        _success();
+    }
+
+    function changeVestingPeriod(uint256 which, uint256 raw) external counted {
+        IPremiumVesting token = IPremiumVesting(address(exits[which % 6]));
+        uint256 period = bound(raw, 1, 365 days);
+        uint256 remainder = token.remaining();
+        uint256[3] memory earned;
+        for (uint256 i; i < 3; ++i) {
+            earned[i] = token.claimable(actors[i]);
+        }
+        token.setVestingPeriod(period);
+        assertEq(token.vestingPeriod(), period);
+        assertEq(token.remaining(), remainder, "checkpoint keeps the unvested pot");
+        assertEq(token.vested(), 0);
+        for (uint256 i; i < 3; ++i) {
+            assertEq(token.claimable(actors[i]), earned[i], "past earnings survive rate changes");
         }
         _success();
     }
@@ -632,6 +652,17 @@ contract ProtocolHandler is CapDeployer {
         }
         for (uint256 k; k < 6; ++k) {
             address token = address(exits[k]);
+            if (k < 5) {
+                bool retired = k < 4 ? ts[k].killed() : pool.killed();
+                assertEq(retired, ghostKilled[token], "retirement follows a permanent Killed event");
+                if (retired) {
+                    assertEq(exits[k].maxDeposit(actors[0]), 0);
+                    assertEq(exits[k].maxMint(actors[0]), 0);
+                }
+            }
+            if (k < 4 && ts[k].totalAssets() * 100 < ts[k].totalSupply()) {
+                assertTrue(ts[k].killed(), "a below-threshold tranche must be retired after slash or exit");
+            }
             uint256 queue;
             uint256 poolQueue;
             for (uint256 i; i < receipts.length; ++i) {
@@ -661,6 +692,12 @@ contract ProtocolHandler is CapDeployer {
             if (k < 2) staked += exits[k].balanceOf(address(pool));
             if (k == 5) staked += stablecoin.balanceOf(address(wrapper));
             assertEq(vest.stakedSupply(), staked, "earning supply");
+        }
+        uint256 idle = vault.balanceOf(address(pool), address(collateral));
+        assertLe(pool.convertToAssets(pool.unlockedSupply()), idle, "pool redemption limit is payable");
+        if (pool.totalAssets() * 100 < pool.totalSupply()) {
+            assertEq(pool.maxDeposit(actors[0]), 0, "a depleted pool cannot recapitalize through new shares");
+            assertEq(pool.maxMint(actors[0]), 0);
         }
     }
 
@@ -725,7 +762,10 @@ contract ProtocolHandler is CapDeployer {
             Vm.Log memory l = logs[i];
             if (l.topics.length == 0) continue;
             bytes32 sig = l.topics[0];
-            if (sig == keccak256("Fund(uint256)")) {
+            if (sig == keccak256("Killed()")) {
+                assertFalse(ghostKilled[l.emitter], "retirement event only occurs once");
+                ghostKilled[l.emitter] = true;
+            } else if (sig == keccak256("Fund(uint256)")) {
                 ghostFunded[l.emitter] += abi.decode(l.data, (uint256));
             } else if (sig == keccak256("Claimed(address,address,uint256)")) {
                 ghostPaid[l.emitter] += abi.decode(l.data, (uint256));

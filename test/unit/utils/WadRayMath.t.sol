@@ -70,8 +70,37 @@ contract WadRayMathTest is Test {
     }
 
     function test_rayMul_roundsHalfUp() public view {
-        // 1 * 1 (in ray) = 1e-54, rounds to 0; but (HALF_RAY worth) rounds up
-        assertEq(m.rayMul(2, HALF_RAY), 1); // 2 * 0.5e27 = 1e27 -> /RAY = 1 after +HALF_RAY
+        assertEq(m.rayMul(1, HALF_RAY - 1), 0);
+        assertEq(m.rayMul(1, HALF_RAY), 1);
+        assertEq(m.rayMul(1, HALF_RAY + 1), 1);
+        assertEq(m.rayMul(3, HALF_RAY), 2);
+    }
+
+    /// @dev The product exceeds 256 bits, but its rounded quotient fits exactly.
+    function test_rayMul_fullWidthIdentity() public view {
+        assertEq(m.rayMul(type(uint256).max, RAY), type(uint256).max);
+        assertEq(m.rayMul(type(uint256).max, 0), 0);
+        assertEq(m.rayMul(type(uint256).max, HALF_RAY), 1 << 255);
+    }
+
+    function test_rayMul_onlyTheRoundedResultMustFit() public {
+        // Exact integer vectors: both floor quotients are uint256.max. Only the first
+        // remainder exceeds HALF_RAY, so its final +1 must still revert.
+        uint256 roundsOver = 115792089237316195423570984892895818615953789242069579146561765391959340397866;
+        vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x11));
+        m.rayMul(roundsOver, RAY + 1);
+        uint256 roundsToMax = 115792089237316195423570984777103729378637593818498594485250125250637942002938;
+        assertEq(m.rayMul(roundsToMax, RAY + 2), type(uint256).max);
+    }
+
+    /// @dev Independent quotient/remainder decomposition; neither reference product overflows.
+    function testFuzz_rayMul_wideProducts(uint256 a, uint256 rawB) public view {
+        uint256 b = rawB % RAY + 1;
+        uint256 whole = (a / RAY) * b;
+        uint256 fraction = (a % RAY) * b;
+        uint256 expected = whole + (fraction + HALF_RAY) / RAY;
+        assertEq(m.rayMul(a, b), expected);
+        assertEq(m.rayMul(b, a), expected);
     }
 
     function test_rayDiv_identity() public view {
@@ -233,7 +262,7 @@ contract WadRayMathTest is Test {
         assertApproxEqRel(m.rayExp(m.rayLn(2e27)), 2e27, 1e12);
     }
 
-    function testFuzz_rayMul_identity(uint128 a) public view {
+    function testFuzz_rayMul_identity(uint256 a) public view {
         assertEq(m.rayMul(a, RAY), a);
     }
 

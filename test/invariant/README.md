@@ -5,9 +5,9 @@ operation counts, baseline skips and issue classification.
 
 ## Property specification (written before the assertions)
 
-Tested production baseline: `05b6aa76fd5b14855e02719361ad3334c23b22c2`,
-branch `cap-network`. No local changes were present. No applicable AGENTS.md
-was found. Production contracts must remain unchanged.
+The suite covers protocol accounting, risk limits, vesting, vault issuance and
+withdrawals. Unit and integration tests exercise arithmetic and lifecycle
+boundaries alongside the stateful campaigns below.
 
 The stateful fixture uses CapDeployer and Registry's real AccessManager selector
 table, real markets, Oracle/ChainlinkAdapter, Vault, Stablecoin, Wrapper, Tranche,
@@ -55,6 +55,13 @@ operations never mint assets to repair a failed precondition.
    Seed shares remain owned by the dead-share holder. A closed-system unwind
    separately repays debt using pre-funded actors, recalls the mock integration,
    drains requests and deallocates positions; it is not a live-state invariant.
+9. **Retirement and limits:** `Killed` events latch permanently and retired vaults
+   advertise zero deposit/mint capacity. A tranche below 1% of par is retired;
+   a depleted Underwriter closes deposits even before a later report latches it.
+   The Underwriter's unlocked share quote never pays more than its idle cash.
+   Each successful write-off leaves no immediately available borrowing capacity.
+10. **Vesting configuration:** changing a period first checkpoints the old schedule.
+    Existing claimable earnings and the unvested pot are preserved at that instant.
 
 All conservation assertions use zero tolerance. Where an integer rational bound
 is needed, floor/ceil are proved with multiplication inequalities, rather than a
@@ -68,7 +75,7 @@ specific errors. Unexpected reverts fail the run.
 Counters partition each selector's attempts into successes, skips and expected
 reverts; they do not interpret a skipped handler as protocol coverage.
 
-- `handlers/ProtocolHandler.sol`: 26 explicitly selected operations, three LPs,
+- `handlers/ProtocolHandler.sol`: 27 explicitly selected operations, three LPs,
   a separately permissioned borrower and liquidator, two real markets, four
   tranches and a two-position Underwriter. Market rates are explicitly nonzero.
 - `Protocol.invariant.t.sol`: a healthy-debt campaign and a loss campaign. The
@@ -199,8 +206,9 @@ formatter diff and run tests after formatting.
   and boundary tests cross-check those views; not every max view is proven maximal.
 - Underwriter cached marks can lag losses by design. Do not apply an individual
   fair-NAV round-trip invariant to those stale marks. Pool book and queued-position
-  conservation are checked at their specified checkpoints. Re-entry into fully
-  wiped positions is outside the prioritized scope.
+  conservation are checked at their specified checkpoints. The integration tests
+  separately exercise live default-tranche issuance pricing and reject re-entry
+  into retired pools and tranches.
 - The reserve integration models deposits and recalls without yield or hidden
   impairment. Reserve loss recognition is tested in a separate small-integer
   scenario with an actual mock-token loss. Live Aera strategy behavior is excluded.
@@ -208,7 +216,8 @@ formatter diff and run tests after formatting.
   recalls the reserve mock and deallocates pools. It proves collateral queues drain
   in that funded scenario. It does not assert every cUSD holder can immediately
   exit recognized bad debt, or prove liveness when a borrower refuses to repay.
-- Risk mutation covers LT; role mutation covers depositor grants/revocations.
+- Risk mutation covers LT; vesting mutation covers all six reward-bearing vaults;
+  role mutation covers depositor grants/revocations.
   Full governance timelocks, delayed grants, beacon upgrades, changing tranche
   membership, fixed `borrowMore`, and arbitrary rate reconfiguration remain in
   existing unit/integration coverage rather than the stateful selector set.
