@@ -18,6 +18,12 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice The named shares exceed this vault's queue under that request id
     error UnknownQueuedRequest();
 
+    /// @notice The deposit's default allocation retired the underwriter
+    error UnderwriterKilled();
+
+    /// @notice Emitted once when a position update retires the underwriter
+    event Killed();
+
     /// @notice Emitted when a tranche is registered with the underwriter
     /// @param tranche The tranche address
     event AddTranche(address indexed tranche);
@@ -61,6 +67,7 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @param asset The vault asset deposited by curators
     /// @param vaultAddress The vault holding curator assets
     /// @param stablecoinAddress The stablecoin used for premium payments
+    /// @param vestingPeriod The initial premium vesting time constant in seconds
     function initialize(
         address authority,
         address registryAddress,
@@ -68,7 +75,8 @@ interface IUnderwriter is IERC7540AsyncRedeem {
         string memory symbol,
         address asset,
         address vaultAddress,
-        address stablecoinAddress
+        address stablecoinAddress,
+        uint256 vestingPeriod
     ) external;
 
     /// @notice Set the role permitted to deposit
@@ -120,14 +128,22 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     function finalizeDeallocateAsync(address tranche, uint256 requestId, uint256 shares) external;
 
     /// @notice Set the registered tranche that receives deposits by default
-    /// @dev Allocator only.
+    /// @dev Allocator only. This authorizes automatic allocation of all incoming deposits.
+    /// Accepted liquidity risk: a deposit followed by an instant redemption can consume
+    /// pre-existing idle liquidity not reserved for queued redemptions, leaving remaining
+    /// holders with default-tranche exposure instead. Queued redemptions retain priority.
+    /// Restoring idle liquidity requires allocator deallocation and sufficient unlocked
+    /// tranche capital; existing market debt can prevent immediate recovery.
     /// @param tranche The default tranche address
     function setDefaultTranche(address tranche) external;
 
     /// @notice Re-value a tranche position and claim its premium
     /// @dev Registration is not checked; see {deallocate}. Remakes the mark only if {allocate}
-    /// already opened one. Share price stays on that book until this runs; that lag is
-    /// intentional, not a live NAV walk.
+    /// already opened one. Valuations stay cached between marks. Deposit and mint quotes
+    /// separately value the default position at its current value.
+    /// Harvested premium enters the pool's own vesting pot, whose period the curator controls.
+    /// It rewards opted-in balances as it vests, including holders who joined after the tranche
+    /// generated it. Previously credited pool rewards remain with their original holders.
     /// @param tranche The tranche address
     function report(address tranche) external;
 
@@ -142,6 +158,28 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice Get when {report} last folded premium into the remainder
     /// @return The last report timestamp
     function lastReported() external view returns (uint256);
+
+    /// @notice Get whether a position update has retired the underwriter
+    /// @dev Latched below 1% of par using idle assets plus recorded tranche values. Deposits and
+    /// mints close permanently; deallocations, redemptions, reports, and premium claims stay open.
+    /// @return Whether the underwriter has been retired
+    function killed() external view returns (bool);
+
+    /// @notice Get the maximum deposit for a receiver
+    /// @dev Zero if the pool is killed, recorded assets are below 1% of par, or the default tranche
+    /// is killed; otherwise unlimited. A killed default blocks entry until removed or replaced
+    /// with a live tranche, without itself retiring the pool. The value check protects impaired pools
+    /// before their next position update.
+    /// Admission remains on the caller of {deposit}, not on the receiver.
+    /// @param receiver The account that would receive shares
+    /// @return maxAssets The maximum deposit amount
+    function maxDeposit(address receiver) external view returns (uint256 maxAssets);
+
+    /// @notice Get the maximum mint for a receiver
+    /// @dev Same gate as {maxDeposit}.
+    /// @param receiver The account that would receive shares
+    /// @return maxShares The maximum mint amount
+    function maxMint(address receiver) external view returns (uint256 maxShares);
 
     /// @notice Get the default allocation tranche
     /// @return The default tranche address
@@ -171,11 +209,14 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice Get the total assets including vault balance and recorded tranche debt
     /// @dev Vault ERC6909 balance plus {totalDebt}. A slash is folded in only when {allocate}
     /// opens or remakes the book, or when {report} / {deallocate} remake a book that already
-    /// exists — Yearn-style, not a live price of positions.
+    /// exists. Deposit and mint quotes separately adjust for the default position, including
+    /// queued shares and positions whose recorded debt is zero, without writing the book.
+    /// Non-default positions remain cached, so unreported gains and losses also affect issuance pricing.
     /// @return assets The total assets
     function totalAssets() external view returns (uint256 assets);
 
     /// @notice Get the shares available for instant redemption based on vault liquidity
+    /// @dev Rounds down so redeeming the unlocked shares cannot exceed idle assets.
     /// @return unlocked The shares redeemable against vault-held assets
     function unlockedSupply() external view returns (uint256 unlocked);
 }

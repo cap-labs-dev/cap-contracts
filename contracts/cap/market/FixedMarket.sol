@@ -142,7 +142,10 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         returns (uint256 repaid, uint256 valueSlashed)
     {
         _requireLoan(id);
-        (repaid, valueSlashed) = _liquidate(recipient, _debtCheck(debt[id], amount));
+        uint256 requested = _debtCheck(debt[id], amount);
+        uint256 capital = totalCapital();
+        uint256 liquidatable = _checkLiquidation(capital, totalDebt());
+        (repaid, valueSlashed) = _liquidate(recipient, requested, liquidatable);
         debt[id] -= repaid;
         _totalDebt -= repaid;
         emit LiquidateFixed(id, msg.sender, recipient, repaid, valueSlashed);

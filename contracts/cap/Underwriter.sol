@@ -9,9 +9,6 @@ import { IUnderwriter } from "../interfaces/IUnderwriter.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import { DeadShares } from "../utils/DeadShares.sol";
 import { PremiumVesting } from "../utils/PremiumVesting.sol";
-import {
-    AccessManagedUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -20,12 +17,7 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 /// @author kexley, Cap Labs
 /// @notice Curator vault that allocates assets into tranches and distributes premium to depositors.
 /// @dev Beacon instance. Upgrade via {UpgradeableBeacon-upgradeTo} on the underwriter beacon.
-contract Underwriter layout at erc7201("cap.storage.Underwriter")
-    is
-    IUnderwriter,
-    AccessManagedUpgradeable,
-    PremiumVesting
-{
+contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwriter, PremiumVesting {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @inheritdoc IUnderwriter
@@ -55,6 +47,12 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     /// @inheritdoc IUnderwriter
     uint256 public lastReported;
 
+    /// @inheritdoc IUnderwriter
+    bool public killed;
+
+    /// @dev Shares per remaining asset at which the pool is retired (1% of par).
+    uint256 private constant KILL_RATIO = 100;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -68,10 +66,10 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         string memory _symbol,
         address _asset,
         address _vaultAddress,
-        address _stablecoinAddress
+        address _stablecoinAddress,
+        uint256 _vestingPeriod
     ) external override initializer {
-        __AccessManaged_init(_authority);
-        __PremiumVesting_init(IERC20(_asset), _name, _symbol, _stablecoinAddress);
+        __PremiumVesting_init(_authority, IERC20(_asset), _name, _symbol, _stablecoinAddress, _vestingPeriod);
         registry = _registry;
         vault = _vaultAddress;
     }
@@ -185,12 +183,15 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     /// @return gain The increase in the recorded position, if any
     /// @return loss The decrease in the recorded position, if any
     function _mark(address tranche) internal returns (uint256 gain, uint256 loss) {
-        if (debt[tranche] == 0) return (0, 0);
+        if (debt[tranche] == 0) {
+            _checkKilled();
+            return (0, 0);
+        }
         return _syncMark(tranche);
     }
 
-    /// @dev Write {debt} from remaining plus queued shares. A slash between reports is a loss that
-    /// waits here on purpose: share price is this cached book, not a live walk of every position.
+    /// @dev Write {debt} from remaining plus queued shares. The book stays cached between marks;
+    /// issuance quotes separately value the default position via {_issuanceAssets}.
     /// @param tranche The tranche to re-value
     /// @return gain The increase in the recorded position, if any
     /// @return loss The decrease in the recorded position, if any
@@ -198,18 +199,34 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         uint256 recorded = debt[tranche];
         uint256 position = ITranche(tranche).balanceOf(address(this)) + queuedShares[tranche];
         uint256 assets = ITranche(tranche).convertToAssets(position);
-        if (assets == recorded) return (0, 0);
 
         if (assets < recorded) {
             loss = recorded - assets;
             totalDebt -= loss;
             emit DebtDecreased(tranche, loss);
-        } else {
+        } else if (assets > recorded) {
             gain = assets - recorded;
             totalDebt += gain;
             emit DebtIncreased(tranche, gain);
         }
         debt[tranche] = assets;
+        _checkKilled();
+    }
+
+    /// @dev Latch retirement after updating a position, including an unchanged or closed book.
+    /// Exits, reports, and premium claims remain available after retirement.
+    function _checkKilled() private {
+        if (!killed && _belowKillThreshold()) {
+            killed = true;
+            emit Killed();
+        }
+    }
+
+    /// @dev Use the same recorded assets as share pricing. Division avoids overflowing assets * 100.
+    /// A never-funded pool is not a loss; equality at 1% of par remains open.
+    function _belowKillThreshold() private view returns (bool) {
+        uint256 supply = totalSupply();
+        return supply > 0 && totalAssets() < Math.ceilDiv(supply, KILL_RATIO);
     }
 
     /// @inheritdoc IUnderwriter
@@ -247,33 +264,94 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     }
 
     /// @inheritdoc IUnderwriter
+    function maxDeposit(address)
+        public
+        view
+        override(ERC4626Upgradeable, IERC4626, IUnderwriter)
+        returns (uint256 maxAssets)
+    {
+        if (_depositsOpen()) {
+            maxAssets = type(uint256).max;
+        }
+    }
+
+    /// @inheritdoc IUnderwriter
+    function maxMint(address)
+        public
+        view
+        override(ERC4626Upgradeable, IERC4626, IUnderwriter)
+        returns (uint256 maxShares)
+    {
+        if (_depositsOpen()) {
+            maxShares = type(uint256).max;
+        }
+    }
+
+    /// @dev A killed default blocks new capital without retiring an otherwise healthy pool.
+    /// @return open Whether the pool and its default tranche permit new capital
+    function _depositsOpen() private view returns (bool) {
+        if (killed || _belowKillThreshold()) {
+            return false;
+        }
+        address tranche = defaultTranche;
+        if (tranche != address(0)) {
+            if (ITranche(tranche).killed()) return false;
+        }
+
+        return true;
+    }
+
+    /// @inheritdoc IUnderwriter
     /// @dev Idle vault balance plus the last marked tranche positions. A slash hits the tranche
     /// immediately, but this vault only folds it in when {_mark} runs (allocate, deallocate, or
-    /// report). Positions are not priced live.
+    /// report). Issuance quotes separately adjust for the default position, even when its book is zero.
     function totalAssets() public view override(ERC4626Upgradeable, IERC4626, IUnderwriter) returns (uint256) {
         return IVault(vault).balanceOf(address(this), asset()) + totalDebt;
     }
 
+    /// @dev Replace the default position's cached value with its current value for issuance only.
+    /// Includes queued shares and zero-book positions, as the allocation's {_syncMark} does.
+    /// Allocation persists the updated book after the incoming assets have been transferred.
+    /// @return assets The assets used to price deposits and mints
+    function _issuanceAssets() internal view returns (uint256 assets) {
+        assets = totalAssets();
+        address tranche = defaultTranche;
+        if (tranche == address(0)) return assets;
+
+        uint256 recorded = debt[tranche];
+        uint256 position = ITranche(tranche).balanceOf(address(this)) + queuedShares[tranche];
+        assets = assets - recorded + ITranche(tranche).convertToAssets(position);
+    }
+
     /// @inheritdoc IERC4626
-    /// @dev Empty vault quotes at par via {DeadShares-seedDeposit} minus the seeded shares.
+    /// @dev Prices the existing default position via {_issuanceAssets} before allocation can mark it.
+    /// Empty vault quotes at par via {DeadShares-seedDeposit} minus the seeded shares.
     function previewDeposit(uint256 assets)
         public
         view
         override(ERC4626Upgradeable, IERC4626)
         returns (uint256 shares)
     {
-        shares = totalSupply() == 0 ? DeadShares.seedDeposit(assets) : super.previewDeposit(assets);
+        uint256 supply = totalSupply();
+        shares = supply == 0
+            ? DeadShares.seedDeposit(assets)
+            : Math.mulDiv(assets, supply + 10 ** _decimalsOffset(), _issuanceAssets() + 1, Math.Rounding.Floor);
     }
 
     /// @inheritdoc IERC4626
-    /// @dev Inverse of {previewDeposit} while empty.
+    /// @dev Uses the same issuance valuation as {previewDeposit}, rounding assets up.
+    /// Inverse of {previewDeposit} while empty.
     function previewMint(uint256 shares) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 assets) {
-        assets = totalSupply() == 0 ? DeadShares.seedMint(shares) : super.previewMint(shares);
+        uint256 supply = totalSupply();
+        assets = supply == 0
+            ? DeadShares.seedMint(shares)
+            : Math.mulDiv(shares, _issuanceAssets() + 1, supply + 10 ** _decimalsOffset(), Math.Rounding.Ceil);
     }
 
     /// @inheritdoc IUnderwriter
-    function unlockedSupply() public view override(ERC7540AsyncRedeem, IUnderwriter) returns (uint256) {
-        return _quoteWithdraw(IVault(vault).balanceOf(address(this), asset()));
+    function unlockedSupply() public view override(ERC7540AsyncRedeem, IUnderwriter) returns (uint256 unlocked) {
+        uint256 idleAssets = IVault(vault).balanceOf(address(this), asset());
+        unlocked = _convertToShares(idleAssets, Math.Rounding.Floor);
     }
 
     /// @dev Mint the seed on the first deposit. Already deducted from the quote.
@@ -284,6 +362,8 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
         if (totalSupply() == 0) _mint(DeadShares.HOLDER, DeadShares.SHARES);
         super._deposit(caller, receiver, assets, shares);
+        // Default allocation can recognize a loss after the entry-point limit check.
+        if (killed) revert UnderwriterKilled();
     }
 
     /// @dev Transfer in assets to the vault from the sender
@@ -313,6 +393,8 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter")
         (uint256 gain, uint256 loss) = _mark(_tranche);
 
         uint256 premium = IPremiumVesting(_tranche).claim(address(this));
+        // Harvested premium vests again at the pool's configured rate. Holders earn as it
+        // vests here, including those who joined after the tranche generated the premium.
         _fund(premium);
         lastReported = block.timestamp;
 

@@ -45,7 +45,16 @@ contract UnderwriterUnitTest is BaseTest {
                 address(impl),
                 abi.encodeCall(
                     Underwriter.initialize,
-                    (address(accessManager), address(this), "Underwriter", "UW", address(collateral), vault, stablecoin)
+                    (
+                        address(accessManager),
+                        address(this),
+                        "Underwriter",
+                        "UW",
+                        address(collateral),
+                        vault,
+                        stablecoin,
+                        12 hours
+                    )
                 )
             )
         );
@@ -118,7 +127,7 @@ contract UnderwriterUnitTest is BaseTest {
     function test_initialize_cannotReinit() public {
         vm.expectRevert();
         underwriter.initialize(
-            address(accessManager), address(this), "Underwriter", "UW", address(collateral), vault, stablecoin
+            address(accessManager), address(this), "Underwriter", "UW", address(collateral), vault, stablecoin, 12 hours
         );
     }
 

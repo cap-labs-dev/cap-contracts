@@ -38,6 +38,7 @@ interface ITranche is IERC7540AsyncRedeem {
     /// @param market The market this tranche underwrites
     /// @param vault The vault holding tranche assets
     /// @param oracle The oracle used for price feeds
+    /// @param vestingPeriod The premium vesting time constant in seconds
     function initialize(
         address authority,
         address registryAddress,
@@ -46,7 +47,8 @@ interface ITranche is IERC7540AsyncRedeem {
         string memory symbol,
         address market,
         address vault,
-        address oracle
+        address oracle,
+        uint256 vestingPeriod
     ) external;
 
     /// @notice Set the role permitted to deposit

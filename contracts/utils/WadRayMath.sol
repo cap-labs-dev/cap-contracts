@@ -51,17 +51,13 @@ library WadRayMath {
     }
 
     /// @dev Multiplies two ray, rounding half up to the nearest ray
-    /// @dev assembly optimized for improved gas savings, see https://twitter.com/transmissions11/status/1451131036377571328
+    /// @dev Uses full-precision multiplication; reverts only if the rounded result overflows.
     /// @param a Ray
     /// @param b Ray
     /// @return c = a raymul b
     function rayMul(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        // to avoid overflow, a <= (type(uint256).max - HALF_RAY) / b
-        assembly {
-            if iszero(or(iszero(b), iszero(gt(a, div(sub(not(0), HALF_RAY), b))))) { revert(0, 0) }
-
-            c := div(add(mul(a, b), HALF_RAY), RAY)
-        }
+        c = Math.mulDiv(a, b, RAY);
+        if (mulmod(a, b, RAY) >= HALF_RAY) c += 1;
     }
 
     /// @dev Divides two ray, rounding half up to the nearest ray

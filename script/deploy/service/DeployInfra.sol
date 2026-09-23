@@ -68,7 +68,15 @@ contract DeployInfra is CreateXUtils {
             implementations.stablecoin,
             abi.encodeCall(
                 Stablecoin.initialize,
-                (infra.accessManager, users.stablecoinUnderlying, "Cap USD", "cUSD", irmAddr, users.reserveVault)
+                (
+                    infra.accessManager,
+                    users.stablecoinUnderlying,
+                    "Cap USD",
+                    "cUSD",
+                    irmAddr,
+                    users.reserveVault,
+                    Registry(implementations.registry).DEFAULT_VESTING_PERIOD()
+                )
             )
         );
 

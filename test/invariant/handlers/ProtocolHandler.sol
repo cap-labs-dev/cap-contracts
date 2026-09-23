@@ -778,7 +778,7 @@ contract ProtocolHandler is CapDeployer {
             uint256 value = activeAssets * oracle.price(t.asset()) / (10 ** t.decimals());
             capital += _min(value, t.maxCapital());
         }
-        return (capital * _min(market.ltv(), market.lt()) + RAY / 2) / RAY;
+        return (capital * _min(market.ltv(), market.lt() - market.buffer()) + RAY / 2) / RAY;
     }
 
     function _checkCeil(uint256 assets, uint256 shares, uint256 numerator, uint256 denominator) internal pure {
