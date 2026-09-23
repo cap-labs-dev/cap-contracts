@@ -40,8 +40,9 @@ interface IFloatingMarket is IBaseMarket {
     function chargePremium() external;
 
     /// @notice Write off {unrecoverableDebt} as bad debt
-    /// @dev The market must be unhealthy. Unrecoverable debt is derived. Remaining debt stays
-    /// liquidatable.
+    /// @dev The market must be unhealthy before the write-off. Clears the representable shortfall
+    /// without slashing collateral. Remaining debt may be healthy, so continued liquidatability
+    /// is not guaranteed. Borrowing remains subject to {creditLimit}; the market is not paused.
     /// @return amount The amount of debt written off, in stablecoin units (18 decimals)
     function writeOff() external returns (uint256 amount);
 

@@ -41,7 +41,7 @@ interface IRegistry {
     /// @param underwriterBeacon The underwriter beacon address
     /// @param wrapper The staked-stablecoin wrapper address
     /// @param lt The default liquidation threshold for new markets in ray decimals (at most one ray, above buffer)
-    /// @param buffer The default liquidation buffer for new markets in ray decimals (strictly below lt)
+    /// @param buffer The default liquidation buffer in ray decimals (at least 0.1e27, strictly below lt)
     /// @param targetHealth The default target health for new markets in ray decimals (min 1.25e27)
     struct InitParams {
         address stablecoin;
@@ -130,6 +130,7 @@ interface IRegistry {
 
     /// @notice Deploy a floating market with tranches at the given assets and weights
     /// @dev Restricted to WHITELISTED. One tranche per entry of `assets` and `weights`.
+    /// Between one and ten tranches may be created; the limit is checked before deployment.
     /// Borrow, borrowMore and extend start on a closed role the owner administers, so they
     /// cannot sit at ADMIN until {setBorrowerRole}.
     /// Tranches use the default premium vesting period of 12 hours.
@@ -172,6 +173,7 @@ interface IRegistry {
 
     /// @notice Add a junior tranche to a market and reweight the waterfall
     /// @dev Caller must hold the market owner role. `weights` covers the whole waterfall, including the new junior.
+    /// Reverts before deployment if the market already has ten configured tranches.
     /// The owner supplies the initial premium vesting period; subsequent changes require the governor.
     /// @param market The market to deploy a tranche for
     /// @param asset The asset for the new tranche

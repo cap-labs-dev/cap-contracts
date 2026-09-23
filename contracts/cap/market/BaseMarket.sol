@@ -7,6 +7,7 @@ import { IPremiumVesting } from "../../interfaces/IPremiumVesting.sol";
 import { IRegistry } from "../../interfaces/IRegistry.sol";
 import { IStablecoin } from "../../interfaces/IStablecoin.sol";
 import { ITranche } from "../../interfaces/ITranche.sol";
+import { MarketLimits } from "../../utils/MarketLimits.sol";
 import { WadRayMath } from "../../utils/WadRayMath.sol";
 import {
     AccessManagedUpgradeable
@@ -54,6 +55,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
         $.stablecoin = IRegistry(_registry).stablecoin();
         $.lt = IRegistry(_registry).lt();
         $.buffer = IRegistry(_registry).buffer();
+        if ($.buffer < MarketLimits.MIN_BUFFER || $.buffer >= $.lt) revert InvalidBuffer();
         $.targetHealth = IRegistry(_registry).targetHealth();
     }
 
@@ -78,9 +80,9 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     /// @inheritdoc IBaseMarket
     function setBuffer(uint256 _buffer) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        // must stay below lt (lockedValue divides by lt - buffer). Raising the buffer only
-        // tightens, so ltv is not re-checked.
-        if (_buffer >= $.lt) revert InvalidBuffer();
+        // Raising the buffer may exceed the stored LTV's margin; creditLimit applies the
+        // tighter lt - buffer cap immediately, without changing the owner's stored LTV.
+        if (_buffer < MarketLimits.MIN_BUFFER || _buffer >= $.lt) revert InvalidBuffer();
         $.buffer = _buffer;
         emit SetBuffer(_buffer);
     }
@@ -88,7 +90,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     /// @inheritdoc IBaseMarket
     function setLt(uint256 _lt) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        if (_lt > 1e27) revert InvalidLt();
+        if (_lt > MarketLimits.MAX_LT) revert InvalidLt();
         // must stay above the buffer. Dropping below ltv is allowed (forces unhealthy).
         if (_lt <= $.buffer) revert InvalidLt();
         $.lt = _lt;
@@ -98,7 +100,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     /// @inheritdoc IBaseMarket
     function setTargetHealth(uint256 _targetHealth) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        if (_targetHealth < 1.25e27) revert InvalidTargetHealth();
+        if (_targetHealth < MarketLimits.MIN_TARGET_HEALTH) revert InvalidTargetHealth();
         $.targetHealth = _targetHealth;
         emit SetTargetHealth(_targetHealth);
     }
@@ -296,7 +298,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
         for (uint256 i; i < $.tranches.length; ++i) {
             limit += ITranche($.tranches[i].tranche).capitalLimit();
         }
-        limit = limit.rayMul(Math.min($.ltv, $.lt));
+        limit = limit.rayMul(Math.min($.ltv, $.lt - $.buffer));
     }
 
     /// @dev Mint credit-backed stablecoin to the recipient
@@ -353,11 +355,11 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
         emit Liquidate(msg.sender, recipient, repaid, slashed);
     }
 
-    /// @dev Record the shortfall as bad debt. The market must already be unhealthy, the same
-    /// gate as {_liquidate}. {unrecoverableDebt} can be positive while {healthiness} is still
-    /// at or above one ray whenever `lt * (1 + bonus) > 1e27` — at the deploy bonus that band
-    /// starts above `lt` 0.9804 and the loss is at most ~1.96% of collateral. That is not a
-    /// write-off; liquidation is the remedy until health drops.
+    /// @dev Record at most the pre-write-off shortfall as bad debt. The market must already be
+    /// unhealthy; positive {unrecoverableDebt} alone does not permit writing off a healthy market.
+    /// Callers then reduce their debt without slashing collateral. The remaining debt may be
+    /// healthy, blocking liquidation while health stays at or above one ray. No borrowing pause
+    /// is imposed; future draws remain subject to {creditLimit}.
     /// @param amount The amount of debt to write off
     function _writeOff(uint256 amount) internal {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
@@ -376,6 +378,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     /// @dev Set the tranches and weights
     /// @param _tranches The tranches and their weights, index 0 is most senior
     function _setTranches(Tranche[] memory _tranches) internal {
+        if (_tranches.length > MarketLimits.MAX_TRANCHES) revert TooManyTranches();
         _beforeTrancheChange();
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         delete $.tranches;

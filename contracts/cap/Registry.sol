@@ -17,6 +17,7 @@ import { IStablecoin } from "../interfaces/IStablecoin.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
 import { IUnderwriter } from "../interfaces/IUnderwriter.sol";
 import { CapRoles } from "../utils/CapRoles.sol";
+import { MarketLimits } from "../utils/MarketLimits.sol";
 import { FixedMarket } from "./market/FixedMarket.sol";
 import { FloatingMarket } from "./market/FloatingMarket.sol";
 import {
@@ -110,8 +111,9 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         trancheBeacon = init.trancheBeacon;
         underwriterBeacon = init.underwriterBeacon;
         wrapper = init.wrapper;
-        if (init.lt > 1e27 || init.lt <= init.buffer) revert IBaseMarket.InvalidLt();
-        if (init.targetHealth < 1.25e27) revert IBaseMarket.InvalidTargetHealth();
+        if (init.buffer < MarketLimits.MIN_BUFFER) revert IBaseMarket.InvalidBuffer();
+        if (init.lt > MarketLimits.MAX_LT || init.lt <= init.buffer) revert IBaseMarket.InvalidLt();
+        if (init.targetHealth < MarketLimits.MIN_TARGET_HEALTH) revert IBaseMarket.InvalidTargetHealth();
         lt = init.lt;
         buffer = init.buffer;
         targetHealth = init.targetHealth;
@@ -193,6 +195,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         if (!isOwner) revert NotMarketOwner();
 
         IBaseMarket.Tranche[] memory existing = IBaseMarket(_market).tranches();
+        if (existing.length >= MarketLimits.MAX_TRANCHES) revert IBaseMarket.TooManyTranches();
         if (_weights.length != existing.length + 1) revert InvalidTrancheCount();
 
         tranche = _deployTranche(
@@ -285,6 +288,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         uint256 _vestingPeriod
     ) internal returns (address market, address[] memory deployedTranches) {
         if (_assets.length == 0) revert InvalidTrancheCount();
+        if (_assets.length > MarketLimits.MAX_TRANCHES) revert IBaseMarket.TooManyTranches();
         if (_assets.length != _weights.length) revert TrancheAssetsMismatch();
         if (!isOperatorRole[_marketOwnerRole]) revert OperatorNotAssigned();
 
