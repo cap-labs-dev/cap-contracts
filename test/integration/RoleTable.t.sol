@@ -349,10 +349,10 @@ contract RoleTableTest is CapDeployer {
         weights[2] = 0.2e27;
 
         vm.expectRevert(IRegistry.NotMarketOwner.selector);
-        registry.createTranche(marketAddr, address(collateral), weights);
+        registry.createTranche(marketAddr, address(collateral), weights, 12 hours);
 
         vm.prank(newOwner);
-        address added = registry.createTranche(marketAddr, address(collateral), weights);
+        address added = registry.createTranche(marketAddr, address(collateral), weights, 12 hours);
 
         assertEq(accessManager.getRoleAdmin(_depositorRole(added)), newRole, "the next tranche follows the new owner");
         assertEq(

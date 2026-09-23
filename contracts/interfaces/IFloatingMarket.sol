@@ -37,17 +37,23 @@ interface IFloatingMarket is IBaseMarket {
     function liquidate(address recipient, uint256 amount) external returns (uint256 repaid, uint256 valueSlashed);
 
     /// @notice Charge the accrued premium
-    /// @dev With no scaled debt, reset the local liquidity index to one ray and refresh both
+    /// @dev Permissionless realization funds both premium pools. More frequent realization can
+    /// increase eligible underwriters' allocation for the same index and debt path, up to rounding.
+    /// The caller receives no separate reward. Total premium equals reported debt growth.
+    /// With no scaled debt, reset the local liquidity index to one ray and refresh both
     /// IRM baselines without minting premiums, including after a full repayment in the same block.
     function chargePremium() external;
 
     /// @notice Write off {unrecoverableDebt} as bad debt
-    /// @dev The market must be unhealthy. Unrecoverable debt is derived. Remaining debt stays
-    /// liquidatable.
+    /// @dev The market must be unhealthy before the write-off. Clears the representable shortfall
+    /// without slashing collateral. Remaining debt may be healthy, so continued liquidatability
+    /// is not guaranteed. Borrowing remains subject to {creditLimit}; the market is not paused.
     /// @return amount The amount of debt written off, in stablecoin units (18 decimals)
     function writeOff() external returns (uint256 amount);
 
     /// @notice Get the liquidity and underwriter premiums
+    /// @dev Underwriting accrues against the last realized liquidity index. Liquidity receives
+    /// the remaining debt growth. Allocation intentionally depends on realization frequency.
     /// @return liquidityPremium The liquidity premium, in stablecoin units (18 decimals)
     /// @return underwriterPremium The underwriter premium, in stablecoin units (18 decimals)
     function premium() external view returns (uint256 liquidityPremium, uint256 underwriterPremium);

@@ -327,7 +327,7 @@ contract DebtLifecycleTest is CapDeployer {
         MarketBundle memory bundle = _distressedMarket();
 
         vm.expectRevert(IBaseMarket.Unhealthy.selector);
-        registry.createTranche(bundle.marketAddr, address(collateral), _thirds());
+        registry.createTranche(bundle.marketAddr, address(collateral), _thirds(), 12 hours);
     }
 
     /// @dev Membership changes go through the registry, so a market owner cannot remove

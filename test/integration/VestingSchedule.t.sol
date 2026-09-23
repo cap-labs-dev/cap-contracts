@@ -7,8 +7,7 @@ import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
 
 /// @title VestingScheduleTest
-/// @notice The time constant is twelve hours, so a day releases most of a pot without a setter that
-/// can move the schedule out from under accrual.
+/// @notice Floating tranches and underwriters start at twelve hours, so a day releases most of a pot.
 contract VestingScheduleTest is CapDeployer {
     FloatingMarket internal market;
     address internal senior;
@@ -32,9 +31,8 @@ contract VestingScheduleTest is CapDeployer {
         market.chargePremium();
     }
 
-    function test_vestingPeriodIsSixHours() public view {
+    function test_vestingPeriodStartsAtTwelveHours() public view {
         assertEq(Tranche(senior).vestingPeriod(), 12 hours);
-        assertEq(Tranche(senior).VESTING_PERIOD(), 12 hours);
     }
 
     /// After two time constants a day has passed and about `1 - 1/e^2` has been released.
@@ -64,9 +62,8 @@ contract VestingScheduleTest is CapDeployer {
         _fundTranche(senior, makeAddr("second"), 10e18);
     }
 
-    function test_underwriterUsesTheSameConstant() public {
+    function test_underwriterStartsWithTheSamePeriod() public {
         Underwriter uw = _deployUnderwriter();
         assertEq(uw.vestingPeriod(), 12 hours);
-        assertEq(uw.VESTING_PERIOD(), 12 hours);
     }
 }
