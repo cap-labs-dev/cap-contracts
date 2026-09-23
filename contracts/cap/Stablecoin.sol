@@ -7,9 +7,6 @@ import { IInterestRateModel } from "../interfaces/IInterestRateModel.sol";
 import { IStablecoin } from "../interfaces/IStablecoin.sol";
 import { PremiumVesting } from "../utils/PremiumVesting.sol";
 import { WadRayMath } from "../utils/WadRayMath.sol";
-import {
-    AccessManagedUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {
@@ -27,7 +24,6 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     is
     IStablecoin,
-    AccessManagedUpgradeable,
     PausableUpgradeable,
     ERC20PermitUpgradeable,
     PremiumVesting,
@@ -63,11 +59,11 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         string memory _name,
         string memory _symbol,
         address _irm,
-        address _reserveVault
+        address _reserveVault,
+        uint256 _vestingPeriod
     ) external reinitializer(2) {
-        __AccessManaged_init(_authority);
         __Pausable_init();
-        __PremiumVesting_init(IERC20Metadata(_asset), _name, _symbol, address(this));
+        __PremiumVesting_init(_authority, IERC20Metadata(_asset), _name, _symbol, address(this), _vestingPeriod);
         // same name the ERC-20 uses, so a v1 proxy that already had permit keeps its domain
         __ERC20Permit_init(_name);
         // both previews scale between the two units, and only the direction that divides can lose

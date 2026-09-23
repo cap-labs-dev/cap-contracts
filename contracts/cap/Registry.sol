@@ -11,6 +11,7 @@ import { IFixedMarket } from "../interfaces/IFixedMarket.sol";
 import { IFloatingMarket } from "../interfaces/IFloatingMarket.sol";
 import { IInterestRateModel } from "../interfaces/IInterestRateModel.sol";
 import { IOracle } from "../interfaces/IOracle.sol";
+import { IPremiumVesting } from "../interfaces/IPremiumVesting.sol";
 import { IRegistry } from "../interfaces/IRegistry.sol";
 import { IStablecoin } from "../interfaces/IStablecoin.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
@@ -30,6 +31,9 @@ import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 /// @dev This contract must hold ADMIN: `setTargetFunctionRole` cannot be delegated.
 contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, AccessManagedUpgradeable, UUPSUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
+
+    /// @notice Deployment default for floating tranches, cUSD, and underwriters, in seconds.
+    uint256 public constant DEFAULT_VESTING_PERIOD = 12 hours;
 
     /// @inheritdoc IRegistry
     address public vault;
@@ -149,7 +153,8 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
             _assets,
             _weights,
             _name,
-            _marketOwnerRole
+            _marketOwnerRole,
+            DEFAULT_VESTING_PERIOD
         );
     }
 
@@ -172,12 +177,13 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
             _assets,
             _weights,
             _name,
-            _marketOwnerRole
+            _marketOwnerRole,
+            _maximumTermLimit / 2
         );
     }
 
     /// @inheritdoc IRegistry
-    function createTranche(address _market, address _asset, uint256[] calldata _weights)
+    function createTranche(address _market, address _asset, uint256[] calldata _weights, uint256 _vestingPeriod)
         external
         returns (address tranche)
     {
@@ -189,7 +195,9 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         IBaseMarket.Tranche[] memory existing = IBaseMarket(_market).tranches();
         if (_weights.length != existing.length + 1) revert InvalidTrancheCount();
 
-        tranche = _deployTranche(_asset, IBaseMarket(_market).name(), _market, ownerRole, _trancheCount[_market]++);
+        tranche = _deployTranche(
+            _asset, IBaseMarket(_market).name(), _market, ownerRole, _trancheCount[_market]++, _vestingPeriod
+        );
 
         IBaseMarket.Tranche[] memory updated = new IBaseMarket.Tranche[](_weights.length);
         for (uint256 i; i < existing.length; ++i) {
@@ -240,7 +248,8 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         underwriter = _deploy(
             underwriterBeacon,
             abi.encodeCall(
-                IUnderwriter.initialize, (authority(), address(this), _name, _symbol, _asset, vault, stablecoin)
+                IUnderwriter.initialize,
+                (authority(), address(this), _name, _symbol, _asset, vault, stablecoin, DEFAULT_VESTING_PERIOD)
             )
         );
 
@@ -263,6 +272,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     /// @param _weights Tranche weights in ray decimals, index 0 is most senior
     /// @param _name The market name
     /// @param _marketOwnerRole The market owner operator role id
+    /// @param _vestingPeriod The initial tranche premium vesting time constant in seconds
     /// @return market The deployed market
     /// @return deployedTranches The deployed tranche addresses in seniority order
     function _createMarket(
@@ -271,7 +281,8 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         address[] calldata _assets,
         uint256[] calldata _weights,
         string memory _name,
-        uint64 _marketOwnerRole
+        uint64 _marketOwnerRole,
+        uint256 _vestingPeriod
     ) internal returns (address market, address[] memory deployedTranches) {
         if (_assets.length == 0) revert InvalidTrancheCount();
         if (_assets.length != _weights.length) revert TrancheAssetsMismatch();
@@ -285,7 +296,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         IBaseMarket.Tranche[] memory marketTranches = new IBaseMarket.Tranche[](_assets.length);
 
         for (uint256 i; i < _assets.length; ++i) {
-            address tranche = _deployTranche(_assets[i], _name, market, _marketOwnerRole, i);
+            address tranche = _deployTranche(_assets[i], _name, market, _marketOwnerRole, i, _vestingPeriod);
             deployedTranches[i] = tranche;
             marketTranches[i] = IBaseMarket.Tranche({ tranche: tranche, weight: _weights[i] });
         }
@@ -302,11 +313,16 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     /// @param market The market the tranche underwrites
     /// @param ownerRole The market owner role that will administer depositors
     /// @param index The tranche's seniority index
+    /// @param _vestingPeriod The initial premium vesting time constant in seconds
     /// @return tranche The deployed tranche
-    function _deployTranche(address _asset, string memory _name, address market, uint64 ownerRole, uint256 index)
-        internal
-        returns (address tranche)
-    {
+    function _deployTranche(
+        address _asset,
+        string memory _name,
+        address market,
+        uint64 ownerRole,
+        uint256 index,
+        uint256 _vestingPeriod
+    ) internal returns (address tranche) {
         if (IOracle(oracle).price(_asset) == 0) revert IOracle.PriceError(_asset);
 
         string memory trancheName = string.concat(_name, " Tranche ", Strings.toString(index));
@@ -315,7 +331,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
             trancheBeacon,
             abi.encodeCall(
                 ITranche.initialize,
-                (authority(), address(this), _asset, trancheName, trancheSymbol, market, vault, oracle)
+                (authority(), address(this), _asset, trancheName, trancheSymbol, market, vault, oracle, _vestingPeriod)
             )
         );
 
@@ -472,7 +488,9 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     function _stablecoinGovernorSelectors() private pure returns (bytes4[] memory selectors) {
-        selectors = _one(IStablecoin.setReserveVault.selector);
+        selectors = new bytes4[](2);
+        selectors[0] = IStablecoin.setReserveVault.selector;
+        selectors[1] = IPremiumVesting.setVestingPeriod.selector;
     }
 
     function _irmMarketSelectors() private pure returns (bytes4[] memory selectors) {
@@ -534,7 +552,9 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     function _trancheGovernorSelectors() private pure returns (bytes4[] memory selectors) {
-        selectors = _one(ITranche.setMaxCapital.selector);
+        selectors = new bytes4[](2);
+        selectors[0] = ITranche.setMaxCapital.selector;
+        selectors[1] = IPremiumVesting.setVestingPeriod.selector;
     }
 
     function _trancheMarketSelectors() private pure returns (bytes4[] memory selectors) {
@@ -542,11 +562,12 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     function _underwriterCuratorSelectors() private pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](4);
+        selectors = new bytes4[](5);
         selectors[0] = IUnderwriter.addTranche.selector;
         selectors[1] = IUnderwriter.removeTranche.selector;
         selectors[2] = IUnderwriter.setDepositorRole.selector;
         selectors[3] = IUnderwriter.setAllocatorRole.selector;
+        selectors[4] = IPremiumVesting.setVestingPeriod.selector;
     }
 
     function _underwriterKeeperSelectors() private pure returns (bytes4[] memory selectors) {
