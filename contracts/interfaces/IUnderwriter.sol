@@ -126,8 +126,8 @@ interface IUnderwriter is IERC7540AsyncRedeem {
 
     /// @notice Re-value a tranche position and claim its premium
     /// @dev Registration is not checked; see {deallocate}. Remakes the mark only if {allocate}
-    /// already opened one. Share price stays on that book until this runs; that lag is
-    /// intentional, not a live NAV walk.
+    /// already opened one. Valuations stay cached between marks. Deposit and mint quotes
+    /// separately value the default position at its current value.
     /// Harvested premium enters the pool's own vesting pot, whose period the curator controls.
     /// It rewards opted-in balances as it vests, including holders who joined after the tranche
     /// generated it. Previously credited pool rewards remain with their original holders.
@@ -174,7 +174,9 @@ interface IUnderwriter is IERC7540AsyncRedeem {
     /// @notice Get the total assets including vault balance and recorded tranche debt
     /// @dev Vault ERC6909 balance plus {totalDebt}. A slash is folded in only when {allocate}
     /// opens or remakes the book, or when {report} / {deallocate} remake a book that already
-    /// exists — Yearn-style, not a live price of positions.
+    /// exists. Deposit and mint quotes separately adjust for the default position, including
+    /// queued shares and positions whose recorded debt is zero, without writing the book.
+    /// Non-default positions remain cached, so unreported gains and losses also affect issuance pricing.
     /// @return assets The total assets
     function totalAssets() external view returns (uint256 assets);
 
