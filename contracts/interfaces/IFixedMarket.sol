@@ -28,6 +28,11 @@ interface IFixedMarket is IBaseMarket {
     /// @param id The closed loan
     error LoanClosed(uint256 id);
 
+    /// @notice The draw's combined liquidity and underwriting premium exceeds the caller's limit
+    /// @param premium The premium calculated for the draw, in cUSD units (18 decimals)
+    /// @param maxPremium The maximum premium the caller accepts, in cUSD units (18 decimals)
+    error PremiumExceedsLimit(uint256 premium, uint256 maxPremium);
+
     /// @notice Emitted when the term limits are updated
     /// @param maximumTermLimit The new maximum term of a loan
     /// @param minimumTermLimit The new minimum term of a loan
@@ -104,9 +109,11 @@ interface IFixedMarket is IBaseMarket {
     /// `type(uint256).max` for the computed available principal over `term`. That size may sit
     /// below the exact maximum.
     /// @param term The term of the borrowed assets
+    /// @param maxPremium Maximum combined liquidity and underwriting premium, in cUSD units (18 decimals).
+    /// Use `type(uint256).max` for no cap. Reverts {PremiumExceedsLimit} if exceeded.
     /// @return id The id of the loan
     /// @return actualPrincipal The actual principal amount of the borrowed assets, in stablecoin units (18 decimals)
-    function borrow(address recipient, uint256 principal, uint256 term)
+    function borrow(address recipient, uint256 principal, uint256 term, uint256 maxPremium)
         external
         returns (uint256 id, uint256 actualPrincipal);
 
@@ -120,8 +127,12 @@ interface IFixedMarket is IBaseMarket {
     /// @param principal The principal amount of the borrowed assets, in stablecoin units (18 decimals), or
     /// `type(uint256).max` for the computed available add-on over the remaining term. That size may
     /// sit below the exact maximum.
+    /// @param maxPremium Maximum combined liquidity and underwriting premium for this add-on, in cUSD units
+    /// (18 decimals). Use `type(uint256).max` for no cap. Reverts {PremiumExceedsLimit} if exceeded.
     /// @return actualPrincipal The actual principal amount of the borrowed assets, in stablecoin units (18 decimals)
-    function borrowMore(uint256 id, address recipient, uint256 principal) external returns (uint256 actualPrincipal);
+    function borrowMore(uint256 id, address recipient, uint256 principal, uint256 maxPremium)
+        external
+        returns (uint256 actualPrincipal);
 
     /// @notice Repay assets to the market
     /// @dev Burns the recorded amount. Arrears accrue only when {extend} or {extendAdmin} runs

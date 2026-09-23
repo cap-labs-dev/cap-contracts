@@ -145,7 +145,7 @@ contract MarketLimitsRegressionTest is CapDeployer {
         FixedMarket fixedMarket = FixedMarket(m);
         _fundTranche(t, makeAddr("supplier"), 1_000e18);
         vm.prank(defaultBorrower);
-        (uint256 id,) = fixedMarket.borrow(defaultBorrower, 400e18, 30 days);
+        (uint256 id,) = fixedMarket.borrow(defaultBorrower, 400e18, 30 days, type(uint256).max);
         fixedMarket.setLiquidationThreshold(RAY);
         irm.setLiquidationBonus(0.1e27);
         _setPrice(address(collateral), 0.1e18);
@@ -173,7 +173,7 @@ contract MarketLimitsRegressionTest is CapDeployer {
         FixedMarket fixedMarket = FixedMarket(m);
         _fundTranche(s, makeAddr("supplier"), 1_000e18);
         vm.prank(defaultBorrower);
-        (uint256 id,) = fixedMarket.borrow(defaultBorrower, 400e18, 30 days);
+        (uint256 id,) = fixedMarket.borrow(defaultBorrower, 400e18, 30 days, type(uint256).max);
         _setPrice(address(collateral), 0.4e18);
         _mintStable(defaultLiquidator, 100e18);
         vm.expectCall(s, abi.encodeCall(ITranche.totalCapital, ()), uint64(1));

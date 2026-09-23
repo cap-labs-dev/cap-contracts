@@ -225,7 +225,7 @@ contract NumericalBoundariesTest is CapDeployer {
         _setMaxCapital(IBaseMarket(m), 10_000e18);
         uint256 term = bound(rawTerm, 1 days, 30 days);
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, 100e18, term);
+        (uint256 id,) = market.borrow(defaultBorrower, 100e18, term, type(uint256).max);
         uint256 edge = market.expiry(id) + market.grace();
         vm.warp(edge - 1);
         vm.expectRevert(IFixedMarket.StillInGracePeriod.selector);
@@ -237,10 +237,10 @@ contract NumericalBoundariesTest is CapDeployer {
         assertEq(market.totalDebt(), stablecoin.creditBackedSupply());
         vm.expectRevert(IFixedMarket.InvalidTerm.selector);
         vm.prank(defaultBorrower);
-        market.borrow(defaultBorrower, 1, 1 days - 1);
+        market.borrow(defaultBorrower, 1, 1 days - 1, type(uint256).max);
         vm.expectRevert(IFixedMarket.InvalidTerm.selector);
         vm.prank(defaultBorrower);
-        market.borrow(defaultBorrower, 1, 30 days + 1);
+        market.borrow(defaultBorrower, 1, 30 days + 1, type(uint256).max);
     }
 
     function testFuzz_shortfallExactWithdrawUsesMinimalShares(uint96 rawAssets, uint96 rawLoss, uint96 rawCredit)

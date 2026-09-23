@@ -177,7 +177,7 @@ contract PremiumBackingTest is CapDeployer {
         uint256 supplyBefore = stablecoin.creditBackedSupply();
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 30 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 30 days, type(uint256).max);
 
         assertEq(market.debt(id), stablecoin.creditBackedSupply() - supplyBefore, "debt must equal cUSD minted");
     }

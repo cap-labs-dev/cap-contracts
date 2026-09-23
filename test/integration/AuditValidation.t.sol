@@ -36,7 +36,7 @@ contract AuditValidationTest is CapDeployer {
         _setBorrowableOn(market, t, 1_000e18);
         _fundTranche(t, makeAddr("supplier"), 10_000e18);
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, 500e18, 1 days);
+        (uint256 id,) = market.borrow(defaultBorrower, 500e18, 1 days, type(uint256).max);
         uint256 initialDebt = market.debt(id);
         _depositStable(defaultBorrower, 100e18);
         vm.warp(market.expiry(id) + 365 days);
@@ -51,7 +51,7 @@ contract AuditValidationTest is CapDeployer {
         _setBorrowableOn(market, t, 1_000e18);
         _fundTranche(t, makeAddr("supplier"), 10_000e18);
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, 500e18, 30 days);
+        (uint256 id,) = market.borrow(defaultBorrower, 500e18, 30 days, type(uint256).max);
         uint256 expiryBefore = market.expiry(id);
         market.setTermLimits(7 days, 1 days);
         vm.prank(defaultBorrower);

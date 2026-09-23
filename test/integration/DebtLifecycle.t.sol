@@ -83,7 +83,7 @@ contract DebtLifecycleTest is CapDeployer {
         FixedMarket market = _readyFixed();
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days, type(uint256).max);
         uint256 originalExpiry = market.expiry(id);
 
         // still inside the grace period, so the keeper cannot roll it yet
@@ -108,7 +108,7 @@ contract DebtLifecycleTest is CapDeployer {
         FixedMarket market = _readyFixed();
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days, type(uint256).max);
 
         vm.warp(market.expiry(id) + 365 days);
 
@@ -123,7 +123,7 @@ contract DebtLifecycleTest is CapDeployer {
         FixedMarket market = _readyFixed();
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days, type(uint256).max);
 
         vm.warp(market.expiry(id) + market.grace() + 1);
 
@@ -136,7 +136,7 @@ contract DebtLifecycleTest is CapDeployer {
         FixedMarket market = _readyFixed();
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days, type(uint256).max);
 
         vm.warp(market.expiry(id) + 2 days);
 
@@ -152,7 +152,7 @@ contract DebtLifecycleTest is CapDeployer {
         FixedMarket market = _readyFixed();
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days, type(uint256).max);
 
         vm.prank(defaultBorrower);
         assertEq(market.extend(id, type(uint256).max), 29 days, "fills the room under the maximum");
@@ -257,7 +257,7 @@ contract DebtLifecycleTest is CapDeployer {
         FixedMarket market = _readyFixed();
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, 4_000e18, 30 days);
+        (uint256 id,) = market.borrow(defaultBorrower, 4_000e18, 30 days, type(uint256).max);
 
         _setPrice(address(collateral), 0.1e18);
 
@@ -420,7 +420,7 @@ contract DebtLifecycleTest is CapDeployer {
         assertEq(market.minimumTermLimit(), 7 days, "minimum updated");
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 60 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 60 days, type(uint256).max);
         assertEq(market.expiry(id), block.timestamp + 60 days, "a term inside the new range is accepted");
     }
 

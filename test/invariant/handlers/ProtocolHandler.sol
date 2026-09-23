@@ -297,9 +297,17 @@ contract ProtocolHandler is CapDeployer {
         }
         uint256 before = stablecoin.balanceOf(defaultBorrower);
         uint256 actual;
-        vm.prank(defaultBorrower);
-        if (fixed_) (, actual) = fixedMarket.borrow(defaultBorrower, amount, bound(rawTerm, 1 days, 30 days));
-        else actual = floating.borrow(defaultBorrower, amount);
+        if (fixed_) {
+            uint256 term = bound(rawTerm, 1 days, 30 days);
+            (uint256 liquidity, uint256 underwriting) = fixedMarket.premiumForBorrow(amount, term);
+            uint256 maxPremium = liquidity + underwriting;
+            vm.prank(defaultBorrower);
+            (, actual) = fixedMarket.borrow(defaultBorrower, amount, term, maxPremium);
+            assertLe(fixedMarket.totalDebt() - debt - actual, maxPremium);
+        } else {
+            vm.prank(defaultBorrower);
+            actual = floating.borrow(defaultBorrower, amount);
+        }
         assertEq(stablecoin.balanceOf(defaultBorrower) - before, actual);
         assertLe(actual, amount);
         _success();

@@ -1182,7 +1182,7 @@ contract AccountingIntegrityTest is CapDeployer {
 
         uint256 limit = market.creditLimit();
         vm.prank(defaultBorrower);
-        (uint256 id, uint256 principal) = market.borrow(defaultBorrower, type(uint256).max, 30 days);
+        (uint256 id, uint256 principal) = market.borrow(defaultBorrower, type(uint256).max, 30 days, type(uint256).max);
 
         emit log_named_uint("credit limit", limit);
         emit log_named_uint("principal   ", principal);
@@ -1200,7 +1200,7 @@ contract AccountingIntegrityTest is CapDeployer {
         FixedMarket market = _fixedMarketOnSlope(2e27);
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, type(uint256).max, 30 days);
+        (uint256 id,) = market.borrow(defaultBorrower, type(uint256).max, 30 days, type(uint256).max);
 
         emit log_named_uint("debt                 ", market.debt(id));
         emit log_named_uint("liquidation threshold", market.debtLiquidationThreshold());
@@ -1223,7 +1223,7 @@ contract AccountingIntegrityTest is CapDeployer {
 
         uint256 limit = market.creditLimit();
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, type(uint256).max, term);
+        (uint256 id,) = market.borrow(defaultBorrower, type(uint256).max, term, type(uint256).max);
 
         assertLe(market.debt(id), limit, "debt must fit the limit at every reserve, term and slope");
         assertGe(market.healthiness(), 1e27, "and must never arrive liquidatable");
@@ -1257,7 +1257,7 @@ contract AccountingIntegrityTest is CapDeployer {
         assertLe(sized + sizedLiq + sizedUw, raw, "the advertised max must itself fit");
 
         vm.prank(defaultBorrower);
-        (uint256 id, uint256 drawn) = market.borrow(defaultBorrower, 1e18, term);
+        (uint256 id, uint256 drawn) = market.borrow(defaultBorrower, 1e18, term, type(uint256).max);
         assertEq(drawn, 1e18);
         assertLe(market.debt(id), raw);
         assertGe(market.healthiness(), 1e27);
@@ -1277,10 +1277,10 @@ contract AccountingIntegrityTest is CapDeployer {
 
         vm.prank(defaultBorrower);
         vm.expectRevert(IBaseMarket.InsufficientLiquidity.selector);
-        market.borrow(defaultBorrower, raw, term);
+        market.borrow(defaultBorrower, raw, term, type(uint256).max);
 
         vm.prank(defaultBorrower);
-        (uint256 id, uint256 drawn) = market.borrow(defaultBorrower, type(uint256).max, term);
+        (uint256 id, uint256 drawn) = market.borrow(defaultBorrower, type(uint256).max, term, type(uint256).max);
         assertEq(drawn, sized, "max fills the term-adjusted offer");
         assertLe(market.debt(id), raw);
         assertGe(market.healthiness(), 1e27);
@@ -1321,7 +1321,7 @@ contract AccountingIntegrityTest is CapDeployer {
         assertLe(sized + sizedLiq + sizedUw, limit, "the offer must fit the raw limit");
 
         vm.prank(defaultBorrower);
-        (uint256 id, uint256 drawn) = market.borrow(defaultBorrower, type(uint256).max, term);
+        (uint256 id, uint256 drawn) = market.borrow(defaultBorrower, type(uint256).max, term, type(uint256).max);
         assertEq(drawn, sized, "max fills the term-adjusted offer");
         assertEq(market.debt(id) - drawn, sizedLiq + sizedUw, "the quote is what the draw pays");
         assertLe(market.debt(id), limit, "max borrow stays inside the raw limit");
@@ -1341,7 +1341,7 @@ contract AccountingIntegrityTest is CapDeployer {
         if (principal + liquidity + underwriter > market.availableCredit()) return;
 
         vm.prank(defaultBorrower);
-        (uint256 id, uint256 drawn) = market.borrow(defaultBorrower, principal, term);
+        (uint256 id, uint256 drawn) = market.borrow(defaultBorrower, principal, term, liquidity + underwriter);
         assertEq(drawn, principal);
         assertEq(market.debt(id) - drawn, liquidity + underwriter, "the quote is what the draw pays");
     }
@@ -1357,7 +1357,7 @@ contract AccountingIntegrityTest is CapDeployer {
         if (slice + firstLiq + firstUw > market.availableCredit()) return;
 
         vm.startPrank(defaultBorrower);
-        (uint256 firstId,) = market.borrow(defaultBorrower, slice, term);
+        (uint256 firstId,) = market.borrow(defaultBorrower, slice, term, type(uint256).max);
         uint256 firstPremium = market.debt(firstId) - slice;
 
         (uint256 nextLiq, uint256 nextUw) = market.premiumForBorrow(slice, term);
@@ -1365,7 +1365,7 @@ contract AccountingIntegrityTest is CapDeployer {
             vm.stopPrank();
             return;
         }
-        (uint256 secondId,) = market.borrow(defaultBorrower, slice, term);
+        (uint256 secondId,) = market.borrow(defaultBorrower, slice, term, type(uint256).max);
         uint256 secondPremium = market.debt(secondId) - slice;
         vm.stopPrank();
 
@@ -1583,10 +1583,10 @@ contract AccountingIntegrityTest is CapDeployer {
         uint256 oneShot = oneLiq + oneUw;
 
         vm.startPrank(defaultBorrower);
-        (uint256 firstId,) = market.borrow(defaultBorrower, half, term);
+        (uint256 firstId,) = market.borrow(defaultBorrower, half, term, type(uint256).max);
         uint256 firstPremium = market.debt(firstId) - half;
         (uint256 nextLiq, uint256 nextUw) = market.premiumForBorrow(half, term);
-        (uint256 secondId,) = market.borrow(defaultBorrower, half, term);
+        (uint256 secondId,) = market.borrow(defaultBorrower, half, term, type(uint256).max);
         uint256 secondPremium = market.debt(secondId) - half;
         vm.stopPrank();
 
@@ -1608,9 +1608,9 @@ contract AccountingIntegrityTest is CapDeployer {
         uint256 oneShot = oneLiq + oneUw;
 
         vm.startPrank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, half, term);
+        (uint256 id,) = market.borrow(defaultBorrower, half, term, type(uint256).max);
         uint256 firstPremium = market.debt(id) - half;
-        market.borrowMore(id, defaultBorrower, half);
+        market.borrowMore(id, defaultBorrower, half, type(uint256).max);
         vm.stopPrank();
 
         uint256 split = market.debt(id) - half * 2;

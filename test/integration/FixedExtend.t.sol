@@ -28,7 +28,7 @@ contract FixedExtendTest is CapDeployer {
         FixedMarket market = _ready();
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days, type(uint256).max);
 
         uint256 expiryBefore = market.expiry(id);
         uint256 debtBefore = market.debt(id);
@@ -45,7 +45,7 @@ contract FixedExtendTest is CapDeployer {
         FixedMarket market = _ready();
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days, type(uint256).max);
 
         vm.prank(defaultBorrower);
         uint256 actual = market.extend(id, type(uint256).max);
@@ -58,7 +58,7 @@ contract FixedExtendTest is CapDeployer {
         FixedMarket market = _ready();
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days, type(uint256).max);
 
         vm.prank(defaultBorrower);
         vm.expectRevert(IFixedMarket.InvalidTerm.selector);
@@ -71,14 +71,14 @@ contract FixedExtendTest is CapDeployer {
 
         vm.prank(defaultBorrower);
         vm.expectRevert(IBaseMarket.InvalidPrincipal.selector);
-        market.borrow(defaultBorrower, type(uint256).max, 1 days);
+        market.borrow(defaultBorrower, type(uint256).max, 1 days, type(uint256).max);
     }
 
     function test_borrowMaxTermFillsTheMaximum() public {
         FixedMarket market = _ready();
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, type(uint256).max);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, type(uint256).max, type(uint256).max);
 
         assertEq(market.expiry(id), block.timestamp + 30 days);
         assertEq(market.totalDebt(), market.debt(id));
@@ -94,7 +94,7 @@ contract FixedExtendTest is CapDeployer {
         vm.expectEmit(address(market));
         emit IFixedMarket.BorrowFixed(0, defaultBorrower, term, PRINCIPAL, openLiq + openUw);
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, term);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, term, type(uint256).max);
         uint256 debtBefore = market.debt(id);
 
         uint256 remaining = market.expiry(id) - block.timestamp;
@@ -103,7 +103,7 @@ contract FixedExtendTest is CapDeployer {
         vm.expectEmit(address(market));
         emit IFixedMarket.BorrowMoreFixed(id, defaultBorrower, remaining, addOn, moreLiq + moreUw);
         vm.prank(defaultBorrower);
-        uint256 added = market.borrowMore(id, defaultBorrower, addOn);
+        uint256 added = market.borrowMore(id, defaultBorrower, addOn, type(uint256).max);
 
         assertGt(added, 0);
         assertGt(market.debt(id), debtBefore);
@@ -113,12 +113,12 @@ contract FixedExtendTest is CapDeployer {
         FixedMarket market = _ready();
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days, type(uint256).max);
         skip(2 days);
 
         vm.prank(defaultBorrower);
         vm.expectRevert(IFixedMarket.LoanExpired.selector);
-        market.borrowMore(id, defaultBorrower, 1e18);
+        market.borrowMore(id, defaultBorrower, 1e18, type(uint256).max);
     }
 
     /// @dev Confirmed: `extend` on an unused id populated expiry from timestamp-0 arrears, then
@@ -137,7 +137,7 @@ contract FixedExtendTest is CapDeployer {
 
         vm.prank(defaultBorrower);
         vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanNotFound.selector, 0));
-        market.borrowMore(0, defaultBorrower, 1e18);
+        market.borrowMore(0, defaultBorrower, 1e18, type(uint256).max);
 
         vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanNotFound.selector, 0));
         market.repay(0, 1e18);
@@ -151,12 +151,12 @@ contract FixedExtendTest is CapDeployer {
         FixedMarket market = _ready();
 
         vm.prank(defaultBorrower);
-        market.borrow(defaultBorrower, PRINCIPAL, 10 days);
+        market.borrow(defaultBorrower, PRINCIPAL, 10 days, type(uint256).max);
         assertEq(market.loanCount(), 1);
 
         vm.prank(defaultBorrower);
         vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanNotFound.selector, 1));
-        market.borrowMore(1, defaultBorrower, 1e18);
+        market.borrowMore(1, defaultBorrower, 1e18, type(uint256).max);
     }
 
     /// @dev Fully repaid loans stay in `loanCount` so keepers can walk them, but they cannot
@@ -165,7 +165,7 @@ contract FixedExtendTest is CapDeployer {
         FixedMarket market = _ready();
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 10 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 10 days, type(uint256).max);
         uint256 owed = market.debt(id);
         _depositStable(defaultBorrower, owed);
 
@@ -178,7 +178,7 @@ contract FixedExtendTest is CapDeployer {
 
         vm.prank(defaultBorrower);
         vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanClosed.selector, id));
-        market.borrowMore(id, defaultBorrower, 1e18);
+        market.borrowMore(id, defaultBorrower, 1e18, type(uint256).max);
 
         vm.prank(defaultBorrower);
         vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanClosed.selector, id));
@@ -188,7 +188,7 @@ contract FixedExtendTest is CapDeployer {
         market.extendAdmin(id, 7 days);
 
         vm.prank(defaultBorrower);
-        (uint256 next,) = market.borrow(defaultBorrower, PRINCIPAL, 10 days);
+        (uint256 next,) = market.borrow(defaultBorrower, PRINCIPAL, 10 days, type(uint256).max);
         assertEq(next, 1, "a new loan takes the next id");
         assertEq(market.loanCount(), 2);
     }
@@ -197,19 +197,19 @@ contract FixedExtendTest is CapDeployer {
         FixedMarket market = _ready();
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days, type(uint256).max);
         skip(1 hours);
 
         vm.prank(defaultBorrower);
         vm.expectRevert(IFixedMarket.InvalidTerm.selector);
-        market.borrowMore(id, defaultBorrower, 1e18);
+        market.borrowMore(id, defaultBorrower, 1e18, type(uint256).max);
     }
 
     function test_extend_whenUnhealthy_reverts() public {
         FixedMarket market = _ready();
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 10 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 10 days, type(uint256).max);
 
         _setPrice(address(collateral), 0.1e18);
         assertLt(market.healthiness(), 1e27);
@@ -223,7 +223,7 @@ contract FixedExtendTest is CapDeployer {
         FixedMarket market = _ready();
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 10 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 10 days, type(uint256).max);
 
         _setPrice(address(collateral), 0.1e18);
         assertLt(market.healthiness(), 1e27);

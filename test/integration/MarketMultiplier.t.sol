@@ -130,9 +130,9 @@ contract MarketMultiplierTest is CapDeployer {
         FixedMarket two = _readyFixed("fx-two", 2e27);
 
         vm.startPrank(defaultBorrower);
-        (uint256 id1,) = one.borrow(defaultBorrower, PRINCIPAL, 30 days);
-        (uint256 id15,) = oneAndAHalf.borrow(defaultBorrower, PRINCIPAL, 30 days);
-        (uint256 id2,) = two.borrow(defaultBorrower, PRINCIPAL, 30 days);
+        (uint256 id1,) = one.borrow(defaultBorrower, PRINCIPAL, 30 days, type(uint256).max);
+        (uint256 id15,) = oneAndAHalf.borrow(defaultBorrower, PRINCIPAL, 30 days, type(uint256).max);
+        (uint256 id2,) = two.borrow(defaultBorrower, PRINCIPAL, 30 days, type(uint256).max);
         vm.stopPrank();
 
         uint256 premium1 = one.debt(id1) - PRINCIPAL;
@@ -151,8 +151,8 @@ contract MarketMultiplierTest is CapDeployer {
         two.setUnderwriterRate(0.2e27);
 
         vm.startPrank(defaultBorrower);
-        (uint256 id1,) = one.borrow(defaultBorrower, PRINCIPAL, 30 days);
-        (uint256 id2,) = two.borrow(defaultBorrower, PRINCIPAL, 30 days);
+        (uint256 id1,) = one.borrow(defaultBorrower, PRINCIPAL, 30 days, type(uint256).max);
+        (uint256 id2,) = two.borrow(defaultBorrower, PRINCIPAL, 30 days, type(uint256).max);
         vm.stopPrank();
 
         assertApproxEqRel(one.debt(id1), two.debt(id2), 1e15);

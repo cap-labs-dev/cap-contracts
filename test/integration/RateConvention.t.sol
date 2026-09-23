@@ -42,7 +42,7 @@ contract RateConventionTest is CapDeployer {
         _fundTranche(t0, makeAddr("senior"), 10_000e18);
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 30 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 30 days, type(uint256).max);
 
         // 20% per year prorated over 30 days = 1.6438%
         uint256 expectedPremium = PRINCIPAL * 20 * 30 days / (100 * 365 days);
@@ -67,7 +67,7 @@ contract RateConventionTest is CapDeployer {
         vm.prank(defaultBorrower);
         floating.borrow(defaultBorrower, PRINCIPAL);
         vm.prank(defaultBorrower);
-        (uint256 id,) = fixedMarket.borrow(defaultBorrower, PRINCIPAL, 30 days);
+        (uint256 id,) = fixedMarket.borrow(defaultBorrower, PRINCIPAL, 30 days, type(uint256).max);
 
         uint256 fixedCost = fixedMarket.debt(id) - PRINCIPAL;
 
@@ -95,7 +95,7 @@ contract RateConventionTest is CapDeployer {
 
         // half the 30 day maximum, so the term multiplier is 1 + half the slope = 1.25
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 15 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 15 days, type(uint256).max);
 
         // the borrow mints credit-backed cUSD, and since no real deposits exist utilization jumps
         // above the kink, taking the liquidity rate to base + slope0 + slope1 = 20% per year
@@ -129,7 +129,7 @@ contract RateConventionTest is CapDeployer {
         _fundTranche(t0, makeAddr("senior"), 10_000e18);
 
         vm.prank(defaultBorrower);
-        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 30 days);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 30 days, type(uint256).max);
 
         // a maximum term loan still pays the full liquidity rate: 20% + 20% underwriter = 40%
         uint256 expectedPremium = PRINCIPAL * 40 * 30 days / (100 * 365 days);

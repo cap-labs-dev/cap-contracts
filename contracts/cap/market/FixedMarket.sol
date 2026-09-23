@@ -62,7 +62,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @inheritdoc IFixedMarket
-    function borrow(address recipient, uint256 principal, uint256 term)
+    function borrow(address recipient, uint256 principal, uint256 term, uint256 maxPremium)
         external
         restricted
         nonReentrant
@@ -73,12 +73,12 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         id = loanCount++;
         expiry[id] = block.timestamp + term;
         uint256 premium;
-        (actualPrincipal, premium) = _borrow(id, recipient, principal, term);
+        (actualPrincipal, premium) = _borrow(id, recipient, principal, term, maxPremium);
         emit BorrowFixed(id, recipient, term, actualPrincipal, premium);
     }
 
     /// @inheritdoc IFixedMarket
-    function borrowMore(uint256 id, address recipient, uint256 principal)
+    function borrowMore(uint256 id, address recipient, uint256 principal, uint256 maxPremium)
         external
         restricted
         nonReentrant
@@ -89,7 +89,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         uint256 term = expiry[id] - block.timestamp;
         if (term < minimumTermLimit) revert InvalidTerm();
         uint256 premium;
-        (actualPrincipal, premium) = _borrow(id, recipient, principal, term);
+        (actualPrincipal, premium) = _borrow(id, recipient, principal, term, maxPremium);
         emit BorrowMoreFixed(id, recipient, term, actualPrincipal, premium);
     }
 
@@ -218,9 +218,10 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     /// @param recipient The address to borrow to
     /// @param principal The principal of the loan, or `type(uint256).max` for the sized max
     /// @param term The term of the loan in seconds, already inside the band
+    /// @param maxPremium The maximum combined premium accepted for this draw
     /// @return actualPrincipal The principal actually drawn
     /// @return chargedPremium The premium minted onto the loan
-    function _borrow(uint256 id, address recipient, uint256 principal, uint256 term)
+    function _borrow(uint256 id, address recipient, uint256 principal, uint256 term, uint256 maxPremium)
         internal
         returns (uint256 actualPrincipal, uint256 chargedPremium)
     {
@@ -230,12 +231,14 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
 
         (uint256 liquidityPremium, uint256 underwriterPremium) =
             _premiumStillToMint(actualPrincipal, term, actualPrincipal);
-        if (actualPrincipal + liquidityPremium + underwriterPremium > limit) revert InsufficientLiquidity();
+        chargedPremium = liquidityPremium + underwriterPremium;
+        if (chargedPremium > maxPremium) revert PremiumExceedsLimit(chargedPremium, maxPremium);
+        if (actualPrincipal + chargedPremium > limit) revert InsufficientLiquidity();
 
         debt[id] += actualPrincipal;
         _totalDebt += actualPrincipal;
         _borrow(recipient, actualPrincipal);
-        chargedPremium = _applyPremium(id, liquidityPremium, underwriterPremium);
+        _applyPremium(id, liquidityPremium, underwriterPremium);
         // credit is min(ltv, lt) against active capital; the threshold is lt against total. A full
         // draw can land on health of one when those match. The Unhealthy assert is for the premium
         // stacked on top, and for any active < total gap. {extend} asserts the same after its charge
