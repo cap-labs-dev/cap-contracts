@@ -4,9 +4,12 @@ pragma solidity ^0.8.28;
 import { IDelegation } from "../../contracts/interfaces/IDelegation.sol";
 import { ILender } from "../../contracts/interfaces/ILender.sol";
 import {
+    AgentCoverageSnapshot,
+    AgentSnapshot,
     DashboardLens,
     EigenLayerSnapshot,
     LoanSnapshot,
+    ReserveSnapshot,
     StakerRewardsTokenSnapshot,
     SymbioticVaultSnapshot
 } from "../../contracts/lens/DashboardLens.sol";
@@ -213,5 +216,55 @@ contract DashboardLensForkTest is Test {
         assertGt(s.collateralTokenPriceLastUpdated, 0, "collateralTokenPriceLastUpdated");
         assertGt(s.vaultAssetPrice, 0, "vaultAssetPrice");
         assertGt(s.vaultAssetPriceLastUpdated, 0, "vaultAssetPriceLastUpdated");
+        assertTrue(s.reserve.vault != address(0), "reserve.vault");
+        assertGt(s.vaultTotalSupplies, 0, "vaultTotalSupplies");
+    }
+
+    // ─── Agent coverage / snapshot ────────────────────────────────────────────
+
+    function test_fork_getAgentCoverageSnapshot() public view {
+        AgentCoverageSnapshot memory s = lens.getAgentCoverageSnapshot(AGENT);
+
+        assertGt(s.epochDuration, 0, "epochDuration");
+        assertEq(s.currentEpoch, IDelegation(address(lens.DELEGATION())).epoch(), "currentEpoch");
+        assertEq(s.coverageCap, IDelegation(address(lens.DELEGATION())).coverageCap(AGENT), "coverageCap");
+        assertGt(s.totalDelegation, 0, "totalDelegation");
+        assertGt(s.liveCoverage, 0, "liveCoverage");
+    }
+
+    function test_fork_getAgentSnapshot() public {
+        AgentSnapshot memory s = lens.getAgentSnapshot(AGENT);
+
+        assertGt(s.coverage.totalDelegation, 0, "coverage.totalDelegation");
+        assertGt(s.lenderDelegation, 0, "lenderDelegation");
+        assertGt(s.health, 0, "health");
+        assertTrue(s.collateralToken != address(0), "collateralToken");
+        assertGt(s.collateralTokenPrice, 0, "collateralTokenPrice");
+        assertGt(s.loans.length, 0, "loans.length");
+
+        bool foundUsdc;
+        for (uint256 i; i < s.loans.length; ++i) {
+            if (s.loans[i].asset == USDC) {
+                foundUsdc = true;
+                assertGt(s.loans[i].assetPriceUSD, 0, "usdc assetPriceUSD");
+            }
+        }
+        assertTrue(foundUsdc, "USDC reserve present");
+    }
+
+    function test_fork_getReserveSnapshots() public {
+        ReserveSnapshot[] memory snapshots = lens.getReserveSnapshots();
+        assertGt(snapshots.length, 0, "reserves length");
+
+        bool foundUsdc;
+        for (uint256 i; i < snapshots.length; ++i) {
+            if (snapshots[i].asset == USDC) {
+                foundUsdc = true;
+                assertTrue(snapshots[i].vault != address(0), "usdc vault");
+                assertGt(snapshots[i].assetPriceUSD, 0, "usdc assetPriceUSD");
+                assertGt(snapshots[i].totalSupplies, 0, "usdc totalSupplies");
+            }
+        }
+        assertTrue(foundUsdc, "USDC reserve present");
     }
 }
