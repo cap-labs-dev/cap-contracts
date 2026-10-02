@@ -142,6 +142,10 @@ Operator approval gives the zap authority to direct payouts and transfer request
 
 ## Deploy infrastructure
 
+For a fresh Ethereum Sepolia deployment using Circle USDC and the configured WETH/USD
+feed, follow the [Sepolia deployment guide](config/SEPOLIA.md). The Sepolia script keeps
+the deployer as admin and leaves market creation permissions unassigned.
+
 [Deploy.s.sol](script/Deploy.s.sol) deploys fresh shared infrastructure through CreateX, initializes access control, seeds the wrapper, and writes the result to `config/cap-v2.json`. It does not create or configure individual credit markets. The target chain needs the canonical CreateX factory and support for the configured EVM bytecode.
 
 Before running it:

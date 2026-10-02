@@ -5,3 +5,7 @@ pre-commit:
       glob: "*.sol"
       run: forge fmt {staged_files}
       stage_fixed: true
+    config-format:
+      glob: "config/cap-v2.json"
+      run: node script/config/formatConfig.js
+      stage_fixed: true

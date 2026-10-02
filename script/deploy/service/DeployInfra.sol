@@ -89,7 +89,7 @@ contract DeployInfra is CreateXUtils {
             implementations.wrapper,
             abi.encodeCall(Wrapper.initialize, (infra.accessManager, infra.stablecoin))
         );
-        _seedWrapper(infra.wrapper, infra.stablecoin, users.stablecoinUnderlying);
+        _seedWrapper(infra.wrapper, infra.stablecoin, users.stablecoinUnderlying, users.deployer);
 
         infra = _deployFactoryBeaconsAndRegistry(implementations, users, saltNamespace, infra);
     }
@@ -260,12 +260,13 @@ contract DeployInfra is CreateXUtils {
     }
 
     /// @dev Deposit 1 cUSD into the wrapper and leave the shares on {DeadShares-HOLDER}
-    function _seedWrapper(address wrapper, address stablecoin, address underlying) private {
+    function _seedWrapper(address wrapper, address stablecoin, address underlying, address payer) private {
         uint256 seedAssets = Stablecoin(stablecoin).previewMint(WRAPPER_SEED);
         IERC20 token = IERC20(underlying);
-        require(token.balanceOf(address(this)) >= seedAssets, "wrapper seed");
+        // During a script broadcast the wallet pays, while address(this) is the script contract.
+        require(token.balanceOf(payer) >= seedAssets, "wrapper seed");
         token.forceApprove(stablecoin, seedAssets);
-        uint256 cusd = Stablecoin(stablecoin).deposit(seedAssets, address(this));
+        uint256 cusd = Stablecoin(stablecoin).deposit(seedAssets, payer);
         IERC20(stablecoin).forceApprove(wrapper, cusd);
         Wrapper(wrapper).deposit(cusd, DeadShares.HOLDER);
     }
