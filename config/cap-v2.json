@@ -32,5 +32,39 @@
             "underwriterBeacon": "0x0000000000000000000000000000000000000000",
             "wrapper": "0x88887bE419578051FF9F4eb6C858A951921D8888"
         }
+    },
+    "11155111": {
+        "deployer": "0x25AcaAb315916F8FFe39eb29Ba403236469Df41F",
+        "timelock": "0x0000000000000000000000000000000000000000",
+        "multisig": "0x0000000000000000000000000000000000000000",
+        "stablecoinUnderlying": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+        "reserveVault": "0x0000000000000000000000000000000000000000",
+        "implems": {
+            "vault": "0x2b1765FFb0fa7B602b1b72FBB8f68F2207993bB5",
+            "stablecoin": "0x2C5a53BD60D274d39fD0287111d44e27B748AB27",
+            "irm": "0xAAF6E56517c28955DB91d83bC2Be3441a30dd874",
+            "oracle": "0x47aDF7B7A11F35bD6c2637F9BAefcaC157b1E1df",
+            "registry": "0xaFf0Fc504a5fC60ec910F2468CA10c91Ee8A9435",
+            "floatingMarket": "0x244F19012D6c2BD14a1945e8E521F60c0620B23c",
+            "fixedMarket": "0xE9a10Dd1f9C7763E40069696f81348A50608e8de",
+            "tranche": "0xebF21Bd68c6E17B664e65174Eb03c45a14CBde92",
+            "underwriter": "0x25e8C0E4Cd30a2e88747C132cfA7c588Cf16262D",
+            "wrapper": "0x39ca17C5FDA5E09b8880C94c91dc27Fe557341FE"
+        },
+        "infra": {
+            "accessManager": "0xA1CAbC9Bc23844A3ADC3c968Ff87944510097f52",
+            "vault": "0x0F52FC6880aF36Ad162fb6Bf42E157F9B82FB4F9",
+            "stablecoin": "0xC49c97bba4C3FA409433678E79F3B48A65389f96",
+            "irm": "0x7E661ec8abdbAd51D0EbDFDF522Dd2A30986aeE9",
+            "oracle": "0x8f888B1a1536dE7351184a685a1C64CcD58a7940",
+            "chainlinkAdapter": "0x0480b962165B096672785b3e531aDc4bFdA31a32",
+            "registry": "0x803a2962f0DBF2Fa1378D98653591526462E46d1",
+            "factory": "0x9124d37A0d34E12680B0d1e59B6568dC2Db916fc",
+            "floatingMarketBeacon": "0x0292ceb16C305303355Ca1A43620bAC06Ee7bFDD",
+            "fixedMarketBeacon": "0x8a118F58432A4071DC7F1eB4FD360C78319e0329",
+            "trancheBeacon": "0xA4AaDc7f7b143A334D214DB3Ae7481ad48dd51B9",
+            "underwriterBeacon": "0x23d6Cc57d9321B9B61f8529C0d8B6dE8Dd812BC6",
+            "wrapper": "0x16d91B2A42F992a589DA587d9CB625070e8fD5CC"
+        }
     }
 }

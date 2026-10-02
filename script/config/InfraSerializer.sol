@@ -20,6 +20,14 @@ abstract contract InfraSerializer {
     /// @param implems The implementation addresses
     /// @param infra The deployed infrastructure addresses
     function _saveInfra(ImplementationsConfig memory implems, InfraConfig memory infra) internal {
+        _saveInfra(implems, infra, _readDeployer());
+    }
+
+    /// @dev Persist implementations and infra under `deployer`. Leaves token config as it is.
+    /// @param implems The implementation addresses
+    /// @param infra The deployed infrastructure addresses
+    /// @param deployer The CreateX sender recorded for this chain
+    function _saveInfra(ImplementationsConfig memory implems, InfraConfig memory infra, address deployer) internal {
         string memory json = VM.readFile(_infraPath());
         string memory prefix = _chainPrefix();
 
@@ -51,7 +59,7 @@ abstract contract InfraSerializer {
         infraJson = infraJson.serialize("wrapper", infra.wrapper);
 
         string memory chainJson = "chain";
-        chainJson.serialize("deployer", json.readAddress(string.concat(prefix, "deployer")));
+        chainJson.serialize("deployer", deployer);
         chainJson.serialize("timelock", json.readAddress(string.concat(prefix, "timelock")));
         chainJson.serialize("multisig", json.readAddress(string.concat(prefix, "multisig")));
         chainJson.serialize("stablecoinUnderlying", json.readAddress(string.concat(prefix, "stablecoinUnderlying")));
