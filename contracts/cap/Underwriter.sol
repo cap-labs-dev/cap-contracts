@@ -288,6 +288,13 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         _report(_tranche);
     }
 
+    /// @inheritdoc IUnderwriter
+    function recoverRemainder(address recipient) external restricted returns (uint256 amount) {
+        // a live pool can still take deposits that opt in
+        if (!killed) revert RemainderStillClaimable();
+        amount = _recoverRemainder(recipient);
+    }
+
     /// @inheritdoc IERC4626
     /// @dev Caller must have the depositor role. The receiver is unrestricted.
     function deposit(uint256 _assets, address _receiver)

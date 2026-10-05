@@ -490,6 +490,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
 
         manager.setTargetFunctionRole(underwriter, _underwriterCuratorSelectors(), curatorRoleId);
         manager.setTargetFunctionRole(underwriter, _underwriterKeeperSelectors(), CapRoles.KEEPER);
+        manager.setTargetFunctionRole(underwriter, _one(IUnderwriter.recoverRemainder.selector), CapRoles.GOVERNOR);
 
         // the seven capital-moving selectors used to sit unwired until {setAllocatorRole} /
         // {setDepositorRole}. Closed roles the curator administers close that ADMIN window.
@@ -622,9 +623,10 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     function _trancheGovernorSelectors() private pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](2);
+        selectors = new bytes4[](3);
         selectors[0] = ITranche.setMaxCapital.selector;
         selectors[1] = IPremiumVesting.setVestingPeriod.selector;
+        selectors[2] = ITranche.recoverRemainder.selector;
     }
 
     function _trancheMarketSelectors() private pure returns (bytes4[] memory selectors) {

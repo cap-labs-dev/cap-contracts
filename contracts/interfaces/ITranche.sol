@@ -62,6 +62,13 @@ interface ITranche is IPremiumVesting, IERC7540AsyncRedeem {
     /// @param maxCapital The new maximum capital in USD (18 decimals)
     function setMaxCapital(uint256 maxCapital) external;
 
+    /// @notice Recover unvested premium stranded in a killed tranche
+    /// @dev Governor only. Requires {killed}, no staked supply, and no shares outside the redemption
+    /// escrow and dead shares, so nobody can opt in and earn it. Credited premium is untouched.
+    /// @param recipient The address receiving the remainder
+    /// @return amount The premium recovered, in stablecoin units (18 decimals)
+    function recoverRemainder(address recipient) external returns (uint256 amount);
+
     /// @notice Slash assets worth `value`, capped by holdings
     /// @dev Caller must be this tranche's market. Returns the floored USD value of
     /// tokens actually transferred. Empty holdings, or a request that cannot

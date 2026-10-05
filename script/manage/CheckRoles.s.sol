@@ -288,6 +288,7 @@ contract CheckRoles is Script, InfraSerializer {
                 IPremiumVesting.setVestingPeriod.selector,
                 CapRoles.GOVERNOR
             );
+            _wired(manager, "Tranche.recoverRemainder", tranche, ITranche.recoverRemainder.selector, CapRoles.GOVERNOR);
             _wired(manager, "Tranche.deposit", tranche, IERC4626.deposit.selector, depositor);
             _wired(manager, "Tranche.mint", tranche, IERC4626.mint.selector, depositor);
             console.log("  depositor role", depositor, "admin", owner);
@@ -303,6 +304,13 @@ contract CheckRoles is Script, InfraSerializer {
             );
             _wired(
                 manager, "Underwriter.setAllocatorRole", underwriter, IUnderwriter.setAllocatorRole.selector, curator
+            );
+            _wired(
+                manager,
+                "Underwriter.recoverRemainder",
+                underwriter,
+                IUnderwriter.recoverRemainder.selector,
+                CapRoles.GOVERNOR
             );
             _notAdmin(manager, "Underwriter.allocate", underwriter, IUnderwriter.allocate.selector);
             _notAdmin(manager, "Underwriter.deposit", underwriter, IERC4626.deposit.selector);

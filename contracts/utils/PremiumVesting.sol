@@ -159,6 +159,25 @@ abstract contract PremiumVesting is IPremiumVesting, AccessManagedUpgradeable, E
         emit Claimed(msg.sender, recipient, premium);
     }
 
+    /// @dev Send a remainder nobody can earn again to `recipient`. The caller confirms retirement,
+    /// which closes entry; this confirms nothing is staked and every share sits in the redemption
+    /// escrow or with the dead-share holder, so no holder is left to opt in and restart vesting.
+    /// Internal only, so a contract that never retires compiles none of it.
+    /// @param recipient The address receiving the remainder
+    /// @return amount The premium recovered, in stablecoin units (18 decimals)
+    function _recoverRemainder(address recipient) internal returns (uint256 amount) {
+        PremiumVestingStorage storage $ = _getPremiumVestingStorage();
+        if ($.staked != 0 || totalSupply() != balanceOf(address(this)) + balanceOf(DeadShares.HOLDER)) {
+            revert RemainderStillClaimable();
+        }
+        amount = $.remainder;
+        uint256 available = _spendablePremium();
+        if (amount > available) amount = available;
+        $.remainder -= amount;
+        IERC20($.stablecoin).safeTransfer(recipient, amount);
+        emit RecoverRemainder(recipient, amount);
+    }
+
     /// @dev Premium token this contract may pay out. Default is the raw balance; cUSD subtracts
     /// the redemption queue so escrowed shares are not paid as yield.
     /// @return available Spendable premium-token units
