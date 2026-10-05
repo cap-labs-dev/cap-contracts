@@ -200,18 +200,20 @@ interface IStablecoin {
     /// @return unlocked The shares not reserved for outstanding borrows or written off, in cUSD share units (18 decimals)
     function unlockedSupply() external view returns (uint256 unlocked);
 
-    /// @notice Get the utilization rate of credit-backed supply
+    /// @notice Get the utilization rate: credit-backed supply plus bad debt over total supply
+    /// @dev Bad debt counts as utilized, matching {unlockedSupply}, so a credit write-off leaves
+    /// utilization unchanged and a reserve loss raises it.
     /// @return rate The utilization rate in ray decimals
     function utilizationRate() external view returns (uint256 rate);
 
     /// @notice Get the utilization after a credit-backed mint of `amount`
-    /// @dev Both supplies rise by `amount`.
+    /// @dev Both supplies rise by `amount`. Bad debt counts as utilized, as in {utilizationRate}.
     /// @param amount The credit-backed supply about to be minted, in cUSD share units (18 decimals)
     /// @return rate The projected utilization rate in ray decimals
     function utilizationRateAfterMint(uint256 amount) external view returns (uint256 rate);
 
-    /// @notice Get the credit-backed and total supply, read together
-    /// @return credit The credit-backed supply, in cUSD share units (18 decimals)
+    /// @notice Get the unavailable and total supply, read together
+    /// @return credit The credit-backed supply plus bad debt, in cUSD share units (18 decimals)
     /// @return supply The total supply, in cUSD share units (18 decimals)
     function supplies() external view returns (uint256 credit, uint256 supply);
 }

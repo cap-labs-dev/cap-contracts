@@ -140,22 +140,26 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
 
     /// @inheritdoc IStablecoin
     function utilizationRate() public view returns (uint256 rate) {
-        rate = _utilizationRate(creditBackedSupply, totalSupply());
+        (uint256 credit, uint256 supply) = supplies();
+        rate = _utilizationRate(credit, supply);
     }
 
     /// @inheritdoc IStablecoin
     function utilizationRateAfterMint(uint256 _amount) public view returns (uint256 rate) {
-        rate = _utilizationRate(creditBackedSupply + _amount, totalSupply() + _amount);
+        (uint256 credit, uint256 supply) = supplies();
+        rate = _utilizationRate(credit + _amount, supply + _amount);
     }
 
     /// @inheritdoc IStablecoin
     function supplies() public view returns (uint256 credit, uint256 supply) {
-        credit = creditBackedSupply;
+        // bad debt is neither redeemable nor earning, so it is as unavailable as lent-out credit,
+        // matching {unlockedSupply}
+        credit = creditBackedSupply + badDebt;
         supply = totalSupply();
     }
 
-    /// @dev Calculates the utilization rate between the credit-backed supply and the total supply.
-    /// @param _credit The credit-backed supply
+    /// @dev Calculates the utilization rate between the unavailable supply and the total supply.
+    /// @param _credit The credit-backed supply plus bad debt
     /// @param _supply The total supply
     /// @return rate The utilization rate in ray decimals
     function _utilizationRate(uint256 _credit, uint256 _supply) internal pure returns (uint256 rate) {
@@ -171,6 +175,8 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         uint256 supply = totalSupply();
         uint256 credit = creditBackedSupply;
         if (credit > supply || badDebt > supply - credit) revert BadDebtExceedsSupply();
+        // a reserve loss raises utilization, so checkpoint the rate as a credit write-off does
+        _updateLiquidityRate();
         emit BadDebtRecognizedInReserve(_amount);
     }
 

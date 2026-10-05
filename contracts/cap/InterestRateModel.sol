@@ -289,7 +289,8 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     function averageUtilizationAfterMint(uint256 mintAmount) public view returns (uint256 rate) {
         (uint256 credit, uint256 supply) = averageSupplies();
         // Credit already minted but not yet absorbed into the average (a same-block borrow, or
-        // the residual of a recent one) is added to both sides. Reserve-only moves do not appear
+        // the residual of a recent one) is added to both sides. The stablecoin counts bad debt as
+        // credit, so a freshly recognized reserve loss is priced in the same way. Reserve-only moves do not appear
         // in the credit gap, so a flash deposit still cannot suppress the price.
         (uint256 liveCredit,) = IStablecoin(stablecoin).supplies();
         if (liveCredit > credit) {

@@ -6,6 +6,7 @@ import { IERC7540AsyncRedeem } from "../../../contracts/interfaces/IERC7540Async
 import { IPremiumVesting } from "../../../contracts/interfaces/IPremiumVesting.sol";
 import { IStablecoin } from "../../../contracts/interfaces/IStablecoin.sol";
 import { CapRoles } from "../../../contracts/utils/CapRoles.sol";
+import { WadRayMath } from "../../../contracts/utils/WadRayMath.sol";
 import { BaseTest } from "../../shared/BaseTest.sol";
 import { MockAeraVault } from "../../shared/mocks/MockAeraVault.sol";
 import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
@@ -272,7 +273,26 @@ contract StablecoinTest is BaseTest {
         assertEq(scoin.totalAssets(), 120e18);
         assertLt(scoin.convertToAssets(120e18), 120e18, "the exit quote is the discounted one");
         assertEq(scoin.creditBackedSupply(), 50e18, "reserve loss does not write off borrower credit");
-        assertEq(irm.updateCalls(), rateUpdates, "reserve loss does not change utilization");
+        assertEq(scoin.utilizationRate(), WadRayMath.rayDiv(80e18, 150e18), "the lost reserve counts as utilized");
+        assertEq(irm.updateCalls(), rateUpdates + 1, "so the rate is checkpointed");
+    }
+
+    /// @dev A write-off moves credit into bad debt. Neither is redeemable, so utilization holds,
+    /// matching {unlockedSupply}, rather than falling and cutting holders' rate after a loss.
+    function test_recognizeBadDebtInCredit_leavesUtilizationUnchanged() public {
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+        scoin.mintCreditBacked(bob, 50e18);
+        uint256 utilization = scoin.utilizationRate();
+        uint256 unlocked = scoin.unlockedSupply();
+
+        scoin.recognizeBadDebtInCredit(20e18);
+
+        assertEq(scoin.utilizationRate(), utilization);
+        assertEq(scoin.unlockedSupply(), unlocked);
+        (uint256 credit, uint256 supply) = scoin.supplies();
+        assertEq(credit, 50e18, "credit-backed supply plus bad debt");
+        assertEq(supply, 150e18);
     }
 
     function test_recognizeBadDebtInCredit_namesTheMarket() public {
