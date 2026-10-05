@@ -243,6 +243,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     function maxRedeem(address _controller)
         public
         view
+        virtual
         override(ERC4626Upgradeable, IERC4626)
         returns (uint256 maxShares)
     {
@@ -291,7 +292,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     }
 
     /// @inheritdoc IERC7540AsyncRedeem
-    function maxInstantRedeem(address _owner) public view returns (uint256 maxShares) {
+    function maxInstantRedeem(address _owner) public view virtual returns (uint256 maxShares) {
         uint256 instantUnlocked = instantUnlockedSupply();
         uint256 balance = balanceOf(_owner);
         maxShares = balance > instantUnlocked ? instantUnlocked : balance;

@@ -11,6 +11,7 @@ import { MockAeraVault } from "../../shared/mocks/MockAeraVault.sol";
 import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
 import { MockIRM } from "../../shared/mocks/MockIRM.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { ERC4626Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -944,8 +945,9 @@ contract StablecoinTest is BaseTest {
         vm.prank(guardian);
         scoin.pause();
 
+        // the zeroed limit trips before the mint does
         vm.prank(alice);
-        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        vm.expectRevert(abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxDeposit.selector, alice, 1e18, 0));
         scoin.deposit(1e18, alice);
 
         vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
@@ -958,8 +960,53 @@ contract StablecoinTest is BaseTest {
         scoin.burnCreditBacked(bob, 1e18);
 
         vm.prank(alice);
-        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        vm.expectRevert(abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxRedeem.selector, alice, 1e18, 0));
         scoin.instantRedeem(1e18, alice, alice);
+    }
+
+    /// @dev ERC-4626 limits must read zero while the action they bound would revert.
+    function test_pause_zeroesDepositAndExitLimits() public {
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+        vm.prank(alice);
+        uint256 id = scoin.requestRedeem(40e18, alice, alice);
+
+        uint256 claimable = scoin.claimableRedeemRequest(id, alice);
+        uint256 maxRedeem = scoin.maxRedeem(alice);
+        uint256 maxWithdraw = scoin.maxWithdraw(alice);
+        uint256 maxInstantRedeem = scoin.maxInstantRedeem(alice);
+        uint256 maxInstantWithdraw = scoin.maxInstantWithdraw(alice);
+        assertEq(claimable, 40e18, "the request is claimable before the pause");
+        assertEq(maxRedeem, 40e18);
+        assertGt(maxWithdraw, 0);
+        assertGt(maxInstantRedeem, 0);
+        assertGt(maxInstantWithdraw, 0);
+
+        vm.prank(guardian);
+        scoin.pause();
+
+        assertEq(scoin.maxDeposit(alice), 0, "deposits mint");
+        assertEq(scoin.maxMint(alice), 0, "and so does mint");
+        assertEq(scoin.maxRedeem(alice), 0, "claims burn");
+        assertEq(scoin.maxWithdraw(alice), 0);
+        assertEq(scoin.maxInstantRedeem(alice), 0, "instant exits burn");
+        assertEq(scoin.maxInstantWithdraw(alice), 0);
+        assertEq(scoin.claimableRedeemRequest(id, alice), claimable, "request state is not rewritten");
+        assertEq(scoin.pendingRedeemRequest(id, alice), 0);
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxRedeem.selector, alice, 40e18, 0));
+        scoin.redeem(40e18, alice, alice);
+
+        vm.prank(guardian);
+        scoin.unpause();
+
+        assertEq(scoin.maxDeposit(alice), type(uint256).max);
+        assertEq(scoin.maxMint(alice), type(uint256).max);
+        assertEq(scoin.maxRedeem(alice), maxRedeem, "limits return on unpause");
+        assertEq(scoin.maxWithdraw(alice), maxWithdraw);
+        assertEq(scoin.maxInstantRedeem(alice), maxInstantRedeem);
+        assertEq(scoin.maxInstantWithdraw(alice), maxInstantWithdraw);
     }
 
     function test_pause_allowsTransfers() public {
