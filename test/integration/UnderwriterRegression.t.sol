@@ -278,6 +278,24 @@ contract UnderwriterRegressionTest is CapDeployer {
         assertFalse(pool.killed());
     }
 
+    /// @dev An unmarked slash leaves the cached value healthy while the live value deposits are
+    /// priced at is already below 1% of par. Entry must close on the live value.
+    function test_liveValueBelowRetirementClosesDepositsBeforeAMark() public {
+        tranche = Tranche(market.tranches()[1].tranche);
+        pool.addTranche(address(tranche));
+        _admitDepositor(address(tranche), address(pool));
+        _allocateAll(1_000e18);
+
+        uint256 remaining = Math.ceilDiv(tranche.totalSupply(), 100);
+        _slash(tranche.totalAssets() - remaining);
+        assertFalse(tranche.killed());
+        assertLt(tranche.convertToAssets(tranche.balanceOf(address(pool))), Math.ceilDiv(pool.totalSupply(), 100));
+        assertGe(pool.totalAssets(), Math.ceilDiv(pool.totalSupply(), 100), "the cached mark is still healthy");
+
+        _assertDepositsClosed();
+        assertFalse(pool.killed(), "closing entry does not latch retirement before a mark");
+    }
+
     function _assertDepositsClosed() internal {
         assertEq(pool.maxDeposit(entrant), 0);
         assertEq(pool.maxMint(entrant), 0);
