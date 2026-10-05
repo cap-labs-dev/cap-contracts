@@ -168,6 +168,17 @@ interface IBaseMarket {
     /// @param roleId The borrower role id
     function setBorrowerRole(uint64 roleId) external;
 
+    /// @notice Add a junior tranche to this market and reweight the waterfall
+    /// @dev Market owner only, so AccessManager enforces the owner's execution delay. Forwards to
+    /// {IRegistry-createTranche}. `weights` covers the whole waterfall, including the new junior.
+    /// @param asset The asset for the new tranche
+    /// @param weights The resulting waterfall weights in ray decimals, last entry is the new tranche
+    /// @param vestingPeriod The initial premium vesting time constant in seconds, from 1 through 1e27
+    /// @return tranche The deployed tranche
+    function createTranche(address asset, uint256[] calldata weights, uint256 vestingPeriod)
+        external
+        returns (address tranche);
+
     /// @notice Set the tranches and their weights
     /// @dev Restricted to the registry; market owners may only change weights.
     /// At most ten tranches may be configured, including empty, killed and zero-weight tranches.

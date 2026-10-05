@@ -66,6 +66,16 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @inheritdoc IBaseMarket
+    /// @dev Not `nonReentrant`: the registry calls back into {setTranches}, which is.
+    function createTranche(address asset, uint256[] calldata weights, uint256 vestingPeriod)
+        external
+        restricted
+        returns (address tranche)
+    {
+        tranche = IRegistry(_getBaseMarketStorage().registry).createTranche(asset, weights, vestingPeriod);
+    }
+
+    /// @inheritdoc IBaseMarket
     function setLoanToValue(uint256 _loanToValue) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         if (_loanToValue + $.buffer > $.liquidationThreshold) revert InvalidLoanToValue();
