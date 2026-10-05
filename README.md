@@ -121,6 +121,7 @@ A few protocol-specific notes:
 - Tranche and underwriter deposits pull **Vault balances**. Approve the ERC20 to the Vault, call `Vault.deposit`, then `setOperator` before depositing. Withdrawals return Vault balances.
 - Market repayment burns the caller's cUSD and does not need an ERC20 approval. Pass `cast max-uint` to clear remaining premium debt.
 - Fixed-market `borrow` and `borrowMore` take a `maxPremium` argument in 18-decimal cUSD units, covering the combined liquidity and underwriting premium for that draw. Execution reverts above the cap; `type(uint256).max` disables it. Extensions use their existing pricing without this cap. These borrowing signatures change the function selectors: upgrades of existing fixed markets must also update the Registry implementation and reapply each market's borrower role through `setBorrowerRole` to configure the new selectors.
+- `availableCredit()` is headroom for total debt. On a fixed market the full-term premium is charged as debt at borrow, so size a draw with `maxPrincipal(term)`, or pass `type(uint256).max` as the principal to borrow the maximum.
 - Queue an exit with `requestRedeem`, then `redeem` the claimable amount. Instant exits stay within `maxInstantRedeem`. Async `previewRedeem` and `previewWithdraw` are unsupported.
 - Call `optIn` and `claim` on cUSD, tranche, or underwriter shares. The wrapper opts in for stcUSD holders.
 

@@ -291,6 +291,9 @@ interface IBaseMarket {
     function totalCapital() external view returns (uint256 capital);
 
     /// @notice Get the available credit
+    /// @dev Headroom for total debt: the credit limit less outstanding debt. On a fixed market the
+    /// full-term premium is charged as debt at borrow, so a draw must leave room for it; size fixed
+    /// borrows with {IFixedMarket-maxPrincipal}, or pass `type(uint256).max` to {IFixedMarket-borrow}.
     /// @return credit The available credit in USD (18 decimals)
     function availableCredit() external view returns (uint256 credit);
 

@@ -151,7 +151,7 @@ contract MarketLimitsRegressionTest is CapDeployer {
         _setPrice(address(collateral), 0.1e18);
         assertGt(fixedMarket.writeOff(id), 0);
         assertEq(fixedMarket.availableCredit(), 0);
-        assertEq(fixedMarket.availableCredit(30 days), 0);
+        assertEq(fixedMarket.maxPrincipal(30 days), 0);
     }
 
     function test_floatingLiquidationValuesEachTrancheOnce() public {
