@@ -284,12 +284,12 @@ contract StablecoinTest is BaseTest {
         scoin.deposit(100e18, alice);
         scoin.mintCreditBacked(bob, 50e18);
         uint256 utilization = scoin.utilizationRate();
-        uint256 unlocked = scoin.unlockedSupply();
+        uint256 drawable = scoin.convertToAssets(scoin.unlockedSupply());
 
         scoin.recognizeBadDebtInCredit(20e18);
 
         assertEq(scoin.utilizationRate(), utilization);
-        assertEq(scoin.unlockedSupply(), unlocked);
+        assertEq(scoin.convertToAssets(scoin.unlockedSupply()), drawable, "the same reserve can be drawn");
         (uint256 credit, uint256 supply) = scoin.supplies();
         assertEq(credit, 50e18, "credit-backed supply plus bad debt");
         assertEq(supply, 150e18);
@@ -942,11 +942,55 @@ contract StablecoinTest is BaseTest {
 
         scoin.recognizeBadDebtInCredit(100e18);
 
-        // the write off moves 100e18 out of creditBackedSupply and into badDebt, and the gate
-        // excludes both, so the redeemable amount is unchanged rather than inflated by the loss
+        // the write off moves 100e18 out of creditBackedSupply and into badDebt. Those shares are
+        // now reserve-backed at a discount, so more of them may exit, but together they draw only
+        // the reserve that is there
         uint256 unlocked = scoin.unlockedSupply();
-        assertEq(unlocked, 1_000e18, "the write off does not unlock anything new");
-        assertLe(scoin.convertToAssets(unlocked), asset.balanceOf(address(scoin)), "gate stays solvent");
+        assertEq(unlocked, 1_100e18, "every reserve-backed share may exit");
+        assertEq(scoin.convertToAssets(unlocked), asset.balanceOf(address(scoin)), "and draws exactly the reserve");
+    }
+
+    /// @dev The auditor's shortfall: 1,000 supply, 850 performing credit, 50 written off and 100
+    /// in reserve. All 150 reserve-backed shares may exit, so a queued request for 100 of them,
+    /// worth about 66.67, leaves the rest of the reserve to other holders.
+    function _shortfallWithRedeemedCredit() internal {
+        vm.prank(alice);
+        scoin.deposit(1_000e18, alice);
+        scoin.mintCreditBacked(bob, 900e18);
+        vm.prank(bob);
+        scoin.instantRedeem(900e18, bob, bob);
+        scoin.recognizeBadDebtInCredit(50e18);
+        assertEq(asset.balanceOf(address(scoin)), 100e18);
+        assertEq(scoin.unlockedSupply(), 150e18, "every reserve-backed share may exit");
+    }
+
+    function test_queuedRequestDoesNotBlockOtherExitsDuringAShortfall() public {
+        _shortfallWithRedeemedCredit();
+        vm.prank(alice);
+        scoin.requestRedeem(100e18, alice, alice);
+
+        assertEq(scoin.instantUnlockedSupply(), 50e18, "the queue holds back only its own shares");
+        uint256 cash = asset.balanceOf(address(scoin));
+        vm.prank(alice);
+        uint256 paid = scoin.instantRedeem(50e18, alice, alice);
+        assertGt(paid, 0, "another exit still gets through");
+        assertLe(paid, cash);
+    }
+
+    /// @dev A multi-request claim burns every request before its single payout retires the
+    /// loss. Re-reading the cap mid-loop would price `supply - credit` below `badDebt` and revert.
+    function test_multiRequestClaimDuringAShortfallDoesNotUnderflow() public {
+        _shortfallWithRedeemedCredit();
+        vm.startPrank(alice);
+        scoin.requestRedeem(120e18, alice, alice);
+        scoin.requestRedeem(30e18, alice, alice);
+        assertEq(scoin.maxRedeem(alice), 150e18);
+
+        uint256 paid = scoin.redeem(150e18, alice, alice);
+        vm.stopPrank();
+        assertEq(paid, 100e18, "the whole reserve, in one payout");
+        assertEq(scoin.badDebt(), 0, "the haircut retired the loss");
+        assertEq(scoin.redemptionQueue(), 0);
     }
 
     function test_pause_onlyGuardian() public {
