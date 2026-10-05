@@ -94,7 +94,12 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @inheritdoc IFixedMarket
-    function extend(uint256 id, uint256 extension) external restricted nonReentrant returns (uint256 actualExtension) {
+    function extend(uint256 id, uint256 extension, uint256 maxPremium)
+        external
+        restricted
+        nonReentrant
+        returns (uint256 actualExtension)
+    {
         _requireOpenLoan(id);
         uint256 previousExpiry = expiry[id];
         if (block.timestamp >= previousExpiry) {
@@ -110,14 +115,14 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
             else actualExtension = extension;
         }
 
-        _extend(id, actualExtension);
+        _extend(id, actualExtension, maxPremium);
         if (healthiness() < 1e27) revert Unhealthy();
         // an extension adds debt like a borrow does, so it must fit the same buffered credit limit
         if (totalDebt() > creditLimit()) revert InsufficientLiquidity();
     }
 
     /// @inheritdoc IFixedMarket
-    function extendAdmin(uint256 id, uint256 extension)
+    function extendAdmin(uint256 id, uint256 extension, uint256 maxPremium)
         external
         restricted
         nonReentrant
@@ -127,7 +132,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         uint256 previousExpiry = expiry[id];
         if (block.timestamp < previousExpiry + grace) revert StillInGracePeriod();
         actualExtension = _rollFromNow(previousExpiry, extension);
-        _extend(id, actualExtension);
+        _extend(id, actualExtension, maxPremium);
     }
 
     /// @inheritdoc IFixedMarket
@@ -357,12 +362,16 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
 
     /// @dev Grow expiry by `extension` and charge premium on outstanding debt over that term.
     /// Mints nothing; {averageUtilizationAfterMint} still folds in unsmoothed credit, so a
-    /// same-block borrow is in the rate the extension pays.
+    /// same-block borrow is in the rate the extension pays. `maxPremium` bounds what such a
+    /// borrow can add, as it does for {borrow}.
     /// @param id The id of the loan
     /// @param extension The seconds added to expiry, including any arrears
-    function _extend(uint256 id, uint256 extension) internal {
+    /// @param maxPremium The maximum combined premium accepted for this extension
+    function _extend(uint256 id, uint256 extension, uint256 maxPremium) internal {
         expiry[id] += extension;
         (uint256 liquidityPremium, uint256 underwriterPremium) = _premiumStillToMint(debt[id], extension, 0);
+        uint256 premium = liquidityPremium + underwriterPremium;
+        if (premium > maxPremium) revert PremiumExceedsLimit(premium, maxPremium);
         uint256 chargedPremium = _applyPremium(id, liquidityPremium, underwriterPremium);
         emit ExtendFixed(id, extension, chargedPremium);
     }

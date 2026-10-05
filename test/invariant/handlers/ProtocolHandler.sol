@@ -353,7 +353,7 @@ contract ProtocolHandler is CapDeployer {
         uint256 expiry = fixedMarket.expiry(id);
         uint256 term = bound(rawTerm, 1 days, 7 days);
         if (block.timestamp >= expiry + fixedMarket.grace()) {
-            fixedMarket.extendAdmin(id, term);
+            fixedMarket.extendAdmin(id, term, type(uint256).max);
         } else {
             if (block.timestamp < expiry && expiry - block.timestamp + term > 30 days) {
                 _skip();
@@ -372,7 +372,7 @@ contract ProtocolHandler is CapDeployer {
                 return;
             }
             vm.prank(defaultBorrower);
-            fixedMarket.extend(id, term);
+            fixedMarket.extend(id, term, type(uint256).max);
             assertLe(fixedMarket.totalDebt(), fixedMarket.creditLimit(), "extension within the credit limit");
         }
         _success();

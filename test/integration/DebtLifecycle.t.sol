@@ -89,13 +89,13 @@ contract DebtLifecycleTest is CapDeployer {
         // still inside the grace period, so the keeper cannot roll it yet
         vm.warp(originalExpiry + market.grace() - 1);
         vm.expectRevert(IFixedMarket.StillInGracePeriod.selector);
-        market.extendAdmin(id, 7 days);
+        market.extendAdmin(id, 7 days, type(uint256).max);
 
         // three days past expiry, one of which was grace
         vm.warp(originalExpiry + 3 days);
         uint256 debtBefore = market.debt(id);
 
-        uint256 actual = market.extendAdmin(id, 7 days);
+        uint256 actual = market.extendAdmin(id, 7 days, type(uint256).max);
 
         assertEq(actual, 10 days, "arrears of 3 days plus the 7 day term");
         assertEq(market.expiry(id), block.timestamp + 7 days, "new expiry is a full term from now");
@@ -112,7 +112,7 @@ contract DebtLifecycleTest is CapDeployer {
 
         vm.warp(market.expiry(id) + 365 days);
 
-        uint256 actual = market.extendAdmin(id, type(uint256).max);
+        uint256 actual = market.extendAdmin(id, type(uint256).max, type(uint256).max);
 
         assertEq(actual, 365 days + 30 days, "a year of arrears plus the 30 day maximum term");
         assertEq(market.expiry(id), block.timestamp + 30 days, "rolled a maximum term from now");
@@ -128,7 +128,7 @@ contract DebtLifecycleTest is CapDeployer {
         vm.warp(market.expiry(id) + market.grace() + 1);
 
         vm.expectRevert(IFixedMarket.InvalidTerm.selector);
-        market.extendAdmin(id, 31 days);
+        market.extendAdmin(id, 31 days, type(uint256).max);
     }
 
     /// `type(uint256).max` used to overflow on the expired branch of extend.
@@ -141,7 +141,7 @@ contract DebtLifecycleTest is CapDeployer {
         vm.warp(market.expiry(id) + 2 days);
 
         vm.prank(defaultBorrower);
-        uint256 actual = market.extend(id, type(uint256).max);
+        uint256 actual = market.extend(id, type(uint256).max, type(uint256).max);
 
         assertEq(actual, 2 days + 30 days, "arrears plus the maximum term");
         assertEq(market.expiry(id), block.timestamp + 30 days, "rolled a maximum term from now");
@@ -155,11 +155,11 @@ contract DebtLifecycleTest is CapDeployer {
         (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days, type(uint256).max);
 
         vm.prank(defaultBorrower);
-        assertEq(market.extend(id, type(uint256).max), 29 days, "fills the room under the maximum");
+        assertEq(market.extend(id, type(uint256).max, type(uint256).max), 29 days, "fills the room under the maximum");
 
         vm.prank(defaultBorrower);
         vm.expectRevert(IFixedMarket.InvalidTerm.selector);
-        market.extend(id, 1 days);
+        market.extend(id, 1 days, type(uint256).max);
     }
 
     // ── unrecoverable debt can be written off ────────────────────────────────
