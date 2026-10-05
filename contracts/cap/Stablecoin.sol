@@ -254,6 +254,30 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         assets = Math.ceilDiv(_shares, _scalingFactor);
     }
 
+    /// @inheritdoc IERC4626
+    /// @dev Zero while paused, since a deposit mints.
+    function maxDeposit(address) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 maxAssets) {
+        if (!paused()) maxAssets = type(uint256).max;
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev Zero while paused; see {maxDeposit}.
+    function maxMint(address) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 maxShares) {
+        if (!paused()) maxShares = type(uint256).max;
+    }
+
+    /// @inheritdoc ERC7540AsyncRedeem
+    /// @dev Zero while paused, since a claim burns. Request state is unchanged; see {claimableRedeemRequest}.
+    function maxRedeem(address _controller) public view override returns (uint256 maxShares) {
+        if (!paused()) maxShares = super.maxRedeem(_controller);
+    }
+
+    /// @inheritdoc ERC7540AsyncRedeem
+    /// @dev Zero while paused, since an instant exit burns.
+    function maxInstantRedeem(address _owner) public view override returns (uint256 maxShares) {
+        if (!paused()) maxShares = super.maxInstantRedeem(_owner);
+    }
+
     /// @inheritdoc IStablecoin
     function decimals()
         public

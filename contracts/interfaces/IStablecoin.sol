@@ -122,7 +122,8 @@ interface IStablecoin {
 
     /// @notice Pause minting and burning
     /// @dev Guardian only. Transfers still work. A panic switch while an issue is sorted out.
-    /// Reverts {Pausable-EnforcedPause} on a mint or burn while paused.
+    /// Reverts {Pausable-EnforcedPause} on a mint or burn while paused. The ERC-4626 `max*` limits
+    /// and the instant-exit limits read zero, so deposits and exits revert on those limits first.
     function pause() external;
 
     /// @notice Resume minting and burning
