@@ -126,6 +126,13 @@ Based on commit `b0a6f64a18bdb6ab97066e0eb086ae6c545ea9d8`, reviewed on 23 Septe
 - **Accepted:** Deposits auto-allocate; exits pay only from idle balances.
 - **Mitigation:** Curators can remove the default tranche or deallocate capital. Allocated or locked funds may delay exits.
 
+#### Tranche exits can raise market LTV above the configured loan-to-value
+
+- **Issue:** `lockedValue()` sizes the capital tranches must keep as `debt / (LT - buffer)`, not by `loanToValue`. When `loanToValue` is below `LT - buffer`, senior exits can raise the market's debt-to-capital ratio up to `LT - buffer` and leave `totalDebt` above `creditLimit()`.
+- **Accepted:** `loanToValue` limits new borrowing only. The exit lock follows the guardian-controlled `LT - buffer`, which keeps debt at least the buffer below the liquidation threshold.
+- **Rationale:** Locking against the market owner's `loanToValue` would let the owner lock tranche capital, including queued redemptions, by lowering it. A `loanToValue` of zero, used to stop new borrowing, would also make the lock divide by zero and block every tranche exit.
+- **Mitigation:** Debt above `creditLimit()` stops further borrowing until capital returns or debt is repaid. The guardian can raise the buffer or lower LT to hold more capital behind the debt.
+
 #### Seeding an empty tranche costs the Underwriter pool
 
 - **Issue:** An allocation into an empty tranche creates 1,000 permanent dead shares after pool issuance has been quoted, reducing pool NAV.
