@@ -139,6 +139,13 @@ Based on commit `b0a6f64a18bdb6ab97066e0eb086ae6c545ea9d8`, reviewed on 23 Septe
 - **Accepted:** The guardian can write off unrecoverable debt even if the residual becomes unliquidatable.
 - **Mitigation:** The 10-percentage-point minimum buffer prevents immediate renewed borrowing against unchanged collateral after a full floating write-off. Guardians should liquidate before writing off when the residual would become healthy; the buffer does not enforce that ordering.
 
+#### Raising the liquidation bonus can make existing debt unrecoverable
+
+- **Issue:** Every market reads the global liquidation bonus live, and recoverable debt is `capital / (1 + liquidationBonus)`. Raising the bonus lowers recoverable debt in every market at once. Where debt has grown past the credit limit through accrual, arrears, or a fall in collateral value, part of it can become unrecoverable. If `LT × (1 + liquidationBonus) > 1` (using fractional ratios), that part can still be healthy and therefore not liquidatable.
+- **Accepted:** Governance can change the bonus up to `MAX_LIQUIDATION_BONUS` at any time. The setter does not check market state.
+- **Rationale:** Debt within the credit limit stays recoverable at any allowed bonus: credit is at most `LT - buffer`, at most 90% of collateral, while at a 10% bonus recoverable debt is about 90.91% of collateral. Blocking increases while a market is distressed would also prevent raising liquidator incentives when they are most needed.
+- **Mitigation:** Before raising the bonus, governance should review markets whose debt exceeds their credit limit. An execution delay can be applied to `setLiquidationBonus` through AccessManager role configuration. A higher bonus does not write off debt; write-offs remain a separate guardian action.
+
 #### Liquidation rounding can reduce collateral payouts
 
 - **Issue:** Collateral payouts round down to token units, so a liquidator can receive less than the intended repayment-plus-bonus value.
