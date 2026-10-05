@@ -240,4 +240,44 @@ contract FixedExtendTest is CapDeployer {
         assertGt(slashed, 0);
         assertEq(market.debt(id), debtBefore - repaid);
     }
+
+    /// @dev A maximum short loan extended in the same block must not end up with more debt than
+    /// a direct borrow to the same expiry could, so the extension is held to the credit limit.
+    function test_extend_cannotBypassTheBufferedCreditLimit() public {
+        FixedMarket market = _ready();
+
+        vm.prank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, type(uint256).max, 1 days, type(uint256).max);
+        assertLe(market.totalDebt(), market.creditLimit(), "a maximum draw fits the limit");
+
+        vm.prank(defaultBorrower);
+        vm.expectRevert(IBaseMarket.InsufficientLiquidity.selector);
+        market.extend(id, type(uint256).max);
+
+        // paying down makes room for the extension premium
+        uint256 paydown = market.debt(id) / 20;
+        vm.prank(defaultBorrower);
+        market.repay(id, paydown);
+
+        vm.prank(defaultBorrower);
+        market.extend(id, 7 days);
+        assertLe(market.totalDebt(), market.creditLimit(), "the extension stays within the limit");
+    }
+
+    /// @dev The keeper's overdue roll is not held to the credit limit, so a loan at the limit can
+    /// still be rolled and charged its arrears.
+    function test_extendAdmin_rollsALoanAtTheCreditLimit() public {
+        FixedMarket market = _ready();
+
+        vm.prank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, type(uint256).max, 1 days, type(uint256).max);
+        vm.warp(market.expiry(id) + market.grace());
+
+        vm.prank(defaultBorrower);
+        vm.expectRevert(IBaseMarket.InsufficientLiquidity.selector);
+        market.extend(id, 7 days);
+
+        market.extendAdmin(id, 7 days);
+        assertGt(market.totalDebt(), market.creditLimit(), "arrears and the roll are charged regardless");
+    }
 }

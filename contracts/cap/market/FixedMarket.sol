@@ -112,6 +112,8 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
 
         _extend(id, actualExtension);
         if (healthiness() < 1e27) revert Unhealthy();
+        // an extension adds debt like a borrow does, so it must fit the same buffered credit limit
+        if (totalDebt() > creditLimit()) revert InsufficientLiquidity();
     }
 
     /// @inheritdoc IFixedMarket
