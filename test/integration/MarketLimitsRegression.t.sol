@@ -179,7 +179,7 @@ contract MarketLimitsRegressionTest is CapDeployer {
         vm.expectCall(s, abi.encodeCall(ITranche.totalCapital, ()), uint64(1));
         vm.expectCall(j, abi.encodeCall(ITranche.totalCapital, ()), uint64(1));
         vm.prank(defaultLiquidator);
-        (uint256 repaid, uint256 slashed) = fixedMarket.liquidate(id, defaultLiquidator, 100e18);
+        (uint256 repaid, uint256 slashed) = fixedMarket.liquidate(_loan(id), defaultLiquidator, 100e18);
         assertEq(repaid, 100e18);
         assertEq(slashed, 102e18);
     }

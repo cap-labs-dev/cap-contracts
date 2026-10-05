@@ -219,6 +219,65 @@ contract FixedExtendTest is CapDeployer {
         market.extend(id, 1 days);
     }
 
+    /// @dev Debt spread over nine loans. Liquidating loan by loan stops once the market crosses a
+    /// health of one; one call over all of them reaches the target health, as a single loan would.
+    function test_liquidate_acrossLoansReachesTargetHealth() public {
+        FixedMarket market = _ready();
+        uint256[] memory ids = new uint256[](9);
+        for (uint256 i; i < ids.length; ++i) {
+            vm.prank(defaultBorrower);
+            (ids[i],) = market.borrow(defaultBorrower, 500e18, 10 days, type(uint256).max);
+        }
+        _setPrice(address(collateral), 0.5e18);
+        assertLt(market.healthiness(), 1e27);
+        uint256 max = market.maxLiquidatable();
+        _mintStable(defaultLiquidator, max);
+
+        // one loan at a time, each call re-checks health and the last one lands just above one
+        uint256 snapshot = vm.snapshotState();
+        vm.startPrank(defaultLiquidator);
+        for (uint256 i; i < ids.length && market.healthiness() < 1e27; ++i) {
+            market.liquidate(_loan(ids[i]), defaultLiquidator, type(uint256).max);
+        }
+        vm.stopPrank();
+        assertLt(market.healthiness(), 1.1e27, "loan by loan stops near one");
+        vm.revertToState(snapshot);
+
+        uint256 debtBefore = market.totalDebt();
+        vm.prank(defaultLiquidator);
+        (uint256 repaid,) = market.liquidate(ids, defaultLiquidator, type(uint256).max);
+        assertEq(repaid, max, "the whole liquidatable amount in one call");
+        assertApproxEqRel(market.healthiness(), capConfig.defaultTargetHealth, 1e15, "target health reached");
+
+        uint256 owed;
+        for (uint256 i; i < ids.length; ++i) {
+            owed += market.debt(ids[i]);
+        }
+        assertEq(owed, market.totalDebt(), "loan debts still sum to the market");
+        assertEq(market.totalDebt(), debtBefore - repaid);
+    }
+
+    function test_liquidate_rejectsUnsortedOrRepeatedIds() public {
+        FixedMarket market = _ready();
+        uint256[] memory ids = new uint256[](2);
+        for (uint256 i; i < ids.length; ++i) {
+            vm.prank(defaultBorrower);
+            (ids[i],) = market.borrow(defaultBorrower, PRINCIPAL, 10 days, type(uint256).max);
+        }
+        _setPrice(address(collateral), 0.1e18);
+
+        uint256[] memory repeated = new uint256[](2);
+        (repeated[0], repeated[1]) = (ids[0], ids[0]);
+        vm.prank(defaultLiquidator);
+        vm.expectRevert(IFixedMarket.InvalidLoanIds.selector);
+        market.liquidate(repeated, defaultLiquidator, type(uint256).max);
+
+        (ids[0], ids[1]) = (ids[1], ids[0]);
+        vm.prank(defaultLiquidator);
+        vm.expectRevert(IFixedMarket.InvalidLoanIds.selector);
+        market.liquidate(ids, defaultLiquidator, type(uint256).max);
+    }
+
     function test_liquidate_unhealthyFixedLoan() public {
         FixedMarket market = _ready();
 
@@ -234,7 +293,7 @@ contract FixedExtendTest is CapDeployer {
 
         uint256 debtBefore = market.debt(id);
         vm.prank(defaultLiquidator);
-        (uint256 repaid, uint256 slashed) = market.liquidate(id, defaultLiquidator, max);
+        (uint256 repaid, uint256 slashed) = market.liquidate(_loan(id), defaultLiquidator, max);
 
         assertGt(repaid, 0);
         assertGt(slashed, 0);

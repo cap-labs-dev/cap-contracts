@@ -423,7 +423,7 @@ contract ProtocolHandler is CapDeployer {
         uint256 repaid;
         uint256 slashed;
         vm.prank(defaultLiquidator);
-        if (fixed_) (repaid, slashed) = fixedMarket.liquidate(id, defaultLiquidator, amount);
+        if (fixed_) (repaid, slashed) = fixedMarket.liquidate(_loan(id), defaultLiquidator, amount);
         else (repaid, slashed) = floating.liquidate(defaultLiquidator, amount);
         assertEq(balance - stablecoin.balanceOf(defaultLiquidator), repaid);
         assertEq(debt - market.totalDebt(), repaid);
