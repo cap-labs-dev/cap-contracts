@@ -169,7 +169,7 @@ Based on commit `b0a6f64a18bdb6ab97066e0eb086ae6c545ea9d8`, reviewed on 23 Septe
 
 #### Queued redemptions remain exposed to losses and changing liquidity
 
-- **Issue:** Queued shares earn no new premiums and remain exposed to losses. Previously claimable shares can become pending again if unlocked liquidity falls.
+- **Issue:** Queued shares earn no new premiums and remain exposed to losses. Previously claimable shares can become pending again if unlocked liquidity falls. After a request settles out of order, a fall in liquidity can leave earlier and later requests claimable against the same unlocked shares; whichever claims first is paid, so a later request can exit ahead of an earlier one, which stays exposed to losses for longer.
 - **Accepted:** Requests record shares, not a fixed payout or permanently reserved assets. Value and availability are determined at claim time; requests cannot be cancelled.
 - **Mitigation:** Rewards earned before queueing remain claimable. Instant exits avoid waiting where liquidity permits. Integrators must handle changing availability and claim reverts.
 
