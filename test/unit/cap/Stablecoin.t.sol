@@ -490,6 +490,17 @@ contract StablecoinTest is BaseTest {
         assertEq(scoin.utilizationRate(), 0);
     }
 
+    /// @dev A draw is priced as if its cash leaves the reserve: credit rises, supply does not.
+    /// With nothing in supply at all, any draw is full utilization rather than zero.
+    function test_utilizationRateAfterMint_countsTheDrawAsCreditOnly() public {
+        assertEq(scoin.utilizationRateAfterMint(1e18), 1e27, "an empty pool is fully utilized by any draw");
+        assertEq(scoin.utilizationRateAfterMint(0), 0);
+
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+        assertEq(scoin.utilizationRateAfterMint(50e18), 0.5e27, "50 against the 100 of reserve, not 50 / 150");
+    }
+
     /// Supply 120e18 against 100e18 of backing. Redeeming 50e18 leaves 70e18 of supply, which
     /// retains 70 * 120 * 100 / (120 * 100 + 70 * 20) = 62.6865... of the backing.
     function test_previewRedeem_withBadDebt_sharesAboveBadDebt() public {

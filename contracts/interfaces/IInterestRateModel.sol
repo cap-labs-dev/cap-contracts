@@ -271,8 +271,9 @@ interface IInterestRateModel {
     function unsmoothedCredit() external view returns (uint256 amount);
 
     /// @notice Get the utilization after a credit-backed mint, against the time-weighted supplies
-    /// @dev `mintAmount` and any already-unabsorbed credit are added in full. A same-tx reserve
-    /// move still carries no weight.
+    /// @dev `mintAmount` and any already-unabsorbed credit are added to credit in full but not to
+    /// supply, pricing the draw as if its cash leaves the reserve. Can exceed one ray; the rate
+    /// curve caps it. A same-tx reserve move still carries no weight.
     /// @param mintAmount The credit-backed supply about to be minted, in stablecoin units (18 decimals)
     /// @return rate The projected utilization rate in ray decimals
     function averageUtilizationAfterMint(uint256 mintAmount) external view returns (uint256 rate);
