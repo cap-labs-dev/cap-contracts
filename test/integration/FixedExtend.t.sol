@@ -70,7 +70,7 @@ contract FixedExtendTest is CapDeployer {
         FixedMarket market = FixedMarket(marketAddr);
 
         vm.prank(defaultBorrower);
-        vm.expectRevert(IBaseMarket.InvalidPrincipal.selector);
+        vm.expectRevert(IBaseMarket.InsufficientLiquidity.selector);
         market.borrow(defaultBorrower, type(uint256).max, 1 days, type(uint256).max);
     }
 
