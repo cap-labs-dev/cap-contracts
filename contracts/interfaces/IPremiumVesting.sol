@@ -85,7 +85,8 @@ interface IPremiumVesting {
     function remaining() external view returns (uint256 amount);
 
     /// @notice Get the instantaneous release rate, remaining / period
-    /// @dev Accrual uses the exponential weight, not this times elapsed.
+    /// @dev Accrual uses the exponential weight, not this times elapsed. Zero when nobody is earning,
+    /// matching a freeze.
     /// @return perSecond The current remainder divided by the vesting period, in stablecoin units (18 decimals)
     function premiumPerSecond() external view returns (uint256 perSecond);
 
