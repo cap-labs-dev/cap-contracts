@@ -364,8 +364,16 @@ contract ProtocolHandler is CapDeployer {
                 _skip();
                 return;
             }
+            // borrower extensions must fit the credit limit; an expired loan also pays its arrears
+            uint256 charged = block.timestamp > expiry ? term + block.timestamp - expiry : term;
+            (uint256 liquidity, uint256 underwriting) = fixedMarket.premiumForExtension(fixedMarket.debt(id), charged);
+            if (fixedMarket.totalDebt() + liquidity + underwriting > fixedMarket.creditLimit()) {
+                _skip();
+                return;
+            }
             vm.prank(defaultBorrower);
             fixedMarket.extend(id, term);
+            assertLe(fixedMarket.totalDebt(), fixedMarket.creditLimit(), "extension within the credit limit");
         }
         _success();
     }

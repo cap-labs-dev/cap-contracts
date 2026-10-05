@@ -158,6 +158,8 @@ interface IFixedMarket is IBaseMarket {
     /// @dev Live loans can grow only up to the current {maximumTermLimit}. If that limit was
     /// lowered below remaining term, there is no room and the call reverts {InvalidTerm}; the
     /// existing expiry is unchanged. Expired loans roll from now and charge arrears.
+    /// Like {borrow}, the charged premium must keep {IBaseMarket-totalDebt} within
+    /// {IBaseMarket-creditLimit}, or the call reverts {IBaseMarket-InsufficientLiquidity}.
     /// `id` must be in `[0, loanCount)` and still carry debt.
     /// @param id The id of the loan
     /// @param extension The extension of the term
