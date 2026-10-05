@@ -93,9 +93,10 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
         uint256 _targetHealth
     ) external initializer {
         __AccessManaged_init(_authority);
-        // the multiplier band has no setter, so an inverted one would leave every
+        // the multiplier band has no setter, and an unset market reads as one ray, so the band must
+        // contain one ray. That also rules out an inverted band, which would leave every
         // {IBaseMarket-setMarketMultiplier} permanently unsatisfiable with no way to repair it
-        if (_minimumMarketMultiplier > _maximumMarketMultiplier) revert InvalidMultiplier();
+        if (_minimumMarketMultiplier > 1e27 || _maximumMarketMultiplier < 1e27) revert InvalidMultiplier();
         stablecoin = _stablecoin;
         minimumMarketMultiplier = _minimumMarketMultiplier;
         maximumMarketMultiplier = _maximumMarketMultiplier;
