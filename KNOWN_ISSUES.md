@@ -65,7 +65,7 @@ Based on commit `b0a6f64a18bdb6ab97066e0eb086ae6c545ea9d8`, reviewed on 23 Septe
 
 #### Floating premium allocation depends on checkpoint frequency
 
-- **Issue:** More frequent realization can increase underwriting's share of the same debt growth at liquidity providers' expense.
+- **Issue:** More frequent realization can increase underwriting's share of the same debt growth at liquidity providers' expense. Debt grows by the product of the two indexes, and within each realization interval the cross term from the rates compounding on each other is allocated to liquidity; shorter intervals shrink that term.
 - **Accepted:** Premium allocation depends on realization frequency. Underwriting rewards are distributed to eligible tranche holders by weight; the caller receives no separate reward.
 - **Mitigation:** A keeper is intended to realize premiums regularly. That cadence is not enforced. Total premium still reconciles to reported debt growth.
 
