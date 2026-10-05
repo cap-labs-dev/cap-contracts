@@ -117,8 +117,9 @@ Based on commit `b0a6f64a18bdb6ab97066e0eb086ae6c545ea9d8`, reviewed on 23 Septe
 
 #### Donations affect tranche and Underwriter valuations
 
-- **Issue:** Donated collateral affects tranche share prices and the Underwriter marks derived from them. Positive-share deposits remain subject to rounding.
+- **Issue:** Donated collateral affects tranche share prices and the Underwriter marks derived from them. Positive-share deposits remain subject to rounding. The tranche kill threshold is 1% of `totalSupply()` in assets, which is 1% of par only at one asset per share, so a donation that raises the share price lowers the effective threshold. A heavily slashed tranche can then stay live and keep taking its full premium weight, which would otherwise pass to other tranches.
 - **Accepted:** No additional donation-specific protection is adopted. Both layers retain 1,000 dead shares, and zero-share deposits revert. These defenses do not establish that every donation strategy is unprofitable.
+- **Rationale:** Keeping a tranche alive this way requires donating assets that remain fully exposed to slashing; it does not avoid losses. A live tranche's premium weight does not depend on its remaining capital in any case.
 
 #### Default allocation can reduce Underwriter exit liquidity
 
