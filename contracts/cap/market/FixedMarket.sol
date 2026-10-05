@@ -193,8 +193,8 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @inheritdoc IFixedMarket
-    function availableCredit(uint256 term) public view returns (uint256 credit) {
-        credit = _principalFor(availableCredit(), _quoteTerm(term));
+    function maxPrincipal(uint256 term) public view returns (uint256 principal) {
+        principal = _principalFor(availableCredit(), _quoteTerm(term));
     }
 
     /// @dev A loan created by {borrow}, including fully repaid ones.

@@ -1229,7 +1229,7 @@ contract AccountingIntegrityTest is CapDeployer {
         assertGe(market.healthiness(), 1e27, "and must never arrive liquidatable");
     }
 
-    /// @dev `availableCredit(term)` used to price a catch-up at the rate a *full-limit* draw
+    /// @dev `maxPrincipal(term)` used to price a catch-up at the rate a *full-limit* draw
     /// would produce. When that hypothetical catch-up exceeded the remaining limit it returned
     /// zero, and `_borrow` then rejected every positive principal — including a 1-token loan
     /// whose own quote still fitted. The duration of that lock depended on unsmoothed credit
@@ -1250,7 +1250,7 @@ contract AccountingIntegrityTest is CapDeployer {
         assertLe(cost, raw, "a 1-token loan plus its quote fits the raw limit");
         assertEq(_legacyTermCredit(market, term), 0, "the full-limit catch-up used to report zero");
 
-        uint256 sized = market.availableCredit(term);
+        uint256 sized = market.maxPrincipal(term);
         assertGe(sized, 1e18, "a smaller affordable draw must still be offered");
 
         (uint256 sizedLiq, uint256 sizedUw) = market.premiumForBorrow(sized, term);
@@ -1272,7 +1272,7 @@ contract AccountingIntegrityTest is CapDeployer {
 
         uint256 term = 365 days;
         uint256 raw = market.availableCredit();
-        uint256 sized = market.availableCredit(term);
+        uint256 sized = market.maxPrincipal(term);
         assertGt(sized, 0, "something smaller than the limit is still drawable");
 
         vm.prank(defaultBorrower);
@@ -1310,7 +1310,7 @@ contract AccountingIntegrityTest is CapDeployer {
         uint256 limit = market.availableCredit();
         if (limit == 0) return;
 
-        uint256 sized = market.availableCredit(term);
+        uint256 sized = market.maxPrincipal(term);
         if (sized == 0) {
             (uint256 liq, uint256 uw) = market.premiumForBorrow(1, term);
             assertGt(1 + liq + uw, limit, "zero means even a wei overshoots");
@@ -1333,7 +1333,7 @@ contract AccountingIntegrityTest is CapDeployer {
     function testFuzz_fixedBorrowPaysTheQuotedPremium(uint96 rawPrincipal, uint32 rawTerm, uint8 rawSlope) public {
         FixedMarket market = _fixedMarketOnSlope(bound(rawSlope, 0, 20) * 0.1e27);
         uint256 term = bound(rawTerm, capConfig.defaultMinimumTermLimit, capConfig.defaultMaximumTermLimit);
-        uint256 sized = market.availableCredit(term);
+        uint256 sized = market.maxPrincipal(term);
         if (sized == 0) return;
 
         uint256 principal = bound(rawPrincipal, 1, sized);
@@ -1383,7 +1383,7 @@ contract AccountingIntegrityTest is CapDeployer {
         (uint256 overLiq, uint256 overUw) = market.premiumForBorrow(principal, market.maximumTermLimit() + 1);
         assertEq(asFlagLiq + asFlagUw, atMaxLiq + atMaxUw, "max uint is the maximum term");
         assertEq(overLiq + overUw, atMaxLiq + atMaxUw, "above the maximum quotes at the maximum");
-        assertEq(market.availableCredit(type(uint256).max), market.availableCredit(market.maximumTermLimit()));
+        assertEq(market.maxPrincipal(type(uint256).max), market.maxPrincipal(market.maximumTermLimit()));
     }
 
     /// @dev A fixed market whose liquidity rate genuinely responds to utilization, on the tightest
@@ -1440,7 +1440,7 @@ contract AccountingIntegrityTest is CapDeployer {
         prior.market.borrow(defaultBorrower, amount);
     }
 
-    /// @dev The previous `availableCredit(term)`: invert at the full-limit post-mint rate, and
+    /// @dev The previous `maxPrincipal(term)`: invert at the full-limit post-mint rate, and
     /// return zero when the catch-up on already-unsmoothed credit exceeds the remaining limit.
     function _legacyTermCredit(FixedMarket market, uint256 term) internal view returns (uint256 credit) {
         uint256 limit = market.availableCredit();

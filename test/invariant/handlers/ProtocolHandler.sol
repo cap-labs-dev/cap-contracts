@@ -289,7 +289,7 @@ contract ProtocolHandler is CapDeployer {
         uint256 debt = market.totalDebt();
         uint256 room = limit > debt ? limit - debt : 0;
         assertEq(market.availableCredit(), room);
-        // Conservative debt headroom, not the availableCredit(term) solver under test.
+        // Conservative debt headroom, not the maxPrincipal(term) solver under test.
         uint256 amount = _amount(raw, room / 4);
         if (amount < 1e9 || market.healthiness() < RAY) {
             _skip();
