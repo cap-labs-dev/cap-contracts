@@ -582,12 +582,11 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     function _marketOwnerSelectors() private pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](5);
+        selectors = new bytes4[](4);
         selectors[0] = IBaseMarket.setTrancheWeights.selector;
         selectors[1] = IBaseMarket.setLoanToValue.selector;
-        selectors[2] = IBaseMarket.setMarketMultiplier.selector;
-        selectors[3] = IBaseMarket.setUnderwriterRate.selector;
-        selectors[4] = IBaseMarket.setBorrowerRole.selector;
+        selectors[2] = IBaseMarket.setUnderwriterRate.selector;
+        selectors[3] = IBaseMarket.setBorrowerRole.selector;
     }
 
     function _marketRegistrySelectors() private pure returns (bytes4[] memory selectors) {
@@ -595,9 +594,10 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     function _marketGovernorSelectors() private pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](2);
+        selectors = new bytes4[](3);
         selectors[0] = IBaseMarket.setTargetHealth.selector;
         selectors[1] = IFixedMarket.setTermLimits.selector;
+        selectors[2] = IBaseMarket.setMarketMultiplier.selector;
     }
 
     function _marketGuardianSelectors() private pure returns (bytes4[] memory selectors) {

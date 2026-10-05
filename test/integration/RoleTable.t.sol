@@ -72,7 +72,6 @@ contract RoleTableTest is CapDeployer {
         // the market owner tunes its own market's risk, pricing and tranche weights
         _expectRole(market, IBaseMarket.setLoanToValue.selector, ownerRole, "setLoanToValue");
         _expectRole(market, IBaseMarket.setTrancheWeights.selector, ownerRole, "setTrancheWeights");
-        _expectRole(market, IBaseMarket.setMarketMultiplier.selector, ownerRole, "setMarketMultiplier");
         _expectRole(market, IBaseMarket.setUnderwriterRate.selector, ownerRole, "setUnderwriterRate");
         _expectRole(market, IBaseMarket.setTranches.selector, CapRoles.REGISTRY, "setTranches");
 
@@ -81,6 +80,7 @@ contract RoleTableTest is CapDeployer {
 
         // governance owns the parameters that bound every market
         _expectRole(market, IBaseMarket.setTargetHealth.selector, CapRoles.GOVERNOR, "setTargetHealth");
+        _expectRole(market, IBaseMarket.setMarketMultiplier.selector, CapRoles.GOVERNOR, "setMarketMultiplier");
 
         // the guardian tightens risk and recognises losses
         _expectRole(market, IBaseMarket.setBuffer.selector, CapRoles.GUARDIAN, "setBuffer");
