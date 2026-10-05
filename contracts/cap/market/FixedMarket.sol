@@ -225,9 +225,11 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         internal
         returns (uint256 actualPrincipal, uint256 chargedPremium)
     {
+        if (principal == 0) revert InvalidPrincipal();
         uint256 limit = availableCredit();
         actualPrincipal = principal == type(uint256).max ? _principalFor(limit, term) : principal;
-        if (actualPrincipal == 0) revert InvalidPrincipal();
+        // no credit, or too little to cover even the smallest draw's premium
+        if (actualPrincipal == 0) revert InsufficientLiquidity();
 
         (uint256 liquidityPremium, uint256 underwriterPremium) =
             _premiumStillToMint(actualPrincipal, term, actualPrincipal);
