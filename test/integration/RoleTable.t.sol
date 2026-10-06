@@ -309,6 +309,7 @@ contract RoleTableTest is CapDeployer {
         // premium is pushed in by whichever market charged it, so this may not be open
         _expectRole(tranche, ITranche.fund.selector, CapRoles.MARKET, "fund");
         _expectRole(tranche, ITranche.setMaxCapital.selector, CapRoles.GOVERNOR, "setMaxCapital");
+        _expectRole(tranche, ITranche.recoverRemainder.selector, CapRoles.GOVERNOR, "recoverRemainder");
 
         // admission is a row like any other, same as on the underwriter: the entry points are
         // gated to a role of their own, and the market owner administers that role's membership
@@ -419,6 +420,7 @@ contract RoleTableTest is CapDeployer {
         _expectRole(underwriter, IUnderwriter.setDefaultTranche.selector, allocatorRole, "setDefaultTranche");
 
         _expectRole(underwriter, IUnderwriter.report.selector, CapRoles.KEEPER, "report");
+        _expectRole(underwriter, IUnderwriter.recoverRemainder.selector, CapRoles.GOVERNOR, "recoverRemainder");
 
         // admission is a row like any other: the entry points are gated to a role of their own,
         // and the curator administers that role's membership rather than a list on the vault

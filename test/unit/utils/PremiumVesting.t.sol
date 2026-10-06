@@ -82,6 +82,10 @@ contract PremiumVestingHarness is PremiumVesting {
     function pending(address account) external view returns (uint256) {
         return pendingPremium(account);
     }
+
+    function recoverRemainder(address recipient) external returns (uint256) {
+        return _recoverRemainder(recipient);
+    }
 }
 
 /// @notice Direct tests for the vesting schedule {Tranche} and {Underwriter} both inherit.
@@ -849,5 +853,46 @@ contract PremiumVestingOptInTest is Test {
         assertApproxEqRel(toAlice, PREMIUM * 3 / 4, 1e12);
         assertApproxEqRel(toBob, PREMIUM / 4, 1e12);
         assertLe(toAlice + toBob, PREMIUM);
+    }
+
+    /// @dev Once every earning balance is queued, nobody can opt in again, so the frozen remainder
+    /// can be recovered. Premium already credited to a holder stays theirs.
+    function test_recoverRemainder_sweepsOnlyTheUnearnableRemainder() public {
+        _stake(alice, 100e18);
+        _fund(PREMIUM);
+        vm.warp(block.timestamp + PERIOD);
+
+        vm.prank(alice);
+        v.requestRedeem(100e18, alice, alice);
+        assertEq(v.stakedSupply(), 0, "queued shares do not earn");
+        uint256 owed = v.claimable(alice);
+        uint256 frozen = v.remaining();
+        assertGt(owed, 0);
+        assertGt(frozen, 0);
+
+        address treasury = makeAddr("treasury");
+        vm.expectEmit(address(v));
+        emit IPremiumVesting.RecoverRemainder(treasury, frozen);
+        assertEq(v.recoverRemainder(treasury), frozen);
+        assertEq(premium.balanceOf(treasury), frozen);
+        assertEq(v.remaining(), 0);
+
+        vm.prank(alice);
+        assertEq(v.claim(alice), owed, "credited premium is untouched");
+    }
+
+    function test_recoverRemainder_revertsWhileAnyoneCouldStillEarn() public {
+        _stake(alice, 100e18);
+        _fund(PREMIUM);
+
+        vm.expectRevert(IPremiumVesting.RemainderStillClaimable.selector);
+        v.recoverRemainder(bob);
+
+        // out but still holding shares outside the escrow, so she could opt back in
+        vm.prank(alice);
+        v.optOut();
+        assertEq(v.stakedSupply(), 0);
+        vm.expectRevert(IPremiumVesting.RemainderStillClaimable.selector);
+        v.recoverRemainder(bob);
     }
 }

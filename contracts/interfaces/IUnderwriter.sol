@@ -160,6 +160,13 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @param tranche The tranche address
     function report(address tranche) external;
 
+    /// @notice Recover unvested premium stranded in a retired underwriter
+    /// @dev Governor only. Requires {killed}, no staked supply, and no shares outside the redemption
+    /// escrow and dead shares, so nobody can opt in and earn it. Credited premium is untouched.
+    /// @param recipient The address receiving the remainder
+    /// @return amount The premium recovered, in stablecoin units (18 decimals)
+    function recoverRemainder(address recipient) external returns (uint256 amount);
+
     /// @notice Get the vault holding curator assets
     /// @return The vault address
     function vault() external view returns (address);

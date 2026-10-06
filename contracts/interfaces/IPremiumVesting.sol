@@ -8,6 +8,10 @@ interface IPremiumVesting {
     /// @notice The period is zero or exceeds the precision supported by the decay calculation
     error InvalidVestingPeriod();
 
+    /// @notice The remainder can still be earned: the contract is live, shares are staked, or
+    /// shares sit outside the redemption escrow and dead shares where a holder could opt in
+    error RemainderStillClaimable();
+
     /// @notice Emitted after accrued premium is checkpointed and the period is changed
     /// @param period The new vesting time constant in seconds
     event SetVestingPeriod(uint256 period);
@@ -30,6 +34,11 @@ interface IPremiumVesting {
     /// @param recipient The address that received the premium
     /// @param amount The amount paid, in stablecoin units (18 decimals)
     event Claimed(address indexed user, address indexed recipient, uint256 amount);
+
+    /// @notice Emitted when governance recovers a remainder nobody can earn
+    /// @param recipient The address that received the remainder
+    /// @param amount The premium recovered, in stablecoin units (18 decimals)
+    event RecoverRemainder(address indexed recipient, uint256 amount);
 
     /// @notice Emitted when an account opts in to earn vested premium
     /// @param account The account that opted in
