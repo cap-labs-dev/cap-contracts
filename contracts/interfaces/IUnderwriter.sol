@@ -186,10 +186,11 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     function killed() external view returns (bool);
 
     /// @notice Get the maximum deposit for a receiver
-    /// @dev Zero if the pool is killed, recorded assets are below 1% of par, or the default tranche
+    /// @dev Zero if the pool is killed, assets are below 1% of par, or the default tranche
     /// is killed; otherwise unlimited. A killed default blocks entry until removed or replaced
-    /// with a live tranche, without itself retiring the pool. The value check protects impaired pools
-    /// before their next position update.
+    /// with a live tranche, without itself retiring the pool. The value check uses the same live
+    /// default-position value as deposit pricing, so it protects impaired pools before their next
+    /// position update.
     /// Admission remains on the caller of {deposit}, not on the receiver.
     /// @param receiver The account that would receive shares
     /// @return maxAssets The maximum deposit amount

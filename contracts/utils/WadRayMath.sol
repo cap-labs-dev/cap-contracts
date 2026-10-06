@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.36;
 
+import { Panic } from "@openzeppelin/contracts/utils/Panic.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title WadRayMath library
@@ -144,7 +145,7 @@ library WadRayMath {
         ln = 2 * sum + k * LN2_RAY;
     }
 
-    /// @dev `RAY × exp(x / RAY)` for `x >= 0`.
+    /// @dev `RAY × exp(x / RAY)` for `x >= 0`. Reverts on overflow.
     /// @param x Exponent in ray
     /// @return exp `exp(x / RAY)` in ray
     function rayExp(uint256 x) internal pure returns (uint256 exp) {
@@ -159,6 +160,8 @@ library WadRayMath {
             if (term == 0) break;
             exp += term;
         }
+        // shifts are unchecked and would silently drop the high bits
+        if (exp > type(uint256).max >> k) Panic.panic(Panic.UNDER_OVERFLOW);
         exp <<= k;
     }
 

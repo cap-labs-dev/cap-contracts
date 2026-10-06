@@ -81,7 +81,10 @@ abstract contract PremiumVesting is IPremiumVesting, AccessManagedUpgradeable, E
 
     /// @inheritdoc IPremiumVesting
     function premiumPerSecond() public view returns (uint256 perSecond) {
-        perSecond = remaining() / vestingPeriod();
+        PremiumVestingStorage storage $ = _getPremiumVestingStorage();
+        // nothing releases while nobody is earning, matching {vested}
+        if ($.staked == 0) return 0;
+        perSecond = remaining() / $.vestingPeriod;
     }
 
     /// @inheritdoc IPremiumVesting

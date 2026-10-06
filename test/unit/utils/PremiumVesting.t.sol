@@ -492,6 +492,23 @@ contract PremiumVestingTest is Test {
         assertGt(v.rate(), 0, "without hitting zero");
     }
 
+    /// @dev The rate must not advertise a release while the pot is frozen.
+    function test_rateIsZeroWhileNobodyIsEarning() public {
+        v.fund(PREMIUM);
+        assertEq(v.stakedSupply(), 0);
+        assertEq(v.rate(), 0, "a frozen pot releases nothing");
+
+        vm.warp(block.timestamp + PERIOD);
+        assertEq(v.rate(), 0, "and stays frozen over time");
+
+        _earn(alice, 1_000e18);
+        assertEq(v.rate(), PREMIUM / PERIOD, "an opt-in restarts the rate on the full pot");
+
+        vm.prank(alice);
+        v.optOut();
+        assertEq(v.rate(), 0, "and the last opt-out freezes it again");
+    }
+
     /// @dev Views used to project a vest while {_accrue} froze. With nobody earning they
     /// must report the stored pot, and settlement must not release it.
     function test_viewsFreezeWhileNobodyIsEarning() public {
