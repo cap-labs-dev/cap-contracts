@@ -146,20 +146,25 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @inheritdoc IFixedMarket
-    function liquidate(uint256 id, address recipient, uint256 amount)
+    function liquidate(uint256[] calldata ids, address recipient, uint256 amount)
         external
         restricted
         nonReentrant
         returns (uint256 repaid, uint256 valueSlashed)
     {
-        _requireLoan(id);
-        uint256 requested = _debtCheck(debt[id], amount);
-        uint256 capital = totalCapital();
-        uint256 liquidatable = _checkLiquidation(capital, totalDebt());
+        uint256 owed;
+        for (uint256 i; i < ids.length; ++i) {
+            // ascending, so no loan's debt can be counted twice
+            if (i > 0 && ids[i] <= ids[i - 1]) revert InvalidLoanIds();
+            _requireLoan(ids[i]);
+            owed += debt[ids[i]];
+        }
+        uint256 requested = _debtCheck(owed, amount);
+        // one health check for the whole call, so it can reach target health across loans
+        uint256 liquidatable = _checkLiquidation(totalCapital(), totalDebt());
         (repaid, valueSlashed) = _liquidate(recipient, requested, liquidatable);
-        debt[id] -= repaid;
         _totalDebt -= repaid;
-        emit LiquidateFixed(id, msg.sender, recipient, repaid, valueSlashed);
+        _spreadLiquidation(ids, recipient, repaid, valueSlashed);
     }
 
     /// @inheritdoc IFixedMarket
@@ -202,6 +207,28 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     /// @inheritdoc IFixedMarket
     function maxPrincipal(uint256 term) public view returns (uint256 principal) {
         principal = _principalFor(availableCredit(), _quoteTerm(term));
+    }
+
+    /// @dev Apply a liquidation's repayment to the listed loans in order. Each loan's event carries
+    /// a proportional share of the slashed value; the last share takes the rounding remainder.
+    /// @param ids The loans, strictly ascending
+    /// @param recipient The recipient of the liquidated assets
+    /// @param repaid The debt repaid across the loans, at most their combined debt
+    /// @param valueSlashed The collateral value delivered for that repayment
+    function _spreadLiquidation(uint256[] calldata ids, address recipient, uint256 repaid, uint256 valueSlashed)
+        private
+    {
+        uint256 slashLeft = valueSlashed;
+        for (uint256 i; i < ids.length && repaid > 0; ++i) {
+            uint256 id = ids[i];
+            uint256 take = Math.min(repaid, debt[id]);
+            if (take == 0) continue;
+            uint256 slashed = take == repaid ? slashLeft : Math.mulDiv(slashLeft, take, repaid);
+            debt[id] -= take;
+            repaid -= take;
+            slashLeft -= slashed;
+            emit LiquidateFixed(id, msg.sender, recipient, take, slashed);
+        }
     }
 
     /// @dev A loan created by {borrow}, including fully repaid ones.

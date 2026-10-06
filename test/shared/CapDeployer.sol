@@ -298,6 +298,12 @@ abstract contract CapDeployer is BaseTest {
 
     // ── market helpers ────────────────────────────────────────────────────────
 
+    /// @dev A single fixed loan id, as {FixedMarket-liquidate} takes a list
+    function _loan(uint256 id) internal pure returns (uint256[] memory ids) {
+        ids = new uint256[](1);
+        ids[0] = id;
+    }
+
     /// @dev The shared collateral repeated once per tranche, for the tests that do not care which
     /// asset a tranche holds
     function _uniformAssets(uint256 count) internal view returns (address[] memory assets) {

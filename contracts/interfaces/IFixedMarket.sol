@@ -33,6 +33,9 @@ interface IFixedMarket is IBaseMarket {
     /// @param maxPremium The maximum premium the caller accepts, in cUSD units (18 decimals)
     error PremiumExceedsLimit(uint256 premium, uint256 maxPremium);
 
+    /// @notice The loan ids passed to {liquidate} are not strictly ascending
+    error InvalidLoanIds();
+
     /// @notice Emitted when the term limits are updated
     /// @param maximumTermLimit The new maximum term of a loan
     /// @param minimumTermLimit The new minimum term of a loan
@@ -142,15 +145,19 @@ interface IFixedMarket is IBaseMarket {
     /// @return repaid The actual amount of assets repaid, in stablecoin units (18 decimals)
     function repay(uint256 id, uint256 amount) external returns (uint256 repaid);
 
-    /// @notice Liquidate assets from the market
-    /// @dev `id` must be in `[0, loanCount)`. Reverts {Healthy} when the market is not
-    /// liquidatable. `amount` of `type(uint256).max` clears as much as {maxLiquidatable}.
-    /// @param id The id of the loan
+    /// @notice Liquidate debt across one or more loans in the market
+    /// @dev Each id must be in `[0, loanCount)` and strictly ascending. Health is checked once, so
+    /// one call can reach {IBaseMarket-targetHealth} when the debt is spread over several loans.
+    /// Repayment is capped at the listed loans' combined debt and {maxLiquidatable}, then applied
+    /// to the loans in the order given; {LiquidateFixed} is emitted per loan with a proportional
+    /// share of the slashed value. Reverts {Healthy} when the market is not liquidatable.
+    /// `amount` of `type(uint256).max` clears as much as the cap allows.
+    /// @param ids The ids of the loans to repay, strictly ascending
     /// @param recipient The recipient of the liquidated assets
     /// @param amount The amount of assets to liquidate, in stablecoin units (18 decimals)
     /// @return repaid The actual amount of assets repaid, in stablecoin units (18 decimals)
     /// @return valueSlashed The USD value of collateral delivered, 18 decimals, possibly across tokens
-    function liquidate(uint256 id, address recipient, uint256 amount)
+    function liquidate(uint256[] calldata ids, address recipient, uint256 amount)
         external
         returns (uint256 repaid, uint256 valueSlashed);
 
