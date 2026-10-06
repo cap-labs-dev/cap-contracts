@@ -160,6 +160,13 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @param tranche The tranche address
     function report(address tranche) external;
 
+    /// @notice Recover unvested premium stranded in a retired underwriter
+    /// @dev Governor only. Requires {killed}, no staked supply, and no shares outside the redemption
+    /// escrow and dead shares, so nobody can opt in and earn it. Credited premium is untouched.
+    /// @param recipient The address receiving the remainder
+    /// @return amount The premium recovered, in stablecoin units (18 decimals)
+    function recoverRemainder(address recipient) external returns (uint256 amount);
+
     /// @notice Get the vault holding curator assets
     /// @return The vault address
     function vault() external view returns (address);
@@ -179,10 +186,11 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     function killed() external view returns (bool);
 
     /// @notice Get the maximum deposit for a receiver
-    /// @dev Zero if the pool is killed, recorded assets are below 1% of par, or the default tranche
+    /// @dev Zero if the pool is killed, assets are below 1% of par, or the default tranche
     /// is killed; otherwise unlimited. A killed default blocks entry until removed or replaced
-    /// with a live tranche, without itself retiring the pool. The value check protects impaired pools
-    /// before their next position update.
+    /// with a live tranche, without itself retiring the pool. The value check uses the same live
+    /// default-position value as deposit pricing, so it protects impaired pools before their next
+    /// position update.
     /// Admission remains on the caller of {deposit}, not on the receiver.
     /// @param receiver The account that would receive shares
     /// @return maxAssets The maximum deposit amount

@@ -87,13 +87,13 @@ contract MarketLimitsRegressionTest is CapDeployer {
         assertTrue(junior.killed());
         for (uint256 count = 3; count <= 10; ++count) {
             vm.prank(defaultMarketOwner);
-            registry.createTranche(address(market), address(collateral), _weights(count), 12 hours);
+            IBaseMarket(address(market)).createTranche(address(collateral), _weights(count), 12 hours);
         }
         assertEq(market.tranches().length, 10);
         uint256[] memory weights = _weights(11);
         vm.prank(defaultMarketOwner);
         vm.expectRevert(IBaseMarket.TooManyTranches.selector);
-        registry.createTranche(address(market), address(collateral), weights, 12 hours);
+        IBaseMarket(address(market)).createTranche(address(collateral), weights, 12 hours);
         assertEq(market.tranches().length, 10);
     }
 
@@ -151,7 +151,7 @@ contract MarketLimitsRegressionTest is CapDeployer {
         _setPrice(address(collateral), 0.1e18);
         assertGt(fixedMarket.writeOff(id), 0);
         assertEq(fixedMarket.availableCredit(), 0);
-        assertEq(fixedMarket.availableCredit(30 days), 0);
+        assertEq(fixedMarket.maxPrincipal(30 days), 0);
     }
 
     function test_floatingLiquidationValuesEachTrancheOnce() public {
@@ -179,7 +179,7 @@ contract MarketLimitsRegressionTest is CapDeployer {
         vm.expectCall(s, abi.encodeCall(ITranche.totalCapital, ()), uint64(1));
         vm.expectCall(j, abi.encodeCall(ITranche.totalCapital, ()), uint64(1));
         vm.prank(defaultLiquidator);
-        (uint256 repaid, uint256 slashed) = fixedMarket.liquidate(id, defaultLiquidator, 100e18);
+        (uint256 repaid, uint256 slashed) = fixedMarket.liquidate(_loan(id), defaultLiquidator, 100e18);
         assertEq(repaid, 100e18);
         assertEq(slashed, 102e18);
     }
