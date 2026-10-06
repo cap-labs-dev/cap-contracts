@@ -114,9 +114,9 @@ interface IInterestRateModel {
     /// @dev Same bounds as the setters.
     /// @param authority The access manager address
     /// @param stablecoin The stablecoin address
-    /// @param minimumMarketMultiplier The minimum market multiplier in ray decimals, at or below the maximum.
-    /// Markets read this band in {IBaseMarket-setMarketMultiplier}.
-    /// @param maximumMarketMultiplier The maximum market multiplier in ray decimals
+    /// @param minimumMarketMultiplier The minimum market multiplier in ray decimals, at or below one ray.
+    /// Markets read this band in {IBaseMarket-setMarketMultiplier}; an unset market reads as one ray.
+    /// @param maximumMarketMultiplier The maximum market multiplier in ray decimals, at or above one ray
     /// @param maximumUnderwriterRate The maximum underwriter rate per year in ray decimals
     /// @param liquidationBonus The liquidation bonus in ray decimals
     /// @param averagingPeriod The averaging period in seconds, inside the bounded window

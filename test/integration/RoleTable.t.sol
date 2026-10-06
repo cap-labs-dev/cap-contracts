@@ -72,7 +72,6 @@ contract RoleTableTest is CapDeployer {
         // the market owner tunes its own market's risk, pricing and tranche weights
         _expectRole(market, IBaseMarket.setLoanToValue.selector, ownerRole, "setLoanToValue");
         _expectRole(market, IBaseMarket.setTrancheWeights.selector, ownerRole, "setTrancheWeights");
-        _expectRole(market, IBaseMarket.setMarketMultiplier.selector, ownerRole, "setMarketMultiplier");
         _expectRole(market, IBaseMarket.setUnderwriterRate.selector, ownerRole, "setUnderwriterRate");
         _expectRole(market, IBaseMarket.createTranche.selector, ownerRole, "createTranche");
         _expectRole(market, IBaseMarket.setTranches.selector, CapRoles.REGISTRY, "setTranches");
@@ -82,6 +81,7 @@ contract RoleTableTest is CapDeployer {
 
         // governance owns the parameters that bound every market
         _expectRole(market, IBaseMarket.setTargetHealth.selector, CapRoles.GOVERNOR, "setTargetHealth");
+        _expectRole(market, IBaseMarket.setMarketMultiplier.selector, CapRoles.GOVERNOR, "setMarketMultiplier");
 
         // the guardian tightens risk and recognises losses
         _expectRole(market, IBaseMarket.setBuffer.selector, CapRoles.GUARDIAN, "setBuffer");
@@ -310,6 +310,7 @@ contract RoleTableTest is CapDeployer {
         // premium is pushed in by whichever market charged it, so this may not be open
         _expectRole(tranche, ITranche.fund.selector, CapRoles.MARKET, "fund");
         _expectRole(tranche, ITranche.setMaxCapital.selector, CapRoles.GOVERNOR, "setMaxCapital");
+        _expectRole(tranche, ITranche.recoverRemainder.selector, CapRoles.GOVERNOR, "recoverRemainder");
 
         // admission is a row like any other, same as on the underwriter: the entry points are
         // gated to a role of their own, and the market owner administers that role's membership
@@ -421,6 +422,7 @@ contract RoleTableTest is CapDeployer {
         _expectRole(underwriter, IUnderwriter.setDefaultTranche.selector, allocatorRole, "setDefaultTranche");
 
         _expectRole(underwriter, IUnderwriter.report.selector, CapRoles.KEEPER, "report");
+        _expectRole(underwriter, IUnderwriter.recoverRemainder.selector, CapRoles.GOVERNOR, "recoverRemainder");
 
         // admission is a row like any other: the entry points are gated to a role of their own,
         // and the curator administers that role's membership rather than a list on the vault

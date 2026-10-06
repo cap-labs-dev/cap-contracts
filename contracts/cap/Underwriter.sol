@@ -238,17 +238,20 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     /// @dev Latch retirement after updating a position, including an unchanged or closed book.
     /// Exits, reports, and premium claims remain available after retirement.
     function _checkKilled() private {
-        if (!killed && _belowKillThreshold()) {
+        if (!killed && _belowKillThreshold(false)) {
             killed = true;
             emit Killed();
         }
     }
 
-    /// @dev Use the same recorded assets as share pricing. Division avoids overflowing assets * 100.
-    /// A never-funded pool is not a loss; equality at 1% of par remains open.
-    function _belowKillThreshold() private view returns (bool) {
+    /// @dev Division avoids overflowing assets * 100. A never-funded pool is not a loss and reads
+    /// no assets; equality at 1% of par remains open.
+    /// @param live Value the default position live, as issuance does, instead of at its last mark
+    function _belowKillThreshold(bool live) private view returns (bool) {
         uint256 supply = totalSupply();
-        return supply > 0 && totalAssets() < Math.ceilDiv(supply, KILL_RATIO);
+        if (supply == 0) return false;
+        uint256 assets = live ? _issuanceAssets() : totalAssets();
+        return assets < Math.ceilDiv(supply, KILL_RATIO);
     }
 
     /// @dev Fold a deposit into {debt}. First allocation opens the book.
@@ -286,6 +289,13 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     /// @inheritdoc IUnderwriter
     function report(address _tranche) external restricted {
         _report(_tranche);
+    }
+
+    /// @inheritdoc IUnderwriter
+    function recoverRemainder(address recipient) external restricted returns (uint256 amount) {
+        // a live pool can still take deposits that opt in
+        if (!killed) revert RemainderStillClaimable();
+        amount = _recoverRemainder(recipient);
     }
 
     /// @inheritdoc IERC4626
@@ -337,7 +347,8 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     /// @dev A killed default blocks new capital without retiring an otherwise healthy pool.
     /// @return open Whether the pool and its default tranche permit new capital
     function _depositsOpen() private view returns (bool) {
-        if (killed || _belowKillThreshold()) {
+        // the live value deposits are priced at, so a stale mark cannot keep a dead pool open
+        if (killed || _belowKillThreshold(true)) {
             return false;
         }
         address tranche = defaultTranche;
@@ -409,8 +420,10 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
         if (totalSupply() == 0) _mint(DeadShares.HOLDER, DeadShares.SHARES);
         super._deposit(caller, receiver, assets, shares);
-        // Default allocation can recognize a loss after the entry-point limit check.
-        if (killed) revert UnderwriterKilled();
+        // Default allocation can recognize a loss after the entry-point limit check, and its kill
+        // check ran before these shares existed. Allocation has marked the default, so totalAssets
+        // is live; test the completed ratio.
+        if (killed || _belowKillThreshold(false)) revert UnderwriterKilled();
     }
 
     /// @dev Transfer in assets to the vault from the sender
