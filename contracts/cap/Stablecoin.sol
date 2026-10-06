@@ -152,8 +152,8 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
 
     /// @inheritdoc IStablecoin
     function supplies() public view returns (uint256 credit, uint256 supply) {
-        // bad debt is neither redeemable nor earning, so it is as unavailable as lent-out credit,
-        // matching {unlockedSupply}
+        // bad debt is value no reserve stands behind, so it is as unavailable as lent-out credit:
+        // the reserve is worth supply less credit and bad debt
         credit = creditBackedSupply + badDebt;
         supply = totalSupply();
     }
@@ -185,7 +185,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     function recognizeBadDebtInCredit(uint256 _amount) external restricted {
         badDebt += _amount;
         if (badDebt > totalSupply()) revert BadDebtExceedsSupply();
-        // will never be repaid, so drop it from credit-backed supply. unlockedSupply is unchanged
+        // will never be repaid, so drop it from credit-backed supply. Utilization is unchanged
         // because badDebt rose by the same amount. Holders take the loss through {backing}.
         creditBackedSupply -= _amount;
         _updateLiquidityRate();
@@ -209,10 +209,12 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     /// @inheritdoc IStablecoin
     function unlockedSupply() public view override(ERC7540AsyncRedeem, IStablecoin) returns (uint256 unlocked) {
         // aggregate reserve capacity, not a restriction on which holders may redeem:
-        // credit-minted tokens are fungible with deposited tokens
-        uint256 locked = creditBackedSupply + badDebt;
+        // credit-minted tokens are fungible with deposited tokens. Bad debt is not a share count
+        // to hold back: during a shortfall every reserve-backed share exits below par, and the
+        // reserve cap below bounds what they can draw
+        uint256 credit = creditBackedSupply;
         uint256 supply = totalSupply();
-        if (supply > locked) unlocked = supply - locked;
+        if (supply > credit) unlocked = supply - credit;
 
         uint256 available = _quoteWithdraw(IERC20(asset()).balanceOf(address(this)));
         if (unlocked > available) unlocked = available;
@@ -319,7 +321,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
 
         uint256 supply = totalSupply() - creditBackedSupply;
         uint256 recognized = supply - shortfall;
-        // saturate at the pricing basis; while shortfall > 0, this exceeds unlockedSupply
+        // saturate at the pricing basis, the reserve-backed shares that {unlockedSupply} counts
         if (value >= recognized) return supply;
 
         uint256 retained = recognized - value;

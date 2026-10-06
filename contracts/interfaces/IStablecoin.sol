@@ -194,15 +194,17 @@ interface IStablecoin {
     /// @return The share token decimals
     function decimals() external view returns (uint8);
 
-    /// @notice Get the aggregate shares available for redemption, excluding credit and bad debt
+    /// @notice Get the aggregate shares available for redemption, excluding credit-backed supply
     /// @dev Any holder, including a borrower, may use this capacity. Limited by liquid reserve;
     /// repeated exits can exhaust it and leave remaining holders backed entirely by credit.
-    /// @return unlocked The shares not reserved for outstanding borrows or written off, in cUSD share units (18 decimals)
+    /// During a shortfall these shares exit below par, so bad debt reduces what each is paid,
+    /// not how many may exit.
+    /// @return unlocked The shares not reserved for outstanding borrows, in cUSD share units (18 decimals)
     function unlockedSupply() external view returns (uint256 unlocked);
 
     /// @notice Get the utilization rate: credit-backed supply plus bad debt over total supply
-    /// @dev Bad debt counts as utilized, matching {unlockedSupply}, so a credit write-off leaves
-    /// utilization unchanged and a reserve loss raises it.
+    /// @dev Bad debt counts as utilized, since no reserve stands behind it, so a credit write-off
+    /// leaves utilization unchanged and a reserve loss raises it.
     /// @return rate The utilization rate in ray decimals
     function utilizationRate() external view returns (uint256 rate);
 

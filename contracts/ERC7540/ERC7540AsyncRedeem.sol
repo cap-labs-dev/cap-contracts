@@ -254,10 +254,11 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         if (unlocked == 0) return 0;
 
         ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
+        uint256 frontier = $.settledQueue + unlocked;
         EnumerableSet.UintSet storage ids = $.controllerRequests[_controller];
         uint256 n = ids.length();
         for (uint256 i; i < n; ++i) {
-            maxShares += _claimableShares(ids.at(i), _controller);
+            maxShares += _claimableAt(ids.at(i), _controller, frontier, unlocked);
             if (maxShares >= unlocked) return unlocked;
         }
     }
@@ -363,24 +364,33 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     /// @param _controller The controller to match
     /// @return claimableShares Shares that may be claimed now
     function _claimableShares(uint256 _requestId, address _controller) internal view returns (uint256 claimableShares) {
-        uint256 balance = _requestShares(_requestId, _controller);
-        if (balance == 0) return 0;
-
+        // an empty request never needs the cap, which may need a price
+        if (_requestShares(_requestId, _controller) == 0) return 0;
         uint256 unlocked = unlockedSupply();
-        if (unlocked == 0) return 0;
+        claimableShares =
+            _claimableAt(_requestId, _controller, _getERC7540AsyncRedeemStorage().settledQueue + unlocked, unlocked);
+    }
 
-        ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
-        uint256 currentIndex = $.settledQueue + unlocked;
-        uint256 queueIndex = $.queueIndex[_requestId];
+    /// @dev The slice of a request below `_frontier`, capped by `_unlocked`. Callers that consume
+    /// several requests fix the frontier once, before any burn, so a mid-loop read cannot see
+    /// supply that is burned but not yet paid.
+    /// @param _requestId The request id
+    /// @param _controller The controller to match
+    /// @param _frontier The FIFO watermark, `settledQueue + unlocked` before any consumption
+    /// @param _unlocked The unlocked shares still available to this claim
+    /// @return claimableShares Shares that may be claimed now
+    function _claimableAt(uint256 _requestId, address _controller, uint256 _frontier, uint256 _unlocked)
+        internal
+        view
+        returns (uint256 claimableShares)
+    {
+        uint256 balance = _requestShares(_requestId, _controller);
+        uint256 queueIndex = _getERC7540AsyncRedeemStorage().queueIndex[_requestId];
+        if (balance == 0 || _unlocked == 0 || _frontier <= queueIndex) return 0;
 
-        if (currentIndex <= queueIndex) {
-            return 0;
-        } else if (currentIndex >= queueIndex + balance) {
-            claimableShares = balance;
-        } else {
-            claimableShares = currentIndex - queueIndex;
-        }
-        if (claimableShares > unlocked) claimableShares = unlocked;
+        claimableShares = _frontier - queueIndex;
+        if (claimableShares > balance) claimableShares = balance;
+        if (claimableShares > _unlocked) claimableShares = _unlocked;
     }
 
     /// @dev Shares a withdrawal of `assets` would burn. Ceil, matching the old {previewWithdraw}.
@@ -411,9 +421,11 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
 
         uint256 remaining = _shares;
         uint256 remainingUnlocked = unlockedSupply();
+        // read once: each consumption burns before the single payout, so re-reading the cap
+        // mid-loop would price supply that is burned but not yet paid
+        uint256 frontier = $.settledQueue + remainingUnlocked;
         for (uint256 i; i < n && remaining > 0 && remainingUnlocked > 0; ++i) {
-            uint256 claimable = _claimableShares(list[i], _controller);
-            if (claimable > remainingUnlocked) claimable = remainingUnlocked;
+            uint256 claimable = _claimableAt(list[i], _controller, frontier, remainingUnlocked);
             if (claimable == 0) continue;
             uint256 take = remaining < claimable ? remaining : claimable;
             _consumeRequest(_controller, take, list[i]);

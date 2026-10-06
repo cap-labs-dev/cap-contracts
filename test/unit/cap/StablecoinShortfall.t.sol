@@ -66,7 +66,7 @@ contract StablecoinShortfallTest is BaseTest {
         _assertQuotes(shares, assets, beforeQuotes);
         scoin.burnCreditBacked(borrower, principal);
         _assertQuotes(shares, assets, beforeQuotes);
-        assertEq(scoin.unlockedSupply(), 80e18, "credit never adds reserve capacity");
+        assertEq(scoin.unlockedSupply(), 100e18, "credit never adds reserve capacity");
         assertEq(scoin.backing(), 80e18 + premium, "managed backing still includes performing credit");
         assertEq(scoin.totalAssets(), (80e18 + premium) / 1e12);
     }
@@ -77,39 +77,37 @@ contract StablecoinShortfallTest is BaseTest {
         assertEq(scoin.quoteWithdraw(assets), expected[2], "ceil inverse unchanged");
     }
 
-    function test_fullReserveWithdrawalIsInitiallyBlocked() public {
+    /// @dev Bad debt lowers what each reserve-backed share is paid, not how many may exit, so the
+    /// whole reserve can leave in one withdrawal that retires the whole loss.
+    function test_fullReserveWithdrawalIsAvailableInOneExit() public {
         scoin.mintCreditBacked(borrower, 100e18);
         assertEq(scoin.quoteWithdraw(80e6), 100e18);
-        assertEq(scoin.maxInstantRedeem(borrower), 80e18);
+        assertEq(scoin.maxInstantRedeem(borrower), 100e18);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxWithdraw.selector, borrower, 80e6, 60_952380)
-        );
         vm.prank(borrower);
-        scoin.instantWithdraw(80e6, borrower, borrower);
+        assertEq(scoin.instantWithdraw(80e6, borrower, borrower), 100e18);
+        assertEq(usdc.balanceOf(address(scoin)), 0);
+        assertEq(scoin.badDebt(), 0, "the haircut retired the loss");
     }
 
     /// @dev Tokens have no provenance restriction. A borrower can absorb the old loss and exhaust
-    /// the reserve through repeated exits, without reducing performing credit. Check both routes.
-    function testFuzz_repeatedCreditRedemptionsRetireLossAndExhaustReserve(bool queued) public {
+    /// the reserve in one exit, without reducing performing credit. Check both routes.
+    function testFuzz_creditRedemptionRetiresLossAndExhaustsReserve(bool queued) public {
         scoin.mintCreditBacked(borrower, 100e18);
         uint256 id;
         if (queued) {
             vm.prank(borrower);
             id = scoin.requestRedeem(100e18, borrower, borrower);
         }
-        uint256[4] memory payouts = [uint256(60_952380), 18_097502, 947856, 2262];
-        for (uint256 i; i < payouts.length; ++i) {
-            uint256 shares = queued ? scoin.claimableRedeemRequest(id, borrower) : scoin.maxInstantRedeem(borrower);
-            uint256 debtBefore = scoin.badDebt();
-            vm.prank(borrower);
-            uint256 paid =
-                queued ? scoin.redeem(id, shares, borrower, borrower) : scoin.instantRedeem(shares, borrower, borrower);
-            assertEq(paid, payouts[i]);
-            assertEq(debtBefore - scoin.badDebt(), shares - paid * 1e12, "haircut retires the loss");
-            assertLe(scoin.creditBackedSupply() + scoin.badDebt(), scoin.totalSupply());
-            assertEq(scoin.creditBackedSupply(), 100e18, "redemption is not repayment");
-        }
+        uint256 shares = queued ? scoin.claimableRedeemRequest(id, borrower) : scoin.maxInstantRedeem(borrower);
+        assertEq(shares, 100e18, "every reserve-backed share may exit at once");
+        uint256 debtBefore = scoin.badDebt();
+        vm.prank(borrower);
+        uint256 paid =
+            queued ? scoin.redeem(id, shares, borrower, borrower) : scoin.instantRedeem(shares, borrower, borrower);
+        assertEq(paid, 80e6);
+        assertEq(debtBefore - scoin.badDebt(), shares - paid * 1e12, "haircut retires the loss");
+        assertEq(scoin.creditBackedSupply(), 100e18, "redemption is not repayment");
         assertEq(usdc.balanceOf(borrower), 80e6);
         assertEq(usdc.balanceOf(address(scoin)), 0);
         assertEq(scoin.badDebt(), 0);
