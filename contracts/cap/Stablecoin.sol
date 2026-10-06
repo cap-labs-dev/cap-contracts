@@ -145,12 +145,6 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     }
 
     /// @inheritdoc IStablecoin
-    function utilizationRateAfterMint(uint256 _amount) public view returns (uint256 rate) {
-        (uint256 credit, uint256 supply) = supplies();
-        rate = _utilizationRate(credit + _amount, supply);
-    }
-
-    /// @inheritdoc IStablecoin
     function supplies() public view returns (uint256 credit, uint256 supply) {
         // bad debt is value no reserve stands behind, so it is as unavailable as lent-out credit:
         // the reserve is worth supply less credit and bad debt
