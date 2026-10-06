@@ -426,8 +426,9 @@ contract InterestRateModelTest is BaseTest {
         assertApproxEqRel(settled, 0.4e27, 1e12, "which enough quiet time does");
     }
 
-    /// @dev The mint is added to the averaged supplies rather than smoothed away, so a borrower
-    /// still pays for the utilization their own draw creates.
+    /// @dev The mint is added to the averaged credit rather than smoothed away, so a borrower
+    /// still pays for the utilization their own draw creates. It is not added to supply: the
+    /// borrowed cash can be redeemed straight away, so the draw is priced as if it has left.
     ///
     /// Settled first, because the mint is an absolute amount added to averaged supplies: measured
     /// against supplies still climbing towards their true level it would read as a larger share
@@ -438,10 +439,19 @@ contract InterestRateModelTest is BaseTest {
         skip(_untilSettled());
         irm.updateLiquidityRate();
 
-        // the mock reports the pair as (0.5e27, 1e27), so a quarter-ray mint lands at 0.75/1.25
+        // the mock reports the pair as (0.5e27, 1e27), so a quarter-ray mint lands at 0.75/1
         assertApproxEqRel(
-            irm.averageUtilizationAfterMint(0.25e27), 0.6e27, 1e12, "the draw moves the level it is priced at"
+            irm.averageUtilizationAfterMint(0.25e27), 0.75e27, 1e12, "the draw moves the level it is priced at"
         );
+    }
+
+    /// @dev With no averaged supply at all, any draw is entirely credit and so prices at the top
+    /// of the curve rather than at zero utilization.
+    function test_averageAfterMint_emptyPoolIsFullyUtilized() public view {
+        (, uint256 supply) = irm.averageSupplies();
+        assertEq(supply, 0);
+        assertEq(irm.averageUtilizationAfterMint(1e18), 1e27);
+        assertEq(irm.averageUtilizationAfterMint(0), 0);
     }
 
     /// @dev A credit-backed mint that has stood for no time is absent from the average, but a
@@ -463,13 +473,13 @@ contract InterestRateModelTest is BaseTest {
         assertApproxEqRel(irm.averageUtilization(), 0.5e27, 1e12, "and the average has not moved");
         assertApproxEqRel(
             irm.averageUtilizationAfterMint(0.1e27),
-            (credit + extra + 0.1e27) * 1e27 / (supply + extra + 0.1e27),
+            (credit + extra + 0.1e27) * 1e27 / supply,
             1e12,
             "unabsorbed credit is in the projected utilization"
         );
         assertGt(
             irm.averageUtilizationAfterMint(0.1e27),
-            (credit + 0.1e27) * 1e27 / (supply + 0.1e27),
+            (credit + 0.1e27) * 1e27 / supply,
             "without it the second mint would be priced off the stale average"
         );
     }
@@ -489,9 +499,9 @@ contract InterestRateModelTest is BaseTest {
         assertEq(irm.unsmoothedCredit(), 0, "a drop is not unsmoothed borrowing");
         assertApproxEqRel(
             irm.averageUtilizationAfterMint(0.1e27),
-            (credit + 0.1e27) * 1e27 / (supply + 0.1e27),
+            (credit + 0.1e27) * 1e27 / supply,
             1e12,
-            "the mint is still added to the average"
+            "the mint is still added to the average credit"
         );
     }
 

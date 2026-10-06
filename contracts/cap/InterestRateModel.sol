@@ -288,17 +288,17 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     /// @inheritdoc IInterestRateModel
     function averageUtilizationAfterMint(uint256 mintAmount) public view returns (uint256 rate) {
         (uint256 credit, uint256 supply) = averageSupplies();
-        // Credit already minted but not yet absorbed into the average (a same-block borrow, or
-        // the residual of a recent one) is added to both sides. The stablecoin counts bad debt as
-        // credit, so a freshly recognized reserve loss is priced in the same way. Reserve-only moves do not appear
-        // in the credit gap, so a flash deposit still cannot suppress the price.
+        // Borrowed cUSD can be redeemed for reserve straight away, so a draw is priced as if its
+        // cash has left: it raises credit, not supply. Credit already minted but not yet absorbed
+        // into the average (a same-block borrow, or the residual of a recent one) is treated the
+        // same way. The stablecoin counts bad debt as credit, so a freshly recognized reserve loss
+        // is priced in too. Reserve-only moves do not appear in the credit gap, so a flash deposit
+        // still cannot suppress the price. Above one ray is capped in {_nextLiquidityRate}.
         (uint256 liveCredit,) = IStablecoin(stablecoin).supplies();
-        if (liveCredit > credit) {
-            uint256 extra = liveCredit - credit;
-            credit += extra;
-            supply += extra;
-        }
-        rate = _ratio(credit + mintAmount, supply + mintAmount);
+        if (liveCredit > credit) credit = liveCredit;
+        credit += mintAmount;
+        // with no supply at all, any draw is entirely credit
+        rate = supply == 0 && credit > 0 ? 1e27 : _ratio(credit, supply);
     }
 
     /// @dev Fold elapsed time into the averages, then set the liquidity rate from

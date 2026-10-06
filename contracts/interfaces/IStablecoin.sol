@@ -207,7 +207,8 @@ interface IStablecoin {
     function utilizationRate() external view returns (uint256 rate);
 
     /// @notice Get the utilization after a credit-backed mint of `amount`
-    /// @dev Both supplies rise by `amount`. Bad debt counts as utilized, as in {utilizationRate}.
+    /// @dev Priced as if the borrowed cash leaves the reserve: credit rises by `amount`, supply
+    /// does not. Can exceed one ray. Bad debt counts as utilized, as in {utilizationRate}.
     /// @param amount The credit-backed supply about to be minted, in cUSD share units (18 decimals)
     /// @return rate The projected utilization rate in ray decimals
     function utilizationRateAfterMint(uint256 amount) external view returns (uint256 rate);

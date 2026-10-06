@@ -1237,7 +1237,10 @@ contract AccountingIntegrityTest is CapDeployer {
     /// 365-day / 2× configuration.
     function test_smallFixedBorrowFitsWhenFullLimitCatchUpDoesNot() public {
         FixedMarket market = _steepYearFixedMarket(100e18);
-        _settleReserve(2_000e18);
+        // draws are priced as if their cash leaves, so the recent credit sits against reserve
+        // alone. 10,000 / 11,500 is above the kink but below one ray, where the steep slope still
+        // gives a full-limit catch-up something to overshoot on
+        _settleReserve(11_500e18);
         _mintRecentCredit(10_000e18);
 
         uint256 term = 365 days;
@@ -1574,7 +1577,8 @@ contract AccountingIntegrityTest is CapDeployer {
     /// That is expected. Borrowers are permissioned and must not split to reduce premium.
     function test_aSecondDrawThisBlockPaysMore() public {
         FixedMarket market = _fixedMarketOnSlope(0.9e27);
-        _depositStable(makeAddr("saver"), 1_000e18);
+        // enough reserve that neither draw saturates utilization at one ray
+        _depositStable(makeAddr("saver"), 10_000e18);
         vm.warp(block.timestamp + 2 hours);
 
         uint256 half = 2_500e18;
@@ -1599,7 +1603,8 @@ contract AccountingIntegrityTest is CapDeployer {
     /// and the split can be cheaper than one draw. Expected; not acceptable use.
     function test_borrowMorePaysTheMarginalPremium() public {
         FixedMarket market = _fixedMarketOnSlope(0.9e27);
-        _depositStable(makeAddr("saver"), 1_000e18);
+        // enough reserve that neither draw saturates utilization at one ray
+        _depositStable(makeAddr("saver"), 10_000e18);
         vm.warp(block.timestamp + 2 hours);
 
         uint256 half = 2_500e18;

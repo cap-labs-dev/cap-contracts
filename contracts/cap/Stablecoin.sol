@@ -147,7 +147,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     /// @inheritdoc IStablecoin
     function utilizationRateAfterMint(uint256 _amount) public view returns (uint256 rate) {
         (uint256 credit, uint256 supply) = supplies();
-        rate = _utilizationRate(credit + _amount, supply + _amount);
+        rate = _utilizationRate(credit + _amount, supply);
     }
 
     /// @inheritdoc IStablecoin
@@ -163,7 +163,8 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     /// @param _supply The total supply
     /// @return rate The utilization rate in ray decimals
     function _utilizationRate(uint256 _credit, uint256 _supply) internal pure returns (uint256 rate) {
-        if (_supply == 0) return 0;
+        // with no supply at all, any credit is full utilization
+        if (_supply == 0) return _credit == 0 ? 0 : WadRayMath.RAY;
         rate = _credit.rayDiv(_supply);
     }
 
