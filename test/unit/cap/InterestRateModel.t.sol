@@ -112,6 +112,39 @@ contract InterestRateModelTest is BaseTest {
         );
     }
 
+    /// @dev An unset market multiplier reads as one ray, so the band must contain it.
+    function test_initialize_requiresTheMultiplierBandToContainOneRay() public {
+        address impl = address(new InterestRateModel());
+
+        vm.expectRevert(IInterestRateModel.InvalidMultiplier.selector);
+        _deployProxy(impl, _initWithBand(1e27 + 1, 2e27));
+
+        vm.expectRevert(IInterestRateModel.InvalidMultiplier.selector);
+        _deployProxy(impl, _initWithBand(0.5e27, 1e27 - 1));
+
+        InterestRateModel point = InterestRateModel(_deployProxy(impl, _initWithBand(1e27, 1e27)));
+        assertEq(point.minimumMarketMultiplier(), 1e27);
+        assertEq(point.maximumMarketMultiplier(), 1e27);
+    }
+
+    function _initWithBand(uint256 minimum, uint256 maximum) internal view returns (bytes memory data) {
+        data = abi.encodeCall(
+            InterestRateModel.initialize,
+            (
+                address(accessManager),
+                address(stablecoin),
+                minimum,
+                maximum,
+                1e27,
+                0.02e27,
+                1 hours,
+                0.8e27,
+                0.1e27,
+                1.25e27
+            )
+        );
+    }
+
     function test_setLiquidationBonus_updatesAndBounds() public {
         irm.setLiquidationBonus(0.05e27);
         assertEq(irm.liquidationBonus(), 0.05e27);

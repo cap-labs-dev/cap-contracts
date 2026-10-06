@@ -214,10 +214,14 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     }
 
     /// @inheritdoc IERC7540Redeem
-    /// @dev Capped by {unlockedSupply}. `settledQueue` is total claimed, not a contiguous
-    /// prefix, so a later 4-arg claim must not keep an earlier request claimable after liquidity
-    /// falls. Liquidity is still allocated FIFO via the watermark; already-claimable shares may
-    /// settle out of order. Pending is the remainder of the request.
+    /// @dev Capped by {unlockedSupply}. The watermark is `settledQueue + unlocked`, and
+    /// `settledQueue` is total claimed, not a contiguous prefix, so a later 4-arg claim must not
+    /// keep an earlier request claimable after liquidity falls. Allocation is FIFO only while
+    /// requests settle in order: already-claimable shares may settle out of order, and the
+    /// watermark then counts them as if they came from the head of the queue. If liquidity falls
+    /// afterwards, earlier and later requests can each show the same unlocked shares as claimable,
+    /// and whichever claims first is paid, so a later request can settle ahead of an earlier one.
+    /// Pending is the remainder of the request.
     function claimableRedeemRequest(uint256 _requestId, address _controller)
         public
         view
