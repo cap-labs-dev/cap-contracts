@@ -289,7 +289,7 @@ contract ProtocolHandler is CapDeployer {
         uint256 debt = market.totalDebt();
         uint256 room = limit > debt ? limit - debt : 0;
         assertEq(market.availableCredit(), room);
-        // Conservative debt headroom, not the availableCredit(term) solver under test.
+        // Conservative debt headroom, not the maxPrincipal(term) solver under test.
         uint256 amount = _amount(raw, room / 4);
         if (amount < 1e9 || market.healthiness() < RAY) {
             _skip();
@@ -353,7 +353,7 @@ contract ProtocolHandler is CapDeployer {
         uint256 expiry = fixedMarket.expiry(id);
         uint256 term = bound(rawTerm, 1 days, 7 days);
         if (block.timestamp >= expiry + fixedMarket.grace()) {
-            fixedMarket.extendAdmin(id, term);
+            fixedMarket.extendAdmin(id, term, type(uint256).max);
         } else {
             if (block.timestamp < expiry && expiry - block.timestamp + term > 30 days) {
                 _skip();
@@ -364,8 +364,16 @@ contract ProtocolHandler is CapDeployer {
                 _skip();
                 return;
             }
+            // borrower extensions must fit the credit limit; an expired loan also pays its arrears
+            uint256 charged = block.timestamp > expiry ? term + block.timestamp - expiry : term;
+            (uint256 liquidity, uint256 underwriting) = fixedMarket.premiumForExtension(fixedMarket.debt(id), charged);
+            if (fixedMarket.totalDebt() + liquidity + underwriting > fixedMarket.creditLimit()) {
+                _skip();
+                return;
+            }
             vm.prank(defaultBorrower);
-            fixedMarket.extend(id, term);
+            fixedMarket.extend(id, term, type(uint256).max);
+            assertLe(fixedMarket.totalDebt(), fixedMarket.creditLimit(), "extension within the credit limit");
         }
         _success();
     }

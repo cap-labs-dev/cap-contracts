@@ -34,7 +34,7 @@ contract FixedExtendTest is CapDeployer {
         uint256 debtBefore = market.debt(id);
 
         vm.prank(defaultBorrower);
-        uint256 actual = market.extend(id, 7 days);
+        uint256 actual = market.extend(id, 7 days, type(uint256).max);
 
         assertEq(actual, 7 days, "returns the requested extension");
         assertEq(market.expiry(id), expiryBefore + 7 days, "expiry moves by 7 days");
@@ -48,7 +48,7 @@ contract FixedExtendTest is CapDeployer {
         (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 1 days, type(uint256).max);
 
         vm.prank(defaultBorrower);
-        uint256 actual = market.extend(id, type(uint256).max);
+        uint256 actual = market.extend(id, type(uint256).max, type(uint256).max);
 
         assertEq(actual, 29 days, "max term is 30 days, 1 day already used");
         assertEq(market.expiry(id), block.timestamp + 30 days, "capped at maximum term");
@@ -62,7 +62,7 @@ contract FixedExtendTest is CapDeployer {
 
         vm.prank(defaultBorrower);
         vm.expectRevert(IFixedMarket.InvalidTerm.selector);
-        market.extend(id, 30 days);
+        market.extend(id, 30 days, type(uint256).max);
     }
 
     function test_borrowMax_withNoCredit_reverts() public {
@@ -70,7 +70,7 @@ contract FixedExtendTest is CapDeployer {
         FixedMarket market = FixedMarket(marketAddr);
 
         vm.prank(defaultBorrower);
-        vm.expectRevert(IBaseMarket.InvalidPrincipal.selector);
+        vm.expectRevert(IBaseMarket.InsufficientLiquidity.selector);
         market.borrow(defaultBorrower, type(uint256).max, 1 days, type(uint256).max);
     }
 
@@ -82,8 +82,8 @@ contract FixedExtendTest is CapDeployer {
 
         assertEq(market.expiry(id), block.timestamp + 30 days);
         assertEq(market.totalDebt(), market.debt(id));
-        assertGt(market.availableCredit(10 days), 0);
-        assertEq(market.availableCredit(365 days), market.availableCredit(30 days));
+        assertGt(market.maxPrincipal(10 days), 0);
+        assertEq(market.maxPrincipal(365 days), market.maxPrincipal(30 days));
     }
 
     function test_borrowMore_onALiveLoan() public {
@@ -130,10 +130,10 @@ contract FixedExtendTest is CapDeployer {
 
         vm.prank(defaultBorrower);
         vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanNotFound.selector, 0));
-        market.extend(0, 7 days);
+        market.extend(0, 7 days, type(uint256).max);
 
         vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanNotFound.selector, 0));
-        market.extendAdmin(0, 7 days);
+        market.extendAdmin(0, 7 days, type(uint256).max);
 
         vm.prank(defaultBorrower);
         vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanNotFound.selector, 0));
@@ -182,10 +182,10 @@ contract FixedExtendTest is CapDeployer {
 
         vm.prank(defaultBorrower);
         vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanClosed.selector, id));
-        market.extend(id, 1 days);
+        market.extend(id, 1 days, type(uint256).max);
 
         vm.expectRevert(abi.encodeWithSelector(IFixedMarket.LoanClosed.selector, id));
-        market.extendAdmin(id, 7 days);
+        market.extendAdmin(id, 7 days, type(uint256).max);
 
         vm.prank(defaultBorrower);
         (uint256 next,) = market.borrow(defaultBorrower, PRINCIPAL, 10 days, type(uint256).max);
@@ -216,7 +216,7 @@ contract FixedExtendTest is CapDeployer {
 
         vm.prank(defaultBorrower);
         vm.expectRevert(IBaseMarket.Unhealthy.selector);
-        market.extend(id, 1 days);
+        market.extend(id, 1 days, type(uint256).max);
     }
 
     /// @dev Debt spread over nine loans. Liquidating loan by loan stops once the market crosses a
@@ -298,5 +298,83 @@ contract FixedExtendTest is CapDeployer {
         assertGt(repaid, 0);
         assertGt(slashed, 0);
         assertEq(market.debt(id), debtBefore - repaid);
+    }
+
+    /// @dev A maximum short loan extended in the same block must not end up with more debt than
+    /// a direct borrow to the same expiry could, so the extension is held to the credit limit.
+    function test_extend_cannotBypassTheBufferedCreditLimit() public {
+        FixedMarket market = _ready();
+
+        vm.prank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, type(uint256).max, 1 days, type(uint256).max);
+        assertLe(market.totalDebt(), market.creditLimit(), "a maximum draw fits the limit");
+
+        vm.prank(defaultBorrower);
+        vm.expectRevert(IBaseMarket.InsufficientLiquidity.selector);
+        market.extend(id, type(uint256).max, type(uint256).max);
+
+        // paying down makes room for the extension premium
+        uint256 paydown = market.debt(id) / 20;
+        vm.prank(defaultBorrower);
+        market.repay(id, paydown);
+
+        vm.prank(defaultBorrower);
+        market.extend(id, 7 days, type(uint256).max);
+        assertLe(market.totalDebt(), market.creditLimit(), "the extension stays within the limit");
+    }
+
+    /// @dev The keeper's overdue roll is not held to the credit limit, so a loan at the limit can
+    /// still be rolled and charged its arrears.
+    function test_extendAdmin_rollsALoanAtTheCreditLimit() public {
+        FixedMarket market = _ready();
+
+        vm.prank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, type(uint256).max, 1 days, type(uint256).max);
+        vm.warp(market.expiry(id) + market.grace());
+
+        vm.prank(defaultBorrower);
+        vm.expectRevert(IBaseMarket.InsufficientLiquidity.selector);
+        market.extend(id, 7 days, type(uint256).max);
+
+        market.extendAdmin(id, 7 days, type(uint256).max);
+        assertGt(market.totalDebt(), market.creditLimit(), "arrears and the roll are charged regardless");
+    }
+
+    /// @dev A floating borrow just before an extension raises the utilization it is priced at,
+    /// at no cost if repaid in the same block. A quoted cap turns that into a revert.
+    function test_extend_maxPremiumStopsAFloatingBorrowSandwich() public {
+        irm.setLiquiditySlopes(capConfig.liquiditySlopes);
+        _depositStable(makeAddr("saver"), 10_000e18);
+        FixedMarket market = _ready();
+        vm.prank(defaultBorrower);
+        (uint256 id,) = market.borrow(defaultBorrower, PRINCIPAL, 10 days, type(uint256).max);
+        vm.warp(block.timestamp + 1 days);
+
+        (uint256 liquidity, uint256 underwriting) = market.premiumForExtension(market.debt(id), 7 days);
+        uint256 quoted = liquidity + underwriting;
+
+        MarketBundle memory floating = _createReadyMarket("Floating");
+        _setMaxCapital(floating.market, 100_000e18);
+        _fundTranche(floating.tranche0Addr, makeAddr("floating supplier"), 100_000e18);
+        uint256 credit = floating.market.availableCredit();
+        assertGt(credit, 5 * PRINCIPAL, "enough floating credit to move utilization");
+        vm.prank(defaultBorrower);
+        floating.market.borrow(defaultBorrower, credit);
+
+        (liquidity, underwriting) = market.premiumForExtension(market.debt(id), 7 days);
+        uint256 inflated = liquidity + underwriting;
+        assertGt(inflated, quoted, "the floating credit is priced into the extension");
+
+        vm.prank(defaultBorrower);
+        vm.expectRevert(abi.encodeWithSelector(IFixedMarket.PremiumExceedsLimit.selector, inflated, quoted));
+        market.extend(id, 7 days, quoted);
+
+        vm.prank(defaultBorrower);
+        floating.market.repay(type(uint256).max);
+
+        uint256 debtBefore = market.debt(id);
+        vm.prank(defaultBorrower);
+        market.extend(id, 7 days, quoted);
+        assertLe(market.debt(id) - debtBefore, quoted, "charged no more than the quote");
     }
 }

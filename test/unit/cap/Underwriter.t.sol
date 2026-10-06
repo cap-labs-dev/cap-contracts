@@ -14,6 +14,29 @@ import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessMa
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
+/// @dev Tracks the underwriter's vault balance so a deposit sees its own transfer, as the real
+/// vault does, rather than a fixed figure set before the call.
+contract MockUnderwriterVault {
+    mapping(address owner => mapping(address asset => uint256 amount)) public balanceOf;
+
+    function transferFrom(address, address to, address asset, uint256 amount) external {
+        balanceOf[to][asset] += amount;
+    }
+
+    function transfer(address, address asset, uint256 amount) external {
+        balanceOf[msg.sender][asset] -= amount;
+    }
+
+    function setOperator(address, bool) external pure returns (bool) {
+        return true;
+    }
+
+    /// @dev Credit a balance no shares were issued against
+    function donate(address owner, address asset, uint256 amount) external {
+        balanceOf[owner][asset] += amount;
+    }
+}
+
 contract UnderwriterUnitTest is BaseTest {
     /// @dev Stands in for the role the Registry allocates per underwriter and wires the entry
     /// points to. Its admin defaults to ADMIN, which this contract holds, so grants need no further
@@ -26,9 +49,6 @@ contract UnderwriterUnitTest is BaseTest {
     Underwriter internal underwriter;
     MockERC20 internal collateral;
 
-    /// @dev Assets the mocked vault reports as held for the underwriter
-    uint256 internal vaultBalance;
-
     address internal vault = makeAddr("vault");
     address internal tranche = makeAddr("tranche");
     address internal supplier = makeAddr("supplier");
@@ -37,6 +57,7 @@ contract UnderwriterUnitTest is BaseTest {
 
     function setUp() public {
         _setUpAccessManager();
+        vm.etch(vault, address(new MockUnderwriterVault()).code);
         collateral = new MockERC20("Wrapped Ether", "WETH", 18);
 
         Underwriter impl = new Underwriter();
@@ -63,8 +84,6 @@ contract UnderwriterUnitTest is BaseTest {
         // role the entry points are gated to
         accessManager.setTargetFunctionRole(address(underwriter), _depositorSelectors(), DEPOSITOR_ROLE);
 
-        // addTranche and removeTranche toggle vault operator rights on the mocked vault
-        vm.mockCall(vault, abi.encodeWithSignature("setOperator(address,bool)"), abi.encode(true));
         // and opt the vault into the tranche's vesting so it can earn what {report} later claims
         vm.mockCall(tranche, abi.encodeWithSignature("optIn()"), abi.encode());
         vm.mockCall(tranche, abi.encodeWithSignature("optOut()"), abi.encode());
@@ -92,7 +111,6 @@ contract UnderwriterUnitTest is BaseTest {
 
     function test_mintSeedsDeadShares() public {
         accessManager.grantRole(DEPOSITOR_ROLE, supplier, 0);
-        _mockVault();
         collateral.mint(supplier, 1e18);
 
         vm.startPrank(supplier);
@@ -227,7 +245,6 @@ contract UnderwriterUnitTest is BaseTest {
         accessManager.schedule(address(underwriter), call, 0);
         vm.warp(block.timestamp + 1 days);
 
-        _mockVault();
         vm.prank(supplier);
         (bool ok,) = address(underwriter).call(call);
 
@@ -256,7 +273,6 @@ contract UnderwriterUnitTest is BaseTest {
     /// quietly rounding away, since a first deposit has to be able to cover the seed.
     function test_deadShares_firstDepositBelowTheSeedIsRejected() public {
         accessManager.grantRole(DEPOSITOR_ROLE, supplier, 0);
-        _mockVault();
         collateral.mint(supplier, DEAD_SHARES);
 
         vm.startPrank(supplier);
@@ -272,8 +288,7 @@ contract UnderwriterUnitTest is BaseTest {
         accessManager.grantRole(DEPOSITOR_ROLE, supplier, 0);
 
         // the vault reports a balance it was never issued shares against
-        vm.mockCall(vault, abi.encodeWithSignature("transferFrom(address,address,address,uint256)"), "");
-        vm.mockCall(vault, abi.encodeWithSignature("balanceOf(address,address)"), abi.encode(uint256(100e18)));
+        MockUnderwriterVault(vault).donate(address(underwriter), address(collateral), 100e18);
         assertEq(underwriter.totalAssets(), 100e18, "donated while completely empty");
         assertEq(underwriter.totalSupply(), 0);
 
@@ -286,23 +301,12 @@ contract UnderwriterUnitTest is BaseTest {
         assertEq(shares, 1e18 - DEAD_SHARES, "priced at par, so the donation did not round them away");
     }
 
-    /// @dev A deposit pulls assets through the vault and prices itself off the balance held there.
-    /// Both are mocked, with the balance tracked so a second deposit is priced off the first rather
-    /// than against a vault that forgot it.
-    function _mockVault() internal {
-        vm.mockCall(vault, abi.encodeWithSignature("transferFrom(address,address,address,uint256)"), "");
-        vm.mockCall(vault, abi.encodeWithSignature("balanceOf(address,address)"), abi.encode(vaultBalance));
-    }
-
     function _deposit(address caller, address receiver) internal {
-        _mockVault();
         collateral.mint(caller, 1e18);
         vm.startPrank(caller);
         collateral.approve(address(underwriter), 1e18);
         underwriter.deposit(1e18, receiver);
         vm.stopPrank();
-        vaultBalance += 1e18;
-        _mockVault();
     }
 
     function _expectDepositRejected(address caller) internal {

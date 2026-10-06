@@ -165,19 +165,25 @@ interface IFixedMarket is IBaseMarket {
     /// @dev Live loans can grow only up to the current {maximumTermLimit}. If that limit was
     /// lowered below remaining term, there is no room and the call reverts {InvalidTerm}; the
     /// existing expiry is unchanged. Expired loans roll from now and charge arrears.
+    /// Like {borrow}, the charged premium must keep {IBaseMarket-totalDebt} within
+    /// {IBaseMarket-creditLimit}, or the call reverts {IBaseMarket-InsufficientLiquidity}.
     /// `id` must be in `[0, loanCount)` and still carry debt.
     /// @param id The id of the loan
     /// @param extension The extension of the term
+    /// @param maxPremium Maximum combined liquidity and underwriting premium, in cUSD units (18 decimals).
+    /// Quote with {premiumForExtension}. Use `type(uint256).max` for no cap. Reverts {PremiumExceedsLimit} if exceeded.
     /// @return actualExtension The actual extension of the term
-    function extend(uint256 id, uint256 extension) external returns (uint256 actualExtension);
+    function extend(uint256 id, uint256 extension, uint256 maxPremium) external returns (uint256 actualExtension);
 
     /// @notice Roll an overdue loan forward and charge premium for the arrears
     /// @dev Health is not checked, so the loan may become liquidatable.
     /// `id` must be in `[0, loanCount)` and still carry debt.
     /// @param id The id of the loan
     /// @param extension The new term to roll the loan forward by
+    /// @param maxPremium Maximum combined liquidity and underwriting premium, in cUSD units (18 decimals).
+    /// Quote with {premiumForExtension}. Use `type(uint256).max` for no cap. Reverts {PremiumExceedsLimit} if exceeded.
     /// @return actualExtension The arrears plus the new term
-    function extendAdmin(uint256 id, uint256 extension) external returns (uint256 actualExtension);
+    function extendAdmin(uint256 id, uint256 extension, uint256 maxPremium) external returns (uint256 actualExtension);
 
     /// @notice Write off this loan's share of {unrecoverableDebt}
     /// @dev The market must be unhealthy before the write-off. Capped at the market-wide shortfall;
@@ -229,8 +235,8 @@ interface IFixedMarket is IBaseMarket {
     /// `type(uint256).max` and anything above {maximumTermLimit} quote at the maximum.
     /// May be below the exact maximum.
     /// @param term The term of the loan
-    /// @return credit The available credit in USD (18 decimals)
-    function availableCredit(uint256 term) external view returns (uint256 credit);
+    /// @return principal The principal borrowable over `term`, in stablecoin units (18 decimals)
+    function maxPrincipal(uint256 term) external view returns (uint256 principal);
 
     /// @notice Get the maximum term limit
     /// @return maximumTermLimit The maximum term limit

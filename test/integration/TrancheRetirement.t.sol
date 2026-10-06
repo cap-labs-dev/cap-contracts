@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import { Tranche } from "../../contracts/cap/Tranche.sol";
+import { IPremiumVesting } from "../../contracts/interfaces/IPremiumVesting.sol";
 import { ITranche } from "../../contracts/interfaces/ITranche.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
 import { ERC4626Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
@@ -37,6 +38,34 @@ contract TrancheRetirementTest is CapDeployer {
 
     function test_queuedWithdrawLatchesRetirement() public {
         _crossThreshold(3);
+    }
+
+    /// @dev A killed tranche whose every holder has queued strands its remainder until governance
+    /// recovers it. A live tranche keeps it for whoever deposits next.
+    function test_killedTrancheWithEveryHolderQueuedRecoversItsRemainder() public {
+        address market = address(tranche.market());
+        stablecoin.mintCreditBacked(address(tranche), 10e18);
+        vm.prank(market);
+        tranche.fund(10e18);
+
+        address treasury = makeAddr("treasury");
+        vm.expectRevert(IPremiumVesting.RemainderStillClaimable.selector);
+        tranche.recoverRemainder(treasury);
+
+        vm.prank(market);
+        tranche.slash(1, makeAddr("slash recipient"));
+        assertTrue(tranche.killed());
+
+        uint256 shares = tranche.balanceOf(supplier);
+        vm.prank(supplier);
+        tranche.requestRedeem(shares, supplier, supplier);
+        assertEq(tranche.stakedSupply(), 0);
+
+        uint256 frozen = tranche.remaining();
+        assertGt(frozen, 0);
+        assertEq(tranche.recoverRemainder(treasury), frozen);
+        assertEq(stablecoin.balanceOf(treasury), frozen);
+        assertEq(tranche.remaining(), 0);
     }
 
     function _crossThreshold(uint256 route) internal {
