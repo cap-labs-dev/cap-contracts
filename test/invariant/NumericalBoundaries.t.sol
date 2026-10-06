@@ -229,9 +229,9 @@ contract NumericalBoundariesTest is CapDeployer {
         uint256 edge = market.expiry(id) + market.grace();
         vm.warp(edge - 1);
         vm.expectRevert(IFixedMarket.StillInGracePeriod.selector);
-        market.extendAdmin(id, 1 days);
+        market.extendAdmin(id, 1 days, type(uint256).max);
         vm.warp(edge + side % 2);
-        market.extendAdmin(id, 1 days);
+        market.extendAdmin(id, 1 days, type(uint256).max);
         assertEq(market.expiry(id), block.timestamp + 1 days);
         assertEq(market.debt(id), market.totalDebt());
         assertEq(market.totalDebt(), stablecoin.creditBackedSupply());

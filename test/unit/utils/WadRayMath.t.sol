@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import { WadRayMath } from "../../../contracts/utils/WadRayMath.sol";
+import { stdError } from "forge-std/StdError.sol";
 import { Test } from "forge-std/Test.sol";
 
 /// @dev Exposes the internal library functions for external calls
@@ -260,6 +261,17 @@ contract WadRayMathTest is Test {
         assertEq(m.rayExp(0), RAY);
         assertApproxEqRel(m.rayExp(m.rayLn(1.1e27)), 1.1e27, 1e12);
         assertApproxEqRel(m.rayExp(m.rayLn(2e27)), 2e27, 1e12);
+    }
+
+    function test_rayExp_revertsInsteadOfWrapping() public {
+        uint256 ln2 = WadRayMath.LN2_RAY;
+        assertEq(m.rayExp(166 * ln2), RAY << 166, "largest power of two that fits");
+
+        vm.expectRevert(stdError.arithmeticError);
+        m.rayExp(167 * ln2);
+
+        vm.expectRevert(stdError.arithmeticError);
+        m.rayExp(256 * ln2);
     }
 
     function testFuzz_rayMul_identity(uint256 a) public view {
