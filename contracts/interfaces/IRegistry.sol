@@ -26,9 +26,6 @@ interface IRegistry {
     /// @notice The market was not deployed by this registry
     error UnknownMarket();
 
-    /// @notice The caller does not hold the market's owner role
-    error NotMarketOwner();
-
     /// @notice The requested slice starts after its end
     /// @dev `start` must not exceed `end`. Bounds past the collection are clamped to its length.
     error InvalidRange();
@@ -169,16 +166,17 @@ interface IRegistry {
         uint256 grace
     ) external returns (address market, address[] memory deployedTranches);
 
-    /// @notice Add a junior tranche to a market and reweight the waterfall
-    /// @dev Caller must hold the market owner role. `weights` covers the whole waterfall, including the new junior.
+    /// @notice Add a junior tranche to the calling market and reweight the waterfall
+    /// @dev Restricted to PROTOCOL and the caller must be a registered market. Owners call
+    /// {IBaseMarket-createTranche}, where AccessManager enforces their execution delay.
+    /// `weights` covers the whole waterfall, including the new junior.
     /// Reverts before deployment if the market already has ten configured tranches.
     /// The owner supplies the initial premium vesting period; subsequent changes require the governor.
-    /// @param market The market to deploy a tranche for
     /// @param asset The asset for the new tranche
     /// @param weights The resulting waterfall weights in ray decimals, last entry is the new tranche
     /// @param vestingPeriod The initial premium vesting time constant in seconds, from 1 through 1e27
     /// @return tranche The deployed tranche
-    function createTranche(address market, address asset, uint256[] calldata weights, uint256 vestingPeriod)
+    function createTranche(address asset, uint256[] calldata weights, uint256 vestingPeriod)
         external
         returns (address tranche);
 

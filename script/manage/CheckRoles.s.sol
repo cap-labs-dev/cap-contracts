@@ -197,6 +197,7 @@ contract CheckRoles is Script, InfraSerializer {
         _wired(
             manager, "Registry.setBorrowerRole", infra.registry, IRegistry.setBorrowerRole.selector, CapRoles.PROTOCOL
         );
+        _wired(manager, "Registry.createTranche", infra.registry, IRegistry.createTranche.selector, CapRoles.PROTOCOL);
         _wired(
             manager, "Registry.setAllocatorRole", infra.registry, IRegistry.setAllocatorRole.selector, CapRoles.PROTOCOL
         );
@@ -253,6 +254,7 @@ contract CheckRoles is Script, InfraSerializer {
             _wired(manager, "Market.setLoanToValue", market, IBaseMarket.setLoanToValue.selector, ownerRole);
             _wired(manager, "Market.setTrancheWeights", market, IBaseMarket.setTrancheWeights.selector, ownerRole);
             _wired(manager, "Market.setUnderwriterRate", market, IBaseMarket.setUnderwriterRate.selector, ownerRole);
+            _wired(manager, "Market.createTranche", market, IBaseMarket.createTranche.selector, ownerRole);
             _wired(manager, "Market.setTranches", market, IBaseMarket.setTranches.selector, CapRoles.REGISTRY);
             _wired(manager, "Market.setTargetHealth", market, IBaseMarket.setTargetHealth.selector, CapRoles.GOVERNOR);
             _wired(

@@ -87,13 +87,13 @@ contract MarketLimitsRegressionTest is CapDeployer {
         assertTrue(junior.killed());
         for (uint256 count = 3; count <= 10; ++count) {
             vm.prank(defaultMarketOwner);
-            registry.createTranche(address(market), address(collateral), _weights(count), 12 hours);
+            IBaseMarket(address(market)).createTranche(address(collateral), _weights(count), 12 hours);
         }
         assertEq(market.tranches().length, 10);
         uint256[] memory weights = _weights(11);
         vm.prank(defaultMarketOwner);
         vm.expectRevert(IBaseMarket.TooManyTranches.selector);
-        registry.createTranche(address(market), address(collateral), weights, 12 hours);
+        IBaseMarket(address(market)).createTranche(address(collateral), weights, 12 hours);
         assertEq(market.tranches().length, 10);
     }
 

@@ -117,7 +117,7 @@ contract MarketTest is CapDeployer {
         next[0] = 0.5e27;
         next[1] = 0.3e27;
         next[2] = 0.2e27;
-        address added = registry.createTranche(marketB, address(collateral), next, registry.DEFAULT_VESTING_PERIOD());
+        address added = IBaseMarket(marketB).createTranche(address(collateral), next, registry.DEFAULT_VESTING_PERIOD());
         assertTrue(registry.isTranche(added));
         assertEq(registry.tranchesLength(), 5);
         assertEq(registry.tranches(4, 5)[0], added);
@@ -170,7 +170,8 @@ contract MarketTest is CapDeployer {
         next[1] = 0.3e27;
         next[2] = 0.2e27;
         vm.recordLogs();
-        address added = registry.createTranche(marketAddr, address(collateral), next, registry.DEFAULT_VESTING_PERIOD());
+        address added =
+            IBaseMarket(marketAddr).createTranche(address(collateral), next, registry.DEFAULT_VESTING_PERIOD());
         _assertDeployed(vm.getRecordedLogs(), registry.trancheBeacon(), added);
 
         vm.recordLogs();

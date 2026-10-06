@@ -177,14 +177,16 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     /// @inheritdoc IRegistry
-    function createTranche(address _market, address _asset, uint256[] calldata _weights, uint256 _vestingPeriod)
+    function createTranche(address _asset, uint256[] calldata _weights, uint256 _vestingPeriod)
         external
+        restricted
         returns (address tranche)
     {
+        // the owner reached this through the market's own restricted entry point, so their
+        // execution delay has already been enforced there
+        address _market = msg.sender;
         if (!isMarket(_market)) revert UnknownMarket();
         uint64 ownerRole = marketOwnerRole(_market);
-        (bool isOwner,) = IAccessManager(authority()).hasRole(ownerRole, msg.sender);
-        if (!isOwner) revert NotMarketOwner();
 
         IBaseMarket.Tranche[] memory existing = IBaseMarket(_market).tranches();
         if (existing.length >= MarketLimits.MAX_TRANCHES) revert IBaseMarket.TooManyTranches();
@@ -529,10 +531,11 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     function _registryProtocolSelectors() private pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](3);
+        selectors = new bytes4[](4);
         selectors[0] = IRegistry.setDepositorRole.selector;
         selectors[1] = IRegistry.setBorrowerRole.selector;
         selectors[2] = IRegistry.setAllocatorRole.selector;
+        selectors[3] = IRegistry.createTranche.selector;
     }
 
     function _stablecoinMarketSelectors() private pure returns (bytes4[] memory selectors) {
@@ -582,11 +585,12 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     function _marketOwnerSelectors() private pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](4);
+        selectors = new bytes4[](5);
         selectors[0] = IBaseMarket.setTrancheWeights.selector;
         selectors[1] = IBaseMarket.setLoanToValue.selector;
         selectors[2] = IBaseMarket.setUnderwriterRate.selector;
         selectors[3] = IBaseMarket.setBorrowerRole.selector;
+        selectors[4] = IBaseMarket.createTranche.selector;
     }
 
     function _marketRegistrySelectors() private pure returns (bytes4[] memory selectors) {

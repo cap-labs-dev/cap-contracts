@@ -116,7 +116,7 @@ contract TrancheTest is CapDeployer {
         MockERC20 unpriced = new MockERC20("Ghost", "GHOST", 18);
 
         vm.expectRevert(abi.encodeWithSelector(IOracle.PriceError.selector, address(unpriced)));
-        registry.createTranche(address(market), address(unpriced), _weights3(0.5e27, 0.3e27, 0.2e27), 12 hours);
+        IBaseMarket(address(market)).createTranche(address(unpriced), _weights3(0.5e27, 0.3e27, 0.2e27), 12 hours);
 
         assertGt(tranche0.unlockedSupply(), 0, "existing depositors can still get out");
     }
@@ -433,9 +433,8 @@ contract TrancheTest is CapDeployer {
         uint256 juniorWeight = market.tranches()[1].weight;
         _slashTo(100e18, 0.5e18);
 
-        address fresh = registry.createTranche(
-            address(market), address(collateral), _weights3(0, juniorWeight, seniorWeight), 12 hours
-        );
+        address fresh = IBaseMarket(address(market))
+            .createTranche(address(collateral), _weights3(0, juniorWeight, seniorWeight), 12 hours);
 
         assertEq(ITranche(fresh).market(), address(market), "wired to the same market");
         assertEq(ITranche(fresh).asset(), tranche0.asset(), "and the same collateral");
@@ -458,8 +457,8 @@ contract TrancheTest is CapDeployer {
     function test_createTranche_addsAJuniorLayerWithItsOwnAsset() public {
         MockERC20 secondAsset = _newCollateral("Staked Ether", "stETH", 18, 2e18);
 
-        address added =
-            registry.createTranche(address(market), address(secondAsset), _weights3(0.5e27, 0.3e27, 0.2e27), 12 hours);
+        address added = IBaseMarket(address(market))
+            .createTranche(address(secondAsset), _weights3(0.5e27, 0.3e27, 0.2e27), 12 hours);
 
         assertEq(market.tranches().length, 3, "the waterfall got a layer deeper");
         assertEq(market.tranches()[2].tranche, added, "the new tranche is the most junior");
@@ -477,24 +476,32 @@ contract TrancheTest is CapDeployer {
     function test_createTranche_rejectsWeightsThatDoNotCoverTheNewTranche() public {
         uint256[] memory tooShort = capConfig.defaultTrancheWeights;
         vm.expectRevert(IRegistry.InvalidTrancheCount.selector);
-        registry.createTranche(address(market), address(collateral), tooShort, 12 hours);
+        IBaseMarket(address(market)).createTranche(address(collateral), tooShort, 12 hours);
     }
 
     function test_createTranche_rejectsWeightsThatDoNotTotalOneRay() public {
         vm.expectRevert(IBaseMarket.InvalidTrancheWeightsTotal.selector);
-        registry.createTranche(address(market), address(collateral), _weights3(0.5e27, 0.3e27, 0.1e27), 12 hours);
+        IBaseMarket(address(market)).createTranche(address(collateral), _weights3(0.5e27, 0.3e27, 0.1e27), 12 hours);
     }
 
-    /// @dev The owner role comes off the market rather than off an argument, so there is no call
-    /// shape that wires a tranche to somebody else's operator role.
-    function test_createTranche_rejectsAMarketItDidNotDeploy() public {
+    /// @dev The market is the caller rather than an argument, so there is no call shape that wires
+    /// a tranche to somebody else's market. The registry entry point is PROTOCOL only, and other
+    /// PROTOCOL holders such as tranches are not markets.
+    function test_createTranche_rejectsACallerThatIsNotAMarket() public {
+        uint256[] memory weights = _weights3(0.5e27, 0.3e27, 0.2e27);
+
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, stranger));
+        registry.createTranche(address(collateral), weights, 12 hours);
+
+        vm.prank(address(tranche0));
         vm.expectRevert(IRegistry.UnknownMarket.selector);
-        registry.createTranche(makeAddr("notAMarket"), address(collateral), _weights3(0.5e27, 0.3e27, 0.2e27), 12 hours);
+        registry.createTranche(address(collateral), weights, 12 hours);
     }
 
     function test_createTranche_namesDoNotCollideWithTheTrancheTheyReplace() public {
-        address fresh =
-            registry.createTranche(address(market), address(collateral), _weights3(0.5e27, 0.3e27, 0.2e27), 12 hours);
+        address fresh = IBaseMarket(address(market))
+            .createTranche(address(collateral), _weights3(0.5e27, 0.3e27, 0.2e27), 12 hours);
 
         assertTrue(
             keccak256(bytes(Tranche(fresh).name())) != keccak256(bytes(tranche0.name())), "distinct from tranche 0"
@@ -504,31 +511,53 @@ contract TrancheTest is CapDeployer {
         );
     }
 
-    /// @dev Adding a tranche is the market owner's call. AccessManager cannot bind the shared
-    /// selector to every owner role, so the Registry checks {marketOwnerRole} itself. Protocol
-    /// roles are not a substitute.
+    /// @dev Adding a tranche is the market owner's call, made on the market so AccessManager binds
+    /// it to that market's owner role and enforces the owner's execution delay. Other roles,
+    /// including ADMIN and another market's owner, are not a substitute.
     function test_createTranche_onlyMarketOwner() public {
         uint256[] memory weights = _weights3(0.5e27, 0.3e27, 0.2e27);
+        bytes memory unauthorized = abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, stranger);
 
         vm.prank(stranger);
-        vm.expectRevert(IRegistry.NotMarketOwner.selector);
-        registry.createTranche(address(market), address(collateral), weights, 12 hours);
+        vm.expectRevert(unauthorized);
+        IBaseMarket(address(market)).createTranche(address(collateral), weights, 12 hours);
 
         accessManager.grantRole(CapRoles.ADMIN, stranger, 0);
         vm.prank(stranger);
-        vm.expectRevert(IRegistry.NotMarketOwner.selector);
-        registry.createTranche(address(market), address(collateral), weights, 12 hours);
+        vm.expectRevert(unauthorized);
+        IBaseMarket(address(market)).createTranche(address(collateral), weights, 12 hours);
 
         address otherOwner = makeAddr("otherOwner");
         uint64 otherOwnerRole = _assignOperator(otherOwner);
         registry.createFloatingMarket(_uniformAssets(2), capConfig.defaultTrancheWeights, "other", otherOwnerRole);
         vm.prank(otherOwner);
-        vm.expectRevert(IRegistry.NotMarketOwner.selector);
-        registry.createTranche(address(market), address(collateral), weights, 12 hours);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, otherOwner));
+        IBaseMarket(address(market)).createTranche(address(collateral), weights, 12 hours);
 
         vm.prank(defaultMarketOwner);
-        registry.createTranche(address(market), address(collateral), weights, 12 hours);
+        IBaseMarket(address(market)).createTranche(address(collateral), weights, 12 hours);
         assertEq(market.tranches().length, 3);
+    }
+
+    /// @dev An owner held behind an execution delay used to add a tranche and reweight the waterfall
+    /// at once through the registry. On the market the delay applies: the call must be scheduled.
+    function test_createTranche_enforcesTheOwnersExecutionDelay() public {
+        uint256[] memory weights = _weights3(0.5e27, 0.3e27, 0.2e27);
+        address delayed = makeAddr("delayedOwner");
+        accessManager.grantRole(_operatorRoleOf(defaultMarketOwner), delayed, 1 days);
+        bytes memory call = abi.encodeCall(IBaseMarket.createTranche, (address(collateral), weights, 12 hours));
+
+        vm.prank(delayed);
+        vm.expectRevert();
+        IBaseMarket(address(market)).createTranche(address(collateral), weights, 12 hours);
+        assertEq(market.tranches().length, 2, "not before the delay");
+
+        vm.prank(delayed);
+        accessManager.schedule(address(market), call, 0);
+        vm.warp(block.timestamp + 1 days);
+        vm.prank(delayed);
+        IBaseMarket(address(market)).createTranche(address(collateral), weights, 12 hours);
+        assertEq(market.tranches().length, 3, "once scheduled and due");
     }
 
     function _weights3(uint256 a, uint256 b, uint256 c) internal pure returns (uint256[] memory weights) {

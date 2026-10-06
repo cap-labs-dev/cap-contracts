@@ -73,6 +73,7 @@ contract RoleTableTest is CapDeployer {
         _expectRole(market, IBaseMarket.setLoanToValue.selector, ownerRole, "setLoanToValue");
         _expectRole(market, IBaseMarket.setTrancheWeights.selector, ownerRole, "setTrancheWeights");
         _expectRole(market, IBaseMarket.setUnderwriterRate.selector, ownerRole, "setUnderwriterRate");
+        _expectRole(market, IBaseMarket.createTranche.selector, ownerRole, "createTranche");
         _expectRole(market, IBaseMarket.setTranches.selector, CapRoles.REGISTRY, "setTranches");
 
         // only the designated borrower can draw credit
@@ -336,8 +337,9 @@ contract RoleTableTest is CapDeployer {
         address newOwner = makeAddr("newMarketOwner");
         uint64 newRole = _assignOperator(newOwner);
 
-        bytes4[] memory ownerSelectors = new bytes4[](1);
+        bytes4[] memory ownerSelectors = new bytes4[](2);
         ownerSelectors[0] = IBaseMarket.setLoanToValue.selector;
+        ownerSelectors[1] = IBaseMarket.createTranche.selector;
         accessManager.setTargetFunctionRole(marketAddr, ownerSelectors, newRole);
 
         assertEq(registry.marketOwnerRole(marketAddr), newRole, "and the new one once it is rehomed");
@@ -348,11 +350,11 @@ contract RoleTableTest is CapDeployer {
         weights[1] = 0.3e27;
         weights[2] = 0.2e27;
 
-        vm.expectRevert(IRegistry.NotMarketOwner.selector);
-        registry.createTranche(marketAddr, address(collateral), weights, 12 hours);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, address(this)));
+        IBaseMarket(marketAddr).createTranche(address(collateral), weights, 12 hours);
 
         vm.prank(newOwner);
-        address added = registry.createTranche(marketAddr, address(collateral), weights, 12 hours);
+        address added = IBaseMarket(marketAddr).createTranche(address(collateral), weights, 12 hours);
 
         assertEq(accessManager.getRoleAdmin(_depositorRole(added)), newRole, "the next tranche follows the new owner");
         assertEq(
@@ -559,6 +561,7 @@ contract RoleTableTest is CapDeployer {
         _expectRole(address(registry), Registry.createUnderwriter.selector, CapRoles.WHITELISTED, "createUnderwriter");
         _expectRole(address(registry), Registry.setDepositorRole.selector, CapRoles.PROTOCOL, "setDepositorRole");
         _expectRole(address(registry), Registry.setBorrowerRole.selector, CapRoles.PROTOCOL, "setBorrowerRole");
+        _expectRole(address(registry), Registry.createTranche.selector, CapRoles.PROTOCOL, "createTranche");
         _expectRole(address(registry), Registry.setAllocatorRole.selector, CapRoles.PROTOCOL, "setAllocatorRole");
 
         // only the Registry deploys through the factory
