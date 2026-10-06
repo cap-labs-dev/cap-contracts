@@ -1546,9 +1546,11 @@ contract AccountingIntegrityTest is CapDeployer {
 
         assertLt(halfway, before, "a held deposit starts being felt as time passes");
         assertLt(settled, halfway, "and keeps being felt");
+        // the live reading: the draw raises credit, not supply, as the averaged pricing assumes
+        (uint256 liveCredit, uint256 liveSupply) = stablecoin.supplies();
         assertApproxEqRel(
             settled,
-            _premiumAt(market, stablecoin.utilizationRateAfterMint(QUOTED_PRINCIPAL)),
+            _premiumAt(market, WadRayMath.rayDiv(liveCredit + QUOTED_PRINCIPAL, liveSupply)),
             0.001e18,
             "until the average has fully caught up with the live reading"
         );
