@@ -42,7 +42,7 @@ Based on commit `b0a6f64a18bdb6ab97066e0eb086ae6c545ea9d8`, reviewed on 23 Septe
 - **Issue:** Reserve movements and temporary deposits can leave averaged utilization above or below live utilization, affecting premiums for the full quoted term.
 - **Accepted:** Pricing retains its averaging lag. Temporary liquidity can influence a quote and exit if reserves remain available; influencing the average does not require waiting a full averaging period.
 - **Rationale:** Pricing from spot utilization alone would let brief deposits or withdrawals manipulate the rate locked in for an entire fixed loan. Averaging reduces sensitivity to these short-lived liquidity changes, at the cost of responding more slowly to lasting changes.
-- **Mitigation:** Fixed borrowers can cap the combined premium on `borrow` and `borrowMore` with `maxPremium`. Execution reverts above the cap. This bounds the accepted cost without removing averaging lag; loan extensions remain uncapped.
+- **Mitigation:** Fixed borrowers can cap the combined premium on `borrow`, `borrowMore` and `extend` with `maxPremium`, and keepers can cap `extendAdmin` the same way. Execution reverts above the cap. This bounds the accepted cost, including credit borrowed and repaid around the call, without removing averaging lag.
 
 #### Splitting fixed borrows can reduce premiums
 
