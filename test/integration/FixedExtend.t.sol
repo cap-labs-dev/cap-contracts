@@ -70,7 +70,7 @@ contract FixedExtendTest is CapDeployer {
         FixedMarket market = FixedMarket(marketAddr);
 
         vm.prank(defaultBorrower);
-        vm.expectRevert(IBaseMarket.InvalidPrincipal.selector);
+        vm.expectRevert(IBaseMarket.InsufficientLiquidity.selector);
         market.borrow(defaultBorrower, type(uint256).max, 1 days, type(uint256).max);
     }
 
@@ -82,8 +82,8 @@ contract FixedExtendTest is CapDeployer {
 
         assertEq(market.expiry(id), block.timestamp + 30 days);
         assertEq(market.totalDebt(), market.debt(id));
-        assertGt(market.availableCredit(10 days), 0);
-        assertEq(market.availableCredit(365 days), market.availableCredit(30 days));
+        assertGt(market.maxPrincipal(10 days), 0);
+        assertEq(market.maxPrincipal(365 days), market.maxPrincipal(30 days));
     }
 
     function test_borrowMore_onALiveLoan() public {

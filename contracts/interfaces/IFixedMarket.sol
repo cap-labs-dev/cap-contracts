@@ -228,8 +228,8 @@ interface IFixedMarket is IBaseMarket {
     /// `type(uint256).max` and anything above {maximumTermLimit} quote at the maximum.
     /// May be below the exact maximum.
     /// @param term The term of the loan
-    /// @return credit The available credit in USD (18 decimals)
-    function availableCredit(uint256 term) external view returns (uint256 credit);
+    /// @return principal The principal borrowable over `term`, in stablecoin units (18 decimals)
+    function maxPrincipal(uint256 term) external view returns (uint256 principal);
 
     /// @notice Get the maximum term limit
     /// @return maximumTermLimit The maximum term limit
