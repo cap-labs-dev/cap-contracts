@@ -1341,4 +1341,96 @@ contract StablecoinTest is BaseTest {
         scoin.instantRedeem(100e18, alice, alice);
         assertEq(asset.balanceOf(alice), 1_000e18);
     }
+
+    /// @dev Fix review (pkqs90): the withdraw paths bounded the quoted shares but not the asset
+    /// value, so once {unlockedSupply} stopped netting bad debt a saturated quote let `B` shares
+    /// draw any balance above `recognized`. 100 reserve-backed cUSD, 20 bad debt, 200 USDC held.
+
+    function _overWithdrawScenario() internal {
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+        vm.prank(guardian);
+        scoin.recognizeBadDebtInReserve(20e18);
+        // recovered funds and reserve gains land on the Stablecoin; coverBadDebt() not run
+        asset.mint(address(scoin), 100e18);
+
+        assertEq(asset.balanceOf(address(scoin)), 200e18);
+        assertEq(scoin.badDebt(), 20e18);
+        assertEq(scoin.convertToAssets(100e18), 80e18, "100 cUSD is worth 80 USDC");
+    }
+
+    function test_instantWithdraw_isBoundedByAssetValue() public {
+        _overWithdrawScenario();
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxWithdraw.selector, alice, 200e18, 80e18)
+        );
+        scoin.instantWithdraw(200e18, alice, alice);
+    }
+
+    function test_fifoWithdraw_isBoundedByAssetValue() public {
+        _overWithdrawScenario();
+        vm.prank(alice);
+        scoin.requestRedeem(100e18, alice, alice);
+        assertEq(scoin.maxRedeem(alice), 100e18);
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxWithdraw.selector, alice, 200e18, 80e18)
+        );
+        scoin.withdraw(200e18, alice, alice);
+    }
+
+    function test_requestWithdraw_isBoundedByAssetValue() public {
+        _overWithdrawScenario();
+        vm.prank(alice);
+        uint256 id = scoin.requestRedeem(100e18, alice, alice);
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxWithdraw.selector, alice, 200e18, 80e18)
+        );
+        scoin.withdraw(id, 200e18, alice, alice);
+    }
+
+    /// The fair exit still works after the fix: 80 USDC for all 100 cUSD.
+    function test_fairExitStillWorks() public {
+        _overWithdrawScenario();
+        vm.prank(alice);
+        uint256 burned = scoin.instantWithdraw(80e18, alice, alice);
+        assertEq(burned, 100e18);
+        assertEq(scoin.badDebt(), 0, "the exit absorbs the shortfall");
+    }
+
+    /// No false reverts: any amount up to maxInstantWithdraw still clears, and never pays more
+    /// than the burned shares are worth.
+    function testFuzz_instantWithdraw_noFalseRevertsBelowMax(
+        uint256 deposit,
+        uint256 loss,
+        uint256 extra,
+        uint256 amount
+    ) public {
+        deposit = bound(deposit, 1e18, 1_000e18);
+        loss = bound(loss, 0, deposit - 1);
+        extra = bound(extra, 0, 1_000e18);
+
+        vm.prank(alice);
+        scoin.deposit(deposit, alice);
+        if (loss > 0) {
+            vm.prank(guardian);
+            scoin.recognizeBadDebtInReserve(loss);
+        }
+        asset.mint(address(scoin), extra);
+
+        uint256 maxAssets = scoin.maxInstantWithdraw(alice);
+        vm.assume(maxAssets > 0);
+        amount = bound(amount, 1, maxAssets);
+
+        uint256 shares = scoin.quoteWithdraw(amount);
+        uint256 worth = scoin.convertToAssets(shares);
+        vm.prank(alice);
+        uint256 burned = scoin.instantWithdraw(amount, alice, alice);
+        assertEq(burned, shares);
+        assertGe(worth, amount, "burned shares are worth at least the payout");
+    }
 }

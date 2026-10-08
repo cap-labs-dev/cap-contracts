@@ -128,6 +128,8 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         shares = _quoteWithdraw(_assets);
         uint256 maxShares = claimableRedeemRequest(_requestId, _controller);
         if (shares > maxShares) revert ERC4626ExceededMaxRedeem(_controller, shares, maxShares);
+        uint256 maxAssets = convertToAssets(maxShares);
+        if (_assets > maxAssets) revert ERC4626ExceededMaxWithdraw(_controller, _assets, maxAssets);
 
         _claim(_receiver, _controller, _assets, shares, _requestId);
     }
@@ -185,8 +187,9 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     {
         shares = _quoteWithdraw(_assets);
         uint256 maxShares = maxRedeem(_controller);
-        if (shares > maxShares) {
-            revert ERC4626ExceededMaxWithdraw(_controller, _assets, convertToAssets(maxShares));
+        uint256 maxAssets = convertToAssets(maxShares);
+        if (_assets > maxAssets || shares > maxShares) {
+            revert ERC4626ExceededMaxWithdraw(_controller, _assets, maxAssets);
         }
         _claimFifo(shares, _receiver, _controller, _assets);
     }
@@ -207,8 +210,9 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     {
         shares = _quoteWithdraw(_assets);
         uint256 maxShares = maxInstantRedeem(_owner);
-        if (shares > maxShares) {
-            revert ERC4626ExceededMaxWithdraw(_owner, _assets, maxInstantWithdraw(_owner));
+        uint256 maxAssets = convertToAssets(maxShares);
+        if (_assets > maxAssets || shares > maxShares) {
+            revert ERC4626ExceededMaxWithdraw(_owner, _assets, maxAssets);
         }
         _withdraw(msg.sender, _receiver, _owner, _assets, shares);
     }
