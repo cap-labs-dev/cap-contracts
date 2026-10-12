@@ -28,4 +28,17 @@ interface IWrapper is IERC4626 {
     /// @notice Get the decimals of the underlying asset
     /// @return decimals The decimals of the underlying asset
     function decimals() external view returns (uint8 decimals);
+
+    /// @notice Preview the shares a deposit of `assets` would mint
+    /// @dev An empty vault quotes at par less the 1,000 dead shares the first deposit seeds, and reverts
+    /// {DeadShares-DepositBelowSeed} at or below that amount.
+    /// @param assets The assets to deposit
+    /// @return shares The shares minted
+    function previewDeposit(uint256 assets) external view returns (uint256 shares);
+
+    /// @notice Preview the assets needed to mint `shares`
+    /// @dev Inverse of {previewDeposit} while empty: 1,000 shares more than the assets.
+    /// @param shares The shares to mint
+    /// @return assets The assets required
+    function previewMint(uint256 shares) external view returns (uint256 assets);
 }

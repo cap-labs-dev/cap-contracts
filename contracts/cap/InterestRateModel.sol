@@ -138,7 +138,6 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     }
 
     /// @inheritdoc IInterestRateModel
-    /// @dev There is no lower bound: a market may set its underwriter rate to zero
     function updateUnderwriterRate(uint256 rate) external restricted {
         if (rate > maximumUnderwriterRate) revert InvalidRate();
         address market = msg.sender;
@@ -174,7 +173,6 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     }
 
     /// @inheritdoc IInterestRateModel
-    /// @dev Uses the time-weighted utilization, not {liquidityRate}. See {averageUtilizationAfterMint}.
     function fixedRatesAfterMint(address market, uint256 termUtilization, uint256 mintAmount)
         public
         view

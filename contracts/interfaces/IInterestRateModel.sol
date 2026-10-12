@@ -174,7 +174,8 @@ interface IInterestRateModel {
     function setTargetHealth(uint256 targetHealth) external;
 
     /// @notice Update the underwriter rate for the calling market ({CapRoles-MARKET})
-    /// @dev Checkpoints the index first so the new rate applies only going forward.
+    /// @dev Checkpoints the index first so the new rate applies only going forward. At most
+    /// {maximumUnderwriterRate} (reverts {InvalidRate}); zero is allowed.
     /// @param rate The new underwriter rate per year in ray decimals
     function updateUnderwriterRate(uint256 rate) external;
 
@@ -323,7 +324,8 @@ interface IInterestRateModel {
     function liquidityIndex() external view returns (uint256 index);
 
     /// @notice Get the fixed rates after a credit-backed mint
-    /// @dev Non-decreasing in `mintAmount`. See {averageUtilizationAfterMint}, which also folds
+    /// @dev Uses the time-weighted utilization, not the spot {liquidityRate}. Non-decreasing in
+    /// `mintAmount`. See {averageUtilizationAfterMint}, which also folds
     /// in unabsorbed credit. The liquidity rate is the protocol curve times the term multiplier;
     /// the caller applies its market multiplier.
     /// @param market The market the underwriter rate is for

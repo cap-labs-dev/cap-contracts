@@ -298,22 +298,20 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         amount = _recoverRemainder(recipient);
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Caller must have the depositor role. The receiver is unrestricted.
+    /// @inheritdoc IUnderwriter
     function deposit(uint256 _assets, address _receiver)
         public
-        override(ERC4626Upgradeable, IERC4626)
+        override(ERC4626Upgradeable, IERC4626, IUnderwriter)
         restricted
         returns (uint256 shares)
     {
         shares = super.deposit(_assets, _receiver);
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Gated the same way as {deposit}; see there for how the allowlist works
+    /// @inheritdoc IUnderwriter
     function mint(uint256 _shares, address _receiver)
         public
-        override(ERC4626Upgradeable, IERC4626)
+        override(ERC4626Upgradeable, IERC4626, IUnderwriter)
         restricted
         returns (uint256 assets)
     {
@@ -360,9 +358,6 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     }
 
     /// @inheritdoc IUnderwriter
-    /// @dev Idle vault balance plus the last marked tranche positions. A slash hits the tranche
-    /// immediately, but this vault only folds it in when {_mark} runs (allocations, deallocations,
-    /// reports). Issuance quotes separately adjust for the default position, even when its book is zero.
     function totalAssets() public view override(ERC4626Upgradeable, IERC4626, IUnderwriter) returns (uint256) {
         return IVault(vault).balanceOf(address(this), asset()) + totalDebt;
     }
@@ -381,13 +376,11 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         assets = assets - recorded + ITranche(tranche).convertToAssets(position);
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Prices the existing default position via {_issuanceAssets} before allocation can mark it.
-    /// Empty vault quotes at par via {DeadShares-seedDeposit} minus the seeded shares.
+    /// @inheritdoc IUnderwriter
     function previewDeposit(uint256 assets)
         public
         view
-        override(ERC4626Upgradeable, IERC4626)
+        override(ERC4626Upgradeable, IERC4626, IUnderwriter)
         returns (uint256 shares)
     {
         uint256 supply = totalSupply();
@@ -396,10 +389,13 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
             : Math.mulDiv(assets, supply + 10 ** _decimalsOffset(), _issuanceAssets() + 1, Math.Rounding.Floor);
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Uses the same issuance valuation as {previewDeposit}, rounding assets up.
-    /// Inverse of {previewDeposit} while empty.
-    function previewMint(uint256 shares) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 assets) {
+    /// @inheritdoc IUnderwriter
+    function previewMint(uint256 shares)
+        public
+        view
+        override(ERC4626Upgradeable, IERC4626, IUnderwriter)
+        returns (uint256 assets)
+    {
         uint256 supply = totalSupply();
         assets = supply == 0
             ? DeadShares.seedMint(shares)

@@ -108,7 +108,6 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     }
 
     /// @inheritdoc IERC7540AsyncRedeem
-    /// @dev Cap extra, not an ERC-7540 method. Needed once requests can move between controllers.
     function controllerOf(uint256 _requestId) public view returns (address controller) {
         controller = _getERC7540AsyncRedeemStorage().requestController[_requestId];
     }
@@ -218,14 +217,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         _withdraw(msg.sender, _receiver, _owner, _assets, shares);
     }
 
-    /// @inheritdoc IERC7540Redeem
-    /// @dev Capped by {unlockedSupply}. The watermark is `settledQueue + unlocked`; `settledQueue`
-    /// counts all claimed shares, not a contiguous prefix. Allocation is FIFO only while
-    /// requests settle in order: already-claimable shares may settle out of order, and the
-    /// watermark then counts them as if they came from the head of the queue. If liquidity falls
-    /// afterwards, earlier and later requests can each show the same unlocked shares as claimable,
-    /// and whichever claims first is paid, so a later request can settle ahead of an earlier one.
-    /// Pending is the remainder of the request.
+    /// @inheritdoc IERC7540AsyncRedeem
     function claimableRedeemRequest(uint256 _requestId, address _controller)
         public
         view

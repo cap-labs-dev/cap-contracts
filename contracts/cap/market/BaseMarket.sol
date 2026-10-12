@@ -66,12 +66,12 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @inheritdoc IBaseMarket
-    /// @dev Not `nonReentrant`: the registry calls back into {setTranches}, which is.
     function createTranche(address asset, uint256[] calldata weights, uint256 vestingPeriod)
         external
         restricted
         returns (address tranche)
     {
+        // not nonReentrant: the registry calls back into {setTranches}, which is
         tranche = IRegistry(_getBaseMarketStorage().registry).createTranche(asset, weights, vestingPeriod);
     }
 
