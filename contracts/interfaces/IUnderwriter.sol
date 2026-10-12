@@ -19,7 +19,7 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @notice The named shares exceed this vault's queue under that request id
     error UnknownQueuedRequest();
 
-    /// @notice The deposit's default allocation retired the underwriter
+    /// @notice The deposit left the underwriter retired or below its kill threshold
     error UnderwriterKilled();
 
     /// @notice Emitted once when a position update retires the underwriter
@@ -92,10 +92,12 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     ) external;
 
     /// @notice Set the role permitted to deposit
+    /// @dev Can be opened to PUBLIC.
     /// @param roleId The depositor role id
     function setDepositorRole(uint64 roleId) external;
 
     /// @notice Set the role permitted to allocate and deallocate
+    /// @dev Must be a registry operator role, not PUBLIC.
     /// @param roleId The allocator role id
     function setAllocatorRole(uint64 roleId) external;
 
@@ -106,8 +108,9 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     function addTranche(address tranche) external;
 
     /// @notice Remove a tranche and block new allocations
-    /// @dev Curator only. Revokes vault operator rights. Existing shares can still be redeemed,
-    /// and {report} can still claim later premium on that leftover position.
+    /// @dev Curator only. Reports first if the book is open, revokes vault operator rights, and
+    /// clears {defaultTranche} if it pointed here. Existing shares can still be redeemed, and
+    /// {report} can still claim later premium on that leftover position.
     /// @param tranche The tranche address
     function removeTranche(address tranche) external;
 
@@ -121,13 +124,14 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @notice Instantly redeem unlocked tranche shares back to the vault
     /// @dev Allocator only. Tranches can be removed from registration and still deallocated.
     /// Remakes the mark only if {debt} is already nonzero — an airdrop cannot open a book.
+    /// Clamped to the shares held and the tranche's instant-unlocked supply.
     /// @param tranche The tranche address
     /// @param shares The shares to redeem
-    /// @return deallocated The amount of shares redeemed
+    /// @return deallocated The shares actually redeemed
     function deallocate(address tranche, uint256 shares) external returns (uint256 deallocated);
 
     /// @notice Request async redemption of tranche shares back to the vault
-    /// @dev Allocator only. Registration is not checked; see {deallocate}.
+    /// @dev Allocator only. Registration is not checked; see {deallocate}. Clamped to the shares held.
     /// @param tranche The tranche address
     /// @param shares The shares to redeem
     /// @return requestId The ERC-7540 request id
@@ -141,12 +145,9 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     function finalizeDeallocateAsync(address tranche, uint256 requestId, uint256 shares) external;
 
     /// @notice Set the registered tranche that receives deposits by default
-    /// @dev Allocator only. This authorizes automatic allocation of all incoming deposits.
-    /// Accepted liquidity risk: a deposit followed by an instant redemption can consume
-    /// pre-existing idle liquidity not reserved for queued redemptions, leaving remaining
-    /// holders with default-tranche exposure instead. Queued redemptions retain priority.
-    /// Restoring idle liquidity requires allocator deallocation and sufficient unlocked
-    /// tranche capital; existing market debt can prevent immediate recovery.
+    /// @dev Allocator only; must be registered. Every deposit is allocated here automatically, so a
+    /// deposit followed by an instant redemption can use up idle liquidity and leave remaining holders
+    /// with default-tranche exposure. Queued redemptions keep priority.
     /// @param tranche The default tranche address
     function setDefaultTranche(address tranche) external;
 
@@ -180,13 +181,14 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     function lastReported() external view returns (uint256);
 
     /// @notice Get whether a position update has retired the underwriter
-    /// @dev Latched below 1% of par using idle assets plus recorded tranche values. Deposits and
-    /// mints close permanently; deallocations, redemptions, reports, and premium claims stay open.
+    /// @dev Latched when idle assets plus recorded tranche values fall below 1% of share supply
+    /// (1% of par at one asset per share). Deposits and mints close permanently; deallocations,
+    /// redemptions, reports, and premium claims stay open.
     /// @return Whether the underwriter has been retired
     function killed() external view returns (bool);
 
     /// @notice Get the maximum deposit for a receiver
-    /// @dev Zero if the pool is killed, assets are below 1% of par, or the default tranche
+    /// @dev Zero if the pool is killed, assets are below its kill threshold, or the default tranche
     /// is killed; otherwise unlimited. A killed default blocks entry until removed or replaced
     /// with a live tranche, without itself retiring the pool. The value check uses the same live
     /// default-position value as deposit pricing, so it protects impaired pools before their next
@@ -233,9 +235,10 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     function totalDebt() external view returns (uint256);
 
     /// @notice Get the total assets including vault balance and recorded tranche debt
-    /// @dev Vault ERC6909 balance plus {totalDebt}. A slash is folded in only when {allocate}
-    /// opens or remakes the book, or when {report} / {deallocate} remake a book that already
-    /// exists. Deposit and mint quotes separately adjust for the default position, including
+    /// @dev Vault ERC6909 balance plus {totalDebt}. A slash is folded in only when a position update
+    /// remakes the book: {allocate} (including default-allocated deposits), {deallocate},
+    /// {deallocateAsync}, {finalizeDeallocateAsync}, {report} or {removeTranche}; only an allocation
+    /// can open a book. Deposit and mint quotes separately adjust for the default position, including
     /// queued shares and positions whose recorded debt is zero, without writing the book.
     /// Non-default positions remain cached, so unreported gains and losses also affect issuance pricing.
     /// @return assets The total assets

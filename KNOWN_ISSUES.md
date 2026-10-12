@@ -1,6 +1,6 @@
 # Known issues and accepted behavior
 
-Based on commit `b0a6f64a18bdb6ab97066e0eb086ae6c545ea9d8`, reviewed on 23 September 2026. Deployed settings may differ. “Accepted” describes the protocol's decision, not a claim that the behavior is harmless.
+Based on commit `5e857ffce7c2f342472a0c9d2565f3b4cd9578f9`, reviewed on 12 October 2026. Deployed settings may differ. “Accepted” describes the protocol's decision, not a claim that the behavior is harmless.
 
 ## Accepted risks
 
@@ -10,7 +10,7 @@ Based on commit `b0a6f64a18bdb6ab97066e0eb086ae6c545ea9d8`, reviewed on 23 Septe
 
 - **Issue:** Borrowers can buy discounted cUSD to repay debt at par, or redeem borrowed cUSD against available reserves without repaying the loan.
 - **Accepted:** cUSD remains fungible regardless of how it was minted. No repayment haircut or reserve allocation by holder is enforced.
-- **Fixed:** Shortfall pricing excludes performing credit, so credit issuance and repayment alone no longer change another holder's identical redemption quote. Cash can still be exhausted through redemptions.
+- **Mitigation:** Shortfall pricing excludes performing credit, so credit issuance and repayment alone do not change another holder's redemption quote. Cash can still be exhausted through redemptions.
 
 #### Holders can exit before a loss is recognized
 
@@ -92,7 +92,7 @@ Based on commit `b0a6f64a18bdb6ab97066e0eb086ae6c545ea9d8`, reviewed on 23 Septe
 #### Underwriter pools vest harvested premiums again
 
 - **Issue:** Already-vested tranche premiums enter the Underwriter's vesting pot, where later pool depositors can earn them.
-- **Accepted:** Underwriters claim tranche rewards only through manager-controlled `_report` calls. Immediate distribution would let someone enter just before a report, collect a share of accumulated rewards, and leave if liquidity permits. We vest again so earning those rewards requires continued participation.
+- **Accepted:** Underwriters claim tranche rewards only through keeper `report` calls, or when the curator removes a tranche. Immediate distribution would let someone enter just before a report, collect a share of accumulated rewards, and leave if liquidity permits. We vest again so earning those rewards requires continued participation.
 - **Mitigation:** The curator controls the pool's vesting period. Later entrants can still earn, but the harvest is distributed over time rather than paid out immediately.
 
 #### Borrowers earn part of their own fixed premium
@@ -189,7 +189,7 @@ Based on commit `b0a6f64a18bdb6ab97066e0eb086ae6c545ea9d8`, reviewed on 23 Septe
 - **Tranche capital caps:** `maxCapital` limits a tranche's contribution to borrowing capacity, not deposits or loss exposure. Collateral above the cap remains available to the liquidation waterfall.
 - **Governance and upgrades:** Privileged roles are trusted to configure permissions, economic parameters and implementations correctly. Upgrades must preserve existing storage and accounting.
 - **Operational availability:** Keepers, guardians and authorized liquidators must perform reporting, premium realization, overdue extensions and liquidation promptly. The contracts do not guarantee a response time.
-- **Temporary pause:** The cUSD pause is intended as a temporary emergency measure. Guardians must lift it when safe; it does not expire automatically. Pausing blocks minting and burning, including borrowing, repayment, liquidation and cUSD redemption. Transfers remain enabled, while interest accrual and loan expiry continue.
+- **Temporary pause:** The cUSD pause is intended as a temporary emergency measure. Guardians must lift it when safe; it does not expire automatically. Pausing blocks minting and burning, including borrowing, repayment, liquidation, cUSD deposits and redemption, and `coverBadDebt`. Any market premium charge that mints also waits: fixed extensions that charge premium and, once a floating market has accrued premium, its premium realization, write-offs, tranche changes and multiplier changes. Fixed write-offs remain available. Transfers remain enabled, while interest accrual and loan expiry continue.
 - **Oracle accuracy:** Configured feeds must report accurate prices in the expected units. A fresh, positive but incorrect primary price is accepted; the secondary source is a fallback, not a cross-check.
 - **Reserve asset peg:** Minting treats one whole reserve token as one cUSD. A reserve token's dollar depeg does not automatically change that conversion.
 - **Reserve liquidity and custody:** Invested reserves depend on the external vault and keeper recalls. Redemptions do not automatically recall investments, and changing the reserve-vault address does not migrate existing funds.

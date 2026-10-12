@@ -53,10 +53,11 @@ interface IInterestRateModel {
 
     /// @notice Time-weighted supplies and the observation they are carried towards
     /// @dev `observed*` is the snapshot taken at `lastUpdate`. The averages move toward it as time
-    /// passes; a snapshot just written has not stood yet, so it has no weight.
-    /// @param credit The time-weighted credit-backed supply as of `lastUpdate`, in stablecoin units (18 decimals)
+    /// passes; a snapshot just written has not stood yet, so it has no weight. Credit is the
+    /// credit-backed supply plus bad debt, as {IStablecoin-supplies} reports it.
+    /// @param credit The time-weighted credit as of `lastUpdate`, in stablecoin units (18 decimals)
     /// @param supply The time-weighted total supply as of `lastUpdate`, in stablecoin units (18 decimals)
-    /// @param observedCredit The credit-backed supply that has stood since `lastUpdate`, in stablecoin units (18 decimals)
+    /// @param observedCredit The credit that has stood since `lastUpdate`, in stablecoin units (18 decimals)
     /// @param observedSupply The total supply that has stood since `lastUpdate`, in stablecoin units (18 decimals)
     /// @param lastUpdate The time the averages were last folded forward
     struct UtilizationAverage {
@@ -149,6 +150,7 @@ interface IInterestRateModel {
     function setTermMultiplierSlope(uint256 slope) external;
 
     /// @notice Set the liquidation bonus
+    /// @dev At most {MarketLimits-MAX_LIQUIDATION_BONUS}. Read live by every market.
     /// @param liquidationBonus The liquidation bonus in ray decimals
     function setLiquidationBonus(uint256 liquidationBonus) external;
 
@@ -158,6 +160,7 @@ interface IInterestRateModel {
     function setAveragingPeriod(uint256 averagingPeriod) external;
 
     /// @notice Set the default liquidation threshold copied onto new markets
+    /// @dev At most one ray and strictly above {buffer}.
     /// @param liquidationThreshold The default liquidation threshold in ray decimals
     function setLiquidationThreshold(uint256 liquidationThreshold) external;
 
@@ -243,9 +246,10 @@ interface IInterestRateModel {
     function MAXIMUM_AVERAGING_PERIOD() external view returns (uint256);
 
     /// @notice Get the stored time-weighted supplies and the observation they are carried towards
-    /// @return credit The time-weighted credit-backed supply as of `lastUpdate`, in stablecoin units (18 decimals)
+    /// @dev Credit is the credit-backed supply plus bad debt; see {UtilizationAverage}.
+    /// @return credit The time-weighted credit as of `lastUpdate`, in stablecoin units (18 decimals)
     /// @return supply The time-weighted total supply as of `lastUpdate`, in stablecoin units (18 decimals)
-    /// @return observedCredit The credit-backed supply that has stood since `lastUpdate`, in stablecoin units (18 decimals)
+    /// @return observedCredit The credit that has stood since `lastUpdate`, in stablecoin units (18 decimals)
     /// @return observedSupply The total supply that has stood since `lastUpdate`, in stablecoin units (18 decimals)
     /// @return lastUpdate The time the averages were last folded forward
     function utilizationAverage()
@@ -255,25 +259,27 @@ interface IInterestRateModel {
 
     /// @notice Get the time-weighted supplies as they stand now
     /// @dev Same-block as a supply move, this is the stored pair.
-    /// @return credit The time-weighted credit-backed supply, in stablecoin units (18 decimals)
+    /// @return credit The time-weighted credit-backed supply plus bad debt, in stablecoin units (18 decimals)
     /// @return supply The time-weighted total supply, in stablecoin units (18 decimals)
     function averageSupplies() external view returns (uint256 credit, uint256 supply);
 
     /// @notice Get the time-weighted utilization rate
-    /// @dev The carried averages only. Unabsorbed credit-backed mints are added by
-    /// {averageUtilizationAfterMint}, not here.
+    /// @dev The carried averages only. Unabsorbed credit is added by {averageUtilizationAfterMint},
+    /// not here. Zero when the average supply is zero.
     /// @return rate The time-weighted utilization rate in ray decimals
     function averageUtilization() external view returns (uint256 rate);
 
-    /// @notice Get the credit-backed supply the time-weighted average has not yet absorbed
-    /// @dev `max(0, live credit - average credit)`. A reserve-only move does not appear.
-    /// @return amount The unsmoothed credit-backed supply, in stablecoin units (18 decimals)
+    /// @notice Get the credit the time-weighted average has not yet absorbed
+    /// @dev `max(0, live credit - average credit)`, where live credit includes bad debt. Deposits
+    /// and par redemptions do not appear; a recognized reserve loss does.
+    /// @return amount The unsmoothed credit-backed supply plus bad debt, in stablecoin units (18 decimals)
     function unsmoothedCredit() external view returns (uint256 amount);
 
     /// @notice Get the utilization after a credit-backed mint, against the time-weighted supplies
     /// @dev `mintAmount` and any already-unabsorbed credit are added to credit in full but not to
     /// supply, pricing the draw as if its cash leaves the reserve. Can exceed one ray; the rate
-    /// curve caps it. A same-tx reserve move still carries no weight.
+    /// curve caps it. A same-tx reserve move still carries no weight. With zero average supply and
+    /// nonzero credit, reads one ray.
     /// @param mintAmount The credit-backed supply about to be minted, in stablecoin units (18 decimals)
     /// @return rate The projected utilization rate in ray decimals
     function averageUtilizationAfterMint(uint256 mintAmount) external view returns (uint256 rate);

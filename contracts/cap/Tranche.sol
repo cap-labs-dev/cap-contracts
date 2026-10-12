@@ -35,7 +35,7 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
     /// @inheritdoc ITranche
     uint256 public maxCapital;
 
-    /// @dev Shares per remaining asset at which the tranche is retired (1% of par)
+    /// @dev Shares per remaining asset at which the tranche is retired (1% of par at one asset per share)
     uint256 private constant KILL_RATIO = 100;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -218,7 +218,8 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
         _checkKilled(totalAssets() - assets);
     }
 
-    /// @dev Retire below 1% of par before assets leave. Equality and zero share supply stay alive.
+    /// @dev Retire below 1% of share supply in assets before assets leave. Equality and zero share
+    /// supply stay alive.
     /// Division avoids overflowing assets * KILL_RATIO. Retirement never blocks an exit.
     /// @param assets The asset balance after the slash or withdrawal
     function _checkKilled(uint256 assets) private {

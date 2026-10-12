@@ -74,8 +74,8 @@ interface IFixedMarket is IBaseMarket {
     /// @param id The id of the loan
     /// @param sender The sender of the liquidation request
     /// @param recipient The recipient of the liquidated assets
-    /// @param amount The amount of debt repaid, in stablecoin units (18 decimals)
-    /// @param valueSlashed The USD value of collateral delivered, 18 decimals, possibly across tokens
+    /// @param amount The debt repaid on this loan, in stablecoin units (18 decimals)
+    /// @param valueSlashed This loan's proportional share of the USD value of collateral delivered, 18 decimals
     event LiquidateFixed(
         uint256 indexed id, address indexed sender, address indexed recipient, uint256 amount, uint256 valueSlashed
     );
@@ -106,7 +106,9 @@ interface IFixedMarket is IBaseMarket {
 
     /// @notice Borrow assets from the market
     /// @dev Premium is {premiumForBorrow}. `type(uint256).max` fills the maximum term;
-    /// a finite term outside the band reverts {InvalidTerm}.
+    /// a finite term outside the band reverts {InvalidTerm}. Reverts {IBaseMarket-InvalidPrincipal}
+    /// for zero and {IBaseMarket-InsufficientLiquidity} if principal plus premium exceeds
+    /// {IBaseMarket-availableCredit}, including a `type(uint256).max` draw with no room.
     /// @param recipient The recipient of the borrowed assets
     /// @param principal The principal amount of the borrowed assets, in stablecoin units (18 decimals), or
     /// `type(uint256).max` for the computed available principal over `term`. That size may sit
@@ -124,7 +126,7 @@ interface IFixedMarket is IBaseMarket {
     /// @dev `id` must still carry debt. A fully repaid loan stays enumerable but cannot
     /// reopen; open a new loan with {borrow}. Premium is {premiumForBorrow} on the
     /// remaining term. Reverts {LoanExpired} at or after expiry, {InvalidTerm} if the
-    /// remainder is below {minimumTermLimit}.
+    /// remainder is below {minimumTermLimit}. Principal limits and reverts match {borrow}.
     /// @param id The id of the loan
     /// @param recipient The recipient of the borrowed assets
     /// @param principal The principal amount of the borrowed assets, in stablecoin units (18 decimals), or
@@ -138,7 +140,8 @@ interface IFixedMarket is IBaseMarket {
         returns (uint256 actualPrincipal);
 
     /// @notice Repay assets to the market
-    /// @dev Burns the recorded amount. Arrears accrue only when {extend} or {extendAdmin} runs
+    /// @dev Burns the recorded amount. `type(uint256).max` clears in full; a closed loan reverts
+    /// {IBaseMarket-InvalidAmount}. Arrears accrue only when {extend} or {extendAdmin} runs
     /// after expiry; a keeper must call that after the grace period.
     /// @param id The id of the loan. Must be in `[0, loanCount)`.
     /// @param amount The amount of assets to repay, in stablecoin units (18 decimals)
@@ -165,9 +168,10 @@ interface IFixedMarket is IBaseMarket {
     /// @dev Live loans can grow only up to the current {maximumTermLimit}. If that limit was
     /// lowered below remaining term, there is no room and the call reverts {InvalidTerm}; the
     /// existing expiry is unchanged. Expired loans roll from now and charge arrears.
-    /// Like {borrow}, the charged premium must keep {IBaseMarket-totalDebt} within
-    /// {IBaseMarket-creditLimit}, or the call reverts {IBaseMarket-InsufficientLiquidity}.
-    /// `id` must be in `[0, loanCount)` and still carry debt.
+    /// `type(uint256).max` fills the room left. Reverts {IBaseMarket-Unhealthy} first if the charge
+    /// leaves the market unhealthy, then, like {borrow}, {IBaseMarket-InsufficientLiquidity} unless
+    /// {IBaseMarket-totalDebt} stays within {IBaseMarket-creditLimit}, including when debt already
+    /// exceeds the limit. `id` must be in `[0, loanCount)` and still carry debt.
     /// @param id The id of the loan
     /// @param extension The extension of the term
     /// @param maxPremium Maximum combined liquidity and underwriting premium, in cUSD units (18 decimals).
@@ -176,7 +180,8 @@ interface IFixedMarket is IBaseMarket {
     function extend(uint256 id, uint256 extension, uint256 maxPremium) external returns (uint256 actualExtension);
 
     /// @notice Roll an overdue loan forward and charge premium for the arrears
-    /// @dev Health is not checked, so the loan may become liquidatable.
+    /// @dev Reverts {StillInGracePeriod} before expiry plus {grace}. Neither health nor
+    /// {IBaseMarket-creditLimit} is checked, so the loan may become liquidatable.
     /// `id` must be in `[0, loanCount)` and still carry debt.
     /// @param id The id of the loan
     /// @param extension The new term to roll the loan forward by
@@ -185,7 +190,7 @@ interface IFixedMarket is IBaseMarket {
     /// @return actualExtension The arrears plus the new term
     function extendAdmin(uint256 id, uint256 extension, uint256 maxPremium) external returns (uint256 actualExtension);
 
-    /// @notice Write off this loan's share of {unrecoverableDebt}
+    /// @notice Write off this loan's debt, up to the market's {unrecoverableDebt}
     /// @dev The market must be unhealthy before the write-off. Capped at the market-wide shortfall;
     /// collateral is not slashed. Remaining market debt may be healthy, so continued liquidatability
     /// is not guaranteed. Borrowing remains subject to {creditLimit}; the market is not paused.
@@ -215,12 +220,9 @@ interface IFixedMarket is IBaseMarket {
         returns (uint256 liquidityPremium, uint256 underwriterPremium);
 
     /// @notice Get the premium a new borrow would be charged
-    /// @dev On this principal at the rate after it is minted. Earlier draws already
-    /// sit in the credit-backed supply, so a later draw is dearer per token, but
-    /// early slices miss the high rate the full principal would have paid. Splitting
-    /// can therefore cheapen the total versus one draw. That is expected. Borrowers
-    /// are permissioned; splitting to reduce premium is not acceptable use.
-    /// `type(uint256).max` and anything above {maximumTermLimit} quote at the maximum.
+    /// @dev Priced on this principal at the rate after it is minted. Each draw is priced alone, so
+    /// splitting one borrow into several can cost less in total. A `term` of `type(uint256).max` or
+    /// above {maximumTermLimit} quotes at the maximum.
     /// @param principal The principal of the loan, in stablecoin units (18 decimals)
     /// @param term The term of the loan
     /// @return liquidityPremium The liquidity premium, in stablecoin units (18 decimals)

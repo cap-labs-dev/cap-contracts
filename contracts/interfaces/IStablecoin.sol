@@ -134,13 +134,15 @@ interface IStablecoin {
     /// @dev Guardian only. Credit-backed supply is unchanged because no borrower debt was lost.
     /// `amount` is cUSD share units (18 decimals), not underlying reserve-token units.
     /// Reverts unless `badDebt + creditBackedSupply <= totalSupply` after the recognition.
+    /// Checkpoints the liquidity rate, since a reserve loss raises utilization.
     /// @param amount The bad debt to recognize, in cUSD share units (18 decimals)
     function recognizeBadDebtInReserve(uint256 amount) external;
 
     /// @notice Recognize unrecoverable borrower debt, socializing the loss across holders
-    /// @dev Market only. Also drops credit-backed supply. Recognized backing falls through
-    /// {backing} / {totalAssets}; redeemers take a further exit haircut via {convertToAssets}.
-    /// `amount` is cUSD share units (18 decimals), not underlying reserve-token units.
+    /// @dev Market only. Also drops credit-backed supply, leaving utilization unchanged. Recognized
+    /// backing falls through {backing} / {totalAssets}; redeemers take a further exit haircut via
+    /// {convertToAssets}. `amount` is cUSD share units (18 decimals), not underlying reserve-token units.
+    /// Reverts {BadDebtExceedsSupply} if bad debt would exceed total supply.
     /// @param amount The bad debt to recognize, in cUSD share units (18 decimals)
     function recognizeBadDebtInCredit(uint256 amount) external;
 

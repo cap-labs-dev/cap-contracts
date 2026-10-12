@@ -100,8 +100,9 @@ interface ITranche is IPremiumVesting, IERC7540AsyncRedeem {
     function oracle() external view returns (address);
 
     /// @notice Get whether the tranche has been retired
-    /// @dev Latched below 1% of par after a slash or withdrawal. Closes deposits. The market
-    /// also stops sending it fresh premium, so leftover dust cannot keep its weight.
+    /// @dev Latched when a slash or withdrawal leaves assets below 1% of share supply (1% of par at
+    /// one asset per share). Closes deposits. The market also stops sending it fresh premium, so
+    /// leftover dust cannot keep its weight.
     /// @return Whether the tranche has been retired
     function killed() external view returns (bool);
 

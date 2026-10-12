@@ -151,8 +151,8 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     /// @notice Claim previously requested redemptions for `controller`, oldest request first
     /// @dev Replaces the ERC-4626 instant-balance redeem. Caller must be `controller` or its
     /// operator; ERC-20 allowance is insufficient. Limited to currently claimable shares
-    /// and {unlockedSupply}. Pays `convertToAssets(shares)` once (floored), then consumes
-    /// receipts to match; per-request floors cannot underpay. Dust transferred onto this
+    /// and {unlockedSupply}. Consumes receipts oldest first, then pays `convertToAssets(shares)`
+    /// (floored) once; per-request floors cannot underpay. Dust transferred onto this
     /// controller is cleared the same way: redeem the claimable dust and the receipts drop
     /// off the FIFO walk.
     /// @param _shares Shares to claim
@@ -174,7 +174,8 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     /// @notice Claim previously requested redemptions for `controller` by asset amount, oldest first
     /// @dev Replaces the ERC-4626 instant-balance withdraw. Caller must be `controller` or its
     /// operator; ERC-20 allowance is insufficient. Limited to currently claimable shares
-    /// and {unlockedSupply}. Burns the ceil-quoted shares and pays `_assets` once.
+    /// and {unlockedSupply}. Burns the ceil-quoted shares and pays `_assets` once. `_assets` may not
+    /// exceed `convertToAssets` of the claimable shares (reverts {ERC4626ExceededMaxWithdraw}).
     /// @param _assets Assets to pay
     /// @param _receiver Asset recipient
     /// @param _controller Request controller, not an instant share-balance owner
@@ -218,9 +219,8 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     }
 
     /// @inheritdoc IERC7540Redeem
-    /// @dev Capped by {unlockedSupply}. The watermark is `settledQueue + unlocked`, and
-    /// `settledQueue` is total claimed, not a contiguous prefix, so a later 4-arg claim must not
-    /// keep an earlier request claimable after liquidity falls. Allocation is FIFO only while
+    /// @dev Capped by {unlockedSupply}. The watermark is `settledQueue + unlocked`; `settledQueue`
+    /// counts all claimed shares, not a contiguous prefix. Allocation is FIFO only while
     /// requests settle in order: already-claimable shares may settle out of order, and the
     /// watermark then counts them as if they came from the head of the queue. If liquidity falls
     /// afterwards, earlier and later requests can each show the same unlocked shares as claimable,
@@ -398,7 +398,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         if (claimableShares > _unlocked) claimableShares = _unlocked;
     }
 
-    /// @dev Shares a withdrawal of `assets` would burn. Ceil, matching the old {previewWithdraw}.
+    /// @dev Shares a withdrawal of `assets` would burn. Ceil, as ERC-4626 {previewWithdraw} rounds.
     /// @param assets The asset amount
     /// @return shares The share amount
     function _quoteWithdraw(uint256 assets) internal view returns (uint256 shares) {

@@ -113,7 +113,7 @@ interface IPremiumVesting {
     function pendingPremium(address user) external view returns (uint256 premium);
 
     /// @notice Get the calculated premium entitlement for an account
-    /// @dev Not the amount {claim} will pay. Payment is capped by the stablecoin this contract holds.
+    /// @dev Not the amount {claim} will pay, which is capped at spendable holdings.
     /// @param user The account to query
     /// @return premium The calculated entitlement, in stablecoin units (18 decimals), uncapped by holdings
     function claimable(address user) external view returns (uint256 premium);

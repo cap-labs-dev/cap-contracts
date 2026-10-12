@@ -87,7 +87,8 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     /// @notice Claim a previously requested redemption by asset amount on a single request
     /// @dev Caller must be `controller` or its operator. ERC-20 allowance is insufficient.
     /// Limited to currently claimable shares on this request and {unlockedSupply}.
-    /// Burns the ceil-quoted shares for `assets`.
+    /// Burns the ceil-quoted shares for `assets`. `assets` may not exceed `convertToAssets` of
+    /// those claimable shares (reverts {ERC4626ExceededMaxWithdraw}).
     /// @param requestId The request to settle
     /// @param assets The assets to pay
     /// @param receiver The asset recipient
@@ -131,6 +132,7 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     function maxInstantWithdraw(address owner) external view returns (uint256 maxAssets);
 
     /// @notice Redeem shares against liquid reserve, without a request
+    /// @dev Caller must be `owner`, its operator, or hold share allowance. Bounded by {maxInstantRedeem}.
     /// @param shares The shares to burn
     /// @param receiver The asset recipient
     /// @param owner The share holder
@@ -138,6 +140,8 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     function instantRedeem(uint256 shares, address receiver, address owner) external returns (uint256 assets);
 
     /// @notice Withdraw assets against liquid reserve, without a request
+    /// @dev Caller must be `owner`, its operator, or hold share allowance. Bounded by {maxInstantRedeem}
+    /// shares and {maxInstantWithdraw} assets.
     /// @param assets The assets to pay
     /// @param receiver The asset recipient
     /// @param owner The share holder
@@ -145,7 +149,7 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     function instantWithdraw(uint256 assets, address receiver, address owner) external returns (uint256 shares);
 
     /// @notice Get the shares a withdrawal of `assets` would burn, including shortfall pricing
-    /// @dev {previewWithdraw} reverts. This is the quote {unlockedSupply} and instant exits use.
+    /// @dev {previewWithdraw} reverts. This is the ceil share quote every withdraw path burns.
     /// @param assets The asset amount
     /// @return shares The share amount
     function quoteWithdraw(uint256 assets) external view returns (uint256 shares);

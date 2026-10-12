@@ -44,7 +44,7 @@ interface IBaseMarket {
     /// @notice The buffer is below 10% or is not strictly below the liquidation threshold
     error InvalidBuffer();
 
-    /// @notice The liquidation threshold exceeds the maximum allowed value
+    /// @notice The liquidation threshold exceeds the maximum or is not above the buffer
     error InvalidLiquidationThreshold();
 
     /// @notice The target health is below the minimum allowed value
@@ -68,7 +68,7 @@ interface IBaseMarket {
     /// @notice The amount is invalid
     error InvalidAmount();
 
-    /// @notice The market has insufficient liquidity for the requested borrow
+    /// @notice The market lacks credit for the requested draw or extension
     error InsufficientLiquidity();
 
     /// @notice The tranche weights do not sum to one ray
@@ -165,12 +165,15 @@ interface IBaseMarket {
     function setTargetHealth(uint256 targetHealth) external;
 
     /// @notice Set the role permitted to borrow from the market
+    /// @dev Must be a registry operator role, not PUBLIC.
     /// @param roleId The borrower role id
     function setBorrowerRole(uint64 roleId) external;
 
     /// @notice Add a junior tranche to this market and reweight the waterfall
     /// @dev Market owner only, so AccessManager enforces the owner's execution delay. Forwards to
     /// {IRegistry-createTranche}. `weights` covers the whole waterfall, including the new junior.
+    /// Reverts {TooManyTranches} at ten, {Unhealthy} if unhealthy after reweighting, and
+    /// {IOracle-PriceError} if the asset has no price.
     /// @param asset The asset for the new tranche
     /// @param weights The resulting waterfall weights in ray decimals, last entry is the new tranche
     /// @param vestingPeriod The initial premium vesting time constant in seconds, from 1 through 1e27
@@ -180,7 +183,8 @@ interface IBaseMarket {
         returns (address tranche);
 
     /// @notice Set the tranches and their weights
-    /// @dev Restricted to the registry; market owners may only change weights.
+    /// @dev Restricted to the registry. Owners reweight via {setTrancheWeights} or add a junior via
+    /// {createTranche}. Reverts {Unhealthy} if the market is unhealthy afterwards.
     /// At most ten tranches may be configured, including empty, killed and zero-weight tranches.
     /// The count is checked before settling premium.
     /// Floating settles outstanding premium under the current list first, so an
@@ -189,7 +193,8 @@ interface IBaseMarket {
     function setTranches(Tranche[] calldata tranches) external;
 
     /// @notice Set the tranche weights
-    /// @dev Floating settles outstanding premium under the current weights first.
+    /// @dev Floating settles outstanding premium under the current weights first. Reverts
+    /// {Unhealthy} if the market is unhealthy afterwards.
     /// @param weights The new tranche weights in ray decimals
     function setTrancheWeights(uint256[] calldata weights) external;
 
@@ -198,7 +203,7 @@ interface IBaseMarket {
     function setUnderwriterRate(uint256 rate) external;
 
     /// @notice Set the market multiplier
-    /// @dev Bounded by the IRM min/max. Floating accrues first so the new factor applies only
+    /// @dev Governor only. Bounded by the IRM min/max. Floating accrues first so the new factor applies only
     /// going forward; fixed applies it to the next term's liquidity rate. Outstanding principal
     /// does not jump.
     /// @param multiplier The new market multiplier in ray decimals

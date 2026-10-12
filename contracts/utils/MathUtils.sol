@@ -34,8 +34,7 @@ library MathUtils {
     /// Each window of at most one year uses Aave's cubic binomial. A single cubic over many
     /// years under-accrues without bound (about 1.9% after 1 y at 100%, 73% after 5 y). Folding
     /// year-sized windows keeps the error at the one-year bound, and matches checkpointing once
-    /// a year. The underwriter index is only written on a rate change, so the view has to do
-    /// this itself.
+    /// a year. Indexes are written only at checkpoints, so the view has to do this itself.
     /// @param rate The interest rate, in ray
     /// @param lastUpdateTimestamp The timestamp of the last update of the interest
     /// @param currentTimestamp The timestamp to accumulate interest up to

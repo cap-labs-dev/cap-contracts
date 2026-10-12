@@ -349,8 +349,8 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
             : average - (average - observed).rayMul(weight);
     }
 
-    /// @dev Utilization as the stablecoin defines it, on the given supplies.
-    /// @param credit The credit-backed supply
+    /// @dev Credit over supply, zero when supply is zero.
+    /// @param credit The credit-backed supply plus bad debt
     /// @param supply The total supply
     /// @return rate The utilization rate in ray decimals
     function _ratio(uint256 credit, uint256 supply) internal pure returns (uint256 rate) {

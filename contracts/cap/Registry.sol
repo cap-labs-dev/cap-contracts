@@ -455,9 +455,8 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
 
         manager.setTargetFunctionRole(market, _marketOwnerSelectors(), ownerRole);
 
-        // borrow / borrowMore / extend used to sit unwired until {setBorrowerRole}, which
-        // AccessManager reports as ADMIN. A closed role the owner administers is the same
-        // pattern as the tranche depositor role: nobody can draw until they are admitted.
+        // borrow, borrowMore and extend start on a closed role the owner administers, so they are never
+        // unwired (which AccessManager reports as ADMIN); nobody can draw until they are admitted
         manager.setTargetFunctionRole(market, _borrowerSelectors(), _newClosedRole(manager, ownerRole));
 
         manager.setTargetFunctionRole(market, _marketRegistrySelectors(), CapRoles.REGISTRY);
@@ -494,8 +493,8 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         manager.setTargetFunctionRole(underwriter, _underwriterKeeperSelectors(), CapRoles.KEEPER);
         manager.setTargetFunctionRole(underwriter, _one(IUnderwriter.recoverRemainder.selector), CapRoles.GOVERNOR);
 
-        // the seven capital-moving selectors used to sit unwired until {setAllocatorRole} /
-        // {setDepositorRole}. Closed roles the curator administers close that ADMIN window.
+        // the capital-moving selectors start on closed roles the curator administers, so they are never
+        // unwired at ADMIN before {setAllocatorRole} / {setDepositorRole}
         manager.setTargetFunctionRole(underwriter, _allocatorSelectors(), _newClosedRole(manager, curatorRoleId));
         manager.setTargetFunctionRole(underwriter, _depositorSelectors(), _newClosedRole(manager, curatorRoleId));
 

@@ -246,8 +246,8 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @dev Draw `principal` and charge {premiumForBorrow}. `type(uint256).max` fills
-    /// {_principalFor}. Reverts {Unhealthy} if the premium (or an active-to-total gap)
-    /// takes health below one ray.
+    /// {_principalFor}. Reverts {InsufficientLiquidity} unless principal plus premium fits
+    /// {availableCredit}; the {Unhealthy} check is a backstop.
     /// @param id The id of the loan
     /// @param recipient The address to borrow to
     /// @param principal The principal of the loan, or `type(uint256).max` for the sized max
@@ -275,9 +275,8 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         _totalDebt += actualPrincipal;
         _borrow(recipient, actualPrincipal);
         _applyPremium(id, liquidityPremium, underwriterPremium);
-        // credit is min(ltv, lt) against active capital; the threshold is lt against total. A full
-        // draw can land on health of one when those match. The Unhealthy assert is for the premium
-        // stacked on top, and for any active < total gap. {extend} asserts the same after its charge
+        // backstop: credit is min(ltv, lt - buffer) of capped active capital and already covers the
+        // premium, so a draw stays below the threshold. {extend} asserts the same after its charge
         if (healthiness() < 1e27) revert Unhealthy();
     }
 

@@ -50,7 +50,7 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     /// @inheritdoc IUnderwriter
     bool public killed;
 
-    /// @dev Shares per remaining asset at which the pool is retired (1% of par).
+    /// @dev Shares per remaining asset at which the pool is retired (1% of par at one asset per share).
     uint256 private constant KILL_RATIO = 100;
 
     /// @inheritdoc IUnderwriter
@@ -245,7 +245,7 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     }
 
     /// @dev Division avoids overflowing assets * 100. A never-funded pool is not a loss and reads
-    /// no assets; equality at 1% of par remains open.
+    /// no assets; equality at the threshold remains open.
     /// @param live Value the default position live, as issuance does, instead of at its last mark
     function _belowKillThreshold(bool live) private view returns (bool) {
         uint256 supply = totalSupply();
@@ -361,8 +361,8 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
 
     /// @inheritdoc IUnderwriter
     /// @dev Idle vault balance plus the last marked tranche positions. A slash hits the tranche
-    /// immediately, but this vault only folds it in when {_mark} runs (allocate, deallocate, or
-    /// report). Issuance quotes separately adjust for the default position, even when its book is zero.
+    /// immediately, but this vault only folds it in when {_mark} runs (allocations, deallocations,
+    /// reports). Issuance quotes separately adjust for the default position, even when its book is zero.
     function totalAssets() public view override(ERC4626Upgradeable, IERC4626, IUnderwriter) returns (uint256) {
         return IVault(vault).balanceOf(address(this), asset()) + totalDebt;
     }
@@ -421,8 +421,8 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         if (totalSupply() == 0) _mint(DeadShares.HOLDER, DeadShares.SHARES);
         super._deposit(caller, receiver, assets, shares);
         // Default allocation can recognize a loss after the entry-point limit check, and its kill
-        // check ran before these shares existed. Allocation has marked the default, so totalAssets
-        // is live; test the completed ratio.
+        // check ran before these shares existed. Allocation has marked the default, so its book is
+        // live (others stay cached); test the completed ratio.
         if (killed || _belowKillThreshold(false)) revert UnderwriterKilled();
     }
 
