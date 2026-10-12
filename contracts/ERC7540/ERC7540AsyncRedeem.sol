@@ -128,6 +128,8 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         shares = _quoteWithdraw(_assets);
         uint256 maxShares = claimableRedeemRequest(_requestId, _controller);
         if (shares > maxShares) revert ERC4626ExceededMaxRedeem(_controller, shares, maxShares);
+        uint256 maxAssets = convertToAssets(maxShares);
+        if (_assets > maxAssets) revert ERC4626ExceededMaxWithdraw(_controller, _assets, maxAssets);
 
         _claim(_receiver, _controller, _assets, shares, _requestId);
     }
@@ -185,8 +187,9 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     {
         shares = _quoteWithdraw(_assets);
         uint256 maxShares = maxRedeem(_controller);
-        if (shares > maxShares) {
-            revert ERC4626ExceededMaxWithdraw(_controller, _assets, convertToAssets(maxShares));
+        uint256 maxAssets = convertToAssets(maxShares);
+        if (_assets > maxAssets || shares > maxShares) {
+            revert ERC4626ExceededMaxWithdraw(_controller, _assets, maxAssets);
         }
         _claimFifo(shares, _receiver, _controller, _assets);
     }
@@ -207,17 +210,22 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     {
         shares = _quoteWithdraw(_assets);
         uint256 maxShares = maxInstantRedeem(_owner);
-        if (shares > maxShares) {
-            revert ERC4626ExceededMaxWithdraw(_owner, _assets, maxInstantWithdraw(_owner));
+        uint256 maxAssets = convertToAssets(maxShares);
+        if (_assets > maxAssets || shares > maxShares) {
+            revert ERC4626ExceededMaxWithdraw(_owner, _assets, maxAssets);
         }
         _withdraw(msg.sender, _receiver, _owner, _assets, shares);
     }
 
     /// @inheritdoc IERC7540Redeem
-    /// @dev Capped by {unlockedSupply}. `settledQueue` is total claimed, not a contiguous
-    /// prefix, so a later 4-arg claim must not keep an earlier request claimable after liquidity
-    /// falls. Liquidity is still allocated FIFO via the watermark; already-claimable shares may
-    /// settle out of order. Pending is the remainder of the request.
+    /// @dev Capped by {unlockedSupply}. The watermark is `settledQueue + unlocked`, and
+    /// `settledQueue` is total claimed, not a contiguous prefix, so a later 4-arg claim must not
+    /// keep an earlier request claimable after liquidity falls. Allocation is FIFO only while
+    /// requests settle in order: already-claimable shares may settle out of order, and the
+    /// watermark then counts them as if they came from the head of the queue. If liquidity falls
+    /// afterwards, earlier and later requests can each show the same unlocked shares as claimable,
+    /// and whichever claims first is paid, so a later request can settle ahead of an earlier one.
+    /// Pending is the remainder of the request.
     function claimableRedeemRequest(uint256 _requestId, address _controller)
         public
         view
@@ -243,6 +251,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     function maxRedeem(address _controller)
         public
         view
+        virtual
         override(ERC4626Upgradeable, IERC4626)
         returns (uint256 maxShares)
     {
@@ -250,10 +259,11 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         if (unlocked == 0) return 0;
 
         ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
+        uint256 frontier = $.settledQueue + unlocked;
         EnumerableSet.UintSet storage ids = $.controllerRequests[_controller];
         uint256 n = ids.length();
         for (uint256 i; i < n; ++i) {
-            maxShares += _claimableShares(ids.at(i), _controller);
+            maxShares += _claimableAt(ids.at(i), _controller, frontier, unlocked);
             if (maxShares >= unlocked) return unlocked;
         }
     }
@@ -291,7 +301,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     }
 
     /// @inheritdoc IERC7540AsyncRedeem
-    function maxInstantRedeem(address _owner) public view returns (uint256 maxShares) {
+    function maxInstantRedeem(address _owner) public view virtual returns (uint256 maxShares) {
         uint256 instantUnlocked = instantUnlockedSupply();
         uint256 balance = balanceOf(_owner);
         maxShares = balance > instantUnlocked ? instantUnlocked : balance;
@@ -359,24 +369,33 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     /// @param _controller The controller to match
     /// @return claimableShares Shares that may be claimed now
     function _claimableShares(uint256 _requestId, address _controller) internal view returns (uint256 claimableShares) {
-        uint256 balance = _requestShares(_requestId, _controller);
-        if (balance == 0) return 0;
-
+        // an empty request never needs the cap, which may need a price
+        if (_requestShares(_requestId, _controller) == 0) return 0;
         uint256 unlocked = unlockedSupply();
-        if (unlocked == 0) return 0;
+        claimableShares =
+            _claimableAt(_requestId, _controller, _getERC7540AsyncRedeemStorage().settledQueue + unlocked, unlocked);
+    }
 
-        ERC7540AsyncRedeemStorage storage $ = _getERC7540AsyncRedeemStorage();
-        uint256 currentIndex = $.settledQueue + unlocked;
-        uint256 queueIndex = $.queueIndex[_requestId];
+    /// @dev The slice of a request below `_frontier`, capped by `_unlocked`. Callers that consume
+    /// several requests fix the frontier once, before any burn, so a mid-loop read cannot see
+    /// supply that is burned but not yet paid.
+    /// @param _requestId The request id
+    /// @param _controller The controller to match
+    /// @param _frontier The FIFO watermark, `settledQueue + unlocked` before any consumption
+    /// @param _unlocked The unlocked shares still available to this claim
+    /// @return claimableShares Shares that may be claimed now
+    function _claimableAt(uint256 _requestId, address _controller, uint256 _frontier, uint256 _unlocked)
+        internal
+        view
+        returns (uint256 claimableShares)
+    {
+        uint256 balance = _requestShares(_requestId, _controller);
+        uint256 queueIndex = _getERC7540AsyncRedeemStorage().queueIndex[_requestId];
+        if (balance == 0 || _unlocked == 0 || _frontier <= queueIndex) return 0;
 
-        if (currentIndex <= queueIndex) {
-            return 0;
-        } else if (currentIndex >= queueIndex + balance) {
-            claimableShares = balance;
-        } else {
-            claimableShares = currentIndex - queueIndex;
-        }
-        if (claimableShares > unlocked) claimableShares = unlocked;
+        claimableShares = _frontier - queueIndex;
+        if (claimableShares > balance) claimableShares = balance;
+        if (claimableShares > _unlocked) claimableShares = _unlocked;
     }
 
     /// @dev Shares a withdrawal of `assets` would burn. Ceil, matching the old {previewWithdraw}.
@@ -407,9 +426,11 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
 
         uint256 remaining = _shares;
         uint256 remainingUnlocked = unlockedSupply();
+        // read once: each consumption burns before the single payout, so re-reading the cap
+        // mid-loop would price supply that is burned but not yet paid
+        uint256 frontier = $.settledQueue + remainingUnlocked;
         for (uint256 i; i < n && remaining > 0 && remainingUnlocked > 0; ++i) {
-            uint256 claimable = _claimableShares(list[i], _controller);
-            if (claimable > remainingUnlocked) claimable = remainingUnlocked;
+            uint256 claimable = _claimableAt(list[i], _controller, frontier, remainingUnlocked);
             if (claimable == 0) continue;
             uint256 take = remaining < claimable ? remaining : claimable;
             _consumeRequest(_controller, take, list[i]);

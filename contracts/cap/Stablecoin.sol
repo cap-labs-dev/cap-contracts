@@ -140,26 +140,25 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
 
     /// @inheritdoc IStablecoin
     function utilizationRate() public view returns (uint256 rate) {
-        rate = _utilizationRate(creditBackedSupply, totalSupply());
-    }
-
-    /// @inheritdoc IStablecoin
-    function utilizationRateAfterMint(uint256 _amount) public view returns (uint256 rate) {
-        rate = _utilizationRate(creditBackedSupply + _amount, totalSupply() + _amount);
+        (uint256 credit, uint256 supply) = supplies();
+        rate = _utilizationRate(credit, supply);
     }
 
     /// @inheritdoc IStablecoin
     function supplies() public view returns (uint256 credit, uint256 supply) {
-        credit = creditBackedSupply;
+        // bad debt is value no reserve stands behind, so it is as unavailable as lent-out credit:
+        // the reserve is worth supply less credit and bad debt
+        credit = creditBackedSupply + badDebt;
         supply = totalSupply();
     }
 
-    /// @dev Calculates the utilization rate between the credit-backed supply and the total supply.
-    /// @param _credit The credit-backed supply
+    /// @dev Calculates the utilization rate between the unavailable supply and the total supply.
+    /// @param _credit The credit-backed supply plus bad debt
     /// @param _supply The total supply
     /// @return rate The utilization rate in ray decimals
     function _utilizationRate(uint256 _credit, uint256 _supply) internal pure returns (uint256 rate) {
-        if (_supply == 0) return 0;
+        // with no supply at all, any credit is full utilization
+        if (_supply == 0) return _credit == 0 ? 0 : WadRayMath.RAY;
         rate = _credit.rayDiv(_supply);
     }
 
@@ -171,6 +170,8 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         uint256 supply = totalSupply();
         uint256 credit = creditBackedSupply;
         if (credit > supply || badDebt > supply - credit) revert BadDebtExceedsSupply();
+        // a reserve loss raises utilization, so checkpoint the rate as a credit write-off does
+        _updateLiquidityRate();
         emit BadDebtRecognizedInReserve(_amount);
     }
 
@@ -178,7 +179,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     function recognizeBadDebtInCredit(uint256 _amount) external restricted {
         badDebt += _amount;
         if (badDebt > totalSupply()) revert BadDebtExceedsSupply();
-        // will never be repaid, so drop it from credit-backed supply. unlockedSupply is unchanged
+        // will never be repaid, so drop it from credit-backed supply. Utilization is unchanged
         // because badDebt rose by the same amount. Holders take the loss through {backing}.
         creditBackedSupply -= _amount;
         _updateLiquidityRate();
@@ -202,10 +203,12 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     /// @inheritdoc IStablecoin
     function unlockedSupply() public view override(ERC7540AsyncRedeem, IStablecoin) returns (uint256 unlocked) {
         // aggregate reserve capacity, not a restriction on which holders may redeem:
-        // credit-minted tokens are fungible with deposited tokens
-        uint256 locked = creditBackedSupply + badDebt;
+        // credit-minted tokens are fungible with deposited tokens. Bad debt is not a share count
+        // to hold back: during a shortfall every reserve-backed share exits below par, and the
+        // reserve cap below bounds what they can draw
+        uint256 credit = creditBackedSupply;
         uint256 supply = totalSupply();
-        if (supply > locked) unlocked = supply - locked;
+        if (supply > credit) unlocked = supply - credit;
 
         uint256 available = _quoteWithdraw(IERC20(asset()).balanceOf(address(this)));
         if (unlocked > available) unlocked = available;
@@ -249,6 +252,30 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         returns (uint256 assets)
     {
         assets = Math.ceilDiv(_shares, _scalingFactor);
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev Zero while paused, since a deposit mints.
+    function maxDeposit(address) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 maxAssets) {
+        if (!paused()) maxAssets = type(uint256).max;
+    }
+
+    /// @inheritdoc IERC4626
+    /// @dev Zero while paused; see {maxDeposit}.
+    function maxMint(address) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 maxShares) {
+        if (!paused()) maxShares = type(uint256).max;
+    }
+
+    /// @inheritdoc ERC7540AsyncRedeem
+    /// @dev Zero while paused, since a claim burns. Request state is unchanged; see {claimableRedeemRequest}.
+    function maxRedeem(address _controller) public view override returns (uint256 maxShares) {
+        if (!paused()) maxShares = super.maxRedeem(_controller);
+    }
+
+    /// @inheritdoc ERC7540AsyncRedeem
+    /// @dev Zero while paused, since an instant exit burns.
+    function maxInstantRedeem(address _owner) public view override returns (uint256 maxShares) {
+        if (!paused()) maxShares = super.maxInstantRedeem(_owner);
     }
 
     /// @inheritdoc IStablecoin
@@ -312,7 +339,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
 
         uint256 supply = totalSupply() - creditBackedSupply;
         uint256 recognized = supply - shortfall;
-        // saturate at the pricing basis; while shortfall > 0, this exceeds unlockedSupply
+        // saturate at the pricing basis, the reserve-backed shares that {unlockedSupply} counts
         if (value >= recognized) return supply;
 
         uint256 retained = recognized - value;

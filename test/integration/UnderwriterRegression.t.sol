@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { Underwriter } from "../../contracts/cap/Underwriter.sol";
 import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
+import { IPremiumVesting } from "../../contracts/interfaces/IPremiumVesting.sol";
 import { IUnderwriter } from "../../contracts/interfaces/IUnderwriter.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
 import { ERC4626Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
@@ -276,6 +277,55 @@ contract UnderwriterRegressionTest is CapDeployer {
         assertEq(pool.totalDebt(), 0);
         assertEq(Tranche(fresh).totalSupply(), 0, "the nested seed mint is rolled back too");
         assertFalse(pool.killed());
+    }
+
+    /// @dev A retired pool whose every holder has queued can never vest its remainder again, so
+    /// governance recovers it. Before the last holder queues, it still belongs to them.
+    function test_retiredPoolWithEveryHolderQueuedRecoversItsRemainder() public {
+        _allocateAll(1_000e18);
+        stablecoin.mintCreditBacked(address(tranche), 10e18);
+        vm.prank(address(market));
+        tranche.fund(10e18);
+        vm.warp(block.timestamp + 20 * tranche.vestingPeriod());
+        _slash(tranche.totalAssets() - 1e18);
+        pool.report(address(tranche));
+        assertTrue(pool.killed());
+        assertGt(pool.remaining(), 0, "the harvest landed in the pool's remainder");
+
+        address treasury = makeAddr("treasury");
+        vm.expectRevert(IPremiumVesting.RemainderStillClaimable.selector);
+        pool.recoverRemainder(treasury);
+
+        uint256 shares = pool.balanceOf(incumbent);
+        vm.prank(incumbent);
+        pool.requestRedeem(shares, incumbent, incumbent);
+        assertEq(pool.stakedSupply(), 0);
+
+        uint256 frozen = pool.remaining();
+        vm.warp(block.timestamp + 20 * pool.vestingPeriod());
+        assertEq(pool.remaining(), frozen, "nothing vests with nobody earning");
+
+        assertEq(pool.recoverRemainder(treasury), frozen);
+        assertEq(stablecoin.balanceOf(treasury), frozen);
+        assertEq(pool.remaining(), 0);
+    }
+
+    /// @dev An unmarked slash leaves the cached value healthy while the live value deposits are
+    /// priced at is already below 1% of par. Entry must close on the live value.
+    function test_liveValueBelowRetirementClosesDepositsBeforeAMark() public {
+        tranche = Tranche(market.tranches()[1].tranche);
+        pool.addTranche(address(tranche));
+        _admitDepositor(address(tranche), address(pool));
+        _allocateAll(1_000e18);
+
+        uint256 remaining = Math.ceilDiv(tranche.totalSupply(), 100);
+        _slash(tranche.totalAssets() - remaining);
+        assertFalse(tranche.killed());
+        assertLt(tranche.convertToAssets(tranche.balanceOf(address(pool))), Math.ceilDiv(pool.totalSupply(), 100));
+        assertGe(pool.totalAssets(), Math.ceilDiv(pool.totalSupply(), 100), "the cached mark is still healthy");
+
+        _assertDepositsClosed();
+        assertFalse(pool.killed(), "closing entry does not latch retirement before a mark");
     }
 
     function _assertDepositsClosed() internal {

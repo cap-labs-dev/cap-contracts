@@ -177,14 +177,16 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     /// @inheritdoc IRegistry
-    function createTranche(address _market, address _asset, uint256[] calldata _weights, uint256 _vestingPeriod)
+    function createTranche(address _asset, uint256[] calldata _weights, uint256 _vestingPeriod)
         external
+        restricted
         returns (address tranche)
     {
+        // the owner reached this through the market's own restricted entry point, so their
+        // execution delay has already been enforced there
+        address _market = msg.sender;
         if (!isMarket(_market)) revert UnknownMarket();
         uint64 ownerRole = marketOwnerRole(_market);
-        (bool isOwner,) = IAccessManager(authority()).hasRole(ownerRole, msg.sender);
-        if (!isOwner) revert NotMarketOwner();
 
         IBaseMarket.Tranche[] memory existing = IBaseMarket(_market).tranches();
         if (existing.length >= MarketLimits.MAX_TRANCHES) revert IBaseMarket.TooManyTranches();
@@ -490,6 +492,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
 
         manager.setTargetFunctionRole(underwriter, _underwriterCuratorSelectors(), curatorRoleId);
         manager.setTargetFunctionRole(underwriter, _underwriterKeeperSelectors(), CapRoles.KEEPER);
+        manager.setTargetFunctionRole(underwriter, _one(IUnderwriter.recoverRemainder.selector), CapRoles.GOVERNOR);
 
         // the seven capital-moving selectors used to sit unwired until {setAllocatorRole} /
         // {setDepositorRole}. Closed roles the curator administers close that ADMIN window.
@@ -528,10 +531,11 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     function _registryProtocolSelectors() private pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](3);
+        selectors = new bytes4[](4);
         selectors[0] = IRegistry.setDepositorRole.selector;
         selectors[1] = IRegistry.setBorrowerRole.selector;
         selectors[2] = IRegistry.setAllocatorRole.selector;
+        selectors[3] = IRegistry.createTranche.selector;
     }
 
     function _stablecoinMarketSelectors() private pure returns (bytes4[] memory selectors) {
@@ -584,9 +588,9 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         selectors = new bytes4[](5);
         selectors[0] = IBaseMarket.setTrancheWeights.selector;
         selectors[1] = IBaseMarket.setLoanToValue.selector;
-        selectors[2] = IBaseMarket.setMarketMultiplier.selector;
-        selectors[3] = IBaseMarket.setUnderwriterRate.selector;
-        selectors[4] = IBaseMarket.setBorrowerRole.selector;
+        selectors[2] = IBaseMarket.setUnderwriterRate.selector;
+        selectors[3] = IBaseMarket.setBorrowerRole.selector;
+        selectors[4] = IBaseMarket.createTranche.selector;
     }
 
     function _marketRegistrySelectors() private pure returns (bytes4[] memory selectors) {
@@ -594,9 +598,10 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     function _marketGovernorSelectors() private pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](2);
+        selectors = new bytes4[](3);
         selectors[0] = IBaseMarket.setTargetHealth.selector;
         selectors[1] = IFixedMarket.setTermLimits.selector;
+        selectors[2] = IBaseMarket.setMarketMultiplier.selector;
     }
 
     function _marketGuardianSelectors() private pure returns (bytes4[] memory selectors) {
@@ -622,9 +627,10 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     function _trancheGovernorSelectors() private pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](2);
+        selectors = new bytes4[](3);
         selectors[0] = ITranche.setMaxCapital.selector;
         selectors[1] = IPremiumVesting.setVestingPeriod.selector;
+        selectors[2] = ITranche.recoverRemainder.selector;
     }
 
     function _trancheMarketSelectors() private pure returns (bytes4[] memory selectors) {

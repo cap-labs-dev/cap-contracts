@@ -6,11 +6,13 @@ import { IERC7540AsyncRedeem } from "../../../contracts/interfaces/IERC7540Async
 import { IPremiumVesting } from "../../../contracts/interfaces/IPremiumVesting.sol";
 import { IStablecoin } from "../../../contracts/interfaces/IStablecoin.sol";
 import { CapRoles } from "../../../contracts/utils/CapRoles.sol";
+import { WadRayMath } from "../../../contracts/utils/WadRayMath.sol";
 import { BaseTest } from "../../shared/BaseTest.sol";
 import { MockAeraVault } from "../../shared/mocks/MockAeraVault.sol";
 import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
 import { MockIRM } from "../../shared/mocks/MockIRM.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { ERC4626Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -272,7 +274,26 @@ contract StablecoinTest is BaseTest {
         assertEq(scoin.totalAssets(), 120e18);
         assertLt(scoin.convertToAssets(120e18), 120e18, "the exit quote is the discounted one");
         assertEq(scoin.creditBackedSupply(), 50e18, "reserve loss does not write off borrower credit");
-        assertEq(irm.updateCalls(), rateUpdates, "reserve loss does not change utilization");
+        assertEq(scoin.utilizationRate(), WadRayMath.rayDiv(80e18, 150e18), "the lost reserve counts as utilized");
+        assertEq(irm.updateCalls(), rateUpdates + 1, "so the rate is checkpointed");
+    }
+
+    /// @dev A write-off moves credit into bad debt. Neither is redeemable, so utilization holds,
+    /// matching {unlockedSupply}, rather than falling and cutting holders' rate after a loss.
+    function test_recognizeBadDebtInCredit_leavesUtilizationUnchanged() public {
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+        scoin.mintCreditBacked(bob, 50e18);
+        uint256 utilization = scoin.utilizationRate();
+        uint256 drawable = scoin.convertToAssets(scoin.unlockedSupply());
+
+        scoin.recognizeBadDebtInCredit(20e18);
+
+        assertEq(scoin.utilizationRate(), utilization);
+        assertEq(scoin.convertToAssets(scoin.unlockedSupply()), drawable, "the same reserve can be drawn");
+        (uint256 credit, uint256 supply) = scoin.supplies();
+        assertEq(credit, 50e18, "credit-backed supply plus bad debt");
+        assertEq(supply, 150e18);
     }
 
     function test_recognizeBadDebtInCredit_namesTheMarket() public {
@@ -911,11 +932,55 @@ contract StablecoinTest is BaseTest {
 
         scoin.recognizeBadDebtInCredit(100e18);
 
-        // the write off moves 100e18 out of creditBackedSupply and into badDebt, and the gate
-        // excludes both, so the redeemable amount is unchanged rather than inflated by the loss
+        // the write off moves 100e18 out of creditBackedSupply and into badDebt. Those shares are
+        // now reserve-backed at a discount, so more of them may exit, but together they draw only
+        // the reserve that is there
         uint256 unlocked = scoin.unlockedSupply();
-        assertEq(unlocked, 1_000e18, "the write off does not unlock anything new");
-        assertLe(scoin.convertToAssets(unlocked), asset.balanceOf(address(scoin)), "gate stays solvent");
+        assertEq(unlocked, 1_100e18, "every reserve-backed share may exit");
+        assertEq(scoin.convertToAssets(unlocked), asset.balanceOf(address(scoin)), "and draws exactly the reserve");
+    }
+
+    /// @dev The auditor's shortfall: 1,000 supply, 850 performing credit, 50 written off and 100
+    /// in reserve. All 150 reserve-backed shares may exit, so a queued request for 100 of them,
+    /// worth about 66.67, leaves the rest of the reserve to other holders.
+    function _shortfallWithRedeemedCredit() internal {
+        vm.prank(alice);
+        scoin.deposit(1_000e18, alice);
+        scoin.mintCreditBacked(bob, 900e18);
+        vm.prank(bob);
+        scoin.instantRedeem(900e18, bob, bob);
+        scoin.recognizeBadDebtInCredit(50e18);
+        assertEq(asset.balanceOf(address(scoin)), 100e18);
+        assertEq(scoin.unlockedSupply(), 150e18, "every reserve-backed share may exit");
+    }
+
+    function test_queuedRequestDoesNotBlockOtherExitsDuringAShortfall() public {
+        _shortfallWithRedeemedCredit();
+        vm.prank(alice);
+        scoin.requestRedeem(100e18, alice, alice);
+
+        assertEq(scoin.instantUnlockedSupply(), 50e18, "the queue holds back only its own shares");
+        uint256 cash = asset.balanceOf(address(scoin));
+        vm.prank(alice);
+        uint256 paid = scoin.instantRedeem(50e18, alice, alice);
+        assertGt(paid, 0, "another exit still gets through");
+        assertLe(paid, cash);
+    }
+
+    /// @dev A multi-request claim burns every request before its single payout retires the
+    /// loss. Re-reading the cap mid-loop would price `supply - credit` below `badDebt` and revert.
+    function test_multiRequestClaimDuringAShortfallDoesNotUnderflow() public {
+        _shortfallWithRedeemedCredit();
+        vm.startPrank(alice);
+        scoin.requestRedeem(120e18, alice, alice);
+        scoin.requestRedeem(30e18, alice, alice);
+        assertEq(scoin.maxRedeem(alice), 150e18);
+
+        uint256 paid = scoin.redeem(150e18, alice, alice);
+        vm.stopPrank();
+        assertEq(paid, 100e18, "the whole reserve, in one payout");
+        assertEq(scoin.badDebt(), 0, "the haircut retired the loss");
+        assertEq(scoin.redemptionQueue(), 0);
     }
 
     function test_pause_onlyGuardian() public {
@@ -944,8 +1009,9 @@ contract StablecoinTest is BaseTest {
         vm.prank(guardian);
         scoin.pause();
 
+        // the zeroed limit trips before the mint does
         vm.prank(alice);
-        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        vm.expectRevert(abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxDeposit.selector, alice, 1e18, 0));
         scoin.deposit(1e18, alice);
 
         vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
@@ -958,8 +1024,53 @@ contract StablecoinTest is BaseTest {
         scoin.burnCreditBacked(bob, 1e18);
 
         vm.prank(alice);
-        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        vm.expectRevert(abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxRedeem.selector, alice, 1e18, 0));
         scoin.instantRedeem(1e18, alice, alice);
+    }
+
+    /// @dev ERC-4626 limits must read zero while the action they bound would revert.
+    function test_pause_zeroesDepositAndExitLimits() public {
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+        vm.prank(alice);
+        uint256 id = scoin.requestRedeem(40e18, alice, alice);
+
+        uint256 claimable = scoin.claimableRedeemRequest(id, alice);
+        uint256 maxRedeem = scoin.maxRedeem(alice);
+        uint256 maxWithdraw = scoin.maxWithdraw(alice);
+        uint256 maxInstantRedeem = scoin.maxInstantRedeem(alice);
+        uint256 maxInstantWithdraw = scoin.maxInstantWithdraw(alice);
+        assertEq(claimable, 40e18, "the request is claimable before the pause");
+        assertEq(maxRedeem, 40e18);
+        assertGt(maxWithdraw, 0);
+        assertGt(maxInstantRedeem, 0);
+        assertGt(maxInstantWithdraw, 0);
+
+        vm.prank(guardian);
+        scoin.pause();
+
+        assertEq(scoin.maxDeposit(alice), 0, "deposits mint");
+        assertEq(scoin.maxMint(alice), 0, "and so does mint");
+        assertEq(scoin.maxRedeem(alice), 0, "claims burn");
+        assertEq(scoin.maxWithdraw(alice), 0);
+        assertEq(scoin.maxInstantRedeem(alice), 0, "instant exits burn");
+        assertEq(scoin.maxInstantWithdraw(alice), 0);
+        assertEq(scoin.claimableRedeemRequest(id, alice), claimable, "request state is not rewritten");
+        assertEq(scoin.pendingRedeemRequest(id, alice), 0);
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxRedeem.selector, alice, 40e18, 0));
+        scoin.redeem(40e18, alice, alice);
+
+        vm.prank(guardian);
+        scoin.unpause();
+
+        assertEq(scoin.maxDeposit(alice), type(uint256).max);
+        assertEq(scoin.maxMint(alice), type(uint256).max);
+        assertEq(scoin.maxRedeem(alice), maxRedeem, "limits return on unpause");
+        assertEq(scoin.maxWithdraw(alice), maxWithdraw);
+        assertEq(scoin.maxInstantRedeem(alice), maxInstantRedeem);
+        assertEq(scoin.maxInstantWithdraw(alice), maxInstantWithdraw);
     }
 
     function test_pause_allowsTransfers() public {
@@ -1229,5 +1340,97 @@ contract StablecoinTest is BaseTest {
         vm.prank(alice);
         scoin.instantRedeem(100e18, alice, alice);
         assertEq(asset.balanceOf(alice), 1_000e18);
+    }
+
+    /// @dev Fix review (pkqs90): the withdraw paths bounded the quoted shares but not the asset
+    /// value, so once {unlockedSupply} stopped netting bad debt a saturated quote let `B` shares
+    /// draw any balance above `recognized`. 100 reserve-backed cUSD, 20 bad debt, 200 USDC held.
+
+    function _overWithdrawScenario() internal {
+        vm.prank(alice);
+        scoin.deposit(100e18, alice);
+        vm.prank(guardian);
+        scoin.recognizeBadDebtInReserve(20e18);
+        // recovered funds and reserve gains land on the Stablecoin; coverBadDebt() not run
+        asset.mint(address(scoin), 100e18);
+
+        assertEq(asset.balanceOf(address(scoin)), 200e18);
+        assertEq(scoin.badDebt(), 20e18);
+        assertEq(scoin.convertToAssets(100e18), 80e18, "100 cUSD is worth 80 USDC");
+    }
+
+    function test_instantWithdraw_isBoundedByAssetValue() public {
+        _overWithdrawScenario();
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxWithdraw.selector, alice, 200e18, 80e18)
+        );
+        scoin.instantWithdraw(200e18, alice, alice);
+    }
+
+    function test_fifoWithdraw_isBoundedByAssetValue() public {
+        _overWithdrawScenario();
+        vm.prank(alice);
+        scoin.requestRedeem(100e18, alice, alice);
+        assertEq(scoin.maxRedeem(alice), 100e18);
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxWithdraw.selector, alice, 200e18, 80e18)
+        );
+        scoin.withdraw(200e18, alice, alice);
+    }
+
+    function test_requestWithdraw_isBoundedByAssetValue() public {
+        _overWithdrawScenario();
+        vm.prank(alice);
+        uint256 id = scoin.requestRedeem(100e18, alice, alice);
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxWithdraw.selector, alice, 200e18, 80e18)
+        );
+        scoin.withdraw(id, 200e18, alice, alice);
+    }
+
+    /// The fair exit still works after the fix: 80 USDC for all 100 cUSD.
+    function test_fairExitStillWorks() public {
+        _overWithdrawScenario();
+        vm.prank(alice);
+        uint256 burned = scoin.instantWithdraw(80e18, alice, alice);
+        assertEq(burned, 100e18);
+        assertEq(scoin.badDebt(), 0, "the exit absorbs the shortfall");
+    }
+
+    /// No false reverts: any amount up to maxInstantWithdraw still clears, and never pays more
+    /// than the burned shares are worth.
+    function testFuzz_instantWithdraw_noFalseRevertsBelowMax(
+        uint256 deposit,
+        uint256 loss,
+        uint256 extra,
+        uint256 amount
+    ) public {
+        deposit = bound(deposit, 1e18, 1_000e18);
+        loss = bound(loss, 0, deposit - 1);
+        extra = bound(extra, 0, 1_000e18);
+
+        vm.prank(alice);
+        scoin.deposit(deposit, alice);
+        if (loss > 0) {
+            vm.prank(guardian);
+            scoin.recognizeBadDebtInReserve(loss);
+        }
+        asset.mint(address(scoin), extra);
+
+        uint256 maxAssets = scoin.maxInstantWithdraw(alice);
+        vm.assume(maxAssets > 0);
+        amount = bound(amount, 1, maxAssets);
+
+        uint256 shares = scoin.quoteWithdraw(amount);
+        uint256 worth = scoin.convertToAssets(shares);
+        vm.prank(alice);
+        uint256 burned = scoin.instantWithdraw(amount, alice, alice);
+        assertEq(burned, shares);
+        assertGe(worth, amount, "burned shares are worth at least the payout");
     }
 }

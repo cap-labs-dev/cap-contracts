@@ -76,6 +76,13 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
     }
 
     /// @inheritdoc ITranche
+    function recoverRemainder(address recipient) external restricted returns (uint256 amount) {
+        // a live tranche can still take deposits that opt in
+        if (!killed) revert RemainderStillClaimable();
+        amount = _recoverRemainder(recipient);
+    }
+
+    /// @inheritdoc ITranche
     function slash(uint256 value, address recipient) external returns (uint256 slashedValue) {
         if (msg.sender != market) revert InvalidMarket();
         uint256 total = totalAssets();

@@ -192,6 +192,17 @@ contract LendingFlowTest is CapDeployer {
         market.borrow(borrower, 0);
     }
 
+    /// @dev Asking for the maximum with no credit left is a shortfall, not a bad principal.
+    function test_borrowMax_withNoCredit_reverts() public {
+        vm.prank(borrower);
+        market.borrow(borrower, type(uint256).max);
+        assertEq(market.availableCredit(), 0);
+
+        vm.prank(borrower);
+        vm.expectRevert(IBaseMarket.InsufficientLiquidity.selector);
+        market.borrow(borrower, type(uint256).max);
+    }
+
     function test_repay_zero_reverts() public {
         vm.prank(borrower);
         market.borrow(borrower, 100e18);

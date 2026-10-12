@@ -66,6 +66,16 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @inheritdoc IBaseMarket
+    /// @dev Not `nonReentrant`: the registry calls back into {setTranches}, which is.
+    function createTranche(address asset, uint256[] calldata weights, uint256 vestingPeriod)
+        external
+        restricted
+        returns (address tranche)
+    {
+        tranche = IRegistry(_getBaseMarketStorage().registry).createTranche(asset, weights, vestingPeriod);
+    }
+
+    /// @inheritdoc IBaseMarket
     function setLoanToValue(uint256 _loanToValue) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         if (_loanToValue + $.buffer > $.liquidationThreshold) revert InvalidLoanToValue();
@@ -420,10 +430,10 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     /// @param principal The principal requested, or `type(uint256).max` for the full credit
     /// @return actualPrincipal The principal that will be drawn
     function _creditCheck(uint256 credit, uint256 principal) internal pure returns (uint256 actualPrincipal) {
-        if (principal == type(uint256).max) actualPrincipal = credit;
-        else if (principal > credit) revert InsufficientLiquidity();
-        else actualPrincipal = principal;
-        if (actualPrincipal == 0) revert InvalidPrincipal();
+        if (principal == 0) revert InvalidPrincipal();
+        actualPrincipal = principal == type(uint256).max ? credit : principal;
+        // a maximum with no credit left is the same shortfall as an amount above it
+        if (actualPrincipal == 0 || actualPrincipal > credit) revert InsufficientLiquidity();
     }
 
     /// @dev Check debt before a repayment

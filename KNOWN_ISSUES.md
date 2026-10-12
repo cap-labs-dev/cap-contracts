@@ -42,7 +42,7 @@ Based on commit `b0a6f64a18bdb6ab97066e0eb086ae6c545ea9d8`, reviewed on 23 Septe
 - **Issue:** Reserve movements and temporary deposits can leave averaged utilization above or below live utilization, affecting premiums for the full quoted term.
 - **Accepted:** Pricing retains its averaging lag. Temporary liquidity can influence a quote and exit if reserves remain available; influencing the average does not require waiting a full averaging period.
 - **Rationale:** Pricing from spot utilization alone would let brief deposits or withdrawals manipulate the rate locked in for an entire fixed loan. Averaging reduces sensitivity to these short-lived liquidity changes, at the cost of responding more slowly to lasting changes.
-- **Mitigation:** Fixed borrowers can cap the combined premium on `borrow` and `borrowMore` with `maxPremium`. Execution reverts above the cap. This bounds the accepted cost without removing averaging lag; loan extensions remain uncapped.
+- **Mitigation:** Fixed borrowers can cap the combined premium on `borrow`, `borrowMore` and `extend` with `maxPremium`, and keepers can cap `extendAdmin` the same way. Execution reverts above the cap. This bounds the accepted cost, including credit borrowed and repaid around the call, without removing averaging lag.
 
 #### Splitting fixed borrows can reduce premiums
 
@@ -65,7 +65,7 @@ Based on commit `b0a6f64a18bdb6ab97066e0eb086ae6c545ea9d8`, reviewed on 23 Septe
 
 #### Floating premium allocation depends on checkpoint frequency
 
-- **Issue:** More frequent realization can increase underwriting's share of the same debt growth at liquidity providers' expense.
+- **Issue:** More frequent realization can increase underwriting's share of the same debt growth at liquidity providers' expense. Debt grows by the product of the two indexes, and within each realization interval the cross term from the rates compounding on each other is allocated to liquidity; shorter intervals shrink that term.
 - **Accepted:** Premium allocation depends on realization frequency. Underwriting rewards are distributed to eligible tranche holders by weight; the caller receives no separate reward.
 - **Mitigation:** A keeper is intended to realize premiums regularly. That cadence is not enforced. Total premium still reconciles to reported debt growth.
 
@@ -117,14 +117,22 @@ Based on commit `b0a6f64a18bdb6ab97066e0eb086ae6c545ea9d8`, reviewed on 23 Septe
 
 #### Donations affect tranche and Underwriter valuations
 
-- **Issue:** Donated collateral affects tranche share prices and the Underwriter marks derived from them. Positive-share deposits remain subject to rounding.
+- **Issue:** Donated collateral affects tranche share prices and the Underwriter marks derived from them. Positive-share deposits remain subject to rounding. The tranche kill threshold is 1% of `totalSupply()` in assets, which is 1% of par only at one asset per share, so a donation that raises the share price lowers the effective threshold. A heavily slashed tranche can then stay live and keep taking its full premium weight, which would otherwise pass to other tranches.
 - **Accepted:** No additional donation-specific protection is adopted. Both layers retain 1,000 dead shares, and zero-share deposits revert. These defenses do not establish that every donation strategy is unprofitable.
+- **Rationale:** Keeping a tranche alive this way requires donating assets that remain fully exposed to slashing; it does not avoid losses. A live tranche's premium weight does not depend on its remaining capital in any case.
 
 #### Default allocation can reduce Underwriter exit liquidity
 
 - **Issue:** Withdrawing idle funds and depositing again allocates them to the default tranche, reducing immediate liquidity for remaining holders.
 - **Accepted:** Deposits auto-allocate; exits pay only from idle balances.
 - **Mitigation:** Curators can remove the default tranche or deallocate capital. Allocated or locked funds may delay exits.
+
+#### Tranche exits can raise market LTV above the configured loan-to-value
+
+- **Issue:** `lockedValue()` sizes the capital tranches must keep as `debt / (LT - buffer)`, not by `loanToValue`. When `loanToValue` is below `LT - buffer`, senior exits can raise the market's debt-to-capital ratio up to `LT - buffer` and leave `totalDebt` above `creditLimit()`.
+- **Accepted:** `loanToValue` limits new borrowing only. The exit lock follows the guardian-controlled `LT - buffer`, which keeps debt at least the buffer below the liquidation threshold.
+- **Rationale:** Locking against the market owner's `loanToValue` would let the owner lock tranche capital, including queued redemptions, by lowering it. A `loanToValue` of zero, used to stop new borrowing, would also make the lock divide by zero and block every tranche exit.
+- **Mitigation:** Debt above `creditLimit()` stops further borrowing until capital returns or debt is repaid. The guardian can raise the buffer or lower LT to hold more capital behind the debt.
 
 #### Seeding an empty tranche costs the Underwriter pool
 
@@ -138,6 +146,13 @@ Based on commit `b0a6f64a18bdb6ab97066e0eb086ae6c545ea9d8`, reviewed on 23 Septe
 - **Issue:** A floating write-off can leave healthy residual debt. A nonzero buffer does not prevent this.
 - **Accepted:** The guardian can write off unrecoverable debt even if the residual becomes unliquidatable.
 - **Mitigation:** The 10-percentage-point minimum buffer prevents immediate renewed borrowing against unchanged collateral after a full floating write-off. Guardians should liquidate before writing off when the residual would become healthy; the buffer does not enforce that ordering.
+
+#### Raising the liquidation bonus can make existing debt unrecoverable
+
+- **Issue:** Every market reads the global liquidation bonus live, and recoverable debt is `capital / (1 + liquidationBonus)`. Raising the bonus lowers recoverable debt in every market at once. Where debt has grown past the credit limit through accrual, arrears, or a fall in collateral value, part of it can become unrecoverable. If `LT × (1 + liquidationBonus) > 1` (using fractional ratios), that part can still be healthy and therefore not liquidatable.
+- **Accepted:** Governance can change the bonus up to `MAX_LIQUIDATION_BONUS` at any time. The setter does not check market state.
+- **Rationale:** Debt within the credit limit stays recoverable at any allowed bonus: credit is at most `LT - buffer`, at most 90% of collateral, while at a 10% bonus recoverable debt is about 90.91% of collateral. Blocking increases while a market is distressed would also prevent raising liquidator incentives when they are most needed.
+- **Mitigation:** Before raising the bonus, governance should review markets whose debt exceeds their credit limit. An execution delay can be applied to `setLiquidationBonus` through AccessManager role configuration. A higher bonus does not write off debt; write-offs remain a separate guardian action.
 
 #### Liquidation rounding can reduce collateral payouts
 
@@ -155,7 +170,7 @@ Based on commit `b0a6f64a18bdb6ab97066e0eb086ae6c545ea9d8`, reviewed on 23 Septe
 
 #### Queued redemptions remain exposed to losses and changing liquidity
 
-- **Issue:** Queued shares earn no new premiums and remain exposed to losses. Previously claimable shares can become pending again if unlocked liquidity falls.
+- **Issue:** Queued shares earn no new premiums and remain exposed to losses. Previously claimable shares can become pending again if unlocked liquidity falls. After a request settles out of order, a fall in liquidity can leave earlier and later requests claimable against the same unlocked shares; whichever claims first is paid, so a later request can exit ahead of an earlier one, which stays exposed to losses for longer.
 - **Accepted:** Requests record shares, not a fixed payout or permanently reserved assets. Value and availability are determined at claim time; requests cannot be cancelled.
 - **Mitigation:** Rewards earned before queueing remain claimable. Instant exits avoid waiting where liquidity permits. Integrators must handle changing availability and claim reverts.
 

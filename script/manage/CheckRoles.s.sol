@@ -197,6 +197,7 @@ contract CheckRoles is Script, InfraSerializer {
         _wired(
             manager, "Registry.setBorrowerRole", infra.registry, IRegistry.setBorrowerRole.selector, CapRoles.PROTOCOL
         );
+        _wired(manager, "Registry.createTranche", infra.registry, IRegistry.createTranche.selector, CapRoles.PROTOCOL);
         _wired(
             manager, "Registry.setAllocatorRole", infra.registry, IRegistry.setAllocatorRole.selector, CapRoles.PROTOCOL
         );
@@ -252,10 +253,17 @@ contract CheckRoles is Script, InfraSerializer {
             uint64 ownerRole = Registry(infra.registry).marketOwnerRole(market);
             _wired(manager, "Market.setLoanToValue", market, IBaseMarket.setLoanToValue.selector, ownerRole);
             _wired(manager, "Market.setTrancheWeights", market, IBaseMarket.setTrancheWeights.selector, ownerRole);
-            _wired(manager, "Market.setMarketMultiplier", market, IBaseMarket.setMarketMultiplier.selector, ownerRole);
             _wired(manager, "Market.setUnderwriterRate", market, IBaseMarket.setUnderwriterRate.selector, ownerRole);
+            _wired(manager, "Market.createTranche", market, IBaseMarket.createTranche.selector, ownerRole);
             _wired(manager, "Market.setTranches", market, IBaseMarket.setTranches.selector, CapRoles.REGISTRY);
             _wired(manager, "Market.setTargetHealth", market, IBaseMarket.setTargetHealth.selector, CapRoles.GOVERNOR);
+            _wired(
+                manager,
+                "Market.setMarketMultiplier",
+                market,
+                IBaseMarket.setMarketMultiplier.selector,
+                CapRoles.GOVERNOR
+            );
             _wired(manager, "Market.setBuffer", market, IBaseMarket.setBuffer.selector, CapRoles.GUARDIAN);
             _wired(
                 manager,
@@ -288,6 +296,7 @@ contract CheckRoles is Script, InfraSerializer {
                 IPremiumVesting.setVestingPeriod.selector,
                 CapRoles.GOVERNOR
             );
+            _wired(manager, "Tranche.recoverRemainder", tranche, ITranche.recoverRemainder.selector, CapRoles.GOVERNOR);
             _wired(manager, "Tranche.deposit", tranche, IERC4626.deposit.selector, depositor);
             _wired(manager, "Tranche.mint", tranche, IERC4626.mint.selector, depositor);
             console.log("  depositor role", depositor, "admin", owner);
@@ -303,6 +312,13 @@ contract CheckRoles is Script, InfraSerializer {
             );
             _wired(
                 manager, "Underwriter.setAllocatorRole", underwriter, IUnderwriter.setAllocatorRole.selector, curator
+            );
+            _wired(
+                manager,
+                "Underwriter.recoverRemainder",
+                underwriter,
+                IUnderwriter.recoverRemainder.selector,
+                CapRoles.GOVERNOR
             );
             _notAdmin(manager, "Underwriter.allocate", underwriter, IUnderwriter.allocate.selector);
             _notAdmin(manager, "Underwriter.deposit", underwriter, IERC4626.deposit.selector);

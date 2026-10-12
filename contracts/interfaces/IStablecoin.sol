@@ -122,7 +122,8 @@ interface IStablecoin {
 
     /// @notice Pause minting and burning
     /// @dev Guardian only. Transfers still work. A panic switch while an issue is sorted out.
-    /// Reverts {Pausable-EnforcedPause} on a mint or burn while paused.
+    /// Reverts {Pausable-EnforcedPause} on a mint or burn while paused. The ERC-4626 `max*` limits
+    /// and the instant-exit limits read zero, so deposits and exits revert on those limits first.
     function pause() external;
 
     /// @notice Resume minting and burning
@@ -194,24 +195,22 @@ interface IStablecoin {
     /// @return The share token decimals
     function decimals() external view returns (uint8);
 
-    /// @notice Get the aggregate shares available for redemption, excluding credit and bad debt
+    /// @notice Get the aggregate shares available for redemption, excluding credit-backed supply
     /// @dev Any holder, including a borrower, may use this capacity. Limited by liquid reserve;
     /// repeated exits can exhaust it and leave remaining holders backed entirely by credit.
-    /// @return unlocked The shares not reserved for outstanding borrows or written off, in cUSD share units (18 decimals)
+    /// During a shortfall these shares exit below par, so bad debt reduces what each is paid,
+    /// not how many may exit.
+    /// @return unlocked The shares not reserved for outstanding borrows, in cUSD share units (18 decimals)
     function unlockedSupply() external view returns (uint256 unlocked);
 
-    /// @notice Get the utilization rate of credit-backed supply
+    /// @notice Get the utilization rate: credit-backed supply plus bad debt over total supply
+    /// @dev Bad debt counts as utilized, since no reserve stands behind it, so a credit write-off
+    /// leaves utilization unchanged and a reserve loss raises it.
     /// @return rate The utilization rate in ray decimals
     function utilizationRate() external view returns (uint256 rate);
 
-    /// @notice Get the utilization after a credit-backed mint of `amount`
-    /// @dev Both supplies rise by `amount`.
-    /// @param amount The credit-backed supply about to be minted, in cUSD share units (18 decimals)
-    /// @return rate The projected utilization rate in ray decimals
-    function utilizationRateAfterMint(uint256 amount) external view returns (uint256 rate);
-
-    /// @notice Get the credit-backed and total supply, read together
-    /// @return credit The credit-backed supply, in cUSD share units (18 decimals)
+    /// @notice Get the unavailable and total supply, read together
+    /// @return credit The credit-backed supply plus bad debt, in cUSD share units (18 decimals)
     /// @return supply The total supply, in cUSD share units (18 decimals)
     function supplies() external view returns (uint256 credit, uint256 supply);
 }

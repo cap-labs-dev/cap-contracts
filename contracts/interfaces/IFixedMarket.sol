@@ -33,6 +33,9 @@ interface IFixedMarket is IBaseMarket {
     /// @param maxPremium The maximum premium the caller accepts, in cUSD units (18 decimals)
     error PremiumExceedsLimit(uint256 premium, uint256 maxPremium);
 
+    /// @notice The loan ids passed to {liquidate} are not strictly ascending
+    error InvalidLoanIds();
+
     /// @notice Emitted when the term limits are updated
     /// @param maximumTermLimit The new maximum term of a loan
     /// @param minimumTermLimit The new minimum term of a loan
@@ -142,15 +145,19 @@ interface IFixedMarket is IBaseMarket {
     /// @return repaid The actual amount of assets repaid, in stablecoin units (18 decimals)
     function repay(uint256 id, uint256 amount) external returns (uint256 repaid);
 
-    /// @notice Liquidate assets from the market
-    /// @dev `id` must be in `[0, loanCount)`. Reverts {Healthy} when the market is not
-    /// liquidatable. `amount` of `type(uint256).max` clears as much as {maxLiquidatable}.
-    /// @param id The id of the loan
+    /// @notice Liquidate debt across one or more loans in the market
+    /// @dev Each id must be in `[0, loanCount)` and strictly ascending. Health is checked once, so
+    /// one call can reach {IBaseMarket-targetHealth} when the debt is spread over several loans.
+    /// Repayment is capped at the listed loans' combined debt and {maxLiquidatable}, then applied
+    /// to the loans in the order given; {LiquidateFixed} is emitted per loan with a proportional
+    /// share of the slashed value. Reverts {Healthy} when the market is not liquidatable.
+    /// `amount` of `type(uint256).max` clears as much as the cap allows.
+    /// @param ids The ids of the loans to repay, strictly ascending
     /// @param recipient The recipient of the liquidated assets
     /// @param amount The amount of assets to liquidate, in stablecoin units (18 decimals)
     /// @return repaid The actual amount of assets repaid, in stablecoin units (18 decimals)
     /// @return valueSlashed The USD value of collateral delivered, 18 decimals, possibly across tokens
-    function liquidate(uint256 id, address recipient, uint256 amount)
+    function liquidate(uint256[] calldata ids, address recipient, uint256 amount)
         external
         returns (uint256 repaid, uint256 valueSlashed);
 
@@ -158,19 +165,25 @@ interface IFixedMarket is IBaseMarket {
     /// @dev Live loans can grow only up to the current {maximumTermLimit}. If that limit was
     /// lowered below remaining term, there is no room and the call reverts {InvalidTerm}; the
     /// existing expiry is unchanged. Expired loans roll from now and charge arrears.
+    /// Like {borrow}, the charged premium must keep {IBaseMarket-totalDebt} within
+    /// {IBaseMarket-creditLimit}, or the call reverts {IBaseMarket-InsufficientLiquidity}.
     /// `id` must be in `[0, loanCount)` and still carry debt.
     /// @param id The id of the loan
     /// @param extension The extension of the term
+    /// @param maxPremium Maximum combined liquidity and underwriting premium, in cUSD units (18 decimals).
+    /// Quote with {premiumForExtension}. Use `type(uint256).max` for no cap. Reverts {PremiumExceedsLimit} if exceeded.
     /// @return actualExtension The actual extension of the term
-    function extend(uint256 id, uint256 extension) external returns (uint256 actualExtension);
+    function extend(uint256 id, uint256 extension, uint256 maxPremium) external returns (uint256 actualExtension);
 
     /// @notice Roll an overdue loan forward and charge premium for the arrears
     /// @dev Health is not checked, so the loan may become liquidatable.
     /// `id` must be in `[0, loanCount)` and still carry debt.
     /// @param id The id of the loan
     /// @param extension The new term to roll the loan forward by
+    /// @param maxPremium Maximum combined liquidity and underwriting premium, in cUSD units (18 decimals).
+    /// Quote with {premiumForExtension}. Use `type(uint256).max` for no cap. Reverts {PremiumExceedsLimit} if exceeded.
     /// @return actualExtension The arrears plus the new term
-    function extendAdmin(uint256 id, uint256 extension) external returns (uint256 actualExtension);
+    function extendAdmin(uint256 id, uint256 extension, uint256 maxPremium) external returns (uint256 actualExtension);
 
     /// @notice Write off this loan's share of {unrecoverableDebt}
     /// @dev The market must be unhealthy before the write-off. Capped at the market-wide shortfall;
@@ -222,8 +235,8 @@ interface IFixedMarket is IBaseMarket {
     /// `type(uint256).max` and anything above {maximumTermLimit} quote at the maximum.
     /// May be below the exact maximum.
     /// @param term The term of the loan
-    /// @return credit The available credit in USD (18 decimals)
-    function availableCredit(uint256 term) external view returns (uint256 credit);
+    /// @return principal The principal borrowable over `term`, in stablecoin units (18 decimals)
+    function maxPrincipal(uint256 term) external view returns (uint256 principal);
 
     /// @notice Get the maximum term limit
     /// @return maximumTermLimit The maximum term limit

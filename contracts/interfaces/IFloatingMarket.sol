@@ -78,8 +78,10 @@ interface IFloatingMarket is IBaseMarket {
     function premiumIndices() external view returns (uint256 liquidityIndex, uint256 underwriterIndex);
 
     /// @notice Get the combined debt index
-    /// @dev With no scaled debt, equals the current IRM underwriter index. The local liquidity
-    /// index resets between debt lifecycles, so this index is not globally monotonic.
+    /// @dev `liquidityIndex × underwriterIndex`, so debt grows at both rates compounded together:
+    /// each rate also accrues on the interest the other has added. With no scaled debt, equals the
+    /// current IRM underwriter index. The local liquidity index resets between debt lifecycles, so
+    /// this index is not globally monotonic.
     /// @return combinedIndex The combined debt index in ray decimals
     function index() external view returns (uint256 combinedIndex);
 }

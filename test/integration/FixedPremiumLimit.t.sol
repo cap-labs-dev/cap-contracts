@@ -28,7 +28,7 @@ contract FixedPremiumLimitTest is CapDeployer {
     {
         uint256 term = bound(rawTerm, 1 days, 30 days);
         if (addOn) _draw(false, 100e18, term, type(uint256).max);
-        uint256 principal = maximumDraw ? market.availableCredit(term) : bound(rawPrincipal, 1e18, 3_000e18);
+        uint256 principal = maximumDraw ? market.maxPrincipal(term) : bound(rawPrincipal, 1e18, 3_000e18);
         uint256 requested = maximumDraw ? type(uint256).max : principal;
         uint256 premium = _quote(principal, term);
         assertGt(premium, 0);

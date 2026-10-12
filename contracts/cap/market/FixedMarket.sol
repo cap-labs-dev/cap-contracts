@@ -94,7 +94,12 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @inheritdoc IFixedMarket
-    function extend(uint256 id, uint256 extension) external restricted nonReentrant returns (uint256 actualExtension) {
+    function extend(uint256 id, uint256 extension, uint256 maxPremium)
+        external
+        restricted
+        nonReentrant
+        returns (uint256 actualExtension)
+    {
         _requireOpenLoan(id);
         uint256 previousExpiry = expiry[id];
         if (block.timestamp >= previousExpiry) {
@@ -110,12 +115,14 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
             else actualExtension = extension;
         }
 
-        _extend(id, actualExtension);
+        _extend(id, actualExtension, maxPremium);
         if (healthiness() < 1e27) revert Unhealthy();
+        // an extension adds debt like a borrow does, so it must fit the same buffered credit limit
+        if (totalDebt() > creditLimit()) revert InsufficientLiquidity();
     }
 
     /// @inheritdoc IFixedMarket
-    function extendAdmin(uint256 id, uint256 extension)
+    function extendAdmin(uint256 id, uint256 extension, uint256 maxPremium)
         external
         restricted
         nonReentrant
@@ -125,7 +132,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         uint256 previousExpiry = expiry[id];
         if (block.timestamp < previousExpiry + grace) revert StillInGracePeriod();
         actualExtension = _rollFromNow(previousExpiry, extension);
-        _extend(id, actualExtension);
+        _extend(id, actualExtension, maxPremium);
     }
 
     /// @inheritdoc IFixedMarket
@@ -139,20 +146,25 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @inheritdoc IFixedMarket
-    function liquidate(uint256 id, address recipient, uint256 amount)
+    function liquidate(uint256[] calldata ids, address recipient, uint256 amount)
         external
         restricted
         nonReentrant
         returns (uint256 repaid, uint256 valueSlashed)
     {
-        _requireLoan(id);
-        uint256 requested = _debtCheck(debt[id], amount);
-        uint256 capital = totalCapital();
-        uint256 liquidatable = _checkLiquidation(capital, totalDebt());
+        uint256 owed;
+        for (uint256 i; i < ids.length; ++i) {
+            // ascending, so no loan's debt can be counted twice
+            if (i > 0 && ids[i] <= ids[i - 1]) revert InvalidLoanIds();
+            _requireLoan(ids[i]);
+            owed += debt[ids[i]];
+        }
+        uint256 requested = _debtCheck(owed, amount);
+        // one health check for the whole call, so it can reach target health across loans
+        uint256 liquidatable = _checkLiquidation(totalCapital(), totalDebt());
         (repaid, valueSlashed) = _liquidate(recipient, requested, liquidatable);
-        debt[id] -= repaid;
         _totalDebt -= repaid;
-        emit LiquidateFixed(id, msg.sender, recipient, repaid, valueSlashed);
+        _spreadLiquidation(ids, recipient, repaid, valueSlashed);
     }
 
     /// @inheritdoc IFixedMarket
@@ -193,8 +205,30 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @inheritdoc IFixedMarket
-    function availableCredit(uint256 term) public view returns (uint256 credit) {
-        credit = _principalFor(availableCredit(), _quoteTerm(term));
+    function maxPrincipal(uint256 term) public view returns (uint256 principal) {
+        principal = _principalFor(availableCredit(), _quoteTerm(term));
+    }
+
+    /// @dev Apply a liquidation's repayment to the listed loans in order. Each loan's event carries
+    /// a proportional share of the slashed value; the last share takes the rounding remainder.
+    /// @param ids The loans, strictly ascending
+    /// @param recipient The recipient of the liquidated assets
+    /// @param repaid The debt repaid across the loans, at most their combined debt
+    /// @param valueSlashed The collateral value delivered for that repayment
+    function _spreadLiquidation(uint256[] calldata ids, address recipient, uint256 repaid, uint256 valueSlashed)
+        private
+    {
+        uint256 slashLeft = valueSlashed;
+        for (uint256 i; i < ids.length && repaid > 0; ++i) {
+            uint256 id = ids[i];
+            uint256 take = Math.min(repaid, debt[id]);
+            if (take == 0) continue;
+            uint256 slashed = take == repaid ? slashLeft : Math.mulDiv(slashLeft, take, repaid);
+            debt[id] -= take;
+            repaid -= take;
+            slashLeft -= slashed;
+            emit LiquidateFixed(id, msg.sender, recipient, take, slashed);
+        }
     }
 
     /// @dev A loan created by {borrow}, including fully repaid ones.
@@ -225,9 +259,11 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         internal
         returns (uint256 actualPrincipal, uint256 chargedPremium)
     {
+        if (principal == 0) revert InvalidPrincipal();
         uint256 limit = availableCredit();
         actualPrincipal = principal == type(uint256).max ? _principalFor(limit, term) : principal;
-        if (actualPrincipal == 0) revert InvalidPrincipal();
+        // no credit, or too little to cover even the smallest draw's premium
+        if (actualPrincipal == 0) revert InsufficientLiquidity();
 
         (uint256 liquidityPremium, uint256 underwriterPremium) =
             _premiumStillToMint(actualPrincipal, term, actualPrincipal);
@@ -355,12 +391,16 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
 
     /// @dev Grow expiry by `extension` and charge premium on outstanding debt over that term.
     /// Mints nothing; {averageUtilizationAfterMint} still folds in unsmoothed credit, so a
-    /// same-block borrow is in the rate the extension pays.
+    /// same-block borrow is in the rate the extension pays. `maxPremium` bounds what such a
+    /// borrow can add, as it does for {borrow}.
     /// @param id The id of the loan
     /// @param extension The seconds added to expiry, including any arrears
-    function _extend(uint256 id, uint256 extension) internal {
+    /// @param maxPremium The maximum combined premium accepted for this extension
+    function _extend(uint256 id, uint256 extension, uint256 maxPremium) internal {
         expiry[id] += extension;
         (uint256 liquidityPremium, uint256 underwriterPremium) = _premiumStillToMint(debt[id], extension, 0);
+        uint256 premium = liquidityPremium + underwriterPremium;
+        if (premium > maxPremium) revert PremiumExceedsLimit(premium, maxPremium);
         uint256 chargedPremium = _applyPremium(id, liquidityPremium, underwriterPremium);
         emit ExtendFixed(id, extension, chargedPremium);
     }

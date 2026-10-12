@@ -56,11 +56,11 @@ contract AuditValidationTest is CapDeployer {
         market.setTermLimits(7 days, 1 days);
         vm.prank(defaultBorrower);
         vm.expectRevert(IFixedMarket.InvalidTerm.selector);
-        market.extend(id, 1 days);
+        market.extend(id, 1 days, type(uint256).max);
         assertEq(market.expiry(id), expiryBefore, "grandfathered expiry is unchanged");
         vm.warp(expiryBefore - 6 days);
         vm.prank(defaultBorrower);
-        uint256 added = market.extend(id, type(uint256).max);
+        uint256 added = market.extend(id, type(uint256).max, type(uint256).max);
         assertEq(added, 1 days, "room opens once remaining sits under the new maximum");
         assertEq(market.expiry(id), expiryBefore + 1 days);
     }

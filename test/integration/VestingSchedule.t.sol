@@ -5,6 +5,7 @@ import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { Underwriter } from "../../contracts/cap/Underwriter.sol";
 import { FixedMarket } from "../../contracts/cap/market/FixedMarket.sol";
 import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
+import { IBaseMarket } from "../../contracts/interfaces/IBaseMarket.sol";
 import { IPremiumVesting } from "../../contracts/interfaces/IPremiumVesting.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
 import { CapRoles } from "../shared/CapRoles.sol";
@@ -94,8 +95,8 @@ contract VestingScheduleTest is CapDeployer {
         uint256[] memory weights = new uint256[](3);
         weights[0] = RAY;
         vm.expectRevert(IPremiumVesting.InvalidVestingPeriod.selector);
-        registry.createTranche(address(market), address(collateral), weights, 0);
-        address t = registry.createTranche(address(market), address(collateral), weights, 7 days);
+        IBaseMarket(address(market)).createTranche(address(collateral), weights, 0);
+        address t = IBaseMarket(address(market)).createTranche(address(collateral), weights, 7 days);
         assertEq(Tranche(t).vestingPeriod(), 7 days);
     }
 
