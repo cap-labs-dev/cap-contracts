@@ -96,8 +96,6 @@ contract RoleTableTest is CapDeployer {
         );
         (bool isMarket,) = accessManager.hasRole(CapRoles.MARKET, market);
         assertTrue(isMarket, "market holds MARKET");
-        (bool isProtocol,) = accessManager.hasRole(CapRoles.PROTOCOL, market);
-        assertTrue(isProtocol, "market holds PROTOCOL so it can forward role setters");
         (bool isWhitelisted,) = accessManager.hasRole(CapRoles.WHITELISTED, market);
         assertFalse(isWhitelisted, "market is not a user launcher");
 
@@ -235,16 +233,20 @@ contract RoleTableTest is CapDeployer {
         registry.createUnderwriter(address(collateral), "Underwriter", "UW", ownerRole);
 
         vm.prank(stranger);
-        vm.expectRevert(unauthorized);
+        vm.expectRevert(IRegistry.UnknownInstance.selector);
         registry.setDepositorRole(ownerRole);
 
         vm.prank(stranger);
-        vm.expectRevert(unauthorized);
+        vm.expectRevert(IRegistry.UnknownMarket.selector);
         registry.setBorrowerRole(ownerRole);
 
         vm.prank(stranger);
-        vm.expectRevert(unauthorized);
+        vm.expectRevert(IRegistry.UnknownInstance.selector);
         registry.setAllocatorRole(ownerRole);
+
+        vm.prank(stranger);
+        vm.expectRevert(IRegistry.UnknownMarket.selector);
+        registry.createTranche(address(collateral), capConfig.defaultTrancheWeights, 12 hours);
     }
 
     function test_createMarket_acceptsRegisteredOperatorRoleIds() public {
@@ -320,8 +322,6 @@ contract RoleTableTest is CapDeployer {
         _expectRole(tranche, IERC4626.deposit.selector, depositorRole, "tranche deposit");
         _expectRole(tranche, IERC4626.mint.selector, depositorRole, "tranche mint");
         assertEq(accessManager.getRoleAdmin(depositorRole), ownerRole, "administered by the market owner");
-        (bool isProtocol,) = accessManager.hasRole(CapRoles.PROTOCOL, tranche);
-        assertTrue(isProtocol, "tranche holds PROTOCOL so it can forward setDepositorRole");
         (bool isWhitelisted,) = accessManager.hasRole(CapRoles.WHITELISTED, tranche);
         assertFalse(isWhitelisted, "tranche is not a user launcher");
     }
@@ -431,8 +431,6 @@ contract RoleTableTest is CapDeployer {
         _expectRole(underwriter, IERC4626.deposit.selector, depositorRole, "deposit");
         _expectRole(underwriter, IERC4626.mint.selector, depositorRole, "mint");
         assertEq(accessManager.getRoleAdmin(depositorRole), curatorRole, "administered by the curator");
-        (bool isProtocol,) = accessManager.hasRole(CapRoles.PROTOCOL, underwriter);
-        assertTrue(isProtocol, "underwriter holds PROTOCOL so it can forward role setters");
         (bool isWhitelisted,) = accessManager.hasRole(CapRoles.WHITELISTED, underwriter);
         assertFalse(isWhitelisted, "underwriter is not a user launcher");
     }
@@ -488,16 +486,54 @@ contract RoleTableTest is CapDeployer {
         (address market,) =
             _createMarket("role-gates", defaultMarketOwner, defaultBorrower, capConfig.defaultTrancheWeights);
 
+        address underwriter = address(_deployUnderwriter());
+
         vm.startPrank(market);
         vm.expectRevert(IRegistry.PublicRole.selector);
         registry.setBorrowerRole(PUBLIC_ROLE);
         vm.expectRevert(IRegistry.NotOperatorRole.selector);
         registry.setBorrowerRole(CapRoles.GOVERNOR);
+        vm.stopPrank();
+
+        vm.startPrank(underwriter);
         vm.expectRevert(IRegistry.PublicRole.selector);
         registry.setAllocatorRole(PUBLIC_ROLE);
         vm.expectRevert(IRegistry.NotOperatorRole.selector);
         registry.setAllocatorRole(CapRoles.GOVERNOR);
         vm.stopPrank();
+    }
+
+    /// @dev Each registry setter serves one kind of instance. A deployed instance of another kind
+    /// is turned away even though the Registry knows it.
+    function test_registrySetters_rejectInstancesOfTheWrongKind() public {
+        (address market, address[] memory tranches) =
+            _createMarket("wrong-kind", defaultMarketOwner, defaultBorrower, capConfig.defaultTrancheWeights);
+        address underwriter = address(_deployUnderwriter());
+        uint64 role = _assignOperator(makeAddr("wrongKindOperator"));
+
+        vm.prank(market);
+        vm.expectRevert(IRegistry.UnknownInstance.selector);
+        registry.setDepositorRole(role);
+
+        vm.prank(market);
+        vm.expectRevert(IRegistry.UnknownInstance.selector);
+        registry.setAllocatorRole(role);
+
+        vm.prank(tranches[0]);
+        vm.expectRevert(IRegistry.UnknownMarket.selector);
+        registry.setBorrowerRole(role);
+
+        vm.prank(tranches[0]);
+        vm.expectRevert(IRegistry.UnknownInstance.selector);
+        registry.setAllocatorRole(role);
+
+        vm.prank(underwriter);
+        vm.expectRevert(IRegistry.UnknownMarket.selector);
+        registry.setBorrowerRole(role);
+
+        vm.prank(underwriter);
+        vm.expectRevert(IRegistry.UnknownMarket.selector);
+        registry.createTranche(address(collateral), capConfig.defaultTrancheWeights, 12 hours);
     }
 
     function test_createUnderwriter_rejectsARoleThatIsNotAnOperatorRole() public {
@@ -552,17 +588,14 @@ contract RoleTableTest is CapDeployer {
         );
         _expectRole(address(oracle), IOracle.setSource.selector, CapRoles.GOVERNOR, "setSource");
 
-        // users create groups and instances; deployed instances only forward the three setters
+        // users create groups and instances. The instance-facing setters and createTranche are not
+        // role-wired: the Registry admits only callers it deployed, of the matching kind
         _expectRole(address(registry), Registry.createChildRoles.selector, CapRoles.WHITELISTED, "createChildRoles");
         _expectRole(
             address(registry), Registry.createFloatingMarket.selector, CapRoles.WHITELISTED, "createFloatingMarket"
         );
         _expectRole(address(registry), Registry.createFixedMarket.selector, CapRoles.WHITELISTED, "createFixedMarket");
         _expectRole(address(registry), Registry.createUnderwriter.selector, CapRoles.WHITELISTED, "createUnderwriter");
-        _expectRole(address(registry), Registry.setDepositorRole.selector, CapRoles.PROTOCOL, "setDepositorRole");
-        _expectRole(address(registry), Registry.setBorrowerRole.selector, CapRoles.PROTOCOL, "setBorrowerRole");
-        _expectRole(address(registry), Registry.createTranche.selector, CapRoles.PROTOCOL, "createTranche");
-        _expectRole(address(registry), Registry.setAllocatorRole.selector, CapRoles.PROTOCOL, "setAllocatorRole");
 
         // only the Registry deploys through the factory
         _expectRole(address(beaconFactory), IBeaconFactory.create.selector, CapRoles.REGISTRY, "factory create");
