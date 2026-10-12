@@ -191,16 +191,6 @@ contract CheckRoles is Script, InfraSerializer {
             IRegistry.createUnderwriter.selector,
             CapRoles.WHITELISTED
         );
-        _wired(
-            manager, "Registry.setDepositorRole", infra.registry, IRegistry.setDepositorRole.selector, CapRoles.PROTOCOL
-        );
-        _wired(
-            manager, "Registry.setBorrowerRole", infra.registry, IRegistry.setBorrowerRole.selector, CapRoles.PROTOCOL
-        );
-        _wired(manager, "Registry.createTranche", infra.registry, IRegistry.createTranche.selector, CapRoles.PROTOCOL);
-        _wired(
-            manager, "Registry.setAllocatorRole", infra.registry, IRegistry.setAllocatorRole.selector, CapRoles.PROTOCOL
-        );
 
         _wired(manager, "Factory.create", infra.factory, IBeaconFactory.create.selector, CapRoles.REGISTRY);
 
@@ -373,7 +363,6 @@ contract CheckRoles is Script, InfraSerializer {
         if (roleId == CapRoles.REGISTRY) return "REGISTRY";
         if (roleId == CapRoles.LIQUIDATOR) return "LIQUIDATOR";
         if (roleId == CapRoles.WHITELISTED) return "WHITELISTED";
-        if (roleId == CapRoles.PROTOCOL) return "PROTOCOL";
         if (roleId == PUBLIC_ROLE) return "PUBLIC";
         return "OPERATOR";
     }

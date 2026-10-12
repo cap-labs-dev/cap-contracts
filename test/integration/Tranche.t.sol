@@ -485,13 +485,13 @@ contract TrancheTest is CapDeployer {
     }
 
     /// @dev The market is the caller rather than an argument, so there is no call shape that wires
-    /// a tranche to somebody else's market. The registry entry point is PROTOCOL only, and other
-    /// PROTOCOL holders such as tranches are not markets.
+    /// a tranche to somebody else's market. The registry entry point only serves markets it
+    /// deployed, so neither outsiders nor other instances such as tranches get through.
     function test_createTranche_rejectsACallerThatIsNotAMarket() public {
         uint256[] memory weights = _weights3(0.5e27, 0.3e27, 0.2e27);
 
         vm.prank(stranger);
-        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, stranger));
+        vm.expectRevert(IRegistry.UnknownMarket.selector);
         registry.createTranche(address(collateral), weights, 12 hours);
 
         vm.prank(address(tranche0));

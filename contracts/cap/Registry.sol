@@ -179,7 +179,6 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     /// @inheritdoc IRegistry
     function createTranche(address _asset, uint256[] calldata _weights, uint256 _vestingPeriod)
         external
-        restricted
         returns (address tranche)
     {
         // the owner reached this through the market's own restricted entry point, so their
@@ -207,14 +206,17 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     /// @inheritdoc IRegistry
-    function setDepositorRole(uint64 roleId) external restricted {
+    function setDepositorRole(uint64 roleId) external {
+        if (!isTranche(msg.sender) && !isUnderwriter(msg.sender)) revert UnknownInstance();
+
         IAccessManager manager = IAccessManager(authority());
         manager.setTargetFunctionRole(msg.sender, _depositorSelectors(), roleId);
         emit SetDepositorRole(msg.sender, roleId);
     }
 
     /// @inheritdoc IRegistry
-    function setBorrowerRole(uint64 roleId) external restricted {
+    function setBorrowerRole(uint64 roleId) external {
+        if (!isMarket(msg.sender)) revert UnknownMarket();
         if (roleId == type(uint64).max) revert PublicRole();
         if (!isOperatorRole(roleId)) revert NotOperatorRole();
 
@@ -224,9 +226,11 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     /// @inheritdoc IRegistry
-    function setAllocatorRole(uint64 roleId) external restricted {
+    function setAllocatorRole(uint64 roleId) external {
+        if (!isUnderwriter(msg.sender)) revert UnknownInstance();
         if (roleId == type(uint64).max) revert PublicRole();
         if (!isOperatorRole(roleId)) revert NotOperatorRole();
+
         IAccessManager manager = IAccessManager(authority());
         manager.setTargetFunctionRole(msg.sender, _allocatorSelectors(), roleId);
         emit SetAllocatorRole(msg.sender, roleId);
@@ -435,7 +439,6 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
 
         manager.setTargetFunctionRole(factory, _factorySelectors(), CapRoles.REGISTRY);
         manager.setTargetFunctionRole(address(this), _registryWhitelistedSelectors(), CapRoles.WHITELISTED);
-        manager.setTargetFunctionRole(address(this), _registryProtocolSelectors(), CapRoles.PROTOCOL);
 
         manager.setTargetFunctionRole(stablecoin, _stablecoinMarketSelectors(), CapRoles.MARKET);
         manager.setTargetFunctionRole(stablecoin, _stablecoinGuardianSelectors(), CapRoles.GUARDIAN);
@@ -466,7 +469,6 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         manager.setTargetFunctionRole(market, _marketLiquidatorSelectors(), CapRoles.LIQUIDATOR);
 
         manager.grantRole(CapRoles.MARKET, market, 0);
-        manager.grantRole(CapRoles.PROTOCOL, market, 0);
     }
 
     /// @dev Wire tranche function selectors to the market owner, market and depositor roles
@@ -480,7 +482,6 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         manager.setTargetFunctionRole(tranche, _trancheGovernorSelectors(), CapRoles.GOVERNOR);
         manager.setTargetFunctionRole(tranche, _trancheMarketSelectors(), CapRoles.MARKET);
         manager.setTargetFunctionRole(tranche, _depositorSelectors(), depositorRoleId);
-        manager.grantRole(CapRoles.PROTOCOL, tranche, 0);
     }
 
     /// @dev Wire underwriter function selectors to the curator and keeper roles
@@ -497,8 +498,6 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         // unwired at ADMIN before {setAllocatorRole} / {setDepositorRole}
         manager.setTargetFunctionRole(underwriter, _allocatorSelectors(), _newClosedRole(manager, curatorRoleId));
         manager.setTargetFunctionRole(underwriter, _depositorSelectors(), _newClosedRole(manager, curatorRoleId));
-
-        manager.grantRole(CapRoles.PROTOCOL, underwriter, 0);
     }
 
     /// @dev A fresh operator role with no members. Same list {createChildRoles} writes, so a
@@ -527,14 +526,6 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         selectors[1] = IRegistry.createFloatingMarket.selector;
         selectors[2] = IRegistry.createFixedMarket.selector;
         selectors[3] = IRegistry.createUnderwriter.selector;
-    }
-
-    function _registryProtocolSelectors() private pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](4);
-        selectors[0] = IRegistry.setDepositorRole.selector;
-        selectors[1] = IRegistry.setBorrowerRole.selector;
-        selectors[2] = IRegistry.setAllocatorRole.selector;
-        selectors[3] = IRegistry.createTranche.selector;
     }
 
     function _stablecoinMarketSelectors() private pure returns (bytes4[] memory selectors) {

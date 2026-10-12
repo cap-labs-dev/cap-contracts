@@ -26,6 +26,9 @@ interface IRegistry {
     /// @notice The market was not deployed by this registry
     error UnknownMarket();
 
+    /// @notice The caller is not a registry instance of the kind the function serves
+    error UnknownInstance();
+
     /// @notice The requested slice starts after its end
     /// @dev `start` must not exceed `end`. Bounds past the collection are clamped to its length.
     error InvalidRange();
@@ -167,7 +170,7 @@ interface IRegistry {
     ) external returns (address market, address[] memory deployedTranches);
 
     /// @notice Add a junior tranche to the calling market and reweight the waterfall
-    /// @dev Restricted to PROTOCOL and the caller must be a registered market. Owners call
+    /// @dev The caller must be a market this registry deployed ({UnknownMarket}). Owners call
     /// {IBaseMarket-createTranche}, where AccessManager enforces their execution delay.
     /// `weights` covers the whole waterfall, including the new junior.
     /// Reverts before deployment if the market already has ten configured tranches.
@@ -181,20 +184,21 @@ interface IRegistry {
         returns (address tranche);
 
     /// @notice Set the depositor role on the calling tranche or underwriter
-    /// @dev Restricted to PROTOCOL. Deployed tranches and underwriters hold that
-    /// role so their own owner/curator setters can forward here.
+    /// @dev The caller must be a tranche or underwriter this registry deployed ({UnknownInstance}),
+    /// so their own owner/curator setters can forward here.
     /// @param roleId The depositor role id
     function setDepositorRole(uint64 roleId) external;
 
     /// @notice Set the borrower role on the calling market
-    /// @dev Restricted to PROTOCOL. Deployed markets hold that role so {IBaseMarket-setBorrowerRole}
-    /// can forward here. Replaces the closed borrower role assigned at create. `roleId` must be a
-    /// registry operator role, not PUBLIC ({PublicRole}, {NotOperatorRole}).
+    /// @dev The caller must be a market this registry deployed ({UnknownMarket}), so
+    /// {IBaseMarket-setBorrowerRole} can forward here. Replaces the closed borrower role assigned
+    /// at create. `roleId` must be a registry operator role, not PUBLIC ({PublicRole},
+    /// {NotOperatorRole}).
     /// @param roleId The borrower role id
     function setBorrowerRole(uint64 roleId) external;
 
     /// @notice Set the allocator role on the calling underwriter
-    /// @dev Restricted to PROTOCOL. Deployed underwriters hold that role so
+    /// @dev The caller must be an underwriter this registry deployed ({UnknownInstance}), so
     /// {IUnderwriter-setAllocatorRole} can forward here. Replaces the closed allocator role
     /// assigned at create. `roleId` must be a registry operator role, not PUBLIC ({PublicRole},
     /// {NotOperatorRole}).

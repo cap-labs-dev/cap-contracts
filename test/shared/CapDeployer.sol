@@ -274,7 +274,6 @@ abstract contract CapDeployer is BaseTest {
         accessManager.grantRole(CapRoles.KEEPER, address(this), 0);
         accessManager.grantRole(CapRoles.GUARDIAN, address(this), 0);
         accessManager.grantRole(CapRoles.ADMIN, address(this), 0);
-        accessManager.grantRole(CapRoles.PROTOCOL, address(this), 0);
         accessManager.grantRole(CapRoles.WHITELISTED, address(this), 0);
         accessManager.grantRole(CapRoles.LIQUIDATOR, defaultLiquidator, 0);
         // integration tests mint and write off on the protocol stablecoin without going through a
