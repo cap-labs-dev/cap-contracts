@@ -3,6 +3,7 @@ pragma solidity 0.8.36;
 
 import { ERC4626Upgradeable, ERC7540AsyncRedeem, IERC4626 } from "../ERC7540/ERC7540AsyncRedeem.sol";
 import { IAeraVault } from "../interfaces/IAeraVault.sol";
+import { IERC7540AsyncRedeem } from "../interfaces/IERC7540AsyncRedeem.sol";
 import { IInterestRateModel } from "../interfaces/IInterestRateModel.sol";
 import { IStablecoin } from "../interfaces/IStablecoin.sol";
 import { PremiumVesting } from "../utils/PremiumVesting.sol";
@@ -233,7 +234,6 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     }
 
     /// @inheritdoc IStablecoin
-    /// @dev Always at par, even with bad debt.
     function previewDeposit(uint256 _assets)
         public
         view
@@ -244,7 +244,6 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
     }
 
     /// @inheritdoc IStablecoin
-    /// @dev At par; see {previewDeposit}. Rounded up.
     function previewMint(uint256 _shares)
         public
         view
@@ -254,15 +253,23 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         assets = Math.ceilDiv(_shares, _scalingFactor);
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Zero while paused, since a deposit mints.
-    function maxDeposit(address) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 maxAssets) {
+    /// @inheritdoc IStablecoin
+    function maxDeposit(address)
+        public
+        view
+        override(ERC4626Upgradeable, IERC4626, IStablecoin)
+        returns (uint256 maxAssets)
+    {
         if (!paused()) maxAssets = type(uint256).max;
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Zero while paused; see {maxDeposit}.
-    function maxMint(address) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 maxShares) {
+    /// @inheritdoc IStablecoin
+    function maxMint(address)
+        public
+        view
+        override(ERC4626Upgradeable, IERC4626, IStablecoin)
+        returns (uint256 maxShares)
+    {
         if (!paused()) maxShares = type(uint256).max;
     }
 
@@ -272,8 +279,7 @@ contract Stablecoin layout at erc7201("cap.storage.Stablecoin")
         if (!paused()) maxShares = super.maxRedeem(_controller);
     }
 
-    /// @inheritdoc ERC7540AsyncRedeem
-    /// @dev Zero while paused, since an instant exit burns.
+    /// @inheritdoc IERC7540AsyncRedeem
     function maxInstantRedeem(address _owner) public view override returns (uint256 maxShares) {
         if (!paused()) maxShares = super.maxInstantRedeem(_owner);
     }

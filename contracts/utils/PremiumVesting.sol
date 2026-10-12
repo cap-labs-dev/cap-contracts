@@ -20,8 +20,7 @@ abstract contract PremiumVesting is IPremiumVesting, AccessManagedUpgradeable, E
     using SafeERC20 for IERC20;
     using WadRayMath for uint256;
 
-    /// @dev Per-share conversions floor. A floored debt can still let entitlements sum past the
-    /// pot; {claim} pays at most the stablecoin this contract holds.
+    /// @dev Precision of {premiumPerShare}
     uint256 private constant RAY = WadRayMath.RAY;
 
     /// @custom:storage-location cap.storage.PremiumVesting
@@ -224,14 +223,14 @@ abstract contract PremiumVesting is IPremiumVesting, AccessManagedUpgradeable, E
         _accrue(_getPremiumVestingStorage(), stakedSupply());
     }
 
-    /// @dev Add premium to the remainder and update the rate
+    /// @dev Accrue, then add premium to the remainder
     /// @param premium The premium being folded in
     function _fund(uint256 premium) internal updatePremium {
         _getPremiumVestingStorage().remainder += premium;
         emit Fund(msg.sender, premium);
     }
 
-    /// @dev Record the claimable premium for an account. Caller must {_updatePremium} first.
+    /// @dev Accrue, then clear and return an account's entitlement
     /// @param account The account collecting
     /// @return premium The entitlement just cleared
     function _settlePremium(address account) internal updatePremium returns (uint256 premium) {
@@ -367,7 +366,7 @@ abstract contract PremiumVesting is IPremiumVesting, AccessManagedUpgradeable, E
 
     /// @dev Premium attributed to `balance` at `perShare`. Floors per account. Aggregate
     /// entitlements can still exceed the pot when a prior debt also floored; {claim} caps payout
-    /// at the stablecoin held.
+    /// at spendable holdings.
     /// @param perShare Cumulative premium released per staked share, in ray decimals
     /// @param balance The share balance being valued
     /// @return amount The attributed premium, in stablecoin units (18 decimals)

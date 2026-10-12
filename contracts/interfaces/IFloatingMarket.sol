@@ -23,9 +23,12 @@ interface IFloatingMarket is IBaseMarket {
     function initialize(address authority, address registry, string memory name) external;
 
     /// @notice Borrow assets from the market
-    /// @dev `actualPrincipal` is the rise in {totalDebt} and is at most `principal`.
+    /// @dev `actualPrincipal` is the rise in {totalDebt} and is at most `principal`. Reverts
+    /// {InvalidPrincipal} for zero, {InsufficientLiquidity} above {availableCredit} (including a
+    /// maximum draw with none left), and {InvalidScaledAmount} if the fill rounds to zero.
     /// @param recipient The recipient of the borrowed assets
-    /// @param principal The principal amount of the borrowed assets, in stablecoin units (18 decimals)
+    /// @param principal The principal amount of the borrowed assets, in stablecoin units (18 decimals), or
+    /// `type(uint256).max` for the full {availableCredit}
     /// @return actualPrincipal The actual principal amount of the borrowed assets, in stablecoin units (18 decimals)
     function borrow(address recipient, uint256 principal) external returns (uint256 actualPrincipal);
 
@@ -36,6 +39,8 @@ interface IFloatingMarket is IBaseMarket {
     function repay(uint256 amount) external returns (uint256 repaid);
 
     /// @notice Liquidate assets from the market
+    /// @dev Reverts {Healthy} unless the market is unhealthy. Repayment is capped at
+    /// {maxLiquidatable}; a zero amount repays nothing.
     /// @param recipient The recipient of the liquidated assets
     /// @param amount The amount of assets to liquidate, in stablecoin units (18 decimals)
     /// @return repaid The actual amount of assets repaid, in stablecoin units (18 decimals)

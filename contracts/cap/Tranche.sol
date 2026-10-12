@@ -35,7 +35,7 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
     /// @inheritdoc ITranche
     uint256 public maxCapital;
 
-    /// @dev Shares per remaining asset at which the tranche is retired (1% of par)
+    /// @dev Shares per remaining asset at which the tranche is retired (1% of par at one asset per share)
     uint256 private constant KILL_RATIO = 100;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -114,22 +114,20 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
         assets = IVault(vault).balanceOf(address(this), asset());
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Caller must have the depositor role. The receiver is unrestricted.
+    /// @inheritdoc ITranche
     function deposit(uint256 _assets, address _receiver)
         public
-        override(ERC4626Upgradeable, IERC4626)
+        override(ERC4626Upgradeable, IERC4626, ITranche)
         restricted
         returns (uint256 shares)
     {
         shares = super.deposit(_assets, _receiver);
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Gated the same way as {deposit}; see there for how the allowlist works
+    /// @inheritdoc ITranche
     function mint(uint256 _shares, address _receiver)
         public
-        override(ERC4626Upgradeable, IERC4626)
+        override(ERC4626Upgradeable, IERC4626, ITranche)
         restricted
         returns (uint256 assets)
     {
@@ -152,20 +150,23 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
         if (!killed) maxShares = type(uint256).max;
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Empty vault quotes at par via {DeadShares-seedDeposit}.
+    /// @inheritdoc ITranche
     function previewDeposit(uint256 assets)
         public
         view
-        override(ERC4626Upgradeable, IERC4626)
+        override(ERC4626Upgradeable, IERC4626, ITranche)
         returns (uint256 shares)
     {
         shares = totalSupply() == 0 ? DeadShares.seedDeposit(assets) : super.previewDeposit(assets);
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Inverse of {previewDeposit} while empty.
-    function previewMint(uint256 shares) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 assets) {
+    /// @inheritdoc ITranche
+    function previewMint(uint256 shares)
+        public
+        view
+        override(ERC4626Upgradeable, IERC4626, ITranche)
+        returns (uint256 assets)
+    {
         assets = totalSupply() == 0 ? DeadShares.seedMint(shares) : super.previewMint(shares);
     }
 
@@ -218,7 +219,8 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
         _checkKilled(totalAssets() - assets);
     }
 
-    /// @dev Retire below 1% of par before assets leave. Equality and zero share supply stay alive.
+    /// @dev Retire below 1% of share supply in assets before assets leave. Equality and zero share
+    /// supply stay alive.
     /// Division avoids overflowing assets * KILL_RATIO. Retirement never blocks an exit.
     /// @param assets The asset balance after the slash or withdrawal
     function _checkKilled(uint256 assets) private {

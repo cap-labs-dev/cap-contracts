@@ -52,13 +52,13 @@ contract FloatingMarket layout at erc7201("cap.storage.FloatingMarket") is IFloa
     }
 
     /// @inheritdoc IBaseMarket
-    /// @dev Accrue at the old multiplier first so the new factor applies only going forward.
     function setMarketMultiplier(uint256 multiplier)
         external
         override(BaseMarket, IBaseMarket)
         restricted
         nonReentrant
     {
+        // accrue at the old multiplier so the new one applies only going forward
         _chargePremium();
         _setMarketMultiplier(multiplier);
     }

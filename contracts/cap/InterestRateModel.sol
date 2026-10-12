@@ -138,7 +138,6 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     }
 
     /// @inheritdoc IInterestRateModel
-    /// @dev There is no lower bound: a market may set its underwriter rate to zero
     function updateUnderwriterRate(uint256 rate) external restricted {
         if (rate > maximumUnderwriterRate) revert InvalidRate();
         address market = msg.sender;
@@ -174,7 +173,6 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
     }
 
     /// @inheritdoc IInterestRateModel
-    /// @dev Uses the time-weighted utilization, not {liquidityRate}. See {averageUtilizationAfterMint}.
     function fixedRatesAfterMint(address market, uint256 termUtilization, uint256 mintAmount)
         public
         view
@@ -349,8 +347,8 @@ contract InterestRateModel layout at erc7201("cap.storage.InterestRateModel")
             : average - (average - observed).rayMul(weight);
     }
 
-    /// @dev Utilization as the stablecoin defines it, on the given supplies.
-    /// @param credit The credit-backed supply
+    /// @dev Credit over supply, zero when supply is zero.
+    /// @param credit The credit-backed supply plus bad debt
     /// @param supply The total supply
     /// @return rate The utilization rate in ray decimals
     function _ratio(uint256 credit, uint256 supply) internal pure returns (uint256 rate) {

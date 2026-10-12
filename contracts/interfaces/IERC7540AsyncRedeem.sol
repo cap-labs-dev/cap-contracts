@@ -61,7 +61,8 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     function transferRequest(uint256 requestId, address to) external;
 
     /// @notice Get the controller that currently owns a request
-    /// @dev Cap extra, not an ERC-7540 method.
+    /// @dev Cap extra, not an ERC-7540 method; needed because {transferRequest} can move requests
+    /// between controllers.
     /// @param requestId The request id
     /// @return controller The controller, or zero if the request does not exist
     function controllerOf(uint256 requestId) external view returns (address controller);
@@ -87,7 +88,8 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     /// @notice Claim a previously requested redemption by asset amount on a single request
     /// @dev Caller must be `controller` or its operator. ERC-20 allowance is insufficient.
     /// Limited to currently claimable shares on this request and {unlockedSupply}.
-    /// Burns the ceil-quoted shares for `assets`.
+    /// Burns the ceil-quoted shares for `assets`. `assets` may not exceed `convertToAssets` of
+    /// those claimable shares (reverts {ERC4626ExceededMaxWithdraw}).
     /// @param requestId The request to settle
     /// @param assets The assets to pay
     /// @param receiver The asset recipient
@@ -96,6 +98,22 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     function withdraw(uint256 requestId, uint256 assets, address receiver, address controller)
         external
         returns (uint256 shares);
+
+    /// @notice Get the shares claimable on a request
+    /// @dev Capped by {unlockedSupply}. The watermark is `settledQueue + unlocked`; `settledQueue`
+    /// counts all claimed shares, not a contiguous prefix. Allocation is FIFO only while
+    /// requests settle in order: already-claimable shares may settle out of order, and the
+    /// watermark then counts them as if they came from the head of the queue. If liquidity falls
+    /// afterwards, earlier and later requests can each show the same unlocked shares as claimable,
+    /// and whichever claims first is paid, so a later request can settle ahead of an earlier one.
+    /// Pending is the remainder of the request.
+    /// @param requestId The request id
+    /// @param controller The request controller
+    /// @return claimableShares The shares claimable now
+    function claimableRedeemRequest(uint256 requestId, address controller)
+        external
+        view
+        returns (uint256 claimableShares);
 
     /// @notice Get the shares not sitting in the redemption queue
     /// @return supply `totalSupply - redemptionQueue`
@@ -121,6 +139,7 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     function instantUnlockedSupply() external view returns (uint256 unlocked);
 
     /// @notice Get the shares {instantRedeem} will accept for `owner`
+    /// @dev Zero while exits are closed; cUSD closes them while paused.
     /// @param owner The share holder
     /// @return maxShares The instant redeem limit
     function maxInstantRedeem(address owner) external view returns (uint256 maxShares);
@@ -131,6 +150,7 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     function maxInstantWithdraw(address owner) external view returns (uint256 maxAssets);
 
     /// @notice Redeem shares against liquid reserve, without a request
+    /// @dev Caller must be `owner`, its operator, or hold share allowance. Bounded by {maxInstantRedeem}.
     /// @param shares The shares to burn
     /// @param receiver The asset recipient
     /// @param owner The share holder
@@ -138,6 +158,8 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     function instantRedeem(uint256 shares, address receiver, address owner) external returns (uint256 assets);
 
     /// @notice Withdraw assets against liquid reserve, without a request
+    /// @dev Caller must be `owner`, its operator, or hold share allowance. Bounded by {maxInstantRedeem}
+    /// shares and {maxInstantWithdraw} assets.
     /// @param assets The assets to pay
     /// @param receiver The asset recipient
     /// @param owner The share holder
@@ -145,7 +167,7 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
     function instantWithdraw(uint256 assets, address receiver, address owner) external returns (uint256 shares);
 
     /// @notice Get the shares a withdrawal of `assets` would burn, including shortfall pricing
-    /// @dev {previewWithdraw} reverts. This is the quote {unlockedSupply} and instant exits use.
+    /// @dev {previewWithdraw} reverts. This is the ceil share quote every withdraw path burns.
     /// @param assets The asset amount
     /// @return shares The share amount
     function quoteWithdraw(uint256 assets) external view returns (uint256 shares);

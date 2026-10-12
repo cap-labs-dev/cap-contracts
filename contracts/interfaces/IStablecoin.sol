@@ -134,13 +134,15 @@ interface IStablecoin {
     /// @dev Guardian only. Credit-backed supply is unchanged because no borrower debt was lost.
     /// `amount` is cUSD share units (18 decimals), not underlying reserve-token units.
     /// Reverts unless `badDebt + creditBackedSupply <= totalSupply` after the recognition.
+    /// Checkpoints the liquidity rate, since a reserve loss raises utilization.
     /// @param amount The bad debt to recognize, in cUSD share units (18 decimals)
     function recognizeBadDebtInReserve(uint256 amount) external;
 
     /// @notice Recognize unrecoverable borrower debt, socializing the loss across holders
-    /// @dev Market only. Also drops credit-backed supply. Recognized backing falls through
-    /// {backing} / {totalAssets}; redeemers take a further exit haircut via {convertToAssets}.
-    /// `amount` is cUSD share units (18 decimals), not underlying reserve-token units.
+    /// @dev Market only. Also drops credit-backed supply, leaving utilization unchanged. Recognized
+    /// backing falls through {backing} / {totalAssets}; redeemers take a further exit haircut via
+    /// {convertToAssets}. `amount` is cUSD share units (18 decimals), not underlying reserve-token units.
+    /// Reverts {BadDebtExceedsSupply} if bad debt would exceed total supply.
     /// @param amount The bad debt to recognize, in cUSD share units (18 decimals)
     function recognizeBadDebtInCredit(uint256 amount) external;
 
@@ -181,14 +183,28 @@ interface IStablecoin {
     function totalAssets() external view returns (uint256 assets);
 
     /// @notice Preview the shares minted for a deposit at the fixed 1:1 exchange rate
+    /// @dev Always at par, even with bad debt.
     /// @param assets The asset amount to deposit
     /// @return shares The share amount minted
     function previewDeposit(uint256 assets) external view returns (uint256 shares);
 
     /// @notice Preview the assets required to mint shares at the fixed 1:1 exchange rate
+    /// @dev At par, even with bad debt. Rounded up.
     /// @param shares The share amount to mint
     /// @return assets The asset amount required
     function previewMint(uint256 shares) external view returns (uint256 assets);
+
+    /// @notice Get the maximum deposit for a receiver
+    /// @dev Unlimited, or zero while paused, since a deposit mints.
+    /// @param receiver The account that would receive shares
+    /// @return maxAssets The maximum deposit amount
+    function maxDeposit(address receiver) external view returns (uint256 maxAssets);
+
+    /// @notice Get the maximum mint for a receiver
+    /// @dev Same as {maxDeposit}.
+    /// @param receiver The account that would receive shares
+    /// @return maxShares The maximum mint amount
+    function maxMint(address receiver) external view returns (uint256 maxShares);
 
     /// @notice Get the share token decimals
     /// @dev Always 18

@@ -100,8 +100,9 @@ interface ITranche is IPremiumVesting, IERC7540AsyncRedeem {
     function oracle() external view returns (address);
 
     /// @notice Get whether the tranche has been retired
-    /// @dev Latched below 1% of par after a slash or withdrawal. Closes deposits. The market
-    /// also stops sending it fresh premium, so leftover dust cannot keep its weight.
+    /// @dev Latched when a slash or withdrawal leaves assets below 1% of share supply (1% of par at
+    /// one asset per share). Closes deposits. The market also stops sending it fresh premium, so
+    /// leftover dust cannot keep its weight.
     /// @return Whether the tranche has been retired
     function killed() external view returns (bool);
 
@@ -130,6 +131,34 @@ interface ITranche is IPremiumVesting, IERC7540AsyncRedeem {
     /// @param receiver The account that would receive shares
     /// @return maxShares The maximum mint amount
     function maxMint(address receiver) external view returns (uint256 maxShares);
+
+    /// @notice Deposit assets for shares
+    /// @dev Caller must hold the depositor role; the receiver is unrestricted. Bounded by {maxDeposit},
+    /// and reverts {ZeroShares} if the deposit would mint no shares.
+    /// @param assets The assets to deposit
+    /// @param receiver The account receiving the shares
+    /// @return shares The shares minted
+    function deposit(uint256 assets, address receiver) external returns (uint256 shares);
+
+    /// @notice Mint an exact amount of shares
+    /// @dev Same depositor-role gate as {deposit}. Bounded by {maxMint}.
+    /// @param shares The shares to mint
+    /// @param receiver The account receiving the shares
+    /// @return assets The assets deposited
+    function mint(uint256 shares, address receiver) external returns (uint256 assets);
+
+    /// @notice Preview the shares a deposit of `assets` would mint
+    /// @dev An empty vault quotes at par less the 1,000 dead shares the first deposit seeds, and reverts
+    /// {DeadShares-DepositBelowSeed} at or below that amount.
+    /// @param assets The assets to deposit
+    /// @return shares The shares minted
+    function previewDeposit(uint256 assets) external view returns (uint256 shares);
+
+    /// @notice Preview the assets needed to mint `shares`
+    /// @dev Inverse of {previewDeposit} while empty: 1,000 shares more than the assets.
+    /// @param shares The shares to mint
+    /// @return assets The assets required
+    function previewMint(uint256 shares) external view returns (uint256 assets);
 
     /// @notice Get the shares available for redemption excluding market-locked assets
     /// @dev A zero lock does not consult the oracle. A positive lock prices locked

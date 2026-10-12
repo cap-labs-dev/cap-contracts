@@ -15,7 +15,6 @@ import {
 import { ERC4626Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
-import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 /// @title Wrapper
 /// @author kexley, Cap Labs
@@ -56,20 +55,18 @@ contract Wrapper layout at erc7201("cap.storage.Wrapper")
         _decimals = ERC4626Upgradeable.decimals();
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Empty vault quotes at par via {DeadShares-seedDeposit}.
+    /// @inheritdoc IWrapper
     function previewDeposit(uint256 assets)
         public
         view
-        override(ERC4626Upgradeable, IERC4626)
+        override(ERC4626Upgradeable, IWrapper)
         returns (uint256 shares)
     {
         shares = totalSupply() == 0 ? DeadShares.seedDeposit(assets) : super.previewDeposit(assets);
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Inverse of {previewDeposit} while empty.
-    function previewMint(uint256 shares) public view override(ERC4626Upgradeable, IERC4626) returns (uint256 assets) {
+    /// @inheritdoc IWrapper
+    function previewMint(uint256 shares) public view override(ERC4626Upgradeable, IWrapper) returns (uint256 assets) {
         assets = totalSupply() == 0 ? DeadShares.seedMint(shares) : super.previewMint(shares);
     }
 

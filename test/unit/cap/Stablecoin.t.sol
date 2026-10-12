@@ -278,8 +278,8 @@ contract StablecoinTest is BaseTest {
         assertEq(irm.updateCalls(), rateUpdates + 1, "so the rate is checkpointed");
     }
 
-    /// @dev A write-off moves credit into bad debt. Neither is redeemable, so utilization holds,
-    /// matching {unlockedSupply}, rather than falling and cutting holders' rate after a loss.
+    /// @dev A write-off moves credit into bad debt, which utilization also counts, so the rate holds
+    /// rather than falling after a loss. The reserve that can be drawn is unchanged.
     function test_recognizeBadDebtInCredit_leavesUtilizationUnchanged() public {
         vm.prank(alice);
         scoin.deposit(100e18, alice);
@@ -818,9 +818,8 @@ contract StablecoinTest is BaseTest {
         assertLe(paid, shares, "never pays out more than the shares burned");
     }
 
-    /// Written off credit leaves creditBackedSupply so utilization stops counting it, but it must
-    /// not become redeemable: no reserve arrived with the write off. Both amounts are excluded
-    /// from unlockedSupply.
+    /// Written off credit leaves creditBackedSupply, but no reserve arrived with it, so the reserve
+    /// cap keeps it unredeemable.
     function test_recognizeBadDebt_releasesCreditWithoutUnlockingIt() public {
         scoin.mintCreditBacked(bob, 100e18);
         assertEq(scoin.creditBackedSupply(), 100e18);
@@ -829,7 +828,7 @@ contract StablecoinTest is BaseTest {
         scoin.recognizeBadDebtInCredit(30e18);
 
         assertEq(scoin.badDebt(), 30e18);
-        assertEq(scoin.creditBackedSupply(), 70e18, "written off credit leaves the utilization base");
+        assertEq(scoin.creditBackedSupply(), 70e18, "written off credit leaves creditBackedSupply");
         assertEq(scoin.unlockedSupply(), 0, "but does not become redeemable against the reserve");
     }
 

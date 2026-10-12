@@ -145,7 +145,7 @@ library WadRayMath {
         ln = 2 * sum + k * LN2_RAY;
     }
 
-    /// @dev `RAY × exp(x / RAY)` for `x >= 0`. Reverts on overflow.
+    /// @dev `RAY × exp(x / RAY)` for `x >= 0`. Panics with {Panic-UNDER_OVERFLOW} on overflow.
     /// @param x Exponent in ray
     /// @return exp `exp(x / RAY)` in ray
     function rayExp(uint256 x) internal pure returns (uint256 exp) {

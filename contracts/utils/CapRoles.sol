@@ -26,12 +26,13 @@ library CapRoles {
     /// @dev Permissioned liquidation of unhealthy markets
     uint64 internal constant LIQUIDATOR = 6;
 
-    /// @dev Users of the system. Opens {createChildRoles} and Registry create* so they can
-    /// stand up operator groups, markets, and underwriters.
+    /// @dev Users of the system. Opens {createChildRoles}, {createFloatingMarket}, {createFixedMarket}
+    /// and {createUnderwriter} so they can stand up operator groups, markets, and underwriters.
     uint64 internal constant WHITELISTED = 7;
 
-    /// @dev Deployed markets, tranches, and underwriters. Opens only the Registry role setters
-    /// those instances forward ({setDepositorRole}, {setBorrowerRole}, {setAllocatorRole}).
+    /// @dev Deployed markets, tranches, and underwriters. Opens the Registry role setters those
+    /// instances forward ({setDepositorRole}, {setBorrowerRole}, {setAllocatorRole}) and, for
+    /// markets, {createTranche}.
     uint64 internal constant PROTOCOL = 8;
 
     /// @dev First role id assigned by {Registry-createChildRoles}

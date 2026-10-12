@@ -188,14 +188,16 @@ interface IRegistry {
 
     /// @notice Set the borrower role on the calling market
     /// @dev Restricted to PROTOCOL. Deployed markets hold that role so {IBaseMarket-setBorrowerRole}
-    /// can forward here. Replaces the closed borrower role assigned at create.
+    /// can forward here. Replaces the closed borrower role assigned at create. `roleId` must be a
+    /// registry operator role, not PUBLIC ({PublicRole}, {NotOperatorRole}).
     /// @param roleId The borrower role id
     function setBorrowerRole(uint64 roleId) external;
 
     /// @notice Set the allocator role on the calling underwriter
     /// @dev Restricted to PROTOCOL. Deployed underwriters hold that role so
     /// {IUnderwriter-setAllocatorRole} can forward here. Replaces the closed allocator role
-    /// assigned at create.
+    /// assigned at create. `roleId` must be a registry operator role, not PUBLIC ({PublicRole},
+    /// {NotOperatorRole}).
     /// @param roleId The allocator role id
     function setAllocatorRole(uint64 roleId) external;
 
@@ -251,7 +253,7 @@ interface IRegistry {
     function underwriters(uint256 start, uint256 end) external view returns (address[] memory listed);
 
     /// @notice Get the owner role for a market this registry deployed
-    /// @dev From {IBaseMarket-setTrancheWeights}. Zero if unknown.
+    /// @dev Live from the AccessManager role on {IBaseMarket-setLoanToValue}. Zero if unknown.
     /// @param market The market to query
     /// @return roleId The market owner role id, or zero if the market is unknown
     function marketOwnerRole(address market) external view returns (uint64 roleId);
