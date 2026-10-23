@@ -173,6 +173,8 @@ contract UnderwriterIntegrationTest is CapDeployer {
         vm.warp(block.timestamp + 20 * underwriter.vestingPeriod());
 
         underwriter.removeTranche(address(tranche0));
+        assertTrue(registry.isTranche(address(tranche0)), "allocation removal preserves Registry membership");
+        assertEq(underwriter.registeredTranches().length, 0);
         uint256 pulledOnRemove = stablecoin.balanceOf(address(underwriter));
         assertGt(pulledOnRemove, 0, "remove reports what has already vested");
 
@@ -184,6 +186,42 @@ contract UnderwriterIntegrationTest is CapDeployer {
         assertGt(
             stablecoin.balanceOf(address(underwriter)), pulledOnRemove, "later premium is not stranded until a re-add"
         );
+    }
+
+    /// @dev A keeper must not poison vesting through an arbitrary claim target. On the old code,
+    /// the maximum return became the remainder and froze opted-in holders as soon as it vested.
+    function test_report_rejectsFabricatedPremiumWithoutBlockingHolderExits() public {
+        _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
+        address keeper = makeAddr("report keeper");
+        _grantKeeper(keeper);
+        address fabricated = address(new FabricatedPremiumTarget());
+        assertFalse(registry.isTranche(fabricated));
+        assertEq(underwriter.debt(fabricated), 0);
+
+        vm.prank(keeper);
+        vm.expectRevert(IUnderwriter.UnknownTranche.selector);
+        underwriter.report(fabricated);
+
+        assertEq(underwriter.remaining(), 0);
+        assertEq(stablecoin.balanceOf(address(underwriter)), 0);
+        assertEq(underwriter.lastReported(), 0);
+        vm.warp(block.timestamp + 1);
+
+        address recipient = makeAddr("share recipient");
+        vm.startPrank(depositor);
+        underwriter.transfer(recipient, 1e18);
+        assertEq(underwriter.claim(depositor), 0);
+        assertEq(underwriter.instantRedeem(1e18, depositor, depositor), 1e18);
+        uint256 requestId = underwriter.requestRedeem(1e18, depositor, depositor);
+        assertEq(underwriter.redeem(requestId, 1e18, depositor, depositor), 1e18);
+        underwriter.optOut();
+        vm.stopPrank();
+
+        assertEq(underwriter.balanceOf(recipient), 1e18);
+        assertEq(underwriter.balanceOf(depositor), DEPOSIT - DEAD_SHARES - 3e18);
+        assertEq(vault.balanceOf(depositor, address(collateral)), 2e18);
+        assertFalse(underwriter.optedIn(depositor));
+        assertEq(underwriter.stakedSupply(), 0);
     }
 
     function test_curatorEarnsPremiumAndDistributesToDepositor() public {
@@ -273,5 +311,12 @@ contract UnderwriterIntegrationTest is CapDeployer {
         vm.prank(depositor);
         underwriter.redeem(reqId, DEPOSIT - DEAD_SHARES, depositor, depositor);
         assertEq(vault.balanceOf(depositor, address(collateral)), DEPOSIT - 2 * DEAD_SHARES);
+    }
+}
+
+/// @dev Implements only claim and sends no cUSD, matching the audit's arbitrary report target.
+contract FabricatedPremiumTarget {
+    function claim(address) external pure returns (uint256) {
+        return type(uint256).max;
     }
 }

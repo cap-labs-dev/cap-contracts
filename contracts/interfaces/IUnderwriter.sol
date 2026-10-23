@@ -16,6 +16,9 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @notice The tranche is not registered with the underwriter
     error NotRegisteredTranche();
 
+    /// @notice The tranche was not deployed by this underwriter's registry
+    error UnknownTranche();
+
     /// @notice The named shares exceed this vault's queue under that request id
     error UnknownQueuedRequest();
 
@@ -152,9 +155,9 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     function setDefaultTranche(address tranche) external;
 
     /// @notice Re-value a tranche position and claim its premium
-    /// @dev Registration is not checked; see {deallocate}. Remakes the mark only if {allocate}
-    /// already opened one. Valuations stay cached between marks. Deposit and mint quotes
-    /// separately value the default position at its current value.
+    /// @dev Requires Registry membership, but not allocation-list membership, so removed tranches
+    /// remain reportable. Remakes the mark only if {allocate} already opened one. Valuations stay
+    /// cached between marks. Deposit and mint quotes separately value the default position live.
     /// Harvested premium enters the pool's own vesting pot, whose period the curator controls.
     /// It rewards opted-in balances as it vests, including holders who joined after the tranche
     /// generated it. Previously credited pool rewards remain with their original holders.

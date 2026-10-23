@@ -55,8 +55,12 @@ contract UnderwriterUnitTest is BaseTest {
     address internal stranger = makeAddr("stranger");
     address internal stablecoin = makeAddr("stablecoin");
 
+    /// @dev This test contract stands in for the Registry passed to initialize.
+    mapping(address => bool) public isTranche;
+
     function setUp() public {
         _setUpAccessManager();
+        isTranche[tranche] = true;
         vm.etch(vault, address(new MockUnderwriterVault()).code);
         collateral = new MockERC20("Wrapped Ether", "WETH", 18);
 
@@ -505,12 +509,12 @@ contract UnderwriterUnitTest is BaseTest {
 
     function _markTranche() internal returns (MockMarkTranche t) {
         t = new MockMarkTranche();
+        isTranche[address(t)] = true;
         underwriter.addTranche(address(t));
     }
 
-    /// @dev {report} is not gated on registration. {removeTranche} only closes allocations; leftover
-    /// shares keep earning, and a re-add must not be the only way to collect that later premium.
-    function test_report_doesNotRequireRegistration() public {
+    /// @dev Registry membership is sufficient; allocation-list membership is not required.
+    function test_report_doesNotRequireAllocationRegistration() public {
         vm.mockCall(tranche, abi.encodeWithSignature("claim(address)", address(underwriter)), abi.encode(uint256(4e18)));
 
         underwriter.report(tranche);
