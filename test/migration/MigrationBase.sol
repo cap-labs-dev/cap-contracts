@@ -25,6 +25,15 @@ interface IAccessControlV1 {
     function getRoleMemberCount(bytes32 roleId) external view returns (uint256);
 }
 
+/// @dev The v1 stcUSD vesting surface the rehearsal settles before upgrading
+interface IStakedCapV1Vesting {
+    function notify() external;
+    function lockedProfit() external view returns (uint256 locked);
+    function lastNotify() external view returns (uint256 timestamp);
+    function lockDuration() external view returns (uint256 duration);
+    function totalAssets() external view returns (uint256 total);
+}
+
 /// @title MigrationBase
 /// @notice Fork Ethereum, upgrade the live cUSD and stcUSD proxies, and stand the v2 stack up
 ///         next to them.
@@ -165,7 +174,12 @@ abstract contract MigrationBase is Test, DeployImplems, DeployInfra, MigrateInfr
 
         _authorizeV1Upgrade(address(scoin));
         _authorizeV1Upgrade(address(wrapper));
+        _settleV1Vesting();
+        uint256 sharePrice = wrapper.convertToAssets(1e18);
+        uint256 stakedAssets = wrapper.totalAssets();
         _upgradeExistingTokens(implems, infra, users, liveName, liveSymbol);
+        assertEq(wrapper.convertToAssets(1e18), sharePrice, "stcUSD share price is continuous");
+        assertEq(wrapper.totalAssets(), stakedAssets, "stcUSD assets are continuous");
 
         _initInfraAccessControl(infra, users);
 
@@ -179,6 +193,18 @@ abstract contract MigrationBase is Test, DeployImplems, DeployInfra, MigrateInfr
         uint256 needed = scoin.previewMint(scoin.totalSupply());
         uint256 held = usdc.balanceOf(address(scoin));
         if (held < needed) deal(address(usdc), address(scoin), needed);
+    }
+
+    /// @dev The runbook step the migration enforces: let a running release finish, notify any
+    ///      un-notified balance, and let that release finish too.
+    function _settleV1Vesting() internal {
+        IStakedCapV1Vesting stakedV1 = IStakedCapV1Vesting(address(wrapper));
+        uint256 duration = stakedV1.lockDuration();
+        if (stakedV1.lockedProfit() > 0) vm.warp(stakedV1.lastNotify() + duration);
+        if (scoin.balanceOf(address(wrapper)) > stakedV1.totalAssets()) {
+            stakedV1.notify();
+            vm.warp(block.timestamp + duration);
+        }
     }
 
     function _authorizeV1Upgrade(address proxy) internal {
