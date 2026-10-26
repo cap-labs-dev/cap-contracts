@@ -105,7 +105,7 @@ Based on commit `5e857ffce7c2f342472a0c9d2565f3b4cd9578f9`, reviewed on 12 Octob
 
 - **Issue:** Per-share rounding can leave funded rewards unclaimable. Separately, if a claim exceeds spendable premium, payment is capped and the unpaid entitlement is cleared.
 - **Accepted:** Rounding dust can remain unclaimable, and capped claim shortfalls are not carried forward. Later funding does not restore a cleared entitlement.
-- **Mitigation:** Underwriters below 1% of par reject new capital, preventing recapitalization from inflating share supply and magnifying rounding loss. The claim cap limits payouts to spendable premium and protects cUSD redemption escrow; it does not preserve unpaid claims.
+- **Mitigation:** Underwriters below 1% of par reject new capital, preventing recapitalization from inflating share supply and magnifying rounding loss. The claim cap limits payouts to spendable premium and protects cUSD redemption escrow; it does not preserve unpaid claims. `claimable()` previews the capped payout, so the Wrapper prices shares only against premium it can collect.
 
 ### Underwriter and tranche accounting
 

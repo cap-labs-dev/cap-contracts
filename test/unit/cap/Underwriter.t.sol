@@ -87,6 +87,7 @@ contract UnderwriterUnitTest is BaseTest {
         // the Registry does this on a real deployment: the allowlist is the membership of whichever
         // role the entry points are gated to
         accessManager.setTargetFunctionRole(address(underwriter), _depositorSelectors(), DEPOSITOR_ROLE);
+        vm.mockCall(stablecoin, abi.encodeWithSelector(IERC20.balanceOf.selector, address(underwriter)), abi.encode(0));
 
         // and opt the vault into the tranche's vesting so it can earn what {report} later claims
         vm.mockCall(tranche, abi.encodeWithSignature("optIn()"), abi.encode());

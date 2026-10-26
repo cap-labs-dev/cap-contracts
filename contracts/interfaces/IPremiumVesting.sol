@@ -112,10 +112,10 @@ interface IPremiumVesting {
     /// @return premium The premium banked at the last checkpoint and not yet collected, in stablecoin units (18 decimals)
     function pendingPremium(address user) external view returns (uint256 premium);
 
-    /// @notice Get the calculated premium entitlement for an account
-    /// @dev Not the amount {claim} will pay, which is capped at spendable holdings.
+    /// @notice Preview the premium currently payable to an account
+    /// @dev Capped at spendable holdings as in {claim}; cUSD excludes redemption escrow.
     /// @param user The account to query
-    /// @return premium The calculated entitlement, in stablecoin units (18 decimals), uncapped by holdings
+    /// @return premium The payable premium, in stablecoin units (18 decimals), capped at spendable holdings
     function claimable(address user) external view returns (uint256 premium);
 
     /// @notice Get the sum of opted-in balances

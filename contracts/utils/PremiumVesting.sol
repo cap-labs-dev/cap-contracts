@@ -105,7 +105,7 @@ abstract contract PremiumVesting is IPremiumVesting, AccessManagedUpgradeable, E
     function claimable(address user) public view returns (uint256 premium) {
         PremiumVestingStorage storage $ = _getPremiumVestingStorage();
         uint256 earning = $.optedIn[user] ? balanceOf(user) : 0;
-        premium = _claimable($, user, earning, $.staked);
+        premium = Math.min(_claimable($, user, earning, $.staked), _spendablePremium());
     }
 
     /// @inheritdoc IPremiumVesting
@@ -321,7 +321,7 @@ abstract contract PremiumVesting is IPremiumVesting, AccessManagedUpgradeable, E
         }
     }
 
-    /// @dev Premium an account could collect, including vest not yet written
+    /// @dev Calculated entitlement including vest not yet written, before the payout cap
     /// @param $ The PremiumVesting storage
     /// @param account The account to query
     /// @param balance The account's current share balance
@@ -366,7 +366,7 @@ abstract contract PremiumVesting is IPremiumVesting, AccessManagedUpgradeable, E
 
     /// @dev Premium attributed to `balance` at `perShare`. Floors per account. Aggregate
     /// entitlements can still exceed the pot when a prior debt also floored; {claim} caps payout
-    /// at spendable holdings.
+    /// at spendable holdings and {claimable} previews the same cap.
     /// @param perShare Cumulative premium released per staked share, in ray decimals
     /// @param balance The share balance being valued
     /// @return amount The attributed premium, in stablecoin units (18 decimals)

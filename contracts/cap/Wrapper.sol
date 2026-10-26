@@ -70,7 +70,7 @@ contract Wrapper layout at erc7201("cap.storage.Wrapper")
         assets = totalSupply() == 0 ? DeadShares.seedMint(shares) : super.previewMint(shares);
     }
 
-    /// @dev Claim vested premium into the vault before the deposit is priced
+    /// @dev Harvest premium already included in the quote before moving assets and minting shares
     /// @param _caller Caller of the deposit
     /// @param _receiver Receiver of the wrapper shares
     /// @param _assets Amount of the asset to pull from the caller
@@ -82,7 +82,7 @@ contract Wrapper layout at erc7201("cap.storage.Wrapper")
         super._deposit(_caller, _receiver, _assets, _shares);
     }
 
-    /// @dev Claim vested premium into the vault before the withdrawal is priced
+    /// @dev Harvest premium already included in the quote before paying out assets
     /// @param _caller Caller of the withdrawal
     /// @param _receiver Receiver of the asset
     /// @param _owner Owner of the wrapper shares being burned
