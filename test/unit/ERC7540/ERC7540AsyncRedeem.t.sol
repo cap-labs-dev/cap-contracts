@@ -6,6 +6,7 @@ import { IERC7540AsyncRedeem } from "../../../contracts/interfaces/IERC7540Async
 import { IERC7540Operator } from "../../../contracts/interfaces/IERC7540Operator.sol";
 import { IERC7540Redeem } from "../../../contracts/interfaces/IERC7540Redeem.sol";
 import { IERC7575 } from "../../../contracts/interfaces/IERC7575.sol";
+import { IERC7575Share } from "../../../contracts/interfaces/IERC7575Share.sol";
 import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
 import { ERC4626Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
@@ -660,13 +661,21 @@ contract ERC7540AsyncRedeemTest is Test {
         assertEq(type(IERC7540Redeem).interfaceId, bytes4(0x620ee8e4), "EIP-7540 redeem id");
         assertEq(type(IERC7540Operator).interfaceId, bytes4(0xe3bc4e65), "EIP-7540 operator id");
         assertEq(type(IERC7575).interfaceId, bytes4(0x2f0a18c5), "EIP-7575 vault id");
+        assertEq(type(IERC7575Share).interfaceId, bytes4(0xf815c03d), "EIP-7575 share id");
 
         assertTrue(vault.supportsInterface(type(IERC4626).interfaceId));
         assertTrue(vault.supportsInterface(type(IERC7540Operator).interfaceId));
         assertTrue(vault.supportsInterface(type(IERC7540Redeem).interfaceId));
         assertTrue(vault.supportsInterface(type(IERC7540AsyncRedeem).interfaceId));
         assertTrue(vault.supportsInterface(type(IERC7575).interfaceId));
+        assertTrue(vault.supportsInterface(type(IERC7575Share).interfaceId), "the vault is its own share");
         assertFalse(vault.supportsInterface(0xffffffff));
+    }
+
+    function test_shareLooksUpItselfForItsAsset() public {
+        assertEq(vault.share(), address(vault));
+        assertEq(vault.vault(address(asset)), address(vault));
+        assertEq(vault.vault(makeAddr("other asset")), address(0));
     }
 
     // --- fully pending request (no liquidity reaches it) ---

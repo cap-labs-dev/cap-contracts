@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 import { IERC7540AsyncRedeem } from "../interfaces/IERC7540AsyncRedeem.sol";
 import { IERC7540Redeem } from "../interfaces/IERC7540Redeem.sol";
 import { IERC7575 } from "../interfaces/IERC7575.sol";
+import { IERC7575Share } from "../interfaces/IERC7575Share.sol";
 import { ERC7540Operator, IERC7540Operator } from "./ERC7540Operator.sol";
 import {
     ERC4626Upgradeable,
@@ -66,6 +67,11 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     /// @inheritdoc IERC7540AsyncRedeem
     function share() public view virtual returns (address shareTokenAddress) {
         shareTokenAddress = address(this);
+    }
+
+    /// @inheritdoc IERC7575Share
+    function vault(address _asset) public view returns (address vaultAddress) {
+        if (_asset == asset()) vaultAddress = address(this);
     }
 
     /// @inheritdoc IERC7540Redeem
@@ -535,6 +541,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165) returns (bool) {
         return interfaceId == type(IERC4626).interfaceId || interfaceId == type(IERC7540Operator).interfaceId
             || interfaceId == type(IERC7540Redeem).interfaceId || interfaceId == type(IERC7540AsyncRedeem).interfaceId
-            || interfaceId == type(IERC7575).interfaceId || super.supportsInterface(interfaceId);
+            || interfaceId == type(IERC7575).interfaceId || interfaceId == type(IERC7575Share).interfaceId
+            || super.supportsInterface(interfaceId);
     }
 }
