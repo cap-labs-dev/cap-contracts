@@ -657,6 +657,29 @@ contract ERC7540AsyncRedeemTest is Test {
         assertEq(vault.activeAssets(), 1_000e18);
     }
 
+    /// @dev A zero-share claim passes every amount check, so only ownership stops it naming another
+    /// controller's request in {RedeemRequestConsumed} and {Withdraw}.
+    function test_perIdClaim_rejectsAnotherControllersRequest() public {
+        vault.setUnlocked(1_000e18);
+        vm.prank(alice);
+        uint256 id = vault.requestRedeem(100e18, alice, alice);
+
+        vm.startPrank(bob);
+        vm.expectRevert(abi.encodeWithSelector(IERC7540AsyncRedeem.RedeemRequestNotFound.selector, id, bob));
+        vault.redeem(id, 0, bob, bob);
+        vm.expectRevert(abi.encodeWithSelector(IERC7540AsyncRedeem.RedeemRequestNotFound.selector, id, bob));
+        vault.withdraw(id, 0, bob, bob);
+        vm.expectRevert(abi.encodeWithSelector(IERC7540AsyncRedeem.RedeemRequestNotFound.selector, id + 1, bob));
+        vault.redeem(id + 1, 0, bob, bob);
+        vm.stopPrank();
+
+        vm.prank(alice);
+        assertEq(vault.redeem(id, 100e18, alice, alice), 100e18, "the owner still claims it");
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IERC7540AsyncRedeem.RedeemRequestNotFound.selector, id, alice));
+        vault.redeem(id, 0, alice, alice);
+    }
+
     function test_supportsInterface() public view {
         assertEq(type(IERC7540Redeem).interfaceId, bytes4(0x620ee8e4), "EIP-7540 redeem id");
         assertEq(type(IERC7540Operator).interfaceId, bytes4(0xe3bc4e65), "EIP-7540 operator id");

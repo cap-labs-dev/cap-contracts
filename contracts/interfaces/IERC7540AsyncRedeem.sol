@@ -75,6 +75,7 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626, IERC7575Share {
 
     /// @notice Claim previously requested shares on a single request
     /// @dev Caller must be `controller` or its operator. ERC-20 allowance is insufficient.
+    /// Reverts {RedeemRequestNotFound} unless `requestId` is open under `controller`.
     /// Limited to currently claimable shares on this request and {unlockedSupply}.
     /// Pays `convertToAssets(shares)` (floored). There is no redemption window.
     /// @param requestId The request to settle
@@ -88,6 +89,7 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626, IERC7575Share {
 
     /// @notice Claim a previously requested redemption by asset amount on a single request
     /// @dev Caller must be `controller` or its operator. ERC-20 allowance is insufficient.
+    /// Reverts {RedeemRequestNotFound} unless `requestId` is open under `controller`.
     /// Limited to currently claimable shares on this request and {unlockedSupply}.
     /// Burns the ceil-quoted shares for `assets`. `assets` may not exceed `convertToAssets` of
     /// those claimable shares (reverts {ERC4626ExceededMaxWithdraw}).
