@@ -1377,7 +1377,8 @@ contract AccountingIntegrityTest is CapDeployer {
         assertGe(secondPremium, firstPremium, "a later equal draw is never cheaper");
     }
 
-    /// @dev Views treat `type(uint256).max` the way {borrow} does: the maximum term.
+    /// @dev Views treat `type(uint256).max` the way {borrow} does: the maximum term. A finite term
+    /// above the maximum is priced as given, as {borrowMore} charges a grandfathered remainder.
     function test_premiumForBorrowTreatsMaxUintAsTheMaximumTerm() public {
         FixedMarket market = _fixedMarketOnSlope(0.9e27);
         uint256 principal = 1_000e18;
@@ -1385,7 +1386,7 @@ contract AccountingIntegrityTest is CapDeployer {
         (uint256 asFlagLiq, uint256 asFlagUw) = market.premiumForBorrow(principal, type(uint256).max);
         (uint256 overLiq, uint256 overUw) = market.premiumForBorrow(principal, market.maximumTermLimit() + 1);
         assertEq(asFlagLiq + asFlagUw, atMaxLiq + atMaxUw, "max uint is the maximum term");
-        assertEq(overLiq + overUw, atMaxLiq + atMaxUw, "above the maximum quotes at the maximum");
+        assertGt(overLiq + overUw, atMaxLiq + atMaxUw, "a finite term above the maximum is priced as given");
         assertEq(market.maxPrincipal(type(uint256).max), market.maxPrincipal(market.maximumTermLimit()));
     }
 

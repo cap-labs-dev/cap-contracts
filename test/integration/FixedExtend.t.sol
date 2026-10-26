@@ -83,7 +83,8 @@ contract FixedExtendTest is CapDeployer {
         assertEq(market.expiry(id), block.timestamp + 30 days);
         assertEq(market.totalDebt(), market.debt(id));
         assertGt(market.maxPrincipal(10 days), 0);
-        assertEq(market.maxPrincipal(365 days), market.maxPrincipal(30 days));
+        assertEq(market.maxPrincipal(type(uint256).max), market.maxPrincipal(30 days));
+        assertLt(market.maxPrincipal(365 days), market.maxPrincipal(30 days), "a finite term is used as given");
     }
 
     function test_borrowMore_onALiveLoan() public {

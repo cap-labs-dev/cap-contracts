@@ -124,9 +124,11 @@ interface IFixedMarket is IBaseMarket {
 
     /// @notice Borrow additional assets against an existing loan
     /// @dev `id` must still carry debt. A fully repaid loan stays enumerable but cannot
-    /// reopen; open a new loan with {borrow}. Premium is {premiumForBorrow} on the
-    /// remaining term. Reverts {LoanExpired} at or after expiry, {InvalidTerm} if the
-    /// remainder is below {minimumTermLimit}. Principal limits and reverts match {borrow}.
+    /// reopen; open a new loan with {borrow}. Premium is {premiumForBorrow} on the remaining
+    /// term `expiry(id) - block.timestamp`, which can exceed a since-lowered {maximumTermLimit};
+    /// size with {maxPrincipal} over the same term. Reverts {LoanExpired} at or after expiry,
+    /// {InvalidTerm} if the remainder is below {minimumTermLimit}. Principal limits and reverts
+    /// match {borrow}.
     /// @param id The id of the loan
     /// @param recipient The recipient of the borrowed assets
     /// @param principal The principal amount of the borrowed assets, in stablecoin units (18 decimals), or
@@ -221,8 +223,9 @@ interface IFixedMarket is IBaseMarket {
 
     /// @notice Get the premium a new borrow would be charged
     /// @dev Priced on this principal at the rate after it is minted. Each draw is priced alone, so
-    /// splitting one borrow into several can cost less in total. A `term` of `type(uint256).max` or
-    /// above {maximumTermLimit} quotes at the maximum.
+    /// splitting one borrow into several can cost less in total. A `term` of `type(uint256).max`
+    /// quotes at {maximumTermLimit}; any other term is priced as given, so a {borrowMore} quote
+    /// passes the loan's remaining term even when it exceeds the maximum.
     /// @param principal The principal of the loan, in stablecoin units (18 decimals)
     /// @param term The term of the loan
     /// @return liquidityPremium The liquidity premium, in stablecoin units (18 decimals)
@@ -234,7 +237,7 @@ interface IFixedMarket is IBaseMarket {
 
     /// @notice Get a principal borrowable over a term, leaving room for the upfront premium
     /// @dev Sized so principal plus {premiumForBorrow} fits in the raw {IBaseMarket-availableCredit}.
-    /// `type(uint256).max` and anything above {maximumTermLimit} quote at the maximum.
+    /// `type(uint256).max` quotes at {maximumTermLimit}; any other term is used as given.
     /// May be below the exact maximum.
     /// @param term The term of the loan
     /// @return principal The principal borrowable over `term`, in stablecoin units (18 decimals)

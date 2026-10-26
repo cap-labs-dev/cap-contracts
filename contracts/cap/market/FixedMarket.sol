@@ -281,7 +281,8 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @dev Rates after `mintAmount` of credit-backed supply is minted.
-    /// @param term The term of the loan in seconds, already capped at the maximum
+    /// @param term The term of the loan in seconds. Can exceed the maximum; the term multiplier
+    /// treats anything at or above it as the maximum
     /// @param mintAmount The credit-backed supply still to be minted before the charge, in stablecoin units (18 decimals)
     /// @return liquidityRate The liquidity rate per year in ray decimals
     /// @return underwriterRate The underwriter rate per year in ray decimals
@@ -311,7 +312,8 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @dev Combined liquidity and underwriter rate after `mintAmount` is minted.
-    /// @param term The term of the loan in seconds, already capped at the maximum
+    /// @param term The term of the loan in seconds. Can exceed the maximum; the term multiplier
+    /// treats anything at or above it as the maximum
     /// @param mintAmount The credit-backed supply still to be minted before the charge, in stablecoin units (18 decimals)
     /// @return rate The combined rate per year in ray decimals
     function _termRate(uint256 term, uint256 mintAmount) internal view returns (uint256 rate) {
@@ -358,12 +360,12 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         principal = Math.mulDiv(limit, 1e27, 1e27 + Math.mulDiv(term, rate, MathUtils.SECONDS_PER_YEAR));
     }
 
-    /// @dev Terms above {maximumTermLimit}, including `type(uint256).max`, quote at the maximum.
-    /// {borrow} still rejects a finite term outside the band.
+    /// @dev `type(uint256).max` quotes at the maximum, as {borrow} reads it. A finite term is used
+    /// as given, so a {borrowMore} remainder above a since-lowered maximum quotes what it is charged.
     /// @param term The requested term in seconds
     /// @return quoted The term used for a view quote
     function _quoteTerm(uint256 term) internal view returns (uint256 quoted) {
-        quoted = term > maximumTermLimit ? maximumTermLimit : term;
+        quoted = term == type(uint256).max ? maximumTermLimit : term;
     }
 
     /// @dev Store term limits. The maximum must be non-zero because rates divide by it;
