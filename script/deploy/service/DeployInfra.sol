@@ -8,7 +8,6 @@ import { BeaconFactory } from "../../../contracts/cap/BeaconFactory.sol";
 import { InterestRateModel } from "../../../contracts/cap/InterestRateModel.sol";
 import { Registry } from "../../../contracts/cap/Registry.sol";
 import { Stablecoin } from "../../../contracts/cap/Stablecoin.sol";
-import { Vault } from "../../../contracts/cap/Vault.sol";
 import { Wrapper } from "../../../contracts/cap/Wrapper.sol";
 import { ChainlinkAdapter } from "../../../contracts/cap/oracle/ChainlinkAdapter.sol";
 import { Oracle } from "../../../contracts/cap/oracle/Oracle.sol";
@@ -133,7 +132,7 @@ contract DeployInfra is CreateXUtils {
         infra = _deployFactoryBeaconsAndRegistry(implementations, users, saltNamespace, infra);
     }
 
-    /// @dev AccessManager, vault, oracle, and the chainlink adapter
+    /// @dev AccessManager, oracle, and the chainlink adapter
     function _deploySharedHead(
         ImplementationsConfig memory implementations,
         UsersConfig memory users,
@@ -150,12 +149,6 @@ contract DeployInfra is CreateXUtils {
         infra.accessManager = _create3(
             _salt(deployer, saltNamespace, "accessManager"),
             abi.encodePacked(type(AccessManager).creationCode, abi.encode(deployer))
-        );
-
-        infra.vault = _create3Proxy(
-            _salt(deployer, saltNamespace, "vault"),
-            implementations.vault,
-            abi.encodeCall(Vault.initialize, (infra.accessManager))
         );
 
         // Deployed here rather than passed in. Handing the registry a foreign address meant the
@@ -228,7 +221,6 @@ contract DeployInfra is CreateXUtils {
                     infra.accessManager,
                     IRegistry.InitParams({
                         stablecoin: infra.stablecoin,
-                        vault: infra.vault,
                         oracle: infra.oracle,
                         irm: infra.irm,
                         factory: infra.factory,

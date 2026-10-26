@@ -41,10 +41,10 @@ contract UnderwriterRegressionTest is CapDeployer {
     }
 
     function _prepareEntrant(uint256 assets) internal {
-        _fundVault(entrant, assets);
+        _mintCollateral(entrant, assets);
         _admitDepositor(address(pool), entrant);
         vm.prank(entrant);
-        vault.setOperator(address(pool), true);
+        collateral.approve(address(pool), type(uint256).max);
     }
 
     /// @dev Both issue paths must price gains and losses before allocation persists the mark.
@@ -57,7 +57,7 @@ contract UnderwriterRegressionTest is CapDeployer {
         _allocateAll(1_000e18);
         if (queue) pool.deallocateAsync(address(tranche), 300e18);
         uint256 change = bound(rawChange, 1e18, 400e18);
-        if (gain) _fundVault(address(tranche), change);
+        if (gain) _mintCollateral(address(tranche), change);
         else _slash(change);
 
         uint256 recorded = pool.debt(address(tranche));
@@ -109,7 +109,7 @@ contract UnderwriterRegressionTest is CapDeployer {
         pool.report(address(tranche));
         assertEq(pool.debt(address(tranche)), 0);
         assertFalse(pool.killed(), "the idle half survived");
-        _fundVault(address(tranche), 500e18);
+        _mintCollateral(address(tranche), 500e18);
         uint256 live = tranche.convertToAssets(tranche.balanceOf(address(pool)));
         assertGt(live, 499e18);
         assertEq(pool.previewDeposit(100e18), Math.mulDiv(100e18, pool.totalSupply() + 1, 500e18 + live + 1));
@@ -143,7 +143,7 @@ contract UnderwriterRegressionTest is CapDeployer {
         pool.report(address(tranche));
         assertTrue(pool.killed());
         assertEq(pool.totalAssets(), 0);
-        _fundVault(address(pool), 2_000e18);
+        _mintCollateral(address(pool), 2_000e18);
         pool.removeTranche(address(tranche));
         assertTrue(pool.killed(), "retirement is permanent after recapitalization");
         _assertDepositsClosed();
@@ -272,7 +272,7 @@ contract UnderwriterRegressionTest is CapDeployer {
         vm.prank(entrant);
         vm.expectRevert(IUnderwriter.UnderwriterKilled.selector);
         pool.deposit(DEAD_SHARES + 1, entrant);
-        assertEq(vault.balanceOf(entrant, address(collateral)), DEAD_SHARES + 1);
+        assertEq(collateral.balanceOf(entrant), DEAD_SHARES + 1);
         assertEq(pool.totalSupply(), 0);
         assertEq(pool.totalDebt(), 0);
         assertEq(Tranche(fresh).totalSupply(), 0, "the nested seed mint is rolled back too");
@@ -343,11 +343,11 @@ contract UnderwriterRegressionTest is CapDeployer {
     function _roundingState() internal {
         _fundUnderwriter(address(pool), incumbent, 2_000);
         pool.allocate(address(tranche), 1_904);
-        _fundVault(address(tranche), 33);
+        _mintCollateral(address(tranche), 33);
         pool.report(address(tranche));
         assertEq(pool.totalSupply(), 2_000);
         assertEq(pool.totalAssets(), 2_021);
-        assertEq(vault.balanceOf(address(pool), address(collateral)), 96);
+        assertEq(collateral.balanceOf(address(pool)), 96);
         assertEq(pool.unlockedSupply(), 95);
         assertEq(pool.convertToAssets(96), 97, "old ceil limit was not payable");
     }
@@ -358,7 +358,7 @@ contract UnderwriterRegressionTest is CapDeployer {
         assertEq(shares, 95);
         vm.prank(incumbent);
         assertEq(pool.instantRedeem(shares, incumbent, incumbent), 95);
-        assertEq(vault.balanceOf(address(pool), address(collateral)), 1);
+        assertEq(collateral.balanceOf(address(pool)), 1);
     }
 
     function test_advertisedQueuedRedeemPaysFromIdleAssets() public {
@@ -377,19 +377,19 @@ contract UnderwriterRegressionTest is CapDeployer {
         _roundingState();
         vm.prank(incumbent);
         assertEq(pool.instantWithdraw(95, incumbent, incumbent), 95, "94 floored shares would pay only 94 assets");
-        assertEq(vault.balanceOf(address(pool), address(collateral)), 1);
+        assertEq(collateral.balanceOf(address(pool)), 1);
     }
 
     function testFuzz_advertisedRedeemNeverExceedsIdleAssets(uint96 rawIdle, uint96 rawGain) public {
         _fundUnderwriter(address(pool), incumbent, 1_000e18);
         uint256 idle = bound(rawIdle, 1, 500e18);
         pool.allocate(address(tranche), 1_000e18 - idle);
-        _fundVault(address(tranche), bound(rawGain, 0, 1_000e18));
+        _mintCollateral(address(tranche), bound(rawGain, 0, 1_000e18));
         pool.report(address(tranche));
         uint256 shares = pool.maxInstantRedeem(incumbent);
         assertLe(pool.convertToAssets(shares), idle);
         vm.prank(incumbent);
         uint256 paid = pool.instantRedeem(shares, incumbent, incumbent);
-        assertEq(vault.balanceOf(address(pool), address(collateral)), idle - paid);
+        assertEq(collateral.balanceOf(address(pool)), idle - paid);
     }
 }

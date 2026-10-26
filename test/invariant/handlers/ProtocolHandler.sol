@@ -94,7 +94,7 @@ contract ProtocolHandler is CapDeployer {
             _admitDepositor(address(ts[j]), address(pool));
             pool.addTranche(address(ts[j]));
         }
-        // All capital enters through the ordinary reserve and custody deposit paths.
+        // All capital enters through the ordinary reserve and collateral deposit paths.
         for (uint256 i; i < 3; ++i) {
             address actor = makeAddr(string.concat("stateful actor ", vm.toString(i)));
             actors[i] = actor;
@@ -102,16 +102,14 @@ contract ProtocolHandler is CapDeployer {
             collateralCreated += 1_000_000e18;
             cusdUnderlying.mint(actor, 1_000_000e18);
             vm.startPrank(actor);
-            collateral.approve(address(vault), type(uint256).max);
             cusdUnderlying.approve(address(stablecoin), type(uint256).max);
             stablecoin.approve(address(wrapper), type(uint256).max);
-            vault.deposit(address(collateral), 100_000e18, actor);
             stablecoin.deposit(100_000e18, actor);
             stablecoin.optIn();
             for (uint256 j; j < 4; ++j) {
-                vault.setOperator(address(ts[j]), true);
+                collateral.approve(address(ts[j]), type(uint256).max);
             }
-            vault.setOperator(address(pool), true);
+            collateral.approve(address(pool), type(uint256).max);
             vm.stopPrank();
             for (uint256 j; j < 5; ++j) {
                 _admitDepositor(address(exits[j]), actor);
@@ -145,20 +143,6 @@ contract ProtocolHandler is CapDeployer {
         _success();
     }
 
-    function custody(uint256 who, uint256 raw, bool withdraw_) external counted {
-        address actor = actors[who % 3];
-        uint256 available = withdraw_ ? vault.balanceOf(actor, address(collateral)) : collateral.balanceOf(actor);
-        uint256 amount = _amount(raw, available);
-        if (amount == 0) {
-            _skip();
-            return;
-        }
-        vm.prank(actor);
-        if (withdraw_) vault.withdraw(address(collateral), amount, actor);
-        else vault.deposit(address(collateral), amount, actor);
-        _success();
-    }
-
     function deposit(uint256 which, uint256 who, uint256 raw) external counted {
         uint256 k = which % 5;
         address actor = actors[who % 3];
@@ -170,7 +154,7 @@ contract ProtocolHandler is CapDeployer {
             _skip();
             return;
         }
-        uint256 amount = _amount(raw, vault.balanceOf(actor, address(collateral)));
+        uint256 amount = _amount(raw, collateral.balanceOf(actor));
         if (amount == 0) {
             _skip();
             return;
@@ -230,7 +214,7 @@ contract ProtocolHandler is CapDeployer {
 
     function allocate(uint256 which, uint256 raw) external counted {
         uint256 k = which % 2;
-        uint256 amount = _amount(raw, vault.balanceOf(address(pool), address(collateral)));
+        uint256 amount = _amount(raw, collateral.balanceOf(address(pool)));
         if (amount == 0 || ts[k].killed()) {
             _skip();
             return;
@@ -594,9 +578,7 @@ contract ProtocolHandler is CapDeployer {
             }
         }
         uint256 health = k < 4 ? IBaseMarket(ts[k].market()).healthiness() : 0;
-        uint256 liquid = k == 5
-            ? cusdUnderlying.balanceOf(address(stablecoin))
-            : vault.balanceOf(address(token), address(collateral));
+        uint256 liquid = k == 5 ? cusdUnderlying.balanceOf(address(stablecoin)) : collateral.balanceOf(address(token));
         uint256 before = _assetBalance(k, actor);
         uint256 supply = token.totalSupply();
         uint256 quote = token.quoteWithdraw(amount);
@@ -634,8 +616,12 @@ contract ProtocolHandler is CapDeployer {
     }
 
     function checkAccounting() public view {
-        assertEq(vault.totalSupply(vault.id(address(collateral))), collateral.balanceOf(address(vault)));
-        uint256 held = collateral.balanceOf(address(vault)) + collateral.balanceOf(defaultLiquidator);
+        // Tranches and the pool hold collateral directly; every token is in one of these places
+        uint256 held = collateral.balanceOf(address(pool)) + collateral.balanceOf(defaultLiquidator);
+        for (uint256 j; j < 4; ++j) {
+            assertEq(ts[j].totalAssets(), collateral.balanceOf(address(ts[j])), "tranche assets are its holdings");
+            held += collateral.balanceOf(address(ts[j]));
+        }
         for (uint256 i; i < 3; ++i) {
             held += collateral.balanceOf(actors[i]);
         }
@@ -662,7 +648,7 @@ contract ProtocolHandler is CapDeployer {
             "physical reserve plus debt backing"
         );
         assertEq(pool.totalDebt(), ghostMarks[0] + ghostMarks[1]);
-        assertEq(pool.totalAssets(), vault.balanceOf(address(pool), address(collateral)) + pool.totalDebt());
+        assertEq(pool.totalAssets(), collateral.balanceOf(address(pool)) + pool.totalDebt());
         for (uint256 i; i < 2; ++i) {
             assertEq(pool.debt(address(ts[i])), ghostMarks[i]);
         }
@@ -709,7 +695,7 @@ contract ProtocolHandler is CapDeployer {
             if (k == 5) staked += stablecoin.balanceOf(address(wrapper));
             assertEq(vest.stakedSupply(), staked, "earning supply");
         }
-        uint256 idle = vault.balanceOf(address(pool), address(collateral));
+        uint256 idle = collateral.balanceOf(address(pool));
         assertLe(pool.convertToAssets(pool.unlockedSupply()), idle, "pool redemption limit is payable");
         if (pool.totalAssets() * 100 < pool.totalSupply()) {
             assertEq(pool.maxDeposit(actors[0]), 0, "a depleted pool cannot recapitalize through new shares");
@@ -817,7 +803,7 @@ contract ProtocolHandler is CapDeployer {
 
     function _syncMark(uint256 k) internal {
         uint256 shares = ts[k].balanceOf(address(pool)) + pool.queuedShares(address(ts[k]));
-        uint256 assets = vault.balanceOf(address(ts[k]), address(collateral));
+        uint256 assets = collateral.balanceOf(address(ts[k]));
         ghostMarks[k] = shares * (assets + 1) / (ts[k].totalSupply() + 1);
         assertEq(pool.debt(address(ts[k])), ghostMarks[k], "mark includes queued position");
     }
@@ -845,7 +831,7 @@ contract ProtocolHandler is CapDeployer {
     }
 
     function _assetBalance(uint256 k, address actor) internal view returns (uint256) {
-        return k == 5 ? cusdUnderlying.balanceOf(actor) : vault.balanceOf(actor, address(collateral));
+        return k == 5 ? cusdUnderlying.balanceOf(actor) : collateral.balanceOf(actor);
     }
 
     function _amount(uint256 raw, uint256 available) internal pure returns (uint256) {

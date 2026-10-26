@@ -10,6 +10,8 @@ import { IPremiumVesting } from "./IPremiumVesting.sol";
 /// @dev Beacon instance. Upgrade via {UpgradeableBeacon-upgradeTo} on the tranche beacon.
 /// Deposits and mints must issue at least one share or revert with {ZeroShares}.
 /// A deposit preview can still return zero when the asset amount rounds below one share.
+/// {IERC4626-totalAssets} is this contract's balance of {asset}. Premium is paid in cUSD, which the
+/// Registry rejects as collateral, so the two balances never mix.
 interface ITranche is IPremiumVesting, IERC7540AsyncRedeem {
     /// @notice The oracle reported a zero price
     error InvalidPrice();
@@ -37,7 +39,6 @@ interface ITranche is IPremiumVesting, IERC7540AsyncRedeem {
     /// @param name The tranche name
     /// @param symbol The tranche symbol
     /// @param market The market this tranche underwrites
-    /// @param vault The vault holding tranche assets
     /// @param oracle The oracle used for price feeds
     /// @param vestingPeriod The premium vesting time constant in seconds
     function initialize(
@@ -47,7 +48,6 @@ interface ITranche is IPremiumVesting, IERC7540AsyncRedeem {
         string memory name,
         string memory symbol,
         address market,
-        address vault,
         address oracle,
         uint256 vestingPeriod
     ) external;
@@ -91,10 +91,6 @@ interface ITranche is IPremiumVesting, IERC7540AsyncRedeem {
     /// @return The registry address
     function registry() external view returns (address);
 
-    /// @notice Get the vault holding tranche assets
-    /// @return The vault address
-    function vault() external view returns (address);
-
     /// @notice Get the oracle used for price feeds
     /// @return The oracle address
     function oracle() external view returns (address);
@@ -114,11 +110,6 @@ interface ITranche is IPremiumVesting, IERC7540AsyncRedeem {
     /// @dev `min` of {activeCapital} and {maxCapital}. Zero when empty or the cap is zero.
     /// @return limit The capital limit in USD (18 decimals)
     function capitalLimit() external view returns (uint256 limit);
-
-    /// @notice Get the total assets held for this tranche in the vault
-    /// @dev Vault ERC6909 balance, not tokens held here.
-    /// @return assets The tranche asset balance
-    function totalAssets() external view returns (uint256 assets);
 
     /// @notice Get the maximum deposit for a receiver
     /// @dev Unlimited until killed, then zero. Admission is on {deposit}, not here.

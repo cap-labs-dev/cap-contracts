@@ -209,9 +209,6 @@ contract CheckRoles is Script, InfraSerializer {
             CapRoles.ADMIN
         );
         _wired(
-            manager, "Vault.upgradeToAndCall", infra.vault, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN
-        );
-        _wired(
             manager, "Oracle.upgradeToAndCall", infra.oracle, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN
         );
         _wired(manager, "IRM.upgradeToAndCall", infra.irm, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);

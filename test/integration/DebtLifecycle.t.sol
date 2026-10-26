@@ -5,6 +5,7 @@ import { Underwriter } from "../../contracts/cap/Underwriter.sol";
 import { FixedMarket } from "../../contracts/cap/market/FixedMarket.sol";
 import { IBaseMarket } from "../../contracts/interfaces/IBaseMarket.sol";
 import { IFixedMarket } from "../../contracts/interfaces/IFixedMarket.sol";
+import { IRegistry } from "../../contracts/interfaces/IRegistry.sol";
 import { ITranche } from "../../contracts/interfaces/ITranche.sol";
 import { WadRayMath } from "../../contracts/utils/WadRayMath.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
@@ -441,19 +442,41 @@ contract DebtLifecycleTest is CapDeployer {
         registry.createFixedMarket(_uniformAssets(weights.length), weights, "Bad", ownerRole, 0, 0, 1 days);
     }
 
-    // ── vault operator rights track tranche registration ─────────────────────
+    // ── tranches never hold a standing allowance over underwriter assets ─────
 
-    function test_trancheOperatorRights_grantedOnAddAndRevokedOnRemove() public {
+    function test_trancheAllowance_onlyForTheAllocationInFlight() public {
         (, address tranche0,) = _createMarket("Floating");
         Underwriter underwriter = _deployUnderwriter();
 
-        assertFalse(vault.isOperator(address(underwriter), tranche0), "no rights before registration");
-
         underwriter.addTranche(tranche0);
-        assertTrue(vault.isOperator(address(underwriter), tranche0), "granted on registration");
+        assertEq(collateral.allowance(address(underwriter), tranche0), 0, "registration grants nothing");
 
-        underwriter.removeTranche(tranche0);
-        assertFalse(vault.isOperator(address(underwriter), tranche0), "revoked on removal");
+        _fundUnderwriter(address(underwriter), makeAddr("supplier"), 100e18);
+        _admitDepositor(tranche0, address(underwriter));
+        underwriter.allocate(tranche0, 40e18);
+        assertEq(collateral.balanceOf(tranche0), 40e18, "the tranche pulled exactly the allocation");
+        assertEq(collateral.allowance(address(underwriter), tranche0), 0, "and the approval was spent");
+    }
+
+    // ── cUSD cannot be collateral: it is also the premium token ──────────────
+
+    function test_registryRejectsStablecoinCollateral() public {
+        address[] memory assets = new address[](1);
+        assets[0] = address(stablecoin);
+        uint256[] memory weights = new uint256[](1);
+        weights[0] = 1e27;
+        vm.expectRevert(IRegistry.StablecoinCollateral.selector);
+        this.createMarketExternal(assets, weights);
+
+        if (_operatorRoleOf(address(this)) == 0) _assignOperator(address(this));
+        uint64 curatorRole = _operatorRoleOf(address(this));
+        vm.expectRevert(IRegistry.StablecoinCollateral.selector);
+        registry.createUnderwriter(address(stablecoin), "cUSD Underwriter", "cuUW", curatorRole);
+    }
+
+    /// @dev External so {vm.expectRevert} targets the registry call inside the helper
+    function createMarketExternal(address[] memory assets, uint256[] memory weights) external {
+        _createMarket("cUSD collateral", address(this), defaultBorrower, assets, weights);
     }
 
     // ── the full repay round trip cannot overshoot scaledDebt ────────────────

@@ -24,7 +24,6 @@ abstract contract InfraSerializer {
         string memory prefix = _chainPrefix();
 
         string memory implemsJson = "implems";
-        implemsJson.serialize("vault", implems.vault);
         implemsJson.serialize("stablecoin", implems.stablecoin);
         implemsJson.serialize("irm", implems.irm);
         implemsJson.serialize("oracle", implems.oracle);
@@ -37,7 +36,6 @@ abstract contract InfraSerializer {
 
         string memory infraJson = "infra";
         infraJson.serialize("accessManager", infra.accessManager);
-        infraJson.serialize("vault", infra.vault);
         infraJson.serialize("stablecoin", infra.stablecoin);
         infraJson.serialize("irm", infra.irm);
         infraJson.serialize("oracle", infra.oracle);
@@ -75,7 +73,6 @@ abstract contract InfraSerializer {
 
         string memory implemsPrefix = string.concat(prefix, "implems.");
         implems = ImplementationsConfig({
-            vault: json.readAddress(string.concat(implemsPrefix, "vault")),
             stablecoin: json.readAddress(string.concat(implemsPrefix, "stablecoin")),
             irm: json.readAddress(string.concat(implemsPrefix, "irm")),
             oracle: json.readAddress(string.concat(implemsPrefix, "oracle")),
@@ -90,7 +87,6 @@ abstract contract InfraSerializer {
         string memory infraPrefix = string.concat(prefix, "infra.");
         infra = InfraConfig({
             accessManager: json.readAddress(string.concat(infraPrefix, "accessManager")),
-            vault: json.readAddress(string.concat(infraPrefix, "vault")),
             stablecoin: json.readAddress(string.concat(infraPrefix, "stablecoin")),
             irm: json.readAddress(string.concat(infraPrefix, "irm")),
             oracle: json.readAddress(string.concat(infraPrefix, "oracle")),

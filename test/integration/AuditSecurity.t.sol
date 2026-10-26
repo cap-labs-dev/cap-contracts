@@ -72,8 +72,8 @@ contract AuditSecurityTest is CapDeployer {
         // This is the state transition caused by the market's liquidation waterfall.
         vm.prank(m);
         Tranche(t).slash(500e18, makeAddr("liquidator"));
-        uint256 trueAssets = vault.balanceOf(address(uw), address(collateral))
-            + Tranche(t).convertToAssets(Tranche(t).balanceOf(address(uw)));
+        uint256 trueAssets =
+            collateral.balanceOf(address(uw)) + Tranche(t).convertToAssets(Tranche(t).balanceOf(address(uw)));
         assertApproxEqAbs(trueAssets, 1500e18, 2000);
         assertApproxEqAbs(uw.totalAssets(), 2000e18, 2000);
         uint256 aliceShares = uw.balanceOf(alice);

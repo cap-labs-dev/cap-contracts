@@ -52,26 +52,26 @@ contract UnderwriterIntegrationTest is CapDeployer {
 
         assertEq(underwriter.balanceOf(depositor), DEPOSIT - DEAD_SHARES);
         assertEq(tranche0.balanceOf(address(underwriter)), DEPOSIT - DEAD_SHARES);
-        assertEq(vault.balanceOf(address(tranche0), address(collateral)), DEPOSIT);
-        assertEq(vault.balanceOf(address(underwriter), address(collateral)), 0);
+        assertEq(collateral.balanceOf(address(tranche0)), DEPOSIT);
+        assertEq(collateral.balanceOf(address(underwriter)), 0);
         // the dead shares the allocation seeded in the tranche are gone for good
         assertEq(underwriter.totalAssets(), DEPOSIT - DEAD_SHARES);
     }
 
     function test_manualAllocateDeallocate_roundtrips() public {
         _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
-        assertEq(vault.balanceOf(address(underwriter), address(collateral)), DEPOSIT);
+        assertEq(collateral.balanceOf(address(underwriter)), DEPOSIT);
 
         underwriter.addTranche(address(tranche0));
         underwriter.allocate(address(tranche0), DEPOSIT);
         assertEq(tranche0.balanceOf(address(underwriter)), DEPOSIT - DEAD_SHARES);
-        assertEq(vault.balanceOf(address(underwriter), address(collateral)), 0);
+        assertEq(collateral.balanceOf(address(underwriter)), 0);
 
         // the underwriter only ever held the allocation less the tranche's seed, so that is all
         // there is to redeem back out of it
         uint256 freed = underwriter.deallocate(address(tranche0), DEPOSIT);
         assertEq(freed, DEPOSIT - DEAD_SHARES);
-        assertEq(vault.balanceOf(address(underwriter), address(collateral)), DEPOSIT - DEAD_SHARES);
+        assertEq(collateral.balanceOf(address(underwriter)), DEPOSIT - DEAD_SHARES);
     }
 
     function test_deallocateAsync_clampsToHeldShares() public {
@@ -127,7 +127,7 @@ contract UnderwriterIntegrationTest is CapDeployer {
 
         uint256 freed = underwriter.deallocate(address(tranche0), DEPOSIT);
         assertEq(freed, DEPOSIT - DEAD_SHARES);
-        assertEq(vault.balanceOf(address(underwriter), address(collateral)), DEPOSIT - DEAD_SHARES);
+        assertEq(collateral.balanceOf(address(underwriter)), DEPOSIT - DEAD_SHARES);
     }
 
     /// @dev Deregistration deliberately leaves the exits open while closing new allocations, but
@@ -146,7 +146,7 @@ contract UnderwriterIntegrationTest is CapDeployer {
 
         assertGt(underwriter.balanceOf(latecomer), 0, "the deposit still lands");
         assertEq(
-            vault.balanceOf(address(underwriter), address(collateral)),
+            collateral.balanceOf(address(underwriter)),
             DEPOSIT,
             "and sits idle in the vault, which is what an unset default has always meant"
         );
@@ -237,7 +237,7 @@ contract UnderwriterIntegrationTest is CapDeployer {
         // two hops, so two seeds: one in the underwriter and one in the tranche it allocated to
         uint256 assets = underwriter.redeem(reqId, DEPOSIT - DEAD_SHARES, depositor, depositor);
         assertEq(assets, DEPOSIT - 2 * DEAD_SHARES);
-        assertEq(vault.balanceOf(depositor, address(collateral)), DEPOSIT - 2 * DEAD_SHARES);
+        assertEq(collateral.balanceOf(depositor), DEPOSIT - 2 * DEAD_SHARES);
         assertEq(underwriter.totalSupply(), DEAD_SHARES, "the seed outlives every holder");
     }
 
@@ -272,6 +272,6 @@ contract UnderwriterIntegrationTest is CapDeployer {
 
         vm.prank(depositor);
         underwriter.redeem(reqId, DEPOSIT - DEAD_SHARES, depositor, depositor);
-        assertEq(vault.balanceOf(depositor, address(collateral)), DEPOSIT - 2 * DEAD_SHARES);
+        assertEq(collateral.balanceOf(depositor), DEPOSIT - 2 * DEAD_SHARES);
     }
 }
