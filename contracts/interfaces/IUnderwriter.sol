@@ -193,8 +193,8 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
 
     /// @notice Get the maximum deposit for a receiver
     /// @dev Zero if the pool is killed, assets are below its kill threshold, or the default tranche
-    /// is killed; otherwise unlimited. A killed default blocks entry until removed or replaced
-    /// with a live tranche, without itself retiring the pool. The value check uses the same live
+    /// is killed or no longer admits this pool as a depositor; otherwise unlimited. Such a default
+    /// blocks entry until removed or replaced, or the pool is re-admitted, without retiring the pool. The value check uses the same live
     /// default-position value as deposit pricing, so it protects impaired pools before their next
     /// position update.
     /// Admission remains on the caller of {deposit}, not on the receiver.

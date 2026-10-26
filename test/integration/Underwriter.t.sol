@@ -7,6 +7,7 @@ import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
 import { IUnderwriter } from "../../contracts/interfaces/IUnderwriter.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
+import { ERC4626Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
 contract UnderwriterIntegrationTest is CapDeployer {
@@ -185,6 +186,31 @@ contract UnderwriterIntegrationTest is CapDeployer {
         vm.expectRevert(IUnderwriter.InvalidTranche.selector);
         underwriter.addTranche(address(stablecoin));
         assertEq(underwriter.registeredTranches().length, 0);
+    }
+
+    /// @dev Every deposit is forwarded to the default tranche, which gates on the pool's own
+    /// admission there. Revoking it must close the limits, not leave them unlimited while the
+    /// deposit itself reverts.
+    function test_maxDeposit_zeroOnceTheDefaultTrancheExpelsThePool() public {
+        _useTranche0AsDefault();
+        assertEq(underwriter.maxDeposit(depositor), type(uint256).max);
+
+        _expelDepositor(address(tranche0), address(underwriter));
+        assertEq(underwriter.maxDeposit(depositor), 0, "deposit limit closes");
+        assertEq(underwriter.maxMint(depositor), 0, "mint limit closes");
+
+        _mintCollateral(depositor, 1e18);
+        _admitDepositor(address(underwriter), depositor);
+        vm.startPrank(depositor);
+        collateral.approve(address(underwriter), 1e18);
+        vm.expectRevert(
+            abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxDeposit.selector, depositor, 1e18, 0)
+        );
+        underwriter.deposit(1e18, depositor);
+        vm.stopPrank();
+
+        _admitDepositor(address(tranche0), address(underwriter));
+        assertEq(underwriter.maxDeposit(depositor), type(uint256).max, "re-admission reopens");
     }
 
     function test_allocate_nonTranche_reverts() public {
