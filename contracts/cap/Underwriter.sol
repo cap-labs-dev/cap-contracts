@@ -9,6 +9,7 @@ import { IUnderwriter } from "../interfaces/IUnderwriter.sol";
 import { IVault } from "../interfaces/IVault.sol";
 import { DeadShares } from "../utils/DeadShares.sol";
 import { PremiumVesting } from "../utils/PremiumVesting.sol";
+import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -342,7 +343,8 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         }
     }
 
-    /// @dev A killed default blocks new capital without retiring an otherwise healthy pool.
+    /// @dev A killed default, or one that no longer admits this pool as a depositor, blocks new
+    /// capital without retiring an otherwise healthy pool.
     /// @return open Whether the pool and its default tranche permit new capital
     function _depositsOpen() private view returns (bool) {
         // the live value deposits are priced at, so a stale mark cannot keep a dead pool open
@@ -352,6 +354,9 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         address tranche = defaultTranche;
         if (tranche != address(0)) {
             if (ITranche(tranche).killed()) return false;
+            // every deposit is forwarded to the default tranche, gated on this pool's admission there
+            (bool admitted,) = IAccessManager(authority()).canCall(address(this), tranche, IERC4626.deposit.selector);
+            if (!admitted) return false;
         }
 
         return true;
