@@ -53,7 +53,7 @@ contract AsyncRedemptionTest is CapDeployer {
         uint256 assets = tranche0.redeem(reqId, held, supplier, supplier);
         // short by the dead shares the first deposit seeded, which are never redeemed
         assertEq(assets, 1_000e18 - DEAD_SHARES);
-        assertEq(vault.balanceOf(supplier, address(collateral)), 1_000e18 - DEAD_SHARES);
+        assertEq(collateral.balanceOf(supplier), 1_000e18 - DEAD_SHARES);
         assertEq(tranche0.totalSupply(), DEAD_SHARES);
     }
 

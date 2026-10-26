@@ -6,7 +6,7 @@ import { IPremiumVesting } from "./IPremiumVesting.sol";
 
 /// @title IUnderwriter
 /// @author kexley, Cap Labs
-/// @notice Interface for the curator vault that allocates vault assets into tranches and distributes premium
+/// @notice Interface for the curator vault that allocates its assets into tranches and distributes premium
 /// @dev The curator role is expected to be held by a timelock or secure multisig, while the
 /// allocator role is intended for an operational wallet with narrower permissions. Beacon instance:
 /// upgrade via {UpgradeableBeacon-upgradeTo} on the underwriter beacon.
@@ -79,8 +79,7 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @param registryAddress The registry that configures access roles
     /// @param name The share token name
     /// @param symbol The share token symbol
-    /// @param asset The vault asset deposited by curators
-    /// @param vaultAddress The vault holding curator assets
+    /// @param asset The collateral ERC20 deposited by curators and held by this contract
     /// @param stablecoinAddress The stablecoin used for premium payments
     /// @param vestingPeriod The initial premium vesting time constant in seconds
     function initialize(
@@ -89,7 +88,6 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
         string memory name,
         string memory symbol,
         address asset,
-        address vaultAddress,
         address stablecoinAddress,
         uint256 vestingPeriod
     ) external;
@@ -105,15 +103,15 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     function setAllocatorRole(uint64 roleId) external;
 
     /// @notice Register a tranche for allocation
-    /// @dev Curator only. The curator is trusted to name a real protocol tranche for this vault
-    /// and asset. Grants the tranche vault operator rights until {removeTranche}.
+    /// @dev Curator only. The curator is trusted to name a real protocol tranche for this asset.
+    /// No standing approval is granted; each allocation approves exactly the amount it deposits.
     /// @param tranche The tranche address
     function addTranche(address tranche) external;
 
     /// @notice Remove a tranche and block new allocations
-    /// @dev Curator only. Reports first if the book is open, revokes vault operator rights, and
-    /// clears {defaultTranche} if it pointed here. Existing shares can still be redeemed, and
-    /// {report} can still claim later premium on that leftover position.
+    /// @dev Curator only. Reports first if the book is open and clears {defaultTranche} if it
+    /// pointed here. Existing shares can still be redeemed, and {report} can still claim later
+    /// premium on that leftover position.
     /// @param tranche The tranche address
     function removeTranche(address tranche) external;
 
@@ -170,10 +168,6 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @param recipient The address receiving the remainder
     /// @return amount The premium recovered, in stablecoin units (18 decimals)
     function recoverRemainder(address recipient) external returns (uint256 amount);
-
-    /// @notice Get the vault holding curator assets
-    /// @return The vault address
-    function vault() external view returns (address);
 
     /// @notice Get the registry that configures access roles
     /// @return The registry address
@@ -267,8 +261,8 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @return The sum of every recorded position
     function totalDebt() external view returns (uint256);
 
-    /// @notice Get the total assets including vault balance and recorded tranche debt
-    /// @dev Vault ERC6909 balance plus {totalDebt}. A slash is folded in only when a position update
+    /// @notice Get the total assets including idle balance and recorded tranche debt
+    /// @dev This contract's balance of {asset} plus {totalDebt}. A slash is folded in only when a position update
     /// remakes the book: {allocate} (including default-allocated deposits), {deallocate},
     /// {deallocateAsync}, {finalizeDeallocateAsync}, {report} or {removeTranche}; only an allocation
     /// can open a book. Deposit and mint quotes separately adjust for the default position, including

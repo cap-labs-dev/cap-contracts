@@ -15,7 +15,6 @@ contract RegistryTest is BaseTest {
     function _validInit() internal view returns (IRegistry.InitParams memory init) {
         init = IRegistry.InitParams({
             stablecoin: address(1),
-            vault: address(2),
             oracle: address(3),
             irm: address(4),
             factory: address(5),
@@ -39,10 +38,6 @@ contract RegistryTest is BaseTest {
 
     function test_initialize_rejectsEachZeroAddress() public {
         IRegistry.InitParams memory init;
-
-        init = _validInit();
-        init.vault = address(0);
-        _initRevertsOnZero(init);
 
         init = _validInit();
         init.stablecoin = address(0);
@@ -93,7 +88,7 @@ contract RegistryTest is BaseTest {
     function test_registryUpgrade_authorized() public {
         Registry registry = _deployRegistry(_validInit());
         UUPSUpgradeable(address(registry)).upgradeToAndCall(address(new Registry()), "");
-        assertEq(registry.vault(), address(2));
+        assertEq(registry.oracle(), address(3));
     }
 
     function test_registryUpgrade_unauthorized_reverts() public {

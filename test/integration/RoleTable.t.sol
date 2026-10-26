@@ -604,7 +604,6 @@ contract RoleTableTest is CapDeployer {
         // them. Naming the role here is what lets this table tell intent from omission.
         _assertAdminUpgrade(address(registry), "registry upgrade");
         _assertAdminUpgrade(address(stablecoin), "stablecoin upgrade");
-        _assertAdminUpgrade(address(vault), "vault upgrade");
         _assertAdminUpgrade(address(oracle), "oracle upgrade");
         _assertAdminUpgrade(address(irm), "irm upgrade");
         _assertAdminUpgrade(address(beaconFactory), "factory upgrade");

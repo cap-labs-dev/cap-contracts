@@ -38,9 +38,6 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     uint256 public constant DEFAULT_VESTING_PERIOD = 12 hours;
 
     /// @inheritdoc IRegistry
-    address public vault;
-
-    /// @inheritdoc IRegistry
     address public stablecoin;
 
     /// @inheritdoc IRegistry
@@ -94,12 +91,11 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     function initialize(address _authority, IRegistry.InitParams calldata init) external initializer {
         __AccessManaged_init(_authority);
         if (
-            init.vault == address(0) || init.stablecoin == address(0) || init.oracle == address(0)
-                || init.irm == address(0) || init.factory == address(0) || init.floatingMarketBeacon == address(0)
+            init.stablecoin == address(0) || init.oracle == address(0) || init.irm == address(0)
+                || init.factory == address(0) || init.floatingMarketBeacon == address(0)
                 || init.fixedMarketBeacon == address(0) || init.trancheBeacon == address(0)
                 || init.underwriterBeacon == address(0) || init.wrapper == address(0)
         ) revert ZeroAddress();
-        vault = init.vault;
         stablecoin = init.stablecoin;
         oracle = init.oracle;
         irm = init.irm;
@@ -245,12 +241,13 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         if (!isOperatorRole(_curatorRole)) {
             revert OperatorNotAssigned();
         }
+        if (_asset == stablecoin) revert StablecoinCollateral();
 
         underwriter = _deploy(
             underwriterBeacon,
             abi.encodeCall(
                 IUnderwriter.initialize,
-                (authority(), address(this), _name, _symbol, _asset, vault, stablecoin, DEFAULT_VESTING_PERIOD)
+                (authority(), address(this), _name, _symbol, _asset, stablecoin, DEFAULT_VESTING_PERIOD)
             )
         );
         _underwriters.add(underwriter);
@@ -396,6 +393,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         uint256 index,
         uint256 _vestingPeriod
     ) internal returns (address tranche) {
+        if (_asset == stablecoin) revert StablecoinCollateral();
         if (IOracle(oracle).price(_asset) == 0) revert IOracle.PriceError(_asset);
 
         string memory trancheName = string.concat(_name, " Tranche ", Strings.toString(index));
@@ -404,7 +402,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
             trancheBeacon,
             abi.encodeCall(
                 ITranche.initialize,
-                (authority(), address(this), _asset, trancheName, trancheSymbol, market, vault, oracle, _vestingPeriod)
+                (authority(), address(this), _asset, trancheName, trancheSymbol, market, oracle, _vestingPeriod)
             )
         );
         _tranches.add(tranche);
@@ -431,7 +429,6 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         bytes4[] memory upgrades = _upgradeSelectors();
         manager.setTargetFunctionRole(address(this), upgrades, CapRoles.ADMIN);
         manager.setTargetFunctionRole(stablecoin, upgrades, CapRoles.ADMIN);
-        manager.setTargetFunctionRole(vault, upgrades, CapRoles.ADMIN);
         manager.setTargetFunctionRole(oracle, upgrades, CapRoles.ADMIN);
         manager.setTargetFunctionRole(irm, upgrades, CapRoles.ADMIN);
         manager.setTargetFunctionRole(factory, upgrades, CapRoles.ADMIN);

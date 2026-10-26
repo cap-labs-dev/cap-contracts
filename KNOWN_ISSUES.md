@@ -182,8 +182,8 @@ Based on commit `5e857ffce7c2f342472a0c9d2565f3b4cd9578f9`, reviewed on 12 Octob
 
 ## Operating assumptions
 
-- **Supported collateral:** The Vault assumes 1:1 token accounting. Fee-on-transfer and rebasing assets are unsupported and must be excluded during asset selection; deposits do not check for these token behaviors.
-- **Curator trust:** Registering a tranche grants it Vault operator permissions over the Underwriter's balances. Curators must verify that it is a genuine protocol tranche using the correct asset and Vault; registration does not enforce those checks.
+- **Supported collateral:** Tranches and Underwriters hold collateral directly and assume a transfer moves exactly the stated amount. Fee-on-transfer, rebasing and transfer-hook (for example ERC-777) assets are unsupported and must be excluded during asset selection; deposits do not check for these token behaviors. cUSD is rejected as collateral because it is also the premium token.
+- **Curator trust:** Registering a tranche lets the Underwriter allocate to it; each allocation approves the tranche for exactly the amount deposited, and no standing approval remains. Curators must verify that it is a genuine protocol tranche using the correct asset; registration does not enforce those checks.
 - **Shared borrower authority:** Borrowing operators within a market must be mutually trusted. Borrower permission allows `borrowMore` or `extend` on any eligible fixed loan ID, without a per-loan owner check. Credit capacity and collateral are shared across the market.
 - **Deposit admission:** Tranche and Underwriter deposit permissions apply to the caller. Admitted callers can deposit for any receiver, and shares remain transferable. Admission does not restrict who can hold shares.
 - **Tranche capital caps:** `maxCapital` limits a tranche's contribution to borrowing capacity, not deposits or loss exposure. Collateral above the cap remains available to the liquidation waterfall.

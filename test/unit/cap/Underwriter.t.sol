@@ -13,29 +13,7 @@ import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-
-/// @dev Tracks the underwriter's vault balance so a deposit sees its own transfer, as the real
-/// vault does, rather than a fixed figure set before the call.
-contract MockUnderwriterVault {
-    mapping(address owner => mapping(address asset => uint256 amount)) public balanceOf;
-
-    function transferFrom(address, address to, address asset, uint256 amount) external {
-        balanceOf[to][asset] += amount;
-    }
-
-    function transfer(address, address asset, uint256 amount) external {
-        balanceOf[msg.sender][asset] -= amount;
-    }
-
-    function setOperator(address, bool) external pure returns (bool) {
-        return true;
-    }
-
-    /// @dev Credit a balance no shares were issued against
-    function donate(address owner, address asset, uint256 amount) external {
-        balanceOf[owner][asset] += amount;
-    }
-}
+import { Vm } from "forge-std/Vm.sol";
 
 contract UnderwriterUnitTest is BaseTest {
     /// @dev Stands in for the role the Registry allocates per underwriter and wires the entry
@@ -49,7 +27,6 @@ contract UnderwriterUnitTest is BaseTest {
     Underwriter internal underwriter;
     MockERC20 internal collateral;
 
-    address internal vault = makeAddr("vault");
     address internal tranche = makeAddr("tranche");
     address internal supplier = makeAddr("supplier");
     address internal stranger = makeAddr("stranger");
@@ -61,7 +38,6 @@ contract UnderwriterUnitTest is BaseTest {
     function setUp() public {
         _setUpAccessManager();
         isTranche[tranche] = true;
-        vm.etch(vault, address(new MockUnderwriterVault()).code);
         collateral = new MockERC20("Wrapped Ether", "WETH", 18);
 
         Underwriter impl = new Underwriter();
@@ -76,7 +52,6 @@ contract UnderwriterUnitTest is BaseTest {
                         "Underwriter",
                         "UW",
                         address(collateral),
-                        vault,
                         stablecoin,
                         12 hours
                     )
@@ -140,7 +115,6 @@ contract UnderwriterUnitTest is BaseTest {
 
     function test_initializedState() public view {
         assertEq(underwriter.asset(), address(collateral));
-        assertEq(underwriter.vault(), vault);
         assertEq(underwriter.registry(), address(this));
         assertEq(underwriter.authority(), address(accessManager));
         assertEq(underwriter.totalSupply(), 0);
@@ -150,7 +124,7 @@ contract UnderwriterUnitTest is BaseTest {
     function test_initialize_cannotReinit() public {
         vm.expectRevert();
         underwriter.initialize(
-            address(accessManager), address(this), "Underwriter", "UW", address(collateral), vault, stablecoin, 12 hours
+            address(accessManager), address(this), "Underwriter", "UW", address(collateral), stablecoin, 12 hours
         );
     }
 
@@ -292,8 +266,8 @@ contract UnderwriterUnitTest is BaseTest {
     function test_deadShares_donationBeforeTheFirstDepositCannotRoundItAway() public {
         accessManager.grantRole(DEPOSITOR_ROLE, supplier, 0);
 
-        // the vault reports a balance it was never issued shares against
-        MockUnderwriterVault(vault).donate(address(underwriter), address(collateral), 100e18);
+        // a balance it was never issued shares against
+        collateral.mint(address(underwriter), 100e18);
         assertEq(underwriter.totalAssets(), 100e18, "donated while completely empty");
         assertEq(underwriter.totalSupply(), 0);
 
@@ -426,7 +400,11 @@ contract UnderwriterUnitTest is BaseTest {
 
         vm.recordLogs();
         underwriter.allocate(address(t), 0);
-        assertEq(vm.getRecordedLogs().length, 0);
+        // the zero approval is the token's event; the underwriter itself records nothing
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; ++i) {
+            assertTrue(logs[i].emitter != address(underwriter), "no underwriter event");
+        }
         assertEq(underwriter.debt(address(t)), 1e18);
         assertEq(underwriter.totalDebt(), 1e18);
     }
@@ -543,21 +521,12 @@ contract UnderwriterUnitTest is BaseTest {
         underwriter.setDefaultTranche(tranche);
     }
 
-    function test_totalAssets_isVaultBalancePlusDebt() public {
-        vm.mockCall(
-            vault,
-            abi.encodeWithSignature("balanceOf(address,address)", address(underwriter), address(collateral)),
-            abi.encode(500e18)
-        );
+    function test_totalAssets_isIdleBalancePlusDebt() public {
+        collateral.mint(address(underwriter), 500e18);
         assertEq(underwriter.totalAssets(), 500e18);
     }
 
-    function test_unlockedSupply_zeroWithoutVaultBalance() public {
-        vm.mockCall(
-            vault,
-            abi.encodeWithSignature("balanceOf(address,address)", address(underwriter), address(collateral)),
-            abi.encode(0)
-        );
+    function test_unlockedSupply_zeroWithoutIdleBalance() public {
         assertEq(underwriter.unlockedSupply(), 0);
     }
 

@@ -6,10 +6,10 @@ import { IPremiumVesting } from "../interfaces/IPremiumVesting.sol";
 import { IRegistry } from "../interfaces/IRegistry.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
 import { IUnderwriter } from "../interfaces/IUnderwriter.sol";
-import { IVault } from "../interfaces/IVault.sol";
 import { DeadShares } from "../utils/DeadShares.sol";
 import { PremiumVesting } from "../utils/PremiumVesting.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -19,12 +19,10 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 /// @dev Beacon instance. Upgrade via {UpgradeableBeacon-upgradeTo} on the underwriter beacon.
 contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwriter, PremiumVesting {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using SafeERC20 for IERC20;
 
     /// @inheritdoc IUnderwriter
     address public registry;
-
-    /// @inheritdoc IUnderwriter
-    address public vault;
 
     /// @inheritdoc IUnderwriter
     address public defaultTranche;
@@ -70,13 +68,11 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         string memory _name,
         string memory _symbol,
         address _asset,
-        address _vaultAddress,
         address _stablecoinAddress,
         uint256 _vestingPeriod
     ) external override initializer {
         __PremiumVesting_init(_authority, IERC20(_asset), _name, _symbol, _stablecoinAddress, _vestingPeriod);
         registry = _registry;
-        vault = _vaultAddress;
     }
 
     /// @inheritdoc IUnderwriter
@@ -91,11 +87,9 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
 
     /// @inheritdoc IUnderwriter
     function addTranche(address _tranche) external restricted {
+        // curator is trusted to name a real protocol tranche for this asset. It holds no standing
+        // approval: {_allocate} approves exactly what each deposit pulls
         _registeredTranches.add(_tranche);
-        // curator is trusted to name a real protocol tranche for this vault and asset. The tranche
-        // pulls this contract's vault balance on deposit, so it needs operator rights for as long
-        // as it is registered and no longer
-        IVault(vault).setOperator(_tranche, true);
         // this vault holds the tranche shares and claims them in {report}, so it has to earn.
         // A third-party market holding the same token would stay out
         IPremiumVesting(_tranche).optIn();
@@ -106,10 +100,9 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     function removeTranche(address _tranche) external restricted {
         if (debt[_tranche] > 0) _report(_tranche);
         _registeredTranches.remove(_tranche);
-        IVault(vault).setOperator(_tranche, false);
         // every deposit routes through {_transferIn} into {_allocate}, which insists on
         // registration, so a deregistered tranche left as the default would revert each one.
-        // Clearing it holds incoming assets in the vault instead, which is what an unset default
+        // Clearing it holds incoming assets here instead, which is what an unset default
         // already means, and the curator can point it somewhere live at their leisure
         if (defaultTranche == _tranche) {
             defaultTranche = address(0);
@@ -130,6 +123,8 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         if (!_registeredTranches.contains(tranche)) revert NotRegisteredTranche();
         // remake first so an unmarked slash is Loss, not netted into Allocated
         _mark(tranche);
+        // the deposit pulls exactly `assets`, so the approval is spent in the same call
+        IERC20(asset()).forceApprove(tranche, assets);
         ITranche(tranche).deposit(assets, address(this));
         // allocate is the only path that may open a book
         _applyAllocated(tranche);
@@ -359,7 +354,7 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
 
     /// @inheritdoc IUnderwriter
     function totalAssets() public view override(ERC4626Upgradeable, IERC4626, IUnderwriter) returns (uint256) {
-        return IVault(vault).balanceOf(address(this), asset()) + totalDebt;
+        return IERC20(asset()).balanceOf(address(this)) + totalDebt;
     }
 
     /// @dev Replace the default position's cached value with its current value for issuance only.
@@ -404,7 +399,7 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
 
     /// @inheritdoc IUnderwriter
     function unlockedSupply() public view override(ERC7540AsyncRedeem, IUnderwriter) returns (uint256 unlocked) {
-        uint256 idleAssets = IVault(vault).balanceOf(address(this), asset());
+        uint256 idleAssets = IERC20(asset()).balanceOf(address(this));
         unlocked = _convertToShares(idleAssets, Math.Rounding.Floor);
     }
 
@@ -422,22 +417,15 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         if (killed || _belowKillThreshold(false)) revert UnderwriterKilled();
     }
 
-    /// @dev Transfer in assets to the vault from the sender
+    /// @dev Pull the deposit, then route it to the default tranche if one is set
     /// @param from The address of the sender
     /// @param assets The amount of assets to transfer in
     function _transferIn(address from, uint256 assets) internal override {
-        IVault(vault).transferFrom(from, address(this), asset(), assets);
+        super._transferIn(from, assets);
 
         if (defaultTranche != address(0)) {
             _allocate(defaultTranche, assets);
         }
-    }
-
-    /// @dev Transfer out assets from the vault to the receiver
-    /// @param to The address of the receiver
-    /// @param assets The amount of assets to transfer out
-    function _transferOut(address to, uint256 assets) internal override {
-        IVault(vault).transfer(to, asset(), assets);
     }
 
     /// @dev Re-value an already-opened book and claim premium from a Registry-deployed tranche.

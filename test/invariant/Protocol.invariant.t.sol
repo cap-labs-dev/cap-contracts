@@ -13,7 +13,6 @@ contract ProtocolInvariantTest is StdInvariant, Test {
     function setUp() public virtual {
         handler = new ProtocolHandler();
         selectors.push(handler.reserveDeposit.selector);
-        selectors.push(handler.custody.selector);
         selectors.push(handler.deposit.selector);
         selectors.push(handler.transferShares.selector);
         selectors.push(handler.wrap.selector);

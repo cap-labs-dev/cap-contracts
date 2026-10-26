@@ -26,7 +26,6 @@ contract StackTest is MigrationBase {
         assertEq(InterestRateModel(infra.irm).stablecoin(), address(scoin));
         assertEq(IAccessManaged(infra.irm).authority(), infra.accessManager);
         assertEq(IAccessManaged(infra.registry).authority(), infra.accessManager);
-        assertEq(IAccessManaged(infra.vault).authority(), infra.accessManager);
         assertEq(IAccessManaged(infra.oracle).authority(), infra.accessManager);
         assertGt(infra.chainlinkAdapter.code.length, 0);
         assertEq(IOracle(infra.oracle).DECIMALS(), scoin.decimals());
@@ -43,7 +42,6 @@ contract StackTest is MigrationBase {
         _expectRole(manager, infra.registry, IRegistry.createFloatingMarket.selector, CapRoles.WHITELISTED);
         _expectRole(manager, infra.registry, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
         _expectRole(manager, infra.stablecoin, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
-        _expectRole(manager, infra.vault, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
         _expectRole(manager, infra.oracle, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
         _expectRole(manager, infra.irm, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
         _expectRole(manager, infra.factory, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);

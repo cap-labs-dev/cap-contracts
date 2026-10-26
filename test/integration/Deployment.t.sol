@@ -128,7 +128,6 @@ contract DeploymentTest is Test, DeployImplems, DeployInfra, ConfigureAccessCont
         _expectRole(manager, infra.factory, IBeaconFactory.create.selector, CapRoles.REGISTRY);
         _expectRole(manager, infra.registry, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
         _expectRole(manager, infra.stablecoin, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
-        _expectRole(manager, infra.vault, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
         _expectRole(manager, infra.oracle, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
         _expectRole(manager, infra.irm, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);
         _expectRole(manager, infra.factory, UUPSUpgradeable.upgradeToAndCall.selector, CapRoles.ADMIN);

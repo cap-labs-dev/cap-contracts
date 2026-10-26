@@ -6,25 +6,24 @@ import { IBaseMarket } from "../interfaces/IBaseMarket.sol";
 import { IOracle } from "../interfaces/IOracle.sol";
 import { IRegistry } from "../interfaces/IRegistry.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
-import { IVault } from "../interfaces/IVault.sol";
 import { DeadShares } from "../utils/DeadShares.sol";
 import { PremiumVesting } from "../utils/PremiumVesting.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title Tranche
 /// @author kexley, Cap Labs
-/// @notice ERC-4626 tranche vault. Deposits via Vault ERC-6909; earns cUSD premium from underwriting.
+/// @notice ERC-4626 tranche vault. Holds its collateral ERC20 directly; earns cUSD premium from underwriting.
 /// @dev Beacon instance. Upgrade via {UpgradeableBeacon-upgradeTo} on the tranche beacon.
 contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVesting {
+    using SafeERC20 for IERC20;
+
     /// @inheritdoc ITranche
     address public registry;
 
     /// @inheritdoc ITranche
     address public market;
-
-    /// @inheritdoc ITranche
-    address public vault;
 
     /// @inheritdoc ITranche
     address public oracle;
@@ -51,7 +50,6 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
         string memory _name,
         string memory _symbol,
         address _market,
-        address _vault,
         address _oracle,
         uint256 _vestingPeriod
     ) external initializer {
@@ -60,7 +58,6 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
         );
         registry = _registry;
         market = _market;
-        vault = _vault;
         oracle = _oracle;
     }
 
@@ -100,18 +97,13 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
 
         _checkKilled(total - assets);
 
-        IVault(vault).withdraw(asset(), assets, recipient);
+        IERC20(asset()).safeTransfer(recipient, assets);
         emit Slashed(recipient, assets, slashedValue);
     }
 
     /// @inheritdoc ITranche
     function fund(uint256 premium) external restricted {
         _fund(premium);
-    }
-
-    /// @inheritdoc ITranche
-    function totalAssets() public view override(ERC4626Upgradeable, IERC4626, ITranche) returns (uint256 assets) {
-        assets = IVault(vault).balanceOf(address(this), asset());
     }
 
     /// @inheritdoc ITranche
@@ -228,20 +220,6 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
             killed = true;
             emit Killed();
         }
-    }
-
-    /// @dev Transfer assets into the vault on deposit
-    /// @param from The account funding the deposit
-    /// @param assets The number of assets to pull
-    function _transferIn(address from, uint256 assets) internal override {
-        IVault(vault).transferFrom(from, address(this), asset(), assets);
-    }
-
-    /// @dev Transfer assets out of the vault on withdraw
-    /// @param to The account receiving the assets
-    /// @param assets The number of assets to send
-    function _transferOut(address to, uint256 assets) internal override {
-        IVault(vault).transfer(to, asset(), assets);
     }
 
     /// @dev Zero price is invalid. Staleness is already checked by the oracle.

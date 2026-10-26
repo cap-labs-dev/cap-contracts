@@ -20,8 +20,8 @@ contract ZeroShareDepositTest is CapDeployer {
     }
 
     function test_trancheRejectsZeroQuoteAndStillAcceptsOneShare() public {
-        _fundVault(address(tranche), 10_000);
-        _fundVault(supplier, 3);
+        _mintCollateral(address(tranche), 10_000);
+        _mintCollateral(supplier, 3);
         assertEq(tranche.previewDeposit(1), 0);
         uint256 supply = tranche.totalSupply();
         vm.startPrank(supplier);
@@ -30,7 +30,7 @@ contract ZeroShareDepositTest is CapDeployer {
         vm.expectRevert(IERC7540AsyncRedeem.ZeroShares.selector);
         tranche.mint(0, supplier);
         vm.stopPrank();
-        assertEq(vault.balanceOf(supplier, address(collateral)), 3);
+        assertEq(collateral.balanceOf(supplier), 3);
         assertEq(tranche.totalAssets(), 20_000);
         assertEq(tranche.totalSupply(), supply);
         vm.prank(supplier);
@@ -40,11 +40,11 @@ contract ZeroShareDepositTest is CapDeployer {
     function test_underwriterRejectsZeroQuoteBeforeAutoAllocation() public {
         Underwriter pool = _deployUnderwriter();
         _fundUnderwriter(address(pool), supplier, 10_000);
-        _fundVault(address(pool), 10_000);
+        _mintCollateral(address(pool), 10_000);
         pool.addTranche(address(tranche));
         _admitDepositor(address(tranche), address(pool));
         pool.setDefaultTranche(address(tranche));
-        _fundVault(supplier, 3);
+        _mintCollateral(supplier, 3);
         assertEq(pool.previewDeposit(1), 0);
         vm.startPrank(supplier);
         vm.expectRevert(IERC7540AsyncRedeem.ZeroShares.selector);
@@ -52,7 +52,7 @@ contract ZeroShareDepositTest is CapDeployer {
         vm.expectRevert(IERC7540AsyncRedeem.ZeroShares.selector);
         pool.mint(0, supplier);
         vm.stopPrank();
-        assertEq(vault.balanceOf(supplier, address(collateral)), 3);
+        assertEq(collateral.balanceOf(supplier), 3);
         assertEq(pool.totalAssets(), 20_000);
         assertEq(pool.totalSupply(), 10_000);
         assertEq(pool.totalDebt(), 0);
@@ -98,17 +98,17 @@ contract ZeroShareDepositTest is CapDeployer {
     function test_underwriterRollsBackWhenNestedTrancheQuoteIsZero() public {
         Underwriter pool = _deployUnderwriter();
         _fundUnderwriter(address(pool), supplier, 10_000);
-        _fundVault(address(tranche), 100_000);
+        _mintCollateral(address(tranche), 100_000);
         pool.addTranche(address(tranche));
         _admitDepositor(address(tranche), address(pool));
         pool.setDefaultTranche(address(tranche));
-        _fundVault(supplier, 1);
+        _mintCollateral(supplier, 1);
         assertEq(pool.previewDeposit(1), 1, "outer issuance itself is nonzero");
         assertEq(tranche.previewDeposit(1), 0, "allocation would donate the deposit");
         vm.prank(supplier);
         vm.expectRevert(IERC7540AsyncRedeem.ZeroShares.selector);
         pool.deposit(1, supplier);
-        assertEq(vault.balanceOf(supplier, address(collateral)), 1);
+        assertEq(collateral.balanceOf(supplier), 1);
         assertEq(pool.totalSupply(), 10_000);
         assertEq(pool.totalAssets(), 10_000);
         assertEq(pool.totalDebt(), 0);
