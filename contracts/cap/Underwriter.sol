@@ -51,6 +51,13 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     /// @dev Shares per remaining asset at which the pool is retired (1% of par at one asset per share).
     uint256 private constant KILL_RATIO = 100;
 
+    /// @dev Reject a target that cannot be a tranche; see {_validTranche}
+    /// @param tranche The tranche to check
+    modifier validTranche(address tranche) {
+        _validTranche(tranche);
+        _;
+    }
+
     /// @inheritdoc IUnderwriter
     function registeredTranches() external view returns (address[] memory) {
         return _registeredTranches.values();
@@ -86,7 +93,7 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     }
 
     /// @inheritdoc IUnderwriter
-    function addTranche(address _tranche) external restricted {
+    function addTranche(address _tranche) external restricted validTranche(_tranche) {
         // curator is trusted to name a real protocol tranche for this asset. It holds no standing
         // approval: {_allocate} approves exactly what each deposit pulls
         _registeredTranches.add(_tranche);
@@ -132,7 +139,12 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     }
 
     /// @inheritdoc IUnderwriter
-    function deallocate(address tranche, uint256 shares) external restricted returns (uint256 deallocated) {
+    function deallocate(address tranche, uint256 shares)
+        external
+        restricted
+        validTranche(tranche)
+        returns (uint256 deallocated)
+    {
         // remake first so an unmarked slash is Loss, not netted into Deallocated
         _mark(tranche);
         // clamped by this contract's own holding as well as the tranche's unlocked supply, so an
@@ -148,7 +160,12 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     }
 
     /// @inheritdoc IUnderwriter
-    function deallocateAsync(address tranche, uint256 shares) external restricted returns (uint256 requestId) {
+    function deallocateAsync(address tranche, uint256 shares)
+        external
+        restricted
+        validTranche(tranche)
+        returns (uint256 requestId)
+    {
         uint256 balance = ITranche(tranche).balanceOf(address(this));
         if (shares > balance) shares = balance;
 
@@ -167,7 +184,11 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     }
 
     /// @inheritdoc IUnderwriter
-    function finalizeDeallocateAsync(address tranche, uint256 requestId, uint256 shares) external restricted {
+    function finalizeDeallocateAsync(address tranche, uint256 requestId, uint256 shares)
+        external
+        restricted
+        validTranche(tranche)
+    {
         // a request is only settled down against what this contract queued under that id. Anyone
         // can name this vault as the controller of a redemption they request against their own
         // shares, which mints a receipt here that no allocation of ours backs. Settling one of
@@ -185,6 +206,13 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
 
         _applyDeallocated(tranche);
         _checkKilled();
+    }
+
+    /// @dev This contract's own shares are user redemption escrow and its cUSD is the premium pot,
+    /// so neither may be treated as a tranche position.
+    /// @param tranche The tranche to check
+    function _validTranche(address tranche) internal view {
+        if (tranche == address(this) || tranche == stablecoin()) revert InvalidTranche();
     }
 
     /// @dev Remaining plus queued shares, in asset units
