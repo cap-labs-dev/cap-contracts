@@ -61,6 +61,12 @@ Based on commit `5e857ffce7c2f342472a0c9d2565f3b4cd9578f9`, reviewed on 12 Octob
 - **Accepted:** Overdue premiums are charged when the loan is extended, not automatically at expiry or repayment.
 - **Mitigation:** Keepers should extend overdue loans once the grace period permits. The contracts do not guarantee that extension happens before repayment.
 
+#### Overdue rolls price arrears into the term multiplier
+
+- **Issue:** Rolling an expired loan prices the arrears and the new term as one term. The term multiplier falls as that combined term approaches the maximum, so a long-overdue roll pays a lower multiplier on its new term than an on-time extension. Arrears are also charged at the rate when the roll happens, not the rates over the overdue interval.
+- **Accepted:** Arrears stay short in operation. Keepers call `extendAdmin` once the grace period ends, so a roll carries roughly the grace period of arrears.
+- **Mitigation:** Prompt keeper extensions bound both effects. The contracts do not enforce when an overdue loan is rolled; see Operational availability.
+
 ### Floating interest and indexes
 
 #### Floating premium allocation depends on checkpoint frequency
