@@ -152,6 +152,41 @@ contract UnderwriterIntegrationTest is CapDeployer {
         );
     }
 
+    /// @dev The underwriter's own shares are user redemption escrow and its cUSD is the premium pot.
+    /// Naming either as a tranche would let the allocator burn or re-queue that escrow, or redeem the
+    /// pot into an asset nothing can recover.
+    function test_exitsRejectTheUnderwriterAndStablecoin() public {
+        _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
+        vm.prank(depositor);
+        uint256 requestId = underwriter.requestRedeem(100e18, depositor, depositor);
+        uint256 escrow = underwriter.balanceOf(address(underwriter));
+        uint256 queue = underwriter.redemptionQueue();
+        assertEq(escrow, 100e18);
+
+        address[2] memory targets = [address(underwriter), address(stablecoin)];
+        for (uint256 i; i < targets.length; ++i) {
+            vm.expectRevert(IUnderwriter.InvalidTranche.selector);
+            underwriter.deallocate(targets[i], escrow);
+            vm.expectRevert(IUnderwriter.InvalidTranche.selector);
+            underwriter.deallocateAsync(targets[i], escrow);
+            vm.expectRevert(IUnderwriter.InvalidTranche.selector);
+            underwriter.finalizeDeallocateAsync(targets[i], requestId, escrow);
+        }
+
+        assertEq(underwriter.balanceOf(address(underwriter)), escrow, "the escrow is untouched");
+        assertEq(underwriter.redemptionQueue(), queue, "and queued once");
+        vm.prank(depositor);
+        assertEq(underwriter.redeem(requestId, 100e18, depositor, depositor), 100e18, "the request still settles");
+    }
+
+    function test_addTranche_rejectsTheUnderwriterAndStablecoin() public {
+        vm.expectRevert(IUnderwriter.InvalidTranche.selector);
+        underwriter.addTranche(address(underwriter));
+        vm.expectRevert(IUnderwriter.InvalidTranche.selector);
+        underwriter.addTranche(address(stablecoin));
+        assertEq(underwriter.registeredTranches().length, 0);
+    }
+
     function test_allocate_nonTranche_reverts() public {
         _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
         vm.expectRevert(IUnderwriter.NotRegisteredTranche.selector);

@@ -16,6 +16,9 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @notice The tranche is not registered with the underwriter
     error NotRegisteredTranche();
 
+    /// @notice The address is this underwriter or the stablecoin, which cannot be a tranche
+    error InvalidTranche();
+
     /// @notice The named shares exceed this vault's queue under that request id
     error UnknownQueuedRequest();
 
@@ -102,6 +105,7 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @notice Register a tranche for allocation
     /// @dev Curator only. The curator is trusted to name a real protocol tranche for this asset.
     /// No standing approval is granted; each allocation approves exactly the amount it deposits.
+    /// Reverts {InvalidTranche} for this underwriter or the stablecoin.
     /// @param tranche The tranche address
     function addTranche(address tranche) external;
 
@@ -121,6 +125,7 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
 
     /// @notice Instantly redeem unlocked tranche shares back to the vault
     /// @dev Allocator only. Tranches can be removed from registration and still deallocated.
+    /// Reverts {InvalidTranche} for this underwriter or the stablecoin.
     /// Remakes the mark only if {debt} is already nonzero — an airdrop cannot open a book.
     /// Clamped to the shares held and the tranche's instant-unlocked supply.
     /// @param tranche The tranche address
@@ -130,6 +135,7 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
 
     /// @notice Request async redemption of tranche shares back to the vault
     /// @dev Allocator only. Registration is not checked; see {deallocate}. Clamped to the shares held.
+    /// Reverts {InvalidTranche} for this underwriter or the stablecoin.
     /// @param tranche The tranche address
     /// @param shares The shares to redeem
     /// @return requestId The ERC-7540 request id
@@ -137,6 +143,7 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
 
     /// @notice Finalize an async tranche redemption
     /// @dev Allocator only. Registration is not checked; see {deallocate}.
+    /// Reverts {InvalidTranche} for this underwriter or the stablecoin.
     /// @param tranche The tranche address
     /// @param requestId The ERC-7540 request id
     /// @param shares The shares to redeem
