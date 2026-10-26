@@ -451,7 +451,9 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         }
     }
 
-    /// @dev Settle a queued claim. Caller authorization is the caller's responsibility.
+    /// @dev Settle a queued claim. Caller authorization is the caller's responsibility. Reverts
+    /// {RedeemRequestNotFound} unless `_requestId` is still open under `_controller`, so even a
+    /// zero-share claim cannot name another controller's request.
     /// @param _receiver The receiver of the assets
     /// @param _controller The controller of the request
     /// @param _assets The number of assets to withdraw
@@ -460,6 +462,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     function _claim(address _receiver, address _controller, uint256 _assets, uint256 _shares, uint256 _requestId)
         internal
     {
+        if (_requestShares(_requestId, _controller) == 0) revert RedeemRequestNotFound(_requestId, _controller);
         uint256 unlocked = unlockedSupply();
         if (_shares > unlocked) revert ERC4626ExceededMaxRedeem(_controller, _shares, unlocked);
 
