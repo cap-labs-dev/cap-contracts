@@ -80,6 +80,15 @@ interface IBaseMarket {
     /// @notice The market would exceed the fixed limit of ten configured tranches
     error TooManyTranches();
 
+    /// @notice The tranche is not listed on this market
+    error TrancheNotSet();
+
+    /// @notice The weights do not match the number of tranches
+    error InvalidTrancheCount();
+
+    /// @notice The remaining tranches cannot back the debt
+    error Undercovered();
+
     /// @notice The write off exceeds the debt that liquidation could never recover
     error ExceedsUnrecoverableDebt();
 
@@ -132,6 +141,10 @@ interface IBaseMarket {
     /// @param rate The new underwriter rate per year in ray decimals
     event SetUnderwriterRate(uint256 rate);
 
+    /// @notice Emitted when a tranche is removed from the market and retired
+    /// @param tranche The removed tranche
+    event RemoveTranche(address indexed tranche);
+
     /// @notice Emitted when the market multiplier is updated
     /// @param multiplier The new market multiplier in ray decimals
     event SetMarketMultiplier(uint256 multiplier);
@@ -182,9 +195,20 @@ interface IBaseMarket {
         external
         returns (address tranche);
 
+    /// @notice Remove a tranche from this market, reweight the rest, and retire it
+    /// @dev Market owner only. Reverts {InvalidTrancheCount} unless `weights` has one entry fewer
+    /// than the market has tranches, {TrancheNotSet} if `tranche` is not listed, {Unhealthy} if
+    /// unhealthy afterwards, and {Undercovered} if the remaining tranches, each counted up to its
+    /// {ITranche-maxCapital}, cannot back the debt at `LT - buffer`. The removed tranche is retired,
+    /// so it takes no further deposits, and its {lockedValue} is zero, so its holders can exit.
+    /// @param tranche The tranche to remove
+    /// @param weights The remaining tranches' weights in ray decimals, in their current order
+    function removeTranche(address tranche, uint256[] calldata weights) external;
+
     /// @notice Set the tranches and their weights
-    /// @dev Restricted to the registry. Owners reweight via {setTrancheWeights} or add a junior via
-    /// {createTranche}. Reverts {Unhealthy} if the market is unhealthy afterwards.
+    /// @dev Restricted to the registry. Owners reweight via {setTrancheWeights}, add a junior via
+    /// {createTranche}, or remove a tranche via {removeTranche}. Reverts {Unhealthy} if the market
+    /// is unhealthy afterwards.
     /// At most ten tranches may be configured, including empty, killed and zero-weight tranches.
     /// The count is checked before settling premium.
     /// Floating settles outstanding premium under the current list first, so an
@@ -194,7 +218,8 @@ interface IBaseMarket {
 
     /// @notice Set the tranche weights
     /// @dev Floating settles outstanding premium under the current weights first. Reverts
-    /// {Unhealthy} if the market is unhealthy afterwards.
+    /// {InvalidTrancheCount} unless there is one weight per tranche, and {Unhealthy} if the market
+    /// is unhealthy afterwards.
     /// @param weights The new tranche weights in ray decimals
     function setTrancheWeights(uint256[] calldata weights) external;
 
@@ -286,7 +311,8 @@ interface IBaseMarket {
 
     /// @notice Get the capital a tranche must keep locked to back the market's debt
     /// @dev USD, 18 decimals, rounded up. Juniors lock first, each counted up to its
-    /// {ITranche-maxCapital}. Zero when the market has no debt, without consulting the oracle.
+    /// {ITranche-maxCapital}. Zero when the market has no debt or the tranche is not listed,
+    /// without consulting the oracle.
     /// @param tranche The tranche address
     /// @return value The locked capital value in USD (18 decimals)
     function lockedValue(address tranche) external view returns (uint256 value);

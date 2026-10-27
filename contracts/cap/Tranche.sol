@@ -86,8 +86,9 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
     function slash(uint256 value, address recipient) external returns (uint256 slashedValue) {
         if (msg.sender != market) revert InvalidMarket();
         uint256 total = totalAssets();
-        // nothing to deliver, and a price would only add a failure mode
-        if (total == 0) return 0;
+        // nothing anyone owns to deliver, and a price would only add a failure mode; see
+        // {totalCapital} for why the supply can sit at or below the dead shares
+        if (total == 0 || totalSupply() <= DeadShares.SHARES) return 0;
 
         uint256 price = getPrice();
         uint256 unit = 10 ** decimals();
@@ -102,6 +103,15 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
 
         IVault(vault).withdraw(asset(), assets, recipient);
         emit Slashed(recipient, assets, slashedValue);
+    }
+
+    /// @inheritdoc ITranche
+    function retire() external {
+        if (msg.sender != market) revert InvalidMarket();
+        if (!killed) {
+            killed = true;
+            emit Killed();
+        }
     }
 
     /// @inheritdoc ITranche
@@ -180,19 +190,27 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
         // at both stages so a discarded fraction cannot be withdrawn. A zero lock never
         // consults the oracle, so a debt-free tranche can still exit after its feed dies.
         uint256 lockedAssets = Math.mulDiv(locked, 10 ** decimals(), getPrice(), Math.Rounding.Ceil);
-        uint256 lockedShares = _quoteWithdraw(lockedAssets);
+        // live shares alone must hold the lock: the dead shares' backing is unowned and stops
+        // counting as capital once no live share remains (see {totalCapital})
+        uint256 lockedShares = _quoteWithdraw(lockedAssets) + DeadShares.SHARES;
         if (supply > lockedShares) unlocked = supply - lockedShares;
     }
 
     /// @inheritdoc ITranche
     function totalCapital() public view returns (uint256 capital) {
         uint256 assets = totalAssets();
-        if (assets == 0) return 0;
+        // The supply is the dead shares alone once every holder has left, and zero before the
+        // first deposit. Either way the balance (their backing, or a donation) is unowned
+        // residue, valued at zero without a price.
+        if (assets == 0 || totalSupply() <= DeadShares.SHARES) return 0;
         capital = assets * getPrice() / 10 ** decimals();
     }
 
     /// @inheritdoc ITranche
     function activeCapital() public view returns (uint256 capital) {
+        // only live shares can be queued, so this is the dead shares alone once every live share
+        // has left or is queued, or zero before the first deposit; see {totalCapital}
+        if (activeSupply() <= DeadShares.SHARES) return 0;
         uint256 assets = activeAssets();
         if (assets == 0) return 0;
         capital = assets * getPrice() / 10 ** decimals();

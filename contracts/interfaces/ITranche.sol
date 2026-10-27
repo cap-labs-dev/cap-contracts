@@ -71,13 +71,18 @@ interface ITranche is IPremiumVesting, IERC7540AsyncRedeem {
 
     /// @notice Slash assets worth `value`, capped by holdings
     /// @dev Caller must be this tranche's market. Returns the floored USD value of
-    /// tokens actually transferred. Empty holdings, or a request that cannot
-    /// produce a positive USD output, return 0 so the market can offer the
+    /// tokens actually transferred. Holdings without live shares, or a request that
+    /// cannot produce a positive USD output, return 0 so the market can offer the
     /// remainder to the next tranche.
     /// @param value The value to slash in USD (18 decimals)
     /// @param recipient The recipient of the slashed assets
     /// @return slashedValue The value slashed in USD (18 decimals)
     function slash(uint256 value, address recipient) external returns (uint256 slashedValue);
+
+    /// @notice Retire the tranche once its market has removed it
+    /// @dev Caller must be this tranche's market. Latches {killed}, which closes deposits while
+    /// exits stay open.
+    function retire() external;
 
     /// @notice Fold premium into the remainder
     /// @param premium The premium being funded, in stablecoin units (18 decimals)
@@ -101,8 +106,8 @@ interface ITranche is IPremiumVesting, IERC7540AsyncRedeem {
 
     /// @notice Get whether the tranche has been retired
     /// @dev Latched when a slash or withdrawal leaves assets below 1% of share supply (1% of par at
-    /// one asset per share). Closes deposits. The market also stops sending it fresh premium, so
-    /// leftover dust cannot keep its weight.
+    /// one asset per share), or when the market removes the tranche. Closes deposits. The market
+    /// also stops sending it fresh premium, so leftover dust cannot keep its weight.
     /// @return Whether the tranche has been retired
     function killed() external view returns (bool);
 
@@ -162,18 +167,21 @@ interface ITranche is IPremiumVesting, IERC7540AsyncRedeem {
 
     /// @notice Get the shares available for redemption excluding market-locked assets
     /// @dev A zero lock does not consult the oracle. A positive lock prices locked
-    /// value and may revert {InvalidPrice}. {pendingRedeemRequest} and
+    /// value and may revert {InvalidPrice}, and live shares alone must hold it: the dead
+    /// shares are excluded, as their backing is not counted once no live share remains. {pendingRedeemRequest} and
     /// {claimableRedeemRequest} read this, which is the documented EIP-7540 deviation.
     /// @return unlocked The shares not locked by the market
     function unlockedSupply() external view returns (uint256 unlocked);
 
     /// @notice Get the total capital value of the tranche in USD (18 decimals)
-    /// @dev Zero when the tranche holds no assets, without consulting the oracle.
+    /// @dev Zero when the tranche holds no assets or has no live shares, without consulting the
+    /// oracle. Only the dead shares' backing and donations remain then, and nobody owns them.
     /// @return capital The total capital value in USD (18 decimals)
     function totalCapital() external view returns (uint256 capital);
 
     /// @notice Get the active capital value of the tranche in USD (18 decimals)
-    /// @dev Zero when no assets are active, without consulting the oracle.
+    /// @dev Zero when no assets are active or no live shares are outside the redemption queue,
+    /// without consulting the oracle.
     /// @return capital The active capital value in USD (18 decimals)
     function activeCapital() external view returns (uint256 capital);
 }

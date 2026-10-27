@@ -37,7 +37,7 @@ contract MarketUnitTest is CapDeployer {
     function test_setTrancheWeights_wrongLength_reverts() public {
         uint256[] memory weights = new uint256[](1);
         weights[0] = RAY;
-        vm.expectRevert(IBaseMarket.InvalidMarket.selector);
+        vm.expectRevert(IBaseMarket.InvalidTrancheCount.selector);
         market.setTrancheWeights(weights);
     }
 
