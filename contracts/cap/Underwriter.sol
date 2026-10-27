@@ -94,9 +94,12 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     }
 
     /// @inheritdoc IUnderwriter
-    function addTranche(address _tranche) external restricted validTranche(_tranche) {
-        // curator is trusted to name a real protocol tranche for this asset. It holds no standing
-        // approval: {_allocate} approves exactly what each deposit pulls
+    function addTranche(address _tranche) external restricted {
+        // only a tranche the registry deployed, in this pool's asset, may be allocated to. It holds
+        // no standing approval: {_allocate} approves exactly what each deposit pulls
+        if (!IRegistry(registry).isTranche(_tranche) || ITranche(_tranche).asset() != asset()) {
+            revert InvalidTranche();
+        }
         _registeredTranches.add(_tranche);
         // this vault holds the tranche shares and claims them in {report}, so it has to earn.
         // A third-party market holding the same token would stay out

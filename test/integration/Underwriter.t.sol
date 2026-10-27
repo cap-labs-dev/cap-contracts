@@ -9,6 +9,7 @@ import { IUnderwriter } from "../../contracts/interfaces/IUnderwriter.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
 import { ERC4626Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
+import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 contract UnderwriterIntegrationTest is CapDeployer {
     address internal borrower = makeAddr("borrower");
@@ -180,12 +181,26 @@ contract UnderwriterIntegrationTest is CapDeployer {
         assertEq(underwriter.redeem(requestId, 100e18, depositor, depositor), 100e18, "the request still settles");
     }
 
-    function test_addTranche_rejectsTheUnderwriterAndStablecoin() public {
-        vm.expectRevert(IUnderwriter.InvalidTranche.selector);
-        underwriter.addTranche(address(underwriter));
-        vm.expectRevert(IUnderwriter.InvalidTranche.selector);
-        underwriter.addTranche(address(stablecoin));
+    /// @dev Only a tranche the registry deployed, in the pool's asset, can be registered. A
+    /// look-alike could otherwise quote the pool's whole idle balance as the price of one share.
+    function test_addTranche_admitsOnlyAProtocolTrancheInItsAsset() public {
+        address lookAlike = makeAddr("look-alike");
+        vm.mockCall(lookAlike, abi.encodeCall(IERC4626.asset, ()), abi.encode(address(collateral)));
+        uint256[] memory weights = new uint256[](3);
+        weights[0] = 0.9e27;
+        weights[1] = 0.05e27;
+        weights[2] = 0.05e27;
+        address otherAsset = market.createTranche(address(_newCollateral("Other", "OTH", 18, 1e18)), weights, 12 hours);
+
+        address[4] memory rejected = [address(underwriter), address(stablecoin), lookAlike, otherAsset];
+        for (uint256 i; i < rejected.length; ++i) {
+            vm.expectRevert(IUnderwriter.InvalidTranche.selector);
+            underwriter.addTranche(rejected[i]);
+        }
         assertEq(underwriter.registeredTranches().length, 0);
+
+        underwriter.addTranche(address(tranche0));
+        assertEq(underwriter.registeredTranches()[0], address(tranche0), "a real tranche in its asset is admitted");
     }
 
     /// @dev Every deposit is forwarded to the default tranche, which gates on the pool's own

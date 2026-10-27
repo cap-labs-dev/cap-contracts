@@ -80,6 +80,10 @@ via_ir = true
 paths = "contracts/cap/Stablecoin.sol"
 max_optimizer_runs = 1
 
+[[profile.release.compilation_restrictions]]
+paths = "contracts/cap/Underwriter.sol"
+max_optimizer_runs = 1
+
 [profile.slither]
 via_ir = true
 
