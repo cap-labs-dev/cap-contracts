@@ -8,8 +8,7 @@ interface IPremiumVesting {
     /// @notice The period is zero or exceeds the precision supported by the decay calculation
     error InvalidVestingPeriod();
 
-    /// @notice The remainder can still be earned: the contract is live, shares are staked, or
-    /// shares sit outside the redemption escrow and dead shares where a holder could opt in
+    /// @notice The remainder can still be earned: the contract is live or shares are staked
     error RemainderStillClaimable();
 
     /// @notice Emitted after accrued premium is checkpointed and the period is changed

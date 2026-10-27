@@ -889,8 +889,8 @@ contract PremiumVestingOptInTest is Test {
         assertLe(toAlice + toBob, PREMIUM);
     }
 
-    /// @dev Once every earning balance is queued, nobody can opt in again, so the frozen remainder
-    /// can be recovered. Premium already credited to a holder stays theirs.
+    /// @dev Once nothing is staked the frozen remainder can be recovered. Premium already credited
+    /// to a holder stays theirs.
     function test_recoverRemainder_sweepsOnlyTheUnearnableRemainder() public {
         _stake(alice, 100e18);
         _fund(PREMIUM);
@@ -915,18 +915,29 @@ contract PremiumVestingOptInTest is Test {
         assertEq(v.claim(alice), owed, "credited premium is untouched");
     }
 
-    function test_recoverRemainder_revertsWhileAnyoneCouldStillEarn() public {
+    /// @dev A staked balance is still earning the remainder, so it blocks recovery. An unstaked one
+    /// does not: the remainder only vests to opted-in balances, and if it did, dust sent to an
+    /// address nobody controls would block recovery for good.
+    function test_recoverRemainder_onlyAStakedBalanceBlocksIt() public {
         _stake(alice, 100e18);
         _fund(PREMIUM);
 
         vm.expectRevert(IPremiumVesting.RemainderStillClaimable.selector);
         v.recoverRemainder(bob);
 
-        // out but still holding shares outside the escrow, so she could opt back in
+        // strand dust where nobody can ever opt in; it leaves the staked supply
+        vm.prank(alice);
+        assertTrue(v.transfer(address(1), 1));
+        vm.expectRevert(IPremiumVesting.RemainderStillClaimable.selector);
+        v.recoverRemainder(bob);
+
         vm.prank(alice);
         v.optOut();
         assertEq(v.stakedSupply(), 0);
-        vm.expectRevert(IPremiumVesting.RemainderStillClaimable.selector);
-        v.recoverRemainder(bob);
+        assertGt(v.balanceOf(alice), 0, "an idle holder remains");
+        assertEq(v.balanceOf(address(1)), 1, "and the stranded dust");
+        uint256 frozen = v.remaining();
+        assertGt(frozen, 0);
+        assertEq(v.recoverRemainder(bob), frozen, "neither blocks recovery");
     }
 }
