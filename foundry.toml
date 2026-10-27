@@ -70,6 +70,16 @@ yul = true                                    # default true
 # cse = true # default false
 # constantOptimizer = true # default false 
 
+# Stablecoin sits at the EIP-170 limit; size-optimise it alone so the rest of the protocol keeps runs = 200.
+[[profile.release.additional_compiler_profiles]]
+name = "size"
+optimizer_runs = 1
+via_ir = true
+
+[[profile.release.compilation_restrictions]]
+paths = "contracts/cap/Stablecoin.sol"
+max_optimizer_runs = 1
+
 [profile.slither]
 via_ir = true
 
