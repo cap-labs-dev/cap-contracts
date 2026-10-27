@@ -466,9 +466,6 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     function _claim(address _receiver, address _controller, uint256 _assets, uint256 _shares, uint256 _requestId)
         internal
     {
-        uint256 unlocked = unlockedSupply();
-        if (_shares > unlocked) revert ERC4626ExceededMaxRedeem(_controller, _shares, unlocked);
-
         _consumeRequest(_controller, _shares, _requestId);
         _payout(msg.sender, _receiver, _controller, _assets, _shares);
     }
