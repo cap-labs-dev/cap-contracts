@@ -400,7 +400,7 @@ contract UnderwriterUnitTest is BaseTest {
 
         vm.recordLogs();
         underwriter.allocate(address(t), 0);
-        // the zero approval is the token's event; the underwriter itself records nothing
+        // nothing to buy, so the underwriter records nothing
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i; i < logs.length; ++i) {
             assertTrue(logs[i].emitter != address(underwriter), "no underwriter event");
@@ -619,11 +619,9 @@ contract UnderwriterUnitTest is BaseTest {
     }
 
     function _openBook(uint256 assets) internal {
-        vm.mockCall(
-            tranche,
-            abi.encodeWithSignature("deposit(uint256,address)", assets, address(underwriter)),
-            abi.encode(assets)
-        );
+        vm.mockCall(tranche, abi.encodeCall(IERC4626.previewDeposit, (assets)), abi.encode(assets));
+        vm.mockCall(tranche, abi.encodeCall(IERC4626.previewMint, (assets)), abi.encode(assets));
+        vm.mockCall(tranche, abi.encodeCall(IERC4626.mint, (assets, address(underwriter))), abi.encode(assets));
         vm.mockCall(
             tranche, abi.encodeWithSelector(IERC20.balanceOf.selector, address(underwriter)), abi.encode(assets)
         );
@@ -648,9 +646,17 @@ contract MockMarkTranche {
         price = newPrice;
     }
 
-    function deposit(uint256 assets, address) external returns (uint256) {
-        shares += assets;
+    function previewDeposit(uint256 assets) external pure returns (uint256) {
         return assets;
+    }
+
+    function previewMint(uint256 amount) external pure returns (uint256) {
+        return amount;
+    }
+
+    function mint(uint256 amount, address) external returns (uint256) {
+        shares += amount;
+        return amount;
     }
 
     function balanceOf(address) external view returns (uint256) {
