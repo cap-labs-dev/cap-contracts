@@ -155,6 +155,9 @@ interface IFixedMarket is IBaseMarket {
     /// to the loans in the order given; {LiquidateFixed} is emitted per loan with a proportional
     /// share of the slashed value. Reverts {Healthy} when the market is not liquidatable.
     /// `amount` of `type(uint256).max` clears as much as the cap allows.
+    /// No minimum output is enforced: the waterfall picks the tokens, an earlier liquidation can
+    /// shrink `repaid`, and value is measured at the oracle. Liquidators must check the returned
+    /// `repaid` and `valueSlashed`, and the tokens received, in their own contract.
     /// @param ids The ids of the loans to repay, strictly ascending
     /// @param recipient The recipient of the liquidated assets
     /// @param amount The amount of assets to liquidate, in stablecoin units (18 decimals)

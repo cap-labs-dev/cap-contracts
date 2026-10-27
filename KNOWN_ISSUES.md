@@ -160,6 +160,12 @@ Based on commit `5e857ffce7c2f342472a0c9d2565f3b4cd9578f9`, reviewed on 12 Octob
 - **Accepted:** Any residual value left after the liquidation waterfall is not refunded or deducted from the liquidator's cUSD repayment.
 - **Mitigation:** Liquidators must account for collateral token precision when sizing repayments, especially small ones.
 
+#### Liquidation has no minimum output
+
+- **Issue:** `liquidate` bounds only the cUSD spent. The liquidation waterfall chooses which collateral tokens are delivered, a liquidation landing first can shrink `repaid` without reverting, and delivered value is measured at the oracle, which may lag the market.
+- **Accepted:** Liquidation is restricted to the LIQUIDATOR role, and the call returns `repaid` and `valueSlashed`. A minimum measured at the oracle would not protect against an oracle that lags the market.
+- **Mitigation:** Liquidators must check the returned `repaid` and `valueSlashed`, and the tokens received, in their own contract, reverting when the outcome is not acceptable.
+
 #### Unavailable collateral prices can block market operations
 
 - **Issue:** If a funded tranche's price is unavailable, market borrowing, liquidation, and exits that require that price can revert.
