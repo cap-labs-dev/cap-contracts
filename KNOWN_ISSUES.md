@@ -176,7 +176,7 @@ Based on commit `5e857ffce7c2f342472a0c9d2565f3b4cd9578f9`, reviewed on 12 Octob
 
 - **Issue:** If a funded tranche's price is unavailable, market borrowing, liquidation, and exits that require that price can revert.
 - **Accepted:** These operations require valid prices and may stop until pricing is restored.
-- **Mitigation:** The oracle tries a secondary source when the primary fails. Empty tranches do not need price valuation, and debt-free tranche exits remain available.
+- **Mitigation:** The oracle tries a secondary source when the primary fails. Tranches without live shares do not need price valuation, a market owner can remove a tranche whose feed has failed if the rest can back the debt, and debt-free tranche exits remain available.
 
 ### Redemption queues
 

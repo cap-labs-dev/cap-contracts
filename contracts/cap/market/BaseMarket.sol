@@ -76,6 +76,35 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @inheritdoc IBaseMarket
+    function removeTranche(address tranche, uint256[] calldata weights) external restricted nonReentrant {
+        BaseMarketStorage storage $ = _getBaseMarketStorage();
+        if (weights.length + 1 != $.tranches.length) revert InvalidTrancheCount();
+        Tranche[] memory remaining = new Tranche[](weights.length);
+        bool passed;
+        for (uint256 i; i < weights.length; ++i) {
+            if ($.tranches[i].tranche == tranche) passed = true;
+            // past the removed tranche, read one slot ahead
+            remaining[i] = Tranche({ tranche: $.tranches[passed ? i + 1 : i].tranche, weight: weights[i] });
+        }
+        // the loop never reads the last slot, so a tranche it did not pass must sit there
+        if (!passed && $.tranches[weights.length].tranche != tranche) revert TrancheNotSet();
+        _setTranches(remaining);
+
+        // its holders leave unlocked, so the rest must carry the whole exit lock, each at its cap
+        uint256 debt = totalDebt();
+        if (debt > 0) {
+            uint256 covered;
+            for (uint256 i; i < remaining.length; ++i) {
+                covered += _cappedCapital(remaining[i].tranche);
+            }
+            if (covered < _requiredBacking(debt)) revert Undercovered();
+        }
+
+        ITranche(tranche).retire();
+        emit RemoveTranche(tranche);
+    }
+
+    /// @inheritdoc IBaseMarket
     function setLoanToValue(uint256 _loanToValue) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
         if (_loanToValue + $.buffer > $.liquidationThreshold) revert InvalidLoanToValue();
@@ -120,7 +149,7 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     /// @inheritdoc IBaseMarket
     function setTrancheWeights(uint256[] calldata _weights) external restricted nonReentrant {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        if (_weights.length != $.tranches.length) revert InvalidMarket();
+        if (_weights.length != $.tranches.length) revert InvalidTrancheCount();
         Tranche[] memory updatedTranches = new Tranche[]($.tranches.length);
         for (uint256 i; i < $.tranches.length; ++i) {
             updatedTranches[i] = Tranche({ tranche: $.tranches[i].tranche, weight: _weights[i] });
@@ -277,20 +306,16 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
         if (debt == 0) return 0;
 
         BaseMarketStorage storage $ = _getBaseMarketStorage();
-        // ceil so a later token conversion cannot start from an understated USD requirement
-        value = Math.mulDiv(debt, WadRayMath.RAY, $.liquidationThreshold - $.buffer, Math.Rounding.Ceil);
+        uint256 length = $.tranches.length;
+        uint256 index;
+        while (index < length && $.tranches[index].tranche != tranche) ++index;
+        // a removed tranche backs nothing, so its exits must not wait on the listed tranches' feeds
+        if (index == length) return 0;
 
-        for (uint256 i = $.tranches.length; i > 0;) {
-            i--;
-            if ($.tranches[i].tranche == tranche) break;
-            // a junior frees the tranches above it only up to its cap, as in {creditLimit},
-            // so capital governance has not priced in cannot stand in for capital it has
-            ITranche junior = ITranche($.tranches[i].tranche);
-            uint256 capital = Math.min(junior.totalCapital(), junior.maxCapital());
-            if (capital > value) {
-                value = 0;
-                break;
-            }
+        value = _requiredBacking(debt);
+        for (uint256 i = length - 1; i > index; --i) {
+            uint256 capital = _cappedCapital($.tranches[i].tranche);
+            if (capital >= value) return 0;
             value -= capital;
         }
     }
@@ -406,6 +431,23 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     /// @dev Floating realises outstanding premium under the current list first.
     /// Fixed has nothing outstanding: term premium is charged when it is minted.
     function _beforeTrancheChange() internal virtual { }
+
+    /// @dev Capital the debt must stay backed by while tranches exit, rounded up so a later
+    /// token conversion cannot start from an understated USD requirement
+    /// @param debt The outstanding debt in stablecoin units (18 decimals)
+    /// @return backing The required capital in USD (18 decimals)
+    function _requiredBacking(uint256 debt) private view returns (uint256 backing) {
+        BaseMarketStorage storage $ = _getBaseMarketStorage();
+        backing = Math.mulDiv(debt, WadRayMath.RAY, $.liquidationThreshold - $.buffer, Math.Rounding.Ceil);
+    }
+
+    /// @dev A tranche's capital up to its cap, as in {creditLimit}, so capital governance has not
+    /// priced in cannot stand in for capital it has
+    /// @param tranche The tranche to value
+    /// @return capital The capped capital in USD (18 decimals)
+    function _cappedCapital(address tranche) private view returns (uint256 capital) {
+        capital = Math.min(ITranche(tranche).totalCapital(), ITranche(tranche).maxCapital());
+    }
 
     /// @dev Set the tranches and weights
     /// @param _tranches The tranches and their weights, index 0 is most senior
