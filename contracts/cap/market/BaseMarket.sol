@@ -283,7 +283,10 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
         for (uint256 i = $.tranches.length; i > 0;) {
             i--;
             if ($.tranches[i].tranche == tranche) break;
-            uint256 capital = ITranche($.tranches[i].tranche).totalCapital();
+            // a junior frees the tranches above it only up to its cap, as in {creditLimit},
+            // so capital governance has not priced in cannot stand in for capital it has
+            ITranche junior = ITranche($.tranches[i].tranche);
+            uint256 capital = Math.min(junior.totalCapital(), junior.maxCapital());
             if (capital > value) {
                 value = 0;
                 break;
