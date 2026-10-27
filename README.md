@@ -166,7 +166,7 @@ yarn deploy --rpc-url "$RPC_URL" --sender "$USER_ADDRESS" --account "$ACCOUNT"
 yarn check-roles --rpc-url "$RPC_URL"
 ```
 
-After deployment, configure oracle sources, market creation permissions, market rates/risk parameters, and participant roles through `Registry`, `Oracle`, and `AccessManager` before opening credit. Migration helpers for existing cUSD/stcUSD proxies live in [script/deploy/service/MigrateInfra.sol](script/deploy/service/MigrateInfra.sol); the fresh deployment command is not an upgrade procedure.
+After deployment, configure oracle sources, market creation permissions, market rates/risk parameters, and participant roles through `Registry`, `Oracle`, and `AccessManager` before opening credit. Existing cUSD/stcUSD proxies move to v2 through [contracts/migration/Migrator.sol](contracts/migration/Migrator.sol), which carries the runbook and upgrades both proxies in one checked transaction; [script/deploy/service/MigrateInfra.sol](script/deploy/service/MigrateInfra.sol) deploys it. The fresh deployment command is not an upgrade procedure.
 
 ## Repository layout
 
