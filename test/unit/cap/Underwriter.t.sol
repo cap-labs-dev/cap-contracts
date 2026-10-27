@@ -32,6 +32,9 @@ contract UnderwriterUnitTest is BaseTest {
     address internal stranger = makeAddr("stranger");
     address internal stablecoin = makeAddr("stablecoin");
 
+    /// @dev This contract is the underwriter's registry; it answers {IRegistry-isTranche} from here
+    mapping(address => bool) public isTranche;
+
     function setUp() public {
         _setUpAccessManager();
         collateral = new MockERC20("Wrapped Ether", "WETH", 18);
@@ -60,6 +63,8 @@ contract UnderwriterUnitTest is BaseTest {
         accessManager.setTargetFunctionRole(address(underwriter), _depositorSelectors(), DEPOSITOR_ROLE);
 
         // and opt the vault into the tranche's vesting so it can earn what {report} later claims
+        vm.mockCall(tranche, abi.encodeCall(IERC4626.asset, ()), abi.encode(address(collateral)));
+        isTranche[tranche] = true;
         vm.mockCall(tranche, abi.encodeWithSignature("optIn()"), abi.encode());
         vm.mockCall(tranche, abi.encodeWithSignature("optOut()"), abi.encode());
         vm.mockCall(tranche, abi.encodeWithSignature("claim(address)", address(underwriter)), abi.encode(uint256(0)));
@@ -482,7 +487,8 @@ contract UnderwriterUnitTest is BaseTest {
     }
 
     function _markTranche() internal returns (MockMarkTranche t) {
-        t = new MockMarkTranche();
+        t = new MockMarkTranche(address(collateral));
+        isTranche[address(t)] = true;
         underwriter.addTranche(address(t));
     }
 
@@ -627,9 +633,14 @@ contract UnderwriterUnitTest is BaseTest {
 
 /// @dev Live convertToAssets so a remake and a later deposit see different books.
 contract MockMarkTranche {
+    address public immutable asset;
     uint256 public shares;
     uint256 public price = 1e18;
     uint256 public nextRequestId = 1;
+
+    constructor(address asset_) {
+        asset = asset_;
+    }
 
     function optIn() external { }
 

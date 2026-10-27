@@ -16,7 +16,7 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @notice The tranche is not registered with the underwriter
     error NotRegisteredTranche();
 
-    /// @notice The address is this underwriter or the stablecoin, which cannot be a tranche
+    /// @notice The address cannot be a tranche of this underwriter
     error InvalidTranche();
 
     /// @notice The named shares exceed this vault's queue under that request id
@@ -103,9 +103,9 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     function setAllocatorRole(uint64 roleId) external;
 
     /// @notice Register a tranche for allocation
-    /// @dev Curator only. The curator is trusted to name a real protocol tranche for this asset.
-    /// No standing approval is granted; each allocation approves exactly the amount it deposits.
-    /// Reverts {InvalidTranche} for this underwriter or the stablecoin.
+    /// @dev Curator only. No standing approval is granted; each allocation approves exactly the
+    /// amount it deposits. Reverts {InvalidTranche} unless the registry deployed the tranche and it
+    /// holds this underwriter's asset.
     /// @param tranche The tranche address
     function addTranche(address tranche) external;
 
