@@ -130,9 +130,13 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         if (!_registeredTranches.contains(tranche)) revert NotRegisteredTranche();
         // remake first so an unmarked slash is Loss, not netted into Allocated
         _mark(tranche);
-        // the deposit pulls exactly `assets`, so the approval is spent in the same call
-        IERC20(asset()).forceApprove(tranche, assets);
-        ITranche(tranche).deposit(assets, address(this));
+        // buy whole shares at their exact price so any remainder stays idle instead of
+        // being donated to the tranche's holders; the approval is spent in the same call
+        uint256 trancheShares = ITranche(tranche).previewDeposit(assets);
+        if (trancheShares == 0) return;
+        uint256 cost = ITranche(tranche).previewMint(trancheShares);
+        IERC20(asset()).forceApprove(tranche, cost);
+        ITranche(tranche).mint(trancheShares, address(this));
         // allocate is the only path that may open a book
         _applyAllocated(tranche);
         _checkKilled();
