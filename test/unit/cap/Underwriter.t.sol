@@ -595,6 +595,7 @@ contract UnderwriterUnitTest is BaseTest {
     /// huge convertToAssets must not be able to enter totalDebt through a refresh.
     function test_deallocate_doesNotOpenABookFromAnAirdrop() public {
         address dumped = makeAddr("airdroppedVault");
+        isTranche[dumped] = true;
         vm.mockCall(dumped, abi.encodeWithSelector(IERC20.balanceOf.selector, address(underwriter)), abi.encode(1e18));
         vm.mockCall(dumped, abi.encodeWithSignature("instantUnlockedSupply()"), abi.encode(1e18));
         vm.mockCall(dumped, abi.encodeWithSignature("convertToAssets(uint256)"), abi.encode(1e30));

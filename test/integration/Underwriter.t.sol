@@ -157,7 +157,7 @@ contract UnderwriterIntegrationTest is CapDeployer {
     /// @dev The underwriter's own shares are user redemption escrow and its cUSD is the premium pot.
     /// Naming either as a tranche would let the allocator burn or re-queue that escrow, or redeem the
     /// pot into an asset nothing can recover.
-    function test_exitsRejectTheUnderwriterAndStablecoin() public {
+    function test_exitsRejectAnythingButARegistryTranche() public {
         _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
         vm.prank(depositor);
         uint256 requestId = underwriter.requestRedeem(100e18, depositor, depositor);
@@ -165,7 +165,7 @@ contract UnderwriterIntegrationTest is CapDeployer {
         uint256 queue = underwriter.redemptionQueue();
         assertEq(escrow, 100e18);
 
-        address[2] memory targets = [address(underwriter), address(stablecoin)];
+        address[3] memory targets = [address(underwriter), address(stablecoin), makeAddr("look-alike")];
         for (uint256 i; i < targets.length; ++i) {
             vm.expectRevert(IUnderwriter.InvalidTranche.selector);
             underwriter.deallocate(targets[i], escrow);
@@ -226,6 +226,19 @@ contract UnderwriterIntegrationTest is CapDeployer {
 
         _admitDepositor(address(tranche0), address(underwriter));
         assertEq(underwriter.maxDeposit(depositor), type(uint256).max, "re-admission reopens");
+    }
+
+    /// @dev Allocation enters the default tranche through mint, so that is the admission the deposit
+    /// limits follow, even where deposit is gated differently.
+    function test_maxDeposit_followsTheDefaultTranchesMintGate() public {
+        _useTranche0AsDefault();
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = IERC4626.mint.selector;
+        accessManager.setTargetFunctionRole(address(tranche0), selectors, 999);
+
+        assertTrue(_mayDeposit(address(tranche0), address(underwriter)), "deposit is still open");
+        assertEq(underwriter.maxDeposit(depositor), 0, "deposit limit closes");
+        assertEq(underwriter.maxMint(depositor), 0, "mint limit closes");
     }
 
     function test_allocate_nonTranche_reverts() public {

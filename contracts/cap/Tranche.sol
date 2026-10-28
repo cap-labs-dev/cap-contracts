@@ -105,10 +105,7 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
     /// @inheritdoc ITranche
     function retire() external {
         if (msg.sender != market) revert InvalidMarket();
-        if (!killed) {
-            killed = true;
-            emit Killed();
-        }
+        if (!killed) _kill();
     }
 
     /// @inheritdoc ITranche
@@ -234,10 +231,13 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
     /// Division avoids overflowing assets * KILL_RATIO. Retirement never blocks an exit.
     /// @param assets The asset balance after the slash or withdrawal
     function _checkKilled(uint256 assets) private {
-        if (!killed && assets < Math.ceilDiv(totalSupply(), KILL_RATIO)) {
-            killed = true;
-            emit Killed();
-        }
+        if (!killed && assets < Math.ceilDiv(totalSupply(), KILL_RATIO)) _kill();
+    }
+
+    /// @dev Retire the tranche: deposits close, exits stay open
+    function _kill() private {
+        killed = true;
+        emit Killed();
     }
 
     /// @dev Zero price is invalid. Staleness is already checked by the oracle.
