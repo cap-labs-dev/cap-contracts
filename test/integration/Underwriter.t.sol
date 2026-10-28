@@ -7,7 +7,9 @@ import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
 import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateModel.sol";
 import { IUnderwriter } from "../../contracts/interfaces/IUnderwriter.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
+import { ERC4626Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
+import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 contract UnderwriterIntegrationTest is CapDeployer {
     address internal borrower = makeAddr("borrower");
@@ -52,26 +54,26 @@ contract UnderwriterIntegrationTest is CapDeployer {
 
         assertEq(underwriter.balanceOf(depositor), DEPOSIT - DEAD_SHARES);
         assertEq(tranche0.balanceOf(address(underwriter)), DEPOSIT - DEAD_SHARES);
-        assertEq(vault.balanceOf(address(tranche0), address(collateral)), DEPOSIT);
-        assertEq(vault.balanceOf(address(underwriter), address(collateral)), 0);
+        assertEq(collateral.balanceOf(address(tranche0)), DEPOSIT);
+        assertEq(collateral.balanceOf(address(underwriter)), 0);
         // the dead shares the allocation seeded in the tranche are gone for good
         assertEq(underwriter.totalAssets(), DEPOSIT - DEAD_SHARES);
     }
 
     function test_manualAllocateDeallocate_roundtrips() public {
         _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
-        assertEq(vault.balanceOf(address(underwriter), address(collateral)), DEPOSIT);
+        assertEq(collateral.balanceOf(address(underwriter)), DEPOSIT);
 
         underwriter.addTranche(address(tranche0));
         underwriter.allocate(address(tranche0), DEPOSIT);
         assertEq(tranche0.balanceOf(address(underwriter)), DEPOSIT - DEAD_SHARES);
-        assertEq(vault.balanceOf(address(underwriter), address(collateral)), 0);
+        assertEq(collateral.balanceOf(address(underwriter)), 0);
 
         // the underwriter only ever held the allocation less the tranche's seed, so that is all
         // there is to redeem back out of it
         uint256 freed = underwriter.deallocate(address(tranche0), DEPOSIT);
         assertEq(freed, DEPOSIT - DEAD_SHARES);
-        assertEq(vault.balanceOf(address(underwriter), address(collateral)), DEPOSIT - DEAD_SHARES);
+        assertEq(collateral.balanceOf(address(underwriter)), DEPOSIT - DEAD_SHARES);
     }
 
     function test_deallocateAsync_clampsToHeldShares() public {
@@ -127,7 +129,7 @@ contract UnderwriterIntegrationTest is CapDeployer {
 
         uint256 freed = underwriter.deallocate(address(tranche0), DEPOSIT);
         assertEq(freed, DEPOSIT - DEAD_SHARES);
-        assertEq(vault.balanceOf(address(underwriter), address(collateral)), DEPOSIT - DEAD_SHARES);
+        assertEq(collateral.balanceOf(address(underwriter)), DEPOSIT - DEAD_SHARES);
     }
 
     /// @dev Deregistration deliberately leaves the exits open while closing new allocations, but
@@ -146,10 +148,97 @@ contract UnderwriterIntegrationTest is CapDeployer {
 
         assertGt(underwriter.balanceOf(latecomer), 0, "the deposit still lands");
         assertEq(
-            vault.balanceOf(address(underwriter), address(collateral)),
+            collateral.balanceOf(address(underwriter)),
             DEPOSIT,
             "and sits idle in the vault, which is what an unset default has always meant"
         );
+    }
+
+    /// @dev The underwriter's own shares are user redemption escrow and its cUSD is the premium pot.
+    /// Naming either as a tranche would let the allocator burn or re-queue that escrow, or redeem the
+    /// pot into an asset nothing can recover.
+    function test_exitsRejectAnythingButARegistryTranche() public {
+        _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
+        vm.prank(depositor);
+        uint256 requestId = underwriter.requestRedeem(100e18, depositor, depositor);
+        uint256 escrow = underwriter.balanceOf(address(underwriter));
+        uint256 queue = underwriter.redemptionQueue();
+        assertEq(escrow, 100e18);
+
+        address[3] memory targets = [address(underwriter), address(stablecoin), makeAddr("look-alike")];
+        for (uint256 i; i < targets.length; ++i) {
+            vm.expectRevert(IUnderwriter.InvalidTranche.selector);
+            underwriter.deallocate(targets[i], escrow);
+            vm.expectRevert(IUnderwriter.InvalidTranche.selector);
+            underwriter.deallocateAsync(targets[i], escrow);
+            vm.expectRevert(IUnderwriter.InvalidTranche.selector);
+            underwriter.finalizeDeallocateAsync(targets[i], requestId, escrow);
+        }
+
+        assertEq(underwriter.balanceOf(address(underwriter)), escrow, "the escrow is untouched");
+        assertEq(underwriter.redemptionQueue(), queue, "and queued once");
+        vm.prank(depositor);
+        assertEq(underwriter.redeem(requestId, 100e18, depositor, depositor), 100e18, "the request still settles");
+    }
+
+    /// @dev Only a tranche the registry deployed, in the pool's asset, can be registered. A
+    /// look-alike could otherwise quote the pool's whole idle balance as the price of one share.
+    function test_addTranche_admitsOnlyAProtocolTrancheInItsAsset() public {
+        address lookAlike = makeAddr("look-alike");
+        vm.mockCall(lookAlike, abi.encodeCall(IERC4626.asset, ()), abi.encode(address(collateral)));
+        uint256[] memory weights = new uint256[](3);
+        weights[0] = 0.9e27;
+        weights[1] = 0.05e27;
+        weights[2] = 0.05e27;
+        address otherAsset = market.createTranche(address(_newCollateral("Other", "OTH", 18, 1e18)), weights, 12 hours);
+
+        address[4] memory rejected = [address(underwriter), address(stablecoin), lookAlike, otherAsset];
+        for (uint256 i; i < rejected.length; ++i) {
+            vm.expectRevert(IUnderwriter.InvalidTranche.selector);
+            underwriter.addTranche(rejected[i]);
+        }
+        assertEq(underwriter.registeredTranches().length, 0);
+
+        underwriter.addTranche(address(tranche0));
+        assertEq(underwriter.registeredTranches()[0], address(tranche0), "a real tranche in its asset is admitted");
+    }
+
+    /// @dev Every deposit is forwarded to the default tranche, which gates on the pool's own
+    /// admission there. Revoking it must close the limits, not leave them unlimited while the
+    /// deposit itself reverts.
+    function test_maxDeposit_zeroOnceTheDefaultTrancheExpelsThePool() public {
+        _useTranche0AsDefault();
+        assertEq(underwriter.maxDeposit(depositor), type(uint256).max);
+
+        _expelDepositor(address(tranche0), address(underwriter));
+        assertEq(underwriter.maxDeposit(depositor), 0, "deposit limit closes");
+        assertEq(underwriter.maxMint(depositor), 0, "mint limit closes");
+
+        _mintCollateral(depositor, 1e18);
+        _admitDepositor(address(underwriter), depositor);
+        vm.startPrank(depositor);
+        collateral.approve(address(underwriter), 1e18);
+        vm.expectRevert(
+            abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxDeposit.selector, depositor, 1e18, 0)
+        );
+        underwriter.deposit(1e18, depositor);
+        vm.stopPrank();
+
+        _admitDepositor(address(tranche0), address(underwriter));
+        assertEq(underwriter.maxDeposit(depositor), type(uint256).max, "re-admission reopens");
+    }
+
+    /// @dev Allocation enters the default tranche through mint, so that is the admission the deposit
+    /// limits follow, even where deposit is gated differently.
+    function test_maxDeposit_followsTheDefaultTranchesMintGate() public {
+        _useTranche0AsDefault();
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = IERC4626.mint.selector;
+        accessManager.setTargetFunctionRole(address(tranche0), selectors, 999);
+
+        assertTrue(_mayDeposit(address(tranche0), address(underwriter)), "deposit is still open");
+        assertEq(underwriter.maxDeposit(depositor), 0, "deposit limit closes");
+        assertEq(underwriter.maxMint(depositor), 0, "mint limit closes");
     }
 
     function test_allocate_nonTranche_reverts() public {
@@ -173,6 +262,8 @@ contract UnderwriterIntegrationTest is CapDeployer {
         vm.warp(block.timestamp + 20 * underwriter.vestingPeriod());
 
         underwriter.removeTranche(address(tranche0));
+        assertTrue(registry.isTranche(address(tranche0)), "allocation removal preserves Registry membership");
+        assertEq(underwriter.registeredTranches().length, 0);
         uint256 pulledOnRemove = stablecoin.balanceOf(address(underwriter));
         assertGt(pulledOnRemove, 0, "remove reports what has already vested");
 
@@ -184,6 +275,42 @@ contract UnderwriterIntegrationTest is CapDeployer {
         assertGt(
             stablecoin.balanceOf(address(underwriter)), pulledOnRemove, "later premium is not stranded until a re-add"
         );
+    }
+
+    /// @dev A keeper must not poison vesting through an arbitrary claim target. On the old code,
+    /// the maximum return became the remainder and froze opted-in holders as soon as it vested.
+    function test_report_rejectsFabricatedPremiumWithoutBlockingHolderExits() public {
+        _fundUnderwriter(address(underwriter), depositor, DEPOSIT);
+        address keeper = makeAddr("report keeper");
+        _grantKeeper(keeper);
+        address fabricated = address(new FabricatedPremiumTarget());
+        assertFalse(registry.isTranche(fabricated));
+        assertEq(underwriter.debt(fabricated), 0);
+
+        vm.prank(keeper);
+        vm.expectRevert(IUnderwriter.UnknownTranche.selector);
+        underwriter.report(fabricated);
+
+        assertEq(underwriter.remaining(), 0);
+        assertEq(stablecoin.balanceOf(address(underwriter)), 0);
+        assertEq(underwriter.lastReported(), 0);
+        vm.warp(block.timestamp + 1);
+
+        address recipient = makeAddr("share recipient");
+        vm.startPrank(depositor);
+        underwriter.transfer(recipient, 1e18);
+        assertEq(underwriter.claim(depositor), 0);
+        assertEq(underwriter.instantRedeem(1e18, depositor, depositor), 1e18);
+        uint256 requestId = underwriter.requestRedeem(1e18, depositor, depositor);
+        assertEq(underwriter.redeem(requestId, 1e18, depositor, depositor), 1e18);
+        underwriter.optOut();
+        vm.stopPrank();
+
+        assertEq(underwriter.balanceOf(recipient), 1e18);
+        assertEq(underwriter.balanceOf(depositor), DEPOSIT - DEAD_SHARES - 3e18);
+        assertEq(collateral.balanceOf(depositor), 2e18);
+        assertFalse(underwriter.optedIn(depositor));
+        assertEq(underwriter.stakedSupply(), 0);
     }
 
     function test_curatorEarnsPremiumAndDistributesToDepositor() public {
@@ -237,7 +364,7 @@ contract UnderwriterIntegrationTest is CapDeployer {
         // two hops, so two seeds: one in the underwriter and one in the tranche it allocated to
         uint256 assets = underwriter.redeem(reqId, DEPOSIT - DEAD_SHARES, depositor, depositor);
         assertEq(assets, DEPOSIT - 2 * DEAD_SHARES);
-        assertEq(vault.balanceOf(depositor, address(collateral)), DEPOSIT - 2 * DEAD_SHARES);
+        assertEq(collateral.balanceOf(depositor), DEPOSIT - 2 * DEAD_SHARES);
         assertEq(underwriter.totalSupply(), DEAD_SHARES, "the seed outlives every holder");
     }
 
@@ -272,6 +399,13 @@ contract UnderwriterIntegrationTest is CapDeployer {
 
         vm.prank(depositor);
         underwriter.redeem(reqId, DEPOSIT - DEAD_SHARES, depositor, depositor);
-        assertEq(vault.balanceOf(depositor, address(collateral)), DEPOSIT - 2 * DEAD_SHARES);
+        assertEq(collateral.balanceOf(depositor), DEPOSIT - 2 * DEAD_SHARES);
+    }
+}
+
+/// @dev Implements only claim and sends no cUSD, matching the audit's arbitrary report target.
+contract FabricatedPremiumTarget {
+    function claim(address) external pure returns (uint256) {
+        return type(uint256).max;
     }
 }

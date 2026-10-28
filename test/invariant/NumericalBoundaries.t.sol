@@ -12,6 +12,7 @@ import { IInterestRateModel } from "../../contracts/interfaces/IInterestRateMode
 import { DeadShares } from "../../contracts/utils/DeadShares.sol";
 import { CapDeployer } from "../shared/CapDeployer.sol";
 import { MockERC20 } from "../shared/mocks/MockERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract NumericalBoundariesTest is CapDeployer {
     address internal alice;
@@ -83,24 +84,6 @@ contract NumericalBoundariesTest is CapDeployer {
         assertLe(assets + paid - out, 1);
     }
 
-    function testFuzz_custodyAcrossDecimals(uint8 decimalSeed, uint96 raw) public {
-        MockERC20 token = new MockERC20("Custody boundary", "CST", _decimals(decimalSeed));
-        uint256 assets = bound(raw, 0, 1e27);
-        token.mint(alice, assets);
-        vm.startPrank(alice);
-        token.approve(address(vault), assets);
-        vault.deposit(address(token), assets, alice);
-        vault.transfer(address(0xB0B), address(token), assets / 2);
-        vault.withdraw(address(token), assets - assets / 2, alice);
-        vm.stopPrank();
-        assertEq(vault.totalSupply(vault.id(address(token))), assets / 2);
-        assertEq(token.balanceOf(address(vault)), assets / 2);
-        vm.prank(address(0xB0B));
-        vault.withdraw(address(token), assets / 2, alice);
-        assertEq(token.balanceOf(alice), assets);
-        assertEq(vault.totalSupply(vault.id(address(token))), 0);
-    }
-
     function _tranche(uint8 decimals_) internal returns (FloatingMarket market, Tranche t, MockERC20 token) {
         token = _newCollateral("Collateral boundary", "COL", decimals_, 1e18);
         address[] memory assets = new address[](1);
@@ -115,9 +98,7 @@ contract NumericalBoundariesTest is CapDeployer {
         _admitDepositor(address(t), alice);
         token.mint(alice, 1e30);
         vm.startPrank(alice);
-        token.approve(address(vault), type(uint256).max);
-        vault.deposit(address(token), 1e29, alice);
-        vault.setOperator(address(t), true);
+        token.approve(address(t), type(uint256).max);
         vm.stopPrank();
     }
 
@@ -145,9 +126,9 @@ contract NumericalBoundariesTest is CapDeployer {
         uint256 donation = bound(rawDonation, 0, 1e18);
         vm.prank(alice);
         uint256 shares = t.deposit(initial, alice);
-        // Explicit tracked donation, from the same finite actor's custody balance.
+        // Explicit tracked donation, from the same finite actor's balance.
         vm.prank(alice);
-        vault.transfer(address(t), address(token), donation);
+        assertTrue(token.transfer(address(t), donation));
         uint256 left = shares / 2;
         vm.startPrank(alice);
         t.requestRedeem(left, alice, alice);
@@ -162,16 +143,15 @@ contract NumericalBoundariesTest is CapDeployer {
         assertLe(requested + finalPayment, initial + donation);
         assertEq(t.redemptionQueue(), 0);
         assertEq(t.totalSupply(), DEAD_SHARES);
-        assertEq(vault.totalSupply(vault.id(address(token))), token.balanceOf(address(vault)));
     }
 
     function _exactQueuedWithdrawal(Tranche t, uint256 requested) internal returns (uint256 burned) {
         uint256 supply = t.totalSupply();
         uint256 assets = t.totalAssets();
-        uint256 before = vault.balanceOf(alice, t.asset());
+        uint256 before = IERC20(t.asset()).balanceOf(alice);
         vm.prank(alice);
         burned = t.withdraw(requested, alice, alice);
-        assertEq(vault.balanceOf(alice, t.asset()) - before, requested);
+        assertEq(IERC20(t.asset()).balanceOf(alice) - before, requested);
         assertGe(burned * (assets + 1), requested * (supply + 1));
         assertLt((burned - 1) * (assets + 1), requested * (supply + 1));
     }
@@ -187,10 +167,10 @@ contract NumericalBoundariesTest is CapDeployer {
         vm.prank(defaultBorrower);
         market.borrow(defaultBorrower, borrowAmount);
         uint256 maxAssets = t.maxInstantWithdraw(alice);
-        uint256 before = vault.balanceOf(alice, address(token));
+        uint256 before = token.balanceOf(alice);
         vm.prank(alice);
         t.instantWithdraw(maxAssets, alice, alice);
-        assertEq(vault.balanceOf(alice, address(token)) - before, maxAssets);
+        assertEq(token.balanceOf(alice) - before, maxAssets);
         assertGe(market.healthiness(), RAY);
         // Independently check retained collateral covers the lock, including token granularity.
         assertGe(t.totalAssets() * 1e18 / 10 ** token.decimals(), market.lockedValue(address(t)));
@@ -214,7 +194,7 @@ contract NumericalBoundariesTest is CapDeployer {
         assertEq(debt - market.totalDebt(), repaid);
         assertEq(value, delivered * 0.4e18 / 10 ** token.decimals());
         assertLe(value * 100, repaid * 102 + 50, "half-up bonus bound, half of one cUSD wei");
-        assertEq(vault.totalSupply(vault.id(address(token))), token.balanceOf(address(vault)));
+        assertEq(token.balanceOf(address(t)), capital - delivered, "the tranche delivered exactly what left it");
     }
 
     function testFuzz_fixedTermGraceAndAggregateDebt(uint32 rawTerm, uint8 side) public {

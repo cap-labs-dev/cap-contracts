@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 import { IERC7540Redeem } from "./IERC7540Redeem.sol";
+import { IERC7575Share } from "./IERC7575Share.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 /// @title IERC7540AsyncRedeem
@@ -9,7 +10,7 @@ import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 /// @notice Interface for the Cap async redeem vault: ERC-7540 redeem plus instant exits and request transfer
 /// @dev {IERC7575} is the flattened ERC-165 id. Do not inherit it here: it duplicates {IERC4626}.
 /// Deposit/mint execution rejects zero-share output with {ZeroShares}; previews may still return zero.
-interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
+interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626, IERC7575Share {
     /// @notice Get the address of the share token
     /// @return shareTokenAddress The address of the share token
     function share() external view returns (address shareTokenAddress);
@@ -74,6 +75,7 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
 
     /// @notice Claim previously requested shares on a single request
     /// @dev Caller must be `controller` or its operator. ERC-20 allowance is insufficient.
+    /// Reverts {RedeemRequestNotFound} unless `requestId` is open under `controller`.
     /// Limited to currently claimable shares on this request and {unlockedSupply}.
     /// Pays `convertToAssets(shares)` (floored). There is no redemption window.
     /// @param requestId The request to settle
@@ -87,6 +89,7 @@ interface IERC7540AsyncRedeem is IERC7540Redeem, IERC4626 {
 
     /// @notice Claim a previously requested redemption by asset amount on a single request
     /// @dev Caller must be `controller` or its operator. ERC-20 allowance is insufficient.
+    /// Reverts {RedeemRequestNotFound} unless `requestId` is open under `controller`.
     /// Limited to currently claimable shares on this request and {unlockedSupply}.
     /// Burns the ceil-quoted shares for `assets`. `assets` may not exceed `convertToAssets` of
     /// those claimable shares (reverts {ERC4626ExceededMaxWithdraw}).

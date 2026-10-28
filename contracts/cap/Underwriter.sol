@@ -6,10 +6,11 @@ import { IPremiumVesting } from "../interfaces/IPremiumVesting.sol";
 import { IRegistry } from "../interfaces/IRegistry.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
 import { IUnderwriter } from "../interfaces/IUnderwriter.sol";
-import { IVault } from "../interfaces/IVault.sol";
 import { DeadShares } from "../utils/DeadShares.sol";
 import { PremiumVesting } from "../utils/PremiumVesting.sol";
+import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -19,12 +20,10 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 /// @dev Beacon instance. Upgrade via {UpgradeableBeacon-upgradeTo} on the underwriter beacon.
 contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwriter, PremiumVesting {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using SafeERC20 for IERC20;
 
     /// @inheritdoc IUnderwriter
     address public registry;
-
-    /// @inheritdoc IUnderwriter
-    address public vault;
 
     /// @inheritdoc IUnderwriter
     address public defaultTranche;
@@ -53,6 +52,13 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     /// @dev Shares per remaining asset at which the pool is retired (1% of par at one asset per share).
     uint256 private constant KILL_RATIO = 100;
 
+    /// @dev Reject a target that cannot be a tranche; see {_validTranche}
+    /// @param tranche The tranche to check
+    modifier validTranche(address tranche) {
+        _validTranche(tranche);
+        _;
+    }
+
     /// @inheritdoc IUnderwriter
     function registeredTranches() external view returns (address[] memory) {
         return _registeredTranches.values();
@@ -70,13 +76,11 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         string memory _name,
         string memory _symbol,
         address _asset,
-        address _vaultAddress,
         address _stablecoinAddress,
         uint256 _vestingPeriod
     ) external override initializer {
         __PremiumVesting_init(_authority, IERC20(_asset), _name, _symbol, _stablecoinAddress, _vestingPeriod);
         registry = _registry;
-        vault = _vaultAddress;
     }
 
     /// @inheritdoc IUnderwriter
@@ -90,12 +94,11 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     }
 
     /// @inheritdoc IUnderwriter
-    function addTranche(address _tranche) external restricted {
+    function addTranche(address _tranche) external restricted validTranche(_tranche) {
+        // only a tranche in this pool's asset may be allocated to. It holds no standing approval:
+        // {_allocate} approves exactly what each deposit pulls
+        if (ITranche(_tranche).asset() != asset()) revert InvalidTranche();
         _registeredTranches.add(_tranche);
-        // curator is trusted to name a real protocol tranche for this vault and asset. The tranche
-        // pulls this contract's vault balance on deposit, so it needs operator rights for as long
-        // as it is registered and no longer
-        IVault(vault).setOperator(_tranche, true);
         // this vault holds the tranche shares and claims them in {report}, so it has to earn.
         // A third-party market holding the same token would stay out
         IPremiumVesting(_tranche).optIn();
@@ -106,10 +109,9 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     function removeTranche(address _tranche) external restricted {
         if (debt[_tranche] > 0) _report(_tranche);
         _registeredTranches.remove(_tranche);
-        IVault(vault).setOperator(_tranche, false);
         // every deposit routes through {_transferIn} into {_allocate}, which insists on
         // registration, so a deregistered tranche left as the default would revert each one.
-        // Clearing it holds incoming assets in the vault instead, which is what an unset default
+        // Clearing it holds incoming assets here instead, which is what an unset default
         // already means, and the curator can point it somewhere live at their leisure
         if (defaultTranche == _tranche) {
             defaultTranche = address(0);
@@ -130,14 +132,25 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         if (!_registeredTranches.contains(tranche)) revert NotRegisteredTranche();
         // remake first so an unmarked slash is Loss, not netted into Allocated
         _mark(tranche);
-        ITranche(tranche).deposit(assets, address(this));
+        // buy whole shares at their exact price so any remainder stays idle instead of
+        // being donated to the tranche's holders; the approval is spent in the same call
+        uint256 trancheShares = ITranche(tranche).previewDeposit(assets);
+        if (trancheShares == 0) return;
+        uint256 cost = ITranche(tranche).previewMint(trancheShares);
+        IERC20(asset()).forceApprove(tranche, cost);
+        ITranche(tranche).mint(trancheShares, address(this));
         // allocate is the only path that may open a book
         _applyAllocated(tranche);
         _checkKilled();
     }
 
     /// @inheritdoc IUnderwriter
-    function deallocate(address tranche, uint256 shares) external restricted returns (uint256 deallocated) {
+    function deallocate(address tranche, uint256 shares)
+        external
+        restricted
+        validTranche(tranche)
+        returns (uint256 deallocated)
+    {
         // remake first so an unmarked slash is Loss, not netted into Deallocated
         _mark(tranche);
         // clamped by this contract's own holding as well as the tranche's unlocked supply, so an
@@ -153,7 +166,12 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     }
 
     /// @inheritdoc IUnderwriter
-    function deallocateAsync(address tranche, uint256 shares) external restricted returns (uint256 requestId) {
+    function deallocateAsync(address tranche, uint256 shares)
+        external
+        restricted
+        validTranche(tranche)
+        returns (uint256 requestId)
+    {
         uint256 balance = ITranche(tranche).balanceOf(address(this));
         if (shares > balance) shares = balance;
 
@@ -172,7 +190,11 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     }
 
     /// @inheritdoc IUnderwriter
-    function finalizeDeallocateAsync(address tranche, uint256 requestId, uint256 shares) external restricted {
+    function finalizeDeallocateAsync(address tranche, uint256 requestId, uint256 shares)
+        external
+        restricted
+        validTranche(tranche)
+    {
         // a request is only settled down against what this contract queued under that id. Anyone
         // can name this vault as the controller of a redemption they request against their own
         // shares, which mints a receipt here that no allocation of ours backs. Settling one of
@@ -190,6 +212,14 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
 
         _applyDeallocated(tranche);
         _checkKilled();
+    }
+
+    /// @dev Only a Registry-deployed tranche can be a tranche position. Membership is permanent, so a
+    /// tranche removed from this pool can still be redeemed, while this contract's own shares (user
+    /// redemption escrow) and its cUSD (the premium pot) never qualify.
+    /// @param tranche The tranche to check
+    function _validTranche(address tranche) internal view {
+        if (!IRegistry(registry).isTranche(tranche)) revert InvalidTranche();
     }
 
     /// @dev Remaining plus queued shares, in asset units
@@ -342,7 +372,8 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         }
     }
 
-    /// @dev A killed default blocks new capital without retiring an otherwise healthy pool.
+    /// @dev A killed default, or one that no longer admits this pool as a depositor, blocks new
+    /// capital without retiring an otherwise healthy pool.
     /// @return open Whether the pool and its default tranche permit new capital
     function _depositsOpen() private view returns (bool) {
         // the live value deposits are priced at, so a stale mark cannot keep a dead pool open
@@ -352,6 +383,10 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         address tranche = defaultTranche;
         if (tranche != address(0)) {
             if (ITranche(tranche).killed()) return false;
+            // every deposit is allocated to the default tranche through mint, gated on this pool's
+            // admission there
+            (bool admitted,) = IAccessManager(authority()).canCall(address(this), tranche, IERC4626.mint.selector);
+            if (!admitted) return false;
         }
 
         return true;
@@ -359,7 +394,7 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
 
     /// @inheritdoc IUnderwriter
     function totalAssets() public view override(ERC4626Upgradeable, IERC4626, IUnderwriter) returns (uint256) {
-        return IVault(vault).balanceOf(address(this), asset()) + totalDebt;
+        return IERC20(asset()).balanceOf(address(this)) + totalDebt;
     }
 
     /// @dev Replace the default position's cached value with its current value for issuance only.
@@ -404,7 +439,7 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
 
     /// @inheritdoc IUnderwriter
     function unlockedSupply() public view override(ERC7540AsyncRedeem, IUnderwriter) returns (uint256 unlocked) {
-        uint256 idleAssets = IVault(vault).balanceOf(address(this), asset());
+        uint256 idleAssets = IERC20(asset()).balanceOf(address(this));
         unlocked = _convertToShares(idleAssets, Math.Rounding.Floor);
     }
 
@@ -422,30 +457,23 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         if (killed || _belowKillThreshold(false)) revert UnderwriterKilled();
     }
 
-    /// @dev Transfer in assets to the vault from the sender
+    /// @dev Pull the deposit, then route it to the default tranche if one is set
     /// @param from The address of the sender
     /// @param assets The amount of assets to transfer in
     function _transferIn(address from, uint256 assets) internal override {
-        IVault(vault).transferFrom(from, address(this), asset(), assets);
+        super._transferIn(from, assets);
 
         if (defaultTranche != address(0)) {
             _allocate(defaultTranche, assets);
         }
     }
 
-    /// @dev Transfer out assets from the vault to the receiver
-    /// @param to The address of the receiver
-    /// @param assets The amount of assets to transfer out
-    function _transferOut(address to, uint256 assets) internal override {
-        IVault(vault).transfer(to, asset(), assets);
-    }
-
-    /// @dev Re-value an already-opened book and claim premium. Registration is not required:
-    /// {removeTranche} only closes new allocations, and leftover shares keep earning until they
-    /// are redeemed. Gating this the same way as {allocate} stranded that later premium until a
-    /// re-add.
+    /// @dev Re-value an already-opened book and claim premium from a Registry-deployed tranche.
+    /// Allocation registration is not required: {removeTranche} only closes new allocations,
+    /// and leftover shares keep earning until they are redeemed.
     /// @param _tranche The tranche to report
     function _report(address _tranche) internal {
+        if (!IRegistry(registry).isTranche(_tranche)) revert UnknownTranche();
         (uint256 gain, uint256 loss) = _mark(_tranche);
 
         uint256 premium = IPremiumVesting(_tranche).claim(address(this));

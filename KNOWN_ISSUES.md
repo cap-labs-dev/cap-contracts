@@ -61,6 +61,12 @@ Based on commit `5e857ffce7c2f342472a0c9d2565f3b4cd9578f9`, reviewed on 12 Octob
 - **Accepted:** Overdue premiums are charged when the loan is extended, not automatically at expiry or repayment.
 - **Mitigation:** Keepers should extend overdue loans once the grace period permits. The contracts do not guarantee that extension happens before repayment.
 
+#### Overdue rolls price arrears into the term multiplier
+
+- **Issue:** Rolling an expired loan prices the arrears and the new term as one term. The term multiplier falls as that combined term approaches the maximum, so a long-overdue roll pays a lower multiplier on its new term than an on-time extension. Arrears are also charged at the rate when the roll happens, not the rates over the overdue interval.
+- **Accepted:** Arrears stay short in operation. Keepers call `extendAdmin` once the grace period ends, so a roll carries roughly the grace period of arrears.
+- **Mitigation:** Prompt keeper extensions bound both effects. The contracts do not enforce when an overdue loan is rolled; see Operational availability.
+
 ### Floating interest and indexes
 
 #### Floating premium allocation depends on checkpoint frequency
@@ -105,7 +111,7 @@ Based on commit `5e857ffce7c2f342472a0c9d2565f3b4cd9578f9`, reviewed on 12 Octob
 
 - **Issue:** Per-share rounding can leave funded rewards unclaimable. Separately, if a claim exceeds spendable premium, payment is capped and the unpaid entitlement is cleared.
 - **Accepted:** Rounding dust can remain unclaimable, and capped claim shortfalls are not carried forward. Later funding does not restore a cleared entitlement.
-- **Mitigation:** Underwriters below 1% of par reject new capital, preventing recapitalization from inflating share supply and magnifying rounding loss. The claim cap limits payouts to spendable premium and protects cUSD redemption escrow; it does not preserve unpaid claims.
+- **Mitigation:** Underwriters below 1% of par reject new capital, preventing recapitalization from inflating share supply and magnifying rounding loss. The claim cap limits payouts to spendable premium and protects cUSD redemption escrow; it does not preserve unpaid claims. `claimable()` previews the capped payout, so the Wrapper prices shares only against premium it can collect.
 
 ### Underwriter and tranche accounting
 
@@ -160,11 +166,17 @@ Based on commit `5e857ffce7c2f342472a0c9d2565f3b4cd9578f9`, reviewed on 12 Octob
 - **Accepted:** Any residual value left after the liquidation waterfall is not refunded or deducted from the liquidator's cUSD repayment.
 - **Mitigation:** Liquidators must account for collateral token precision when sizing repayments, especially small ones.
 
+#### Liquidation has no minimum output
+
+- **Issue:** `liquidate` bounds only the cUSD spent. The liquidation waterfall chooses which collateral tokens are delivered, a liquidation landing first can shrink `repaid` without reverting, and delivered value is measured at the oracle, which may lag the market.
+- **Accepted:** Liquidation is restricted to the LIQUIDATOR role, and the call returns `repaid` and `valueSlashed`. A minimum measured at the oracle would not protect against an oracle that lags the market.
+- **Mitigation:** Liquidators must check the returned `repaid` and `valueSlashed`, and the tokens received, in their own contract, reverting when the outcome is not acceptable.
+
 #### Unavailable collateral prices can block market operations
 
 - **Issue:** If a funded tranche's price is unavailable, market borrowing, liquidation, and exits that require that price can revert.
 - **Accepted:** These operations require valid prices and may stop until pricing is restored.
-- **Mitigation:** The oracle tries a secondary source when the primary fails. Empty tranches do not need price valuation, and debt-free tranche exits remain available.
+- **Mitigation:** The oracle tries a secondary source when the primary fails. Tranches without live shares do not need price valuation, a market owner can remove a tranche whose feed has failed if the rest can back the debt, and debt-free tranche exits remain available.
 
 ### Redemption queues
 
@@ -182,11 +194,13 @@ Based on commit `5e857ffce7c2f342472a0c9d2565f3b4cd9578f9`, reviewed on 12 Octob
 
 ## Operating assumptions
 
-- **Supported collateral:** The Vault assumes 1:1 token accounting. Fee-on-transfer and rebasing assets are unsupported and must be excluded during asset selection; deposits do not check for these token behaviors.
-- **Curator trust:** Registering a tranche grants it Vault operator permissions over the Underwriter's balances. Curators must verify that it is a genuine protocol tranche using the correct asset and Vault; registration does not enforce those checks.
+- **Supported collateral:** Tranches and Underwriters hold collateral directly and assume a transfer moves exactly the stated amount. Fee-on-transfer, rebasing and transfer-hook (for example ERC-777) assets are unsupported and must be excluded during asset selection; deposits do not check for these token behaviors. cUSD is rejected as collateral because it is also the premium token.
+- **Curator trust:** Registering a tranche lets the Underwriter allocate to it; each allocation approves the tranche for exactly the amount deposited, and no standing approval remains. Registration only admits tranches the Registry deployed that hold the Underwriter's asset; curators remain trusted to choose markets whose risk suits the pool.
 - **Shared borrower authority:** Borrowing operators within a market must be mutually trusted. Borrower permission allows `borrowMore` or `extend` on any eligible fixed loan ID, without a per-loan owner check. Credit capacity and collateral are shared across the market.
 - **Deposit admission:** Tranche and Underwriter deposit permissions apply to the caller. Admitted callers can deposit for any receiver, and shares remain transferable. Admission does not restrict who can hold shares.
-- **Tranche capital caps:** `maxCapital` limits a tranche's contribution to borrowing capacity, not deposits or loss exposure. Collateral above the cap remains available to the liquidation waterfall.
+- **Role configuration:** Choosing role ids is the responsibility of the controlling party. Borrower and allocator roles must be registry operator roles, because those entry points must never be public; a depositor role may be any role, including PUBLIC. Setting it to a protocol role such as GUARDIAN or KEEPER affects only that instance and is undone by setting it again. `createChildRoles` accepts any parent except PUBLIC, so a group may be administered by a protocol role such as the keeper or guardian. A parent held only by contracts that never grant roles leaves the group's membership frozen; choosing the parent correctly is the caller's responsibility.
+- **Retired premium:** Once a Tranche or Underwriter is retired and nothing is staked, the governor may recover its unvested premium. Holders who have not opted in by then cannot claim it later; credited premium and principal are unaffected.
+- **Tranche capital caps:** `maxCapital` limits a tranche's contribution to borrowing capacity and to the backing that frees the tranches above it, not deposits or loss exposure. Lowering a junior's cap while the market has debt can lock the tranches above it. Collateral above the cap remains available to the liquidation waterfall.
 - **Governance and upgrades:** Privileged roles are trusted to configure permissions, economic parameters and implementations correctly. Upgrades must preserve existing storage and accounting.
 - **Operational availability:** Keepers, guardians and authorized liquidators must perform reporting, premium realization, overdue extensions and liquidation promptly. The contracts do not guarantee a response time.
 - **Temporary pause:** The cUSD pause is intended as a temporary emergency measure. Guardians must lift it when safe; it does not expire automatically. Pausing blocks minting and burning, including borrowing, repayment, liquidation, cUSD deposits and redemption, and `coverBadDebt`. Any market premium charge that mints also waits: fixed extensions that charge premium and, once a floating market has accrued premium, its premium realization, write-offs, tranche changes and multiplier changes. Fixed write-offs remain available. Transfers remain enabled, while interest accrual and loan expiry continue.

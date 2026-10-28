@@ -74,6 +74,7 @@ contract RoleTableTest is CapDeployer {
         _expectRole(market, IBaseMarket.setTrancheWeights.selector, ownerRole, "setTrancheWeights");
         _expectRole(market, IBaseMarket.setUnderwriterRate.selector, ownerRole, "setUnderwriterRate");
         _expectRole(market, IBaseMarket.createTranche.selector, ownerRole, "createTranche");
+        _expectRole(market, IBaseMarket.removeTranche.selector, ownerRole, "removeTranche");
         _expectRole(market, IBaseMarket.setTranches.selector, CapRoles.REGISTRY, "setTranches");
 
         // only the designated borrower can draw credit
@@ -604,7 +605,6 @@ contract RoleTableTest is CapDeployer {
         // them. Naming the role here is what lets this table tell intent from omission.
         _assertAdminUpgrade(address(registry), "registry upgrade");
         _assertAdminUpgrade(address(stablecoin), "stablecoin upgrade");
-        _assertAdminUpgrade(address(vault), "vault upgrade");
         _assertAdminUpgrade(address(oracle), "oracle upgrade");
         _assertAdminUpgrade(address(irm), "irm upgrade");
         _assertAdminUpgrade(address(beaconFactory), "factory upgrade");

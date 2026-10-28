@@ -95,7 +95,7 @@ contract TrancheRetirementTest is CapDeployer {
         tranche.mint(1, supplier);
         vm.stopPrank();
 
-        _fundVault(address(tranche), 1_000_000);
+        _mintCollateral(address(tranche), 1_000_000);
         assertEq(tranche.maxDeposit(supplier), 0, "donations cannot undo retirement");
         uint256 remaining = tranche.balanceOf(supplier);
         vm.prank(supplier);

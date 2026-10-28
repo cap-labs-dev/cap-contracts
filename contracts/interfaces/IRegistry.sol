@@ -33,9 +33,13 @@ interface IRegistry {
     /// @dev `start` must not exceed `end`. Bounds past the collection are clamped to its length.
     error InvalidRange();
 
+    /// @notice The stablecoin cannot be tranche or underwriter collateral
+    /// @dev Tranches and Underwriters hold collateral and cUSD premium as plain ERC20 balances,
+    /// so a cUSD collateral balance would be indistinguishable from premium.
+    error StablecoinCollateral();
+
     /// @notice Shared initialization parameters for the registry
     /// @param stablecoin The stablecoin address
-    /// @param vault The vault address
     /// @param oracle The oracle address
     /// @param irm The interest rate model address
     /// @param factory The beacon proxy factory address
@@ -46,7 +50,6 @@ interface IRegistry {
     /// @param wrapper The staked-stablecoin wrapper address
     struct InitParams {
         address stablecoin;
-        address vault;
         address oracle;
         address irm;
         address factory;
@@ -282,10 +285,6 @@ interface IRegistry {
     /// @notice Get the stablecoin address
     /// @return The stablecoin address
     function stablecoin() external view returns (address);
-
-    /// @notice Get the vault address
-    /// @return The vault address
-    function vault() external view returns (address);
 
     /// @notice Get the oracle address
     /// @return The oracle address

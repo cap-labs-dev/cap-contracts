@@ -5,6 +5,8 @@ import { InterestRateModel } from "../../contracts/cap/InterestRateModel.sol";
 import { Registry } from "../../contracts/cap/Registry.sol";
 import { Stablecoin } from "../../contracts/cap/Stablecoin.sol";
 import { Wrapper } from "../../contracts/cap/Wrapper.sol";
+import { IVaultV1 } from "../../contracts/migration/IVaultV1.sol";
+import { Migrator } from "../../contracts/migration/Migrator.sol";
 import { ImplementationsConfig, InfraConfig, UsersConfig } from "../../script/deploy/interfaces/DeployConfigs.sol";
 import { ConfigureAccessControl } from "../../script/deploy/service/ConfigureAccessControl.sol";
 import { DeployImplems } from "../../script/deploy/service/DeployImplems.sol";
@@ -25,13 +27,32 @@ interface IAccessControlV1 {
     function getRoleMemberCount(bytes32 roleId) external view returns (uint256);
 }
 
+/// @dev The v1 vault's record of the underlying supplied, which the unwind brings back to the proxy
+interface IVaultV1Supplies {
+    function totalSupplies(address asset) external view returns (uint256 supplied);
+}
+
+/// @dev The v1 FeeReceiver setter the runbook uses to send fee proceeds to the migrator
+interface IFeeReceiverV1Admin {
+    function setStakedCapToken(address stakedCapToken) external;
+}
+
+/// @dev The v1 stcUSD vesting surface the rehearsal settles before upgrading
+interface IStakedCapV1Vesting {
+    function notify() external;
+    function lockedProfit() external view returns (uint256 locked);
+    function lastNotify() external view returns (uint256 timestamp);
+    function lockDuration() external view returns (uint256 duration);
+    function totalAssets() external view returns (uint256 total);
+}
+
 /// @title MigrationBase
 /// @notice Fork Ethereum, upgrade the live cUSD and stcUSD proxies, and stand the v2 stack up
 ///         next to them.
 ///
-/// The rehearsal world is the one after the v1 unwind: every loan repaid to cUSD, the
-/// fractional reserve idle, and wWTGXX swapped for USDC. {_assumeUnwindComplete} tops the
-/// vault up to par USDC so the post-upgrade reserve matches that state.
+/// The rehearsal follows the {Migrator} runbook. The fork is mid-unwind, so
+/// {_assumeUnwindComplete} stands in for that step by topping cUSD up to par USDC; the migrator
+/// checks the backing itself and refuses to finish without it.
 abstract contract MigrationBase is Test, DeployImplems, DeployInfra, MigrateInfra, ConfigureAccessControl {
     using stdJson for string;
 
@@ -40,8 +61,11 @@ abstract contract MigrationBase is Test, DeployImplems, DeployInfra, MigrateInfr
     // keccak256(abi.encode(uint256(keccak256("cap.storage.Access")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant V1_ACCESS_STORAGE = 0xb413d65cb88f23816c329284a0d3eb15a99df7963ab7402ade4c5da22bff6b00;
     bytes32 internal constant MIGRATION_SALT = keccak256("migration-fork");
+    /// @dev Cap on the executor's top-up; the gap was about 392 USDC at block 26,285,413
+    uint256 internal constant MAX_TOP_UP = 10_000e6;
 
     UsersConfig internal users;
+    Migrator internal migrator;
     ImplementationsConfig internal implems;
     InfraConfig internal infra;
 
@@ -79,6 +103,8 @@ abstract contract MigrationBase is Test, DeployImplems, DeployInfra, MigrateInfr
 
     /// @dev stcUSD OFT lockbox, a known live holder used as a balance canary
     address internal constant STCUSD_OFT_LOCKBOX = 0x983AEAaA0d0426839158435C43725EA7F45d4137;
+    /// @dev v1 cUSD FeeReceiver, which the runbook points at the migrator
+    address internal constant FEE_RECEIVER = 0x0036c7b9b62c53F47c804a5643F0c09f864beF0b;
     /// @dev cUSD OFT lockbox
     address internal constant CUSD_OFT_LOCKBOX = 0xA62571EbdFfAbC3051a2e5B9e1f57b23D830c8Fd;
 
@@ -88,7 +114,6 @@ abstract contract MigrationBase is Test, DeployImplems, DeployInfra, MigrateInfr
         _loadLiveConfig();
         _snapshotLive();
         _deployAndUpgrade();
-        _assumeUnwindComplete();
     }
 
     /// @dev Fork mainnet. Skips the suite when `ETH_RPC_URL` is unset so CI without an RPC stays green.
@@ -116,6 +141,7 @@ abstract contract MigrationBase is Test, DeployImplems, DeployInfra, MigrateInfr
         require(liveCusd.code.length > 0, "cUSD missing on this fork");
         require(liveWrapper.code.length > 0, "stcUSD missing on this fork");
         require(liveUsdc.code.length > 0, "USDC missing on this fork");
+        require(FEE_RECEIVER.code.length > 0, "v1 FeeReceiver missing on this fork");
 
         scoin = Stablecoin(liveCusd);
         wrapper = Wrapper(liveWrapper);
@@ -163,38 +189,74 @@ abstract contract MigrationBase is Test, DeployImplems, DeployInfra, MigrateInfr
         implems = _deployImplementations();
         infra = _deployInfraAroundExisting(implems, users, MIGRATION_SALT, address(scoin), address(wrapper));
 
-        _authorizeV1Upgrade(address(scoin));
-        _authorizeV1Upgrade(address(wrapper));
-        _upgradeExistingTokens(implems, infra, users, liveName, liveSymbol);
+        migrator = _deployMigrator(implems, infra, users, FEE_RECEIVER, address(this));
 
+        _redirectV1Fees(address(migrator));
+        _assumeUnwindComplete();
+        _settleV1Vesting();
+        _authorizeV1(bytes4(0), address(scoin), address(migrator));
+        _authorizeV1(bytes4(0), address(wrapper), address(migrator));
+        // the v2 roles are in place first, so the migrator can confirm the tokens stay upgradable
         _initInfraAccessControl(infra, users);
+        uint256 sharePrice = wrapper.convertToAssets(1e18);
+        uint256 stakedAssets = wrapper.totalAssets();
+        // the executor covers the gap v1's oracle-priced mints left between supply and USDC
+        deal(address(usdc), address(this), MAX_TOP_UP);
+        usdc.approve(address(migrator), MAX_TOP_UP);
+        migrator.migrate(MAX_TOP_UP);
+        vm.clearMockedCalls();
+        assertEq(wrapper.convertToAssets(1e18), sharePrice, "stcUSD share price is continuous");
+        assertEq(wrapper.totalAssets(), stakedAssets, "stcUSD assets are continuous");
 
         assertEq(infra.stablecoin, address(scoin), "cUSD address must not move");
         assertEq(infra.wrapper, address(wrapper), "stcUSD address must not move");
     }
 
-    /// @dev Loans repaid, fractional reserve divested, wWTGXX swapped to USDC: the vault holds
-    ///      par USDC for the outstanding supply. Deal the shortfall if this fork is still mid-unwind.
+    /// @dev Loans repaid and fractional reserve divested with its interest realized: every USDC v1
+    ///      records as supplied is back on the proxy. That is still short of the supply; the executor
+    ///      tops up the rest. The fork is mid-unwind, so v1's own records of it are stood in for until
+    ///      the upgrade replaces them.
     function _assumeUnwindComplete() internal {
-        uint256 needed = scoin.previewMint(scoin.totalSupply());
-        uint256 held = usdc.balanceOf(address(scoin));
-        if (held < needed) deal(address(usdc), address(scoin), needed);
+        uint256 supplied = IVaultV1Supplies(address(scoin)).totalSupplies(address(usdc));
+        if (usdc.balanceOf(address(scoin)) < supplied) deal(address(usdc), address(scoin), supplied);
+        vm.mockCall(address(scoin), abi.encodeCall(IVaultV1.totalBorrows, (address(usdc))), abi.encode(0));
+        vm.mockCall(address(scoin), abi.encodeCall(IVaultV1.loaned, (address(usdc))), abi.encode(0));
+        vm.mockCall(address(scoin), abi.encodeCall(IVaultV1.claimableInterest, (address(usdc))), abi.encode(0));
     }
 
-    function _authorizeV1Upgrade(address proxy) internal {
-        address accessControl = _v1AccessControl(proxy);
+    /// @dev The runbook step the migration enforces: let a running release finish, notify any
+    ///      un-notified balance, and let that release finish too.
+    function _settleV1Vesting() internal {
+        IStakedCapV1Vesting stakedV1 = IStakedCapV1Vesting(address(wrapper));
+        uint256 duration = stakedV1.lockDuration();
+        if (stakedV1.lockedProfit() > 0) vm.warp(stakedV1.lastNotify() + duration);
+        if (scoin.balanceOf(address(wrapper)) > stakedV1.totalAssets()) {
+            stakedV1.notify();
+            vm.warp(block.timestamp + duration);
+        }
+    }
+
+    /// @dev Runbook step 1: fee proceeds collect in the migrator rather than vesting into stcUSD
+    function _redirectV1Fees(address to) internal {
+        _authorizeV1(IFeeReceiverV1Admin.setStakedCapToken.selector, FEE_RECEIVER, address(this));
+        IFeeReceiverV1Admin(FEE_RECEIVER).setStakedCapToken(to);
+    }
+
+    /// @dev Grant `account` a v1 permission, as the v1 admin would
+    function _authorizeV1(bytes4 selector, address target, address account) internal {
+        address accessControl = _v1AccessControl(target);
         require(accessControl.code.length > 0, "v1 AccessControl missing");
 
         IAccessControlV1 ac = IAccessControlV1(accessControl);
-        bytes32 upgradeRole = ac.role(bytes4(0), proxy);
-        uint256 holders = ac.getRoleMemberCount(upgradeRole);
+        bytes32 grantedRole = ac.role(selector, target);
+        uint256 holders = ac.getRoleMemberCount(grantedRole);
         for (uint256 i; i < holders; ++i) {
-            if (ac.getRoleMember(upgradeRole, i) == address(this)) return;
+            if (ac.getRoleMember(grantedRole, i) == account) return;
         }
 
         address admin = ac.getRoleMember(bytes32(0), 0);
         vm.prank(admin);
-        ac.grantAccess(bytes4(0), proxy, address(this));
+        ac.grantAccess(selector, target, account);
     }
 
     function _v1AccessControl(address proxy) internal view returns (address accessControl) {
