@@ -128,7 +128,7 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
 
     /// @notice Instantly redeem unlocked tranche shares back to the vault
     /// @dev Allocator only. Tranches can be removed from registration and still deallocated.
-    /// Reverts {InvalidTranche} for this underwriter or the stablecoin.
+    /// Reverts {InvalidTranche} unless the registry deployed the tranche.
     /// Remakes the mark only if {debt} is already nonzero — an airdrop cannot open a book.
     /// Clamped to the shares held and the tranche's instant-unlocked supply.
     /// @param tranche The tranche address
@@ -138,7 +138,7 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
 
     /// @notice Request async redemption of tranche shares back to the vault
     /// @dev Allocator only. Registration is not checked; see {deallocate}. Clamped to the shares held.
-    /// Reverts {InvalidTranche} for this underwriter or the stablecoin.
+    /// Reverts {InvalidTranche} unless the registry deployed the tranche.
     /// @param tranche The tranche address
     /// @param shares The shares to redeem
     /// @return requestId The ERC-7540 request id
@@ -146,7 +146,7 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
 
     /// @notice Finalize an async tranche redemption
     /// @dev Allocator only. Registration is not checked; see {deallocate}.
-    /// Reverts {InvalidTranche} for this underwriter or the stablecoin.
+    /// Reverts {InvalidTranche} unless the registry deployed the tranche.
     /// @param tranche The tranche address
     /// @param requestId The ERC-7540 request id
     /// @param shares The shares to redeem

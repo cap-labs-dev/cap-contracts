@@ -94,12 +94,10 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     }
 
     /// @inheritdoc IUnderwriter
-    function addTranche(address _tranche) external restricted {
-        // only a tranche the registry deployed, in this pool's asset, may be allocated to. It holds
-        // no standing approval: {_allocate} approves exactly what each deposit pulls
-        if (!IRegistry(registry).isTranche(_tranche) || ITranche(_tranche).asset() != asset()) {
-            revert InvalidTranche();
-        }
+    function addTranche(address _tranche) external restricted validTranche(_tranche) {
+        // only a tranche in this pool's asset may be allocated to. It holds no standing approval:
+        // {_allocate} approves exactly what each deposit pulls
+        if (ITranche(_tranche).asset() != asset()) revert InvalidTranche();
         _registeredTranches.add(_tranche);
         // this vault holds the tranche shares and claims them in {report}, so it has to earn.
         // A third-party market holding the same token would stay out
@@ -216,11 +214,12 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         _checkKilled();
     }
 
-    /// @dev This contract's own shares are user redemption escrow and its cUSD is the premium pot,
-    /// so neither may be treated as a tranche position.
+    /// @dev Only a Registry-deployed tranche can be a tranche position. Membership is permanent, so a
+    /// tranche removed from this pool can still be redeemed, while this contract's own shares (user
+    /// redemption escrow) and its cUSD (the premium pot) never qualify.
     /// @param tranche The tranche to check
     function _validTranche(address tranche) internal view {
-        if (tranche == address(this) || tranche == stablecoin()) revert InvalidTranche();
+        if (!IRegistry(registry).isTranche(tranche)) revert InvalidTranche();
     }
 
     /// @dev Remaining plus queued shares, in asset units
@@ -384,8 +383,9 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         address tranche = defaultTranche;
         if (tranche != address(0)) {
             if (ITranche(tranche).killed()) return false;
-            // every deposit is forwarded to the default tranche, gated on this pool's admission there
-            (bool admitted,) = IAccessManager(authority()).canCall(address(this), tranche, IERC4626.deposit.selector);
+            // every deposit is allocated to the default tranche through mint, gated on this pool's
+            // admission there
+            (bool admitted,) = IAccessManager(authority()).canCall(address(this), tranche, IERC4626.mint.selector);
             if (!admitted) return false;
         }
 
