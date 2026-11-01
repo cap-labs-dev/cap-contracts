@@ -5,6 +5,8 @@ import { InterestRateModel } from "../../contracts/cap/InterestRateModel.sol";
 import { Registry } from "../../contracts/cap/Registry.sol";
 import { Stablecoin } from "../../contracts/cap/Stablecoin.sol";
 import { Wrapper } from "../../contracts/cap/Wrapper.sol";
+import { IFeeReceiverV1 } from "../../contracts/migration/IFeeReceiverV1.sol";
+import { ILenderV1 } from "../../contracts/migration/ILenderV1.sol";
 import { IVaultV1 } from "../../contracts/migration/IVaultV1.sol";
 import { Migrator } from "../../contracts/migration/Migrator.sol";
 import { ImplementationsConfig, InfraConfig, UsersConfig } from "../../script/deploy/interfaces/DeployConfigs.sol";
@@ -63,6 +65,8 @@ abstract contract MigrationBase is Test, DeployImplems, DeployInfra, MigrateInfr
     bytes32 internal constant MIGRATION_SALT = keccak256("migration-fork");
     /// @dev Cap on the executor's top-up; the gap was about 392 USDC at block 26,285,413
     uint256 internal constant MAX_TOP_UP = 10_000e6;
+    /// @dev The stcUSD price-jump tolerance the executor passes, in basis points
+    uint256 internal constant MAX_PRICE_JUMP = 1;
 
     UsersConfig internal users;
     Migrator internal migrator;
@@ -105,6 +109,8 @@ abstract contract MigrationBase is Test, DeployImplems, DeployInfra, MigrateInfr
     address internal constant STCUSD_OFT_LOCKBOX = 0x983AEAaA0d0426839158435C43725EA7F45d4137;
     /// @dev v1 cUSD FeeReceiver, which the runbook points at the migrator
     address internal constant FEE_RECEIVER = 0x0036c7b9b62c53F47c804a5643F0c09f864beF0b;
+    /// @dev v1 Lender, whose debt tokens must be fully repaid
+    address internal constant LENDER = 0x15622c3dbbc5614E6DFa9446603c1779647f01FC;
     /// @dev cUSD OFT lockbox
     address internal constant CUSD_OFT_LOCKBOX = 0xA62571EbdFfAbC3051a2e5B9e1f57b23D830c8Fd;
 
@@ -142,6 +148,7 @@ abstract contract MigrationBase is Test, DeployImplems, DeployInfra, MigrateInfr
         require(liveWrapper.code.length > 0, "stcUSD missing on this fork");
         require(liveUsdc.code.length > 0, "USDC missing on this fork");
         require(FEE_RECEIVER.code.length > 0, "v1 FeeReceiver missing on this fork");
+        require(LENDER.code.length > 0, "v1 Lender missing on this fork");
 
         scoin = Stablecoin(liveCusd);
         wrapper = Wrapper(liveWrapper);
@@ -189,7 +196,7 @@ abstract contract MigrationBase is Test, DeployImplems, DeployInfra, MigrateInfr
         implems = _deployImplementations();
         infra = _deployInfraAroundExisting(implems, users, MIGRATION_SALT, address(scoin), address(wrapper));
 
-        migrator = _deployMigrator(implems, infra, users, FEE_RECEIVER, address(this));
+        migrator = _deployMigrator(implems, infra, users, FEE_RECEIVER, LENDER, address(this));
 
         _redirectV1Fees(address(migrator));
         _assumeUnwindComplete();
@@ -203,7 +210,7 @@ abstract contract MigrationBase is Test, DeployImplems, DeployInfra, MigrateInfr
         // the executor covers the gap v1's oracle-priced mints left between supply and USDC
         deal(address(usdc), address(this), MAX_TOP_UP);
         usdc.approve(address(migrator), MAX_TOP_UP);
-        migrator.migrate(MAX_TOP_UP);
+        migrator.migrate(MAX_TOP_UP, MAX_PRICE_JUMP);
         vm.clearMockedCalls();
         assertEq(wrapper.convertToAssets(1e18), sharePrice, "stcUSD share price is continuous");
         assertEq(wrapper.totalAssets(), stakedAssets, "stcUSD assets are continuous");
@@ -213,19 +220,21 @@ abstract contract MigrationBase is Test, DeployImplems, DeployInfra, MigrateInfr
     }
 
     /// @dev Loans repaid and fractional reserve divested with its interest realized: every USDC v1
-    ///      records as supplied is back on the proxy. That is still short of the supply; the executor
-    ///      tops up the rest. The fork is mid-unwind, so v1's own records of it are stood in for until
-    ///      the upgrade replaces them.
+    /// records as supplied is back on the proxy. That is still short of the supply; the executor
+    /// tops up the rest. The fork is mid-unwind, so v1's own records of it are stood in for until
+    /// the upgrade replaces them.
     function _assumeUnwindComplete() internal {
         uint256 supplied = IVaultV1Supplies(address(scoin)).totalSupplies(address(usdc));
         if (usdc.balanceOf(address(scoin)) < supplied) deal(address(usdc), address(scoin), supplied);
         vm.mockCall(address(scoin), abi.encodeCall(IVaultV1.totalBorrows, (address(usdc))), abi.encode(0));
+        (,, address debtToken,,,,) = ILenderV1(LENDER).reservesData(address(usdc));
+        vm.mockCall(debtToken, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(0));
         vm.mockCall(address(scoin), abi.encodeCall(IVaultV1.loaned, (address(usdc))), abi.encode(0));
         vm.mockCall(address(scoin), abi.encodeCall(IVaultV1.claimableInterest, (address(usdc))), abi.encode(0));
     }
 
     /// @dev The runbook step the migration enforces: let a running release finish, notify any
-    ///      un-notified balance, and let that release finish too.
+    /// un-notified balance, and let that release finish too.
     function _settleV1Vesting() internal {
         IStakedCapV1Vesting stakedV1 = IStakedCapV1Vesting(address(wrapper));
         uint256 duration = stakedV1.lockDuration();
@@ -240,6 +249,8 @@ abstract contract MigrationBase is Test, DeployImplems, DeployInfra, MigrateInfr
     function _redirectV1Fees(address to) internal {
         _authorizeV1(IFeeReceiverV1Admin.setStakedCapToken.selector, FEE_RECEIVER, address(this));
         IFeeReceiverV1Admin(FEE_RECEIVER).setStakedCapToken(to);
+        // stands in for the getter the runbook's FeeReceiver upgrade adds
+        vm.mockCall(FEE_RECEIVER, abi.encodeCall(IFeeReceiverV1.stakedCapToken, ()), abi.encode(to));
     }
 
     /// @dev Grant `account` a v1 permission, as the v1 admin would

@@ -15,6 +15,7 @@ contract MigrateInfra {
     /// @param infra The infrastructure, including the live token proxies and the new IRM
     /// @param users Token configuration (`stablecoinUnderlying`, `reserveVault`)
     /// @param feeReceiver The v1 FeeReceiver proxy
+    /// @param lender The v1 Lender proxy
     /// @param executor The only account that may run the migration
     /// @return migrator The deployed migrator
     function _deployMigrator(
@@ -22,6 +23,7 @@ contract MigrateInfra {
         InfraConfig memory infra,
         UsersConfig memory users,
         address feeReceiver,
+        address lender,
         address executor
     ) internal returns (Migrator migrator) {
         migrator = new Migrator(
@@ -31,6 +33,7 @@ contract MigrateInfra {
                 stablecoin: infra.stablecoin,
                 wrapper: infra.wrapper,
                 feeReceiver: feeReceiver,
+                lender: lender,
                 stablecoinImplementation: implementations.stablecoin,
                 wrapperImplementation: implementations.wrapper,
                 authority: infra.accessManager,

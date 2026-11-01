@@ -5,6 +5,11 @@ pragma solidity 0.8.36;
 /// @author kexley, Cap Labs
 /// @notice Interface for the distribution surface of the v1 FeeReceiver
 interface IFeeReceiverV1 {
+    /// @notice Get the staked token the collected cUSD is sent to
+    /// @dev Added by the FeeReceiver upgrade in the {IMigrator} runbook; v1 has no getter.
+    /// @return token The staked token
+    function stakedCapToken() external view returns (address token);
+
     /// @notice Send the collected cUSD to the staked token, notifying it once its last release is over
     /// @dev Asks the staked token for `lastNotify` and `lockDuration`, so it reverts against an
     /// address that cannot answer them.

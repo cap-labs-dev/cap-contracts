@@ -5,6 +5,7 @@ import { IERC7540AsyncRedeem } from "../interfaces/IERC7540AsyncRedeem.sol";
 import { IStablecoin } from "../interfaces/IStablecoin.sol";
 import { IWrapper } from "../interfaces/IWrapper.sol";
 import { IFeeReceiverV1 } from "./IFeeReceiverV1.sol";
+import { ILenderV1 } from "./ILenderV1.sol";
 import { IMigrator } from "./IMigrator.sol";
 import { IStakedCapV1 } from "./IStakedCapV1.sol";
 import { IVaultV1 } from "./IVaultV1.sol";
@@ -26,9 +27,8 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 contract Migrator is IMigrator {
     using SafeERC20 for IERC20;
 
-    /// @dev Largest stcUSD share-price jump the upgrade accepts, as a fraction of v1 assets (1 bp).
-    /// Exact equality would let anyone block the migration with a 1 wei donation.
-    uint256 private constant MAX_STAKED_PRICE_JUMP = 10_000;
+    /// @dev Denominator of the stcUSD price-jump tolerance
+    uint256 private constant BPS = 10_000;
 
     /// @inheritdoc IMigrator
     address public immutable executor;
@@ -44,6 +44,9 @@ contract Migrator is IMigrator {
 
     /// @inheritdoc IMigrator
     address public immutable feeReceiver;
+
+    /// @inheritdoc IMigrator
+    address public immutable lender;
 
     /// @inheritdoc IMigrator
     address public immutable stablecoinImplementation;
@@ -76,6 +79,7 @@ contract Migrator is IMigrator {
         stablecoin = config.stablecoin;
         wrapper = config.wrapper;
         feeReceiver = config.feeReceiver;
+        lender = config.lender;
         stablecoinImplementation = config.stablecoinImplementation;
         wrapperImplementation = config.wrapperImplementation;
         authority = config.authority;
@@ -94,12 +98,13 @@ contract Migrator is IMigrator {
     function lockDuration() external pure returns (uint256 duration) { }
 
     /// @inheritdoc IMigrator
-    function migrate(uint256 maxTopUp) external {
+    function migrate(uint256 maxTopUp, uint256 maxPriceJump) external {
         if (msg.sender != executor) revert NotExecutor();
         if (migrated) revert AlreadyMigrated();
         migrated = true;
 
-        // reverts unless the FeeReceiver points somewhere that answers it, such as this contract
+        // fees still sent to v1 stcUSD would skip the vest, and once it is upgraded block `distribute`
+        if (IFeeReceiverV1(feeReceiver).stakedCapToken() != address(this)) revert FeesNotRedirected();
         IFeeReceiverV1(feeReceiver).distribute();
 
         _checkUnwound();
@@ -141,9 +146,9 @@ contract Migrator is IMigrator {
         // v2 treats the whole supply as reserve-backed and caps exits at the underlying it holds
         if (IStablecoin(stablecoin).unlockedSupply() < cusdSupply) revert UnwindIncomplete();
         // v2 values stcUSD at its whole cUSD balance, so locked or un-notified v1 profit lands at once
-        if (IWrapper(wrapper).totalAssets() > stakedAssets + stakedAssets / MAX_STAKED_PRICE_JUMP) {
-            revert StakedPriceWouldJump();
-        }
+        uint256 maxJump = Math.mulDiv(stakedAssets, maxPriceJump, BPS);
+        uint256 newAssets = IWrapper(wrapper).totalAssets();
+        if (newAssets > stakedAssets + maxJump) revert StakedPriceWouldJump(newAssets - stakedAssets, maxJump);
 
         _returnFees();
         emit Migrated();
@@ -156,14 +161,19 @@ contract Migrator is IMigrator {
         _returnFees();
     }
 
-    /// @dev Require the v1 unwind to be complete for every asset: nothing lent to agents, nothing
-    /// invested in the fractional reserve, and no reserve interest left to realize, since the v1
-    /// functions that would recover any of it are gone once cUSD is upgraded
+    /// @dev Require the v1 unwind to be complete for every asset: nothing lent to or owed by agents,
+    /// nothing invested in the fractional reserve, and no reserve interest left to realize, since the
+    /// v1 functions that would recover any of it are gone once cUSD is upgraded.
+    /// Interest accrues in the debt token before it is borrowed from the vault, so the vault's borrows
+    /// alone can read zero while agents still owe it, and their repayment would then revert.
     function _checkUnwound() private view {
         address[] memory v1Assets = IVaultV1(stablecoin).assets();
         for (uint256 i; i < v1Assets.length; ++i) {
             address asset = v1Assets[i];
-            if (IVaultV1(stablecoin).totalBorrows(asset) != 0) revert LoansOutstanding(asset);
+            (,, address debtToken,,,,) = ILenderV1(lender).reservesData(asset);
+            if (IVaultV1(stablecoin).totalBorrows(asset) != 0 || IERC20(debtToken).totalSupply() != 0) {
+                revert LoansOutstanding(asset);
+            }
             if (IVaultV1(stablecoin).loaned(asset) != 0) revert ReserveInvested(asset);
             if (IVaultV1(stablecoin).claimableInterest(asset) != 0) revert InterestUnrealized(asset);
         }
