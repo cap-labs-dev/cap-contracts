@@ -5,9 +5,10 @@ pragma solidity 0.8.36;
 /// @author kexley, Cap Labs
 /// @notice Interface for the one-shot migration of the live cUSD and stcUSD proxies onto v2
 /// @dev Runbook, in order:
-/// 1. At least one `lockDuration` ahead, point the v1 FeeReceiver's `setStakedCapToken` at the
-/// migrator so fee proceeds stop vesting into stcUSD and collect there. It answers the
-/// {lastNotify} and {lockDuration} calls `distribute` makes, which a plain wallet cannot.
+/// 1. At least one `lockDuration` ahead, upgrade the v1 FeeReceiver to an implementation with a
+/// public `stakedCapToken` getter, then point its `setStakedCapToken` at the migrator so fee
+/// proceeds stop vesting into stcUSD and collect there. It answers the {lastNotify} and
+/// {lockDuration} calls `distribute` makes, which a plain wallet cannot.
 /// 2. Complete the v1 unwind: loans repaid, reserve divested and its interest realized, everything
 /// back in USDC on cUSD. The v1 harvest functions live on cUSD and are gone once it is upgraded.
 /// v1 priced mints and burns off the oracle, so the USDC it records falls slightly short of the cUSD
@@ -15,8 +16,9 @@ pragma solidity 0.8.36;
 /// 3. If stcUSD holds an un-notified balance, call its `notify`; wait out any running release.
 /// 4. Grant the migrator v1 upgrade access on both proxies.
 /// 5. Configure the v2 AccessManager, so the upgrader can upgrade both tokens once they are on v2.
-/// 6. The executor calls {migrate} with a cap on the top-up; it refuses to finish unless steps 1
-/// to 3 and 5 are done.
+/// 6. The executor calls {migrate} with a cap on the top-up and a tolerance on the stcUSD price
+/// jump; it refuses to finish unless steps 1 to 3 and 5 are done. A donation to stcUSD beyond the
+/// tolerance can be waited out as in step 3, or accepted with a wider tolerance.
 /// Recover forward: v2 never updates v1 stcUSD's `storedTotal`, so rolling the proxies back to v1
 /// after holders have moved through v2 would let early v1 redeemers be paid from later ones.
 interface IMigrator {
@@ -26,6 +28,7 @@ interface IMigrator {
     /// @param stablecoin The live cUSD proxy
     /// @param wrapper The live stcUSD proxy
     /// @param feeReceiver The v1 FeeReceiver proxy
+    /// @param lender The v1 Lender proxy
     /// @param stablecoinImplementation The v2 cUSD implementation
     /// @param wrapperImplementation The v2 stcUSD implementation
     /// @param authority The v2 access manager
@@ -39,6 +42,7 @@ interface IMigrator {
         address stablecoin;
         address wrapper;
         address feeReceiver;
+        address lender;
         address stablecoinImplementation;
         address wrapperImplementation;
         address authority;
@@ -57,7 +61,10 @@ interface IMigrator {
     /// @notice The migration has not run yet
     error NotMigrated();
 
-    /// @notice v1 still has an asset lent to agents
+    /// @notice The v1 FeeReceiver does not send its fees to the migrator
+    error FeesNotRedirected();
+
+    /// @notice v1 agents still owe an asset, principal or accrued interest
     /// @param asset The asset with loans outstanding
     error LoansOutstanding(address asset);
 
@@ -86,7 +93,9 @@ interface IMigrator {
     error TopUpExceedsMax(uint256 shortfall, uint256 maxTopUp);
 
     /// @notice v1 stcUSD still has locked or un-notified profit that would enter the v2 price at once
-    error StakedPriceWouldJump();
+    /// @param jump The rise in stcUSD assets, in cUSD
+    /// @param maxJump The most the executor allowed, in cUSD
+    error StakedPriceWouldJump(uint256 jump, uint256 maxJump);
 
     /// @notice Emitted when both proxies are on v2 and every check has passed
     event Migrated();
@@ -119,6 +128,10 @@ interface IMigrator {
     /// @notice Get the v1 FeeReceiver proxy
     /// @return proxy The FeeReceiver proxy
     function feeReceiver() external view returns (address proxy);
+
+    /// @notice Get the v1 Lender proxy
+    /// @return proxy The Lender proxy
+    function lender() external view returns (address proxy);
 
     /// @notice Get the v2 cUSD implementation
     /// @return implementation The cUSD implementation
@@ -165,16 +178,18 @@ interface IMigrator {
     /// and return the fees to cUSD holders
     /// @dev Executor only, once. The shortfall between the cUSD supply and the underlying cUSD holds
     /// is pulled from the executor. Reverts:
+    /// - {FeesNotRedirected} unless the v1 FeeReceiver sends its fees to the migrator
     /// - {LoansOutstanding}, {ReserveInvested} or {InterestUnrealized} while any v1 asset is still
-    /// lent, invested or owed interest
+    /// owed by agents, invested or owed reserve interest
     /// - {TopUpExceedsMax} if the shortfall is more than `maxTopUp`
     /// - {StateNotCarriedOver} if a supply or permit domain moved
     /// - {AccessNotConfigured} unless the upgrader can upgrade both tokens through the access manager
     /// - {UnwindIncomplete} unless cUSD can honour every exit
-    /// - {StakedPriceWouldJump} if the stcUSD price would rise more than 1 bp
-    /// - if the FeeReceiver points anywhere that cannot answer it
+    /// - {StakedPriceWouldJump} if the stcUSD price would rise more than `maxPriceJump`
     /// @param maxTopUp The most underlying the executor will add to bring cUSD to par
-    function migrate(uint256 maxTopUp) external;
+    /// @param maxPriceJump The most the stcUSD assets may rise, in basis points of the v1 assets.
+    /// Zero lets a 1 wei donation block the migration.
+    function migrate(uint256 maxTopUp, uint256 maxPriceJump) external;
 
     /// @notice Return fees that reach the migrator after {migrate} to cUSD holders
     /// @dev Permissionless: it only ever funds the cUSD vest. Reverts {NotMigrated} before {migrate}.

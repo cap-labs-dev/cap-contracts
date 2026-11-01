@@ -112,7 +112,7 @@ contract StakedCapV1 is ERC4626Upgradeable, ERC20PermitUpgradeable, UUPSUpgradea
 }
 
 /// @dev v1 FeeReceiver's `distribute`: push the cUSD to the staked token, then ask it when it last
-///      notified, notifying it if the last release is over
+/// notified, notifying it if the last release is over
 contract FeeReceiverV1 {
     IERC20 public capToken;
     address public stakedCapToken;
@@ -135,6 +135,16 @@ contract FeeReceiverV1 {
     }
 }
 
+/// @dev v1 Lender: each asset's debt token, whose supply carries agent interest before it is
+/// realized as a vault borrow
+contract LenderV1 {
+    MockERC20 public immutable debtToken = new MockERC20("cap USDC Debt", "debtUSDC", 6);
+
+    function reservesData(address) external view returns (uint256, address, address, address, uint8, bool, uint256) {
+        return (0, address(0), address(debtToken), address(0), 6, false, 0);
+    }
+}
+
 /// @notice The migration runs as one transaction against v1 stand-ins and the real v2
 ///         implementations: it refuses to finish while any runbook step is undone, and once it does
 ///         finish both tokens carry their state over and the collected fees vest to cUSD holders.
@@ -143,11 +153,13 @@ contract MigratorTest is BaseTest {
         0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
     uint256 private constant LOCK = 1 days;
     uint256 private constant FEES = 10e18;
+    uint256 private constant MAX_PRICE_JUMP = 1;
 
     MockERC20 internal usdc;
     CapTokenV1 internal cusd;
     StakedCapV1 internal stcusd;
     FeeReceiverV1 internal feeReceiver;
+    LenderV1 internal lender = new LenderV1();
     Migrator internal migrator;
 
     address internal alice = makeAddr("alice");
@@ -188,6 +200,7 @@ contract MigratorTest is BaseTest {
             stablecoin: address(cusd),
             wrapper: address(stcusd),
             feeReceiver: address(feeReceiver),
+            lender: address(lender),
             stablecoinImplementation: address(new Stablecoin()),
             wrapperImplementation: address(new Wrapper()),
             authority: address(accessManager),
@@ -226,7 +239,7 @@ contract MigratorTest is BaseTest {
         emit IMigrator.FeesReturned(FEES, FEES / 1e12);
         vm.expectEmit(address(migrator));
         emit IMigrator.Migrated();
-        migrator.migrate(0);
+        migrator.migrate(0, MAX_PRICE_JUMP);
 
         assertEq(_implementation(address(cusd)), migrator.stablecoinImplementation());
         assertEq(_implementation(address(stcusd)), migrator.wrapperImplementation());
@@ -244,7 +257,7 @@ contract MigratorTest is BaseTest {
         assertTrue(migrator.migrated());
 
         vm.expectRevert(IMigrator.AlreadyMigrated.selector);
-        migrator.migrate(0);
+        migrator.migrate(0, MAX_PRICE_JUMP);
     }
 
     /// @dev The tokens must not land on v2 without someone able to upgrade them there
@@ -256,41 +269,47 @@ contract MigratorTest is BaseTest {
         _prepare();
 
         vm.expectRevert(abi.encodeWithSelector(IMigrator.AccessNotConfigured.selector, address(cusd)));
-        migrator.migrate(0);
+        migrator.migrate(0, MAX_PRICE_JUMP);
 
         // an execution delay is still a working upgrade path
         accessManager.grantRole(accessManager.ADMIN_ROLE(), upgrader, 2 days);
-        migrator.migrate(0);
+        migrator.migrate(0, MAX_PRICE_JUMP);
     }
 
     function test_migrate_onlyTheExecutor() public {
         _prepare();
         vm.prank(alice);
         vm.expectRevert(IMigrator.NotExecutor.selector);
-        migrator.migrate(0);
+        migrator.migrate(0, MAX_PRICE_JUMP);
     }
 
     /// @dev v2 caps cUSD exits at the underlying the proxy holds, so an unfinished unwind would
-    ///      freeze them. One unbacked wei is enough to refuse.
+    /// freeze them. One unbacked wei is enough to refuse.
     /// @dev The v1 functions that recover loans, reserve investments and reserve interest live on
-    ///      cUSD and are gone once it is upgraded, so each must be cleared first
+    /// cUSD and are gone once it is upgraded, so each must be cleared first
     function test_migrate_refusesUntilTheV1UnwindIsComplete() public {
         _prepare();
 
         cusd.setUnwind(1, 0, 0);
         vm.expectRevert(abi.encodeWithSelector(IMigrator.LoansOutstanding.selector, address(usdc)));
-        migrator.migrate(0);
+        migrator.migrate(0, MAX_PRICE_JUMP);
+
+        // interest accrued in the debt token but not yet borrowed from the vault is still owed
+        lender.debtToken().mint(alice, 1);
+        vm.expectRevert(abi.encodeWithSelector(IMigrator.LoansOutstanding.selector, address(usdc)));
+        migrator.migrate(0, MAX_PRICE_JUMP);
+        lender.debtToken().burn(alice, 1);
 
         cusd.setUnwind(0, 1, 0);
         vm.expectRevert(abi.encodeWithSelector(IMigrator.ReserveInvested.selector, address(usdc)));
-        migrator.migrate(0);
+        migrator.migrate(0, MAX_PRICE_JUMP);
 
         cusd.setUnwind(0, 0, 1);
         vm.expectRevert(abi.encodeWithSelector(IMigrator.InterestUnrealized.selector, address(usdc)));
-        migrator.migrate(0);
+        migrator.migrate(0, MAX_PRICE_JUMP);
 
         cusd.setUnwind(0, 0, 0);
-        migrator.migrate(0);
+        migrator.migrate(0, MAX_PRICE_JUMP);
     }
 
     function test_migrate_topsUpTheShortfallWithinTheCap() public {
@@ -300,14 +319,14 @@ contract MigratorTest is BaseTest {
         uint256 shortfall = 391.67e6;
 
         vm.expectRevert(abi.encodeWithSelector(IMigrator.TopUpExceedsMax.selector, shortfall, shortfall - 1));
-        migrator.migrate(shortfall - 1);
+        migrator.migrate(shortfall - 1, MAX_PRICE_JUMP);
 
         usdc.mint(address(this), 1_000e6);
         usdc.approve(address(migrator), 1_000e6);
         uint256 held = usdc.balanceOf(address(cusd));
         vm.expectEmit(address(migrator));
         emit IMigrator.ToppedUp(shortfall);
-        migrator.migrate(1_000e6);
+        migrator.migrate(1_000e6, MAX_PRICE_JUMP);
 
         assertEq(usdc.balanceOf(address(this)), 1_000e6 - shortfall, "only the shortfall is pulled");
         assertEq(usdc.balanceOf(address(cusd)), held + shortfall);
@@ -323,49 +342,64 @@ contract MigratorTest is BaseTest {
 
         vm.expectEmit(address(migrator));
         emit IMigrator.ToppedUp(1);
-        migrator.migrate(1);
+        migrator.migrate(1, MAX_PRICE_JUMP);
         assertEq(Stablecoin(address(cusd)).unlockedSupply(), cusd.totalSupply());
     }
 
     /// @dev v2 values stcUSD at its whole cUSD balance, so v1 profit still locked, or not yet
-    ///      notified, would enter the share price at once
+    /// notified, would enter the share price at once
     function test_migrate_refusesUntilStakedProfitIsReleased() public {
         _prepare();
         vm.prank(alice);
         assertTrue(cusd.transfer(address(stcusd), 50e18));
 
-        vm.expectRevert(IMigrator.StakedPriceWouldJump.selector);
-        migrator.migrate(0);
+        vm.expectRevert(abi.encodeWithSelector(IMigrator.StakedPriceWouldJump.selector, 50e18, 0.06e18));
+        migrator.migrate(0, MAX_PRICE_JUMP);
 
         stcusd.notify();
         vm.warp(block.timestamp + LOCK / 2);
         assertGt(stcusd.lockedProfit(), 0);
-        vm.expectRevert(IMigrator.StakedPriceWouldJump.selector);
-        migrator.migrate(0);
+        vm.expectRevert(abi.encodeWithSelector(IMigrator.StakedPriceWouldJump.selector, 25e18, 0.0625e18));
+        migrator.migrate(0, MAX_PRICE_JUMP);
 
         vm.warp(block.timestamp + LOCK);
-        migrator.migrate(0);
+        migrator.migrate(0, MAX_PRICE_JUMP);
     }
 
-    /// @dev Fees still pointed at stcUSD would land in its price; pointed at a plain wallet,
-    ///      `distribute` cannot ask it about notifying and reverts. Either way the migration refuses.
+    /// @dev A donation to stcUSD beyond the tolerance blocks the migration until it is released, or
+    /// until the executor accepts it with a wider tolerance
+    function test_migrate_acceptsAStakedPriceJumpWithinTheTolerance() public {
+        _prepare();
+        vm.prank(alice);
+        assertTrue(cusd.transfer(address(stcusd), 6e18));
+
+        // 6 cUSD on 600 is 100 bp
+        vm.expectRevert(abi.encodeWithSelector(IMigrator.StakedPriceWouldJump.selector, 6e18, 5.94e18));
+        migrator.migrate(0, 99);
+
+        migrator.migrate(0, 100);
+        assertEq(Wrapper(address(stcusd)).totalAssets(), 606e18);
+    }
+
+    /// @dev Fees still pointed at stcUSD would skip the vest, and once stcUSD is upgraded every
+    /// later `distribute` would revert, so the migration refuses unless they come here
     function test_migrate_refusesUntilFeesAreRedirectedHere() public {
         cusd.grantUpgrade(address(migrator));
         stcusd.grantUpgrade(address(migrator));
 
-        vm.expectRevert(IMigrator.StakedPriceWouldJump.selector);
-        migrator.migrate(0);
+        vm.expectRevert(IMigrator.FeesNotRedirected.selector);
+        migrator.migrate(0, MAX_PRICE_JUMP);
 
         feeReceiver.setStakedCapToken(makeAddr("holding wallet"));
-        vm.expectRevert();
-        migrator.migrate(0);
+        vm.expectRevert(IMigrator.FeesNotRedirected.selector);
+        migrator.migrate(0, MAX_PRICE_JUMP);
 
         feeReceiver.setStakedCapToken(address(migrator));
-        migrator.migrate(0);
+        migrator.migrate(0, MAX_PRICE_JUMP);
     }
 
     /// @dev Fees are returned in whole units of the underlying, so the cUSD supply does not move;
-    ///      the sub-unit dust waits for a later call
+    /// the sub-unit dust waits for a later call
     function test_migrate_returnsFeesWithoutMovingTheSupply() public {
         _prepare();
         // a fee balance that is not a whole number of USDC units, still backed in full
@@ -373,7 +407,7 @@ contract MigratorTest is BaseTest {
         usdc.mint(address(cusd), 1);
         uint256 supply = cusd.totalSupply();
 
-        migrator.migrate(0);
+        migrator.migrate(0, MAX_PRICE_JUMP);
         assertEq(cusd.totalSupply(), supply, "burned and minted the same shares");
         assertEq(cusd.balanceOf(address(migrator)), 1e12 - 1, "dust below one USDC unit waits");
         assertEq(IPremiumVesting(address(cusd)).remaining(), FEES);
@@ -385,7 +419,7 @@ contract MigratorTest is BaseTest {
         vm.expectRevert(IMigrator.NotMigrated.selector);
         migrator.returnFees();
 
-        migrator.migrate(0);
+        migrator.migrate(0, MAX_PRICE_JUMP);
         uint256 remaining = IPremiumVesting(address(cusd)).remaining();
         // later fees arrive the way they did before: backed cUSD sent to the receiver
         usdc.mint(alice, 5e6);
