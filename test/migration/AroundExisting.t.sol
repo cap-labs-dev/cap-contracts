@@ -41,7 +41,6 @@ contract AroundExistingTest is Test, DeployImplems, DeployInfra, ConfigureAccess
         assertEq(Registry(deployed.registry).wrapper(), liveStcusd);
         assertTrue(deployed.accessManager != address(0));
         assertTrue(deployed.irm != address(0));
-        assertTrue(deployed.vault != address(0));
         assertTrue(deployed.oracle != address(0));
     }
 }

@@ -146,7 +146,8 @@ contract PremiumVestingTest is Test {
         v.fund(PREMIUM);
         vm.warp(block.timestamp + elapsed);
         uint256 vestedBefore = v.vested();
-        uint256 owedBefore = v.claimable(alice);
+        // The schedule harness does not hold premium tokens; compare the uncapped entitlement.
+        uint256 owedBefore = v.claimable(alice, 1e18, 1e18);
 
         vm.expectEmit(address(v));
         emit IPremiumVesting.PremiumAccrued(vestedBefore * 1e9, PREMIUM - vestedBefore, 1e18);
@@ -156,7 +157,7 @@ contract PremiumVestingTest is Test {
 
         assertEq(v.remainder(), PREMIUM - vestedBefore);
         assertEq(v.lastUpdate(), block.timestamp);
-        assertEq(v.claimable(alice), owedBefore, "past earnings are preserved");
+        assertEq(v.claimable(alice, 1e18, 1e18), owedBefore, "past earnings are preserved");
         assertEq(v.vested(), 0, "the new rate starts now");
         assertEq(v.period(), newPeriod);
         vm.warp(block.timestamp + newPeriod);
@@ -171,9 +172,9 @@ contract PremiumVestingTest is Test {
         assertEq(v.remaining(), PREMIUM);
         assertEq(v.vested(), 0);
         _earn(alice, 1e18);
-        assertEq(v.claimable(alice), 0);
+        assertEq(v.claimable(alice, 1e18, 1e18), 0);
         vm.warp(block.timestamp + 1 days);
-        assertApproxEqRel(v.claimable(alice), PREMIUM * 632 / 1000, 0.001e18);
+        assertApproxEqRel(v.claimable(alice, 1e18, 1e18), PREMIUM * 632 / 1000, 0.001e18);
     }
 
     function test_setVestingPeriod_rejectsInvalidBoundsWithoutCheckpointing() public {
@@ -837,9 +838,42 @@ contract PremiumVestingOptInTest is Test {
         premium.mint(address(v), 1);
         vm.warp(block.timestamp + _untilSettled());
 
-        assertGt(v.claimable(alice), 1, "she is owed more than is sitting here");
+        assertGt(v.claimable(alice, 100e18, 100e18), 1, "the uncapped entitlement exceeds holdings");
+        assertEq(v.claimable(alice), 1, "the public view previews the capped payment");
         vm.prank(alice);
         assertEq(v.claim(alice), 1, "but she is paid what is there");
+    }
+
+    function test_claimableReturnsZeroWhenPremiumPotIsEmpty() public {
+        _stake(alice, 100e18);
+        v.fund(PREMIUM);
+        vm.warp(block.timestamp + _untilSettled());
+
+        assertGt(v.claimable(alice, 100e18, 100e18), 0);
+        assertEq(v.claimable(alice), 0);
+        vm.prank(alice);
+        assertEq(v.claim(alice), 0);
+        assertEq(v.claimable(alice, 100e18, 100e18), 0, "even a zero payment clears the full entitlement");
+    }
+
+    function testFuzz_claimableMatchesCappedClaimAndClearsFullEntitlement(uint256 rawAvailable) public {
+        _stake(alice, 100e18);
+        v.fund(PREMIUM);
+        vm.warp(block.timestamp + _untilSettled());
+        uint256 entitlement = v.claimable(alice, 100e18, 100e18);
+        uint256 available = bound(rawAvailable, 0, entitlement - 1);
+        premium.mint(address(v), available);
+
+        assertEq(v.claimable(alice), available);
+        assertEq(v.claimable(alice, 100e18, 100e18), entitlement, "preview does not change accounting");
+        vm.prank(alice);
+        assertEq(v.claim(alice), available);
+        assertEq(premium.balanceOf(alice), available);
+        assertEq(v.claimable(alice, 100e18, 100e18), 0);
+        assertEq(v.pendingPremium(alice), 0);
+
+        premium.mint(address(v), entitlement);
+        assertEq(v.claimable(alice), 0, "replenishing the pot does not restore the discarded shortfall");
     }
 
     function test_twoHoldersSplitByOptedInBalance() public {
@@ -855,8 +889,8 @@ contract PremiumVestingOptInTest is Test {
         assertLe(toAlice + toBob, PREMIUM);
     }
 
-    /// @dev Once every earning balance is queued, nobody can opt in again, so the frozen remainder
-    /// can be recovered. Premium already credited to a holder stays theirs.
+    /// @dev Once nothing is staked the frozen remainder can be recovered. Premium already credited
+    /// to a holder stays theirs.
     function test_recoverRemainder_sweepsOnlyTheUnearnableRemainder() public {
         _stake(alice, 100e18);
         _fund(PREMIUM);
@@ -881,18 +915,29 @@ contract PremiumVestingOptInTest is Test {
         assertEq(v.claim(alice), owed, "credited premium is untouched");
     }
 
-    function test_recoverRemainder_revertsWhileAnyoneCouldStillEarn() public {
+    /// @dev A staked balance is still earning the remainder, so it blocks recovery. An unstaked one
+    /// does not: the remainder only vests to opted-in balances, and if it did, dust sent to an
+    /// address nobody controls would block recovery for good.
+    function test_recoverRemainder_onlyAStakedBalanceBlocksIt() public {
         _stake(alice, 100e18);
         _fund(PREMIUM);
 
         vm.expectRevert(IPremiumVesting.RemainderStillClaimable.selector);
         v.recoverRemainder(bob);
 
-        // out but still holding shares outside the escrow, so she could opt back in
+        // strand dust where nobody can ever opt in; it leaves the staked supply
+        vm.prank(alice);
+        assertTrue(v.transfer(address(1), 1));
+        vm.expectRevert(IPremiumVesting.RemainderStillClaimable.selector);
+        v.recoverRemainder(bob);
+
         vm.prank(alice);
         v.optOut();
         assertEq(v.stakedSupply(), 0);
-        vm.expectRevert(IPremiumVesting.RemainderStillClaimable.selector);
-        v.recoverRemainder(bob);
+        assertGt(v.balanceOf(alice), 0, "an idle holder remains");
+        assertEq(v.balanceOf(address(1)), 1, "and the stranded dust");
+        uint256 frozen = v.remaining();
+        assertGt(frozen, 0);
+        assertEq(v.recoverRemainder(bob), frozen, "neither blocks recovery");
     }
 }

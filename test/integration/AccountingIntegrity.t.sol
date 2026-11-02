@@ -180,9 +180,9 @@ contract AccountingIntegrityTest is CapDeployer {
         // a few hours pass against nobody
         vm.warp(block.timestamp + 3 hours);
 
-        _fundVault(address(this), 1);
+        _mintCollateral(address(this), 1);
         _admitDepositor(address(uw), address(this));
-        vault.setOperator(address(uw), true);
+        collateral.approve(address(uw), type(uint256).max);
         uw.deposit(1, address(this));
         uw.optIn();
 
@@ -652,9 +652,9 @@ contract AccountingIntegrityTest is CapDeployer {
         // a window runs against nobody; the remainder freezes rather than dumping on the next deposit
         vm.warp(block.timestamp + b.tranche0.vestingPeriod());
 
-        _fundVault(address(this), 1);
+        _mintCollateral(address(this), 1);
         _admitDepositor(address(b.tranche0), address(this));
-        vault.setOperator(b.tranche0Addr, true);
+        collateral.approve(b.tranche0Addr, type(uint256).max);
         b.tranche0.deposit(1, address(this));
         b.tranche0.optIn();
 
@@ -1028,7 +1028,7 @@ contract AccountingIntegrityTest is CapDeployer {
 
         assertEq(t.balanceOf(address(uw)), 0, "the position is gone");
         assertEq(uw.totalDebt(), 0, "so nothing may still be recorded against it");
-        assertEq(uw.totalAssets(), vault.balanceOf(address(uw), address(collateral)), "the books match the assets held");
+        assertEq(uw.totalAssets(), collateral.balanceOf(address(uw)), "the books match the assets held");
 
         uint256 pool = uw.totalAssets();
         uint256 aliceRedeemable = uw.maxInstantRedeem(alice);
@@ -1060,8 +1060,7 @@ contract AccountingIntegrityTest is CapDeployer {
         uint256 held = t.balanceOf(address(uw));
         uw.deallocate(address(t), held * bound(rawFraction, 0, 10_000) / 10_000);
 
-        uint256 realisable =
-            vault.balanceOf(address(uw), address(collateral)) + t.convertToAssets(t.balanceOf(address(uw)));
+        uint256 realisable = collateral.balanceOf(address(uw)) + t.convertToAssets(t.balanceOf(address(uw)));
         assertEq(uw.totalAssets(), realisable, "the books must equal what the underwriter could realise");
     }
 
@@ -1377,7 +1376,8 @@ contract AccountingIntegrityTest is CapDeployer {
         assertGe(secondPremium, firstPremium, "a later equal draw is never cheaper");
     }
 
-    /// @dev Views treat `type(uint256).max` the way {borrow} does: the maximum term.
+    /// @dev Views treat `type(uint256).max` the way {borrow} does: the maximum term. A finite term
+    /// above the maximum is priced as given, as {borrowMore} charges a grandfathered remainder.
     function test_premiumForBorrowTreatsMaxUintAsTheMaximumTerm() public {
         FixedMarket market = _fixedMarketOnSlope(0.9e27);
         uint256 principal = 1_000e18;
@@ -1385,7 +1385,7 @@ contract AccountingIntegrityTest is CapDeployer {
         (uint256 asFlagLiq, uint256 asFlagUw) = market.premiumForBorrow(principal, type(uint256).max);
         (uint256 overLiq, uint256 overUw) = market.premiumForBorrow(principal, market.maximumTermLimit() + 1);
         assertEq(asFlagLiq + asFlagUw, atMaxLiq + atMaxUw, "max uint is the maximum term");
-        assertEq(overLiq + overUw, atMaxLiq + atMaxUw, "above the maximum quotes at the maximum");
+        assertGt(overLiq + overUw, atMaxLiq + atMaxUw, "a finite term above the maximum is priced as given");
         assertEq(market.maxPrincipal(type(uint256).max), market.maxPrincipal(market.maximumTermLimit()));
     }
 

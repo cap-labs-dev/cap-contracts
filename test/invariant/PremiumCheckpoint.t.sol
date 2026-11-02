@@ -40,11 +40,17 @@ contract PremiumCheckpointTest is CapDeployer {
         uint256 paid;
         uint256 clearedShortPayment;
         for (uint256 i; i < 3; ++i) {
-            uint256 entitlement = t.claimable(actors[i]);
+            // Bank the full entitlement without changing the balance or final opted-in supply.
+            vm.startPrank(actors[i]);
+            t.optOut();
+            t.optIn();
+            uint256 entitlement = t.pendingPremium(actors[i]);
+            uint256 expected = t.claimable(actors[i]);
             uint256 before = stablecoin.balanceOf(actors[i]);
-            vm.prank(actors[i]);
             uint256 actual = t.claim(actors[i]);
+            vm.stopPrank();
             assertEq(stablecoin.balanceOf(actors[i]) - before, actual);
+            assertEq(actual, expected, "claimable previews the actual payout");
             assertLe(actual, entitlement);
             paid += actual;
             clearedShortPayment += entitlement - actual;

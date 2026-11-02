@@ -6,7 +6,7 @@ import { IPremiumVesting } from "./IPremiumVesting.sol";
 
 /// @title IUnderwriter
 /// @author kexley, Cap Labs
-/// @notice Interface for the curator vault that allocates vault assets into tranches and distributes premium
+/// @notice Interface for the curator vault that allocates its assets into tranches and distributes premium
 /// @dev The curator role is expected to be held by a timelock or secure multisig, while the
 /// allocator role is intended for an operational wallet with narrower permissions. Beacon instance:
 /// upgrade via {UpgradeableBeacon-upgradeTo} on the underwriter beacon.
@@ -15,6 +15,12 @@ import { IPremiumVesting } from "./IPremiumVesting.sol";
 interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @notice The tranche is not registered with the underwriter
     error NotRegisteredTranche();
+
+    /// @notice The tranche was not deployed by this underwriter's registry
+    error UnknownTranche();
+
+    /// @notice The address cannot be a tranche of this underwriter
+    error InvalidTranche();
 
     /// @notice The named shares exceed this vault's queue under that request id
     error UnknownQueuedRequest();
@@ -76,8 +82,7 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @param registryAddress The registry that configures access roles
     /// @param name The share token name
     /// @param symbol The share token symbol
-    /// @param asset The vault asset deposited by curators
-    /// @param vaultAddress The vault holding curator assets
+    /// @param asset The collateral ERC20 deposited by curators and held by this contract
     /// @param stablecoinAddress The stablecoin used for premium payments
     /// @param vestingPeriod The initial premium vesting time constant in seconds
     function initialize(
@@ -86,7 +91,6 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
         string memory name,
         string memory symbol,
         address asset,
-        address vaultAddress,
         address stablecoinAddress,
         uint256 vestingPeriod
     ) external;
@@ -102,15 +106,16 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     function setAllocatorRole(uint64 roleId) external;
 
     /// @notice Register a tranche for allocation
-    /// @dev Curator only. The curator is trusted to name a real protocol tranche for this vault
-    /// and asset. Grants the tranche vault operator rights until {removeTranche}.
+    /// @dev Curator only. No standing approval is granted; each allocation approves exactly the
+    /// amount it deposits. Reverts {InvalidTranche} unless the registry deployed the tranche and it
+    /// holds this underwriter's asset.
     /// @param tranche The tranche address
     function addTranche(address tranche) external;
 
     /// @notice Remove a tranche and block new allocations
-    /// @dev Curator only. Reports first if the book is open, revokes vault operator rights, and
-    /// clears {defaultTranche} if it pointed here. Existing shares can still be redeemed, and
-    /// {report} can still claim later premium on that leftover position.
+    /// @dev Curator only. Reports first if the book is open and clears {defaultTranche} if it
+    /// pointed here. Existing shares can still be redeemed, and {report} can still claim later
+    /// premium on that leftover position.
     /// @param tranche The tranche address
     function removeTranche(address tranche) external;
 
@@ -123,6 +128,7 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
 
     /// @notice Instantly redeem unlocked tranche shares back to the vault
     /// @dev Allocator only. Tranches can be removed from registration and still deallocated.
+    /// Reverts {InvalidTranche} unless the registry deployed the tranche.
     /// Remakes the mark only if {debt} is already nonzero — an airdrop cannot open a book.
     /// Clamped to the shares held and the tranche's instant-unlocked supply.
     /// @param tranche The tranche address
@@ -132,6 +138,7 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
 
     /// @notice Request async redemption of tranche shares back to the vault
     /// @dev Allocator only. Registration is not checked; see {deallocate}. Clamped to the shares held.
+    /// Reverts {InvalidTranche} unless the registry deployed the tranche.
     /// @param tranche The tranche address
     /// @param shares The shares to redeem
     /// @return requestId The ERC-7540 request id
@@ -139,6 +146,7 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
 
     /// @notice Finalize an async tranche redemption
     /// @dev Allocator only. Registration is not checked; see {deallocate}.
+    /// Reverts {InvalidTranche} unless the registry deployed the tranche.
     /// @param tranche The tranche address
     /// @param requestId The ERC-7540 request id
     /// @param shares The shares to redeem
@@ -152,9 +160,9 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     function setDefaultTranche(address tranche) external;
 
     /// @notice Re-value a tranche position and claim its premium
-    /// @dev Registration is not checked; see {deallocate}. Remakes the mark only if {allocate}
-    /// already opened one. Valuations stay cached between marks. Deposit and mint quotes
-    /// separately value the default position at its current value.
+    /// @dev Requires Registry membership, but not allocation-list membership, so removed tranches
+    /// remain reportable. Remakes the mark only if {allocate} already opened one. Valuations stay
+    /// cached between marks. Deposit and mint quotes separately value the default position live.
     /// Harvested premium enters the pool's own vesting pot, whose period the curator controls.
     /// It rewards opted-in balances as it vests, including holders who joined after the tranche
     /// generated it. Previously credited pool rewards remain with their original holders.
@@ -162,15 +170,11 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     function report(address tranche) external;
 
     /// @notice Recover unvested premium stranded in a retired underwriter
-    /// @dev Governor only. Requires {killed}, no staked supply, and no shares outside the redemption
-    /// escrow and dead shares, so nobody can opt in and earn it. Credited premium is untouched.
+    /// @dev Governor only. Requires {killed} and no staked supply. Holders who have not opted in by
+    /// then give up the frozen remainder. Credited premium is untouched.
     /// @param recipient The address receiving the remainder
     /// @return amount The premium recovered, in stablecoin units (18 decimals)
     function recoverRemainder(address recipient) external returns (uint256 amount);
-
-    /// @notice Get the vault holding curator assets
-    /// @return The vault address
-    function vault() external view returns (address);
 
     /// @notice Get the registry that configures access roles
     /// @return The registry address
@@ -189,8 +193,8 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
 
     /// @notice Get the maximum deposit for a receiver
     /// @dev Zero if the pool is killed, assets are below its kill threshold, or the default tranche
-    /// is killed; otherwise unlimited. A killed default blocks entry until removed or replaced
-    /// with a live tranche, without itself retiring the pool. The value check uses the same live
+    /// is killed or no longer admits this pool as a depositor; otherwise unlimited. Such a default
+    /// blocks entry until removed or replaced, or the pool is re-admitted, without retiring the pool. The value check uses the same live
     /// default-position value as deposit pricing, so it protects impaired pools before their next
     /// position update.
     /// Admission remains on the caller of {deposit}, not on the receiver.
@@ -264,8 +268,8 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @return The sum of every recorded position
     function totalDebt() external view returns (uint256);
 
-    /// @notice Get the total assets including vault balance and recorded tranche debt
-    /// @dev Vault ERC6909 balance plus {totalDebt}. A slash is folded in only when a position update
+    /// @notice Get the total assets including idle balance and recorded tranche debt
+    /// @dev This contract's balance of {asset} plus {totalDebt}. A slash is folded in only when a position update
     /// remakes the book: {allocate} (including default-allocated deposits), {deallocate},
     /// {deallocateAsync}, {finalizeDeallocateAsync}, {report} or {removeTranche}; only an allocation
     /// can open a book. Deposit and mint quotes separately adjust for the default position, including

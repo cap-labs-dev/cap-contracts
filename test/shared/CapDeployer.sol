@@ -12,7 +12,6 @@ import { Registry } from "../../contracts/cap/Registry.sol";
 import { Stablecoin } from "../../contracts/cap/Stablecoin.sol";
 import { Tranche } from "../../contracts/cap/Tranche.sol";
 import { Underwriter } from "../../contracts/cap/Underwriter.sol";
-import { Vault } from "../../contracts/cap/Vault.sol";
 import { Wrapper } from "../../contracts/cap/Wrapper.sol";
 import { FixedMarket } from "../../contracts/cap/market/FixedMarket.sol";
 import { FloatingMarket } from "../../contracts/cap/market/FloatingMarket.sol";
@@ -57,7 +56,6 @@ abstract contract CapDeployer is BaseTest {
     /// aggregator the way a real one moves rather than by overwriting the oracle's answer
     mapping(address asset => MockAggregator feed) internal feeds;
 
-    Vault internal vault;
     Wrapper internal wrapper;
     Stablecoin internal stablecoin;
     InterestRateModel internal irm;
@@ -175,8 +173,6 @@ abstract contract CapDeployer is BaseTest {
         cusdUnderlying = new MockERC20("USD Coin", "USDC", 18);
         collateral = new MockERC20("Wrapped Ether", "WETH", 18);
 
-        vault = Vault(_deployProxy(address(new Vault()), abi.encodeCall(Vault.initialize, (authority))));
-
         InterestRateModel irmImpl = new InterestRateModel();
         Stablecoin stablecoinImpl = new Stablecoin();
 
@@ -252,7 +248,6 @@ abstract contract CapDeployer is BaseTest {
                         address(accessManager),
                         IRegistry.InitParams({
                             stablecoin: address(stablecoin),
-                            vault: address(vault),
                             oracle: address(oracle),
                             irm: address(irm),
                             factory: address(beaconFactory),
@@ -554,11 +549,8 @@ abstract contract CapDeployer is BaseTest {
 
     function _fundTranche(address tranche, address asset, address supplier, uint256 amount) internal {
         MockERC20(asset).mint(supplier, amount);
-        vm.startPrank(supplier);
-        MockERC20(asset).approve(address(vault), amount);
-        vault.deposit(asset, amount, supplier);
-        vault.setOperator(tranche, true);
-        vm.stopPrank();
+        vm.prank(supplier);
+        MockERC20(asset).approve(tranche, type(uint256).max);
 
         _admitDepositor(tranche, supplier);
 
@@ -568,12 +560,8 @@ abstract contract CapDeployer is BaseTest {
         vm.stopPrank();
     }
 
-    function _fundVault(address who, uint256 amount) internal {
+    function _mintCollateral(address who, uint256 amount) internal {
         collateral.mint(who, amount);
-        vm.startPrank(who);
-        collateral.approve(address(vault), amount);
-        vault.deposit(address(collateral), amount, who);
-        vm.stopPrank();
     }
 
     function _mintStable(address to, uint256 amount) internal {
@@ -614,10 +602,10 @@ abstract contract CapDeployer is BaseTest {
     }
 
     function _fundUnderwriter(address underwriter, address supplier, uint256 amount) internal {
-        _fundVault(supplier, amount);
+        _mintCollateral(supplier, amount);
         _admitDepositor(underwriter, supplier);
         vm.startPrank(supplier);
-        vault.setOperator(underwriter, true);
+        collateral.approve(underwriter, type(uint256).max);
         Underwriter(underwriter).deposit(amount, supplier);
         Underwriter(underwriter).optIn();
         vm.stopPrank();

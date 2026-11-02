@@ -208,4 +208,102 @@ contract LockedValueTest is CapDeployer {
             "liquidationThreshold stays strictly below targetHealth"
         );
     }
+
+    /// @dev 500 of debt against 1,000 of the approved collateral in the senior, then the owner adds
+    /// an uncapped junior in another oracle-listed asset and fills it past the senior's lock.
+    function _swapSetup() internal returns (FloatingMarket market, address senior, address swap) {
+        _deployCap();
+        address marketAddr;
+        (marketAddr, senior,) = _createMarket("M");
+        market = FloatingMarket(marketAddr);
+        _setMarketSlopes(marketAddr);
+        _setMaxCapital(market, 100_000e18);
+        _fundTranche(senior, makeAddr("senior"), 1_000e18);
+        vm.prank(defaultBorrower);
+        market.borrow(defaultBorrower, 500e18);
+
+        uint256[] memory weights = new uint256[](3);
+        weights[0] = 0.9e27;
+        weights[1] = 0.05e27;
+        weights[2] = 0.05e27;
+        MockERC20 risky = _newCollateral("Risky", "RSK", 18, 1e18);
+        swap = market.createTranche(address(risky), weights, 12 hours);
+        _fundTranche(swap, address(risky), makeAddr("owner"), 1_000e18);
+        assertEq(ITranche(swap).maxCapital(), 0, "governance has not priced the new asset in");
+    }
+
+    /// An uncapped junior cannot release the senior's collateral, so the debt stays on the asset
+    /// governance approved for the market.
+    function test_uncappedJuniorDoesNotUnlockTheSenior() public {
+        (FloatingMarket market, address senior, address swap) = _swapSetup();
+        assertGt(Tranche(swap).totalCapital(), 714.3e18, "the junior holds more than the requirement");
+
+        // 500 / 0.7, none of it absorbed by the uncapped junior
+        assertApproxEqAbs(market.lockedValue(senior), 714285714285714285715, 1, "the senior still locks it all");
+        uint256 exitable = Tranche(senior).maxInstantRedeem(makeAddr("senior"));
+        // the dead shares stay behind as well, since their backing never holds a lock
+        assertApproxEqAbs(exitable, 1_000e18 - 714285714285714285715 - 1_000, 1, "only the excess can leave");
+
+        vm.prank(makeAddr("senior"));
+        vm.expectRevert();
+        Tranche(senior).instantRedeem(exitable + 1, makeAddr("senior"), makeAddr("senior"));
+    }
+
+    /// The junior shields the tranches above it up to its cap and no further.
+    function test_juniorShieldsUpToItsCap() public {
+        (FloatingMarket market, address senior, address swap) = _swapSetup();
+        uint256 required = market.lockedValue(senior);
+
+        ITranche(swap).setMaxCapital(200e18);
+        assertEq(market.lockedValue(senior), required - 200e18, "counted at its cap");
+
+        ITranche(swap).setMaxCapital(100_000e18);
+        assertEq(market.lockedValue(senior), 0, "a cap above its holdings counts them in full");
+
+        ITranche(swap).setMaxCapital(0);
+        assertEq(market.lockedValue(senior), required, "cutting the cap relocks the senior");
+    }
+
+    /// @dev The owner opens a junior with a single live share, donates so the dead shares own
+    /// almost all of it, lets the senior leave on that backing, then tries to walk away from it.
+    /// The dead shares' backing is unowned and valued at zero once no live share remains, so it
+    /// must never count towards a lock either.
+    function test_deadShareBackingCannotMeetALock() public {
+        _deployCap();
+        (address marketAddr, address senior,) = _createMarket("M");
+        FloatingMarket market = FloatingMarket(marketAddr);
+        _setMarketSlopes(marketAddr);
+        _setMaxCapital(market, 100_000e18);
+        _fundTranche(senior, makeAddr("senior"), 1_000e18);
+        vm.prank(defaultBorrower);
+        market.borrow(defaultBorrower, 500e18);
+
+        uint256[] memory weights = new uint256[](3);
+        weights[0] = 0.9e27;
+        weights[1] = 0.05e27;
+        weights[2] = 0.05e27;
+        MockERC20 risky = _newCollateral("Risky", "RSK", 18, 1e18);
+        Tranche junior = Tranche(market.createTranche(address(risky), weights, 12 hours));
+        junior.setMaxCapital(100_000e18);
+
+        address owner = makeAddr("owner");
+        _fundTranche(address(junior), address(risky), owner, 1_001);
+        assertEq(junior.balanceOf(owner), 1, "one live share beside the dead ones");
+        risky.mint(owner, 1_000e18);
+        vm.startPrank(owner);
+        assertTrue(risky.transfer(address(junior), 1_000e18));
+        vm.stopPrank();
+
+        // the junior now frees the senior, which leaves
+        assertEq(market.lockedValue(senior), 0);
+        _exitUnlocked(senior, makeAddr("senior"));
+        assertGt(market.lockedValue(address(junior)), 0, "the junior carries the debt");
+
+        // the last live share must stay: without it the backing is unowned and unslashable
+        assertEq(junior.maxInstantRedeem(owner), 0, "the dead shares cannot hold the lock");
+        vm.prank(owner);
+        vm.expectRevert();
+        junior.instantRedeem(1, owner, owner);
+        assertGe(market.healthiness(), 1e27, "the debt stays backed");
+    }
 }

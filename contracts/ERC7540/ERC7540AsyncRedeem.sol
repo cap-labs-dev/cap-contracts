@@ -4,6 +4,7 @@ pragma solidity 0.8.36;
 import { IERC7540AsyncRedeem } from "../interfaces/IERC7540AsyncRedeem.sol";
 import { IERC7540Redeem } from "../interfaces/IERC7540Redeem.sol";
 import { IERC7575 } from "../interfaces/IERC7575.sol";
+import { IERC7575Share } from "../interfaces/IERC7575Share.sol";
 import { ERC7540Operator, IERC7540Operator } from "./ERC7540Operator.sol";
 import {
     ERC4626Upgradeable,
@@ -66,6 +67,11 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     /// @inheritdoc IERC7540AsyncRedeem
     function share() public view virtual returns (address shareTokenAddress) {
         shareTokenAddress = address(this);
+    }
+
+    /// @inheritdoc IERC7575Share
+    function vault(address _asset) public view returns (address vaultAddress) {
+        if (_asset == asset()) vaultAddress = address(this);
     }
 
     /// @inheritdoc IERC7540Redeem
@@ -451,7 +457,9 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
         }
     }
 
-    /// @dev Settle a queued claim. Caller authorization is the caller's responsibility.
+    /// @dev Settle a queued claim. Caller authorization is the caller's responsibility. Reverts
+    /// {RedeemRequestNotFound} unless `_requestId` is still open under `_controller`, so even a
+    /// zero-share claim cannot name another controller's request.
     /// @param _receiver The receiver of the assets
     /// @param _controller The controller of the request
     /// @param _assets The number of assets to withdraw
@@ -460,9 +468,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     function _claim(address _receiver, address _controller, uint256 _assets, uint256 _shares, uint256 _requestId)
         internal
     {
-        uint256 unlocked = unlockedSupply();
-        if (_shares > unlocked) revert ERC4626ExceededMaxRedeem(_controller, _shares, unlocked);
-
+        if (_requestShares(_requestId, _controller) == 0) revert RedeemRequestNotFound(_requestId, _controller);
         _consumeRequest(_controller, _shares, _requestId);
         _payout(msg.sender, _receiver, _controller, _assets, _shares);
     }
@@ -538,6 +544,7 @@ abstract contract ERC7540AsyncRedeem is IERC7540AsyncRedeem, ERC7540Operator, ER
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165) returns (bool) {
         return interfaceId == type(IERC4626).interfaceId || interfaceId == type(IERC7540Operator).interfaceId
             || interfaceId == type(IERC7540Redeem).interfaceId || interfaceId == type(IERC7540AsyncRedeem).interfaceId
-            || interfaceId == type(IERC7575).interfaceId || super.supportsInterface(interfaceId);
+            || interfaceId == type(IERC7575).interfaceId || interfaceId == type(IERC7575Share).interfaceId
+            || super.supportsInterface(interfaceId);
     }
 }

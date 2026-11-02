@@ -10,17 +10,16 @@ withdrawals. Unit and integration tests exercise arithmetic and lifecycle
 boundaries alongside the stateful campaigns below.
 
 The stateful fixture uses CapDeployer and Registry's real AccessManager selector
-table, real markets, Oracle/ChainlinkAdapter, Vault, Stablecoin, Wrapper, Tranche,
+table, real markets, Oracle/ChainlinkAdapter, Stablecoin, Wrapper, Tranche,
 Underwriter and IRM. Only ordinary ERC20 assets, external feeds and Aera custody
 are mocked. No RPC is required. Actors receive finite budgets at deployment;
 operations never mint assets to repair a failed precondition.
 
 ### Live-state properties
 
-1. **Custody:** each ERC6909 supply equals the underlying tokens in Vault. This
-   closed system permits no custody donations, rebases or transfer fees. For a
-   deployment permitting donations the general requirement is supply <= custody.
-   External token conservation also counts actor holdings and liquidation receipts.
+1. **Custody:** each tranche's totalAssets equals the collateral it holds, and
+   collateral is conserved across tranches, the pool, actors and liquidation
+   receipts. This closed system permits no donations, rebases or transfer fees.
 2. **Debt:** sum of enumerated fixed loans equals aggregate fixed debt. Independent
    principal receipts, premium allocation events, repayments and write-offs explain
    credit issuance. Floating live debt minus the two *unrealized* premium components
@@ -39,7 +38,7 @@ operations never mint assets to repair a failed precondition.
    value. A successful exit consumes no more than current liquidity. A withdrawal
    alone preserves health if the market was healthy immediately before it;
    prices, rates, time and risk parameters are held fixed across that call.
-6. **Pool marks:** totalAssets = idle ERC6909 + cached position books. A book is
+6. **Pool marks:** totalAssets = idle collateral + cached position books. A book is
    compared with an independent rational position valuation only when a documented
    marking operation occurs. Unrealized losses may remain between reports. Queued
    and wallet shares are valued together. The known stale-book exit trade-off is
@@ -83,7 +82,7 @@ reverts; they do not interpret a skipped handler as protocol coverage.
   and queued deallocation. Bootstrap calls are excluded from random-call metrics.
   Both campaigns check all live properties after every call and unwind after
   every sequence. One combined invariant keeps these properties on the same state.
-- `NumericalBoundaries.t.sol`: custody and reserve decimal scaling, zero/one/seed
+- `NumericalBoundaries.t.sol`: collateral and reserve decimal scaling, zero/one/seed
   boundaries, donations, multiple receipts, exact-asset withdrawals, credit-limit
   exits, liquidation granularity, maturity/grace neighbors, rate kink neighbors,
   and an exhaustive small-integer reference for nonlinear shortfall exit quotes.
@@ -188,11 +187,11 @@ formatter diff and run tests after formatting.
 - All assertions observe the state before any optional maintenance. `charge`,
   `report`, `recall`, `cover` and `unwind` are separately named operations.
 - The stateful reserve and collateral are 18 decimals. The dedicated numerical
-  fuzz tests deploy 6-, 8- and 18-decimal reserves/collateral/custody assets. They
+  fuzz tests deploy 6-, 8- and 18-decimal reserve and collateral assets. They
   do not constitute a mixed-decimal stateful market campaign.
 - Stateful deposits/draws use finite budgets and at most 1,000 tokens per call;
-  fuzz boundaries separately reach `1e24` reserve/deposit units and `1e27` custody
-  units. This is not a claim of correctness throughout the uint256 domain.
+  fuzz boundaries separately reach `1e24` reserve/deposit units and `1e30`
+  collateral units. This is not a claim of correctness throughout the uint256 domain.
 - Time advances up to seven days per call and is capped at five years. Feeds use
   CapDeployer's documented ten-year staleness window. Price shocks range from
   $0.01 to $2.00. Oracle outages and malformed external tokens remain covered by

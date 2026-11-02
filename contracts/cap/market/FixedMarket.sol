@@ -206,7 +206,7 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
 
     /// @inheritdoc IFixedMarket
     function maxPrincipal(uint256 term) public view returns (uint256 principal) {
-        principal = _principalFor(availableCredit(), _quoteTerm(term));
+        (principal,,) = _principalFor(availableCredit(), _quoteTerm(term));
     }
 
     /// @dev Apply a liquidation's repayment to the listed loans in order. Each loan's event carries
@@ -261,12 +261,17 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     {
         if (principal == 0) revert InvalidPrincipal();
         uint256 limit = availableCredit();
-        actualPrincipal = principal == type(uint256).max ? _principalFor(limit, term) : principal;
-        // no credit, or too little to cover even the smallest draw's premium
-        if (actualPrincipal == 0) revert InsufficientLiquidity();
-
-        (uint256 liquidityPremium, uint256 underwriterPremium) =
-            _premiumStillToMint(actualPrincipal, term, actualPrincipal);
+        uint256 liquidityPremium;
+        uint256 underwriterPremium;
+        if (principal == type(uint256).max) {
+            // sizing already priced the principal it settled on
+            (actualPrincipal, liquidityPremium, underwriterPremium) = _principalFor(limit, term);
+            // no credit, or too little to cover even the smallest draw's premium
+            if (actualPrincipal == 0) revert InsufficientLiquidity();
+        } else {
+            actualPrincipal = principal;
+            (liquidityPremium, underwriterPremium) = _premiumStillToMint(actualPrincipal, term, actualPrincipal);
+        }
         chargedPremium = liquidityPremium + underwriterPremium;
         if (chargedPremium > maxPremium) revert PremiumExceedsLimit(chargedPremium, maxPremium);
         if (actualPrincipal + chargedPremium > limit) revert InsufficientLiquidity();
@@ -281,7 +286,8 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @dev Rates after `mintAmount` of credit-backed supply is minted.
-    /// @param term The term of the loan in seconds, already capped at the maximum
+    /// @param term The term of the loan in seconds. Can exceed the maximum; the term multiplier
+    /// treats anything at or above it as the maximum
     /// @param mintAmount The credit-backed supply still to be minted before the charge, in stablecoin units (18 decimals)
     /// @return liquidityRate The liquidity rate per year in ray decimals
     /// @return underwriterRate The underwriter rate per year in ray decimals
@@ -311,7 +317,8 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     }
 
     /// @dev Combined liquidity and underwriter rate after `mintAmount` is minted.
-    /// @param term The term of the loan in seconds, already capped at the maximum
+    /// @param term The term of the loan in seconds. Can exceed the maximum; the term multiplier
+    /// treats anything at or above it as the maximum
     /// @param mintAmount The credit-backed supply still to be minted before the charge, in stablecoin units (18 decimals)
     /// @return rate The combined rate per year in ray decimals
     function _termRate(uint256 term, uint256 mintAmount) internal view returns (uint256 rate) {
@@ -325,18 +332,25 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     /// @param limit The raw {IBaseMarket-availableCredit} the draw must fit, in USD (18 decimals)
     /// @param term The term of the loan in seconds
     /// @return principal A principal whose {_borrowCost} is at most `limit`, or zero, in stablecoin units (18 decimals)
-    function _principalFor(uint256 limit, uint256 term) internal view returns (uint256 principal) {
-        if (limit == 0) return 0;
+    /// @return liquidityPremium The liquidity premium on `principal`, or zero, in stablecoin units (18 decimals)
+    /// @return underwriterPremium The underwriter premium on `principal`, or zero, in stablecoin units (18 decimals)
+    function _principalFor(uint256 limit, uint256 term)
+        internal
+        view
+        returns (uint256 principal, uint256 liquidityPremium, uint256 underwriterPremium)
+    {
+        if (limit == 0) return (0, 0, 0);
 
         principal = _principalWithin(limit, term, _termRate(term, 0));
         if (principal > limit) principal = limit;
 
-        uint256 cost = _borrowCost(principal, term);
+        uint256 cost;
+        (cost, liquidityPremium, underwriterPremium) = _borrowCost(principal, term);
         while (cost > limit) {
             uint256 next = Math.mulDiv(principal, limit, cost);
-            if (next == 0 || next >= principal) return 0;
+            if (next == 0 || next >= principal) return (0, 0, 0);
             principal = next;
-            cost = _borrowCost(principal, term);
+            (cost, liquidityPremium, underwriterPremium) = _borrowCost(principal, term);
         }
     }
 
@@ -344,8 +358,14 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
     /// @param principal The principal of the loan, in stablecoin units (18 decimals)
     /// @param term The term of the loan in seconds
     /// @return cost Principal plus {premiumForBorrow} for that pair, in stablecoin units (18 decimals)
-    function _borrowCost(uint256 principal, uint256 term) internal view returns (uint256 cost) {
-        (uint256 liquidityPremium, uint256 underwriterPremium) = _premiumStillToMint(principal, term, principal);
+    /// @return liquidityPremium The liquidity premium, in stablecoin units (18 decimals)
+    /// @return underwriterPremium The underwriter premium, in stablecoin units (18 decimals)
+    function _borrowCost(uint256 principal, uint256 term)
+        internal
+        view
+        returns (uint256 cost, uint256 liquidityPremium, uint256 underwriterPremium)
+    {
+        (liquidityPremium, underwriterPremium) = _premiumStillToMint(principal, term, principal);
         cost = principal + liquidityPremium + underwriterPremium;
     }
 
@@ -358,12 +378,12 @@ contract FixedMarket layout at erc7201("cap.storage.FixedMarket") is IFixedMarke
         principal = Math.mulDiv(limit, 1e27, 1e27 + Math.mulDiv(term, rate, MathUtils.SECONDS_PER_YEAR));
     }
 
-    /// @dev Terms above {maximumTermLimit}, including `type(uint256).max`, quote at the maximum.
-    /// {borrow} still rejects a finite term outside the band.
+    /// @dev `type(uint256).max` quotes at the maximum, as {borrow} reads it. A finite term is used
+    /// as given, so a {borrowMore} remainder above a since-lowered maximum quotes what it is charged.
     /// @param term The requested term in seconds
     /// @return quoted The term used for a view quote
     function _quoteTerm(uint256 term) internal view returns (uint256 quoted) {
-        quoted = term > maximumTermLimit ? maximumTermLimit : term;
+        quoted = term == type(uint256).max ? maximumTermLimit : term;
     }
 
     /// @dev Store term limits. The maximum must be non-zero because rates divide by it;

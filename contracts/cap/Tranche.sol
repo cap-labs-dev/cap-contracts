@@ -6,25 +6,24 @@ import { IBaseMarket } from "../interfaces/IBaseMarket.sol";
 import { IOracle } from "../interfaces/IOracle.sol";
 import { IRegistry } from "../interfaces/IRegistry.sol";
 import { ITranche } from "../interfaces/ITranche.sol";
-import { IVault } from "../interfaces/IVault.sol";
 import { DeadShares } from "../utils/DeadShares.sol";
 import { PremiumVesting } from "../utils/PremiumVesting.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title Tranche
 /// @author kexley, Cap Labs
-/// @notice ERC-4626 tranche vault. Deposits via Vault ERC-6909; earns cUSD premium from underwriting.
+/// @notice ERC-4626 tranche vault. Holds its collateral ERC20 directly; earns cUSD premium from underwriting.
 /// @dev Beacon instance. Upgrade via {UpgradeableBeacon-upgradeTo} on the tranche beacon.
 contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVesting {
+    using SafeERC20 for IERC20;
+
     /// @inheritdoc ITranche
     address public registry;
 
     /// @inheritdoc ITranche
     address public market;
-
-    /// @inheritdoc ITranche
-    address public vault;
 
     /// @inheritdoc ITranche
     address public oracle;
@@ -51,7 +50,6 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
         string memory _name,
         string memory _symbol,
         address _market,
-        address _vault,
         address _oracle,
         uint256 _vestingPeriod
     ) external initializer {
@@ -60,7 +58,6 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
         );
         registry = _registry;
         market = _market;
-        vault = _vault;
         oracle = _oracle;
     }
 
@@ -86,8 +83,9 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
     function slash(uint256 value, address recipient) external returns (uint256 slashedValue) {
         if (msg.sender != market) revert InvalidMarket();
         uint256 total = totalAssets();
-        // nothing to deliver, and a price would only add a failure mode
-        if (total == 0) return 0;
+        // nothing anyone owns to deliver, and a price would only add a failure mode; see
+        // {totalCapital} for why the supply can sit at or below the dead shares
+        if (total == 0 || totalSupply() <= DeadShares.SHARES) return 0;
 
         uint256 price = getPrice();
         uint256 unit = 10 ** decimals();
@@ -100,18 +98,19 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
 
         _checkKilled(total - assets);
 
-        IVault(vault).withdraw(asset(), assets, recipient);
+        IERC20(asset()).safeTransfer(recipient, assets);
         emit Slashed(recipient, assets, slashedValue);
+    }
+
+    /// @inheritdoc ITranche
+    function retire() external {
+        if (msg.sender != market) revert InvalidMarket();
+        if (!killed) _kill();
     }
 
     /// @inheritdoc ITranche
     function fund(uint256 premium) external restricted {
         _fund(premium);
-    }
-
-    /// @inheritdoc ITranche
-    function totalAssets() public view override(ERC4626Upgradeable, IERC4626, ITranche) returns (uint256 assets) {
-        assets = IVault(vault).balanceOf(address(this), asset());
     }
 
     /// @inheritdoc ITranche
@@ -180,19 +179,27 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
         // at both stages so a discarded fraction cannot be withdrawn. A zero lock never
         // consults the oracle, so a debt-free tranche can still exit after its feed dies.
         uint256 lockedAssets = Math.mulDiv(locked, 10 ** decimals(), getPrice(), Math.Rounding.Ceil);
-        uint256 lockedShares = _quoteWithdraw(lockedAssets);
+        // live shares alone must hold the lock: the dead shares' backing is unowned and stops
+        // counting as capital once no live share remains (see {totalCapital})
+        uint256 lockedShares = _quoteWithdraw(lockedAssets) + DeadShares.SHARES;
         if (supply > lockedShares) unlocked = supply - lockedShares;
     }
 
     /// @inheritdoc ITranche
     function totalCapital() public view returns (uint256 capital) {
         uint256 assets = totalAssets();
-        if (assets == 0) return 0;
+        // The supply is the dead shares alone once every holder has left, and zero before the
+        // first deposit. Either way the balance (their backing, or a donation) is unowned
+        // residue, valued at zero without a price.
+        if (assets == 0 || totalSupply() <= DeadShares.SHARES) return 0;
         capital = assets * getPrice() / 10 ** decimals();
     }
 
     /// @inheritdoc ITranche
     function activeCapital() public view returns (uint256 capital) {
+        // only live shares can be queued, so this is the dead shares alone once every live share
+        // has left or is queued, or zero before the first deposit; see {totalCapital}
+        if (activeSupply() <= DeadShares.SHARES) return 0;
         uint256 assets = activeAssets();
         if (assets == 0) return 0;
         capital = assets * getPrice() / 10 ** decimals();
@@ -224,24 +231,13 @@ contract Tranche layout at erc7201("cap.storage.Tranche") is ITranche, PremiumVe
     /// Division avoids overflowing assets * KILL_RATIO. Retirement never blocks an exit.
     /// @param assets The asset balance after the slash or withdrawal
     function _checkKilled(uint256 assets) private {
-        if (!killed && assets < Math.ceilDiv(totalSupply(), KILL_RATIO)) {
-            killed = true;
-            emit Killed();
-        }
+        if (!killed && assets < Math.ceilDiv(totalSupply(), KILL_RATIO)) _kill();
     }
 
-    /// @dev Transfer assets into the vault on deposit
-    /// @param from The account funding the deposit
-    /// @param assets The number of assets to pull
-    function _transferIn(address from, uint256 assets) internal override {
-        IVault(vault).transferFrom(from, address(this), asset(), assets);
-    }
-
-    /// @dev Transfer assets out of the vault on withdraw
-    /// @param to The account receiving the assets
-    /// @param assets The number of assets to send
-    function _transferOut(address to, uint256 assets) internal override {
-        IVault(vault).transfer(to, asset(), assets);
+    /// @dev Retire the tranche: deposits close, exits stay open
+    function _kill() private {
+        killed = true;
+        emit Killed();
     }
 
     /// @dev Zero price is invalid. Staleness is already checked by the oracle.

@@ -41,6 +41,9 @@ interface IFloatingMarket is IBaseMarket {
     /// @notice Liquidate assets from the market
     /// @dev Reverts {Healthy} unless the market is unhealthy. Repayment is capped at
     /// {maxLiquidatable}; a zero amount repays nothing.
+    /// No minimum output is enforced: the waterfall picks the tokens, an earlier liquidation can
+    /// shrink `repaid`, and value is measured at the oracle. Liquidators must check the returned
+    /// `repaid` and `valueSlashed`, and the tokens received, in their own contract.
     /// @param recipient The recipient of the liquidated assets
     /// @param amount The amount of assets to liquidate, in stablecoin units (18 decimals)
     /// @return repaid The actual amount of assets repaid, in stablecoin units (18 decimals)

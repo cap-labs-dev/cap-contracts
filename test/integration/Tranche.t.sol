@@ -49,10 +49,10 @@ contract TrancheTest is CapDeployer {
         uint256 assets = 100e18;
         uint256 shares = assets - DEAD_SHARES;
         _admitDepositor(address(tranche0), supplier);
-        _fundVault(supplier, assets);
+        _mintCollateral(supplier, assets);
 
         vm.startPrank(supplier);
-        vault.setOperator(address(tranche0), true);
+        collateral.approve(address(tranche0), type(uint256).max);
         uint256 paid = tranche0.mint(shares, supplier);
         vm.stopPrank();
 
@@ -154,9 +154,9 @@ contract TrancheTest is CapDeployer {
     /// @dev The tranche keeps no allowlist of its own, so admitting and removing a depositor is
     /// nothing but a grant and a revoke of the role wired to the entry points.
     function test_depositorRoleMembershipDrivesAdmission() public {
-        _fundVault(supplier, 3e18);
+        _mintCollateral(supplier, 3e18);
         vm.prank(supplier);
-        vault.setOperator(address(tranche0), true);
+        collateral.approve(address(tranche0), type(uint256).max);
 
         _expectDepositRejected(supplier);
 
@@ -180,9 +180,9 @@ contract TrancheTest is CapDeployer {
     /// @dev Opening a tranche to everyone is repointing the selector at the public role, which is
     /// the AccessManager's to do rather than the market owner's.
     function test_publicRoleOnTheEntryPointsOpensTheTrancheToEveryone() public {
-        _fundVault(supplier, 1e18);
+        _mintCollateral(supplier, 1e18);
         vm.prank(supplier);
-        vault.setOperator(address(tranche0), true);
+        collateral.approve(address(tranche0), type(uint256).max);
 
         _expectDepositRejected(supplier);
 
@@ -590,9 +590,9 @@ contract TrancheTest is CapDeployer {
         assertEq(tranche0.maxDeposit(supplier), 0, "a killed tranche accepts no assets");
         assertEq(tranche0.maxMint(supplier), 0, "a killed tranche mints no shares");
 
-        _fundVault(supplier, 10e18);
+        _mintCollateral(supplier, 10e18);
         vm.startPrank(supplier);
-        vault.setOperator(address(tranche0), true);
+        collateral.approve(address(tranche0), type(uint256).max);
         vm.expectRevert(
             abi.encodeWithSelector(ERC4626Upgradeable.ERC4626ExceededMaxDeposit.selector, supplier, 10e18, 0)
         );
@@ -613,7 +613,7 @@ contract TrancheTest is CapDeployer {
         tranche0.redeem(id, claimable, supplier, supplier);
         vm.stopPrank();
 
-        assertGt(vault.balanceOf(supplier, address(collateral)), 0, "the holder recovers the dust");
+        assertGt(collateral.balanceOf(supplier), 0, "the holder recovers the dust");
     }
 
     function test_slash_emitsKilledOnlyOnce() public {
@@ -648,7 +648,7 @@ contract TrancheTest is CapDeployer {
         // the dead shares keep their slice of the collateral and their place in the supply
         assertEq(assets, 100e18 - DEAD_SHARES);
         assertEq(tranche0.totalSupply(), DEAD_SHARES);
-        assertEq(vault.balanceOf(supplier, address(collateral)), 100e18 - DEAD_SHARES);
+        assertEq(collateral.balanceOf(supplier), 100e18 - DEAD_SHARES);
     }
 
     // ── dead shares ───────────────────────────────────────────────────────────
@@ -675,10 +675,10 @@ contract TrancheTest is CapDeployer {
     /// inflation attack starts from is refused outright rather than quietly rounding to nothing.
     function test_firstDepositBelowTheSeedIsRejected() public {
         _admitDepositor(address(tranche0), supplier);
-        _fundVault(supplier, DEAD_SHARES);
+        _mintCollateral(supplier, DEAD_SHARES);
 
         vm.startPrank(supplier);
-        vault.setOperator(address(tranche0), true);
+        collateral.approve(address(tranche0), type(uint256).max);
         vm.expectRevert(abi.encodeWithSelector(DeadShares.DepositBelowSeed.selector, DEAD_SHARES, DEAD_SHARES));
         tranche0.deposit(DEAD_SHARES, supplier);
         vm.stopPrank();
@@ -692,15 +692,15 @@ contract TrancheTest is CapDeployer {
         _admitDepositor(address(tranche0), supplier);
         _admitDepositor(address(tranche0), stranger);
 
-        _fundVault(stranger, 100e18);
+        _mintCollateral(stranger, 100e18);
         vm.prank(stranger);
-        vault.transfer(address(tranche0), address(collateral), 100e18);
+        assertTrue(collateral.transfer(address(tranche0), 100e18));
         assertEq(tranche0.totalAssets(), 100e18, "donated while completely empty");
         assertEq(tranche0.totalSupply(), 0);
 
-        _fundVault(supplier, 1e18);
+        _mintCollateral(supplier, 1e18);
         vm.startPrank(supplier);
-        vault.setOperator(address(tranche0), true);
+        collateral.approve(address(tranche0), type(uint256).max);
         uint256 shares = tranche0.deposit(1e18, supplier);
         vm.stopPrank();
 
@@ -905,29 +905,29 @@ contract TrancheTest is CapDeployer {
         assertLe(stablecoin.balanceOf(b.tranche1Addr), 2, "and left only dust behind");
     }
 
-    /// @dev The whole point of the dead shares. Anyone can push collateral to a tranche through
-    /// {IVault-transfer} without minting against it, so a lone wei-sized holder could otherwise
+    /// @dev The whole point of the dead shares. Anyone can push collateral to a tranche with a
+    /// plain ERC20 transfer without minting against it, so a lone wei-sized holder could otherwise
     /// donate enough to round the next depositor down to nothing.
     function test_deadSharesDefeatTheDonationRounding() public {
         _admitDepositor(address(tranche0), supplier);
         _admitDepositor(address(tranche0), stranger);
 
         // attacker takes the smallest position the seed leaves open, one share
-        _fundVault(supplier, DEAD_SHARES + 1);
+        _mintCollateral(supplier, DEAD_SHARES + 1);
         vm.startPrank(supplier);
-        vault.setOperator(address(tranche0), true);
+        collateral.approve(address(tranche0), type(uint256).max);
         tranche0.deposit(DEAD_SHARES + 1, supplier);
         assertEq(tranche0.balanceOf(supplier), 1, "and the seed dwarfs it");
         vm.stopPrank();
 
         // then donates far more than the victim is about to deposit
-        _fundVault(supplier, 100e18);
+        _mintCollateral(supplier, 100e18);
         vm.prank(supplier);
-        vault.transfer(address(tranche0), address(collateral), 100e18);
+        assertTrue(collateral.transfer(address(tranche0), 100e18));
 
-        _fundVault(stranger, 1e18);
+        _mintCollateral(stranger, 1e18);
         vm.startPrank(stranger);
-        vault.setOperator(address(tranche0), true);
+        collateral.approve(address(tranche0), type(uint256).max);
         uint256 shares = tranche0.deposit(1e18, stranger);
         vm.stopPrank();
 
@@ -959,9 +959,9 @@ contract TrancheTest is CapDeployer {
 
         address marketHolder = makeAddr("lendingMarket");
         _admitDepositor(b.tranche0Addr, marketHolder);
-        _fundVault(marketHolder, 100e18);
+        _mintCollateral(marketHolder, 100e18);
         vm.startPrank(marketHolder);
-        vault.setOperator(b.tranche0Addr, true);
+        collateral.approve(b.tranche0Addr, type(uint256).max);
         b.tranche0.deposit(100e18, marketHolder);
         vm.stopPrank();
 

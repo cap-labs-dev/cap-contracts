@@ -13,29 +13,7 @@ import { MockERC20 } from "../../shared/mocks/MockERC20.sol";
 import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-
-/// @dev Tracks the underwriter's vault balance so a deposit sees its own transfer, as the real
-/// vault does, rather than a fixed figure set before the call.
-contract MockUnderwriterVault {
-    mapping(address owner => mapping(address asset => uint256 amount)) public balanceOf;
-
-    function transferFrom(address, address to, address asset, uint256 amount) external {
-        balanceOf[to][asset] += amount;
-    }
-
-    function transfer(address, address asset, uint256 amount) external {
-        balanceOf[msg.sender][asset] -= amount;
-    }
-
-    function setOperator(address, bool) external pure returns (bool) {
-        return true;
-    }
-
-    /// @dev Credit a balance no shares were issued against
-    function donate(address owner, address asset, uint256 amount) external {
-        balanceOf[owner][asset] += amount;
-    }
-}
+import { Vm } from "forge-std/Vm.sol";
 
 contract UnderwriterUnitTest is BaseTest {
     /// @dev Stands in for the role the Registry allocates per underwriter and wires the entry
@@ -49,15 +27,17 @@ contract UnderwriterUnitTest is BaseTest {
     Underwriter internal underwriter;
     MockERC20 internal collateral;
 
-    address internal vault = makeAddr("vault");
     address internal tranche = makeAddr("tranche");
     address internal supplier = makeAddr("supplier");
     address internal stranger = makeAddr("stranger");
     address internal stablecoin = makeAddr("stablecoin");
 
+    /// @dev This contract is the underwriter's registry; it answers {IRegistry-isTranche} from here
+    mapping(address => bool) public isTranche;
+
     function setUp() public {
         _setUpAccessManager();
-        vm.etch(vault, address(new MockUnderwriterVault()).code);
+        isTranche[tranche] = true;
         collateral = new MockERC20("Wrapped Ether", "WETH", 18);
 
         Underwriter impl = new Underwriter();
@@ -72,7 +52,6 @@ contract UnderwriterUnitTest is BaseTest {
                         "Underwriter",
                         "UW",
                         address(collateral),
-                        vault,
                         stablecoin,
                         12 hours
                     )
@@ -83,8 +62,10 @@ contract UnderwriterUnitTest is BaseTest {
         // the Registry does this on a real deployment: the allowlist is the membership of whichever
         // role the entry points are gated to
         accessManager.setTargetFunctionRole(address(underwriter), _depositorSelectors(), DEPOSITOR_ROLE);
+        vm.mockCall(stablecoin, abi.encodeWithSelector(IERC20.balanceOf.selector, address(underwriter)), abi.encode(0));
 
         // and opt the vault into the tranche's vesting so it can earn what {report} later claims
+        vm.mockCall(tranche, abi.encodeCall(IERC4626.asset, ()), abi.encode(address(collateral)));
         vm.mockCall(tranche, abi.encodeWithSignature("optIn()"), abi.encode());
         vm.mockCall(tranche, abi.encodeWithSignature("optOut()"), abi.encode());
         vm.mockCall(tranche, abi.encodeWithSignature("claim(address)", address(underwriter)), abi.encode(uint256(0)));
@@ -135,7 +116,6 @@ contract UnderwriterUnitTest is BaseTest {
 
     function test_initializedState() public view {
         assertEq(underwriter.asset(), address(collateral));
-        assertEq(underwriter.vault(), vault);
         assertEq(underwriter.registry(), address(this));
         assertEq(underwriter.authority(), address(accessManager));
         assertEq(underwriter.totalSupply(), 0);
@@ -145,7 +125,7 @@ contract UnderwriterUnitTest is BaseTest {
     function test_initialize_cannotReinit() public {
         vm.expectRevert();
         underwriter.initialize(
-            address(accessManager), address(this), "Underwriter", "UW", address(collateral), vault, stablecoin, 12 hours
+            address(accessManager), address(this), "Underwriter", "UW", address(collateral), stablecoin, 12 hours
         );
     }
 
@@ -287,8 +267,8 @@ contract UnderwriterUnitTest is BaseTest {
     function test_deadShares_donationBeforeTheFirstDepositCannotRoundItAway() public {
         accessManager.grantRole(DEPOSITOR_ROLE, supplier, 0);
 
-        // the vault reports a balance it was never issued shares against
-        MockUnderwriterVault(vault).donate(address(underwriter), address(collateral), 100e18);
+        // a balance it was never issued shares against
+        collateral.mint(address(underwriter), 100e18);
         assertEq(underwriter.totalAssets(), 100e18, "donated while completely empty");
         assertEq(underwriter.totalSupply(), 0);
 
@@ -421,7 +401,11 @@ contract UnderwriterUnitTest is BaseTest {
 
         vm.recordLogs();
         underwriter.allocate(address(t), 0);
-        assertEq(vm.getRecordedLogs().length, 0);
+        // nothing to buy, so the underwriter records nothing
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; ++i) {
+            assertTrue(logs[i].emitter != address(underwriter), "no underwriter event");
+        }
         assertEq(underwriter.debt(address(t)), 1e18);
         assertEq(underwriter.totalDebt(), 1e18);
     }
@@ -504,13 +488,13 @@ contract UnderwriterUnitTest is BaseTest {
     }
 
     function _markTranche() internal returns (MockMarkTranche t) {
-        t = new MockMarkTranche();
+        t = new MockMarkTranche(address(collateral));
+        isTranche[address(t)] = true;
         underwriter.addTranche(address(t));
     }
 
-    /// @dev {report} is not gated on registration. {removeTranche} only closes allocations; leftover
-    /// shares keep earning, and a re-add must not be the only way to collect that later premium.
-    function test_report_doesNotRequireRegistration() public {
+    /// @dev Registry membership is sufficient; allocation-list membership is not required.
+    function test_report_doesNotRequireAllocationRegistration() public {
         vm.mockCall(tranche, abi.encodeWithSignature("claim(address)", address(underwriter)), abi.encode(uint256(4e18)));
 
         underwriter.report(tranche);
@@ -538,21 +522,12 @@ contract UnderwriterUnitTest is BaseTest {
         underwriter.setDefaultTranche(tranche);
     }
 
-    function test_totalAssets_isVaultBalancePlusDebt() public {
-        vm.mockCall(
-            vault,
-            abi.encodeWithSignature("balanceOf(address,address)", address(underwriter), address(collateral)),
-            abi.encode(500e18)
-        );
+    function test_totalAssets_isIdleBalancePlusDebt() public {
+        collateral.mint(address(underwriter), 500e18);
         assertEq(underwriter.totalAssets(), 500e18);
     }
 
-    function test_unlockedSupply_zeroWithoutVaultBalance() public {
-        vm.mockCall(
-            vault,
-            abi.encodeWithSignature("balanceOf(address,address)", address(underwriter), address(collateral)),
-            abi.encode(0)
-        );
+    function test_unlockedSupply_zeroWithoutIdleBalance() public {
         assertEq(underwriter.unlockedSupply(), 0);
     }
 
@@ -620,6 +595,7 @@ contract UnderwriterUnitTest is BaseTest {
     /// huge convertToAssets must not be able to enter totalDebt through a refresh.
     function test_deallocate_doesNotOpenABookFromAnAirdrop() public {
         address dumped = makeAddr("airdroppedVault");
+        isTranche[dumped] = true;
         vm.mockCall(dumped, abi.encodeWithSelector(IERC20.balanceOf.selector, address(underwriter)), abi.encode(1e18));
         vm.mockCall(dumped, abi.encodeWithSignature("instantUnlockedSupply()"), abi.encode(1e18));
         vm.mockCall(dumped, abi.encodeWithSignature("convertToAssets(uint256)"), abi.encode(1e30));
@@ -645,11 +621,9 @@ contract UnderwriterUnitTest is BaseTest {
     }
 
     function _openBook(uint256 assets) internal {
-        vm.mockCall(
-            tranche,
-            abi.encodeWithSignature("deposit(uint256,address)", assets, address(underwriter)),
-            abi.encode(assets)
-        );
+        vm.mockCall(tranche, abi.encodeCall(IERC4626.previewDeposit, (assets)), abi.encode(assets));
+        vm.mockCall(tranche, abi.encodeCall(IERC4626.previewMint, (assets)), abi.encode(assets));
+        vm.mockCall(tranche, abi.encodeCall(IERC4626.mint, (assets, address(underwriter))), abi.encode(assets));
         vm.mockCall(
             tranche, abi.encodeWithSelector(IERC20.balanceOf.selector, address(underwriter)), abi.encode(assets)
         );
@@ -660,9 +634,14 @@ contract UnderwriterUnitTest is BaseTest {
 
 /// @dev Live convertToAssets so a remake and a later deposit see different books.
 contract MockMarkTranche {
+    address public immutable asset;
     uint256 public shares;
     uint256 public price = 1e18;
     uint256 public nextRequestId = 1;
+
+    constructor(address asset_) {
+        asset = asset_;
+    }
 
     function optIn() external { }
 
@@ -674,9 +653,17 @@ contract MockMarkTranche {
         price = newPrice;
     }
 
-    function deposit(uint256 assets, address) external returns (uint256) {
-        shares += assets;
+    function previewDeposit(uint256 assets) external pure returns (uint256) {
         return assets;
+    }
+
+    function previewMint(uint256 amount) external pure returns (uint256) {
+        return amount;
+    }
+
+    function mint(uint256 amount, address) external returns (uint256) {
+        shares += amount;
+        return amount;
     }
 
     function balanceOf(address) external view returns (uint256) {

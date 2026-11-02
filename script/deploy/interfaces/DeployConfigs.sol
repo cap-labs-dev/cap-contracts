@@ -13,7 +13,6 @@ struct UsersConfig {
 }
 
 struct ImplementationsConfig {
-    address vault;
     address stablecoin;
     address irm;
     address oracle;
@@ -27,7 +26,6 @@ struct ImplementationsConfig {
 
 struct InfraConfig {
     address accessManager;
-    address vault;
     address stablecoin;
     address irm;
     address oracle;
