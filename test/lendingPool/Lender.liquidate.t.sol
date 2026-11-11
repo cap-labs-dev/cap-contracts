@@ -309,6 +309,8 @@ contract LenderLiquidateTest is CapIntegrationFixture {
             // approve repay amount for liquidation
             usdc.approve(address(lender), type(uint256).max);
 
+            // eigen slashes are paid out to the liquidator in a second step, record them to complete them below
+            vm.recordLogs();
             lender.liquidate(user_agent, address(usdc), 1000e6, 0);
 
             (,, uint256 totalDebt,,,) = lender.agent(user_agent);
@@ -353,6 +355,8 @@ contract LenderLiquidateTest is CapIntegrationFixture {
             console.log("Health after liquidations", health);
 
             assertEq(usdc.balanceOf(env.testUsers.liquidator), 0);
+            assertEq(collateralToken.balanceOf(env.testUsers.liquidator), 0);
+            _completeQueuedEigenSlashes(vm.getRecordedLogs());
             assertGt(collateralToken.balanceOf(env.testUsers.liquidator), 0);
 
             uint256 coverage = Delegation(env.infra.delegation).coverage(user_agent);

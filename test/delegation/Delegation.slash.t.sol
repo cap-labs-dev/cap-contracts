@@ -58,7 +58,11 @@ contract DelegationSlashTest is LenderFixture {
         address liquidator = makeAddr("liquidator");
 
         /// USD Value of 100 eth of delegation
+        /// @dev eigen slashes are paid out in a second step after the eigen slash resolution delay
+        vm.recordLogs();
         delegation.slash(agent, liquidator, 15600e8);
+        assertEq(collateralToken.balanceOf(liquidator), 0);
+        _completeQueuedEigenSlashes(vm.getRecordedLogs());
 
         // Since WETH is worth $2600 we expect 6 eth or more due to precision
         assertGt(collateralToken.balanceOf(liquidator), 6e18);

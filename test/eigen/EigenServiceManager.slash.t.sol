@@ -3,8 +3,11 @@ pragma solidity ^0.8.28;
 
 import { EigenServiceManager } from "../../contracts/delegation/providers/eigenlayer/EigenServiceManager.sol";
 import { IStrategy } from "../../contracts/delegation/providers/eigenlayer/interfaces/IStrategy.sol";
+import { IStrategyManager } from "../../contracts/delegation/providers/eigenlayer/interfaces/IStrategyManager.sol";
+import { IEigenServiceManager } from "../../contracts/interfaces/IEigenServiceManager.sol";
 import { CapIntegrationFixture } from "../fixtures/CapIntegrationFixture.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Vm } from "forge-std/Vm.sol";
 
 /// @dev Slash behavior: ensures collateral is pulled from Eigen strategy positions and forwarded.
 contract EigenServiceManagerSlashTest is CapIntegrationFixture {
@@ -29,7 +32,7 @@ contract EigenServiceManagerSlashTest is CapIntegrationFixture {
         assertEq(coverage, slashableCollateral);
 
         // slash 10% of agent collateral
-        eigenServiceManager.slash(agent, recipient, 0.1e18, uint48(block.timestamp));
+        _slashAndComplete(agent, recipient, 0.1e18, uint48(block.timestamp));
 
         // all vaults have been slashed 10% and sent to the recipient
         assertApproxEqAbs(collateral.balanceOf(recipient), 1e18, 10);
@@ -59,7 +62,7 @@ contract EigenServiceManagerSlashTest is CapIntegrationFixture {
         assertEq(coverage, slashableCollateral);
 
         // slash 10% of agent collateral
-        eigenServiceManager.slash(agent, recipient, 1, uint48(block.timestamp));
+        _slashAndComplete(agent, recipient, 1, uint48(block.timestamp));
 
         // all vaults have been slashed 10% and sent to the recipient
         assertApproxEqAbs(collateral.balanceOf(recipient), 19, 1);
@@ -114,7 +117,7 @@ contract EigenServiceManagerSlashTest is CapIntegrationFixture {
 
             address recipient = makeAddr("recipient");
 
-            eigenServiceManager.slash(agent, recipient, 1e18, uint48(block.timestamp));
+            _slashAndComplete(agent, recipient, 1e18, uint48(block.timestamp));
 
             // strategy collateral has been slashed and sent to the recipient
             assertApproxEqAbs(collateral.balanceOf(recipient), 10e18, 1);
@@ -136,7 +139,7 @@ contract EigenServiceManagerSlashTest is CapIntegrationFixture {
 
         // Should succeed when called by authorized address
         vm.startPrank(env.infra.delegation);
-        eigenServiceManager.slash(agent, recipient, 0.1e18, uint48(block.timestamp));
+        _slashAndComplete(agent, recipient, 0.1e18, uint48(block.timestamp));
         vm.stopPrank();
     }
 
@@ -192,7 +195,7 @@ contract EigenServiceManagerSlashTest is CapIntegrationFixture {
         vm.startPrank(env.infra.delegation);
 
         // Slash 100% (1e18 = 100%)
-        eigenServiceManager.slash(agent, recipient, 1e18, uint48(block.timestamp));
+        _slashAndComplete(agent, recipient, 1e18, uint48(block.timestamp));
 
         // All collateral should be slashed
         uint256 slashedAmount = collateral.balanceOf(recipient) - initialBalance;
@@ -221,7 +224,7 @@ contract EigenServiceManagerSlashTest is CapIntegrationFixture {
             address testRecipient = makeAddr(string(abi.encodePacked("recipient", i)));
             uint256 beforeBalance = collateral.balanceOf(testRecipient);
 
-            eigenServiceManager.slash(agent, testRecipient, slashShares[i], uint48(block.timestamp));
+            _slashAndComplete(agent, testRecipient, slashShares[i], uint48(block.timestamp));
 
             uint256 afterBalance = collateral.balanceOf(testRecipient);
             assertGt(afterBalance, beforeBalance, "Slash should transfer tokens to recipient");
@@ -240,12 +243,12 @@ contract EigenServiceManagerSlashTest is CapIntegrationFixture {
 
         // First slash - 10%
         address recipient1 = makeAddr("recipient1");
-        eigenServiceManager.slash(agent, recipient1, 0.1e18, uint48(block.timestamp));
+        _slashAndComplete(agent, recipient1, 0.1e18, uint48(block.timestamp));
         uint256 coverageAfterFirst = eigenServiceManager.coverage(agent);
 
         // Second slash - 20% of remaining
         address recipient2 = makeAddr("recipient2");
-        eigenServiceManager.slash(agent, recipient2, 0.2e18, uint48(block.timestamp));
+        _slashAndComplete(agent, recipient2, 0.2e18, uint48(block.timestamp));
         uint256 coverageAfterSecond = eigenServiceManager.coverage(agent);
 
         // Coverage should decrease with each slash
@@ -271,11 +274,11 @@ contract EigenServiceManagerSlashTest is CapIntegrationFixture {
 
         // Slash agent1
         address recipient1 = makeAddr("recipient1");
-        eigenServiceManager.slash(agent1, recipient1, 0.15e18, uint48(block.timestamp));
+        _slashAndComplete(agent1, recipient1, 0.15e18, uint48(block.timestamp));
 
         // Slash agent2
         address recipient2 = makeAddr("recipient2");
-        eigenServiceManager.slash(agent2, recipient2, 0.25e18, uint48(block.timestamp));
+        _slashAndComplete(agent2, recipient2, 0.25e18, uint48(block.timestamp));
 
         // Both agents should have reduced coverage
         assertLt(eigenServiceManager.coverage(agent1), coverage1Before);
@@ -296,15 +299,15 @@ contract EigenServiceManagerSlashTest is CapIntegrationFixture {
         vm.startPrank(env.infra.delegation);
 
         // Test slashing with current timestamp
-        eigenServiceManager.slash(agent, recipient, 0.1e18, uint48(block.timestamp));
+        _slashAndComplete(agent, recipient, 0.1e18, uint48(block.timestamp));
         uint256 balanceAfterCurrent = collateral.balanceOf(recipient);
 
         // Test slashing with past timestamp
-        eigenServiceManager.slash(agent, recipient, 0.1e18, uint48(block.timestamp - 1 days));
+        _slashAndComplete(agent, recipient, 0.1e18, uint48(block.timestamp - 1 days));
         uint256 balanceAfterPast = collateral.balanceOf(recipient);
 
         // Test slashing with future timestamp (should still work)
-        eigenServiceManager.slash(agent, recipient, 0.1e18, uint48(block.timestamp + 1 days));
+        _slashAndComplete(agent, recipient, 0.1e18, uint48(block.timestamp + 1 days));
         uint256 balanceAfterFuture = collateral.balanceOf(recipient);
 
         // All slashes should have transferred tokens
@@ -324,7 +327,7 @@ contract EigenServiceManagerSlashTest is CapIntegrationFixture {
 
         vm.startPrank(env.infra.delegation);
 
-        eigenServiceManager.slash(agent, recipient, 0.3e18, uint48(block.timestamp));
+        _slashAndComplete(agent, recipient, 0.3e18, uint48(block.timestamp));
 
         uint256 coverageAfter = eigenServiceManager.coverage(agent);
         uint256 slashableAfter = eigenServiceManager.slashableCollateral(agent, 0);
@@ -346,10 +349,9 @@ contract EigenServiceManagerSlashTest is CapIntegrationFixture {
 
         vm.startPrank(env.infra.delegation);
 
-        // Expect the Slash event to be emitted
-        // Note: The event emits slashedAmount (actual amount), not slashShare (percentage)
+        // Expect the SlashQueued event to be emitted, the Slash event is emitted when the slash is completed
         vm.expectEmit(true, true, false, false);
-        emit Slash(agent, recipient, 0, uint48(block.timestamp)); // Amount will be checked separately
+        emit SlashQueued(agent, recipient, 0, 0, 0); // Slash id and amounts are checked separately
 
         eigenServiceManager.slash(agent, recipient, slashShare, uint48(block.timestamp));
 
@@ -357,7 +359,9 @@ contract EigenServiceManagerSlashTest is CapIntegrationFixture {
     }
 
     // Add event definition for testing
-    event Slash(address indexed agent, address indexed recipient, uint256 slashShare, uint48 timestamp);
+    event SlashQueued(
+        address indexed agent, address indexed recipient, uint256 slashId, uint256 shares, uint256 amount
+    );
 
     function test_slash_boundary_values() public {
         address agent = env.testUsers.agents[1];
@@ -368,7 +372,7 @@ contract EigenServiceManagerSlashTest is CapIntegrationFixture {
 
         // Test minimum non-zero slash (1 wei)
         uint256 balanceBefore = collateral.balanceOf(recipient);
-        eigenServiceManager.slash(agent, recipient, 1, uint48(block.timestamp));
+        _slashAndComplete(agent, recipient, 1, uint48(block.timestamp));
         uint256 balanceAfter = collateral.balanceOf(recipient);
 
         // Should have transferred some amount (even if very small)
@@ -392,7 +396,7 @@ contract EigenServiceManagerSlashTest is CapIntegrationFixture {
         vm.startPrank(env.infra.delegation);
 
         // Should still be able to slash remaining collateral
-        eigenServiceManager.slash(agent, recipient, 0.5e18, uint48(block.timestamp));
+        _slashAndComplete(agent, recipient, 0.5e18, uint48(block.timestamp));
 
         // Should have received some tokens
         assertGt(collateral.balanceOf(recipient), 0);
@@ -417,5 +421,165 @@ contract EigenServiceManagerSlashTest is CapIntegrationFixture {
 
         // Should match coverage
         assertEq(slashable1, eigenServiceManager.coverage(agent));
+    }
+
+    function test_slash_queues_payout_and_transfers_nothing() public {
+        address agent = env.testUsers.agents[1];
+        address recipient = makeAddr("recipient");
+        address strategy = eigenAb.eigenAddresses.strategy;
+        IERC20 collateral = IERC20(IStrategy(strategy).underlyingToken());
+        uint256 serviceManagerBalance = collateral.balanceOf(address(eigenServiceManager));
+        uint256 coverageBefore = eigenServiceManager.coverage(agent);
+
+        vm.startPrank(env.infra.delegation);
+        uint256 slashId = _queueSlash(agent, recipient, 0.1e18);
+        vm.stopPrank();
+
+        // the stake is slashed immediately but nothing is transferred until the slash is completed
+        assertLt(eigenServiceManager.coverage(agent), coverageBefore);
+        assertEq(collateral.balanceOf(recipient), 0);
+        assertEq(collateral.balanceOf(address(eigenServiceManager)), serviceManagerBalance);
+
+        IEigenServiceManager.PendingSlash memory pending = eigenServiceManager.pendingSlash(agent, slashId);
+        assertEq(pending.recipient, recipient);
+        assertApproxEqAbs(pending.amount, 1e18, 10);
+        assertGt(
+            IStrategyManager(eigenAb.eigenAddresses.strategyManager)
+                .getBurnOrRedistributableShares(_eigenOperatorSet(agent), slashId, strategy),
+            0
+        );
+    }
+
+    function test_complete_slash_reverts_before_resolution_delay() public {
+        address agent = env.testUsers.agents[1];
+        address recipient = makeAddr("recipient");
+        IERC20 collateral = IERC20(IStrategy(eigenAb.eigenAddresses.strategy).underlyingToken());
+
+        vm.startPrank(env.infra.delegation);
+        uint256 slashId = _queueSlash(agent, recipient, 0.1e18);
+        vm.stopPrank();
+        uint256 pendingAmount = eigenServiceManager.pendingSlash(agent, slashId).amount;
+
+        // eigen enforces the slash resolution delay, the slash cannot be completed yet
+        vm.expectRevert(abi.encodeWithSignature("SlashResolutionDelayNotElapsed()"));
+        eigenServiceManager.completeSlash(agent, slashId);
+
+        // the pending slash is untouched
+        assertEq(eigenServiceManager.pendingSlash(agent, slashId).recipient, recipient);
+        assertEq(collateral.balanceOf(recipient), 0);
+
+        _rollPastEigenSlashResolution(agent, slashId);
+        eigenServiceManager.completeSlash(agent, slashId);
+        assertGe(collateral.balanceOf(recipient), pendingAmount);
+        assertApproxEqAbs(collateral.balanceOf(recipient), 1e18, 10);
+    }
+
+    function test_complete_slash_after_delay_pays_liquidator() public {
+        address agent = env.testUsers.agents[1];
+        address recipient = makeAddr("recipient");
+        address keeper = makeAddr("keeper");
+        address strategy = eigenAb.eigenAddresses.strategy;
+        IERC20 collateral = IERC20(IStrategy(strategy).underlyingToken());
+        uint256 serviceManagerBalance = collateral.balanceOf(address(eigenServiceManager));
+
+        vm.startPrank(env.infra.delegation);
+        uint256 slashId = _queueSlash(agent, recipient, 0.1e18);
+        vm.stopPrank();
+        IEigenServiceManager.PendingSlash memory pending = eigenServiceManager.pendingSlash(agent, slashId);
+
+        _rollPastEigenSlashResolution(agent, slashId);
+
+        // anyone can complete the slash, the collateral goes to the recipient recorded at slash time
+        vm.prank(keeper);
+        uint256 paid = eigenServiceManager.completeSlash(agent, slashId);
+
+        assertGe(paid, pending.amount);
+        assertApproxEqAbs(paid, pending.amount, 2);
+        assertEq(collateral.balanceOf(recipient), paid);
+        assertEq(collateral.balanceOf(keeper), 0);
+        assertEq(collateral.balanceOf(address(eigenServiceManager)), serviceManagerBalance);
+        assertEq(eigenServiceManager.pendingSlash(agent, slashId).recipient, address(0));
+        assertEq(
+            IStrategyManager(eigenAb.eigenAddresses.strategyManager)
+                .getBurnOrRedistributableShares(_eigenOperatorSet(agent), slashId, strategy),
+            0
+        );
+
+        // cannot be completed twice
+        vm.expectRevert(IEigenServiceManager.NoPendingSlash.selector);
+        eigenServiceManager.completeSlash(agent, slashId);
+    }
+
+    function test_complete_slash_after_third_party_clear() public {
+        address agent = env.testUsers.agents[1];
+        IERC20 collateral = IERC20(IStrategy(eigenAb.eigenAddresses.strategy).underlyingToken());
+        uint256 serviceManagerBalance = collateral.balanceOf(address(eigenServiceManager));
+
+        // two pending slashes on the same operator and collateral
+        vm.startPrank(env.infra.delegation);
+        uint256 slashId1 = _queueSlash(agent, makeAddr("recipient1"), 0.1e18);
+        uint256 slashId2 = _queueSlash(agent, makeAddr("recipient2"), 0.2e18);
+        vm.stopPrank();
+        IEigenServiceManager.PendingSlash memory pending1 = eigenServiceManager.pendingSlash(agent, slashId1);
+        IEigenServiceManager.PendingSlash memory pending2 = eigenServiceManager.pendingSlash(agent, slashId2);
+
+        _rollPastEigenSlashResolution(agent, slashId2);
+
+        // a third party clears both slashes, once per strategy and once for the whole slash
+        vm.startPrank(makeAddr("thirdParty"));
+        IStrategyManager(eigenAb.eigenAddresses.strategyManager)
+            .clearBurnOrRedistributableSharesByStrategy(
+                _eigenOperatorSet(agent), slashId1, eigenAb.eigenAddresses.strategy
+            );
+        uint256 cleared1 = collateral.balanceOf(address(eigenServiceManager)) - serviceManagerBalance;
+        (bool success,) = eigenAb.eigenAddresses.strategyManager
+            .call(
+                abi.encodeWithSignature(
+                    "clearBurnOrRedistributableShares((address,uint32),uint256)", _eigenOperatorSet(agent), slashId2
+                )
+            );
+        assertTrue(success);
+        uint256 cleared2 = collateral.balanceOf(address(eigenServiceManager)) - serviceManagerBalance - cleared1;
+        vm.stopPrank();
+
+        // the collateral is parked in the service manager and paid out to the right recipients
+        assertEq(eigenServiceManager.completeSlash(agent, slashId2), pending2.amount);
+        assertEq(eigenServiceManager.completeSlash(agent, slashId1), pending1.amount);
+
+        assertLe(pending1.amount, cleared1);
+        assertLe(pending2.amount, cleared2);
+        assertApproxEqAbs(pending1.amount, cleared1, 2);
+        assertApproxEqAbs(pending2.amount, cleared2, 2);
+        assertEq(collateral.balanceOf(pending1.recipient), pending1.amount);
+        assertEq(collateral.balanceOf(pending2.recipient), pending2.amount);
+        assertApproxEqAbs(collateral.balanceOf(address(eigenServiceManager)), serviceManagerBalance, 4);
+
+        // cannot be completed twice
+        vm.expectRevert(IEigenServiceManager.NoPendingSlash.selector);
+        eigenServiceManager.completeSlash(agent, slashId1);
+        vm.expectRevert(IEigenServiceManager.NoPendingSlash.selector);
+        eigenServiceManager.completeSlash(agent, slashId2);
+    }
+
+    /// @dev Slashes and completes the slash so the recipient is paid
+    function _slashAndComplete(address agent, address recipient, uint256 slashShare, uint48 timestamp) internal {
+        vm.recordLogs();
+        eigenServiceManager.slash(agent, recipient, slashShare, timestamp);
+        _completeQueuedEigenSlashes(vm.getRecordedLogs());
+    }
+
+    /// @dev Slashes without completing and returns the eigen slash id
+    function _queueSlash(address agent, address recipient, uint256 slashShare) internal returns (uint256) {
+        vm.recordLogs();
+        eigenServiceManager.slash(agent, recipient, slashShare, uint48(block.timestamp));
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter != address(eigenServiceManager)) continue;
+            if (logs[i].topics[0] == IEigenServiceManager.SlashQueued.selector) {
+                (uint256 slashId,,) = abi.decode(logs[i].data, (uint256, uint256, uint256));
+                return slashId;
+            }
+        }
+        revert("slash not queued");
     }
 }
