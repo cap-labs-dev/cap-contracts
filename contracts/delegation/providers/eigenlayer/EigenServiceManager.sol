@@ -112,19 +112,22 @@ contract EigenServiceManager is
             IAllocationManager.OperatorSet({ avs: address(this), id: operatorData.operatorSetId });
         IStrategyManager strategyManager = IStrategyManager($.eigen.strategyManager);
 
+        /// @dev The collateral available to pay this slash. The payout is the amount valued at slash time in both
+        /// cases so it does not depend on who clears the shares, any surplus from rounding stays in this contract.
+        uint256 available;
         if (strategyManager.getBurnOrRedistributableShares(operatorSet, _slashId, _strategy) != 0) {
             /// @dev Clear the shares ourselves, this sends the collateral to this contract (the redistribution
             /// recipient). Reverts until the eigen slash resolution delay has passed or while eigen is paused.
             uint256 beforeClear = _slashedCollateral.balanceOf(address(this));
             strategyManager.clearBurnOrRedistributableSharesByStrategy(operatorSet, _slashId, _strategy);
-            amount = _slashedCollateral.balanceOf(address(this)) - beforeClear;
+            available = _slashedCollateral.balanceOf(address(this)) - beforeClear;
         } else {
-            /// @dev Someone else already cleared the shares and the collateral is sitting in this contract. Pay the
-            /// amount valued at slash time, which never exceeds what the clear sent here since the strategy share
-            /// price cannot go down. Collateral tokens are never reward tokens, so the balance is only slashed funds.
-            uint256 balance = _slashedCollateral.balanceOf(address(this));
-            amount = pending.amount < balance ? pending.amount : balance;
+            /// @dev Someone else already cleared the shares and the collateral is sitting in this contract. The
+            /// amount valued at slash time never exceeds what the clear sent here since the strategy share price
+            /// cannot go down. Collateral tokens are never reward tokens, so the balance is only slashed funds.
+            available = _slashedCollateral.balanceOf(address(this));
         }
+        amount = pending.amount < available ? pending.amount : available;
 
         if (amount > 0) _slashedCollateral.safeTransfer(pending.recipient, amount);
 

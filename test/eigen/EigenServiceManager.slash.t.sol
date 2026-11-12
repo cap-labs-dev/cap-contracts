@@ -470,7 +470,8 @@ contract EigenServiceManagerSlashTest is CapIntegrationFixture {
 
         _rollPastEigenSlashResolution(agent, slashId);
         eigenServiceManager.completeSlash(agent, slashId);
-        assertGe(collateral.balanceOf(recipient), pendingAmount);
+        // the payout is the amount valued at slash time, the same as when a third party clears the shares
+        assertEq(collateral.balanceOf(recipient), pendingAmount);
         assertApproxEqAbs(collateral.balanceOf(recipient), 1e18, 10);
     }
 
