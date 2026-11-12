@@ -30,7 +30,7 @@ contract EigenServiceManager is
 {
     using SafeERC20 for IERC20;
 
-    /// @dev USDC is the reward token and can never be registered as collateral
+    /// @dev USDC is the only reward token and can never be registered as collateral
     address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -137,6 +137,9 @@ contract EigenServiceManager is
         checkAccess(this.distributeRewards.selector)
     {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        /// @dev Only USDC is ever distributed as rewards. Slashed collateral cleared by a third party sits in this
+        /// contract until the slash is completed and must never be distributed, USDC can never be collateral.
+        if (_token != USDC) revert InvalidRewardToken();
         CachedOperatorData storage operatorData = $.operators[_operator];
 
         uint256 calcIntervalSeconds = IRewardsCoordinator($.eigen.rewardsCoordinator).CALCULATION_INTERVAL_SECONDS();

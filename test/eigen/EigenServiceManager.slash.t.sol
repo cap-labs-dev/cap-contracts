@@ -569,6 +569,42 @@ contract EigenServiceManagerSlashTest is CapIntegrationFixture {
     }
 
     /// @dev Slashes without completing and returns the eigen slash id
+    /// @dev Slashed collateral cleared by a third party must not be sweepable as rewards before the slash is completed
+    function test_distribute_rewards_blocked_while_slash_pending() public {
+        address agent = env.testUsers.agents[1];
+        address recipient = makeAddr("recipient");
+        IERC20 collateral = IERC20(IStrategy(eigenAb.eigenAddresses.strategy).underlyingToken());
+
+        vm.startPrank(env.infra.delegation);
+        uint256 slashId = _queueSlash(agent, recipient, 0.1e18);
+        uint256 pendingAmount = eigenServiceManager.pendingSlash(agent, slashId).amount;
+
+        // collateral is never a reward token, blocked before anything is parked
+        vm.expectRevert(IEigenServiceManager.InvalidRewardToken.selector);
+        eigenServiceManager.distributeRewards(agent, address(collateral));
+        vm.stopPrank();
+
+        // a third party clears the slash, the collateral is now parked in the service manager
+        _rollPastEigenSlashResolution(agent, slashId);
+        vm.prank(makeAddr("thirdParty"));
+        IStrategyManager(eigenAb.eigenAddresses.strategyManager)
+            .clearBurnOrRedistributableSharesByStrategy(
+                _eigenOperatorSet(agent), slashId, eigenAb.eigenAddresses.strategy
+            );
+
+        // an attacker cannot redirect the parked collateral to restakers as rewards, for any operator
+        vm.startPrank(env.infra.delegation);
+        vm.expectRevert(IEigenServiceManager.InvalidRewardToken.selector);
+        eigenServiceManager.distributeRewards(agent, address(collateral));
+        vm.expectRevert(IEigenServiceManager.InvalidRewardToken.selector);
+        eigenServiceManager.distributeRewards(env.testUsers.agents[0], address(collateral));
+        vm.stopPrank();
+
+        // the liquidator is still paid in full
+        eigenServiceManager.completeSlash(agent, slashId);
+        assertEq(collateral.balanceOf(recipient), pendingAmount);
+    }
+
     function _queueSlash(address agent, address recipient, uint256 slashShare) internal returns (uint256) {
         vm.recordLogs();
         eigenServiceManager.slash(agent, recipient, slashShare, uint48(block.timestamp));

@@ -35,6 +35,8 @@ interface IEigenServiceManager {
     error NoPendingSlash();
     /// @dev The reward token cannot be used as collateral
     error InvalidCollateral();
+    /// @dev Only USDC can be distributed as rewards
+    error InvalidRewardToken();
 
     /// @dev Operator registered
     event OperatorRegistered(
