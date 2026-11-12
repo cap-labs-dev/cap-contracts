@@ -36,11 +36,31 @@ contract DeployMocks is ProxyUtils {
         }
     }
 
+    /// @dev Mainnet USDC, the only reward token the EigenServiceManager accepts
+    address internal constant MAINNET_USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+
     function _deployUSDMocks() internal returns (address[] memory usdMocks) {
         usdMocks = new address[](3);
         usdMocks[0] = address(new MockERC20("USDT", "USDT", 6));
-        usdMocks[1] = address(new MockERC20("USDC", "USDC", 6));
+        usdMocks[1] = _deployMockUSDC();
         usdMocks[2] = address(new MockERC20("USDx", "USDx", 18));
+    }
+
+    /// @dev Deploys the USDC mock at the mainnet USDC address so the EigenServiceManager reward token check matches
+    function _deployMockUSDC() internal returns (address) {
+        Vm vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+
+        // Run the mock constructor at the USDC address, then install the runtime code it returns
+        vm.etch(MAINNET_USDC, abi.encodePacked(type(MockERC20).creationCode, abi.encode("USDC", "USDC", uint8(6))));
+        (bool success, bytes memory runtimeCode) = MAINNET_USDC.call("");
+        require(success, "USDC mock deployment failed");
+        vm.etch(MAINNET_USDC, runtimeCode);
+
+        // On a mainnet fork the real USDC storage is still there, reset the mock's total supply slot
+        vm.store(MAINNET_USDC, bytes32(uint256(2)), bytes32(0));
+        vm.label(MAINNET_USDC, "USDC");
+
+        return MAINNET_USDC;
     }
 
     function _deployEthMocks() internal returns (address[] memory ethMocks) {
@@ -79,8 +99,7 @@ contract DeployMocks is ProxyUtils {
         internal
     {
         MockNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).setMockCoverage(agent, coverage);
-        MockNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware).setMockSlashableCollateral(
-            agent, coverage
-        );
+        MockNetworkMiddleware(env.symbiotic.networkAdapter.networkMiddleware)
+            .setMockSlashableCollateral(agent, coverage);
     }
 }

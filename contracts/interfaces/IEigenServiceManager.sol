@@ -31,13 +31,23 @@ interface IEigenServiceManager {
     error ZeroSlash();
     /// @dev Slash share too small
     error SlashShareTooSmall();
+    /// @dev No pending slash for the operator and slash id
+    error NoPendingSlash();
+    /// @dev The reward token cannot be used as collateral
+    error InvalidCollateral();
+    /// @dev Only USDC can be distributed as rewards
+    error InvalidRewardToken();
 
     /// @dev Operator registered
     event OperatorRegistered(
         address indexed operator, address indexed eigenOperator, address indexed avs, uint32 operatorSetId
     );
-    /// @dev Emitted on slash
+    /// @dev Emitted when slashed collateral is sent to the recipient (on slash completion)
     event Slash(address indexed agent, address indexed recipient, uint256 slashShare, uint48 timestamp);
+    /// @dev Emitted when an operator is slashed and the payout is queued until the slash can be completed
+    event SlashQueued(
+        address indexed agent, address indexed recipient, uint256 slashId, uint256 shares, uint256 amount
+    );
     /// @dev Strategy registered
     event StrategyRegistered(address indexed strategy, address indexed operator);
     /// @dev Epochs between distributions set
@@ -55,6 +65,7 @@ interface IEigenServiceManager {
     /// @param nextOperatorId Next operator id
     /// @param pendingRewards Pending rewards
     /// @param eigenOperatorToOperator Mapping from eigen operator to operator
+    /// @param pendingSlashes Pending slashes by operator and eigen slash id
     struct EigenServiceManagerStorage {
         EigenAddresses eigen;
         address oracle;
@@ -65,6 +76,16 @@ interface IEigenServiceManager {
         mapping(address => uint256) pendingRewardsByToken;
         mapping(address => CachedOperatorData) operators;
         mapping(address => address) eigenOperatorToOperator;
+        // @dev appended for the slash resolution delay, do not reorder
+        mapping(address => mapping(uint256 => PendingSlash)) pendingSlashes;
+    }
+
+    /// @dev Slash waiting for the eigen slash resolution delay before the collateral can be paid out
+    /// @param recipient Recipient of the slashed collateral
+    /// @param amount Collateral amount owed to the recipient, valued at the time of the slash
+    struct PendingSlash {
+        address recipient;
+        uint256 amount;
     }
 
     /// @dev Cached operator data
@@ -122,6 +143,7 @@ interface IEigenServiceManager {
 
     /**
      * @notice Distributes rewards to the operator
+     * @dev Reverts for strategy collateral tokens, slashed collateral waiting for completion must not be a reward
      * @param _operator The operator to distribute rewards to
      * @param _token The token to distribute rewards for
      */
@@ -164,6 +186,26 @@ interface IEigenServiceManager {
      * @param _timestamp The timestamp of the slash (unused for eigenlayer)
      */
     function slash(address _operator, address _recipient, uint256 _slashShare, uint48 _timestamp) external;
+
+    /**
+     * @notice Completes a slash once eigen's slash resolution delay has passed and sends the collateral to the
+     * recipient recorded at slash time. Permissionless.
+     * @dev Clears the slashed shares from eigen if nobody did yet, otherwise pays out the collateral that was already
+     * sent to this contract by a third party clear. Reverts while the eigen resolution delay has not elapsed or
+     * eigen burning/redistribution is paused.
+     * @param _operator The slashed operator
+     * @param _slashId The eigen slash id emitted in `SlashQueued`
+     * @return amount The amount of collateral sent to the recipient
+     */
+    function completeSlash(address _operator, uint256 _slashId) external returns (uint256 amount);
+
+    /**
+     * @notice Returns a pending slash
+     * @param _operator The slashed operator
+     * @param _slashId The eigen slash id
+     * @return The pending slash, empty if it does not exist or was completed
+     */
+    function pendingSlash(address _operator, uint256 _slashId) external view returns (PendingSlash memory);
 
     /**
      * @notice Allocates the operator set, is public and can be called permissionless. We would have allocated on registerStrategy but it needs to wait at least a block.

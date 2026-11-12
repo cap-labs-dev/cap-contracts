@@ -16,12 +16,22 @@ import { BeaconProxy } from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.so
 import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { ReentrancyGuardTransient } from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 /// @title EigenServiceManager
 /// @author weso, Cap Labs
 /// @notice This contract acts as the avs in the eigenlayer protocol
-contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, EigenServiceManagerStorageUtils {
+contract EigenServiceManager is
+    IEigenServiceManager,
+    UUPSUpgradeable,
+    Access,
+    ReentrancyGuardTransient,
+    EigenServiceManagerStorageUtils
+{
     using SafeERC20 for IERC20;
+
+    /// @dev USDC is the only reward token and can never be registered as collateral
+    address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -66,23 +76,62 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         if (_slashShare == 0) revert ZeroSlash();
 
         address _strategy = operatorData.strategy;
-        IERC20 _slashedCollateral = IStrategy(_strategy).underlyingToken();
 
         /// Slash share is a percentage of total operators collateral, this is calculated in Delegation.sol
-        uint256 beforeSlash = _slashedCollateral.balanceOf(address(this));
-
         /// We map to the eigen operator address in this _slash function
         /// @dev rounding considerations suggested via eigen
         /// https://docs.eigencloud.xyz/products/eigenlayer/developers/howto/build/slashing/precision-rounding-considerations
         /// Since we control the magnitude and are the only allocation, rounding is less of a concern
-        _slash(_strategy, _operator, _slashShare);
+        (uint256 slashId, uint256 slashedShares) = _slash(_strategy, _operator, _slashShare);
 
-        /// Send slashed collateral to the liquidator
-        uint256 slashedAmount = _slashedCollateral.balanceOf(address(this)) - beforeSlash;
-        if (slashedAmount == 0) revert ZeroSlash();
-        _slashedCollateral.safeTransfer(_recipient, slashedAmount);
+        /// @dev Eigen only releases the slashed shares after its slash resolution delay, so the payout is queued and
+        /// completed later via `completeSlash`. The amount is valued now: the strategy share price can only go up
+        /// until the shares are cleared, so this never exceeds what the clear sends to this contract.
+        uint256 slashedAmount = IStrategy(_strategy).sharesToUnderlyingView(slashedShares);
+        if (slashedShares == 0 || slashedAmount == 0) revert ZeroSlash();
 
-        emit Slash(_operator, _recipient, slashedAmount, uint48(block.timestamp));
+        $.pendingSlashes[_operator][slashId] = PendingSlash({ recipient: _recipient, amount: slashedAmount });
+
+        emit SlashQueued(_operator, _recipient, slashId, slashedShares, slashedAmount);
+    }
+
+    /// @inheritdoc IEigenServiceManager
+    function completeSlash(address _operator, uint256 _slashId) external nonReentrant returns (uint256 amount) {
+        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        PendingSlash memory pending = $.pendingSlashes[_operator][_slashId];
+        if (pending.recipient == address(0)) revert NoPendingSlash();
+
+        /// @dev Remove the pending slash before any external call so it can only be completed once
+        delete $.pendingSlashes[_operator][_slashId];
+
+        CachedOperatorData storage operatorData = $.operators[_operator];
+        address _strategy = operatorData.strategy;
+        IERC20 _slashedCollateral = IStrategy(_strategy).underlyingToken();
+
+        IAllocationManager.OperatorSet memory operatorSet =
+            IAllocationManager.OperatorSet({ avs: address(this), id: operatorData.operatorSetId });
+        IStrategyManager strategyManager = IStrategyManager($.eigen.strategyManager);
+
+        /// @dev The collateral available to pay this slash. The payout is the amount valued at slash time in both
+        /// cases so it does not depend on who clears the shares, any surplus from rounding stays in this contract.
+        uint256 available;
+        if (strategyManager.getBurnOrRedistributableShares(operatorSet, _slashId, _strategy) != 0) {
+            /// @dev Clear the shares ourselves, this sends the collateral to this contract (the redistribution
+            /// recipient). Reverts until the eigen slash resolution delay has passed or while eigen is paused.
+            uint256 beforeClear = _slashedCollateral.balanceOf(address(this));
+            strategyManager.clearBurnOrRedistributableSharesByStrategy(operatorSet, _slashId, _strategy);
+            available = _slashedCollateral.balanceOf(address(this)) - beforeClear;
+        } else {
+            /// @dev Someone else already cleared the shares and the collateral is sitting in this contract. The
+            /// amount valued at slash time never exceeds what the clear sent here since the strategy share price
+            /// cannot go down. Collateral tokens are never reward tokens, so the balance is only slashed funds.
+            available = _slashedCollateral.balanceOf(address(this));
+        }
+        amount = pending.amount < available ? pending.amount : available;
+
+        if (amount > 0) _slashedCollateral.safeTransfer(pending.recipient, amount);
+
+        emit Slash(_operator, pending.recipient, amount, uint48(block.timestamp));
     }
 
     /// @inheritdoc IEigenServiceManager
@@ -91,6 +140,9 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         checkAccess(this.distributeRewards.selector)
     {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        /// @dev Only USDC is ever distributed as rewards. Slashed collateral cleared by a third party sits in this
+        /// contract until the slash is completed and must never be distributed, USDC can never be collateral.
+        if (_token != USDC) revert InvalidRewardToken();
         CachedOperatorData storage operatorData = $.operators[_operator];
 
         uint256 calcIntervalSeconds = IRewardsCoordinator($.eigen.rewardsCoordinator).CALCULATION_INTERVAL_SECONDS();
@@ -177,6 +229,9 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         if (operatorData.strategy != address(0)) revert AlreadyRegisteredOperator();
         if (operatorData.operatorSetId != 0) revert OperatorSetAlreadyCreated();
         if (IERC20Metadata(address(IStrategy(_strategy).underlyingToken())).decimals() < 6) revert InvalidDecimals();
+        /// @dev Slashed collateral can sit in this contract until the slash is completed, so the reward token must
+        /// never be used as collateral
+        if (address(IStrategy(_strategy).underlyingToken()) == USDC) revert InvalidCollateral();
 
         IAllocationManager allocationManager = IAllocationManager($.eigen.allocationManager);
 
@@ -330,6 +385,12 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
         return operatorData.pendingRewards[_token];
     }
 
+    /// @inheritdoc IEigenServiceManager
+    function pendingSlash(address _operator, uint256 _slashId) external view returns (PendingSlash memory) {
+        EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
+        return $.pendingSlashes[_operator][_slashId];
+    }
+
     /// @dev Deploys an eigen operator
     /// @param _operator The operator/borrower address
     /// @param _operatorMetadata The operator metadata
@@ -357,7 +418,12 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
     /// @param _strategy The strategy address
     /// @param _operator The operator address
     /// @param _slashShare The slash share
-    function _slash(address _strategy, address _operator, uint256 _slashShare) private {
+    /// @return slashId The eigen slash id
+    /// @return slashedShares The strategy shares slashed, claimable after the eigen slash resolution delay
+    function _slash(address _strategy, address _operator, uint256 _slashShare)
+        private
+        returns (uint256 slashId, uint256 slashedShares)
+    {
         EigenServiceManagerStorage storage $ = getEigenServiceManagerStorage();
         CachedOperatorData storage operatorData = $.operators[_operator];
         address[] memory strategies = new address[](1);
@@ -378,15 +444,10 @@ contract EigenServiceManager is IEigenServiceManager, UUPSUpgradeable, Access, E
             description: "liquidation"
         });
 
-        // @dev slash the operator
-        (uint256 slashId,) = IAllocationManager($.eigen.allocationManager).slashOperator(address(this), slashingParams);
-
-        IAllocationManager.OperatorSet memory operatorSet =
-            IAllocationManager.OperatorSet({ avs: address(this), id: operatorData.operatorSetId });
-
-        // @dev clear the burn or redistributable shares, this sends them to the service manager
-        IStrategyManager($.eigen.strategyManager)
-            .clearBurnOrRedistributableSharesByStrategy(operatorSet, slashId, _strategy);
+        // @dev slash the operator, the shares can only be cleared after the eigen slash resolution delay
+        uint256[] memory shares;
+        (slashId, shares) = IAllocationManager($.eigen.allocationManager).slashOperator(address(this), slashingParams);
+        slashedShares = shares[0];
     }
 
     /// @notice Create a rewards submission

@@ -112,7 +112,7 @@ contract TestHarnessConfigReader {
             useMockBackingNetwork: false,
             mockChainId: 11155111,
             rpcUrl: "https://mainnet.gateway.tenderly.co",
-            blockNumber: 23285216
+            blockNumber: 26393000
         });
 
         cfg.infra = TestInfraParams({ delegationEpochDuration: 1 days });
