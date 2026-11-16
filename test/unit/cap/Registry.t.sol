@@ -5,8 +5,10 @@ import { BeaconFactory } from "../../../contracts/cap/BeaconFactory.sol";
 import { Registry } from "../../../contracts/cap/Registry.sol";
 import { IBeaconFactory } from "../../../contracts/interfaces/IBeaconFactory.sol";
 import { IRegistry } from "../../../contracts/interfaces/IRegistry.sol";
+import { CapRoles } from "../../../contracts/utils/CapRoles.sol";
 import { BaseTest } from "../../shared/BaseTest.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { IAccessManaged } from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import { UpgradeableBeacon } from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 contract DummyBeaconImpl { }
@@ -83,6 +85,77 @@ contract RegistryTest is BaseTest {
         registry = Registry(
             _deployProxy(address(impl), abi.encodeCall(Registry.initialize, (address(accessManager), init)))
         );
+    }
+
+    function test_protocolFee_defaultsOff() public {
+        Registry registry = _deployRegistry(_validInit());
+        (address receiver, uint256 liquidityRate, uint256 underwriterRate) = registry.protocolFee();
+        assertEq(receiver, address(0));
+        assertEq(liquidityRate, 0);
+        assertEq(underwriterRate, 0);
+        assertEq(registry.feeReceiver(), address(0));
+        assertEq(registry.liquidityFeeRate(), 0);
+        assertEq(registry.underwriterFeeRate(), 0);
+    }
+
+    function test_setProtocolFee_governorSetsAndEmits() public {
+        Registry registry = _deployRegistry(_validInit());
+        address governor = makeAddr("governor");
+        accessManager.grantRole(CapRoles.GOVERNOR, governor, 0);
+        address receiver = makeAddr("fee receiver");
+
+        vm.expectEmit(address(registry));
+        emit IRegistry.SetProtocolFee(receiver, 0.1e27, 0.25e27);
+        vm.prank(governor);
+        registry.setProtocolFee(receiver, 0.1e27, 0.25e27);
+
+        (address got, uint256 liquidityRate, uint256 underwriterRate) = registry.protocolFee();
+        assertEq(got, receiver);
+        assertEq(liquidityRate, 0.1e27);
+        assertEq(underwriterRate, 0.25e27);
+        assertEq(registry.MAX_FEE_RATE(), 0.5e27);
+    }
+
+    function test_setProtocolFee_zeroReceiverSwitchesOff() public {
+        Registry registry = _deployRegistry(_validInit());
+        accessManager.grantRole(CapRoles.GOVERNOR, address(this), 0);
+        registry.setProtocolFee(makeAddr("fee receiver"), 0.1e27, 0.1e27);
+        registry.setProtocolFee(address(0), 0, 0);
+        (address receiver, uint256 liquidityRate, uint256 underwriterRate) = registry.protocolFee();
+        assertEq(receiver, address(0));
+        assertEq(liquidityRate, 0);
+        assertEq(underwriterRate, 0);
+    }
+
+    function test_setProtocolFee_rejectsRateAboveCapOnEitherLeg() public {
+        Registry registry = _deployRegistry(_validInit());
+        accessManager.grantRole(CapRoles.GOVERNOR, address(this), 0);
+        address receiver = makeAddr("fee receiver");
+        vm.expectRevert(IRegistry.InvalidFeeRate.selector);
+        registry.setProtocolFee(receiver, 0.5e27 + 1, 0);
+        vm.expectRevert(IRegistry.InvalidFeeRate.selector);
+        registry.setProtocolFee(receiver, 0, 0.5e27 + 1);
+        registry.setProtocolFee(receiver, 0.5e27, 0.5e27);
+    }
+
+    function test_setProtocolFee_rejectsRatesWithoutReceiver() public {
+        Registry registry = _deployRegistry(_validInit());
+        accessManager.grantRole(CapRoles.GOVERNOR, address(this), 0);
+        vm.expectRevert(IRegistry.FeeReceiverRequired.selector);
+        registry.setProtocolFee(address(0), 1, 0);
+        vm.expectRevert(IRegistry.FeeReceiverRequired.selector);
+        registry.setProtocolFee(address(0), 0, 1);
+    }
+
+    function test_setProtocolFee_nonGovernorReverts() public {
+        Registry registry = _deployRegistry(_validInit());
+        address stranger = makeAddr("stranger");
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, stranger));
+        registry.setProtocolFee(makeAddr("fee receiver"), 0.1e27, 0.1e27);
+        // the admin is not the governor either
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, address(this)));
+        registry.setProtocolFee(makeAddr("fee receiver"), 0.1e27, 0.1e27);
     }
 
     function test_registryUpgrade_authorized() public {

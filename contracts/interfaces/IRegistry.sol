@@ -38,6 +38,13 @@ interface IRegistry {
     /// so a cUSD collateral balance would be indistinguishable from premium.
     error StablecoinCollateral();
 
+    /// @notice A protocol fee rate exceeds {MAX_FEE_RATE}
+    error InvalidFeeRate();
+
+    /// @notice A nonzero fee rate was set with no receiver
+    /// @dev A zero receiver switches the fee off, so rates must be zero alongside it.
+    error FeeReceiverRequired();
+
     /// @notice Shared initialization parameters for the registry
     /// @param stablecoin The stablecoin address
     /// @param oracle The oracle address
@@ -106,6 +113,12 @@ interface IRegistry {
     /// @param underwriter The underwriter whose allocator role changed
     /// @param roleId The new allocator role id
     event SetAllocatorRole(address indexed underwriter, uint64 indexed roleId);
+
+    /// @notice Emitted when the protocol fee is updated
+    /// @param receiver The address that receives the fee in cUSD, or zero when the fee is off
+    /// @param liquidityFeeRate The share of liquidity premium taken, in ray decimals
+    /// @param underwriterFeeRate The share of underwriter premium taken, in ray decimals
+    event SetProtocolFee(address indexed receiver, uint256 liquidityFeeRate, uint256 underwriterFeeRate);
 
     /// @notice Initialize the registry and wire shared infrastructure roles
     /// @dev This contract must hold ADMIN to call `setTargetFunctionRole`. Per-market roles are
@@ -277,6 +290,36 @@ interface IRegistry {
     function createUnderwriter(address asset, string memory name, string memory symbol, uint64 curatorRole)
         external
         returns (address underwriter);
+
+    /// @notice Set the protocol fee taken from borrower premium
+    /// @dev Restricted to GOVERNOR. Markets read this at every premium charge, so it applies to
+    /// all markets at once. A zero `receiver` switches the fee off and requires zero rates
+    /// ({FeeReceiverRequired}). Each rate must not exceed {MAX_FEE_RATE} ({InvalidFeeRate}).
+    /// @param receiver The address that receives the fee in cUSD
+    /// @param liquidityFeeRate The share of liquidity premium taken, in ray decimals
+    /// @param underwriterFeeRate The share of underwriter premium taken, in ray decimals
+    function setProtocolFee(address receiver, uint256 liquidityFeeRate, uint256 underwriterFeeRate) external;
+
+    /// @notice Get the protocol fee configuration
+    /// @return receiver The address that receives the fee in cUSD, or zero when the fee is off
+    /// @return liquidityFeeRate The share of liquidity premium taken, in ray decimals
+    /// @return underwriterFeeRate The share of underwriter premium taken, in ray decimals
+    function protocolFee()
+        external
+        view
+        returns (address receiver, uint256 liquidityFeeRate, uint256 underwriterFeeRate);
+
+    /// @notice Get the address that receives the protocol fee
+    /// @return The fee receiver, or zero when the fee is off
+    function feeReceiver() external view returns (address);
+
+    /// @notice Get the share of liquidity premium taken as protocol fee
+    /// @return The liquidity fee rate in ray decimals
+    function liquidityFeeRate() external view returns (uint256);
+
+    /// @notice Get the share of underwriter premium taken as protocol fee
+    /// @return The underwriter fee rate in ray decimals
+    function underwriterFeeRate() external view returns (uint256);
 
     /// @notice Get the interest rate model address
     /// @return The interest rate model address

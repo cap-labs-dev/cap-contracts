@@ -70,19 +70,22 @@ yul = true                                    # default true
 # cse = true # default false
 # constantOptimizer = true # default false 
 
-# Stablecoin sits at the EIP-170 limit; size-optimise it alone so the rest of the protocol keeps runs = 200.
+# Stablecoin and Underwriter sit at the EIP-170 limit; size-optimise them alone so the rest of the
+# protocol keeps runs = 200. Both come out smaller through the legacy pipeline than through via-IR.
 [[profile.release.additional_compiler_profiles]]
 name = "size"
 optimizer_runs = 1
-via_ir = true
+via_ir = false
 
 [[profile.release.compilation_restrictions]]
 paths = "contracts/cap/Stablecoin.sol"
 max_optimizer_runs = 1
+via_ir = false
 
 [[profile.release.compilation_restrictions]]
 paths = "contracts/cap/Underwriter.sol"
 max_optimizer_runs = 1
+via_ir = false
 
 [profile.slither]
 via_ir = true

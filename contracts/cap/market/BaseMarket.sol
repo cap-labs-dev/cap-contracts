@@ -493,15 +493,21 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
     }
 
     /// @dev Charge the premium
-    /// @dev Alive tranches that still hold assets and have opted-in shares take their weight of
-    /// the underwriter premium. Killed or empty tranches do not: a dust remainder after a slash
-    /// must not keep a senior's weight. Ineligible weight goes to the senior if it still earns,
-    /// or vests on the stablecoin. Already-funded premium is not touched. Eligibility does not
-    /// price collateral, so an oracle outage cannot block a charge or a repayment.
+    /// @dev The protocol fee configured on the registry is taken off each leg first and minted
+    /// to the fee receiver in cUSD; the borrower's charge is unchanged, only its split. Alive
+    /// tranches that still hold assets and have opted-in shares take their weight of the
+    /// remaining underwriter premium. Killed or empty tranches do not: a dust remainder after a
+    /// slash must not keep a senior's weight. Ineligible weight goes to the senior if it still
+    /// earns, or vests on the stablecoin. Already-funded premium is not touched. Eligibility does
+    /// not price collateral, so an oracle outage cannot block a charge or a repayment.
     /// @param liquidityPremium The amount of liquidity premium to charge
     /// @param underwriterPremium The amount of underwriter premium to charge
     function _chargePremium(uint256 liquidityPremium, uint256 underwriterPremium) internal {
         BaseMarketStorage storage $ = _getBaseMarketStorage();
+
+        (uint256 liquidityFee, uint256 underwriterFee) = _chargeProtocolFee(liquidityPremium, underwriterPremium);
+        liquidityPremium -= liquidityFee;
+        underwriterPremium -= underwriterFee;
 
         if (liquidityPremium > 0) {
             IStablecoin($.stablecoin).fundCreditBacked(liquidityPremium);
@@ -540,6 +546,31 @@ abstract contract BaseMarket is IBaseMarket, AccessManagedUpgradeable, Reentranc
             IStablecoin($.stablecoin).fundCreditBacked(remaining);
             emit ChargeLiquidityPremium(remaining);
         }
+    }
+
+    /// @dev Take the protocol fee off both premium legs and mint it to the fee receiver
+    /// @dev Read live from the registry so one governor setting covers every market. A zero
+    /// receiver or zero rates charge nothing. The fee is credit-backed cUSD like the premium it
+    /// comes from, so total minted premium still equals reported debt growth.
+    /// @param liquidityPremium The liquidity premium before the fee
+    /// @param underwriterPremium The underwriter premium before the fee
+    /// @return liquidityFee The fee taken from the liquidity premium
+    /// @return underwriterFee The fee taken from the underwriter premium
+    function _chargeProtocolFee(uint256 liquidityPremium, uint256 underwriterPremium)
+        private
+        returns (uint256 liquidityFee, uint256 underwriterFee)
+    {
+        BaseMarketStorage storage $ = _getBaseMarketStorage();
+        (address receiver, uint256 liquidityRate, uint256 underwriterRate) = IRegistry($.registry).protocolFee();
+        if (receiver == address(0)) return (0, 0);
+
+        liquidityFee = liquidityPremium.rayMul(liquidityRate);
+        underwriterFee = underwriterPremium.rayMul(underwriterRate);
+        uint256 fee = liquidityFee + underwriterFee;
+        if (fee == 0) return (0, 0);
+
+        IStablecoin($.stablecoin).mintCreditBacked(receiver, fee);
+        emit ChargeProtocolFee(receiver, liquidityFee, underwriterFee);
     }
 
     /// @dev New underwriting premium is for holdings that still back the market and can be claimed.

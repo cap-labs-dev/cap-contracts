@@ -418,6 +418,7 @@ contract RoleTableTest is CapDeployer {
         // the curator controls strategy membership
         _expectRole(underwriter, IUnderwriter.addTranche.selector, curatorRole, "addTranche");
         _expectRole(underwriter, IUnderwriter.removeTranche.selector, curatorRole, "removeTranche");
+        _expectRole(underwriter, IUnderwriter.setCuratorFee.selector, curatorRole, "setCuratorFee");
 
         // the allocator moves capital and selects its default route
         _expectRole(underwriter, IUnderwriter.setDefaultTranche.selector, allocatorRole, "setDefaultTranche");
@@ -597,6 +598,7 @@ contract RoleTableTest is CapDeployer {
         );
         _expectRole(address(registry), Registry.createFixedMarket.selector, CapRoles.WHITELISTED, "createFixedMarket");
         _expectRole(address(registry), Registry.createUnderwriter.selector, CapRoles.WHITELISTED, "createUnderwriter");
+        _expectRole(address(registry), Registry.setProtocolFee.selector, CapRoles.GOVERNOR, "setProtocolFee");
 
         // only the Registry deploys through the factory
         _expectRole(address(beaconFactory), IBeaconFactory.create.selector, CapRoles.REGISTRY, "factory create");

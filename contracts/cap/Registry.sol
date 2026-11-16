@@ -37,6 +37,9 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     /// @notice Deployment default for floating tranches, cUSD, and underwriters, in seconds.
     uint256 public constant DEFAULT_VESTING_PERIOD = 12 hours;
 
+    /// @notice The most of either premium leg the protocol fee may take, in ray decimals (50%)
+    uint256 public constant MAX_FEE_RATE = 0.5e27;
+
     /// @inheritdoc IRegistry
     address public stablecoin;
 
@@ -63,6 +66,15 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
 
     /// @inheritdoc IRegistry
     address public wrapper;
+
+    /// @inheritdoc IRegistry
+    address public feeReceiver;
+
+    /// @inheritdoc IRegistry
+    uint256 public liquidityFeeRate;
+
+    /// @inheritdoc IRegistry
+    uint256 public underwriterFeeRate;
 
     /// @dev Next operator role id to assign
     uint64 private _nextOperatorRoleId;
@@ -107,6 +119,28 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
         wrapper = init.wrapper;
         _nextOperatorRoleId = CapRoles.FIRST_OPERATOR_ROLE;
         _configureInfraRoles();
+    }
+
+    /// @inheritdoc IRegistry
+    function setProtocolFee(address _receiver, uint256 _liquidityFeeRate, uint256 _underwriterFeeRate)
+        external
+        restricted
+    {
+        if (_liquidityFeeRate > MAX_FEE_RATE || _underwriterFeeRate > MAX_FEE_RATE) revert InvalidFeeRate();
+        if (_receiver == address(0) && (_liquidityFeeRate != 0 || _underwriterFeeRate != 0)) {
+            revert FeeReceiverRequired();
+        }
+        feeReceiver = _receiver;
+        liquidityFeeRate = _liquidityFeeRate;
+        underwriterFeeRate = _underwriterFeeRate;
+        emit SetProtocolFee(_receiver, _liquidityFeeRate, _underwriterFeeRate);
+    }
+
+    /// @inheritdoc IRegistry
+    function protocolFee() external view returns (address receiver, uint256 liquidityRate, uint256 underwriterRate) {
+        receiver = feeReceiver;
+        liquidityRate = liquidityFeeRate;
+        underwriterRate = underwriterFeeRate;
     }
 
     /// @inheritdoc IRegistry
@@ -436,6 +470,7 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
 
         manager.setTargetFunctionRole(factory, _factorySelectors(), CapRoles.REGISTRY);
         manager.setTargetFunctionRole(address(this), _registryWhitelistedSelectors(), CapRoles.WHITELISTED);
+        manager.setTargetFunctionRole(address(this), _one(IRegistry.setProtocolFee.selector), CapRoles.GOVERNOR);
 
         manager.setTargetFunctionRole(stablecoin, _stablecoinMarketSelectors(), CapRoles.MARKET);
         manager.setTargetFunctionRole(stablecoin, _stablecoinGuardianSelectors(), CapRoles.GUARDIAN);
@@ -626,12 +661,13 @@ contract Registry layout at erc7201("cap.storage.Registry") is IRegistry, Access
     }
 
     function _underwriterCuratorSelectors() private pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](5);
+        selectors = new bytes4[](6);
         selectors[0] = IUnderwriter.addTranche.selector;
         selectors[1] = IUnderwriter.removeTranche.selector;
         selectors[2] = IUnderwriter.setDepositorRole.selector;
         selectors[3] = IUnderwriter.setAllocatorRole.selector;
         selectors[4] = IPremiumVesting.setVestingPeriod.selector;
+        selectors[5] = IUnderwriter.setCuratorFee.selector;
     }
 
     function _underwriterKeeperSelectors() private pure returns (bytes4[] memory selectors) {

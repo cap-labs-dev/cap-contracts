@@ -6,6 +6,7 @@ import { IBaseMarket } from "../../../../contracts/interfaces/IBaseMarket.sol";
 import { IInterestRateModel } from "../../../../contracts/interfaces/IInterestRateModel.sol";
 import { ITranche } from "../../../../contracts/interfaces/ITranche.sol";
 import { BaseTest } from "../../../shared/BaseTest.sol";
+import { Vm } from "forge-std/Vm.sol";
 
 contract BareMarket is BaseMarket {
     function initialize(address authority) external initializer {
@@ -167,6 +168,128 @@ contract BaseMarketTest is BaseTest {
         market.charge(0, 100e18);
     }
 
+    /// @dev Fee off: the configured receiver is zero, so nothing is minted to it even with rates set.
+    function test_chargePremium_zeroReceiverTakesNoFee() public {
+        (ChargeableMarket market, MockEarnTranche senior, MockEarnTranche junior) = _readyMarket(true, true);
+        _mockProtocolFee(address(0), 0.1e27, 0.1e27);
+
+        vm.expectEmit(address(market));
+        emit IBaseMarket.ChargeLiquidityPremium(10e18);
+        vm.expectEmit(address(market));
+        emit IBaseMarket.ChargeUnderwriterPremium(address(junior), 20e18);
+        vm.expectEmit(address(market));
+        emit IBaseMarket.ChargeUnderwriterPremium(address(senior), 80e18);
+        market.charge(10e18, 100e18);
+    }
+
+    /// @dev Each leg is taxed at its own rate before the split; the receiver is minted the sum in cUSD.
+    function test_chargePremium_takesProtocolFeeOffBothLegs() public {
+        (ChargeableMarket market, MockEarnTranche senior, MockEarnTranche junior) = _readyMarket(true, true);
+        address receiver = makeAddr("fee receiver");
+        _mockProtocolFee(receiver, 0.1e27, 0.25e27);
+
+        // 10% of 10e18 liquidity and 25% of 100e18 underwriter
+        vm.expectCall(scoin, abi.encodeWithSignature("mintCreditBacked(address,uint256)", receiver, 26e18));
+        vm.expectCall(scoin, abi.encodeWithSignature("fundCreditBacked(uint256)", 9e18));
+        vm.expectEmit(address(market));
+        emit IBaseMarket.ChargeProtocolFee(receiver, 1e18, 25e18);
+        vm.expectEmit(address(market));
+        emit IBaseMarket.ChargeLiquidityPremium(9e18);
+        vm.expectEmit(address(market));
+        emit IBaseMarket.ChargeUnderwriterPremium(address(junior), 15e18);
+        vm.expectEmit(address(market));
+        emit IBaseMarket.ChargeUnderwriterPremium(address(senior), 60e18);
+        market.charge(10e18, 100e18);
+    }
+
+    /// @dev Only one leg taxed: the other passes through whole.
+    function test_chargePremium_feeOnOneLegOnly() public {
+        (ChargeableMarket market, MockEarnTranche senior, MockEarnTranche junior) = _readyMarket(true, true);
+        address receiver = makeAddr("fee receiver");
+        _mockProtocolFee(receiver, 0, 0.5e27);
+
+        vm.expectEmit(address(market));
+        emit IBaseMarket.ChargeProtocolFee(receiver, 0, 50e18);
+        vm.expectEmit(address(market));
+        emit IBaseMarket.ChargeLiquidityPremium(10e18);
+        vm.expectEmit(address(market));
+        emit IBaseMarket.ChargeUnderwriterPremium(address(junior), 10e18);
+        vm.expectEmit(address(market));
+        emit IBaseMarket.ChargeUnderwriterPremium(address(senior), 40e18);
+        market.charge(10e18, 100e18);
+    }
+
+    /// @dev A receiver with rates that round to zero emits no fee event and mints nothing.
+    function test_chargePremium_zeroFeeSkipsMint() public {
+        (ChargeableMarket market,,) = _readyMarket(true, true);
+        address receiver = makeAddr("fee receiver");
+        _mockProtocolFee(receiver, 0.1e27, 0.1e27);
+
+        vm.expectCall(scoin, abi.encodeWithSignature("mintCreditBacked(address,uint256)", receiver, 0), 0);
+        vm.recordLogs();
+        market.charge(1, 1);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; ++i) {
+            assertTrue(logs[i].topics[0] != IBaseMarket.ChargeProtocolFee.selector, "no fee event");
+        }
+    }
+
+    /// @dev Fee taken once at origination; the fallback of ineligible weight is not taxed again.
+    function test_chargePremium_fallbackIsNotTaxedTwice() public {
+        (ChargeableMarket market,, MockEarnTranche junior) = _readyMarket(false, true);
+        address receiver = makeAddr("fee receiver");
+        _mockProtocolFee(receiver, 0, 0.1e27);
+
+        vm.expectEmit(address(market));
+        emit IBaseMarket.ChargeProtocolFee(receiver, 0, 10e18);
+        vm.expectEmit(address(market));
+        emit IBaseMarket.ChargeLiquidityPremium(10e18);
+        vm.expectEmit(address(market));
+        emit IBaseMarket.ChargeUnderwriterPremium(address(junior), 18e18);
+        vm.expectEmit(address(market));
+        emit IBaseMarket.ChargeLiquidityPremium(72e18);
+        market.charge(10e18, 100e18);
+    }
+
+    /// @dev Fee plus what reaches the pools always equals the charge, at any rate up to the cap.
+    function testFuzz_chargePremium_feePlusSplitEqualsCharge(
+        uint96 rawLiquidity,
+        uint96 rawUnderwriter,
+        uint64 rawLiquidityRate,
+        uint64 rawUnderwriterRate
+    ) public {
+        (ChargeableMarket market,,) = _readyMarket(true, true);
+        address receiver = makeAddr("fee receiver");
+        uint256 liquidityRate = bound(rawLiquidityRate, 0, 0.5e27);
+        uint256 underwriterRate = bound(rawUnderwriterRate, 0, 0.5e27);
+        _mockProtocolFee(receiver, liquidityRate, underwriterRate);
+
+        vm.recordLogs();
+        market.charge(rawLiquidity, rawUnderwriter);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        uint256 fee;
+        uint256 pools;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].topics[0] == IBaseMarket.ChargeProtocolFee.selector) {
+                (uint256 l, uint256 u) = abi.decode(logs[i].data, (uint256, uint256));
+                fee += l + u;
+            } else if (
+                logs[i].topics[0] == IBaseMarket.ChargeLiquidityPremium.selector
+                    || logs[i].topics[0] == IBaseMarket.ChargeUnderwriterPremium.selector
+            ) {
+                pools += abi.decode(logs[i].data, (uint256));
+            }
+        }
+        assertEq(fee + pools, uint256(rawLiquidity) + rawUnderwriter);
+        assertLe(fee, (uint256(rawLiquidity) + 1) / 2 + (uint256(rawUnderwriter) + 1) / 2);
+    }
+
+    function _mockProtocolFee(address receiver, uint256 liquidityRate, uint256 underwriterRate) internal {
+        vm.mockCall(
+            registry, abi.encodeWithSignature("protocolFee()"), abi.encode(receiver, liquidityRate, underwriterRate)
+        );
+    }
+
     function _readyMarket(bool seniorEarns, bool juniorEarns)
         internal
         returns (ChargeableMarket market, MockEarnTranche senior, MockEarnTranche junior)
@@ -174,6 +297,7 @@ contract BaseMarketTest is BaseTest {
         _setUpAccessManager();
         vm.mockCall(registry, abi.encodeWithSignature("irm()"), abi.encode(irm));
         vm.mockCall(registry, abi.encodeWithSignature("stablecoin()"), abi.encode(scoin));
+        _mockProtocolFee(address(0), 0, 0);
         vm.mockCall(irm, abi.encodeWithSignature("liquidationThreshold()"), abi.encode(uint256(0.9e27)));
         vm.mockCall(irm, abi.encodeWithSignature("buffer()"), abi.encode(uint256(0.1e27)));
         vm.mockCall(irm, abi.encodeWithSignature("targetHealth()"), abi.encode(uint256(1.25e27)));

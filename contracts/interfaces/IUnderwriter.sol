@@ -28,6 +28,13 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @notice The deposit left the underwriter retired or below its kill threshold
     error UnderwriterKilled();
 
+    /// @notice The curator fee rate exceeds the maximum
+    error InvalidCuratorFee();
+
+    /// @notice A nonzero curator fee rate was set with no recipient
+    /// @dev A zero recipient switches the fee off, so the rate must be zero alongside it.
+    error CuratorFeeRecipientRequired();
+
     /// @notice Emitted once when a position update retires the underwriter
     event Killed();
 
@@ -76,6 +83,17 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @notice Emitted when the default allocation tranche is updated
     /// @param tranche The new default tranche address
     event SetDefaultTranche(address tranche);
+
+    /// @notice Emitted when the curator fee is updated
+    /// @param recipient The address that receives the fee in cUSD, or zero when the fee is off
+    /// @param rate The share of harvested premium taken, in ray decimals
+    event SetCuratorFee(address indexed recipient, uint256 rate);
+
+    /// @notice Emitted when the curator fee is taken off harvested premium
+    /// @param tranche The tranche the premium was claimed from
+    /// @param recipient The fee recipient
+    /// @param fee The cUSD sent to the recipient
+    event ChargeCuratorFee(address indexed tranche, address indexed recipient, uint256 fee);
 
     /// @notice Initialize the underwriter
     /// @param authority The access manager address
@@ -159,11 +177,29 @@ interface IUnderwriter is IPremiumVesting, IERC7540AsyncRedeem {
     /// @param tranche The default tranche address
     function setDefaultTranche(address tranche) external;
 
+    /// @notice Set the curator fee taken off premium as it is harvested
+    /// @dev Curator only, behind the role's AccessManager execution delay. A zero `recipient`
+    /// switches the fee off and requires a zero rate ({CuratorFeeRecipientRequired}). The rate
+    /// must not exceed `MAX_CURATOR_FEE` ({InvalidCuratorFee}). Applies to premium claimed by
+    /// later {report} calls only; already-funded premium is not touched.
+    /// @param recipient The address that receives the fee in cUSD
+    /// @param rate The share of harvested premium taken, in ray decimals
+    function setCuratorFee(address recipient, uint256 rate) external;
+
+    /// @notice Get the address that receives the curator fee
+    /// @return recipient The fee recipient, or zero when the fee is off
+    function curatorFeeRecipient() external view returns (address recipient);
+
+    /// @notice Get the share of harvested premium taken as curator fee
+    /// @return rate The curator fee rate in ray decimals
+    function curatorFeeRate() external view returns (uint256 rate);
+
     /// @notice Re-value a tranche position and claim its premium
     /// @dev Requires Registry membership, but not allocation-list membership, so removed tranches
     /// remain reportable. Remakes the mark only if {allocate} already opened one. Valuations stay
     /// cached between marks. Deposit and mint quotes separately value the default position live.
-    /// Harvested premium enters the pool's own vesting pot, whose period the curator controls.
+    /// The curator fee is paid out of the claimed premium first, in cUSD, to the fee recipient.
+    /// The rest enters the pool's own vesting pot, whose period the curator controls.
     /// It rewards opted-in balances as it vests, including holders who joined after the tranche
     /// generated it. Previously credited pool rewards remain with their original holders.
     /// @param tranche The tranche address

@@ -8,6 +8,7 @@ import { ITranche } from "../interfaces/ITranche.sol";
 import { IUnderwriter } from "../interfaces/IUnderwriter.sol";
 import { DeadShares } from "../utils/DeadShares.sol";
 import { PremiumVesting } from "../utils/PremiumVesting.sol";
+import { WadRayMath } from "../utils/WadRayMath.sol";
 import { IAccessManager } from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -21,12 +22,19 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwriter, PremiumVesting {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
+    using WadRayMath for uint256;
 
     /// @inheritdoc IUnderwriter
     address public registry;
 
     /// @inheritdoc IUnderwriter
     address public defaultTranche;
+
+    /// @inheritdoc IUnderwriter
+    address public curatorFeeRecipient;
+
+    /// @inheritdoc IUnderwriter
+    uint256 public curatorFeeRate;
 
     /// @inheritdoc IUnderwriter
     mapping(address => uint256) public debt;
@@ -51,6 +59,9 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
 
     /// @dev Shares per remaining asset at which the pool is retired (1% of par at one asset per share).
     uint256 private constant KILL_RATIO = 100;
+
+    /// @notice The most of harvested premium the curator fee may take, in ray decimals (50%)
+    uint256 public constant MAX_CURATOR_FEE = 0.5e27;
 
     /// @dev Reject a target that cannot be a tranche; see {_validTranche}
     /// @param tranche The tranche to check
@@ -317,6 +328,15 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
     }
 
     /// @inheritdoc IUnderwriter
+    function setCuratorFee(address _recipient, uint256 _rate) external restricted {
+        if (_rate > MAX_CURATOR_FEE) revert InvalidCuratorFee();
+        if (_recipient == address(0) && _rate != 0) revert CuratorFeeRecipientRequired();
+        curatorFeeRecipient = _recipient;
+        curatorFeeRate = _rate;
+        emit SetCuratorFee(_recipient, _rate);
+    }
+
+    /// @inheritdoc IUnderwriter
     function report(address _tranche) external restricted {
         _report(_tranche);
     }
@@ -477,11 +497,27 @@ contract Underwriter layout at erc7201("cap.storage.Underwriter") is IUnderwrite
         (uint256 gain, uint256 loss) = _mark(_tranche);
 
         uint256 premium = IPremiumVesting(_tranche).claim(address(this));
+        premium -= _chargeCuratorFee(_tranche, premium);
         // Harvested premium vests again at the pool's configured rate. Holders earn as it
         // vests here, including those who joined after the tranche generated the premium.
         _fund(premium);
         lastReported = block.timestamp;
 
         emit Reported(_tranche, premium, gain, loss);
+    }
+
+    /// @dev Pay the curator fee out of premium just claimed, in cUSD, before the rest vests
+    /// @dev The rate in force at the claim is what applies; a later change does not reach premium
+    /// already funded. Zero recipient or a fee that rounds to zero pays nothing.
+    /// @param _tranche The tranche the premium came from, for the event
+    /// @param premium The premium just claimed
+    /// @return fee The cUSD sent to the recipient
+    function _chargeCuratorFee(address _tranche, uint256 premium) internal returns (uint256 fee) {
+        address recipient = curatorFeeRecipient;
+        if (recipient == address(0)) return 0;
+        fee = premium.rayMul(curatorFeeRate);
+        if (fee == 0) return 0;
+        IERC20(stablecoin()).safeTransfer(recipient, fee);
+        emit ChargeCuratorFee(_tranche, recipient, fee);
     }
 }

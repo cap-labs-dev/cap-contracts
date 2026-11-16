@@ -159,6 +159,13 @@ interface IBaseMarket {
     /// @param premium The amount minted, in stablecoin units (18 decimals)
     event ChargeUnderwriterPremium(address indexed recipient, uint256 premium);
 
+    /// @notice Emitted when the protocol fee is taken off a premium charge
+    /// @dev Minted in cUSD to the registry's fee receiver before the legs are split.
+    /// @param receiver The fee receiver
+    /// @param liquidityFee The fee taken from the liquidity premium
+    /// @param underwriterFee The fee taken from the underwriter premium
+    event ChargeProtocolFee(address indexed receiver, uint256 liquidityFee, uint256 underwriterFee);
+
     /// @notice Set the loan-to-value ratio
     /// @param loanToValue The new loan-to-value ratio in ray decimals
     function setLoanToValue(uint256 loanToValue) external;
