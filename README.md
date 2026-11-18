@@ -144,6 +144,11 @@ Operator approval gives the zap authority to direct payouts and transfer request
 
 ## Deploy infrastructure
 
+For a fresh Ethereum Sepolia deployment with admin-mintable test tokens and a scripted
+storyline of operators (groups, markets, pools, borrowing, a liquidation, exits), follow the
+[Sepolia deployment guide](config/SEPOLIA.md). The Sepolia script keeps the deployer as admin.
+
+
 [Deploy.s.sol](script/Deploy.s.sol) deploys fresh shared infrastructure through CreateX, initializes access control, seeds the wrapper, and writes the result to `config/cap-v2.json`. It does not create or configure individual credit markets. The target chain needs the canonical CreateX factory and support for the configured EVM bytecode.
 
 Before running it:

@@ -25,6 +25,7 @@ import { console } from "forge-std/console.sol";
 /// @title CheckRoles
 /// @notice Print who holds each protocol role and which role every gated selector is wired to
 /// @dev Reads `config/cap-v2.json`. Pass `MARKET`, `TRANCHE`, or `UNDERWRITER` to dump an instance.
+/// Set EXPECT_DEPLOYER_ADMIN=true for deployments intentionally administered by their deployer.
 contract CheckRoles is Script, InfraSerializer {
     uint64 internal constant PUBLIC_ROLE = type(uint64).max;
 
@@ -54,7 +55,7 @@ contract CheckRoles is Script, InfraSerializer {
         console.log("== contract holders ==");
         _holder(manager, "ADMIN", CapRoles.ADMIN, infra.registry, true);
         _holder(manager, "REGISTRY", CapRoles.REGISTRY, infra.registry, true);
-        _holder(manager, "ADMIN", CapRoles.ADMIN, _readDeployer(), false);
+        _holder(manager, "ADMIN", CapRoles.ADMIN, _readDeployer(), vm.envOr("EXPECT_DEPLOYER_ADMIN", false));
         console.log("");
     }
 

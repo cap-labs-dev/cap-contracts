@@ -15,6 +15,7 @@ remappings = [
 ]
 fs_permissions = [
     { access = "read-write", path = "./config/cap-v2.json" },
+    { access = "read-write", path = "./config/sepolia-scenarios.json" },
     { access = "read-write", path = "./artifacts/fuzz-and-invariant-tests" },
 ]
 optimizer = true
@@ -22,10 +23,14 @@ optimizer_runs = 200
 
 [rpc_endpoints]
 ethereum  = "${ETH_RPC_URL}"
+sepolia   = "${SEPOLIA_RPC_URL}"
 monad     = "${MONAD_RPC_URL}"
 tempo     = "${TEMPO_RPC_URL}"
 megaeth   = "${MEGAETH_RPC_URL}"
 katana    = "${KATANA_RPC_URL}"
+
+[etherscan]
+sepolia = { key = "${ETHERSCAN_API_KEY}", chain = 11155111 }
 
 [invariant]
 show_metrics = true
