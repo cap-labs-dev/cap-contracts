@@ -1,0 +1,109 @@
+{
+    "actors": {
+        "Allocator A": "0x1a81745d8CFf436F2CD616006d1b44b0a15a2f63",
+        "Allocator B": "0x00EBB82d37a719e4F97fdB76BE4267b6bEfbEF90",
+        "Allocator C": "0x84071e07d3031531D04e1dD160D0Dfb7920D91Bc",
+        "Atlas Capital (owner)": "0x15ed8295B0975Ee088E41a10bCb293ad92a296bc",
+        "Boreal Credit (owner)": "0x2dCdaF28360b717DDDA731A976B3A66B5AD280A8",
+        "Borrower A": "0x8D1446fdaF98311d86426d931d3f1aD1bF661E94",
+        "Borrower B": "0xD857b7E898bFE65a14482e15C27F3b8C9F1BaB06",
+        "Borrower C": "0x9CFc16490d131c1b7a30366aEa7Ab0f72ff967E5",
+        "Borrower D": "0x23e813c70C737f7463189Faa0Fb7D2F6ef1b4A0c",
+        "Borrower E": "0x89dA8c9C75D9D5CFa3Fc3e2ABe0779Bc5Df81b8F",
+        "Borrower F": "0x9fE3Cb7E87703Eb4587535672c621Ebc077463Cc",
+        "Cinder Markets (owner)": "0x0D7439ffF99D322b6fA1E7E25B445F38D84BbeEe",
+        "Curator A": "0xa300d4b6BE6C6412476950341955E1c66780AED8",
+        "Curator B": "0x9742e931C42D3f99BaBe545d9e25560FF2625cD9",
+        "Curator C": "0x32B9D92Cfa4904f0070B1ccc3e73514879794D13",
+        "Depositor A": "0x5979C0aCc82515b5EC64F0f8C2C697A0d8a1eF19",
+        "Depositor B": "0xc3545620A02CB8110d98a15F21C6cfA8d40Ec922",
+        "Depositor C": "0x66945038036bE715C9Fb5b1a4145450C4498AEbA",
+        "Depositor D": "0x21495e69d78281c83B2103C732385dE9315EbAe1",
+        "Depositor E": "0xB0B144361021673f66c883cF9688434108272C73",
+        "Liquidator": "0x6b98770A8cFa451342DBda86846de5e57793B1D6",
+        "Pool LP A": "0x85E0EafB17dD4299eB2a2e16810f3cB0E51FCc76",
+        "Pool LP B": "0x23e79D783573FD31ff7218c7482173e6bbfF8E0E",
+        "Pool LP C": "0x47b329c6057B6854485f57aac7172eFb8562E7e8"
+    },
+    "actorsIndexOffset": 0,
+    "atlasRetiredTranche": "0x38A25A5fea989f88acfD3637FB63d99bFe2dada3",
+    "chainId": 11155111,
+    "deployer": "0x25AcaAb315916F8FFe39eb29Ba403236469Df41F",
+    "markets": {
+        "atlasEthCredit": {
+            "address": "0x446327474d8D45c0d07afA611366bbE726D7B1Ec",
+            "kind": "floating",
+            "ownerRole": 100,
+            "tranches": [
+                "0xd24C6c53989Ba10a2543C7F47FcA8Acd619D853B",
+                "0xF4333ec827De9A3fE39EaE24a68337F867151696",
+                "0x6E7c5e10C1f48Cc5E40BD96dE9d923f74c3ce3df",
+                "0xa43f220d95c5E18067599bc3107bf029Fd85dcE5"
+            ]
+        },
+        "borealFixedTerm": {
+            "address": "0x99f4eF98054e15d1DaB70BaAF0b0d49fA8c35F2c",
+            "kind": "fixed",
+            "ownerRole": 101,
+            "tranches": [
+                "0x5afCD3164EE3F93d390bBf086620535B49fD53e5",
+                "0xEc2d7df11e6e2e0506463bEb443418223224c895"
+            ]
+        },
+        "cinderBtcCredit": {
+            "address": "0x514aaBc1cA1b688Fe20b9Df995AeA906686AcE48",
+            "kind": "floating",
+            "ownerRole": 102,
+            "tranches": [
+                "0xEe0915C1c05DD129E320Ab2Df587d7307227AA5e"
+            ]
+        },
+        "cinderWstethCredit": {
+            "address": "0x14260870E5Ab67a81c85b8aaDc7386BFAeac0622",
+            "kind": "floating",
+            "ownerRole": 102,
+            "tranches": [
+                "0x17428A02a401D521141325a58c52572b36408326",
+                "0xF098Ae2970Aa0903282cB1ae5F31C55fc25A5250"
+            ]
+        }
+    },
+    "namespace": "0xe3e4fc29d4d15a3b3ba2b4cb3fe215fa66e12f1bba4fdbeaafacdcb877772405",
+    "roles": {
+        "atlasBorrowersA": 118,
+        "atlasBorrowersB": 135,
+        "atlasLpsV1": 122,
+        "atlasLpsV2": 140,
+        "atlasOwners": 100,
+        "borealBorrowersA": 119,
+        "borealBorrowersB": 136,
+        "borealOwners": 101,
+        "cinderBtcBorrowers": 120,
+        "cinderOwners": 102,
+        "cinderWstethBorrowersA": 121,
+        "cinderWstethBorrowersB": 137,
+        "curatorA": 103,
+        "curatorB": 104,
+        "curatorC": 105,
+        "uwWbtcAllocators": 129,
+        "uwWethAllocators": 125,
+        "uwWethDepositors": 126,
+        "uwWstethAllocatorsV1": 132,
+        "uwWstethAllocatorsV2": 134,
+        "uwWstethDepositors": 133
+    },
+    "tokens": {
+        "btcFallbackFeed": "0xa9374F8f6598cfdd82F46618f8616A1154476C47",
+        "ethFallbackFeed": "0x7332d683E813eFC3Be054D5f88BeE315EE8AE37F",
+        "mUSDC": "0x45a27ef13e09DAE84082FD9ac91F3cAa43Bf6aEa",
+        "mWBTC": "0x94ff1A8DdB7B1B3e33AF48c9d8b18cEfB2198EDD",
+        "mWETH": "0xeFFF9Dc5A027BeF57c586720e3c81F4D38Ed490f",
+        "mwstETH": "0xC33b5ba7EF33F3F11825151E2503Fcb5ccCf7c72",
+        "wstethFeed": "0xD39f3a2C93F36f66C86e9396DDce7A4067Ae4C69"
+    },
+    "underwriters": {
+        "capWbtcUnderwriter": "0xC9d51F062B66A19A868796BC719042cF0f631Fd8",
+        "capWethUnderwriter": "0x835c76a453459b2f96155A0a460b089624698D13",
+        "capWstethUnderwriter": "0x0Fe6Af6De52E8dCAE63a5476cB82E8D44734b2EE"
+    }
+}

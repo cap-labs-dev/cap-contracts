@@ -118,8 +118,11 @@ hold Sepolia ETH.
 ## Deploy
 
 ```sh
-yarn deploy:sepolia --account cap-sepolia --broadcast --slow --skip-simulation --gas-estimate-multiplier 200
+yarn deploy:sepolia --account cap-sepolia --sender <deployer> --broadcast --slow --skip-simulation --gas-estimate-multiplier 200 --verify
 ```
+
+`--sender` is needed next to `--account`: Forge resolves the keystore's address only when it
+unlocks it, after the script has already checked who the deployer is.
 
 Why these flags:
 
@@ -136,26 +139,29 @@ Why these flags:
 ### Etherscan verification
 
 Set `ETHERSCAN_API_KEY` (an Etherscan v2 key works for Sepolia) and add `--verify` to the
-broadcast, and Forge submits every contract the run creates as soon as its transaction is
-mined: the implementations and `BeaconFactory` it deploys directly, and the contracts created
-inside other calls (the CreateX proxies and beacons, the mock tokens and feeds, every market,
-tranche and pool the `Registry` deploys through the factory), which the broadcast artifacts
-record with their init code and constructor arguments.
+broadcast. Forge then verifies the ten contracts the script creates directly (the nine
+implementations and `BeaconFactory`) as their transactions are mined.
+
+Forge does not submit contracts created inside other calls: the CreateX proxies and beacons,
+the AccessManager, the adapter library, the mock tokens and feeds, and every market, tranche
+and pool the Registry deploys through the factory. After `save()` has written the config, run
 
 ```sh
-yarn deploy:sepolia --account cap-sepolia --broadcast --slow --skip-simulation --gas-estimate-multiplier 200 --verify
+bash script/sepolia/verify-sepolia.sh
 ```
 
-If Etherscan rate-limits or a submission fails, the broadcast itself is unaffected; re-run the
-same command with `--resume --verify` once the run has finished and Forge submits what is
-still unverified without sending anything. Proxies show their implementation on Etherscan
-once the implementation is verified ("Is this a proxy?" on the contract page).
+`script/sepolia/VerifyArgs.s.sol` rebuilds each of those 36 contracts' constructor arguments
+from `config/cap-v2.json` and `config/sepolia-scenarios.json`, checks them against the on-chain
+runtime code, and the shell loop feeds them to `forge verify-contract`. Etherscan marks later
+contracts with the same bytecode as "Similar Match" automatically, so some submissions come
+back "already verified"; the loop treats that as success. Proxies show their implementation on
+Etherscan once both are verified ("Is this a proxy?" on the contract page).
 
 An interrupted broadcast has deployed part of the stack. Keep the broadcast artifacts and
 resume with the same account, namespace and mnemonic:
 
 ```sh
-yarn deploy:sepolia --account cap-sepolia --broadcast --slow --skip-simulation --gas-estimate-multiplier 200 --resume
+yarn deploy:sepolia --account cap-sepolia --sender <deployer> --broadcast --slow --skip-simulation --gas-estimate-multiplier 200 --resume
 ```
 
 Optional: `SCENARIO_WRITEOFF=true` adds scenario 9.3, where the guardian writes off
@@ -169,9 +175,10 @@ the life of the deployment, which changes every cUSD exit price, so it is off by
 3. Fund the deployer: >= 2 ETH (see the budget above; more if gas is high). No USDC needed.
 4. `export SEPOLIA_RPC_URL=...`, `export ACTORS_MNEMONIC='...'` (the fresh actors phrase), `export ETHERSCAN_API_KEY=...`.
 5. Dry run: `yarn deploy:sepolia --sender <deployer>`; read the actor table and the scenario log, check the feed prices it prints.
-6. Broadcast: the command under *Deploy* with `--verify`. About an hour. If it stops, the same command plus `--resume`.
+6. Broadcast: the command under *Deploy*. About an hour. If it stops, the same command plus `--resume`.
 7. `yarn save:sepolia --sender <deployer>` writes `config/cap-v2.json`; `EXPECT_DEPLOYER_ADMIN=true yarn check-roles --rpc-url sepolia` must end with "roles match the table".
-8. Hand `config/sepolia-scenarios.json` and the actors phrase to whoever drives the UI; commit `config/cap-v2.json`.
+8. `bash script/sepolia/verify-sepolia.sh` verifies the 36 internally created contracts on Etherscan.
+9. Hand `config/sepolia-scenarios.json` and the actors phrase to whoever drives the UI; commit `config/cap-v2.json`.
 
 ## Verify and save
 
